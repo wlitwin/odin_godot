@@ -1,6 +1,7 @@
 # Confirmed P2P spectators
 
-`Watch(State, Input, Event, Seats)` consumes confirmed history from an admitted
+Use `Watch(State, Input, Event, Seats)` to show a P2P match without joining its
+player roster. It consumes confirmed history from an admitted
 source participant. It never occupies a player slot, samples an input, or contributes
 to the players' confirmation frontier. One `Watch_Source` serves one spectator;
 applications can provision several bounded source streams. The source borrows its

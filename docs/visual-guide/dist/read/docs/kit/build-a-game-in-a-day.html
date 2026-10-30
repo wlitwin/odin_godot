@@ -14,7 +14,7 @@ co-op cave crawler. Cavecrawl is the complete reference implementation for the
 features introduced below.</p>
 <p>Generated wrappers handle routine authority, prediction, rejection, and
 presentation policy. Gameplay mutations can therefore remain direct and
-compact. Code that genuinely differs by role remains explicit in authority
+compact. Code that differs by role remains explicit in authority
 steps, command consequences, and presentation hooks.</p>
 <h2 id="0-the-one-struct">0. The one struct<a class="heading-anchor" href="#0-the-one-struct" aria-label="Link to this section">#</a></h2>
 <p>Everything hangs off your main script (cavecrawl calls it <code>CaveLobby</code>):</p>
@@ -94,15 +94,15 @@ generates the typed census, so ordinary lookup and iteration need no mirror map:
 <span class="hljs-keyword">for</span> tracked <span class="hljs-keyword">in</span> chest_all(&amp;self.boot) {
 	inspect(tracked.entity)
 }</code></pre></div><p>A custom shell may call the entity installer directly. Typed <code>_spawned</code> and
-<code>_freed</code> hooks remain for genuinely game-shaped indexes or bookkeeping, not for
+<code>_freed</code> hooks remain for game-specific indexes or bookkeeping, not for
 recreating the registry.</p>
 <p>The host spawns typed. The tag generates a <code>chest_spawn</code> helper, so
 world-building code exists exactly once and no cast ever appears:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">chest, id := chest_spawn(&amp;self.boot)
 chest.x, chest.y = <span class="hljs-number">300</span>, <span class="hljs-number">180</span>
-kboot.boot_spawn_send(&amp;self.boot, id)</code></pre></div><p>Fields you change on the host after this ride the per-tick delta walk to
-everyone. That is the whole replication story: <strong>you change a field, and you
-are done.</strong></p>
+kboot.boot_spawn_send(&amp;self.boot, id)</code></pre></div><p>After replication starts, the per-tick delta walk sends changes to registered
+authority-written fields. Clients receive the current value; late joiners
+receive it in their snapshot.</p>
 <h2 id="3-movement-that-feels-right-30-minutes">3. Movement that feels right (30 minutes)<a class="heading-anchor" href="#3-movement-that-feels-right-30-minutes" aria-label="Link to this section">#</a></h2>
 <p>Give players&#39; avatars owner-streamed fields:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span></code></pre></div><p>The owner writes them every frame; the toolkit ships last-value snapshots on
@@ -129,7 +129,8 @@ wrapper runs it authoritatively on the host and predictively
 on clients; a false first return means no: state auto-reverts on every peer,
 and a rejection carries the authoritative truth back. Two players race the
 last item: both predict success, the host runs them in arrival order, the
-loser reverts. Conflict resolution costs you nothing: it is the pipeline.</p>
+loser reverts. The command pipeline serializes the attempts and returns the
+authority&#39;s verdict.</p>
 <p>A command may only mutate its target. The cross-entity half (&quot;loot lands in my
 bag&quot;) is the verb&#39;s name-paired
 <strong><a href="net.html#command-consequences">consequence</a></strong>: results after the applied
@@ -255,7 +256,7 @@ two real
 processes, real ENet, 120ms injected latency, driving the real scene tree and
 grepping log lines (<code>examples/cavecrawl/run.sh</code> + <code>cave_test.gd</code>). When
 something feels wrong in play, reproduce it in the driver rather than in
-playtests. The greps show you exactly what shipped. Steal the pattern: your
+playtests. The log assertions check the behavior on each peer. Use the same pattern: your
 game&#39;s <code>@(gd_method)</code> surface is drivable by a test script exactly like keys
 drive it in play.</p>
 <h2 id="12-moving-contested-state-to-the-simulation-lane">12. Moving contested state to the simulation lane<a class="heading-anchor" href="#12-moving-contested-state-to-the-simulation-lane" aria-label="Link to this section">#</a></h2>
@@ -267,5 +268,5 @@ the simulation lane. Session identity, entities, commands, chat, and saves can
 remain on their existing lanes. Read <a href="timelines.html">Timelines</a> to choose a
 model and <a href="sim.html#promoting-a-coop-game">kit/sim</a> for the migration checklist.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="glossary.html"><span>Kit glossary</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/build-a-game-in-a-day.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="glossary.html"><span>Kit glossary</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/build-a-game-in-a-day.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#0-the-one-struct" class="">0. The one struct</a><a href="#1-boot-and-lobby-15-minutes" class="">1. Boot and lobby (15 minutes)</a><a href="#2-your-first-replicated-entity-30-minutes" class="">2. Your first replicated entity (30 minutes)</a><a href="#3-movement-that-feels-right-30-minutes" class="">3. Movement that feels right (30 minutes)</a><a href="#4-verbs--the-intent-pipeline-1-hour" class="">4. Verbs — the intent pipeline (1 hour)</a><a href="#5-combat-that-never-feels-sloppy-1-2-hours" class="">5. Combat that never feels sloppy (1-2 hours)</a><a href="#6-enemies-1-hour" class="">6. Enemies (1 hour)</a><a href="#7-levels-replicate-the-byte-not-the-scenery-1-hour" class="">7. Levels: replicate the byte, not the scenery (1 hour)</a><a href="#8-runs-end-match-flow-1-hour" class="">8. Runs end: match flow (1 hour)</a><a href="#9-quit-and-resume-30-minutes" class="">9. Quit and resume (30 minutes)</a><a href="#9b-carryable-entities-30-minutes" class="">9b. Carryable entities (30 minutes)</a><a href="#9c-host-migration-30-minutes" class="">9c. Host migration (30 minutes)</a><a href="#9d-shared-seed-procgen-30-minutes" class="">9d. Shared-seed procgen (30 minutes)</a><a href="#10-ship-it-on-steam-1-hour--a-friend" class="">10. Ship it on Steam (1 hour + a friend)</a><a href="#11-headless-acceptance-tests" class="">11. Headless acceptance tests</a><a href="#12-moving-contested-state-to-the-simulation-lane" class="">12. Moving contested state to the simulation lane</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/build-a-game-in-a-day.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

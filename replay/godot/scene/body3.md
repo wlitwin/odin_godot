@@ -1,7 +1,9 @@
 # Owner-streamed 3D bodies
 
-`Body3` uses the same owner-state and producer-driver protocol as Body2. It borrows
-a RigidBody3D or CharacterBody3D and optional skin; keep it outside frame state.
+Use `Body3` for cooperative 3D motion produced by a Godot solver and accepted
+through Replay's entity-ownership protocol. It uses the same owner-state and
+producer-driver protocol as Body2. It borrows a RigidBody3D or CharacterBody3D
+and optional skin; keep the adapter outside frame state.
 
 ```odin
 body3_attach(&adapter, physics_body, .Rigid, skin)

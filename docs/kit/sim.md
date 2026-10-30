@@ -6,7 +6,8 @@ sends snapshots; the owning client predicts the same ticks and reconciles when
 its result differs.
 
 Use the simulation lane for movement, aiming, projectiles, or shared objects
-whose state should be computed by a trusted authority. Reliable session state
+whose state should be computed by a trusted authority. A simulation lane is the
+fixed-tick pipeline that retains input and state history for prediction and correction. Reliable session state
 such as inventory, score, chat, entity lifetime, and saves remains on
 `kit/session` and `kit/net`.
 
@@ -306,7 +307,7 @@ Entity thunks run every simulated tick, live and replay identically, in
 track order, each fed its owner's input (`nil` coasts: an inputless entity
 type, or a remote player on a client whose truth is already inbound). The two
 optional world passes run after entity ticks: the everywhere pass for pure-sim
-cross-entity work (contact), the authority pass for genuinely WORLD-shaped
+cross-entity work (contact), the authority pass for world-level
 authority work (respawn queues, wave directors). One input **class** exists
 per distinct `@(gd_tick)` input TYPE: `lane_init` registers the primary
 (class 0) and `lane_add_input_class` registers each extra, and the wire ships
@@ -327,8 +328,8 @@ For hand-driven setups (tests, generated-code-free games) `lane_init` +
 `lane_set_sim` (rawptr sample + the two `Step_Proc`s, everywhere then
 authority) + `lane_track` / `lane_track_set` + explicit
 `lane_frame`/`lane_present` calls remain fully supported; the generated
-wiring and the thunks are sugar over exactly that. `lane_present` is
-genuinely optional there: until the first call, the `presented` latch keeps
+wiring and generated thunks call those same procedures. `lane_present` is
+optional there: until the first call, the `presented` latch keeps
 ingest painting watched truth directly (a hand-driven client that never
 presents never freezes its watched entities); after it, watched fields
 belong to the presenter.
@@ -458,7 +459,7 @@ the pairs this peer HAS INPUTS for: yours on your screen, everyone's on the
 server; a remote touch reaches you as the server's word, never as a local
 guess.
 
-Rules that keep the pattern honest:
+Constraints for contested prediction:
 
 - **Contested entities must be SELF-SIMULATING.** A ball integrates its own
   motion, which is what makes every peer's between-batch prediction good. An
@@ -479,7 +480,7 @@ Rules that keep the pattern honest:
   held input; mark the AVATARS `contested` too, and every peer ticks every
   entity (remote ones extrapolated with held inputs), so the whole scene
   lives on ONE predicted timeline. No claim dance at all (contested
-  presentation is simply the predicted pose), remote touches play out beside
+  presentation uses the predicted pose), remote touches play out beside
   the avatars making them, immediately. The price is resim on nearly every
   batch (held inputs drift: small, constant, glided corrections on remote
   avatars instead of delayed-but-accurate ones) and a few echo bytes per
@@ -710,7 +711,7 @@ packet, and the host de-jitters each into its own per-player buffer. An entity's
 tick reads only its own class, so the two timelines never cross, and a reconcile
 of one leaves the other untouched.
 
-The authoring is just a second `@(gd_sample)`, one per input type:
+Declare a second `@(gd_sample)`, one per input type:
 
 ```odin
 // two ticking kinds, two input structs
@@ -759,7 +760,7 @@ one contested entity at a time. The worked comparison is
    `interp` on displayed floats.
 3. **Move its writes into a `@(gd_tick)`.** Frame-rate mutation becomes a
    fixed-rate pure step: (predicted fields, input) → predicted fields. This
-   is the one honest rewrite, and it is where engine physics must become
+   is the main simulation rewrite, and it is where engine physics must become
    query-based kinematics (slopball's `play.Puppet` ball becomes speedball's
    forty lines of bounce arithmetic; see Gotchas).
 4. **Declare and sample the input struct.** Mark it `@(gd_input)`, put field

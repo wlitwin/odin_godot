@@ -101,18 +101,18 @@ function updateDelay() {
 $('#delay').addEventListener('input',updateDelay); updateDelay();
 
 const policies = {
-  coop: { label:'TRUSTED PLAYERS / OWNER-DRIVEN MOTION',title:'Let the player drive the body; let the host settle shared state.',
-    kit:'Start with hello_net. Owner fields carry movement; host fields carry shared state. Commands resolve interactions such as taking loot or transferring control.',
-    replay:'Use Party → Room for the invitation and recovery lifecycle. Use owned body observations when cooperative motion depends on live Godot physics.',
-    note:'An owner’s motion observations are trusted under this policy. A migration successor needs the complete authority backup and a valid authority transition, not just its visible client state.' },
-  server: { label:'LISTEN HOST OR DEDICATED AUTHORITY',title:'Send intent. Predict locally. Accept the authority’s correction.',
-    kit:'Start with hello_sim or quickdraw. Tagged predicted fields and gd_tick run the replayable motion. The session still carries replicated lobby and shared state.',
-    replay:'Start with Hello’s network scene. A net.Model supplies step/action callbacks, validators, and held-control rules. Session runs Host, Server, Client, or Observer roles.',
-    note:'A listen host is controlled by a player. For a competitive trust boundary, put authority and failover on trusted infrastructure. Prediction does not make the authority verdict instantaneous.' },
-  p2p: { label:'FIXED ROSTER / REPRODUCIBLE SIMULATION',title:'Exchange admitted inputs and reproduce the same steps.',
-    kit:'Kit’s sim lane is an authority/prediction design. It is not the repository’s deterministic peer-input runner; choose the Replay P2P example for that contract.',
-    replay:'Start with replay_duel. P2P_Party admits the fixed roster; P2P_Direct or RTC binds transport identities; p2p.Runner exchanges inputs and rolls back late arrivals.',
-    note:'The game must reproduce math, RNG, iteration, allocation, and input order across its targets. Tested integer Duel equality does not establish determinism for arbitrary game code or Godot physics.' }
+  coop: { label:'TRUSTED PLAYERS / OWNER-DRIVEN MOTION',title:'Players simulate motion; the authority resolves shared interactions.',
+    kit:'Start with hello_net. The entity’s owning player writes its movement fields, while the host writes shared state. Commands let the authority judge interactions such as taking loot or transferring control.',
+    replay:'Use Party for invitations and enrollment, then Room for the recoverable game session. Use the owned profile to record accepted body observations when movement depends on Godot physics.',
+    note:'This policy trusts the owning player’s motion observations. A successor taking over authority needs a complete authority backup and an accepted authority transition. A recipient-filtered client snapshot is insufficient for that recovery.' },
+  server: { label:'LISTEN HOST OR DEDICATED AUTHORITY',title:'Submit input, predict locally, then apply authority corrections.',
+    kit:'Start with hello_sim or quickdraw. A gd_tick procedure advances tagged predicted fields from typed input. Session replication handles the lobby and other shared state alongside that simulation.',
+    replay:'Start with the Session starter. A net.Model supplies step and action callbacks, validators, and held-input rules. Session runs Host, Server, Client, or Observer roles. Hello’s network scene demonstrates lower-level runner integration.',
+    note:'The hosting player controls a listen host. Run a dedicated competitive authority and its failover on trusted infrastructure. Clients can predict an action immediately, but must still wait for the authority to accept it.' },
+  p2p: { label:'FIXED ROSTER / REPRODUCIBLE SIMULATION',title:'Exchange inputs and reproduce the same simulation ticks.',
+    kit:'Kit’s simulation lane uses authority and client prediction. Use the Replay P2P example when the game needs deterministic input exchange among peers.',
+    replay:'Start with replay_duel. P2P_Party admits a fixed roster. P2P_Direct or RTC binds connections to those identities, and p2p.Runner exchanges inputs and replays affected ticks when an input arrives late.',
+    note:'The game must reproduce arithmetic, random-number generation, iteration, allocation, and input order across its targets. The integer Duel example has cross-target checks; a new model needs its own determinism tests. These checks do not cover Godot rigid-body solving.' }
 };
 function selectPolicy(key) {
   const p = policies[key];

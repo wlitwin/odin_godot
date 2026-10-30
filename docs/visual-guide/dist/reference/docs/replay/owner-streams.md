@@ -1,7 +1,8 @@
 # Owner observations and engine physics
 
-M4 implementation contract. This document distinguishes the intended profile from
-its current validation status; see progress.md for passed gates.
+This contract explains how Replay records externally simulated motion and
+transfers its producer between participants. The acceptance sequence retains
+the M4 implementation scope; see [progress](progress.md) for passed gates.
 
 An engine-owned body is an external observation producer. A Godot solver may run on
 the currently authorized participant; Replay records accepted pose/velocity samples
@@ -12,7 +13,7 @@ substitute a current engine query for a historical dynamic collision query.
 
 ## Transport and admission
 
-The authoritative runner gains an explicit `Latest_Observation` control policy.
+The authoritative runner supports an explicit `Latest_Observation` control policy.
 Normal scheduled input remains the default. The policy participates in the existing
 session/checkpoint contract hash, so peers must agree before play. Latest samples
 are coalesced into the next authority tick; they are not queued until a predicted
@@ -70,20 +71,20 @@ pose test does not establish physics-game parity or the completed M4 milestone.
 ## Cavecrawl profile
 
 The separate [owner-motion Cavecrawl](../../examples/replay_cavecrawl_owned/README.md)
-now composes the existing gameplay world with versioned avatar/relic observations.
+composes the existing gameplay World with versioned avatar/relic observations.
 It shares inventory/combat/progression code with the server-simulated C8 port while
 keeping a distinct content contract and isolated app state. The original manual
 producer supplies poses; this is not an engine-physics or deterministic-P2P claim.
 Native interaction/handoff/migration and typed service-checkpoint gates are recorded
 in [the acceptance result](results/cave-owner-2026-09-19/README.md). [Local Chrome migration and saves](results/cave-owner-browser-2026-09-19/README.md)
-now pass with actual RTC traffic and isolated storage. Other browsers/public networks,
+pass with actual RTC traffic and isolated storage. Other browsers/public networks,
 full original-rule/presentation parity and paired ergonomic comparison remain open.
 
 
 ## Reliable interaction context
 
 [Scoped action context](../../replay/owned/README.md#context-carried-by-a-reliable-action)
-now separates a command's claimed owner pose from the coalesced motion stream.
+separates an action's claimed owner pose from the coalesced motion stream.
 Cavecrawl O2 uses issued positions for range checks and the original 64-pixel
 throw-origin leash, without moving its current avatar pose. The [acceptance result](results/owner-action-context-2026-09-20/README.md)
 includes real suppressed-motion/reliable-action delivery, overtaking motion,

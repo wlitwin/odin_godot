@@ -1,7 +1,8 @@
 # Feature scenarios
 
-`replay/testing` runs without Godot and owns/destroys its timelines, checkpoint
-buffers and temporary servers. Results include before/after frames and a structured
+Use `replay/testing` to compare a feature's corrected or restored simulation
+against an uninterrupted reference. It runs without Godot and owns/destroys its
+timelines, checkpoint buffers and temporary servers. Results include before/after frames and a structured
 report (`phase`, failing tick where available, timeline/network error, final
 canonical state hash). Only `.Complete` is success; a zero-initialized report fails.
 
@@ -46,7 +47,7 @@ agreement, and process-group termination/kill on failures. All logs survive a
 failure. Free-port selection still has the normal bind race; readiness and network
 behavior belong to the test protocol. The helper sends no external messages.
 
-Stormcaller's focused tests now exercise these helpers:
+Stormcaller's focused tests exercise these helpers:
 
 ```sh
 nix develop --command odin test tests/replay_scenarios -collection:godot=.

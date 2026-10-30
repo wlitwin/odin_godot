@@ -10,7 +10,7 @@ in the same way. Riding SceneMultiplayer, rather than owning the peer and pollin
 `@(gd_rpc)` and the engine's spawner/synchronizer interop working alongside the toolkit.
 
 State ownership rule (same as the events package): **no package globals**. A session's
-transport state lives in the owning script's struct. The procs here are stateless sugar.
+transport state lives in the owning script's struct. The procedures operate on that supplied state.
 
 ## The channel plan
 
@@ -119,7 +119,7 @@ ends the moment the multiplayer peer installs.
 [kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
 `boot_join` and their `boot_host_web` / `boot_join_web` twins.
 
-All four `begin_*` calls are **sugar** over one mechanism: `transport_host` /
+All four `begin_*` calls use one mechanism: `transport_host` /
 `transport_join` with the flavor picked for you. They are the shortest way to spell the common
 case and the names games already say; reach for the generic pair when the transport is a
 *variable* (a settings menu, a fallback chain, kit/boot's doors). See [Swapping
@@ -170,9 +170,9 @@ proves the full loop against a local relay; with `HELLO_RELAY` set, its lobby gr
 field). **NAT coverage:** this covers the same-LAN pair, the port-forwarded or public host,
 and the common port-preserving home NAT (the relay hands the host each joiner's observed
 endpoint and `wire_punch` warms the mapping with a few UDP packets). Symmetric NATs it does
-NOT cover: there is no TURN for raw ENet. When the connect times out, say so and offer the
-browser build (WebRTC + TURN) and Steam, which always work. A copyable code serves most
-players; the two spare doors serve the rest.
+NOT cover: there is no TURN for raw ENet. When the connection times out, report the failure and offer another configured
+transport, such as WebRTC with TURN or Steam. Verify reachability for those
+transports in the deployment you support.
 
 ## The disconnect signals are required
 
@@ -232,7 +232,7 @@ while confirms measurably ride the slow wire.
 
 `jitter_ms` adds a uniform extra `[0, jitter)` per packet, with one constraint: delivery stays
 FIFO per sender (the shim sits above ENet's already-ordered channels, and reordering here
-would break the ordered-reliable contract). `loss_pct` is channel-honest the same way: a
+would break the ordered-reliable contract). `loss_pct` also preserves the channel contract: a
 **stream** batch rolls the dice and vanishes (last-value semantics: the next batch supersedes
 it, which is the real behavior of the unreliable channel), while **reliable** traffic must
 arrive, so its "loss" costs what loss really costs a reliable channel: a retransmit's worth of

@@ -1,5 +1,9 @@
 # Cavecrawl relic acceptance
 
+Check relic placement, carrier identity and version across descent and restart.
+The suite preserves old saved values through conversion, then tests subsequent
+transitions under the current rules.
+
 ```sh
 REPLAY_CAVE_RELIC_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_relic/run.sh
 ```

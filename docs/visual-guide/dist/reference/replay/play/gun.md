@@ -1,7 +1,8 @@
 # Replay gun mechanism
 
-`Gun_State` owns magazine, reload countdown, jam-clear taps and lifetime jam
-sequence. `Gun_Def` supplies the immutable knobs. Both are value-only and can
+Use `Gun_State` for replayable magazine, reload and jam/clear transitions. It
+stores the magazine, reload countdown, jam-clear taps and lifetime jam sequence.
+`Gun_Def` supplies the immutable rules. Both are value-only and can
 live inside any saved world; there is no node or networking dependency.
 
 ```odin

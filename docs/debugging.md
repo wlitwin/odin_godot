@@ -4,7 +4,7 @@
 
 Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),
 loaded by the engine through the GDExtension boundary. There is **no interpreter**. That
-single fact decides which tools work:
+determines which tools can inspect them:
 
 | Tool | Works for Odin scripts? |
 | --- | --- |
@@ -92,8 +92,8 @@ stack overflow, editor surfacing, and a real exported-.app crash.
 
 ## Launching the debugger from the editor (macOS + Linux)
 
-Three items under **Project > Tools** remove every manual lldb step (paths, SIP
-re-signing, breakpoint syntax):
+Three items under **Project > Tools** configure common lldb launch tasks,
+including paths, SIP re-signing, and breakpoint syntax:
 
 - **Debug Game (LLDB)**: opens a terminal window running the game under lldb (the
   game starts immediately). A script `panic`/failed `assert` **freezes the session at

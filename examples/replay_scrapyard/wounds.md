@@ -28,8 +28,7 @@ three-peer revival. History is bounded to the existing proxy window; omitted
 feedback is counted. Browser visuals, hardware listening and wider failure cases
 remain part of full validation.
 
-Exact wall contacts are not retained after projectile removal. That remaining
-work needs explicit contact information from the simulation; projectile disappearance
-alone cannot distinguish a wall hit from a body hit or timeout. Wall impacts,
-remaining actor/menu behavior, other platforms, playtests and full comparison remain
-requirements.
+For wall effects, [wall contacts](walls.md) retain explicit contact information
+from the simulation. Projectile disappearance alone cannot distinguish a wall hit
+from a body hit or timeout. Broader actor/menu behavior, other platforms, playtests
+and full comparison remain requirements.

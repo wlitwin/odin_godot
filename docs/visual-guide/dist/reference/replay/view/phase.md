@@ -1,6 +1,7 @@
 # Bounded motion between ticks
 
-`Tick_Phase` tracks a render fraction against a specific simulation epoch,
+Use `Tick_Phase` to animate between committed ticks without wrapping backward
+when prediction stalls. It tracks a render fraction against a specific simulation epoch,
 presentation revision and retained head tick. `tick_phase` seeds from the fixed
 clock's fraction when the head advances. If the head stays fixed, it advances
 monotonically to one tick and then holds. A prediction stall cannot wrap the

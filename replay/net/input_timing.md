@@ -1,6 +1,9 @@
 # Scheduled-input timing feedback
 
-The welcome exchange supplies a conservative initial prediction lead. It includes
+Scheduled clients use timing feedback to keep inputs ahead of the authority
+without retaining an unnecessarily large prediction lead. The welcome exchange
+supplies a conservative initial prediction lead: the number of ticks the client
+simulates ahead of accepted authority state. It includes
 initial connection, application and checkpoint work, so it is not a permanent
 estimate of steady traffic. After admission, clients calibrate using the existing
 `input_newest` value in accepted snapshots. No protocol or checkpoint change is

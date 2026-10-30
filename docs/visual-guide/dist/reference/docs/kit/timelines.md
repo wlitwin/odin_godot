@@ -64,9 +64,9 @@ its predicted version of the object. Other peers continue to display delayed
 authoritative snapshots.
 
 Claims are useful when round-trip delay on a kick, grab, or steering handoff is
-noticeable but predicting the whole world would be excessive. A claim should be
-tied to the interaction that caused it and released when that interaction ends,
-not simply when the object crosses an arbitrary distance.
+noticeable but predicting the whole world would be excessive. Tie the claim to
+the interaction that caused it. Release it when that influence ends; for a kicked
+ball, increasing distance alone does not indicate that the kick’s motion has ended.
 
 This model can still show mixed-time artifacts: a predicted ball may move before
 a delayed remote player visibly reaches it. If contact itself is central to the

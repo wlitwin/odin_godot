@@ -4,8 +4,8 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>claimball — predict-self + the claim</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/claimball/README.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-claim">The claim</a></nav></details>
-<article class="reading-body "><p>The third telling of one soccer game, so you can read the models against each
-other and pick one:</p>
+<article class="reading-body "><p>Run Claimball to compare local avatar prediction with prediction of the whole
+world. These three soccer examples use different authority and display policies:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -30,36 +30,38 @@ other and pick one:</p>
 <td>only your avatar predicted; the ball predicted and <em>claimed</em></td>
 </tr>
 </tbody></table>
-</div><p>Claimball keeps the ball <code>@(gd_tick = &quot;contested&quot;)</code> — predicted on every screen,
-so a touch resolves on your timeline the instant you make it — but a kicker is a
-plain <code>@(gd_tick)</code> (predict-self, <code>echo_inputs = false</code>): each peer predicts only
-its OWN kicker and WATCHES the others, an interp-delay behind but exact. No
-held-input echo, no constant corrective glide on remote avatars — the price is
-paid on the shared ball instead, through the <strong>claim</strong>.</p>
+</div><p>Claimball keeps the ball <code>@(gd_tick = &quot;contested&quot;)</code>, so each peer predicts the
+ball locally before the authority settles its state. A kicker uses plain
+<code>@(gd_tick)</code> (predict-self, <code>echo_inputs = false</code>): each peer predicts its own
+kicker and displays remote kickers from authority history with an interpolation
+delay. The game does not echo held input for remote prediction. A <strong>claim</strong>
+chooses how to display the ball as it moves between these timelines; it does not
+transfer gameplay authority.</p>
 <h2 id="the-claim">The claim<a class="heading-anchor" href="#the-claim" aria-label="Link to this section">#</a></h2>
-<p>A contested ball runs on my predicted timeline, but my opponent renders in the
-past. If I always draw the ball from my prediction, a shot my opponent takes
-appears a whole interp-delay before their avatar visibly kicks it. So the ball&#39;s
-<em>presentation</em> is claim-weighted — one boolean, asked every tick: <strong>is my sim
-driving this ball right now?</strong></p>
+<p>A contested ball runs on the local predicted timeline while a remote kicker is
+drawn from delayed authority history. Drawing every ball pose from local
+prediction would show a remote shot before the remote avatar visibly kicks it.
+The ball&#39;s presentation—the displayed state and effects—therefore uses a claim
+weight. The live world pass claims the ball while the local kicker is in reach
+or the ball is still moving fast from that kicker&#39;s shot.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// claimball.odin, the world pass — LIVE pass only (presentation, never a resim):</span>
 <span class="hljs-keyword">if</span> ksim.lane_live(&amp;g.lane) {
 	<span class="hljs-keyword">if</span> my_kicker_in_reach || ball_still_fast_from_my_kick {
 		ksim.lane_claim(&amp;g.lane, ball.net_id)   <span class="hljs-comment">// draw it from MY predicted pose</span>
 	}
-}</code></pre></div><p>Claimed, the ball draws instant from your prediction — legitimately, you caused
-its motion. Unclaimed, it draws the watched view, so an opponent&#39;s touch moves it
-beside their delayed avatar, right where they appear to hit it. <code>lane_claimed</code>
+}</code></pre></div><p>Claimed, the ball draws from your prediction. Unclaimed, it draws from the
+watched authority history, so an opponent&#39;s touch moves it beside their delayed
+avatar. <code>lane_claimed</code>
 reads the weight back (near 1 while claiming, decaying to 0 over ~¼s after).</p>
-<p><strong>The one footgun:</strong> release the claim when the ball <strong>slows</strong>, never on mere
+<p><strong>Release the claim when the ball slows</strong>, never on mere
 distance. Your kick&#39;s whole flight is your consequence — hold the claim while the
 ball is fast and far. Release on distance and the fade target (the watched view,
 sitting a timeline-skew <em>behind</em> a fast ball) yanks your own kick backward
-mid-flight. Release on slow, the timelines have converged, and the handback is
-invisible (<code>util.odin</code>&#39;s <code>RELEASE_SPEED</code>).</p>
-<p>Also here, unchanged from the twin: the GOAL RESET is predicted (every screen
-snaps the ball home the instant its sim crosses the line), the SCORE is
-authority-only (<code>ball_tick_then</code>, delta lane).</p>
+mid-flight. Releasing when it slows lets the timelines converge before the display returns
+to the watched view (<code>util.odin</code>&#39;s <code>RELEASE_SPEED</code>).</p>
+<p>The goal reset is predicted: each screen snaps the ball home when its simulation
+crosses the line. The score changes only on the authority in <code>ball_tick_then</code>
+and replicates through the delta lane, Kit&#39;s field-change replication path.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh examples/claimball
 <span class="hljs-variable">$GODOT</span> --path examples/claimball                  <span class="hljs-comment"># host, join from a second window</span>
 CLB_LATENCY=120 <span class="hljs-variable">$GODOT</span> --path examples/claimball  <span class="hljs-comment"># feel the touches at 240ms RTT</span>
@@ -73,5 +75,5 @@ Env: <code>CLB_ROLE</code> (host/join/single/serve) · <code>CLB_PORT</code> · 
 <p>See <a href="../../docs/onboarding/07-the-competitive-turn.html">docs/onboarding/07-the-competitive-turn.md</a>
 for the walkthrough and <a href="../../docs/kit/sim.html">docs/kit/sim.md</a> for the full lane.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/onboarding/07-the-competitive-turn.html"><span>7 · The competitive turn</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/claimball/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/onboarding/07-the-competitive-turn.html"><span>7 · The competitive turn</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/claimball/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-claim" class="">The claim</a></nav><div class="outline-actions"><a href="../../../reference/examples/claimball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

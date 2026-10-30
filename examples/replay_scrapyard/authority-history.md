@@ -1,7 +1,9 @@
 # Authority-only rewind history
 
-Introduced in content `0x5253435241503048` and retained in current content 49, Replay keeps the 32-tick `hit_history` in the authority's
-complete world and checkpoints, while omitting it from ordinary public snapshots.
+Introduced in content `0x5253435241503048` and retained through content 49 and
+later revisions, Replay keeps the 32-tick `hit_history` in the authority's
+complete World and checkpoints, while omitting it from ordinary public snapshots.
+The [save guide](saves.md) records the current content and conversion contract.
 Current players, mobs, projectiles, health, equipment and other gameplay state
 remain public. The captured loaded-workload delta that motivated this change had
 7,581 of its 7,861 changed bytes in this historical cache.
@@ -18,10 +20,12 @@ geometry.
 Checkpoint capture uses the complete authority projection. Host migration,
 saves and offline conversion therefore retain the history needed for subsequent
 rewind queries. Tests compare complete restored history and continue simulation.
-The game version changes because projection/schema contracts changed. Content-47
-rooms require matching old clients; content-48 clients use new rooms/databases.
-Older offline saves use the explicit converter, which now accepts contents 42–48 and seeds the recorded takeover epoch.
-It verifies full-world preservation and reports the new public digest separately.
+The content-48 transition changed the projection/schema contract: content-47
+rooms required matching old clients, while content-48 clients used new rooms and
+databases. The converter paths for contents 42–48 retain those source contracts
+and seed the recorded takeover epoch. They verify full-world preservation and
+report the new public digest separately. Use the [current offline conversion
+procedure](saves.md#converting-older-replay-runs) for the complete accepted format list.
 
 The loaded fixture checks public payload reduction and real compression support
 and delivery. Adaptive compression is allowed to choose sparse or ordinary LZ4

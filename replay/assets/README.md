@@ -1,7 +1,8 @@
 # Asset references, caches and exchange
 
-An `assets.Ref` is a SHA-256 ID and byte count. It is a value suitable for a frame,
-canonical schema or checkpoint. Payload bytes live in an independently owned
+Use `assets.Ref` to refer to immutable payload bytes from gameplay state without
+copying those bytes into every frame. It contains a SHA-256 ID and byte count,
+and is suitable for a frame, canonical schema or checkpoint. Payload bytes live in an independently owned
 `Cache`. A new payload gets a new ID; receiving an asset never changes simulation
 state.
 
@@ -9,7 +10,7 @@ state.
 `cache_read` / `cache_copy` return copies so ordinary reads cannot mutate content
 under an existing hash. Cache capacity and invalid data leave previous entries
 intact. Pins protect current dependencies; release pins and explicitly discard
-entries that are no longer needed. Destroy the owner when its lifetime ends.
+entries that are no longer needed. Destroy the cache when its lifetime ends.
 
 `Mesh` exchanges missing watched references with explicitly bound peers. Its name
 does not require a full network mesh: bind only the authority on clients, and the

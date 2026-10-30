@@ -1,8 +1,8 @@
 # Replay Claimball
 
-A separate [Claimball](../claimball/README.md) port. Unlike Replay Speedball's
-complete-pitch prediction, each player predicts **only their own avatar and the
-shared ball**. Other active avatars are removed from the prediction group; the
+Run this [Claimball](../claimball/README.md) port to predict **only the local
+avatar and shared ball** before the authority settles their state. Replay
+Speedball instead predicts the complete pitch. Other active avatars are removed from the prediction group; the
 authority continues to simulate everyone. Original Claimball/Speedball/Slopball
 remain runnable in their original directories.
 
@@ -29,14 +29,17 @@ fixture is a type-check, not browser multiplayer acceptance.
 
 ## The group and the claim
 
-[`shared/pitch`](shared/pitch/types.odin) declares a `Prediction_Group`: projection
-retains the local player/ball and records timestamped outsiders separately. Its
+[`shared/pitch`](shared/pitch/types.odin) declares a `Prediction_Group`, the subset
+of world state a client simulates speculatively. Projection builds that subset
+from an authority frame: it retains the local player/ball and records timestamped
+remote players (outsiders) separately. Its
 validator rejects reintroduced remote simulation members. The ordinary gameplay
 step iterates the group's connected players. Outside avatars do not produce
 predicted contacts, matching the original's predict-self policy; remote touches
 arrive through authoritative correction. See the [group contract](../../replay/net/groups.md).
 
-Presentation draws remote players from observed frames. A local influence inside
+Presentation—the displayed state and effects—draws remote players from observed
+authority frames. A local influence inside
 38 pixels claims the ball. The claim stays active through fast flight, including
 when the ball leaves reach. Once untouched and below 0.6 units/tick, it fades back
 to observed presentation over 0.25 seconds. A fast ball that this player never

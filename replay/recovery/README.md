@@ -2,7 +2,8 @@
 
 `replay/recovery` transfers complete authority checkpoints to an explicitly trusted
 successor. It builds on `replay/net` archives and the borrowed transport interface.
-It provides transfer/validation/retention; it does not select a legitimate leader,
+Use it to keep an eligible backup ready before a host stops. It provides
+transfer, validation and retention; it does not select a legitimate leader,
 fence a partitioned authority, discover a new host, or reconnect game clients.
 
 The reusable [transfer package](../transfer/README.md) also supports bounded canonical
@@ -53,7 +54,7 @@ be shallow-copied. `sender_begin` accepts encoded archive bytes and copies them;
 sender. `sender_cancel` permits explicit replacement while retaining the last
 validated receipt; sequences continue increasing within the binding.
 
-The low-level protocol does not independently drain the wire. `Link` now integrates
+The low-level protocol does not independently drain the wire. `Link` integrates
 it with the gameplay runner using `transport.Router`, separate queues, and a combined
 output budget. `handles` is only untrusted routing inspection. The standalone ENet
 acceptance fixture uses a dedicated wire; the cave replication gate uses the same
@@ -194,9 +195,10 @@ gameplay and periodic backups on the same ENet connection, with the same fault
 settings, and verifies a common checkpoint containing the guest's loot and open
 door. Save/resume and restarted-host/guest recovery gates remain separate.
 
-Next: install coordinator-approved successor/fencing decisions, then implement planned
-and abrupt takeover with surviving-client frontier reconciliation. See the
-[recovery contract](../../docs/replay/recovery.md) and [roadmap](../../docs/replay/roadmap.md).
+The [Room driver](../godot/room.md) installs coordinator-approved successor and
+fencing decisions, then performs planned or abrupt takeover with surviving-client
+frontier reconciliation. See the [recovery contract](../../docs/replay/recovery.md)
+and [roadmap](../../docs/replay/roadmap.md) for its guarantees and remaining work.
 
 ## Independent application consumers
 
@@ -217,7 +219,7 @@ uses an additional route while Session assets keep their existing one.
 
 ## Schema-aware checkpoint compression
 
-Link now negotiates both ordinary block compression (Features bit 128) and Frame
+Link negotiates both ordinary block compression (Features bit 128) and Frame
 schema grouping (bit 256, requiring 128). It obtains the fixed Frame schema and
 canonical section offset from its checkpoint codec. Both endpoints validate the
 same plan fingerprint. Grouped candidates are selected only when smaller; ordinary

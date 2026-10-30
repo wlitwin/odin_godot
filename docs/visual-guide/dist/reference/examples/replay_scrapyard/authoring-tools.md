@@ -26,6 +26,10 @@ with one enemy. New IDs still require deliberate gameplay/version decisions.
 
 ## Bake content once
 
+Baking validates authored Godot Resources and copies their gameplay values into a
+portable catalog. Tests and headless servers can load that catalog without opening
+the editor.
+
 Interactive `content_load` and `dev/export_content.tscn` call the same
 `scripts/content.odin` extractor. After building/importing the current project:
 
@@ -129,7 +133,7 @@ The owner retains the required assets and callback configuration; the candidate
 registry can close immediately. Presentation and notice traversal need no raw
 callback casts or access to pool/index internals.
 
-Runner uses the simpler declaration without appearance/configure:
+The player-character view uses the simpler declaration without appearance/configure:
 
 ```odin
 //gd:replay_view value=value,present=runner_view_present,validate=runner_view_validate

@@ -44,5 +44,5 @@ binary reliable messages.
 
 RTC setup, authorization, ICE settings, continuation data, and peer identities
 stay together here. Steam setup and endpoint conversion likewise share this
-package. The extraction changes package paths, not packet formats, identity
-encoding, authority policies, or supported backends.
+package. These feature-package imports use the same packet formats, identity
+encoding, authority policies and supported backends as the lifecycle package.

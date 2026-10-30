@@ -70,8 +70,8 @@ four forwards, not the channel plan, not the session.
   connects to.
 - `my_steam_id() -> u64`, `persona_name(allocator := context.temp_allocator) -> string`:
   return identity information; the persona name is the natural default for session names.
-- `invite_overlay(lobby_id: u64)`: pops the Steam overlay's invite dialog, the whole "get
-  your friends in" UI, for free.
+- `invite_overlay(lobby_id: u64)`: opens the Steam overlay's invite dialog so
+  players can invite friends to the lobby.
 - `host_peer(node: gd.Node) -> bool`: installs a Steam host peer on the node's
   MultiplayerAPI (transport seat 1, like ENet hosting). From here the `Session_Wire` takes
   over unchanged.

@@ -2,13 +2,14 @@
 
 > **Building a co-op game? Use the [Kit multiplayer toolkit](../../docs/kit/index.md)
 > instead** — `examples/cavecrawl` and `examples/slopball` are its references.
-> This example predates the toolkit and is kept as the demonstration of the RAW
-> engine surface the toolkit absorbs: `MultiplayerSynchronizer`, `@(gd_rpc)`,
-> and ~1,100 lines of hand-rolled netcode the kit games never write.
+> Use this example to study Godot's engine APIs directly:
+> `MultiplayerSynchronizer`, `@(gd_rpc)`, and ~1,100 lines of networking code
+> that Kit supplies for its examples.
 
-A pure-Odin / Polygon2D co-op survivors example where **ONE gameplay codebase runs in THREE
-modes** — single-player, co-op over native ENet, and co-op in the browser over WebRTC — and the
-netcode is **owner / peer-authoritative** so your own actions are instant (no host round-trip).
+This pure-Odin / Polygon2D survivors game runs in three modes: single-player,
+native ENet co-op, and browser WebRTC co-op. Each player simulates their own pawn
+and projectiles locally, so movement and firing do not wait for a host round-trip.
+Peers trust the firing player's damage reports.
 
 `examples/survivors` remains the single-player gameplay reference; its co-op layer is
 retained as the *host-authoritative* engine-native variant + the regression tests for the
@@ -25,12 +26,12 @@ on the start screen (WASD to move; weapons auto-fire at the nearest enemy).
 
 ## One codebase, three modes
 
-There is no separate "single-player game" and "co-op game". The SAME `arena_player.odin`,
+The same `arena_player.odin`,
 `arena_bullet.odin`, `arena_enemy.odin` and the `ArenaGame` orchestrator (`arena.odin`) run in
 all three modes:
 
 - **Single-player == host-with-no-peers.** Single mode opens no transport at all; the
-  authoritative simulation runs exactly as the host's does, the broadcasts simply reach nobody.
+  authoritative simulation runs exactly as the host's does, the broadcasts have no remote recipients.
 - **Transport is chosen at compile time by platform**: native builds use ENet (`gd.host` /
   `gd.join`); the web build uses WebRTC (`gd.webrtc_host` / `gd.webrtc_join` / `gd.webrtc_poll`).
   The same `@(gd_rpc)` methods and `gd.rpc` calls work over either, once connected.
@@ -42,9 +43,9 @@ all three modes:
 **Pawns are OWNER-authoritative.** Each player's pawn has its multiplayer authority set to the
 owning peer (recursively, so the child `MultiplayerSynchronizer` streams *from* the owner). The
 owner simulates its OWN pawn locally every frame — movement (with momentum) and auto-fire — with
-**zero round-trip**. Non-owners run none of that; they just render the synchronized transform.
-So your pawn answers your input the same frame you press a key, while still appearing, smoothly
-synced, on the other screen. (See the gate in `arena_player.odin`:
+**zero round-trip**. Other peers render the synchronized transform instead of simulating that pawn's
+input. Your pawn therefore answers input in the same frame while remote screens
+receive its updated position. (See the gate in `arena_player.odin`:
 `if !node_is_multiplayer_authority(owner) { return }`.)
 
 **Projectiles are OWNER-authoritative + deterministic-local.** When a peer auto-fires, it spawns
@@ -52,8 +53,8 @@ its bullet **locally, immediately** (it sees its own shot with no network delay)
 broadcasts `fired(origin, dir)`; every other peer spawns a matching **ghost** bullet that flies
 the same path. Only the firing peer's own bullet resolves hits — when it overlaps an enemy it
 authoritatively applies + **broadcasts** the damage/kill (`damage`, `call_local`), and peers
-**trust it** (no anti-cheat — by design). This is the opposite of the host-authoritative
-anti-pattern (client RPCs the host to spawn its bullet, then waits for it to come back).
+**trust it** (no anti-cheat — by design). This policy favors local response and trusts peers; it does not validate hits
+on the host.
 
 **Enemies are a shared horde: HOST-authoritative spawn + movement, PEER-authoritative damage.**
 The host spawns enemies through a `MultiplayerSpawner` (auto-instantiated on every client) and
@@ -61,7 +62,7 @@ moves them toward the nearest pawn; a `MultiplayerSynchronizer` streams the host
 the spawn-once `id`. Because a horde isn't something a player *inputs*, host authority there is
 not perceived as input lag. **Damage/death is peer-authoritative**: `hp` is tracked locally on
 every peer and decremented by the broadcast `damage` RPC (whoever's bullet hit), so both peers
-agree on every death; the host (the node owner) frees the node and the spawner replicates the
+agree on every death; the host, which controls the enemy's multiplayer authority, frees the node and the spawner replicates the
 despawn. `hp` is therefore deliberately *not* in the synchronizer config.
 
 > Scaling note: for hundreds of enemies you'd switch to *deterministic-local* enemies (host
@@ -86,15 +87,15 @@ despawn. `hp` is therefore deliberately *not* in the synchronizer config.
 | native (ENet) | `ARENA_NATIVE_OK` | connection; both owner-auth pawns on both peers; **owner-local move replication**; spawner enemy + position sync; **OWNER-LOCAL bullet immediacy** (`BULLET_LOCAL` on the firer the same tick + `BULLET_REMOTE` on the other peer — local-first, no host round-trip); **peer-authoritative kill agreed by BOTH peers**, credited to the firer; despawn replication; XP to the firer |
 | web (WebRTC) | `ARENA_WEB_OK` | the same owner-auth guarantees, in two real browsers over a browser-native WebRTC data channel (gated: `ARENA_WEB_BUNDLED` skip when no Chrome/puppeteer) |
 
-The "OWNER-LOCAL IMMEDIACY" proof is the crux: the firer (the **client**, to make the strongest
+The "OWNER-LOCAL IMMEDIACY" check observes when the shot appears: the firer (the **client**, to make the strongest
 case) logs `BULLET_LOCAL` the same frame its local auto-fire timer fires — a direct local spawn,
 not a request sent to the host — and the host only later logs `BULLET_REMOTE` when the broadcast
 arrives. No round-trip gates the owner seeing its own shot.
 
 ## Deploying internet co-op (room-code lobby)
 
-The web build pairs two friends through a **room-code lobby** over a real signaling server — the
-deployable path, not a localhost-only demo:
+The web build pairs two players through a **room-code lobby**. To use it across
+networks, provide a signaling server reachable by both players:
 
 1. **Stand up a signaling relay** reachable by both players at a public `wss://HOST/rtc`. ANY
    server speaking the small JSON wire protocol below works; a Node reference implementation

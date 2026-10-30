@@ -9,8 +9,8 @@ or cross-message compression dependency beyond the acknowledged base.
 The encoder stages one complete pass in its workspace before changing output.
 Its workspace contains the 16,384-byte hash table and a 65,808-byte output bound
 (82,192 bytes total). Short encoder output returns the required size without
-writing the caller's destination. This replaces the previous second match-search
-pass with a copy of the completed block. The decoder still preflights before writing. The decoder bounds literal/match lengths, validates
+writing the caller's destination. A successful encode copies the completed block
+to the destination. The decoder bounds literal/match lengths, validates
 backreferences and the exact decoded length, and checks the LZ4 terminal conditions
 before writing. Output may not overlap inputs; the encoder workspace may not overlap
 any input/output. A failed operation may change scratch workspace, never output.
@@ -26,7 +26,6 @@ policy. The network runner negotiates its use separately and verifies the result
 canonical target hash and state before publication. Compression is selected only
 when its payload is smaller than both the existing sparse delta and full state.
 Smaller packets can still cost more CPU; measure actual workloads.
-
 
 The [staging comparison](../../tests/replay_lz4_staging/README.md) retains the earlier
 implementation as an exact-byte reference. Explicit decoder word-copy/XOR experiments

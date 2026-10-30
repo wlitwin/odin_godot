@@ -1,6 +1,6 @@
 # Reading and editing the Scrapyard code
 
-New to the project? Start with the [visual contributor guide](contributor-guide.md)
+Start with the [visual contributor guide](contributor-guide.md)
 for the architecture, a hands-on reading path and an end-to-end feature trace.
 
 ## The frame loop
@@ -21,7 +21,8 @@ dispatch_session_changes(self)
 present_session_frame(self, dt)
 ```
 
-The deferred `finish_frame` runs audio, recording, diagnostics, social/recovery,
+The deferred `finish_frame` runs when the process callback exits. It runs audio,
+recording, diagnostics, social/recovery,
 screen and feedback hooks even when a frame returns early. Their order is
 intentional. Input edges are captured before session advancement; corrections
 and event changes are consumed before presentation.

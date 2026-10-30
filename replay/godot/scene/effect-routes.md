@@ -1,6 +1,8 @@
 # Declarative visual and audio routes
 
-`Effect_Route2(Event, Value, Rig)` connects a typed event projection, bounded visual
+Use effect routes to turn journal changes into visual or audio cues that retain
+the same event identity through correction. `Effect_Route2(Event, Value, Rig)`
+connects a typed event projection, bounded visual
 cue pool and typed scene binding. `Audio_Route(Event)` connects an event-to-sound
 projection, bounded voices and a consumption ledger. Both consume ordinary journal
 changes, preserving occurrence IDs through update, confirmation and cancellation.

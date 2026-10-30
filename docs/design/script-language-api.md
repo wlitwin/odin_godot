@@ -1,5 +1,11 @@
 # The ScriptLanguageExtension surface (Godot 4.6.2) — implementation reference
 
+This implementation record describes the engine version named above and the
+validation/completion work measured during that implementation. Its counts,
+timings, and phase references retain that scope. For current script authoring
+and editor setup, use [the authoring guide](../authoring-guide.md) and
+[Workflow](../workflow.md).
+
 The "fully replace GDScript" goal means implementing three engine interfaces. Extracted
 from the pinned engine (`extension_api.json` + `gdextension_interface.h`):
 
@@ -235,9 +241,9 @@ offers `node2d_set_position`, etc.).
   runs on a private heap+temp-arena context and NEVER touches Godot/gdext. `session_complete`
   blocks only the calling thread for the request round-trip (warm: tens of ms) — completion is a
   discrete action, far cheaper than the fresh spawn it replaces.
-- **Robust / never hangs.** If `ols` can't start, dies, or a request times out, `session_complete`
+- **Failure and timeout handling.** If `ols` can't start, dies, or a request times out, `session_complete`
   returns `ok=false` and the glue (`core/complete.odin`) transparently FALLS BACK to fresh-spawn
-  `run_completion`, so completion never regresses or breaks the editor. A killed `ols` is detected
+  `run_completion`, so a failed persistent session can still attempt completion. A killed `ols` is detected
   (reader EOF) and the session RESTARTS on the next call; a short retry backoff prevents
   spawn-storms; a bogus `ols` binary fails in ~8 ms. The warn-once-if-`ols`-missing behavior and
   the `odin_godot/ols_bin` -> `OLS` -> PATH resolution are unchanged. `_finish` (`lv_finish_session`)

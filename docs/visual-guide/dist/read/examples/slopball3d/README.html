@@ -4,17 +4,17 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>slopball3d — co-op physics soccer, third dimension on</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/slopball3d/README.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#what-3d-actually-changed">What 3D actually changed</a><a href="#run-it">Run it</a><a href="#automated-tests">Automated tests</a></nav></details>
-<article class="reading-body "><p>The kit&#39;s <strong>3D</strong> exercise: the same engine-physics contract slopball proved in 2D,
-with gravity turned on. The ball is a real <code>RigidBody3D</code> — it arcs off lofted kicks,
-bounces, and tumbles — and the players are <code>CharacterBody3D</code> capsules. It answers the
-kit&#39;s second-most-asked question — <em>&quot;does any of this work in 3D?&quot;</em> — with
-<code>play.Puppet3</code> and, mostly, <em>&quot;it already did.&quot;</em></p>
+<article class="reading-body "><p>Use this Kit example to replicate 3D Godot physics bodies. The ball is a
+<code>RigidBody3D</code> that arcs, bounces and tumbles; players are <code>CharacterBody3D</code> capsules.
+<code>play.Puppet3</code> lets the ball&#39;s entity owner simulate it and stream its pose and
+momentum, while other peers freeze their solver and display the received state.</p>
 <h2 id="what-3d-actually-changed">What 3D actually changed<a class="heading-anchor" href="#what-3d-actually-changed" aria-label="Link to this section">#</a></h2>
-<p>Very little — that is the point of the example:</p>
+<p>The 3D version reuses Kit&#39;s session and replication APIs, with these physics and
+rotation choices:</p>
 <ul>
 <li><strong>The wire core changed nothing.</strong> Session, streams, deltas, commands, chat, lobby:
 all dimension-free. A kicker streams its pose as one <code>pos: [3]f32</code> field.</li>
-<li><strong>Rotation became a quaternion — and got BETTER.</strong> The 2D puppet must snap its angle
+<li><strong>Rotation uses a quaternion.</strong> The 2D puppet must snap its angle
 (a componentwise lerp sweeps the long way around the ±π wrap); the stream layer&#39;s
 <code>.Quat</code> kind nlerps hemisphere-safely, so <code>rot: gd.Quaternion</code> on <code>play.Puppet3</code>
 interps correctly and watchers see the tumble turn smoothly.</li>
@@ -28,18 +28,19 @@ possession (<code>puppet3_claim</code>), physics interpolation + cut resets. The
 runs on ground-plane (XZ) distances; kicks loft with a y impulse.</li>
 </ul>
 <h2 id="run-it">Run it<a class="heading-anchor" href="#run-it" aria-label="Link to this section">#</a></h2>
-<p>Two windows on one machine (build once with <code>bash ../../build/build_scripts.sh .</code>):</p>
+<p>From <code>examples/slopball3d</code>, build once with <code>bash ../../build/build_scripts.sh .</code>,
+then open two windows on one machine:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">SLOP3_NAME=lefty  godot --path .    <span class="hljs-comment"># Host</span>
 SLOP3_NAME=righty godot --path .    <span class="hljs-comment"># Join</span></code></pre></div><p>WASD moves on the pitch plane, Space kicks (lofted), first to <code>SLOP3_GOALS</code> (default 3)
 takes the match. Odd seats defend the left goal, even the right.</p>
 <h2 id="automated-tests">Automated tests<a class="heading-anchor" href="#automated-tests" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><code>run.sh</code> — solo gate (<code>SLOPBALL3D_SINGLE_OK</code>): the striker bot runs the whole loop
-headless. The repo&#39;s only exercise of the 3D physics <em>solver</em> under <code>--headless</code>.</li>
+headless, exercising the 3D physics <em>solver</em> under <code>--headless</code>.</li>
 <li><code>native_run.sh</code> — 3-peer integration test (<code>SLOPBALL3D_NATIVE_OK</code>): host + striker + watcher.
 The seat transfers to the striker client, its local solver (gravity, tumble) scores,
 and the three screens agree on the ball within centimeters at the same session tick.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/slopball3d/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/slopball3d/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#what-3d-actually-changed" class="">What 3D actually changed</a><a href="#run-it" class="">Run it</a><a href="#automated-tests" class="">Automated tests</a></nav><div class="outline-actions"><a href="../../../reference/examples/slopball3d/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

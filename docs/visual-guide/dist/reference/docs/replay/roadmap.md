@@ -1,10 +1,11 @@
 # Replay roadmap and implementation plan
 
-**Current priority:** [finish the framework](framework-completion.md). On
-2026-09-20 the user redirected work away from exhaustive parity across all games.
-That completion plan takes precedence over game-parity gates below. The original
-milestones and results remain design/history references, not a requirement to
-finish every remake before completing the framework. Both versions stay preserved.
+This is the original experimental roadmap, retained as a contributor design and
+validation record. On 2026-09-20 the scope changed to
+[framework completion](framework-completion.md), deferring exhaustive parity
+across all games. That plan takes precedence over the game-parity gates below.
+Milestone proposals, open rows, and results retain their historical scope;
+both versions of each game remain preserved.
 
 The revised framework-first scope now has a completed
 [experimental release assessment](release-assessment.md). Historical open parity
@@ -390,7 +391,7 @@ Full original gameplay/presentation and paired comparison remain required.
 
 Depends on M3 and relevant M4 session/save work. Host migration is a required
 capability, not an optional stretch goal. The existing Kit implementation's
-`boot_migration` currently rejects a sim lane, so acceptance must include a
+`boot_migration` requires that no sim lane is installed, so acceptance must include a
 running replayed simulation as well as a co-op session.
 
 Implementation:

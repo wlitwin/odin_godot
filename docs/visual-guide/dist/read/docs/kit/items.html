@@ -18,16 +18,14 @@ entity struct</strong>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Chest :: <span class="hljs-keyword">struct</span> {
 	slots: [<span class="hljs-number">8</span>]kitems.Slot <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	...
-}</code></pre></div><p>Inventory replication comes for free: slots ride the <a href="net.html">kit/net</a> shadow-delta walk
-like any other POD field, so chest state reaches every peer without one line of new wire
-code, and reject-truth snapshots carry the whole inventory back when a prediction loses a
-race.</p>
+}</code></pre></div><p>Tag the inventory as replicated state. Slots then use the <a href="net.html">kit/net</a>
+shadow-delta walk like other fixed-layout fields. Predicate rejections carry
+authoritative inventory state back when a prediction loses a race.</p>
 <p>Every operation is <strong>deterministic and allocation-free</strong>. They run inside <code>@(gd_command)</code>
 procs, so the predicting client and the host execute the same op from byte-identical args
 and land on identical slots. Two players grabbing the same last item both predict success;
 the host runs them in arrival order, the second op finds the slot empty and rejects, and the
-loser&#39;s optimistic state reverts. Conflict resolution is just the intent pipeline: there is
-no separate reconciliation code.</p>
+loser&#39;s optimistic state reverts. The command pipeline returns the verdict and applies the correction.</p>
 <p>Item <strong>definitions are code, not wire</strong>: every peer registers the same table in <code>ready()</code>
 (ids are game constants), so only 4-byte slots ever ship.</p>
 <h2 id="definitions-the-table">Definitions: the Table<a class="heading-anchor" href="#definitions-the-table" aria-label="Link to this section">#</a></h2>
@@ -126,7 +124,7 @@ table.</p>
 <h2 id="grid-packing-shape-as-a-mechanic">Grid packing (shape as a mechanic)<a class="heading-anchor" href="#grid-packing-shape-as-a-mechanic" aria-label="Link to this section">#</a></h2>
 <p>For inventories where the SHAPE matters (2x3 rifles, 3x3 crates, attaché-case
 Tetris), <code>packing.odin</code> adds a second board type with the same replication
-story: a packed inventory is a fixed array of 10-byte <code>Packed_Entry</code> values
+mechanism: a packed inventory is a fixed array of 10-byte <code>Packed_Entry</code> values
 inside a replicated struct, and board dimensions are game constants passed to
 the ops.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Stash :: <span class="hljs-keyword">struct</span> {
@@ -159,5 +157,5 @@ call it in <code>ready()</code> every run, on every peer, with the same constant
 Handle the leftover, as <code>cave_credit</code> does by putting it back in the chest.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="interact.html"><span>kit/interact</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/items.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="interact.html"><span>kit/interact</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/items.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#definitions-the-table" class="">Definitions: the Table</a><a href="#slots-and-operations" class="">Slots and operations</a><a href="#which-ops-take-the-table" class="">Which ops take the Table</a><a href="#worked-example-looting-a-chest" class="">Worked example: looting a chest</a><a href="#grid-packing-shape-as-a-mechanic" class="">Grid packing (shape as a mechanic)</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/items.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

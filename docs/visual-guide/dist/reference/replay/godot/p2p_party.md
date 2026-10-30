@@ -14,7 +14,8 @@ configuration without creating an authority `Room` or owning the gameplay runner
    shareable before other participants have enrolled.
 3. Continue pumping. After enrollment, the owner opens a separate control
    connection, obtains a fresh nonce using Godot Crypto, performs Challenge/Rebind,
-   then queries until the entire enabled roster exists. No lease permits gameplay.
+   then queries until the entire enabled roster exists. This path creates no
+   gameplay authority lease; the fixed-roster P2P protocol governs gameplay.
 4. When `ready`, obtain `p2p_party_rtc`. Keep the owner at its stable address while
    RTC borrows its authorization/ICE callbacks. The first roster member creates
    signaling; other members join. Supply the returned match scope and ordered
@@ -62,7 +63,7 @@ combines private SQLite enrollment and challenged mesh signaling. Browser return
 still requires a compatible participant archive: room credentials do not contain
 the simulation or input history.
 
-The native [P2P Direct owner](p2p_direct.md) now supplies authenticated two-player
+The native [P2P Direct owner](p2p_direct.md) supplies authenticated two-player
 ENet gameplay, endpoint discovery and connection replacement. Party keeps
 registration and pair provisioning on separate Router lanes of one socket;
 `p2p_party_pair_begin` is also available to custom transport owners. Its endpoint

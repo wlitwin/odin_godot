@@ -1,8 +1,8 @@
 # Authenticated P2P links
 
-This experimental transport wrapper binds one physical connection to two
-provisioned member incarnations. The native [P2P Direct owner](../../godot/p2p_direct.md)
-now connects it to party provisioning and Duel's ENet transport.
+Use this experimental transport wrapper to authenticate and encrypt a physical
+connection between two provisioned member incarnations. The native [P2P Direct owner](../../godot/p2p_direct.md)
+connects it to party provisioning and Duel's ENet transport.
 
 The trusted service derives a pair key from the two enrollment keys using Odin's
 HKDF-SHA256 implementation. The derivation binds the entire match scope and the

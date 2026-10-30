@@ -16,7 +16,8 @@ player state, including local prediction and remote presentation.
 Enemies now use attack rows when stopped near living prey or winding a boss slam,
 face nearby prey, and use the original row frame counts and 12-FPS death playback.
 Observed health loss produces a short hit flash and wobble. Initial observations,
-rewinds and epoch/body replacements seed silently. The typed view owner gives a reused simulation slot a fresh scene lifetime,
+rewinds and epoch/body replacements seed silently. The typed view adapter manages scene lifetime and gives a reused simulation slot
+a fresh scene instance,
 including when a zombie slot becomes a barrel; rotation/facing/cue state cannot
 leak from the previous entity. Status
 washes follow the original last-visible-status rule and damaging-status flicker.

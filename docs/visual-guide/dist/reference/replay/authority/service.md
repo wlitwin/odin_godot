@@ -1,13 +1,15 @@
 # Authenticated authority service and durable storage
 
-`Service` exposes the coordinator through the borrowed Replay transport interface.
-`Rpc_Client` correlates replies with a `Lease`; the SQLite adapter implements the
-durable compare-and-swap callback. The library and real-process fixture now exercise
-planned transfer of an actual replayed simulation and coordinator crash/restart.
-The Room driver additionally passes live-client planned/crash, repeated, returned-
-host, partition, and successor-loss gates. [Process registration](registration.md)
-now supplies fresh incarnations for known members. General room/invite provisioning
-and broader combat/platform acceptance remain open.
+Use `Service` to expose a room's authority coordinator over Replay's transport
+interface. `Rpc_Client` correlates replies with a time-limited `Lease`; the SQLite
+adapter durably commits each coordinator decision with compare-and-swap.
+[Process registration](registration.md) supplies fresh incarnations for known
+members, and the [Room driver](../godot/room.md) connects these decisions to live
+gameplay.
+
+The evidence below describes the service fixture's tests, including planned
+simulation transfer and coordinator crash/restart. Broader integration results
+belong to the Room gates and [framework audit](../../docs/replay/framework-audit.md).
 
 ## Trust and message contract
 
@@ -87,7 +89,7 @@ durability boundary and synchronization behavior in its
 [synchronous pragma documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
 
 The current adapter supports native macOS and Linux and links SQLite. The Nix dev
-shell now includes it. The runtime tests here ran on macOS. This is a local-file
+shell includes it. The runtime tests here ran on macOS. This is a local-file
 backend, not a replicated coordinator database; use one authoritative database on
 a supported local filesystem. The implementation relies on SQLite and the storage
 stack honoring their synchronization contract. Tests kill processes and verify
@@ -108,7 +110,7 @@ nix develop --command bash tests/replay_authority_sqlite/run.sh
 nix develop --command bash tests/replay_authority_service/run.sh
 ```
 
-The authority suite now has 19 native tests plus a WASM type-check. New cases cover
+The service assessment recorded 19 native tests plus a WASM type-check. Cases cover
 MAC forgery/cross-identity requests, nonce-bound replies, oversized ingress, durable
 replay frontiers across newer reads/restart, lost replies, storage failures, and
 recovery of an unconsumed committed grant. SQLite tests reopen the database, race
@@ -125,6 +127,6 @@ successor alive, waits through quarantine, and resumes its retained world at epo
 
 This proves the decision service, durability, and simulation transfer components.
 The fixture uses explicit test provisioning and a separate checkpoint connection.
-It does not yet prove migration of live Cavecrawl clients, gameplay rendezvous,
-or every M5 crash/partition scenario. That driver and its acceptance cases remain
-the next work.
+This fixture does not prove migration of live Cavecrawl clients, gameplay
+rendezvous or every M5 crash/partition scenario. Consult the
+[Room driver](../godot/room.md) and its acceptance cases for those integrations.

@@ -13,8 +13,8 @@ bash addons/odin_godot/build/build_scripts.sh .
 ```
 
 Open the project in Godot and run `main.tscn`. Arrows move; Space takes the center
-coin when close enough. The coin and both bags belong to one replayable world, so
-the action transfers it atomically. The same model runs offline or with a server:
+coin when close enough. The coin and both bags belong to one World, the value
+that holds mutable simulation state. A step transfers the coin atomically. The same model runs offline or with a server:
 
 ```sh
 # Separate terminals, native ENet on the same machine:
@@ -30,9 +30,10 @@ matchmaking/NAT solution. Browser exports run the default offline model; network
 browser deployment requires an RTC/Party configuration supplied by your game.
 
 Edit `shared/game/game.odin` for simulation rules. It has no Godot objects or I/O.
-`scripts/starter.odin` owns Session, samples input and displays frames. Keep scene
-effects outside the simulation; the starter consumes presentation events without
-playing irreversible effects. Add proper event-ID reconciliation when adding effects.
+`scripts/starter.odin` owns Session, samples input, and displays frames: retained
+copies of the World at individual ticks. Keep scene effects outside the simulation.
+The starter consumes occurrence notifications without playing irreversible effects.
+When adding effects, use occurrence IDs to revise or cancel them if prediction changes.
 
 Build artifacts and generated scripts remain in your project, not in the addon.
 The installed `addons/odin_godot/docs/replay.md` guide describes the model,

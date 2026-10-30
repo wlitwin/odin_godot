@@ -1,7 +1,9 @@
 # Replay Speedball
 
 A separate [Speedball](../speedball/README.md) port using a complete, replayable
-pitch. Every playable peer predicts all players and the shared ball. Contacts,
+pitch. Every playable peer predicts all players and the shared ball before the
+authority settles their state. Replay's runner schedules the simulation steps and
+manages input and history. Contacts,
 kicks, spikes, score and kickoff state live in ordinary Odin values in
 [`shared/pitch`](shared/pitch/types.odin); the Godot script handles input and views.
 Original Speedball, Claimball and Slopball remain independently runnable.
@@ -73,6 +75,9 @@ what is preserved and what remains. The native Room path described below now exe
 This remains an incomplete M6 port, not full game parity.
 
 ## Prediction and presentation
+
+Presentation selects the state and effects to display. Its smoothing changes the
+drawn pose while the simulation retains the values used for gameplay.
 
 The runner now refreshes remote held-input guesses from each authoritative
 snapshot before replaying the speculative suffix. Local input samples, aiming

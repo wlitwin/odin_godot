@@ -1,7 +1,7 @@
 # Browser blob storage
 
-`browser_store.odin` provides asynchronous IndexedDB storage for bounded opaque
-bytes. Keep I/O outside simulation steps. An operation has one owner and three
+Use the browser store to persist bounded opaque bytes in IndexedDB, such as a
+profile or encoded save. `browser_store.odin` provides asynchronous operations. Keep I/O outside simulation steps. An operation has one owner and three
 phases: Idle, Pending, Complete. Submission returning `true` means work started;
 only Complete with error None is a success receipt. Close each operation after
 consuming its result.
@@ -46,15 +46,14 @@ The payload limit is not a total process memory bound.
 Success is published from transaction completion, after all requests commit;
 request success alone is insufficient. Writes request `strict` durability. These
 semantics follow the [IndexedDB transaction contract](https://w3c.github.io/IndexedDB/#transaction-concept).
-The verified envelope is Chrome on arm64 macOS, including a killed browser after
+The tested configuration is Chrome on arm64 macOS, including a killed browser after
 a completion receipt. Browser quota, eviction and user deletion remain applicable;
 portable power-loss durability is not claimed. Storage errors are surfaced
 without an automatic volatile fallback.
 
 Closing a pending operation discards its receipt and attempts to abort an active
 transaction. A write may already have committed. Read its record to determine the
-result; closing is not proof of rollback. Operations have no invented success
-deadline. A blocked database open reports Open, and a caller may close an operation
+result; closing is not proof of rollback. A pending operation does not become successful merely because time has elapsed. A blocked database open reports Open, and a caller may close an operation
 it no longer wants to await.
 
 `tests/replay_browser_store/run.sh` exercises the real Godot/WASM bridge and

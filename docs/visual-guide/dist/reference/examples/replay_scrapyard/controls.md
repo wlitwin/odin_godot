@@ -1,9 +1,13 @@
 # Controls and discrete intents
 
-Movement, aim, held fire and revive remain sampled controls. The current Godot
+Movement, aim, held fire and revive use sampled controls: values captured for
+each scheduled simulation step. Discrete Replay actions instead request individual
+operations and receive an accepted or refused result. The current Godot
 driver submits dash as `Action{kind=.Dash, aim=direction}`. A versioned
 `dash_schedule()` selects receipt-time delivery for dash and turret mount/release; other actions retain
-scheduled timing. The comparison fixture explicitly chooses receipt timing for
+scheduled timing. Receipt-time delivery queues a valid request for the next
+available authority tick in per-seat order; the client's proposed tick does not
+choose that execution time. The comparison fixture explicitly chooses receipt timing for
 every action and disables the classifier in its isolated game copy.
 
 **T** captures a generation-checked turret target for mount/release through the
@@ -39,8 +43,8 @@ presence does not give those historical inputs receipt-time delivery or a new
 action verdict. This preserves their original execution semantics during import
 and replay while the new input path uses explicit action results.
 
-Content 47 adds the Dash enum member and timing contract. The offline converter
-accepts content 42–47, using frozen old action enums and preserving world state,
+Content 47 introduced the Dash enum member and timing contract. The converter
+paths for content 42–47 use frozen old action enums and preserve world state,
 pending action IDs/ticks, recorded controls and assets. A newly loaded game does
 not silently reinterpret an older save; use the explicit converter described in
 [saves](saves.md).
@@ -57,4 +61,6 @@ snapshot interval in simulation ticks, clamped to 1..30 (default 3). Simulation 
 on backpressure, loss and recipient budgets. This is a local delivery preference,
 not a change to gameplay speed or saved world content.
 
-Current content 48 adds [authority-only rewind history](authority-history.md); dash timing remains unchanged.
+Content 48 introduced [authority-only rewind history](authority-history.md)
+without changing dash timing. The [save guide](saves.md) records current content
+and accepted conversion inputs.

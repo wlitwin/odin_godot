@@ -1,6 +1,8 @@
 # Compact recent facts
 
-Protocol-7 feature **4096** permits envelope kind **27**, `Recent_Facts_Compact`.
+Compact recent facts reduce header overhead when the authority copies recent
+recorded occurrence batches onto the unreliable channel. Protocol-7 feature
+**4096** permits envelope kind **27**, `Recent_Facts_Compact`.
 It replaces repeated inner packet envelopes and connection scopes with one shared
 header. The reliable fact stream, every-other-tick bundle cadence, four-tick
 coverage, canonical events, recipient filtering and normal admission remain intact.

@@ -4,13 +4,16 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Coordinator-driven game rooms</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/room.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#transition-behavior">Transition behavior</a><a href="#recovery-measurements">Recovery measurements</a><a href="#remaining-m5-work">Remaining M5 work</a><a href="#external-checkpoint-dependencies">External checkpoint dependencies</a><a href="#displaying-backup-preparation">Displaying backup preparation</a></nav></details>
-<article class="reading-body "><p><a href="dedicated.html">Dedicated infrastructure rooms</a> keep authorities and standbys
+<article class="reading-body "><p>Use <code>Room(State, Control, Action, Event, Seats)</code> when a game needs
+coordinator-approved authority and host migration. It combines an authenticated
+coordinator client, a time-limited authority lease, independently owned prepared
+checkpoints, and the gameplay <code>Session</code>. It runs
+initial hosting/joining, periodic trusted backups, planned handoff, abrupt takeover,
+old-owner rejoin, and surviving-client redirection.</p>
+<p><a href="dedicated.html">Dedicated infrastructure rooms</a> keep authorities and standbys
 avatarless through bootstrap, failover and return; authenticated member identity
 is independent of a playable seat.</p>
-<p><code>Room(State, Control, Action, Event, Seats)</code> combines an authenticated coordinator
-client, lease, owned prepared checkpoints, and the gameplay <code>Session</code>. It now runs
-initial hosting/joining, periodic trusted backups, planned handoff, abrupt takeover,
-old-owner rejoin, and surviving-client redirection. Gameplay can use native ENet or authenticated RTC. The control connection can
+<p>Gameplay can use native ENet or authenticated RTC. The control connection can
 use ENet or WebSocket (<code>control_backend = .Websocket</code>, with a full URL in
 <code>coordinator</code>). For RTC, set <code>session.backend = .Rtc</code> and <code>session.rtc.url</code> to the
 trusted signaling provider. Room derives the authority-specific room code from
@@ -43,7 +46,7 @@ action, and <code>room_handoff</code> requests a planned transfer. Dispose with 
 publication runs in <code>room_frame</code> alongside the existing lease and migration work.
 Trusted Party members can also <a href="room_restore.html">resume published progress</a> from a
 fresh process when no live authority remains, using a new fenced grant.
-Owners remain at stable addresses; models/immutable asset descriptors must remain
+Runtime owners remain at stable addresses; models/immutable asset descriptors must remain
 valid across role changes. A selected successor receives complete authority data.
 The room does not choose arbitrary peers or grant hosting permission itself.</p>
 <h2 id="transition-behavior">Transition behavior<a class="heading-anchor" href="#transition-behavior" aria-label="Link to this section">#</a></h2>
@@ -98,9 +101,8 @@ successor has already won. This never revives the expired epoch. A granted succe
 renews its reservation while it finishes installing the runtime/presentation.</p>
 <h2 id="recovery-measurements">Recovery measurements<a class="heading-anchor" href="#recovery-measurements" aria-label="Link to this section">#</a></h2>
 <p>A rejected <code>Claim</code> returns the driver to Following so it can prepare newer
-replicas. Previously it stayed in Claiming and repeatedly submitted the same old
-point; an early <code>Busy</code> response could therefore strand subsequent recovery even
-while checkpoint transfer continued. <code>last_command</code>/<code>last_result</code> retain the latest
+replicas. Retrying the same rejected point would prevent preparation from making
+progress even while checkpoint transfer continued. <code>last_command</code>/<code>last_result</code> retain the latest
 completed coordinator decision, and <code>claim_rejections</code>/<code>busy_claims</code> count rejected
 attempts. These diagnostics are distinct from <code>control_error</code>, which reports
 local RPC/control operations. Coordinator fencing and rollback limits are unchanged;
@@ -151,18 +153,18 @@ scoring. Surviving peers compare whole-world hashes at a common tick. See
 <code>examples/replay_slopball/migration_run.sh</code>. This restores accepted engine state;
 it does not replay or transfer Godot solver contact caches.</p>
 <ul>
-<li>General room/invite provisioning and richer lobby controls; known-member process
-registration and endpoint rebinding now exist.</li>
+<li>Public room/invite deployment and richer lobby controls; known-member process
+registration and endpoint rebinding exist.</li>
 <li>Broader failure timing/topology coverage beyond the tested successor loss,
 repeated handoff, isolated-host control partition, and returned killed host.</li>
 <li>Recovery during the remaining combat/loot scenario corpus beyond the initial
 Cavecrawl and Quickdraw gates.</li>
-<li>Broader error/retry UX, role-independent dedicated-server policy integration,
-and platform/network reachability coverage.</li>
+<li>Broader error/retry UX and platform/network reachability coverage.
+<a href="dedicated.html">Dedicated-server policy</a> has its own integration gates.</li>
 <li>External outbox/idempotency integration where games need persistent services.</li>
 </ul>
-<p>The tested driver is a substantial M5 increment, not completion of every migration
-or roadmap acceptance gate.</p>
+<p>These gates cover the scenarios described above; the remaining migration and
+roadmap cases need separate acceptance.</p>
 <h2 id="external-checkpoint-dependencies">External checkpoint dependencies<a class="heading-anchor" href="#external-checkpoint-dependencies" aria-label="Link to this section">#</a></h2>
 <p><code>Room_Options.preparation_ready(user, point, bytes)</code> may gate coordinator preparation
 on external dependencies. It receives an already validated candidate archive as a
@@ -181,5 +183,5 @@ Applications must retain the dependencies of every point they advertise as prepa
 approved, stale and uncertain states. It retains accepted coordinator metadata
 across pending requests and does not modify authority decisions or permits.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="dedicated.html"><span>Dedicated Room authorities</span><span aria-hidden="true">→</span></a><a href="../authority/paired_clock.html"><span>Paired elapsed clock</span><span aria-hidden="true">→</span></a><a href="../authority/registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="dedicated.html"><span>Dedicated Room authorities</span><span aria-hidden="true">→</span></a><a href="../authority/paired_clock.html"><span>Paired elapsed clock</span><span aria-hidden="true">→</span></a><a href="../authority/registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#transition-behavior" class="">Transition behavior</a><a href="#recovery-measurements" class="">Recovery measurements</a><a href="#remaining-m5-work" class="">Remaining M5 work</a><a href="#external-checkpoint-dependencies" class="">External checkpoint dependencies</a><a href="#displaying-backup-preparation" class="">Displaying backup preparation</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/room.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

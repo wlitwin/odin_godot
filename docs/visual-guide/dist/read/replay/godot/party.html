@@ -46,8 +46,8 @@ game starts while an attempt is active and avoid calling <code>room_open</code> 
 The helper does not silently close an existing game session to start another one.</p>
 <h2 id="storage-and-permission-rules">Storage and permission rules<a class="heading-anchor" href="#storage-and-permission-rules" aria-label="Link to this section">#</a></h2>
 <p>The service URL hashes to the same slot/reference keys used by Cavecrawl&#39;s original
-online implementation. The helper preserves its enrollment/cursor formats, so
-extracting the shared code does not reset identities. Namespace/content and an
+online implementation. The helper preserves its enrollment/cursor formats, so existing
+enrollment records retain their identities. Namespace/content and an
 exact service URL remain the application&#39;s configuration. <code>Party_Storage</code> supplies
 native slot selection and recent-reference CAS callbacks. The optional
 <code>provision_sqlite.Party_Store</code> owns a database connection and a copied path, and
@@ -83,7 +83,7 @@ other native storage platforms remain separate work. See the
 <a href="../../examples/replay_cavecrawl/online.html">Cavecrawl flow</a>,
 <a href="../../examples/replay_scrapyard/online.html">Scrapyard flow</a>, and
 <span class="local-reference" title="docs/replay/results/scrapyard-party-2026-09-07/README.md · available in the repository">recorded integration evidence</span>.</p>
-<p><code>Party_Config.ice_json</code> now carries validated deployment ICE settings into Room,
+<p><code>Party_Config.ice_json</code> carries validated deployment ICE settings into Room,
 including relay-only TURN configuration. The string is copied during open and
 retained across Room transitions. See <a href="transport/ice-deployment.html">ICE configuration and relay evidence</a>.</p>
 <p>Alternatively set <code>relay_credentials=true</code> to use the authenticated
@@ -97,9 +97,9 @@ when opening the following session; redirect/reconnect keeps that spectator flag
 Speedball disables checkpoint reception for observers, and automatic successor
 selection considers connected player seats. The watch preference does not revoke
 the underlying invite&#39;s trusted membership permissions.</p>
-<p><a href="../../examples/replay_quickdraw/online.html">Quickdraw parties</a> now exercise native
+<p><a href="../../examples/replay_quickdraw/online.html">Quickdraw parties</a> exercise native
 create/join/rejoin and browser combat recovery, observer permissions, fresh host
 return and original/successor checkpoint publication through the same component.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/online.html"><span>Online party menus</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/party.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/online.html"><span>Online party menus</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/party.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#lifecycle" class="">Lifecycle</a><a href="#storage-and-permission-rules" class="">Storage and permission rules</a><a href="#game-specific-ownership" class="">Game-specific ownership</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/party.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

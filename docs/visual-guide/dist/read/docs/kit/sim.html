@@ -9,7 +9,8 @@ client sends tick-stamped input windows; the authority advances final state and
 sends snapshots; the owning client predicts the same ticks and reconciles when
 its result differs.</p>
 <p>Use the simulation lane for movement, aiming, projectiles, or shared objects
-whose state should be computed by a trusted authority. Reliable session state
+whose state should be computed by a trusted authority. A simulation lane is the
+fixed-tick pipeline that retains input and state history for prediction and correction. Reliable session state
 such as inventory, score, chat, entity lifetime, and saves remains on
 <code>kit/session</code> and <code>kit/net</code>.</p>
 <p>The package does not import Godot. Its input, snapshot, history,
@@ -276,7 +277,7 @@ entities on the lane itself; <code>&lt;game&gt;_net_frame</code> drives the unde
 track order, each fed its owner&#39;s input (<code>nil</code> coasts: an inputless entity
 type, or a remote player on a client whose truth is already inbound). The two
 optional world passes run after entity ticks: the everywhere pass for pure-sim
-cross-entity work (contact), the authority pass for genuinely WORLD-shaped
+cross-entity work (contact), the authority pass for world-level
 authority work (respawn queues, wave directors). One input <strong>class</strong> exists
 per distinct <code>@(gd_tick)</code> input TYPE: <code>lane_init</code> registers the primary
 (class 0) and <code>lane_add_input_class</code> registers each extra, and the wire ships
@@ -292,8 +293,8 @@ A world pass that reads inputs takes the typed view:</p>
 <code>lane_set_sim</code> (rawptr sample + the two <code>Step_Proc</code>s, everywhere then
 authority) + <code>lane_track</code> / <code>lane_track_set</code> + explicit
 <code>lane_frame</code>/<code>lane_present</code> calls remain fully supported; the generated
-wiring and the thunks are sugar over exactly that. <code>lane_present</code> is
-genuinely optional there: until the first call, the <code>presented</code> latch keeps
+wiring and generated thunks call those same procedures. <code>lane_present</code> is
+optional there: until the first call, the <code>presented</code> latch keeps
 ingest painting watched truth directly (a hand-driven client that never
 presents never freezes its watched entities); after it, watched fields
 belong to the presenter.</p>
@@ -407,7 +408,7 @@ score lands authority-side. Contact belongs in the world pass, applied only to
 the pairs this peer HAS INPUTS for: yours on your screen, everyone&#39;s on the
 server; a remote touch reaches you as the server&#39;s word, never as a local
 guess.</p>
-<p>Rules that keep the pattern honest:</p>
+<p>Constraints for contested prediction:</p>
 <ul>
 <li><strong>Contested entities must be SELF-SIMULATING.</strong> A ball integrates its own
 motion, which is what makes every peer&#39;s between-batch prediction good. An
@@ -428,7 +429,7 @@ Rocket League model: what speedball ships). Batches echo every player&#39;s
 held input; mark the AVATARS <code>contested</code> too, and every peer ticks every
 entity (remote ones extrapolated with held inputs), so the whole scene
 lives on ONE predicted timeline. No claim dance at all (contested
-presentation is simply the predicted pose), remote touches play out beside
+presentation uses the predicted pose), remote touches play out beside
 the avatars making them, immediately. The price is resim on nearly every
 batch (held inputs drift: small, constant, glided corrections on remote
 avatars instead of delayed-but-accurate ones) and a few echo bytes per
@@ -624,7 +625,7 @@ client samples one per tick, ships one window per class on the single upstream
 packet, and the host de-jitters each into its own per-player buffer. An entity&#39;s
 tick reads only its own class, so the two timelines never cross, and a reconcile
 of one leaves the other untouched.</p>
-<p>The authoring is just a second <code>@(gd_sample)</code>, one per input type:</p>
+<p>Declare a second <code>@(gd_sample)</code>, one per input type:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// two ticking kinds, two input structs</span>
 <span class="hljs-meta">@(gd_tick)</span> gunner_tick :: <span class="hljs-keyword">proc</span>(self: ^Gunner, <span class="hljs-keyword">in</span>: Gunner_Input) { ... }
 <span class="hljs-meta">@(gd_tick)</span> drone_tick  :: <span class="hljs-keyword">proc</span>(self: ^Drone,  <span class="hljs-keyword">in</span>: Drone_Input)  { ... }
@@ -665,7 +666,7 @@ owner&#39;s stream&quot; to &quot;the server&#39;s simulation, predicted locally
 <code>interp</code> on displayed floats.</li>
 <li><strong>Move its writes into a <code>@(gd_tick)</code>.</strong> Frame-rate mutation becomes a
 fixed-rate pure step: (predicted fields, input) → predicted fields. This
-is the one honest rewrite, and it is where engine physics must become
+is the main simulation rewrite, and it is where engine physics must become
 query-based kinematics (slopball&#39;s <code>play.Puppet</code> ball becomes speedball&#39;s
 forty lines of bounce arithmetic; see Gotchas).</li>
 <li><strong>Declare and sample the input struct.</strong> Mark it <code>@(gd_input)</code>, put field
@@ -824,5 +825,5 @@ blend math, and tick this lane is built on), <a href="session.html">session</a>
 (identity and everything reliable), <a href="play.html">play</a> (the coop shelf:
 Puppet is that model&#39;s physics answer, <code>play/sim</code> is this one&#39;s).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/sim.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/sim.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#defining-a-sim-entity" class="">Defining a sim entity</a><a href="#simulation-blocks-in-godotplaysim" class="">Simulation blocks in godot:play/sim</a><a href="#what-the-lane-does-underneath" class="">What the lane does underneath</a><a href="#the-contested-object" class="">The contested object</a><a href="#lag-compensation" class="">Lag compensation</a><a href="#discrete-verbs-on-the-lane" class="">Discrete verbs on the lane</a><a href="#predicted-spawns--a-fired-projectile" class="">Predicted spawns — a fired projectile</a><a href="#two-entity-kinds-two-inputs" class="">Two entity kinds, two inputs</a><a href="#promoting-a-coop-game" class="">Promoting a coop game</a><a href="#tuning" class="">Tuning</a><a href="#gotchas" class="">Gotchas</a><a href="#implementation-and-test-coverage" class="">Implementation and test coverage</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/sim.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

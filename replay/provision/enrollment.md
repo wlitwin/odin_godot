@@ -1,7 +1,8 @@
 # Durable client enrollment
 
-Create/join now has a client-side journal that persists the exact request before
-it can be sent, and persists a successful credential before it can be used. Its
+Use the client enrollment journal to preserve identity across a crash during
+Create or Join. It persists the exact request before sending it, then persists a
+successful credential before exposing it for use. Its
 native SQLite and browser IndexedDB drivers use compare-and-swap, so another
 process/tab cannot silently replace the identity in the same slot.
 
@@ -133,7 +134,7 @@ write, competing tabs and corrupt-record preservation. Native uses verified TLS;
 the browser fixture explicitly opts into loopback WS. Public browser TLS deployment
 remains a separate gate.
 
-Cavecrawl and Scrapyard now use the shared [Party API](../godot/party.md) with this
+Cavecrawl and Scrapyard use the shared [Party API](../godot/party.md) with this
 flow and a separate CAS recent-room reference. Their fixed co-op invitation is
 reproducible from the persisted creator claim and scoped request inputs, so issuance
 retries survive restart without a separate generated-secret record. Other game

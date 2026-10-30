@@ -4,14 +4,14 @@ Godot scripting assumes a class: you inherit a node, override its methods, and
 `self` is everything. Odin scripts have no classes. A script is three separate
 things instead, and this page maps each GDScript reflex to its Odin form.
 
-The shape to internalize first:
+The script has three parts:
 
 > **A script is a struct (your state) plus free procs (your behavior), riding
 > on an engine node (`self.owner`).**
 
 GDScript fuses those three into one `self`. Keeping them apart means your state
-is just a struct: diffable, shippable, and predictable. That is the property
-the multiplayer toolkit in posts 3–6 relies on.
+has a fixed layout that generated code can inspect. Kit, the multiplayer
+framework in posts 3–6, uses field descriptors to replicate and snapshot it.
 
 ## The reflex map
 
@@ -94,9 +94,8 @@ Because all scripts compile into one package, `Player` in one file is the
 same type in every file: cross-script calls are direct, typed calls, not
 `get("hp")` string lookups.
 
-If you're coming from C#, this is composition over inheritance. Most gameplay
-hierarchies are one level deep and exist to share three fields; a struct
-member does that without the fragile-base problems.
+This is composition: embed shared data and pass it to shared procedures.
+Changing that data does not require a script inheritance hierarchy.
 
 ## Replacing autoloads
 
@@ -114,17 +113,15 @@ An autoload is two things in one: a *node* that's always in the tree, and a
 
 ## What the compiler checks
 
-The reflex map is mechanical, and after a week you won't consult it. What the
-compiler gives you instead:
+The compiler and scriptgen check different parts of this arrangement:
 
-- A typo'd field is a compile error, not a runtime `Nil` five playtests later.
+- An unknown struct field produces a compile error.
 - A signal payload is typed: emit with an `int` where a `Node2d` is declared
   and it doesn't build.
 - Refactors are grep-able and checked: rename a field, the compiler lists
   every use site.
-- The Inspector, the scene, and your code can't drift apart silently:
-  scriptgen validates tags at build time and errors in the same
-  `path:line:` format your editor already jumps to.
+- scriptgen validates field tags at build time and reports errors in
+  `path:line:` format, so your editor can jump to the declaration.
 
 In the next post, a field tag makes state *network-synchronized*. The
 compiler-checked struct layout is what makes that possible.

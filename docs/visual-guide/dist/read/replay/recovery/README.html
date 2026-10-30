@@ -6,7 +6,8 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#ownership-and-integration">Ownership and integration</a><a href="#shared-gameplay-connection">Shared gameplay connection</a><a href="#transfer-and-retention-protocol">Transfer and retention protocol</a><a href="#evidence-and-limits">Evidence and limits</a><a href="#independent-application-consumers">Independent application consumers</a><a href="#schema-aware-checkpoint-compression">Schema-aware checkpoint compression</a><a href="#checkpoint-delivery-channel">Checkpoint delivery channel</a></nav></details>
 <article class="reading-body "><p><code>replay/recovery</code> transfers complete authority checkpoints to an explicitly trusted
 successor. It builds on <code>replay/net</code> archives and the borrowed transport interface.
-It provides transfer/validation/retention; it does not select a legitimate leader,
+Use it to keep an eligible backup ready before a host stops. It provides
+transfer, validation and retention; it does not select a legitimate leader,
 fence a partitioned authority, discover a new host, or reconnect game clients.</p>
 <p>The reusable <a href="../transfer/README.html">transfer package</a> also supports bounded canonical
 records. Recovery retains compatible <code>Sender</code> / <code>Blob_Receiver</code> facade names.
@@ -47,7 +48,7 @@ be shallow-copied. <code>sender_begin</code> accepts encoded archive bytes and c
 <code>sender_publish</code> encodes a typed checkpoint first. Only one transfer is active per
 sender. <code>sender_cancel</code> permits explicit replacement while retaining the last
 validated receipt; sequences continue increasing within the binding.</p>
-<p>The low-level protocol does not independently drain the wire. <code>Link</code> now integrates
+<p>The low-level protocol does not independently drain the wire. <code>Link</code> integrates
 it with the gameplay runner using <code>transport.Router</code>, separate queues, and a combined
 output budget. <code>handles</code> is only untrusted routing inspection. The standalone ENet
 acceptance fixture uses a dedicated wire; the cave replication gate uses the same
@@ -180,9 +181,10 @@ workaround; the crash has not been reproduced or claimed fixed.</p>
 gameplay and periodic backups on the same ENet connection, with the same fault
 settings, and verifies a common checkpoint containing the guest&#39;s loot and open
 door. Save/resume and restarted-host/guest recovery gates remain separate.</p>
-<p>Next: install coordinator-approved successor/fencing decisions, then implement planned
-and abrupt takeover with surviving-client frontier reconciliation. See the
-<a href="../../docs/replay/recovery.html">recovery contract</a> and <a href="../../docs/replay/roadmap.html">roadmap</a>.</p>
+<p>The <a href="../godot/room.html">Room driver</a> installs coordinator-approved successor and
+fencing decisions, then performs planned or abrupt takeover with surviving-client
+frontier reconciliation. See the <a href="../../docs/replay/recovery.html">recovery contract</a>
+and <a href="../../docs/replay/roadmap.html">roadmap</a> for its guarantees and remaining work.</p>
 <h2 id="independent-application-consumers">Independent application consumers<a class="heading-anchor" href="#independent-application-consumers" aria-label="Link to this section">#</a></h2>
 <p><code>link_add_application(&amp;config, Application_Route{user, handles})</code> reserves another
 bounded receive lane before <code>link_init</code>. It returns <code>(lane, ok)</code>; adding an identical
@@ -197,7 +199,7 @@ consumers must drain their lanes after the shared pump. A full reliable receive
 lane preserves its packet and can exert transport backpressure. <a href="../comms/README.html">Comms</a>
 uses an additional route while Session assets keep their existing one.</p>
 <h2 id="schema-aware-checkpoint-compression">Schema-aware checkpoint compression<a class="heading-anchor" href="#schema-aware-checkpoint-compression" aria-label="Link to this section">#</a></h2>
-<p>Link now negotiates both ordinary block compression (Features bit 128) and Frame
+<p>Link negotiates both ordinary block compression (Features bit 128) and Frame
 schema grouping (bit 256, requiring 128). It obtains the fixed Frame schema and
 canonical section offset from its checkpoint codec. Both endpoints validate the
 same plan fingerprint. Grouped candidates are selected only when smaller; ordinary
@@ -223,5 +225,5 @@ transport; the archive sender does not duplicate them. Reliable congestion can
 still delay gameplay on that channel, so callers must inspect actual backup age
 and failure state. A fresh replica is never an unconditional guarantee.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../transfer/README.html"><span>Bounded blob transfer</span><span aria-hidden="true">→</span></a><a href="../p2p/spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/recovery.html"><span>Replay checkpoint and recovery contract</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/recovery/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../transfer/README.html"><span>Bounded blob transfer</span><span aria-hidden="true">→</span></a><a href="../p2p/spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/recovery/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-integration" class="">Ownership and integration</a><a href="#shared-gameplay-connection" class="">Shared gameplay connection</a><a href="#transfer-and-retention-protocol" class="">Transfer and retention protocol</a><a href="#evidence-and-limits" class="">Evidence and limits</a><a href="#independent-application-consumers" class="">Independent application consumers</a><a href="#schema-aware-checkpoint-compression" class="">Schema-aware checkpoint compression</a><a href="#checkpoint-delivery-channel" class="">Checkpoint delivery channel</a></nav><div class="outline-actions"><a href="../../../reference/replay/recovery/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

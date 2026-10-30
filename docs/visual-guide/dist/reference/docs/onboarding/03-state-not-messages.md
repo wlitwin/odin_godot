@@ -1,22 +1,16 @@
 # 3 · State, not messages
 
-Most Godot projects reach for multiplayer late: you open the RPC docs and find
-that multiplayer isn't a feature you add so much as a structure you either have
-or don't. Every script that mutates state has to know *who* may mutate it,
-*which* machine it runs on, and *what* to tell everyone else. The retrofit
-touches everything.
-
-This post is the mental-model shift that removes the problem: **stop thinking
-in messages ("tell the other peers X happened") and start thinking in state
-("this field is true everywhere").** Structure a game this way from the first
-hour (the toolkit makes it nearly free), and multiplayer is a property the
-code already has.
+Adding multiplayer requires a rule for each shared value: who may write it,
+and how other peers receive it. Hand-written RPCs can scatter those rules
+across scripts. Kit puts them on fields and lets the session synchronize the
+registered state. This post sets up that arrangement, including entity creation
+and player identity.
 
 ## The model
 
-One machine, the **host**, owns the truth. Every replicated field lives in a
-struct on every machine, and the toolkit makes everyone's copy converge on the
-host's automatically and incrementally, every network tick.
+One machine, the **host**, runs the authority that decides shared state. Every
+registered entity has replicated fields on each peer. At network ticks, the
+session sends changes from the authority to those copies.
 
 You know why this works from post 2: your state is a struct with a fixed
 layout. The toolkit keeps a shadow copy, diffs it after each tick, and ships
@@ -33,17 +27,17 @@ Hole :: struct {
 }
 ```
 
-The host writes `self.hole.idx = 2`; a beat later that byte is true on every
-screen. **Change a field, and you're done.** No `rpc("set_hole", 2)`, no
-MultiplayerSynchronizer node to configure, no late-joiner-missed-the-call bug:
-a field is *state*, so whoever joins next gets it in their snapshot. An RPC
-only exists at the moment it's sent; a field exists whenever anyone looks.
+The host writes `self.hole.idx = 2`; the next state update carries that value
+to clients. A player who joins later receives the current value in a snapshot.
+The field retains the result, so a late joiner does not need the original call
+that changed it.
 
 ## Entities: the world as a table of structs
 
 Replicated structs are **entities** in a registry. Each has a type, a numeric
-`net_id`, and an owner. You declare one with a tag on the scene you already
-export, capturing what the scene bodies and its stable wire id:
+`net_id`, and a network owner: the player allowed to write its owner-streamed
+fields. This differs from the script's `owner` field, which holds a Godot node.
+Tags on the exported scene declare the entity type and stable wire ID:
 
 ```odin
 Golf :: struct {
@@ -65,13 +59,13 @@ every machine, host included. There is no separate "server spawns, then sends a
 spawn message you handle differently" path. The host asks the session to spawn;
 the session builds the scene *locally* and tells everyone else to build *the
 same scene*. You write the declaration once, and there is no per-role creation
-code to write. When a player joins mid-game, the session replays the registry
-through the same table, and a resumed save uses the same table. Drop-in-join
-and load-game are already handled.
+code to write. When a player joins mid-game, the session recreates the registry
+through the same table. A resumed save uses that table too.
 
 ## Setup
 
-`kit/boot` reduces standing this up to declaring what's yours and attaching:
+`kit/boot` configures the session and its frame pump from your entity and
+container declarations:
 
 ```odin
 golf_ready :: proc(self: ^Golf) {
@@ -98,7 +92,7 @@ drives it all. Your game reacts by declaring **event halves**: plain procs
 named for the event (`golf_player_joined`, `golf_entity_spawned`, an
 authority-only `golf_player_joined_then` for consequences) that the generated
 `golf_net_frame` dispatches to synchronously. There are no callbacks into a
-half-initialized script, and no role branch of your own to write. The component
+half-initialized script. The component
 calls remain available when a game needs custom dispatch ordering.
 
 One concept in the join call pays off for the rest of the series: a player
@@ -109,9 +103,9 @@ There is no separate reconnect system; identity is state too.
 
 ## Movement: owner-written fields
 
-Host-authoritative fields would make *your own avatar* feel like molasses,
-with every keypress waiting on a round trip. So there is one other flavor of
-replication: fields the entity's **owner** writes,
+Waiting for authority updates would delay local movement by a round trip. In
+cooperative games that trust player motion, the entity's **network owner** can
+write movement fields instead:
 
 ```odin
 x, y: f32 `gd:"owner"`, // continuous owner fields interpolate by default
@@ -122,13 +116,12 @@ interpolation buffer that stays smooth through jitter and packet loss. Your
 machine moves your avatar with local, zero-latency code; remote screens watch
 a slightly delayed, smoothed version. (That "slightly delayed" becomes post 5.)
 
-The host owns deltas for truth; the owner owns streams for motion. The two are
-disjoint sets, both just fields, and the word *message* never appeared.
+Authority-written fields use state deltas; owner-written fields use motion
+streams. Each field selects one policy.
 
 ## What the model gives you
 
-Structuring state this way feels like discipline until you list what falls out
-of it, each item a direct consequence of *state-is-the-protocol*:
+The same registry and snapshot mechanism supports these session operations:
 
 - **Drop-in joins**: the registry replays through your factory.
 - **Reconnect after a crash**: the token reclaims the seat, and the snapshot
@@ -137,15 +130,10 @@ of it, each item a direct consequence of *state-is-the-protocol*:
   (`ksave.save_write` / `ksave.resume`, post 6).
 - **Host migration**: a backup snapshot plus "everyone rejoins the new host";
   the toolkit automates the handoff (post 6).
-- **Single-player**: a session with one seat, using the same code. You never
-  build the game twice.
+- **Single-player**: a session with one seat, using the same gameplay code.
 
-These are consequences of the model rather than separate features. That is the
-value of learning it: you are not learning six systems, you are learning one
-shape that implies six systems.
-
-What's missing is the other half: players don't just *watch* state, they *act*
-on it. Two players acting on the same chest at once is where netcode
-traditionally gets ugly. That's the next post.
+Each operation needs its documented setup, but uses the same entity identities
+and field declarations. The next post adds actions on shared state: two players
+taking the same item need an authority verdict as well as local feedback.
 
 *Next: [Verbs, not RPCs →](04-verbs-not-rpcs.md)*

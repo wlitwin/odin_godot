@@ -1,5 +1,9 @@
 # Spike W — Odin → Emscripten SIDE_MODULE → Godot 4.6.2 Web
 
+Historical spike record. Versions, verdicts, and open steps below describe this
+experiment; they are not the current web-export status. See the subsequent
+[web implementation](web-internals.md) and current [export guide](../exporting.md).
+
 ## Verdict: 🟡 YELLOW
 
 The full compile + link + dynamic-linking ABI path is **proven**, and Godot 4.6.2's
@@ -12,8 +16,8 @@ GDExtension. No fundamental blocker found. Two explicit, named steps remain befo
    The link step must be redone under 4.0.20 so the dynamic-linking / longjmp ABI matches
    the engine's `godot.side.wasm` main module.
 2. **In-browser load test.** Export, serve over HTTP with COOP/COEP headers, and confirm
-   the extension's `entry_symbol` is invoked at runtime. This needs a browser; it cannot
-   be done headless. (The spike used a leaf `add()` module; the real binding must also
+   the extension's `entry_symbol` is invoked at runtime. This needs browser
+   execution, which the spike did not exercise. (The spike used a leaf `add()` module; the real binding must also
    compile the full `godot/` package to `freestanding_wasm32` and export `*_init`.)
 
 **Single most important finding:** Godot 4.6.2's headless web export, with

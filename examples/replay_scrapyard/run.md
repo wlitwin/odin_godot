@@ -1,9 +1,15 @@
 # The run loop
 
+A run advances through waves, floor-clear shopping, a shared departure gate and
+wipe recovery. The director is the saved-state scheduler that announces waves,
+spawns enemies and tracks completion/rest deadlines.
+
 `RSY_WAVE_BASE=0` supports an empty wave for parity with the original arena modes.
 An empty single-wave floor clears once without inventing a death or rest interval;
-both connected players receive the normal clear award. The experimental content
-ID is `0x5253435241503048`; older run archives require explicit conversion.
+both connected players receive the normal clear award. Content `0x5253435241503048`
+introduced the [authority-only rewind history](authority-history.md) retained by
+this model. Use the [save guide](saves.md) for current content and explicit
+conversion of older runs.
 
 Interactive play enables the run loop by default. Existing combat fixtures set
 `RSY_RUN=0` to keep their isolated encounters. The full run uses the original

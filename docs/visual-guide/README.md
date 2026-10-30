@@ -28,6 +28,9 @@ routes and documentation navigation. `dist/sdk.css` and `dist/site.js` supply th
 shared layout and search. The visual field guide remains authored in
 `dist/guide.html`; `dist/app.js` drives its interactive models.
 
+Editorial changes follow the [documentation style guide](EDITORIAL.md), written
+for developers who know programming and game development but are new to this SDK.
+
 Task-based tutorials live in `content/`. `build-readers.mjs` renders them and the
 repository's linked documents into HTML, with highlighted code, tables, and
 static diagrams. Related Markdown links resolve to other reading pages. Original

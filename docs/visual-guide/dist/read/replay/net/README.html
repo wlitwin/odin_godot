@@ -2,13 +2,16 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay server/client runner · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay server/client runner</h1><div class="reader-meta"><span>21 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/README.md" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay server/client runner</h1><div class="reader-meta"><span>22 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/README.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#gameplay-model">Gameplay model</a><a href="#runtime-ownership-and-loop">Runtime ownership and loop</a><a href="#admission-delivery-and-recovery">Admission, delivery, and recovery</a><a href="#durable-authority-checkpoints">Durable authority checkpoints</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#authority-side-infrastructure-checks">Authority-side infrastructure checks</a><a href="#presentation-failures-and-catch-up">Presentation failures and catch-up</a><a href="#delivery-under-transport-loss">Delivery under transport loss</a><a href="#opt-in-direct-host-epoch-discovery">Opt-in direct-host epoch discovery</a><a href="#prediction-limits-and-cooperative-action-timing">Prediction limits and cooperative action timing</a><a href="#small-action-copies-under-loss">Small action copies under loss</a><a href="#receive-budget-deferral">Receive-budget deferral</a></nav></details>
-<article class="reading-body "><p><code>replay/net</code> connects a complete-world simulation to canonical codecs,
-transport-owned peer identities, prediction, authoritative correction, and the
-presentation journal. It is an experimental M3 implementation with acknowledged
-snapshot deltas and compact facts. Broader admission/recovery review and the later
-roadmap capabilities remain open work.</p>
+<article class="reading-body "><p>Use <code>replay/net</code> to run a game with an authority that accepts shared gameplay
+results and clients that predict local state. The runner schedules simulation
+steps and manages input, history, network delivery and correction. It connects a
+complete-world simulation to canonical codecs, transport-owned peer identities
+and an identity-aware presentation journal.</p>
+<p>The API remains experimental. The sections below describe implemented contracts
+and their tests; the <a href="../../docs/replay/framework-audit.html">framework audit</a> tracks
+broader admission, recovery and release acceptance.</p>
 <p><code>Model.control_timing</code> defaults to <code>Scheduled</code>. The explicit <code>Latest_Observation</code>
 profile sends one current control sample, coalesces newer producer ticks into the
 next authority tick, and preserves the accepted value in replay history. It has a
@@ -47,7 +50,7 @@ observers. It refuses unscoped player prediction when the public projection omit
 state. <a href="replication.html">Recipient views</a> can filter snapshots, controls and events
 for players with validated prediction groups, or for observers.
 Authored group projection, footprint validation and timestamped boundary values
-now have initial native and Claimball gates. Broader group policies remain M6 work.</p>
+have initial native and Claimball gates. Broader group policies remain M6 work.</p>
 <p>On authority correction, the current full-world runner replaces older remote
 held-input guesses in the replayed suffix using the snapshot&#39;s held-input boundary.
 It applies <code>hold</code> once per prediction tick, including bootstrap and continuation,
@@ -65,7 +68,7 @@ subject to the roadmap&#39;s workload measurements.</p>
 <p>An optional <a href="profiling.html">profiling clock</a> records replay wall time/depth and
 histogram bounds without entering simulation or the network contract. Godot
 Sessions install it automatically.</p>
-<p>A complete snapshot ahead of a briefly stalled client can now be adopted directly
+<p>A complete snapshot ahead of a briefly stalled client can be adopted directly
 when all intervening authoritative facts remain available. The runner preserves
 the journal and action queues, reprojects the group and rebuilds bounded prediction
 lead. <code>Stats.snapshot_catchups</code> records this path; it does not require a full
@@ -119,11 +122,11 @@ different connection. Tokens are stored as SHA-256 digests on the server.</li>
 <li>Tokens are bearer reconnect credentials, not account authentication or transport
 encryption. Supply unpredictable tokens and the appropriate transport/deployment
 policy. The Godot sample uses random tokens normally and deterministic labels
-only for tests. <code>replay/godot.session_profile</code> now persists a local credential
+only for tests. <code>session_profile</code> from <code>replay/godot/storage</code> persists a local credential
 separately from the checkpoint&#39;s roster of token hashes.</li>
 <li>A stable seat is reserved across disconnect/reconnect. This initial version
 reserves seats until explicit release. <code>server_set_locked</code>, custom admission,
-kick, ban/unban, and <code>server_release_seat</code> now supply basic room controls. Release
+kick, ban/unban, and <code>server_release_seat</code> supply basic room controls. Release
 requires a disconnected seat with settled actions and a model <code>reset_player</code>
 callback; initialization for the next occupant occurs inside its joining tick.
 Bans survive reservation release and durable checkpoint recovery. Custom
@@ -170,7 +173,7 @@ action/event types and seat count, then pass it as <code>codec</code> to encode/
 Destroy it once with <code>checkpoint_codec_destroy</code>. It retains schema programs, not
 game state. Every call still validates content, policy, values, and runtime contract;
 using a cache for a different type set is rejected. The uncached convenience path
-remains available and emits identical bytes. Recovery receivers and <code>Link</code> now
+remains available and emits identical bytes. Recovery receivers and <code>Link</code>
 keep these programs warm automatically.</p>
 <p><code>client_authority</code> transitions a surviving client to an approved newer epoch.
 Its Welcome resolves pending old IDs against the recovered frontiers, restarts
@@ -197,9 +200,10 @@ the cache; <code>delta_snapshots=false</code> selects a full-snapshot reference 
 match actual sent IDs/hashes within the current connection/checkpoint context.
 Facts encode only active occurrences, so empty ticks have a small header.</p>
 <p><code>egress_bytes_per_second</code> and <code>egress_bytes_per_pump</code> bound outbound traffic. Peer
-iteration rotates; checkpoints/facts precede optional snapshots. The per-peer
-burst permits two seconds of traffic or at least one complete message. Deferral
-retains reliable work and lets newer state supersede unsent snapshots. Stats expose
+iteration rotates; checkpoints/facts precede optional snapshots. Per-peer burst
+credit is capped at a quarter-second of the configured rate or one complete
+protocol packet, whichever is larger; see <a href="#delivery-under-transport-loss">delivery under transport loss</a>.
+Deferral retains reliable work and lets newer state supersede unsent snapshots. Stats expose
 full/delta counts, saved bytes, baseline misses, rejected ACKs, and egress deferral.
 The protocol contract is now version 7, including compact scheduled-input windows,
 removal, fresh-seat semantics,
@@ -214,9 +218,9 @@ Snapshots larger than <code>unreliable_packet_limit</code> (1,200 bytes by defau
 delivery so large full snapshots do not depend on lossy UDP fragmentation. Small
 deltas continue to use the superseding unreliable path. Each peer has at most one
 unacknowledged large snapshot; new large snapshots wait for its acknowledgement.
-Facts and small deltas may continue. Large snapshots receive reliable ACKs, with
-the usual heartbeat ACK as a fallback. A validated baseline miss releases the
-gate so an undecodable in-flight delta cannot prevent a replacement full state.
+Facts and small deltas may continue. Large snapshots use the same unreliable
+latest-state ACKs as smaller snapshots, with the periodic heartbeat ACK as a
+fallback. A validated baseline miss releases the gate so an undecodable in-flight delta cannot prevent a replacement full state.
 This bounds ordered state backlog during bootstrap and on slow connections;
 large-state update frequency is consequently limited by acknowledgement latency.</p>
 <p>Failure-corpus expansion and admission/recovery review remain required. These tests
@@ -246,7 +250,7 @@ or reconstruct evicted state.</p>
 a Welcome/journal reset. The Godot Session facade presents those as confirmed
 action-result changes, so a stale/future action verdict survives a full resync.
 Ordinary fact-delivered results retain their existing presentation route.</p>
-<p>A same-epoch Welcome now rebases the existing presentation journal. Queued changes
+<p>A same-epoch Welcome rebases the existing presentation journal. Queued changes
 survive, already confirmed watched effects mature at the new checkpoint, and
 abandoned speculative effects receive cancellations. The runner checks output
 capacity before installing the checkpoint; a full queue defers installation until
@@ -255,7 +259,7 @@ Welcome verdicts use Session&#39;s synthetic route, avoiding duplicate confirmed
 verdicts. First admission and authorized epoch changes retain their distinct
 initialization/reset behavior. Unknown effects in missing history are not invented;
 this preserves known obligations, not a complete effect log across arbitrary gaps.</p>
-<p>Scheduled clients now refine their welcome-time prediction lead from
+<p>Scheduled clients refine their welcome-time prediction lead from
 <a href="input_timing.html">acknowledged-input turnaround and arrival margin</a>. Local send
 history is bounded, stale samples are rejected, and large excess lead can drain
 without retiming queued controls/actions. The existing <code>clock_scale</code> contract
@@ -275,7 +279,7 @@ capacity, event identity or timing policy is relaxed. Consumers must still drain
 the journal after pumping/stepping; the diagnostic record is not error recovery.</p>
 <p>A receive batch may itself span more than the fact ring, even when the transport
 retained complete snapshots and every needed event. Before an incoming valid fact
-would overflow that ring, the receiver now tries to apply a usable retained
+would overflow that ring, the receiver tries to apply a usable retained
 snapshot, mature its watched effects and rebuild prediction lead. This can release
 an older complete prefix even when a later fact is still delayed. Mid-batch work
 uses zero elapsed presentation time; the pump advances that clock once at its end.
@@ -356,7 +360,7 @@ and generates a fresh challenge; it defaults off. Speedball enables it for direc
 sessions so Join/Watch works after a manual save/resume without exposing epochs in
 the game UI. See the <span class="local-reference" title="docs/replay/results/speedball-save-2026-09-08/README.md · available in the repository">save/discovery result</span>.</p>
 <h2 id="prediction-limits-and-cooperative-action-timing">Prediction limits and cooperative action timing<a class="heading-anchor" href="#prediction-limits-and-cooperative-action-timing" aria-label="Link to this section">#</a></h2>
-<p>Reaching <code>max_prediction</code> now returns <code>Capacity</code> from <code>client_step</code> and increments
+<p>Reaching <code>max_prediction</code> returns <code>Capacity</code> from <code>client_step</code> and increments
 <code>Stats.stalls</code> while preserving the readable world, journal and queued actions.
 Continue pumping. An ordinary correction or complete ahead snapshot can resume
 prediction using retained facts; actual fact/history exhaustion still requests a
@@ -457,9 +461,9 @@ latency bound during arbitrary loss or congestion.</p>
 byte allowance to the transport and stop on <code>Buffer_Too_Small</code>, leaving the packet
 queued for the next pump. Crossing the budget no longer discards reliable facts or
 actions. Existing packet/byte limits and transport storage bounds remain intact.</p>
-<p>Latest-observation clients now negotiate <a href="observations.html">packet-local sparse observations</a>
+<p>Latest-observation clients negotiate <a href="observations.html">packet-local sparse observations</a>
 when both peers support them. Canonical values, cadence, admission and checkpoint
 contracts stay unchanged; old peers and dense values use the full packet.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/replay/owner-streams.html"><span>Cooperative body ownership</span><span aria-hidden="true">→</span></a><a href="groups.html"><span>Authored prediction groups</span><span aria-hidden="true">→</span></a><a href="replication.html"><span>Recipient views and interest management</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/replay/framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/owner-streams.html"><span>Cooperative body ownership</span><span aria-hidden="true">→</span></a><a href="groups.html"><span>Authored prediction groups</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#gameplay-model" class="">Gameplay model</a><a href="#runtime-ownership-and-loop" class="">Runtime ownership and loop</a><a href="#admission-delivery-and-recovery" class="">Admission, delivery, and recovery</a><a href="#durable-authority-checkpoints" class="">Durable authority checkpoints</a><a href="#verification-and-current-limits" class="">Verification and current limits</a><a href="#authority-side-infrastructure-checks" class="">Authority-side infrastructure checks</a><a href="#presentation-failures-and-catch-up" class="">Presentation failures and catch-up</a><a href="#delivery-under-transport-loss" class="">Delivery under transport loss</a><a href="#opt-in-direct-host-epoch-discovery" class="">Opt-in direct-host epoch discovery</a><a href="#prediction-limits-and-cooperative-action-timing" class="">Prediction limits and cooperative action timing</a><a href="#small-action-copies-under-loss" class="">Small action copies under loss</a><a href="#receive-budget-deferral" class="">Receive-budget deferral</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

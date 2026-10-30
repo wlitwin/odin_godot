@@ -4,19 +4,19 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay checkpoint and recovery contract</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/recovery.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#data-boundary">Data boundary</a><a href="#api-and-ownership">API and ownership</a><a href="#wirefile-format">Wire/file format</a><a href="#godot-persistence">Godot persistence</a><a href="#verified-gates">Verified gates</a><a href="#next-m5-implementation-sequence">Next M5 implementation sequence</a></nav></details>
-<article class="reading-body "><p>Replay now has a durable authority archive and explicit save/resume APIs. A saved
-world can be restored by a fresh process with its player reservations, room rules,
-and action frontiers intact. This is the shared foundation for M4 saves and M5
-migration. Bounded checkpoint replication to an explicitly trusted peer now has
-native and real ENet gates. The coordinator decision model and runner permits now
-also have native/Godot gates. Authenticated control RPCs, a SQLite backend, and a
-real-process simulation handoff/coordinator-restart gate now exist. The Room driver
-also has native/browser planned/crash, old-owner return, repeated handoff,
-control-partition and successor-loss gates. Durable provisioning, checkpoint
-publication and cold restore are implemented. See the <a href="framework-audit.html">framework audit</a>
-for evidence and remaining deployment/recovery limits.</p>
+<article class="reading-body "><p>A Replay authority archive lets a fresh process restore the World, player
+reservations, room rules, and action frontiers from a checkpoint. Recovery
+combines that state with an authorized successor, a newer authority epoch, and
+a handshake that reconciles surviving clients. An archive alone does not elect
+an authority or recover work accepted after its capture tick.</p>
+<p>The implementation includes bounded replication to an explicitly trusted peer,
+authenticated coordinator RPCs with SQLite storage, durable provisioning,
+checkpoint publication, and cold restore. Native and browser gates cover planned
+and crash handoff, old-owner return, repeated handoff, control partition, and
+successor loss. The <a href="framework-audit.html">framework audit</a> records the evidence
+and remaining deployment/recovery limits.</p>
 <p>The <a href="../../replay/net/checkpoint_upgrade.html">explicit protocol-6 to 7 archive bridge</a>
-now preserves compatible worlds while validating the old contract. It grants no
+preserves compatible Worlds while validating the old contract. It grants no
 new lease; coordinated upgrade remains an application transition. Normal loaders
 continue to reject incompatible versions.</p>
 <h2 id="data-boundary">Data boundary<a class="heading-anchor" href="#data-boundary" aria-label="Link to this section">#</a></h2>
@@ -122,7 +122,7 @@ replay of every input after a crash requires a separate accepted-decision log.</
 <p>Already executed gameplay is in the frame. Recent verdicts and settled/received
 frontiers prevent accepted sequence IDs from being applied again. Lost work after
 the archive tick is outside this guarantee. A surviving client that observed such
-work needs the planned recovery handshake to reconcile its newer frontier; simply
+work needs the recovery handshake to reconcile its newer frontier;
 changing its epoch is not a complete abrupt-recovery protocol.</p>
 <h2 id="wirefile-format">Wire/file format<a class="heading-anchor" href="#wirefile-format" aria-label="Link to this section">#</a></h2>
 <p>Archive version 4 uses the canonical <code>RPLY</code> envelope (52 bytes), custom message
@@ -139,7 +139,7 @@ seats, credential digests, action frontiers, scheduling, and outcome order. A
 malformed/truncated/oversized/wrong-content archive cannot partially install a
 world. The checksum detects accidental corruption; it is not authentication.</p>
 <p>Schema/content/version mismatches currently reject the archive. There is no
-automatic schema upgrade. Future converters must explicitly decode an old schema,
+automatic schema upgrade. Converters must explicitly decode an old schema,
 convert the complete frame/session contract, validate the new result, and retain
 the old file until a new archive has been successfully written.</p>
 <p>The archive can exceed the 64 KiB transport packet limit. The recovery transfer
@@ -214,5 +214,5 @@ checkpoint age and size, restore cost, and responsiveness after recovery.</li>
 this snapshot-based acceptance. M5 remains incomplete until the driver, fencing,
 partition policy, and real successor takeover gates exist.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../replay/net/checkpoint_upgrade.html"><span>Explicit checkpoint conversion</span><span aria-hidden="true">→</span></a><a href="../../replay/recovery/README.html"><span>Replay checkpoint replication</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/recovery.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../replay/net/checkpoint_upgrade.html"><span>Explicit checkpoint conversion</span><span aria-hidden="true">→</span></a><a href="../../replay/recovery/README.html"><span>Replay checkpoint replication</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/recovery.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#data-boundary" class="">Data boundary</a><a href="#api-and-ownership" class="">API and ownership</a><a href="#wirefile-format" class="">Wire/file format</a><a href="#godot-persistence" class="">Godot persistence</a><a href="#verified-gates" class="">Verified gates</a><a href="#next-m5-implementation-sequence" class="">Next M5 implementation sequence</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/recovery.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

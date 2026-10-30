@@ -4,18 +4,17 @@
 an authority-controlled room. `Room` owns an existing `authority.Service`; its
 durable `Bundle` contains the authority record, member credentials, enrollment
 retry records and invite consumption. Every change uses the same revision CAS.
-This closes the previous gap between durable membership and separately configured
-service keys. The game simulation and host-migration protocol are unchanged.
+Membership and its service keys therefore commit together. The game simulation and host-migration protocol are unchanged.
 
 The SQLite store also provides [durable room checkpoint publication](checkpoints.md)
 with separate revision CAS, typed validation and atomic metadata/bytes. The
 [authenticated transfer endpoints](checkpoint/README.md) have native TLS restart
-acceptance. The standalone service now registers the three compiled game models;
+acceptance. The standalone service registers the three compiled game models;
 Room/Party owns publication and authenticated cold restore with native/browser
 acceptance. Game models/dependencies must still opt into the typed service contract;
 see [published restore](../godot/room_restore.md).
 
-The [create/join protocol and Godot connection](protocol.md) now expose this
+The [create/join protocol and Godot connection](protocol.md) expose this
 backend through a bounded room hub and verified TLS. Native create/join/restart
 acceptance passes on loopback. The [client journal](enrollment.md) adds durable
 native/browser enrollment. Shared Party menus and Room recovery are integrated into

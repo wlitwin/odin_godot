@@ -1,17 +1,16 @@
 # Process registration and gameplay identity
 
 A control key identifies an authorized member. A process incarnation identifies
-one running instance of that member. The service now assigns fresh incarnations
+one running instance of that member. The service assigns fresh incarnations
 through authenticated Challenge/Rebind RPCs; callers do not need to guess the next
 counter or reuse an old process identity.
 
 The initial member, key, permissions, game-token hash, and endpoint are
-provisioned by a trusted room/admission provider. The new
+provisioned by a trusted room/admission provider. The
 [admission backend](../provision/README.md) persists those credentials together
 with invite consumption. Its bounded create/join protocol has native TLS acceptance;
-the client journal now adds durable native/browser enrollment. Public deployment
-and game UI remain pending.
-Registration preserves those
+the client journal adds durable native/browser enrollment. Public deployment
+remains separate from these local acceptance gates. Registration preserves those
 permissions and the game-token binding. It can update the endpoint using an
 explicit request, but it cannot enable hosting or create an unknown member.
 
@@ -99,5 +98,6 @@ These real-process gates passed:
 The partition injection pauses the old host's control pumping; its gameplay
 connection remains present. This establishes the lease/room behavior under that
 specific partition, not every network topology or every crash instruction boundary.
-Broader combat coverage, competitive migration, lobby/invite provisioning, and
-other platform/reachability profiles remain roadmap work.
+These gates do not establish broader combat coverage, competitive migration,
+lobby/invite provisioning or other platform/reachability profiles; consult each
+feature's own acceptance results.

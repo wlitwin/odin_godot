@@ -4,32 +4,31 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>speedball — the contested twin</h1><div class="reader-meta"><span>1 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/speedball/README.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>This is the same game as <span class="local-reference" title="examples/slopball/ · available in the repository">slopball</span> implemented on the simulation
-lane; read them side by side to compare the models. Slopball hands the ball&#39;s
-simulation seat to the last toucher using <code>play.Puppet</code>. Speedball keeps one
-authority and lets every peer
-predict the ball**:</p>
+<article class="reading-body "><p>Compare this game with <span class="local-reference" title="examples/slopball/ · available in the repository">slopball</span> to choose a simulation policy.
+Slopball hands the ball&#39;s physics simulation to the last toucher using
+<code>play.Puppet</code>. Speedball keeps one authority and lets each peer predict the
+ball locally. Kit&#39;s simulation lane schedules fixed ticks and retains history
+for correction:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_tick = &quot;contested&quot;)</span>
-ball_tick :: <span class="hljs-keyword">proc</span>(self: ^Ball) -&gt; (scored: <span class="hljs-type">u8</span>) { ... }</code></pre></div><p>That one config token is the <strong>predict-the-contested-object</strong> pattern (the
-Rocket League middle path): local dribbles and kicks resolve immediately. The
-integration test drives a ball to goal through 240 ms RTT using local touches.
-The server&#39;s
-simulation stays the only truth; when an opponent you render in the past
-touches it first, the reconcile snaps your ball and the glide hides the
-loss. Costs, paid honestly: resim CPU on every peer, and that mispredict.</p>
+ball_tick :: <span class="hljs-keyword">proc</span>(self: ^Ball) -&gt; (scored: <span class="hljs-type">u8</span>) { ... }</code></pre></div><p>The <code>contested</code> tag enables local prediction of the shared ball, so local
+dribbles and kicks can respond before the server result arrives. The integration
+test drives a ball to goal through 240 ms RTT using local touches. The server
+settles gameplay: when accepted state disagrees with prediction, the client
+applies the correction and replays its remaining predicted ticks. Display
+smoothing eases the resulting position change. Each peer pays the CPU cost of
+replay and may show a speculative touch that is later corrected.</p>
 <p>Also showcased: the GOAL RESET is predicted (detection + kickoff freeze live
 in the ball&#39;s own tick — every screen snaps the ball home the instant its
 sim crosses the line), while the SCORE is authority-only (<code>ball_tick_then</code>,
 delta lane). The world pass is pure sim — contact and kicks for whichever
 kicker⟷ball pairs this peer has inputs for, no role gates anywhere.</p>
-<p>And the full send: speedball runs PREDICT-WORLD (<code>echo_inputs</code> — the Rocket
-League model). The kickers are <code>contested</code> too, batches echo every player&#39;s
-held input, and every peer simulates the whole pitch on one predicted
-timeline — your touches answer your feet, an opponent&#39;s tackle plays out
-beside their avatar immediately, and the server&#39;s word arrives as small
-glided corrections. (The claim-weighted middle path — predict only the
-ball, watch the players — remains in the lane for games that want it; see
-docs/kit/sim.md&#39;s contested section for when to pick which.)</p>
+<p>Speedball also predicts the players (<code>echo_inputs</code>). The kickers are <code>contested</code>,
+and batches echo each player&#39;s held input so every peer simulates the whole
+pitch on one predicted timeline. Remote contacts therefore use predicted avatars
+as well as a predicted ball. Corrections can affect any of them. The lane also
+supports predicting the ball while watching delayed authority poses for remote
+players, with a presentation claim selecting the ball&#39;s displayed pose; see
+docs/kit/sim.md&#39;s contested section for the tradeoff.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh examples/speedball
 <span class="hljs-variable">$GODOT</span> --path examples/speedball                  <span class="hljs-comment"># host, join from a second window</span>
 SPB_LATENCY=120 <span class="hljs-variable">$GODOT</span> --path examples/speedball  <span class="hljs-comment"># feel the touches at 240ms RTT</span>
@@ -39,5 +38,5 @@ bash examples/speedball/native_run.sh   <span class="hljs-comment"># contested-b
 Env: <code>SPB_ROLE</code> (host/join/single/serve) · <code>SPB_PORT</code> · <code>SPB_NAME</code> ·
 <code>SPB_TOKEN</code> · <code>SPB_LATENCY</code> · <code>SPB_BOT</code> (striker/idle) · <code>SPB_GOALS</code>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/speedball/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/speedball/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/speedball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

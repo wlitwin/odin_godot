@@ -1,5 +1,9 @@
 # Cavecrawl floor-state acceptance
 
+Check which player values survive descent and which reset on another run. The
+suite compares complete replayed state/events and inspects actual Godot transition
+frames, including converted historical archives.
+
 ```sh
 REPLAY_CAVE_FLOOR_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_floor/run.sh
 ```

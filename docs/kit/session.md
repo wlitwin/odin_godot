@@ -199,21 +199,20 @@ and allocate straight from `context.allocator`. A game driving them under a cust
 must keep `context.allocator` STABLE across each subsystem's init, use, and destroy, because
 their frees inherit whatever ambient is in force at teardown.
 
-The middle tier is verified by machinery, not by reading. `tests/kitsession`'s
+An allocator-isolation test checks the stored-and-rebound allocator convention. `tests/kitsession`'s
 `the_session_never_spends_the_ambient_allocator` runs a full lifecycle (start, join, both
 spawn paths, blobs, interest, stats, profiles, ticks, kick, leave, disconnect, a re-init,
 destroy) with a tracking allocator handed to the session and a *watching* allocator
 installed as the ambient, then asserts the session touched the ambient ZERO times. It is the
 only way to catch a newly added root that forgot to rebind, because the omission is silent:
-the session still works, it just spends memory it does not own.
+the session can appear to work while allocating through the wrong allocator.
 
 ## Start, drive, drain
 
 ([kit/boot](boot.md) drives this whole section for you: `boot_host`/
 `boot_join` call the starts, and generated `<game>_net_frame` ticks and drains
 through Boot. What follows is
-the layer underneath, which stays public for games that want the ritual
-their own way.)
+the lower-level API, available for games that need custom lifecycle ordering.)
 
 ```odin
 session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false)
@@ -233,9 +232,8 @@ SERVER, not a player. Its seat is flagged `Player.dedicated` on every roster (th
 carries it, so clients know too): games skip it when spawning avatars
 (`if p.dedicated {continue}`), the kit lobby/scoreboard hide it, `session_count()` does not
 count it, and `max_players` caps humans only. Host migration never arms: a dead dedicated
-server restarts; migration is the peer model's answer to a *player*-host leaving. This is
-the always-on/public escape hatch; the friends-host-for-friends model is unchanged. There is
-one call door: [`kboot.boot_serve`](boot.md). See `examples/slopball/server_run.sh`.
+server restarts; migration is the peer model's answer to a *player*-host leaving. Use this role when infrastructure runs the authority. The player-hosted
+role remains available. The Boot entry point is [`kboot.boot_serve`](boot.md). See `examples/slopball/server_run.sh`.
 
 Clients call `session_client_start` when they begin connecting and `session_client_join`
 once the transport handshake completes; no WELCOME within `join_timeout` produces
@@ -618,7 +616,7 @@ AFTER the verb's `_then`. It survives session starts, like everything wired in
 
 **Existence global, freshness local.** Every peer still knows every entity: spawns,
 despawns, joins, saves, and migration backups are never filtered, so
-everything those give you for free stays free. What interest filters is the
+those lifecycle operations continue to include the complete registry. Interest filters the
 per-tick STATE traffic: a peer only receives deltas and owner-stream samples
 for entities near its **focus**, and it is off by default.
 
@@ -689,7 +687,7 @@ against the reliable lane.
 
 ### Host relay
 
-Almost every app-channel citizen wants the same shape. A client sends its word **up** to the
+Several app-channel subsystems use the same relay pattern. A client sends its word **up** to the
 host; the host **stamps** the sender it already vouched for and rebroadcasts; a peer that
 receives a stamped cast from anyone but the host is looking at a **spoof** and drops it; and
 the author's own copy comes back, or does not, by policy.
@@ -739,7 +737,7 @@ ksess.relay_flush(&c.relay)        // host: broadcast (+ local echo) · client: 
 
 Tags are one byte and collisions are LOUD: `relay_route` asserts on a tag already relayed by
 a different subsystem, naming the taken ones (comms 0, [combat](combat.md)'s fires 1, xfer
-2, [kit/sim](sim.md) 3). Not every citizen needs the relay: the fire lane is cast-only with
+2, [kit/sim](sim.md) 3). Not every subsystem needs the relay: the fire lane is cast-only with
 no upload arm, and kit/sim's lane rides `SES_APP` directly on the stream channel with its
 own tick semantics.
 
@@ -856,8 +854,10 @@ session_backup_parts :: proc(...) -> (game_blob, snapshot: []u8, ok: bool) // co
 ```
 
 The session names WHO; the info blob is opaque to it (a Steam lobby id fits where an
-`addr:port` does). Migration is coop-lane only: `boot_migration` refuses a sim lane
-(the lane's authority cannot migrate without a rebuild; a dead sim server restarts).
+`addr:port` does). Live migration is supported only for the cooperative lane.
+`boot_migration` requires that no simulation lane is installed; this precondition
+is asserted in development builds. Simulation-lane recovery restarts the authority
+with fresh lane history rather than migrating live rollback state.
 
 ## Ownership transfer
 
@@ -928,8 +928,9 @@ drained next frame, it must be queued.*
 
 ### Tier 1 — pull callbacks (the session is asking a question)
 
-The session lends you its eyes and its memory. It calls, you answer, it continues. Keep them
-**total and cheap**: answer the question, return. Do not mutate the world, send, spawn, or
+These callbacks return information the session needs before it can continue.
+Keep them **total and cheap**: return a valid answer promptly, including for
+empty or unavailable input. Do not mutate the world, send, spawn, or
 despawn inside one: the session is mid-operation and holding invariants.
 
 | callback | asked | why it can't be an event |
@@ -1155,10 +1156,10 @@ trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, seal
 }
 ```
 
-What falls out for free: the trade is an entity, so a mid-trade host
+The trade is an entity, so a mid-trade host
 migration resumes with the window intact, a reconnecting player finds their
 table where they left it, and a late joiner spectating the market sees it:
-zero catch-up code. `Ev_Player_Left` is the one edge you own: the host
+the ordinary snapshot restores its fields. `Ev_Player_Left` is the one edge you own: the host
 despawns any table naming the departed (their seat may reclaim it later, but
 an open offer must not outlive its owner's presence). Escrow is the variant
 when a promised item must not be double-promised to two windows: the offer's

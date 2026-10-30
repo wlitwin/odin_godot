@@ -1,11 +1,10 @@
 # Building gameplay: the kit + play recipe
 
-Godot's composition guides teach one move: build an entity from small, focused
-**components** (a `HealthComponent`, a `HitboxComponent`, a `VelocityComponent`), each
-owning one concern, attached to a node. That pattern maps cleanly onto single-player, which
-has exactly one runtime (the frame) and one authority (you). A `kit` game has neither: many
-peers run the behavior, and only the host decides. So you still compose, just along a
-different axis.
+A networked gameplay item has data, player intent, authority decisions, and
+presentation that may run on different peers or clocks. Kit represents its
+shared state in registered entities; the `play` package supplies local state
+machines, timing, and transition tracking. This recipe shows how to compose
+those pieces without mixing authority decisions into presentation.
 
 > Single-player composition asks *"what are its parts?"*: health, movement, hitbox.
 > kit + play composition asks *"where does each part live across the wire?"* It's the same
@@ -66,12 +65,12 @@ How these differ from Godot components:
 - They compose at the **struct** level, flattened by scriptgen, not at the scene-tree level
   at runtime.
 
-scriptgen carries an embedded primitive's wire, export, `@onready`, and signal needs up into
-the parent for free, and so do its **verbs**. A block that declares a `@(gd_command)` on
+scriptgen carries an embedded primitive's wire, export, `@onready`, and signal
+declarations into the parent, including its **commands**. A block that declares a `@(gd_command)` on
 itself has that command hoisted onto whatever entity embeds it (with the wielder threaded
 in), so a self-contained gameplay block (a gun that carries its own `fire`, a door its own
 `open`) drops in as one field and brings both its replicated state *and* its Intent seam.
-The composition is recursive: you keep leveling up (gun → loadout → character) without
+The composition is recursive (gun → loadout → character), without
 threading a command declaration back up to the entity by hand. See
 [kit/ — composing verbs from embedded blocks](kit/net.md#composing-verbs-from-embedded-blocks).
 
@@ -131,7 +130,7 @@ about getting them right.
 The gun fills **all seven** slots and composes the whole toolbox. Its states are
 `Ready → (fire) → Reloading` on an empty mag, or `Ready → Jammed` on a dud round that you
 mash the trigger to clear. It's host-authoritative, yet feels instant: the client predicts
-every transition and the host silently agrees.
+each eligible transition, then accepts or corrects it from authority updates.
 
 Several of these items also ship as drop-in **blocks**: `play.Gun` packages the gun's State +
 Authority + Prediction (plus kit/net's built-in Reconcile), `play.Ability` a cooldown cast,
@@ -271,8 +270,7 @@ it skips.**
 
 **Revive: a channeled ability.** A plain (non-predicted) command: `runner_revive` only
 asserts the target is down; `host_honor_revive` re-checks `kinter.in_range` and the reviver's
-pulse before granting `hp`. It skips Prediction and Reconcile because you can't honestly
-predict "did my friend agree I'm in reach," though the *channel bar* is pure local
+pulse before granting `hp`. It skips Prediction and Reconcile because reach depends on another player's authoritative state, though the *channel bar* is pure local
 presentation off the replicated `rev_pct`, built once and driven with `play.marker`:
 
 ```odin
@@ -364,8 +362,8 @@ that trip people up have hard rules:
    shadow from one field. Everything else (`Edge`, `Pace`, timers, clocks) stays **off the
    wire**.
 
-2. **Predict only what's deterministic from shared inputs.** Client prediction is honest
-   *only* when the client can compute the exact answer the host will. Cooldowns and the
+2. **Predict only what's deterministic from shared inputs.** Client prediction is useful
+   when shared inputs let the client reproduce the authority's decision. Cooldowns and the
    deterministic `jam_roll` qualify; an AOE that mutates many entities, or a check against
    another player's state, does **not**: those stay host-only (see revive, slime). When in
    doubt, don't predict: a plain command that resolves a few frames later beats a prediction

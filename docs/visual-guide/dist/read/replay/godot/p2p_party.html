@@ -18,7 +18,8 @@ request, grant and recent-room selection. A creator&#39;s <code>party.code</code
 shareable before other participants have enrolled.</li>
 <li>Continue pumping. After enrollment, the owner opens a separate control
 connection, obtains a fresh nonce using Godot Crypto, performs Challenge/Rebind,
-then queries until the entire enabled roster exists. No lease permits gameplay.</li>
+then queries until the entire enabled roster exists. This path creates no
+gameplay authority lease; the fixed-roster P2P protocol governs gameplay.</li>
 <li>When <code>ready</code>, obtain <code>p2p_party_rtc</code>. Keep the owner at its stable address while
 RTC borrows its authorization/ICE callbacks. The first roster member creates
 signaling; other members join. Supply the returned match scope and ordered
@@ -59,7 +60,7 @@ create/join/rejoin. Its separate <a href="../../examples/replay_duel_service/REA
 combines private SQLite enrollment and challenged mesh signaling. Browser return
 still requires a compatible participant archive: room credentials do not contain
 the simulation or input history.</p>
-<p>The native <a href="p2p_direct.html">P2P Direct owner</a> now supplies authenticated two-player
+<p>The native <a href="p2p_direct.html">P2P Direct owner</a> supplies authenticated two-player
 ENet gameplay, endpoint discovery and connection replacement. Party keeps
 registration and pair provisioning on separate Router lanes of one socket;
 <code>p2p_party_pair_begin</code> is also available to custom transport owners. Its endpoint
@@ -69,5 +70,5 @@ change ports without rewriting the durable enrollment request.</p>
 work. ENet and browser WebRTC are separate gameplay backends; a native RTC
 extension must not be assumed available.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_duel_service/README.html"><span>Replay Duel provisioning and signaling service</span><span aria-hidden="true">→</span></a><a href="p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/p2p_party.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_duel_service/README.html"><span>Replay Duel provisioning and signaling service</span><span aria-hidden="true">→</span></a><a href="p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/p2p_party.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#signaling-service" class="">Signaling service</a><a href="#current-game-coverage" class="">Current game coverage</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/p2p_party.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

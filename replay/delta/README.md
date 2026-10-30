@@ -1,7 +1,8 @@
 # Canonical snapshot deltas
 
 `replay/delta` provides a sparse XOR codec and a bounded snapshot cache over
-canonical bytes from `replay/schema`. It never compares compiler-layout padding.
+canonical bytes from `replay/schema`. Use it to send changes against an acknowledged
+snapshot baseline. It never compares compiler-layout padding.
 
 The little-endian delta format contains a u16 run count, then sorted,
 non-overlapping `(offset:u16, size:u16, XOR bytes)` runs. Values are at most 65,535

@@ -55,7 +55,7 @@ await diagram('kit-pickup','A Kit command from prediction to authority','The cli
   box(433,185,234,66,'Check + mutate chest',['Range · availability · predicate'])+arrow(550,166,550,183)+
   arrow(550,251,550,272)+box(433,275,234,66,'Authority command hook',['On success: credit the bag.'])+
   arrow(667,307,840,307)+text(752,293,'accepted fields',10,c.muted,'middle')+
-  arrow(550,375,175,375)+text(350,364,'Verdict + authoritative target state',11,c.muted,'middle')+
+  arrow(550,375,175,375)+text(350,364,'Result + authoritative target state',11,c.muted,'middle')+
   text(48,441,'ACCEPT',10,'#365b41','start',true)+text(128,441,'Prediction stands; replicated fields converge.',12)+
   text(48,469,'REJECT',10,c.accent,'start',true)+text(128,469,'Revert the chest prediction; no bag credit is issued.',12));
 await diagram('frame-boundary','Inside and outside a Replay frame','The World holds all mutable gameplay dependencies: player values, chest existence, allocation metadata, timers, RNG, and scheduled work. Immutable content is versioned. Godot, transport, and storage are external.',420,({c,text,box,rect,arrow})=>

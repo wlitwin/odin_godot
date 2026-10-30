@@ -27,13 +27,15 @@ continues the saved lifetime rather than replaying an old launch.
 
 ## Compatibility
 
-Arc paths introduced content **`0x5253435241503046`**; [dash actions](controls.md) now use content **`0x5253435241503047`**. Adding the Arc enum member changes
-the canonical schema/contract even though the world stays 52,600 bytes. Gameplay
-protocol 7 and checkpoint layout 4 are unchanged. Older peers fail admission;
-older saves require the explicit [offline converter](saves.md#converting-older-replay-runs).
+Arc paths introduced content **`0x5253435241503046`**; [dash actions](controls.md)
+subsequently introduced **`0x5253435241503047`**. Adding the Arc enum member changed
+the canonical schema/contract while the World remained 52,600 bytes. Gameplay
+protocol 7 and checkpoint layout 4 were unchanged by that transition. Older peers
+fail admission; older saves require the explicit [offline converter](saves.md#converting-older-replay-runs).
+The save guide records the current content identity and accepted input formats.
 
-The converter accepts contents 42–45 with frozen old world/Flash and event/action
-descriptors, maps the world fields and pending actions, and retains the existing
+The converter paths for contents 42–45 use frozen old World/Flash and event/action
+descriptors, map World fields and pending actions, and retain the existing
 identity, outcomes, inputs and asset checks. The content-45 fixture was created
 with the actual old converter before the enum changed. Existing destinations and
 source files are never overwritten. Earlier shared value types remain reused

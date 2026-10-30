@@ -1,8 +1,9 @@
 # Build a game with Replay
 
-Replay organizes gameplay around a complete typed World. The runner retains
-frames and input, restores a prior frame when necessary, and steps the changed
-suffix again. Godot owns input devices, scenes, animation, and effects outside
+Replay organizes gameplay around a World: a typed value containing all mutable
+simulation state. A frame captures that state at one tick. The runner retains
+frames and input, restores a prior frame when necessary, and reruns subsequent
+steps with the revised input. Godot owns input devices, scenes, animation, and effects outside
 that world. Replay is experimental; consult the support and runner contracts
 for the configuration you intend to ship.
 
@@ -44,9 +45,9 @@ metadata. Use supported value types and handles. Keep node references, sockets,
 audio playback, and persistent storage outside the frame.
 
 A step reads the world, typed input, simulation tick, and fixed versioned
-definitions. Read devices before stepping. Record semantic occurrences during
-the step and reconcile their Begin, Update, Confirm, and Cancel changes in
-presentation. The [frame contract](../../replay/architecture.md) describes
+definitions. Read devices before stepping. Record occurrences during the step to describe gameplay results, such as a
+pickup or a hit. Presentation uses their Begin, Update, Confirm, and Cancel
+changes to create, revise, confirm, or remove effects after replay. The [frame contract](../../replay/architecture.md) describes
 transaction boundaries and history limits.
 
 ## Connect Godot

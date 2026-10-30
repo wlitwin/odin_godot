@@ -1,9 +1,11 @@
 # Replay room service
 
-This standalone Godot/Odin service runs the durable admission hub, authenticated
-authority coordinator and per-room RTC signaling. It supports one game content ID
+Run this standalone Godot/Odin service to enroll room members, coordinate which
+process may accept gameplay results, and connect peers through RTC signaling. Its
+admission hub persists credentials; its authority coordinator grants and checks
+time-bounded hosting leases. It supports one game content ID
 and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
-browser clients use RTC. The service now stores and transfers durable checkpoints
+browser clients use RTC. The service stores and transfers durable checkpoints
 for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball and Slopball3D models. It does not run gameplay;
 checkpoint download does not grant authority or automatically resume a game.
 
@@ -17,14 +19,14 @@ From the repository root, create a private data directory and start the service:
 
 ```sh
 mkdir -m 700 -p .replay-room-data
-REPLAY_ROOM_CONTENT=0x4341564552504c33 \
+REPLAY_ROOM_CONTENT=0x4341564552504c39 \
 REPLAY_ROOM_DB="$PWD/.replay-room-data/rooms.sqlite3" \
 REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
 nix develop --command bash examples/replay_room_service/run.sh
 ```
 
 Creation is explicit. On subsequent runs omit `REPLAY_ROOM_CREATE_DB=1`, so losing
-the database does not silently recreate an empty authority floor.
+the database does not silently erase previous authority decisions.
 
 In another terminal:
 
@@ -79,13 +81,15 @@ records to fit capacity.
 
 The deployment's content ID selects validation code; client requests cannot select
 a model or schema. An explicit model/content mismatch fails before opening the
-database. Current compiled models are:
+database. Match this value to the game build’s `CONTENT` constant; changing it
+selects a different compatibility contract. Current compiled models are:
 
 | Model | Content ID |
 | --- | --- |
-| Cavecrawl | `0x4341564552504c33` |
+| Cavecrawl | `0x4341564552504c39` |
+| Cavecrawl with owner observations | `0x434156454f574e33` |
 | Speedball | `0x5253504545444234` |
-| Scrapyard | `0x5253435241503047` |
+| Scrapyard | `0x525343524150304b` |
 | Quickdraw | `0x52515549434b4432` |
 | Claimball | `0x52434c41494d4233` |
 | Slopball | `0x52534c4f50423234` |
@@ -93,8 +97,8 @@ database. Current compiled models are:
 
 Each admitted room receives one bounded checkpoint endpoint. Unknown-room traffic
 does not create endpoints, load storage or restart coordinators. Metadata and
-checkpoint bytes commit atomically with publication and full coordinator-Record
-CAS. A final authorization guard rejects a lease that expires during validation or
+checkpoint bytes commit atomically with publication and a compare-and-swap
+(CAS) against the full coordinator Record. A final authorization guard rejects a lease that expires during validation or
 storage work. A normal player cannot read authority-only checkpoints; reads require
 trusted hosting permission, and dedicated rooms additionally require infrastructure.
 

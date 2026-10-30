@@ -30,8 +30,8 @@ observations in the reducer as well as disabling local control. Content B24
 checkpoints are incompatible without an explicit conversion.
 
 The established Body2 prepare/commit handoff, velocity seeding and confirmed goal
-policies remain in use. This UI does not add solver rollback, replay contact caches,
-netgraph parity. See [Party and browser play](online.md) for service-backed sessions.
+policies remain in use. This UI does not add solver rollback, replay contact
+caches or provide netgraph parity. See [Party and browser play](online.md) for service-backed sessions.
 Original Slopball and the separate 3D port remain intact.
 
 ## Native checkpoint saves

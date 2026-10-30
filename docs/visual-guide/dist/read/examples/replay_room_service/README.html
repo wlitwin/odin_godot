@@ -2,12 +2,14 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay room service · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay room service</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_room_service/README.md" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay room service</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_room_service/README.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#local-cavecrawl">Local Cavecrawl</a><a href="#configuration">Configuration</a><a href="#durable-checkpoints">Durable checkpoints</a><a href="#verification">Verification</a></nav></details>
-<article class="reading-body "><p>This standalone Godot/Odin service runs the durable admission hub, authenticated
-authority coordinator and per-room RTC signaling. It supports one game content ID
+<article class="reading-body "><p>Run this standalone Godot/Odin service to enroll room members, coordinate which
+process may accept gameplay results, and connect peers through RTC signaling. Its
+admission hub persists credentials; its authority coordinator grants and checks
+time-bounded hosting leases. It supports one game content ID
 and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
-browser clients use RTC. The service now stores and transfers durable checkpoints
+browser clients use RTC. The service stores and transfers durable checkpoints
 for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball and Slopball3D models. It does not run gameplay;
 checkpoint download does not grant authority or automatically resume a game.</p>
 <p>The bundled SQLite service currently runs on macOS/Linux. Both frameworks and all
@@ -16,11 +18,11 @@ a hosted service or a completed Internet operational profile.</p>
 <h2 id="local-cavecrawl">Local Cavecrawl<a class="heading-anchor" href="#local-cavecrawl" aria-label="Link to this section">#</a></h2>
 <p>From the repository root, create a private data directory and start the service:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -m 700 -p .replay-room-data
-REPLAY_ROOM_CONTENT=0x4341564552504c33 \
+REPLAY_ROOM_CONTENT=0x4341564552504c39 \
 REPLAY_ROOM_DB=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/.replay-room-data/rooms.sqlite3&quot;</span> \
 REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_room_service/run.sh</code></pre></div><p>Creation is explicit. On subsequent runs omit <code>REPLAY_ROOM_CREATE_DB=1</code>, so losing
-the database does not silently recreate an empty authority floor.</p>
+the database does not silently erase previous authority decisions.</p>
 <p>In another terminal:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_CAVE_ROOM_SERVICE=ws://127.0.0.1:49740 \
 REPLAY_CAVE_ROOM_LOCAL=1 \
@@ -110,7 +112,8 @@ records to fit capacity.</p>
 <h2 id="durable-checkpoints">Durable checkpoints<a class="heading-anchor" href="#durable-checkpoints" aria-label="Link to this section">#</a></h2>
 <p>The deployment&#39;s content ID selects validation code; client requests cannot select
 a model or schema. An explicit model/content mismatch fails before opening the
-database. Current compiled models are:</p>
+database. Match this value to the game build’s <code>CONTENT</code> constant; changing it
+selects a different compatibility contract. Current compiled models are:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -120,7 +123,11 @@ database. Current compiled models are:</p>
 </thead>
 <tbody><tr>
 <td>Cavecrawl</td>
-<td><code>0x4341564552504c33</code></td>
+<td><code>0x4341564552504c39</code></td>
+</tr>
+<tr>
+<td>Cavecrawl with owner observations</td>
+<td><code>0x434156454f574e33</code></td>
 </tr>
 <tr>
 <td>Speedball</td>
@@ -128,7 +135,7 @@ database. Current compiled models are:</p>
 </tr>
 <tr>
 <td>Scrapyard</td>
-<td><code>0x5253435241503047</code></td>
+<td><code>0x525343524150304b</code></td>
 </tr>
 <tr>
 <td>Quickdraw</td>
@@ -149,8 +156,8 @@ database. Current compiled models are:</p>
 </tbody></table>
 </div><p>Each admitted room receives one bounded checkpoint endpoint. Unknown-room traffic
 does not create endpoints, load storage or restart coordinators. Metadata and
-checkpoint bytes commit atomically with publication and full coordinator-Record
-CAS. A final authorization guard rejects a lease that expires during validation or
+checkpoint bytes commit atomically with publication and a compare-and-swap
+(CAS) against the full coordinator Record. A final authorization guard rejects a lease that expires during validation or
 storage work. A normal player cannot read authority-only checkpoints; reads require
 trusted hosting permission, and dedicated rooms additionally require infrastructure.</p>
 <p>Use the <a href="../../replay/provision/checkpoint/README.html">checkpoint client API</a> on the
@@ -207,5 +214,5 @@ play and after migration. Its <code>party_restore_run.sh</code> and <code>party_
 gates resume actual saved cave play after every original process has exited, then
 admit a new guest and publish the continued game.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="../../replay/provision/checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_room_service/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="../../replay/provision/checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_room_service/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#local-cavecrawl" class="">Local Cavecrawl</a><a href="#configuration" class="">Configuration</a><a href="#durable-checkpoints" class="">Durable checkpoints</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_room_service/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

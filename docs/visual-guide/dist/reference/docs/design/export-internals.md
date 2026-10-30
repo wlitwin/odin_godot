@@ -1,5 +1,10 @@
 # Phase 5 — the export pipeline
 
+Historical implementation record for Phase 5. The verdicts and blockers below
+describe that milestone, including its incomplete browser path. The subsequent
+[web implementation record](web-internals.md) records browser execution; use
+[Exporting](../exporting.md) for current build instructions.
+
 Turns the working extension into a shippable game: `.odin` scripts are compiled
 **ahead of time, at export**, into the exported build (an exported game has no Odin
 compiler). Native desktop (macOS) is the **firm** milestone; web/WASM is secondary.

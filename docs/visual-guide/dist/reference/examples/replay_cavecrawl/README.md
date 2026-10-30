@@ -2,9 +2,12 @@
 
 This is a **separate, in-progress reimplementation** of the original
 [Cavecrawl](../cavecrawl/README.md). Both projects remain independently runnable.
-The new version uses Replay's complete-world simulation and session facade.
+The new version keeps mutable gameplay state in a `World` value. Replay's runner
+schedules simulation steps and manages input and history; `replay/godot.Session`
+connects that runtime to Godot and the network. Godot scenes display the resulting
+state and effects.
 
-The [online party menu](online.md) now creates and joins rooms through a
+The [online party menu](online.md) creates and joins rooms through a
 [standalone service](../replay_room_service/README.md), persists credentials,
 selects trusted successors automatically and rejoins recent parties. It has
 native TLS and browser RTC acceptance; public deployment remains open.

@@ -4,7 +4,9 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="README.html" aria-current="page">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Deterministic peer rollback — initial runner</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/p2p/README.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#input-and-confirmation-contract">Input and confirmation contract</a><a href="#determinism-and-trust">Determinism and trust</a><a href="#archives-and-participant-recovery">Archives and participant recovery</a><a href="#implemented-envelope-and-remaining-m7-work">Implemented envelope and remaining M7 work</a></nav></details>
-<article class="reading-body "><p><code>Runner(State, Input, Event, Seats)</code> is independent of the server-authoritative
+<article class="reading-body "><p>Use <code>Runner(State, Input, Event, Seats)</code> for a fixed-roster match whose peers
+replay the same deterministic simulation. The runner schedules steps and manages
+input delivery, prediction and rollback independently of the server-authoritative
 runner. Each participant owns its input stream and simulates the same complete
 match. No participant supplies authoritative state corrections to another.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">model := p2p.Model(World, Input, Event, <span class="hljs-number">2</span>){
@@ -109,7 +111,7 @@ backward time and missing transport callbacks. Both transports are borrowed;
 the caller owns their lifetimes and retirement.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Provider has authenticated the same ordered identities and fenced old traffic.</span>
 error = p2p.reconnect(&amp;survivor, replacement_transport, monotonic_ms)
-<span class="hljs-comment">// Continue pumping and advancing normally once phase is Running.</span></code></pre></div><p>The native Duel now exercises either participant returning. When the original
+<span class="hljs-comment">// Continue pumping and advancing normally once phase is Running.</span></code></pre></div><p>The native Duel exercises either participant returning. When the original
 listener returns, the surviving dialing process closes/reopens its ENet transport,
 rebuilds logical mappings and reconnects the retained runner even though the
 remote physical server ID is again 1. Closing the transport owner retires the old
@@ -150,29 +152,28 @@ work; either survivor retains its runner. Both reach the tick-600 reference worl
 divergence checks and native two-process ENet gate exist. A lost input burst
 recovers through retransmission and bounded rollback. The Godot demo reconciles
 speculative events and compares the final world with an independent reference.</p>
-<p>Confirmed <a href="spectators.html">spectators</a> now join a running match, replay received
+<p>Confirmed <a href="spectators.html">spectators</a> join a running match, replay received
 history, and reset explicitly after a blackout exceeds retained history. They use
 separate bounded transfer streams and never join the player confirmation roster.
-An admitted spectator can now rebind to another participant using a retained
+An admitted spectator can rebind to another participant using a retained
 state/event/chain anchor. The replacement must prove overlap; missing history or
 conflict is explicit. Native Duel and repeated native/WASM source-switch gates
 exercise this <a href="spectators.html#changing-the-source-without-discarding-the-world">continuity contract</a>.
 Optional <a href="profiling.html">profiling</a> separates forward/replay/hash/pump wall time from
 capture-to-simulation input latency. Standalone benchmarks measure process CPU and
 the effect of fixed input-delay settings using matched recorded gameplay.</p>
-<p>An initial <a href="admission/README.html">authenticated admission provider</a> now checks
+<p>An initial <a href="admission/README.html">authenticated admission provider</a> checks
 fixed-roster credentials before initial binding and browser rejoin. It reuses the
 bounded challenged signaling frontend and supports full-mesh introductions.</p>
-<p><a href="provision/README.html">Fixed-roster provisioning</a> now supplies durable room/invite
+<p><a href="provision/README.html">Fixed-roster provisioning</a> supplies durable room/invite
 enrollment, exact retries and authenticated incarnation changes. Its native TLS
 service/client and SQLite crash gates pass. The <a href="../godot/p2p_party.html">P2P party client</a>
-now connects browser Duel&#39;s invite menus to authenticated gameplay and fresh-process
-guest/creator return. The native <a href="../godot/p2p_direct.html">P2P Direct owner</a> now
-supports authenticated two-player ENet and fresh-process endpoint replacement.</p>
+connects browser Duel&#39;s invite menus to authenticated gameplay and fresh-process
+guest/creator return. The native <a href="../godot/p2p_direct.html">P2P Direct owner</a> supports authenticated two-player ENet and fresh-process endpoint replacement.</p>
 <p>Roster changes, public authenticated provisioning,
 cross-native-platform execution and deployment integration remain pending. A
 copied Frame alone does not resume this session protocol. The fixed-point corpus
-and archive replay execute in WASM. The playable Duel now also passes real WebRTC
+and archive replay execute in WASM. The playable Duel also passes real WebRTC
 Chrome-process gates for delayed/lost inputs, a bounded blackout, late spectator
 reset and coordinated participant-file restoration. Public rendezvous/TURN and
 other browser engines are not established by these local gates.
@@ -180,8 +181,8 @@ The archive retains a bounded diagnostic window, not a complete input/arrival lo
 for arbitrarily long matches. Broader recording tools and field-level diffs remain
 debugger work.</p>
 <p>See <a href="../../examples/replay_duel/README.html">Replay Duel</a> and the full
-<a href="../../docs/replay/roadmap.html">roadmap</a>. This is an M7 increment, not completion of
-all P2P capabilities or the Replay roadmap.</p>
+<a href="../../docs/replay/roadmap.html">roadmap</a>. These tests cover the implemented fixed-roster contract; the remaining P2P
+capabilities and Replay roadmap work need separate acceptance.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="profiling.html"><span>P2P timing and benchmark contract</span><span aria-hidden="true">→</span></a><a href="admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="profiling.html"><span>P2P timing and benchmark contract</span><span aria-hidden="true">→</span></a><a href="admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#input-and-confirmation-contract" class="">Input and confirmation contract</a><a href="#determinism-and-trust" class="">Determinism and trust</a><a href="#archives-and-participant-recovery" class="">Archives and participant recovery</a><a href="#implemented-envelope-and-remaining-m7-work" class="">Implemented envelope and remaining M7 work</a></nav><div class="outline-actions"><a href="../../../reference/replay/p2p/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

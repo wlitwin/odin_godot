@@ -14,7 +14,8 @@ Two players stand beside a chest with five items. The initial input says player
 one takes it. After eight ticks, a revised input says player two took it instead.
 Replay restores the whole world and rebuilds those ticks. Both inventories,
 the chest's destruction, projectile lifetime/allocation, RNG, and occurrence
-history are managed by that same operation.
+history are managed by that same operation. An occurrence is a recorded event
+with an identity that lets presentation match it across replay.
 
 The executable verifies the corrected result against an independent run that
 received the correct input from the start. It also copies the frame at tick four

@@ -49,8 +49,8 @@ The helper does not silently close an existing game session to start another one
 ## Storage and permission rules
 
 The service URL hashes to the same slot/reference keys used by Cavecrawl's original
-online implementation. The helper preserves its enrollment/cursor formats, so
-extracting the shared code does not reset identities. Namespace/content and an
+online implementation. The helper preserves its enrollment/cursor formats, so existing
+enrollment records retain their identities. Namespace/content and an
 exact service URL remain the application's configuration. `Party_Storage` supplies
 native slot selection and recent-reference CAS callbacks. The optional
 `provision_sqlite.Party_Store` owns a database connection and a copied path, and
@@ -93,7 +93,7 @@ other native storage platforms remain separate work. See the
 [Scrapyard flow](../../examples/replay_scrapyard/online.md), and
 [recorded integration evidence](../../docs/replay/results/scrapyard-party-2026-09-07/README.md).
 
-`Party_Config.ice_json` now carries validated deployment ICE settings into Room,
+`Party_Config.ice_json` carries validated deployment ICE settings into Room,
 including relay-only TURN configuration. The string is copied during open and
 retained across Room transitions. See [ICE configuration and relay evidence](transport/ice-deployment.md).
 
@@ -111,6 +111,6 @@ Speedball disables checkpoint reception for observers, and automatic successor
 selection considers connected player seats. The watch preference does not revoke
 the underlying invite's trusted membership permissions.
 
-[Quickdraw parties](../../examples/replay_quickdraw/online.md) now exercise native
+[Quickdraw parties](../../examples/replay_quickdraw/online.md) exercise native
 create/join/rejoin and browser combat recovery, observer permissions, fresh host
 return and original/successor checkpoint publication through the same component.

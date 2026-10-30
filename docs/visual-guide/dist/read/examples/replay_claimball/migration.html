@@ -6,8 +6,9 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#run-the-acceptance-fixture">Run the acceptance fixture</a><a href="#configured-room-contract">Configured Room contract</a></nav></details>
 <article class="reading-body "><p>Claimball can run through Replay&#39;s existing authenticated Room lifecycle. A trusted
 connected player receives complete authority checkpoints and can become host after
-planned handoff or owner loss. Prediction remains local-avatar-plus-ball; the
-checkpoint is the complete authority world, including outsiders.</p>
+planned handoff or loss of the current host. Prediction remains local-avatar-plus-ball; the
+checkpoint is the complete authority world, including remote players excluded
+from each client&#39;s prediction group.</p>
 <p>The fixed-coordinator entry point below remains useful for development.
 <a href="online.html">Party menus and browser RTC</a> now provide a provisioned Room path and
 durable publication as well. Whole-party restore now has native WSS/browser
@@ -50,5 +51,5 @@ Room state and retained checkpoint equality; it does not install a test world or
 grant authority. The <span class="local-reference" title="docs/replay/results/claimball-migration-2026-09-13/README.md · available in the repository">receipts</span>
 state the measured rollback and scope of these native checks.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Claimball Parties and browser play</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/migration.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Claimball Parties and browser play</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/migration.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#run-the-acceptance-fixture" class="">Run the acceptance fixture</a><a href="#configured-room-contract" class="">Configured Room contract</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_claimball/migration.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

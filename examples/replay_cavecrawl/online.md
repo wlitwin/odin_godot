@@ -1,8 +1,9 @@
 # Party menus and durable enrollment
 
-The separate Replay Cavecrawl can now create/join parties through the
-[room service](../replay_room_service/README.md). Players no longer need preassigned
-member IDs or control keys. With `REPLAY_CAVE_ROOM_SERVICE` configured, the menu
+Create or join a Replay Cavecrawl party through the
+[room service](../replay_room_service/README.md), which enrolls trusted members
+and coordinates which process may host. This flow supplies member IDs and control
+keys instead of requiring players to configure them. With `REPLAY_CAVE_ROOM_SERVICE` configured, the menu
 shows **Create party**, **Join party**, **Rejoin recent party**, and **Copy party
 invite**. Without it, the existing solo/LAN menu and preconfigured fixtures remain.
 

@@ -1,6 +1,7 @@
 # Runner timing diagnostics
 
-Set a runner's `profile_clock` to a monotonic microsecond clock. `profile_metrics`
+Use runner timing diagnostics to measure simulation, snapshot and correction
+costs separately. Set a runner's `profile_clock` to a monotonic microsecond clock. `profile_metrics`
 records bounded histograms and optional `profile_sample(user, metric, elapsed_us)`
 receives raw durations. The sample callback should write to preallocated storage;
 it must not affect gameplay or block on I/O. Nothing is serialized or transmitted.

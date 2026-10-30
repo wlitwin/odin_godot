@@ -1,7 +1,8 @@
 # Self-contained save bundles
 
-A bundle combines an opaque checkpoint/root document with the exact asset payloads
-it requires. The root remains independently encoded; assets are sorted by reference
+Use a bundle to save a checkpoint together with the asset payloads needed to
+restore it. A bundle combines an opaque checkpoint/root document with those exact
+payloads. The root remains independently encoded; assets are sorted by reference
 and deduplicated. Capturing gameplay state does not silently capture an entire cache.
 
 `bundle_encode(root, refs, cache, meta)` validates references, availability and total

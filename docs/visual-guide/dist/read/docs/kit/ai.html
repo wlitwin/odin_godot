@@ -10,14 +10,13 @@ as a director that paces enemy waves. It supplies the <em>verbs</em>; you write 
 NPC shape: host-brained, owner-streamed poses. On the <a href="sim.html">sim lane</a> an NPC is a
 server-ticked entity with <code>predict</code> fields, and its brain runs in the AUTHORITY pass. The
 perception/steering math is pure and safe in either; the wave director is
-authority-side logic and ports as-is. See <a href="nav.html">nav</a> for the one genuinely
-dangerous crossing.</p>
+authority-side logic and ports as-is. See <a href="nav.html">nav</a> for the restriction on live NavigationServer queries.</p>
 <h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
 <p><strong>Patterns, not a framework</strong>: kit/ai has no Brain type, no behavior tree, no update loop.
 The game writes an ordinary <code>switch</code> over a replicated <code>state: u8</code> in its <strong>host</strong> tick,
 built from these verbs. Cavecrawl&#39;s dweller is the documented example.</p>
 <p>An NPC is an entity <strong>owned by the host player</strong>: the host&#39;s brain tick writes <code>x/y</code> like
-any owner writes streamed fields, and every client interpolates the motion for free. Its
+any network owner writes streamed fields, and clients interpolate the motion. Its
 state byte and hp are plain replicated fields. The whole network presence of cavecrawl&#39;s
 dweller is this struct (<code>examples/cavecrawl/scripts/dweller.odin</code>):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Dweller :: <span class="hljs-keyword">struct</span> {
@@ -28,9 +27,9 @@ dweller is this struct (<code>examples/cavecrawl/scripts/dweller.odin</code>):</
 	hp:     <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	state:  <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// its mood, on every screen</span>
 	...
-}</code></pre></div><p>Replicated mood byte + owner-streamed position = <strong>clients watch the hunt for free</strong>: every
-peer renders the same 🦇/😈/💨 from <code>state</code> and sees the chase as smooth interpolated
-motion, without one line of AI or wire code on the client.</p>
+}</code></pre></div><p>Clients render the mood from <code>state</code> and interpolate the streamed position.
+The host runs the brain; the clients need presentation code, with no separate
+AI decision loop or NPC packet format.</p>
 <p>Everything here is deterministic, allocation-free, dimension-agnostic (<code>[3]f32</code>; 2D leaves
 z zero) and engine-free.</p>
 <h2 id="perception">Perception<a class="heading-anchor" href="#perception" aria-label="Link to this section">#</a></h2>
@@ -137,5 +136,5 @@ smooths the tick steps.</li>
 everything (open world).</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="nav.html"><span>kit/nav — pathfinding adapters</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ai.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="nav.html"><span>kit/nav — pathfinding adapters</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ai.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#perception" class="">Perception</a><a href="#steering-per-tick-returns-the-new-position" class="">Steering (per tick; returns the new position)</a><a href="#the-wave-director" class="">The wave director</a><a href="#worked-example-the-dwellers-brain" class="">Worked example: the dweller's brain</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/ai.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,7 +1,7 @@
 # claimball — predict-self + the claim
 
-The third telling of one soccer game, so you can read the models against each
-other and pick one:
+Run Claimball to compare local avatar prediction with prediction of the whole
+world. These three soccer examples use different authority and display policies:
 
 | example | model | the ball |
 |---|---|---|
@@ -9,20 +9,22 @@ other and pick one:
 | [speedball](../speedball/) | predict-**world** (`echo_inputs`) | every avatar echoed; one predicted timeline |
 | **claimball** | predict-**self** + the **claim** | only your avatar predicted; the ball predicted and *claimed* |
 
-Claimball keeps the ball `@(gd_tick = "contested")` — predicted on every screen,
-so a touch resolves on your timeline the instant you make it — but a kicker is a
-plain `@(gd_tick)` (predict-self, `echo_inputs = false`): each peer predicts only
-its OWN kicker and WATCHES the others, an interp-delay behind but exact. No
-held-input echo, no constant corrective glide on remote avatars — the price is
-paid on the shared ball instead, through the **claim**.
+Claimball keeps the ball `@(gd_tick = "contested")`, so each peer predicts the
+ball locally before the authority settles its state. A kicker uses plain
+`@(gd_tick)` (predict-self, `echo_inputs = false`): each peer predicts its own
+kicker and displays remote kickers from authority history with an interpolation
+delay. The game does not echo held input for remote prediction. A **claim**
+chooses how to display the ball as it moves between these timelines; it does not
+transfer gameplay authority.
 
 ## The claim
 
-A contested ball runs on my predicted timeline, but my opponent renders in the
-past. If I always draw the ball from my prediction, a shot my opponent takes
-appears a whole interp-delay before their avatar visibly kicks it. So the ball's
-*presentation* is claim-weighted — one boolean, asked every tick: **is my sim
-driving this ball right now?**
+A contested ball runs on the local predicted timeline while a remote kicker is
+drawn from delayed authority history. Drawing every ball pose from local
+prediction would show a remote shot before the remote avatar visibly kicks it.
+The ball's presentation—the displayed state and effects—therefore uses a claim
+weight. The live world pass claims the ball while the local kicker is in reach
+or the ball is still moving fast from that kicker's shot.
 
 ```odin
 // claimball.odin, the world pass — LIVE pass only (presentation, never a resim):
@@ -33,21 +35,21 @@ if ksim.lane_live(&g.lane) {
 }
 ```
 
-Claimed, the ball draws instant from your prediction — legitimately, you caused
-its motion. Unclaimed, it draws the watched view, so an opponent's touch moves it
-beside their delayed avatar, right where they appear to hit it. `lane_claimed`
+Claimed, the ball draws from your prediction. Unclaimed, it draws from the
+watched authority history, so an opponent's touch moves it beside their delayed
+avatar. `lane_claimed`
 reads the weight back (near 1 while claiming, decaying to 0 over ~¼s after).
 
-**The one footgun:** release the claim when the ball **slows**, never on mere
+**Release the claim when the ball slows**, never on mere
 distance. Your kick's whole flight is your consequence — hold the claim while the
 ball is fast and far. Release on distance and the fade target (the watched view,
 sitting a timeline-skew *behind* a fast ball) yanks your own kick backward
-mid-flight. Release on slow, the timelines have converged, and the handback is
-invisible (`util.odin`'s `RELEASE_SPEED`).
+mid-flight. Releasing when it slows lets the timelines converge before the display returns
+to the watched view (`util.odin`'s `RELEASE_SPEED`).
 
-Also here, unchanged from the twin: the GOAL RESET is predicted (every screen
-snaps the ball home the instant its sim crosses the line), the SCORE is
-authority-only (`ball_tick_then`, delta lane).
+The goal reset is predicted: each screen snaps the ball home when its simulation
+crosses the line. The score changes only on the authority in `ball_tick_then`
+and replicates through the delta lane, Kit's field-change replication path.
 
 ```sh
 bash build/build_scripts.sh examples/claimball

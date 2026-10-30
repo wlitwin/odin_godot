@@ -1,8 +1,8 @@
 # Tagged value unions
 
-Replay now supports ordinary Odin tagged unions and `union #no_nil` when every
-possible variant is a supported owned value. Actions, controls, events and world
-state can carry their own typed alternatives:
+Use ordinary Odin tagged unions or `union #no_nil` when actions, controls,
+events or state need typed alternatives. Replay supports them when every possible
+variant is a supported owned value:
 
 ```odin
 Take :: struct {amount: u32}

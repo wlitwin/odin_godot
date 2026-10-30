@@ -1,13 +1,17 @@
 # Coordinator-driven game rooms
 
+Use `Room(State, Control, Action, Event, Seats)` when a game needs
+coordinator-approved authority and host migration. It combines an authenticated
+coordinator client, a time-limited authority lease, independently owned prepared
+checkpoints, and the gameplay `Session`. It runs
+initial hosting/joining, periodic trusted backups, planned handoff, abrupt takeover,
+old-owner rejoin, and surviving-client redirection.
+
 [Dedicated infrastructure rooms](dedicated.md) keep authorities and standbys
 avatarless through bootstrap, failover and return; authenticated member identity
 is independent of a playable seat.
 
-`Room(State, Control, Action, Event, Seats)` combines an authenticated coordinator
-client, lease, owned prepared checkpoints, and the gameplay `Session`. It now runs
-initial hosting/joining, periodic trusted backups, planned handoff, abrupt takeover,
-old-owner rejoin, and surviving-client redirection. Gameplay can use native ENet or authenticated RTC. The control connection can
+Gameplay can use native ENet or authenticated RTC. The control connection can
 use ENet or WebSocket (`control_backend = .Websocket`, with a full URL in
 `coordinator`). For RTC, set `session.backend = .Rtc` and `session.rtc.url` to the
 trusted signaling provider. Room derives the authority-specific room code from
@@ -45,7 +49,7 @@ action, and `room_handoff` requests a planned transfer. Dispose with `room_close
 publication runs in `room_frame` alongside the existing lease and migration work.
 Trusted Party members can also [resume published progress](room_restore.md) from a
 fresh process when no live authority remains, using a new fenced grant.
-Owners remain at stable addresses; models/immutable asset descriptors must remain
+Runtime owners remain at stable addresses; models/immutable asset descriptors must remain
 valid across role changes. A selected successor receives complete authority data.
 The room does not choose arbitrary peers or grant hosting permission itself.
 
@@ -110,9 +114,8 @@ renews its reservation while it finishes installing the runtime/presentation.
 ## Recovery measurements
 
 A rejected `Claim` returns the driver to Following so it can prepare newer
-replicas. Previously it stayed in Claiming and repeatedly submitted the same old
-point; an early `Busy` response could therefore strand subsequent recovery even
-while checkpoint transfer continued. `last_command`/`last_result` retain the latest
+replicas. Retrying the same rejected point would prevent preparation from making
+progress even while checkpoint transfer continued. `last_command`/`last_result` retain the latest
 completed coordinator decision, and `claim_rejections`/`busy_claims` count rejected
 attempts. These diagnostics are distinct from `control_error`, which reports
 local RPC/control operations. Coordinator fencing and rollback limits are unchanged;
@@ -179,18 +182,18 @@ scoring. Surviving peers compare whole-world hashes at a common tick. See
 `examples/replay_slopball/migration_run.sh`. This restores accepted engine state;
 it does not replay or transfer Godot solver contact caches.
 
-- General room/invite provisioning and richer lobby controls; known-member process
-  registration and endpoint rebinding now exist.
+- Public room/invite deployment and richer lobby controls; known-member process
+  registration and endpoint rebinding exist.
 - Broader failure timing/topology coverage beyond the tested successor loss,
   repeated handoff, isolated-host control partition, and returned killed host.
 - Recovery during the remaining combat/loot scenario corpus beyond the initial
   Cavecrawl and Quickdraw gates.
-- Broader error/retry UX, role-independent dedicated-server policy integration,
-  and platform/network reachability coverage.
+- Broader error/retry UX and platform/network reachability coverage.
+  [Dedicated-server policy](dedicated.md) has its own integration gates.
 - External outbox/idempotency integration where games need persistent services.
 
-The tested driver is a substantial M5 increment, not completion of every migration
-or roadmap acceptance gate.
+These gates cover the scenarios described above; the remaining migration and
+roadmap cases need separate acceptance.
 
 ## External checkpoint dependencies
 

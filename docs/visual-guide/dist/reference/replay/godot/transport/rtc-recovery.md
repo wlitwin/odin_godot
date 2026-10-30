@@ -1,7 +1,8 @@
 # RTC continuation during a gameplay reconnect
 
-An authenticated RTC adapter can now carry its short-lived signaling reservation
-across a full same-term gameplay transport reconnect. `Rtc_Continuation` contains
+Use RTC continuation to preserve an authenticated signaling reservation when
+replacing a gameplay transport within the same authority term. `Rtc_Continuation`
+contains
 the existing logical peer ID, opaque room code, resume token and host/client role.
 It is in-memory transport state, not a membership credential, checkpoint or save.
 
@@ -48,14 +49,14 @@ platform/browser envelopes remain separate work.
 
 ## Replacing a peer connection under the same ID
 
-The public and raw RTC transports now expose the peer-connection serial as local
+The public and raw RTC transports expose the peer-connection serial as local
 connection-generation metadata. Fragment assembly/delivery state and outer Replay
 Delay/Router queues retire work from the old generation. A provider's replacement
 introduction can therefore create fresh channels under the same numeric ID without
 splicing old fragments or treating old delivery frontiers as belonging to the new
 connection. Signaling-only continuation of healthy channels retains its generation.
 
-The authenticated Duel now tests creator recovery: the creator saves and pauses,
+The authenticated Duel tests creator recovery: the creator saves and pauses,
 its browser is killed, and a fresh authenticated browser restores its file. The
 joining browser retains its runner through timeout and reconnects when creator
 ID 1 changes generation. Both reach the reference world with correct occurrences.

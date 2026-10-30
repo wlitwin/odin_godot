@@ -4,7 +4,7 @@ This page covers **building the distributable addon** (`nix build`), **what's in
 **how a user installs it** into a Godot project, compiles their scripts, and exports for
 all platforms. For the export pipeline internals see [exporting.md](exporting.md).
 
-> **Honesty about platform status** (this repo is developed on macOS):
+> **Platform verification status** (this repo is developed on macOS):
 >
 > | Platform | Cross-BUILD | Runtime |
 > |----------|-------------|---------|
@@ -16,8 +16,8 @@ all platforms. For the export pipeline internals see [exporting.md](exporting.md
 > "Cross-build verified" means `nix build .#dist-cross` (and `build/build_cross.sh`)
 > produce a `.so`/`.dll` of the right format/arch that **exports the `odin_godot_init`
 > entry** (and the scripts dll exports `odin_scripts_boot`). The C-ABI gdext boundary is
-> identical across platforms, so there is high confidence, but a Linux/Windows Godot has
-> not loaded these binaries on this macOS host. See **Runtime-confirming** below.
+> shared across platforms. This build check does not establish that Linux or Windows
+> Godot can load and run the binaries; those runs need a target host. See **Runtime-confirming** below.
 
 ## The two-dll model
 
@@ -62,7 +62,7 @@ addons/odin_godot/
 The addon root mirrors the repo's collection layout, so the bundled build scripts resolve
 `-collection:godot=$ODIN_GODOT_ROOT` (pointing at the addon) exactly as they do in-repo.
 
-Replay now ships as an experimental source collection beside Kit, with a separate
+Replay ships as an experimental source collection beside Kit, with a separate
 `template/replay/` project and a download-oriented `docs/replay.md` guide. Source
 collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
 compiler still resolves imports from them. The default Hello starter is unchanged.

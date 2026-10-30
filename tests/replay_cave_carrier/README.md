@@ -1,5 +1,9 @@
 # Cavecrawl carrier acceptance
 
+This suite checks that a carried relic retains its player identity and version
+through death, disconnect, save conversion and approved host recovery. Native
+and browser fixtures below exercise different parts of that contract.
+
 ```sh
 REPLAY_CAVE_CARRIER_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_carrier/run.sh
 ```
@@ -21,7 +25,8 @@ takeovers. The host waits for the carried state to reach both the acknowledged
 backup and coordinator-authorized checkpoint. Surviving processes verify unchanged
 carrier/version after twenty new-epoch ticks, continued attachment while moving,
 and a fresh set-down action. Test probes only read authoritative observations.
-Old-host carrier adoption is outside these four scenarios and remains open.
+Old-host carrier adoption is outside these four scenarios; the separate
+[adoption guide](../../examples/replay_cavecrawl/adoption.md) describes its checks.
 
 The three-browser variant extends the existing social/RTC gate with a guest's
 initial relic grab, authoritative carrier/attachment observations before and after

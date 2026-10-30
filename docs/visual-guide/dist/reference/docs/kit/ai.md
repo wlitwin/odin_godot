@@ -7,8 +7,7 @@ as a director that paces enemy waves. It supplies the *verbs*; you write the bra
 NPC shape: host-brained, owner-streamed poses. On the [sim lane](sim.md) an NPC is a
 server-ticked entity with `predict` fields, and its brain runs in the AUTHORITY pass. The
 perception/steering math is pure and safe in either; the wave director is
-authority-side logic and ports as-is. See [nav](nav.md) for the one genuinely
-dangerous crossing.
+authority-side logic and ports as-is. See [nav](nav.md) for the restriction on live NavigationServer queries.
 
 ## Mental model
 
@@ -17,7 +16,7 @@ The game writes an ordinary `switch` over a replicated `state: u8` in its **host
 built from these verbs. Cavecrawl's dweller is the documented example.
 
 An NPC is an entity **owned by the host player**: the host's brain tick writes `x/y` like
-any owner writes streamed fields, and every client interpolates the motion for free. Its
+any network owner writes streamed fields, and clients interpolate the motion. Its
 state byte and hp are plain replicated fields. The whole network presence of cavecrawl's
 dweller is this struct (`examples/cavecrawl/scripts/dweller.odin`):
 
@@ -33,9 +32,9 @@ Dweller :: struct {
 }
 ```
 
-Replicated mood byte + owner-streamed position = **clients watch the hunt for free**: every
-peer renders the same 🦇/😈/💨 from `state` and sees the chase as smooth interpolated
-motion, without one line of AI or wire code on the client.
+Clients render the mood from `state` and interpolate the streamed position.
+The host runs the brain; the clients need presentation code, with no separate
+AI decision loop or NPC packet format.
 
 Everything here is deterministic, allocation-free, dimension-agnostic (`[3]f32`; 2D leaves
 z zero) and engine-free.

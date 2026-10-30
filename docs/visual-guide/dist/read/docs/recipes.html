@@ -4,12 +4,11 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Building gameplay: the kit + play recipe</h1><div class="reader-meta"><span>12 min read</span><span>Odin × Godot</span><a href="../../reference/docs/recipes.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#layer-1-an-entity-is-a-struct-of-play-fields">Layer 1: an entity is a struct of play fields</a><a href="#layer-2-one-behavior-sliced-by-authority">Layer 2: one behavior, sliced by authority</a><a href="#worked-example-the-fire--reload--jam-gun">Worked example: the fire / reload / jam gun</a><a href="#the-same-skeleton-five-ways">The same skeleton, five ways</a><a href="#checklist-for-a-new-item">Checklist for a new item</a><a href="#see-also">See also</a></nav></details>
-<article class="reading-body "><p>Godot&#39;s composition guides teach one move: build an entity from small, focused
-<strong>components</strong> (a <code>HealthComponent</code>, a <code>HitboxComponent</code>, a <code>VelocityComponent</code>), each
-owning one concern, attached to a node. That pattern maps cleanly onto single-player, which
-has exactly one runtime (the frame) and one authority (you). A <code>kit</code> game has neither: many
-peers run the behavior, and only the host decides. So you still compose, just along a
-different axis.</p>
+<article class="reading-body "><p>A networked gameplay item has data, player intent, authority decisions, and
+presentation that may run on different peers or clocks. Kit represents its
+shared state in registered entities; the <code>play</code> package supplies local state
+machines, timing, and transition tracking. This recipe shows how to compose
+those pieces without mixing authority decisions into presentation.</p>
 <blockquote>
 <p>Single-player composition asks <em>&quot;what are its parts?&quot;</em>: health, movement, hitbox.
 kit + play composition asks <em>&quot;where does each part live across the wire?&quot;</em> It&#39;s the same
@@ -60,12 +59,12 @@ transition in the render path, rather than connecting a callback (see
 <li>They compose at the <strong>struct</strong> level, flattened by scriptgen, not at the scene-tree level
 at runtime.</li>
 </ul>
-<p>scriptgen carries an embedded primitive&#39;s wire, export, <code>@onready</code>, and signal needs up into
-the parent for free, and so do its <strong>verbs</strong>. A block that declares a <code>@(gd_command)</code> on
+<p>scriptgen carries an embedded primitive&#39;s wire, export, <code>@onready</code>, and signal
+declarations into the parent, including its <strong>commands</strong>. A block that declares a <code>@(gd_command)</code> on
 itself has that command hoisted onto whatever entity embeds it (with the wielder threaded
 in), so a self-contained gameplay block (a gun that carries its own <code>fire</code>, a door its own
 <code>open</code>) drops in as one field and brings both its replicated state <em>and</em> its Intent seam.
-The composition is recursive: you keep leveling up (gun → loadout → character) without
+The composition is recursive (gun → loadout → character), without
 threading a command declaration back up to the entity by hand. See
 <a href="kit/net.html#composing-verbs-from-embedded-blocks">kit/ — composing verbs from embedded blocks</a>.</p>
 <h3 id="the-play-toolbox">The <code>play</code> toolbox<a class="heading-anchor" href="#the-play-toolbox" aria-label="Link to this section">#</a></h3>
@@ -206,7 +205,7 @@ about getting them right.</p>
 <p>The gun fills <strong>all seven</strong> slots and composes the whole toolbox. Its states are
 <code>Ready → (fire) → Reloading</code> on an empty mag, or <code>Ready → Jammed</code> on a dud round that you
 mash the trigger to clear. It&#39;s host-authoritative, yet feels instant: the client predicts
-every transition and the host silently agrees.</p>
+each eligible transition, then accepts or corrects it from authority updates.</p>
 <p>Several of these items also ship as drop-in <strong>blocks</strong>: <code>play.Gun</code> packages the gun&#39;s State +
 Authority + Prediction (plus kit/net&#39;s built-in Reconcile), <code>play.Ability</code> a cooldown cast,
 <code>play.Channel</code> the revive-style hold-to-progress. The walkthrough below hand-rolls each slot,
@@ -361,8 +360,7 @@ it skips.</strong></p>
 </tbody></table>
 </div><p><strong>Revive: a channeled ability.</strong> A plain (non-predicted) command: <code>runner_revive</code> only
 asserts the target is down; <code>host_honor_revive</code> re-checks <code>kinter.in_range</code> and the reviver&#39;s
-pulse before granting <code>hp</code>. It skips Prediction and Reconcile because you can&#39;t honestly
-predict &quot;did my friend agree I&#39;m in reach,&quot; though the <em>channel bar</em> is pure local
+pulse before granting <code>hp</code>. It skips Prediction and Reconcile because reach depends on another player&#39;s authoritative state, though the <em>channel bar</em> is pure local
 presentation off the replicated <code>rev_pct</code>, built once and driven with <code>play.marker</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">play.show(self.revive_bar, active)
 play.follow(self.revive_bar, d.x, d.y - <span class="hljs-number">44</span>)
@@ -421,8 +419,8 @@ named states, it&#39;s a <code>play.Machine</code>: you get the replicated <code
 shadow from one field. Everything else (<code>Edge</code>, <code>Pace</code>, timers, clocks) stays <strong>off the
 wire</strong>.</p>
 </li>
-<li><p><strong>Predict only what&#39;s deterministic from shared inputs.</strong> Client prediction is honest
-<em>only</em> when the client can compute the exact answer the host will. Cooldowns and the
+<li><p><strong>Predict only what&#39;s deterministic from shared inputs.</strong> Client prediction is useful
+when shared inputs let the client reproduce the authority&#39;s decision. Cooldowns and the
 deterministic <code>jam_roll</code> qualify; an AOE that mutates many entities, or a check against
 another player&#39;s state, does <strong>not</strong>: those stay host-only (see revive, slime). When in
 doubt, don&#39;t predict: a plain command that resolves a few frames later beats a prediction
@@ -459,5 +457,5 @@ systems instead of a per-frame edge read.</li>
 are the authoritative API reference.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="events.html"><span>Pure-Odin events — events.Event(T)</span><span aria-hidden="true">→</span></a><a href="kit/net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="kit/index.html"><span>Kit multiplayer toolkit</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/recipes.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="events.html"><span>Pure-Odin events — events.Event(T)</span><span aria-hidden="true">→</span></a><a href="kit/net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="kit/index.html"><span>Kit multiplayer toolkit</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/recipes.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#layer-1-an-entity-is-a-struct-of-play-fields" class="">Layer 1: an entity is a struct of play fields</a><a href="#the-play-toolbox" class="subsection">The play toolbox</a><a href="#layer-2-one-behavior-sliced-by-authority" class="">Layer 2: one behavior, sliced by authority</a><a href="#worked-example-the-fire--reload--jam-gun" class="">Worked example: the fire / reload / jam gun</a><a href="#the-same-skeleton-five-ways" class="">The same skeleton, five ways</a><a href="#checklist-for-a-new-item" class="">Checklist for a new item</a><a href="#see-also" class="">See also</a></nav><div class="outline-actions"><a href="../../reference/docs/recipes.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,6 +1,8 @@
 # MultiplayerPeer connection generations
 
-The shared Godot MultiplayerPeer adapter assigns a nonzero, increasing generation
+Connection generations distinguish successive connections when a backend reuses
+a numeric peer ID. The shared Godot MultiplayerPeer adapter assigns a nonzero,
+increasing generation
 to each accepted connection within one open adapter lifetime. A reused numeric
 peer ID receives a new generation. Duplicate connect notifications for an active
 ID are idempotent. Unknown/disconnected peers report zero; exhaustion refuses a

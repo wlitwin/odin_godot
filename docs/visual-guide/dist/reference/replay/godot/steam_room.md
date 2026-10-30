@@ -1,6 +1,7 @@
 # Steam destinations for Room recovery
 
-Room can now use the Steam gameplay backend with an ENet or WebSocket coordinator.
+Use the Steam gameplay backend with Room when coordinator-approved recovery
+needs to reconnect through Steam. The coordinator can use ENet or WebSocket.
 It retains the same lease, complete-checkpoint and authority-fencing rules.
 Steam is native-only; Web builds still require RTC gameplay.
 

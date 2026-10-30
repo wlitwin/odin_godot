@@ -1,6 +1,8 @@
 # Deterministic peer rollback — initial runner
 
-`Runner(State, Input, Event, Seats)` is independent of the server-authoritative
+Use `Runner(State, Input, Event, Seats)` for a fixed-roster match whose peers
+replay the same deterministic simulation. The runner schedules steps and manages
+input delivery, prediction and rollback independently of the server-authoritative
 runner. Each participant owns its input stream and simulates the same complete
 match. No participant supplies authoritative state corrections to another.
 
@@ -128,7 +130,7 @@ error = p2p.reconnect(&survivor, replacement_transport, monotonic_ms)
 // Continue pumping and advancing normally once phase is Running.
 ```
 
-The native Duel now exercises either participant returning. When the original
+The native Duel exercises either participant returning. When the original
 listener returns, the surviving dialing process closes/reopens its ENet transport,
 rebuilds logical mappings and reconnects the retained runner even though the
 remote physical server ID is again 1. Closing the transport owner retires the old
@@ -175,10 +177,10 @@ divergence checks and native two-process ENet gate exist. A lost input burst
 recovers through retransmission and bounded rollback. The Godot demo reconciles
 speculative events and compares the final world with an independent reference.
 
-Confirmed [spectators](spectators.md) now join a running match, replay received
+Confirmed [spectators](spectators.md) join a running match, replay received
 history, and reset explicitly after a blackout exceeds retained history. They use
 separate bounded transfer streams and never join the player confirmation roster.
-An admitted spectator can now rebind to another participant using a retained
+An admitted spectator can rebind to another participant using a retained
 state/event/chain anchor. The replacement must prove overlap; missing history or
 conflict is explicit. Native Duel and repeated native/WASM source-switch gates
 exercise this [continuity contract](spectators.md#changing-the-source-without-discarding-the-world).
@@ -186,21 +188,20 @@ Optional [profiling](profiling.md) separates forward/replay/hash/pump wall time 
 capture-to-simulation input latency. Standalone benchmarks measure process CPU and
 the effect of fixed input-delay settings using matched recorded gameplay.
 
-An initial [authenticated admission provider](admission/README.md) now checks
+An initial [authenticated admission provider](admission/README.md) checks
 fixed-roster credentials before initial binding and browser rejoin. It reuses the
 bounded challenged signaling frontend and supports full-mesh introductions.
 
-[Fixed-roster provisioning](provision/README.md) now supplies durable room/invite
+[Fixed-roster provisioning](provision/README.md) supplies durable room/invite
 enrollment, exact retries and authenticated incarnation changes. Its native TLS
 service/client and SQLite crash gates pass. The [P2P party client](../godot/p2p_party.md)
-now connects browser Duel's invite menus to authenticated gameplay and fresh-process
-guest/creator return. The native [P2P Direct owner](../godot/p2p_direct.md) now
-supports authenticated two-player ENet and fresh-process endpoint replacement.
+connects browser Duel's invite menus to authenticated gameplay and fresh-process
+guest/creator return. The native [P2P Direct owner](../godot/p2p_direct.md) supports authenticated two-player ENet and fresh-process endpoint replacement.
 
 Roster changes, public authenticated provisioning,
 cross-native-platform execution and deployment integration remain pending. A
 copied Frame alone does not resume this session protocol. The fixed-point corpus
-and archive replay execute in WASM. The playable Duel now also passes real WebRTC
+and archive replay execute in WASM. The playable Duel also passes real WebRTC
 Chrome-process gates for delayed/lost inputs, a bounded blackout, late spectator
 reset and coordinated participant-file restoration. Public rendezvous/TURN and
 other browser engines are not established by these local gates.
@@ -209,5 +210,5 @@ for arbitrarily long matches. Broader recording tools and field-level diffs rema
 debugger work.
 
 See [Replay Duel](../../examples/replay_duel/README.md) and the full
-[roadmap](../../docs/replay/roadmap.md). This is an M7 increment, not completion of
-all P2P capabilities or the Replay roadmap.
+[roadmap](../../docs/replay/roadmap.md). These tests cover the implemented fixed-roster contract; the remaining P2P
+capabilities and Replay roadmap work need separate acceptance.

@@ -1,18 +1,18 @@
 # slopball3d — co-op physics soccer, third dimension on
 
-The kit's **3D** exercise: the same engine-physics contract slopball proved in 2D,
-with gravity turned on. The ball is a real `RigidBody3D` — it arcs off lofted kicks,
-bounces, and tumbles — and the players are `CharacterBody3D` capsules. It answers the
-kit's second-most-asked question — *"does any of this work in 3D?"* — with
-`play.Puppet3` and, mostly, *"it already did."*
+Use this Kit example to replicate 3D Godot physics bodies. The ball is a
+`RigidBody3D` that arcs, bounces and tumbles; players are `CharacterBody3D` capsules.
+`play.Puppet3` lets the ball's entity owner simulate it and stream its pose and
+momentum, while other peers freeze their solver and display the received state.
 
 ## What 3D actually changed
 
-Very little — that is the point of the example:
+The 3D version reuses Kit's session and replication APIs, with these physics and
+rotation choices:
 
 - **The wire core changed nothing.** Session, streams, deltas, commands, chat, lobby:
   all dimension-free. A kicker streams its pose as one `pos: [3]f32` field.
-- **Rotation became a quaternion — and got BETTER.** The 2D puppet must snap its angle
+- **Rotation uses a quaternion.** The 2D puppet must snap its angle
   (a componentwise lerp sweeps the long way around the ±π wrap); the stream layer's
   `.Quat` kind nlerps hemisphere-safely, so `rot: gd.Quaternion` on `play.Puppet3`
   interps correctly and watchers see the tumble turn smoothly.
@@ -27,7 +27,8 @@ Very little — that is the point of the example:
 
 ## Run it
 
-Two windows on one machine (build once with `bash ../../build/build_scripts.sh .`):
+From `examples/slopball3d`, build once with `bash ../../build/build_scripts.sh .`,
+then open two windows on one machine:
 
 ```sh
 SLOP3_NAME=lefty  godot --path .    # Host
@@ -40,7 +41,7 @@ takes the match. Odd seats defend the left goal, even the right.
 ## Automated tests
 
 - `run.sh` — solo gate (`SLOPBALL3D_SINGLE_OK`): the striker bot runs the whole loop
-  headless. The repo's only exercise of the 3D physics *solver* under `--headless`.
+  headless, exercising the 3D physics *solver* under `--headless`.
 - `native_run.sh` — 3-peer integration test (`SLOPBALL3D_NATIVE_OK`): host + striker + watcher.
   The seat transfers to the striker client, its local solver (gravity, tumble) scores,
   and the three screens agree on the ball within centimeters at the same session tick.

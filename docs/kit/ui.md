@@ -27,8 +27,8 @@ the node tree belongs to the scene and is freed with the owner.
 Refresh procs reuse their row Labels across repaints and hide extras; nothing reallocates
 per frame.
 
-The package's **public API speaks `string`, not `cstring`**: callers use `fmt.tprintf` and
-never think about NUL termination or c-allocator lifetimes.
+The package's **public API takes `string`, not `cstring`**. Callers can pass
+`fmt.tprintf` results; the widget implementation handles engine string conversion.
 
 ## API by task
 
@@ -120,7 +120,7 @@ a play-block game gathers its blocks' countdowns into a local array beside the s
 
 ## Adopting your own scenes
 
-The kit provides the implementation, never the final look. A game that wants its own
+The stock implementation can also drive authored scenes. A game that wants its own
 lobby/chat/scoreboard authors a scene in the editor and hands it to boot
 (`Options.lobby_scene` / `chat_scene` / `score_scene`, see [boot.md](boot.md)); the kit
 ADOPTS it: instances the scene, resolves the nodes it drives **by NAME, at any depth**

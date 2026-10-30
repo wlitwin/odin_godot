@@ -14,6 +14,6 @@ request fails. Verification does not renew a lease or mutate durable records.
 
 The signaling service must issue a fresh cryptographic challenge per connection,
 expire it and consume it once. Passing a reused challenge to this stateless
-verifier would not implement replay protection. The [Godot frontend](../godot/rendezvous.md) now implements that lifecycle and
+verifier would not implement replay protection. The [Godot frontend](../godot/rendezvous.md) implements that lifecycle and
 connects it to RTC authorization. Public deployment/provisioning remains separate
 from the verified loopback fixtures.

@@ -1,6 +1,7 @@
 # Replay WebRTC adapter
 
-`Rtc` owns raw Godot `WebRTCPeerConnection` and `WebRTCDataChannel` objects.
+Use `Rtc` for Replay packets over WebRTC data channels, including browser
+gameplay. It owns raw Godot `WebRTCPeerConnection` and `WebRTCDataChannel` objects.
 It does not install `MultiplayerAPI`, use scene RPCs, or share a global session pool.
 Keep its address stable while open. `rtc_transport` exposes the same copied-packet
 interface used by ENet, server/client sessions and the P2P runner.
@@ -54,7 +55,7 @@ to loopback; it is not a public authenticated room service. Browser-native WebRT
 is the tested target. Native use explicitly requires `native_extension = true`
 and an installed Godot WebRTC extension; native ENet remains the default.
 
-Party and the Cavecrawl/Scrapyard menus now carry bounded, validated ICE settings
+Party and the Cavecrawl/Scrapyard menus carry bounded, validated ICE settings
 through Room migration/rejoin. Actual Coturn UDP/TCP fixtures inspect selected
 relay candidates and transferred bytes; wrong credentials cannot fall back to
 direct gameplay in relay-only mode. See [ICE deployment settings](ice-deployment.md).
@@ -118,14 +119,14 @@ closing/reopening the same adapter address.
 A second scenario uses the ordinary Hello simulation through `Session` and compares
 canonical world hashes after movement and a reliable firing action.
 
-`Room` now supports challenged RTC destinations through `Migration_Transport`,
+`Room` supports challenged RTC destinations through `Migration_Transport`,
 using a trusted provider URL and a code derived from the signed authority view.
 Planned and killed-host Cavecrawl browser gates pass. Wider failure cases, public
 provisioning/TURN and additional browser engines remain open. See the
 [authenticated signaling frontend](../rendezvous.md). Replay Duel also provides
 P2P gameplay/spectator/archive gates; other ports still need browser acceptance.
 
-Same-term Room reconnection can now retain an authenticated RTC continuation
+Same-term Room reconnection can retain an authenticated RTC continuation
 across transport replacement, while requesting new channels and preserving the
 client's action ledger. Real Coturn outage tests exercise recovery without replacing
 the game processes or authority. See [RTC recovery](rtc-recovery.md).

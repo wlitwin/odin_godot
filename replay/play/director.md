@@ -1,6 +1,8 @@
 # Waves and held channels
 
-`Wave` describes a count and a post-clear rest in ticks. `Director` owns the current
+Use `Director` to pace waves with bounded spawn work, and `Channel` for sustained
+interactions whose duration belongs in the simulation. `Wave` describes a count
+and a post-clear rest in ticks. `Director` owns the current
 wave, pending spawns, live count, rest deadline and completion flag. Put it in the
 world when it determines gameplay; it then travels with rollback and checkpoints.
 

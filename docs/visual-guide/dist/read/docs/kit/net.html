@@ -150,8 +150,8 @@ again at authority ingress:</p>
 	access         = .Any_Seat,
 	prediction     = .Optimistic,
 	max_args_bytes = 64,
-})</span></code></pre></div><p>The old comma strings remain accepted for migration, but new code should use
-the typed presets or literal so Odin can catch misspelled policy members.</p>
+})</span></code></pre></div><p>Quoted command-policy strings are rejected. Use a typed preset or literal so
+the compiler can check policy members.</p>
 <p>A successful command may invoke a name-paired <code>&lt;verb&gt;_then</code> half for
 authority-only cross-entity work such as spawning, crediting a player, or
 transferring ownership.</p>
@@ -426,7 +426,7 @@ so its mutations reach every peer in the same batch as the verb&#39;s own. The
 <code>runner_weapon_fire_then</code>: the block ships the verb and its state machine,
 the game keeps the consequence, and no index keying or entity-classifying
 switch ever appears. A composed verb&#39;s payload is the block&#39;s <em>offer</em>
-(&quot;a live round left the barrel&quot;); a game that doesn&#39;t care simply declares no
+(&quot;a live round left the barrel&quot;); a game that does not consume it declares no
 <code>_then</code>.</p>
 <p><strong>Build-time contract.</strong> A mispaired consequence is a scriptgen error, not a
 proc that silently never fires: the shape (<code>[game,] self, by, wire args…, payload…</code>) is validated against the verb, and <strong>every half wears <code>@(gd_half)</code></strong>:
@@ -478,7 +478,7 @@ never collide (<code>weapon: Gun</code> + <code>sidearm: Gun</code> → <code>ru
 distinct command IDs). Issue it exactly like a direct command
 (<code>runner_weapon_fire_cmd(&amp;boot, self, dx, dy)</code>); the owner is passed for you, so only the wire
 args appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block&#39;s
-replicated state for free (it&#39;s already in the entity&#39;s descriptor), and the block&#39;s
+replicated state because it is part of the entity&#39;s descriptor, and the block&#39;s
 cross-entity effects (spawning a projectile, applying damage) live in the game&#39;s
 <code>runner_weapon_fire_then</code> <a href="#command-consequences">consequence</a>, exactly as a direct command&#39;s
 do: the block ships the verb, the game keeps the &quot;and then&quot;.</p>
@@ -517,7 +517,7 @@ spelunker_hp_codec :: knet.Wire_Codec {
 }</code></pre></div><p>The wire size is FIXED per field, which is what frees the representation:
 quantize, bit-pack, or ship an <em>index</em> into a structure both sides grow
 deterministically (a shared-seed table means the wire only needs to name an
-entry, not carry it). Two rules keep codecs honest: <code>decode(encode(x))</code> should
+entry, not carry it). Two codec requirements matter: <code>decode(encode(x))</code> should
 be stable (receivers hold decoded values; an unstable round trip makes confirmed
 predictions micro-snap), and dirtiness is still diffed on struct bytes: a change
 smaller than the wire precision still sends, so pick a precision at least as fine
@@ -529,8 +529,7 @@ bit in a u64 mask, a byte-identical apply on every peer. A dynamic&#39;s bytes a
 header whose elements a memcpy would tear, and the deeper problem survives any
 encoding: <strong>byte-diffing has no element identity</strong>: insert one element at the
 front and every byte after it &quot;changed&quot;, so the diff ships the world for a
-one-item edit. A variable-length ask is always one of three real shapes, and
-each already has first-class machinery:</p>
+one-item edit. Choose a representation according to the collection&#39;s size and update pattern:</p>
 <ul>
 <li><strong>Bounded</strong> → a fixed array + count/sentinel: <code>bag: [6]kitems.Slot</code> with
 <code>ITEM_NONE</code> empties (cavecrawl). One field, one diff atom, edges and
@@ -695,7 +694,7 @@ game_whisper :: <span class="hljs-keyword">proc</span>(self: ^Game, from: knet.P
 }</code></pre></div><p>scriptgen generates the game-owned route, a <code>game_messages(self, &amp;ses)</code> you call
 once in <code>ready()</code> (one line, like <code>fire_listen</code>), and two send doors:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">game_whisper_send(&amp;ses, msg, ksess.HOST_PEER)   <span class="hljs-comment">// to a peer, or ksess.BROADCAST_PEER</span>
-game_whisper_send_to(&amp;ses, player, msg)         <span class="hljs-comment">// to a PLAYER (seat resolved on the host)</span></code></pre></div><p>It is pure sugar over the runtime typed-route API
+game_whisper_send_to(&amp;ses, player, msg)         <span class="hljs-comment">// to a PLAYER (seat resolved on the host)</span></code></pre></div><p>It wraps the runtime typed-route API
 (<a href="session.html#app-messages"><code>session_app_send_typed</code></a> / <code>session_app_listen</code>),
 which stays available for hand-rolled routing. The generated payload has a
 <strong>canonical raw ABI</strong>: fixed-width, recursively validated, padding-free bytes;
@@ -708,7 +707,7 @@ schema. cavecrawl&#39;s arrival greeting is the worked example.</p>
 <p>The counter-rule, because it is the tempting mistake: <strong>don&#39;t send state as a
 message.</strong> &quot;Player X&#39;s score is now 5&quot; shipped as a message is lost to a peer who
 joins a second later, and gone forever on a dropped packet. Replicate the score
-instead and it is always correct, always caught up. Reach for a message only when you
+instead so a snapshot can restore its current value. Use a message when you
 <em>want</em> the opposite of those guarantees: a fire-and-forget signal to whoever is
 listening right now.</p>
 <h2 id="wire-tick-and-clocks">Wire, tick, and clocks<a class="heading-anchor" href="#wire-tick-and-clocks" aria-label="Link to this section">#</a></h2>
@@ -939,8 +938,9 @@ while pending: legal optimistic writes never trip it. Two build-time cousins
 guard the same doctrine: a direct call of a <code>@(gd_command)</code> proc is a
 scriptgen error pointing at the <code>&lt;verb&gt;_cmd</code> wrapper, and a gd-shaped tag
 under a typo&#39;d namespace (<code>gs:&quot;replicate&quot;</code>) is named instead of silently
-ignored. The whole runtime walk strips under <code>-disable-assert</code>, like every kit
-guardrail.</li>
+ignored. Development builds assert on a violation. Under <code>-disable-assert</code>, the
+session retains the walk and increments <code>session_guard_hits</code>; native builds
+also log the first violation. See <a href="session.html#gotchas">session</a>.</li>
 <li><strong>Deltas carry STATE, not events.</strong> The walk memcmps entity-vs-shadow once per net tick;
 a replicated byte pulsed <code>1 → 0</code> <em>within</em> one tick equals its shadow when the diff runs
 and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl&#39;s
@@ -973,5 +973,5 @@ session.</li>
 which <a href="timelines.html">timelines</a> helps you choose), <a href="comms.html">kit/comms</a>, <a href="combat.html">kit/combat</a>,
 <a href="save.html">kit/save</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/net.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/net.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#declaring-a-replicated-entity" class="">Declaring a replicated entity</a><a href="#command-consequences" class="">Command consequences</a><a href="#composing-verbs-from-embedded-blocks" class="">Composing verbs from embedded blocks</a><a href="#wire-codecs" class="">Wire codecs</a><a href="#dynamic-collections" class="">Dynamic collections</a><a href="#field-change-edges" class="">Field-change edges</a><a href="#advanced-registry-primitives" class="">Advanced: registry primitives</a><a href="#the-per-tick-walks" class="">The per-tick walks</a><a href="#advanced-the-command-loop-primitives" class="">Advanced: the command-loop primitives</a><a href="#typed-app-messages" class="">Typed app messages</a><a href="#wire-tick-and-clocks" class="">Wire, tick, and clocks</a><a href="#the-two-timelines-presenting-consequences" class="">The two timelines (presenting consequences)</a><a href="#one-package-two-lanes" class="">One package, two lanes</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/net.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

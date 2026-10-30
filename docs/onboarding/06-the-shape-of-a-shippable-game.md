@@ -2,9 +2,7 @@
 
 This post covers what takes a game from "my friends can connect" to
 something you would hand to strangers: persistent identity, saves, host
-migration, Steam and web transports, and the testing habit that keeps them
-honest. Most of it is one call plus a concept the earlier posts already gave
-you.
+migration, Steam and web transports, and integration tests under latency.
 
 ## Persistent identity
 
@@ -42,8 +40,8 @@ exactly as they would after any drop.
 Backup snapshots stream to a designated client every few seconds. On host
 loss, that client **rebinds as the server, resumes the session from the
 backup, and everyone else auto-rejoins with their tokens**, all of it
-hands-free, mid-run. The test suite proves it by `kill -9`-ing the host
-process.
+during the run. The integration test exercises this path by sending `kill -9`
+to the host process.
 
 Your part is wiring two events and providing an address (`Ev_Backup_Target`
 / `Ev_Succession`). The party keeps playing; nobody re-lobbies. This works
@@ -53,8 +51,8 @@ there is no list of pending RPCs to lose.
 ## Transports: Steam and web
 
 Everything above runs over plain ENet: localhost, LAN, a VPS. The session
-sits behind Godot's MultiplayerPeer abstraction, so shipping over Steam is
-the lobby ritual and nothing else: create or join a Steam lobby, hand the
+sits behind Godot's MultiplayerPeer abstraction. For Steam, create or join a
+lobby, hand the
 peer to the same wire, and invite through the overlay. Gameplay code,
 replication, prediction, and migration are untouched. The browser export
 runs the same session over WebRTC.
@@ -76,8 +74,8 @@ themselves against exactly those conditions:
 
 The addon ships the harness template (`build/template/test/` +
 [kit/testing](../kit/testing.md)); adapting it to a new game is an
-afternoon. When your acceptance test is green under injected latency, you can
-ship.
+project-specific task. A passing latency test checks this scenario; also
+verify the export target, deployment, and failure cases your game supports.
 
 ## Where to go next
 
@@ -92,8 +90,6 @@ ship.
 4. **Then build yours**, one brick per session, and keep the acceptance test
    green before the next brick.
 
-None of this asked you to be a network programmer. You wrote structs with
-tagged fields, verbs that return bool, and presentation procs: single-player-
-shaped code under a discipline. What that discipline buys is reconnects,
-drop-in joins, saves, host migration, and honest-feeling latency, and you
-keep the editor, the scene tree, and the engine you already know.
+These features use the tagged fields, validating commands, and presentation
+procedures from the earlier posts. Keep their ownership and timing rules
+explicit as you add identity, recovery, and transports to the game.

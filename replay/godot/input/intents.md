@@ -1,7 +1,9 @@
 # Copied action intents
 
-`net.Action_Intent(Action)` owns one copied, unsubmitted action and a bounded set
-of tickets already accepted by the network ledger. It lives beside device/UI
+Use `net.Action_Intent(Action)` to retain a UI or device action while submission
+is blocked and track its eventual authority result. It owns one copied,
+unsubmitted action and a bounded set of tickets already accepted by the network
+ledger; each ticket identifies one submitted request. It lives beside device/UI
 state, outside the simulation. It does not change action scheduling, admission,
 prediction, game predicates or checkpoint policy.
 

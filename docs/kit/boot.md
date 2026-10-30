@@ -79,7 +79,7 @@ of event dispatch.
 
 The lower-level `boot_attach`, `<game>_entities`, `<game>_messages`,
 `<game>_lane_init`, `boot_lane`, `boot_pump`, and `<game>_events` procedures
-are primitives for a genuinely custom frame graph, not alternate spellings of
+are primitives for custom frame ordering, not alternate spellings of
 `<game>_net_frame`. Use them only when event dispatch or lane installation must
 occur at a custom point. A shell with multiple direct sessions or lanes is left
 on these explicit APIs because the generator cannot safely guess a graph.
@@ -200,8 +200,8 @@ teardown using the session/comms/lane pointers retained by `Boot`.
 doors; it deliberately leaves caller-owned lane, comms, and session values to
 their matching destroy procedures. All three forms are idempotent.
 
-**The ownership rule**, one line per layer: boot lives as long as its node;
-below boot, X destroys what X inits; node trees belong to the scene. Boot
+**Lifetime and teardown:** Boot lives as long as its node. Each lower layer
+destroys the resources it initializes; node trees belong to the scene. Boot
 created the container nodes (`ui_layer` / `stage` / `world`), so `boot_detach`
 queue-frees those, and the widgets, the legend, and the world's entities
 parented under them ride the subtree down with one free each. The [kui
@@ -228,9 +228,9 @@ a different development cap.
 ## Connecting: the doors
 
 `boot_host(b, port, name)` and `boot_join(b, addr, port, token, name)` do
-transport-up, session-start, and the menu/status/chat ritual (via
-`netgd.begin_host` / `netgd.begin_join`, which exist separately if you want the
-ritual your way).
+transport setup, session start, and menu/status/chat updates. They call
+`netgd.begin_host` / `netgd.begin_join`, which remain available for custom
+lifecycle ordering.
 
 Under both is one door per direction, parameterized by transport:
 
@@ -239,22 +239,21 @@ boot_open_host(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token = 0, dedi
 boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = false, status = "Joining...") -> bool
 ```
 
-Every named door on this page is those two plus a status line. The ritual,
+Every named host/join entry point combines those two operations with a status
+line. The lifecycle setup,
 reconnect identity, [host-migration](netgd.md#swapping-transports) config (its
 flavor comes from the transport's own record, so a door is never told twice),
 phase, menu, chat, and roster, is written once, and a new transport inherits
-all of it by filling a `netgd.Transport`. Steam gets both doors for the price
-of one record (`ksteam.TRANSPORT`, documented in [steamgd.md](steamgd.md)).
+all of it by filling a `netgd.Transport`. Steam supplies both entry points through
+one record (`ksteam.TRANSPORT`, documented in [steamgd.md](steamgd.md)).
 
 ### Single player (the solo door)
 
 `boot_single(b, name)` is the same game, alone: a full authority session over
 `netgd.OFFLINE` — an `OfflineMultiplayerPeer` seats you as host id 1 and your
-per-tick broadcasts cleanly reach nobody (without one, `send_bytes` with no
-peer installed spams "peer isn't set" every tick — the gotcha every
-hand-rolled solo path re-derived). The whole authoritative sim runs exactly
-as it does with friends, the door ritual included, so solo stops being the
-one path that bypassed `boot_open_host`. Succession never arms (nobody to
+per-tick broadcasts have no remote recipients. Without that peer, `send_bytes`
+reports "peer isn't set" every tick. The authoritative simulation and
+`boot_open_host` setup run as they do in a multiplayer session. Succession never arms (nobody to
 migrate to); works identically on native and web.
 
 ### Dedicated server
@@ -319,8 +318,8 @@ AOI pressure. Pass it directly to `netgraph_refresh`.
 A game with a [kit/xfer album](xfer.md) (sprays, skins) hands it to boot once —
 `boot_album(b, &album)` after `album_init` — and both of its chores become the
 kit's: `boot_pump` pumps it once per net tick, and every `Ev_Player_Joined`
-replays the kept payloads to the newcomer (`album_welcome`), so a late joiner
-never again sees a blank spray wall because a game forgot the host's half.
+replays the retained payloads to the newcomer (`album_welcome`). The game does
+not need a separate player-joined handler to populate the spray wall.
 
 ## The web room, surfaced
 

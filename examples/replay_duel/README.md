@@ -1,8 +1,9 @@
 # Replay Duel
 
-A new deterministic two-player projectile duel for the P2P roadmap. It does not
-replace any original game. Both participants simulate the complete match and
-exchange inputs; neither sends authoritative world corrections.
+Run this two-player projectile duel to study peer-to-peer (P2P) simulation.
+Both participants simulate the complete match and exchange inputs; neither sends
+authoritative world corrections. Deterministic execution lets them compare state
+hashes after receiving the same inputs. The original games remain separate.
 
 ```sh
 nix develop --command bash examples/replay_duel/play.sh
@@ -93,7 +94,8 @@ nix develop --command bash tests/replay_p2p_native/run.sh
 The model in `shared/duel` uses Q24.8 coordinates, checked updates, stable projectile
 slots and frame-owned RNG. Three hits kill a fighter; respawn happens after a
 deterministic randomized delay. All bullets resolve before damage is applied so
-same-tick trades are symmetric. Presentation uses copied values and an event journal.
+same-tick trades are symmetric. Presentation draws copied state and uses an event journal to reconcile displayed
+effects after replay.
 
 The real-process gate uses 120 ms receive delay per side, 0–20 ms jitter, 10%
 unreliable loss and 10% duplication. It simulates 600 ticks, waits for both confirmed
@@ -292,8 +294,8 @@ ID, restores its archive and reaches the tick-600 reference with the live surviv
 
 The fixture uses published test credentials and loopback WS. A deployment must
 issue personal credentials and authenticate the provider, for example through
-verified WSS. This does not yet connect P2P to the public Party account/invite flow,
-provide authenticated spectator admission. Native listening-transport replacement
+verified WSS. This fixture does not provide a public Party account/invite flow or
+authenticated spectator admission. Native listening-transport replacement
 has the separate loopback gate above. The browser gate covers either participant returning, including a
 creator whose numeric RTC ID remains 1 while its connection generation changes. See [the provider contract](../../replay/p2p/admission/README.md) and
 [recorded evidence](../../docs/replay/results/p2p-admission-2026-09-08/README.md).

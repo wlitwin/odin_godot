@@ -6,13 +6,16 @@ remains a separate supported implementation.
 
 ## Objective
 
-An author writes gameplay as ordinary operations over one coherent world:
+Gameplay operates on a **World**, the typed value containing all mutable
+simulation state. A **frame** stores that value at one tick. A **step** applies
+the next input batch and records gameplay results as **occurrences**, each with
+an identity that presentation can track across replay:
 
 ```text
 step(frame at T, input batch for T+1) -> frame at T+1 + occurrences
 ```
 
-The runtime controls input delivery, stepping, history, correction, and
+A **runner** owns input delivery, stepping, retained history, correction, and
 presentation scheduling. Single-player uses the same simulation contract. The
 author still chooses game rules, authority, prediction scope, and which effects
 may be shown speculatively.
@@ -36,11 +39,11 @@ decision. Receipt-time delivery does not override game predicates or FIFO order.
    historical, being authoritative, and being replicated are separate policies.
 3. **Complete state per simulation group.** Cross-entity mutation is ordinary
    code. The default group is the public world; an authored client projection can
-   now remove nonmembers and retain explicit timestamped boundary values. Replay
+   remove nonmembers and retain explicit timestamped boundary values. Replay
    restores that complete group. Multiple independent groups remain later work;
    see the [implemented group contract](../../replay/net/groups.md).
-4. **Typed state before code generation.** The first API is usable without
-   scriptgen. Future generated authoring must lower onto a documented public API.
+4. **Typed state before code generation.** The API is usable without scriptgen.
+   Generated authoring must use a documented public API.
 5. **Presentation receives copies or explicitly read-only views.** It never
    temporarily overwrites simulation fields. The initial API uses copies because
    Odin does not provide a general deeply immutable borrowed view.
@@ -131,8 +134,9 @@ prototype resource limits, not supported multiplayer scale envelopes.
 `Result.tick` is the failing tick or final processed tick. Only a successful
 revision commits staged results. Audit never commits.
 
-The starting checkpoint is confirmed. A runner explicitly advances the simulation
-confirmation frontier when authority settles state. `revise_input` rejects
+The starting checkpoint is confirmed. **Confirmation** marks state as settled
+under the runner's authority or commit protocol. The **confirmation frontier**
+is the latest settled tick; the runner advances it explicitly. `revise_input` rejects
 committed ticks and `rewind` rejects movement before the frontier. Copying an old
 frame into a new timeline remains valid for playback inspection or an authorized
 recovery protocol; neither operation is an authority election.
@@ -157,7 +161,7 @@ purity. Audit is a diagnostic supplement, not a static effect system.
 Ordinary unsuccessful gameplay actions should validate before mutating. `abort`
 rejects the complete tick, including other players' actions in that batch. Use it
 for inability to simulate the tick safely, not as the default response to a
-player trying an unavailable item. The loot example simply ignores an invalid
+player trying an unavailable item. The Loot example ignores an invalid
 take and continues with the other player's input.
 
 ## Entity identity and lifetime
@@ -173,7 +177,8 @@ require the caller to choose the right pool. They are not yet global network IDs
 A rewound alternate branch can recreate an ID; a presentation object must resolve
 against the current view and must not treat a stale handle as a global lifetime
 guarantee. Wire IDs, provisional spawn identity, and branch-aware presentation
-reconciliation are explicit later milestones.
+reconciliation are separate contracts of the network runners and presentation
+layer; the pool itself does not supply them.
 
 ## Occurrences
 
@@ -198,7 +203,7 @@ fencing, input sequencing, and reconnect credentials belong to the session layer
 
 The frame is a typed in-process value. Copying it makes a detached checkpoint,
 and another timeline can resume from it. Canonical value/envelope codecs, durable
-saves and the native coordinated recovery profile now exist. Padded structs
+saves, and the native coordinated recovery profile are implemented. Padded structs
 are safe to copy; audit uses logical
 reflection equality rather than a raw memory comparison. NaNs compare unequal
 and will surface in audit; the network schema enforces finite values and the model
@@ -212,9 +217,9 @@ groups. Alternative replica carriers and broader migration/deployment profiles
 remain additional work.
 A client's visibility-filtered snapshot is not a complete migration backup.
 
-Strict P2P mode will additionally require cross-target reproducibility: math,
+Strict P2P mode requires cross-target reproducibility: math,
 collision algorithms, iteration order, allocation, RNG, and input ordering. The
-initial integer duel now has native arm64/WASM execution equality and a separate
+integer Duel example has native arm64/WASM execution equality and a separate
 peer-input runner. That evidence is scoped to its tested corpus, not arbitrary
 models or every target; see [P2P](../../replay/p2p/README.md).
 Server-authoritative mode can tolerate numerical discrepancies but still needs
@@ -225,14 +230,14 @@ replayable state and useful correction limits.
 Simulation collision must use frame-owned dynamic state. Static level assets can
 be immutable query inputs; moving doors/platforms must have historical state.
 An ordinary Godot physics world is not made replayable by saving node poses.
-Initial movement primitives will use explicit 2D kinematics and collision math.
-The [owner-streamed profile](owner-streams.md) now has latest-observation admission,
+Replayable movement uses explicit kinematics and collision math.
+The [owner-streamed profile](owner-streams.md) provides latest-observation admission,
 saved owner/handoff state, and Godot 2D/3D adapters. It records accepted engine outputs;
 it does not replay Godot contact solving. A separate Slopball port exercises the
 initial profile, including planned/crash physics migration; broader scenarios remain pending.
 
 A complete migration checkpoint combines a full authority frame,
-content/protocol versions, session membership/ownership, command deduplication
+content/protocol versions, session membership/ownership, action deduplication
 frontiers, and an authority term. Host selection and transport rendezvous remain
 separate services. They must establish a unique accepted term before simulation
 resumes. Read [the migration milestone](roadmap.md#m5--session-recovery-and-host-migration)

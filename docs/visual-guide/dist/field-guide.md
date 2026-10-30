@@ -2,13 +2,13 @@
 
 Kit and Replay are independent frameworks. Kit starts from script entities and
 field declarations. Replay starts from a complete replayable simulation frame.
-Both have cooperative and authoritative prediction paths. Replay is experimental.
+Both support cooperative games and server-authoritative prediction. Replay is experimental.
 
 ## The engine boundary
 
 Godot owns the editor, scene tree, input devices, rendering and audio.
-An Odin script is a struct and free procs attached to a node. `self` addresses
-the script struct; `self.owner` addresses the engine node.
+An Odin node script is a struct and free procedures attached to a node. `self` addresses
+the script struct; `self.owner` refers to the engine node.
 
 `scripts/*.odin → scriptgen → Odin compiler → scripts library`
 
@@ -19,8 +19,8 @@ Pure Replay gameplay packages also run without Godot.
 
 - `gd:"replicate"`: authority-written state.
 - `gd:"owner"`: cooperative owner-written streams, interpolated remotely.
-- `gd:"predict,interp"` and `@(gd_tick)`: server-authoritative sim lane.
-- `@(gd_command)`: target mutation with generated submission and verdict handling.
+- `gd:"predict,interp"` and `@(gd_tick)`: server-authoritative simulation lane.
+- `@(gd_command)`: target mutation with generated submission and authority-result handling.
 - Predicted commands mutate only their target. Cross-entity consequences belong
   in the authority command hook after acceptance.
 - Start with `examples/hello_net`, then compare `examples/hello_sim`.
@@ -29,24 +29,25 @@ Pure Replay gameplay packages also run without Godot.
 
 `step(frame at T, input for T+1) → frame at T+1 + occurrences`
 
-- World contains mutable gameplay dependencies: health, positions, bags, RNG,
+- `World` contains mutable gameplay dependencies: health, positions, bags, random-number-generator state,
   cooldowns, scheduled work, entity lifetime and allocation metadata.
 - Keep node pointers, sockets, resources, live audio and storage outside World.
 - A step reads its state, input, tick and immutable versioned definitions.
-- Emit occurrences in the step. Present Begin/Update/Confirm/Cancel outside it.
+- Emit occurrences, recorded events with an identity, in the step. Handle their
+  Begin/Update/Confirm/Cancel notifications outside the simulation.
 - `revise_input` replaces a local recorded input batch. It does not establish
   network authority.
 - `correct` ingests a complete verified authority frame and its occurrences,
-  then stages the speculative suffix before committing the operation.
+  then stages the remaining predicted ticks before committing the operation.
 - `Timeline`: local simulation. `Session`: direct network roles.
   `Party → Room`: invitations and authority recovery. `P2P_Party` plus the
   admitted peer runner: deterministic fixed-roster rollback.
 
 ## Three contracts to keep separate
 
-1. Authority: whose result may settle the game?
-2. History: which values must be restored to compute the next tick?
-3. Presentation: which frame and occurrences should this screen display?
+1. Authority: the process allowed to settle a gameplay result.
+2. History: the values that must be restored to compute the next tick.
+3. Presentation: the frames and effects selected for this screen’s display time.
 
 Client-filtered visible state is not a complete authority migration backup.
 A new epoch scopes occurrence identities; it does not elect a legitimate host.

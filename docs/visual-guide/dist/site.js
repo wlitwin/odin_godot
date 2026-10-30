@@ -51,6 +51,7 @@
   dialog.addEventListener('click',event=>{ if(event.target===dialog) dialog.close(); });
   input.addEventListener('input',render);
   input.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){event.preventDefault();dialog.close();return;}
     const links=[...results.querySelectorAll('a')];
     if(event.key==='ArrowDown' && links.length){event.preventDefault();selected=(selected+1)%links.length;markSelected();}
     if(event.key==='ArrowUp' && links.length){event.preventDefault();selected=(selected+links.length-1)%links.length;markSelected();}

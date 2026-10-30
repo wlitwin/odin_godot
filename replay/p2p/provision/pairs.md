@@ -1,10 +1,12 @@
 # Pair-key provisioning
 
-`Pair_Service` is an optional bounded read service over an existing P2P Hub.
+Use `Pair_Service` to obtain the pair key and current peer endpoint needed for a
+native authenticated P2P link. It is an optional bounded read service over an
+existing P2P Hub.
 It supplies the [native link](../link/README.md) with a pair grant and the remote
 member's currently registered endpoint. It does not alter durable schemas or
 grant simulation authority. Embeddings route its messages explicitly; the Duel
-service now enables it alongside provisioning, registration and RTC signaling.
+service enables it alongside provisioning, registration and RTC signaling.
 
 Requests/replies use separate canonical kinds `0x5054` / `0x5055`, version 1 and
 separate HMAC domains. A request binds room/content, current identity, the process
@@ -32,5 +34,5 @@ Three tests in `tests/replay_p2p_provision` cover symmetric pair issuance withou
 root-key disclosure, no durable writes, incarnation rotation, bad MAC/current-
 registration refusal, self/unknown-peer rejection, delayed-reply correlation and
 per-member request budgets. The native [P2P Direct owner](../../godot/p2p_direct.md)
-now requests these decisions before admitting a physical ENet connection,
+requests these decisions before admitting a physical ENet connection,
 including process replacement.

@@ -1,12 +1,8 @@
 # 1 · What if your scripts were compiled?
 
-You open your project, add a `Node2D`, attach a script, press play. The script
-is not GDScript. It is compiled, native machine code, and everything else
-about your day is unchanged.
-
-That's the whole pitch of odin_godot at the surface level, and it's worth
-being precise about it, because "replace GDScript" usually means "abandon the
-editor workflow," and this doesn't.
+odin_godot lets you attach an `.odin` script to a Godot node and run it as
+compiled native code. Scenes, Inspector properties, and engine callbacks remain
+part of the Godot workflow. The script layout, build step, and debugger change.
 
 ## What stays
 
@@ -19,9 +15,8 @@ editor workflow," and this doesn't.
 - **Signals** connect in code or the editor.
 - **The play button.** Save an `.odin` file and the extension recompiles and
   hot-reloads it, so the edit → run loop survives.
-- **GDScript itself.** Mixing is fine. Plenty of projects keep GDScript for UI
-  glue and one-off editor tools and write the game in Odin. You migrate a
-  script at a time, not a project at a time.
+- **GDScript itself.** Odin scripts can coexist with GDScript. You can keep
+  existing UI or editor scripts and migrate gameplay one script at a time.
 
 ## What changes
 
@@ -64,8 +59,7 @@ mover_process :: proc(self: ^Mover, delta: f64) {
 }
 ```
 
-The two files are the same length and express the same ideas, with three
-structural differences:
+The examples express the same behavior, with three structural differences:
 
 1. **Your state is a struct.** Every field is declared, typed, and laid out in
    memory exactly as written. Tags on fields (`gd:"export"`) replace
@@ -78,30 +72,26 @@ structural differences:
    them separate, and that distinction ends up mattering a lot.
 
 A code generator (`scriptgen`, run by the build) reads your file and emits the
-registration/marshalling boilerplate as a sibling `.gen.odin` you never edit.
-You write the two files above levels of ceremony apart from raw GDExtension.
+registration and argument-conversion code in a sibling `.gen.odin` file. Edit
+the authored script; the build regenerates that file.
 
 ## Why bother
 
-The honest answer comes in three tiers, from smallest to largest:
+The compile step and fixed data layout affect both execution and framework integration:
 
-**Performance is the obvious one, and the least interesting.** Compiled Odin
-runs your per-frame logic at native speed with real arrays and real structs.
-The survivors-like example in this repo pushes entity counts GDScript can't.
-If that's all you need, you could also reach for C#. Keep reading.
+**Gameplay procedures compile to native code.** Arrays and structs have explicit
+layouts, so loops over gameplay state do not require an interpreter. The
+Survivors example shows this style of per-frame entity processing; measure your
+own workload before choosing a language for performance.
 
-**The language fits gameplay code.** Odin is a small systems language:
-procedures, structs, slices, explicit everything. It has no classes, no
-exceptions, and no GC pauses. Value semantics and fixed layouts mean the shape
-of your data is a decision you make, not one the runtime makes for you.
-Gameplay state (a thousand things with positions and hit points and timers)
-is exactly the workload it's shaped for.
+**State has an explicit layout.** Odin provides procedures, structs, slices, and
+explicit memory management, with no classes or garbage collector. Positions,
+health, and timers can live together in value types that your code controls.
 
-**The layout is the payoff.** Because a script's state is a struct with a
-known memory layout, the extension can do things to your state that a dynamic
-language can't promise. Diff it. Snapshot it. Ship it over a network and
-reconstruct it bit-for-bit on another machine. Tag a field `gd:"replicate"`
-and it is synchronized to every player, automatically, every tick:
+**Kit uses that layout for replication.** Kit is the SDK's entity-based
+multiplayer framework. Its generated field descriptors let a session compare
+state, build snapshots, and send changes to peers. Tag a field `gd:"replicate"`
+to include it in authority-written state:
 
 ```odin
 Chest :: struct {
@@ -112,30 +102,29 @@ Chest :: struct {
 }
 ```
 
-That's not a serialization library you call. It's a property of the field. The
-multiplayer framework built on it (posts 3–6) gives you client prediction,
-drop-in joins, reconnects, saves, and host migration as consequences of your
-structs being structs. This is the part that has no GDScript or C# equivalent.
+The tag declares the field's replication policy. A configured Kit session uses
+it for networking and snapshots; posts 3–6 show how commands, identity, and
+session setup add prediction, drop-in joins, reconnects, saves, and migration.
 
 ## The honest costs
 
 - **A compile step.** Save-to-reload is a compile (a second or two, kept warm),
-  not an instant re-parse. You feel it; you also stop shipping typo crashes.
+  rather than an instant re-parse. Type errors are reported before the new
+  library loads.
 - **No in-editor breakpoints.** Debugging is prints plus `lldb`, a real
   native debugger, but not the one in the editor. Crashes give you symbolized
   native backtraces naming your Odin proc ([Debugging](../debugging.md)).
-- **A new language.** Odin is genuinely small (if you've written any C-family
-  code, the snippets above already read fine), but it is a new language, and
-  its compiler will say no to things GDScript happily lets slide, catching at
-  build time what GDScript would surface as a runtime crash.
+- **A new language.** Odin uses explicit types, pointers, and memory ownership.
+  Its compiler catches invalid field access and type mismatches, while runtime
+  behavior still needs testing.
 - **A toolchain.** Everything is pinned in a Nix flake; setup is
   [one page](../getting-started.md).
 
 ## Do this now
 
 Work through [Getting Started](../getting-started.md): toolchain, project
-wiring, and the exact `Mover` above, attached and walking. It takes fifteen
-minutes if Nix is already installed. When the node moves, come back for post
-2: unlearning the class hierarchy.
+wiring, and the `Mover` above, attached and moving. When it runs, continue to
+post 2 for composition, cross-script access, and the distinction between the
+script struct and its node.
 
 *Next: [Thinking in structs →](02-thinking-in-structs.md)*

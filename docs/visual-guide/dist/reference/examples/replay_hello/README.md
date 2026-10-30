@@ -1,9 +1,10 @@
 # Replay Hello and Loot views
 
-New Godot scenes built on Replay. The original `hello_net`, `hello_sim`,
-Cavecrawl, and Scrapyard projects remain in their original locations. These
-Hello and Loot scenes remain **offline**; the separate Network scene now uses
-the new server/client/observer runner.
+Run Hello to see fixed-tick gameplay displayed in Godot, Loot to inspect a
+corrected inventory transfer, or Network to connect a host, client and observer.
+Hello and Loot are **offline**. Network uses Replay's runner, the runtime that
+schedules simulation steps and manages network input and history. The original
+`hello_net`, `hello_sim`, Cavecrawl, and Scrapyard projects remain separate.
 
 From the repository root:
 
@@ -49,7 +50,8 @@ only when running the acceptance gate against already current binaries.
 
 ## Hello
 
-The script uses the shared `game.Timeline` runtime alias directly; generated Godot
+The script uses `game.Timeline`, the shared model's name for its Replay timeline
+runtime, directly; generated Godot
 registration stays separate from the pure model package.
 
 `shared/hello/game.odin` contains the complete simulation, shared with native

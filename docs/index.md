@@ -1,7 +1,7 @@
 # odin_godot documentation
 
-Write Godot scripts in compiled Odin. These docs are organized as a path: **learn → build →
-use → ship.**
+Use these guides to install odin_godot, write compiled Odin scripts, choose a
+multiplayer framework, and export a game.
 
 ## Start here
 
@@ -10,13 +10,10 @@ use → ship.**
   correction lab, examples, and searchable reference.
 - **[Getting Started](getting-started.md)**: install the Nix toolchain, build the extension,
   add it to a Godot project, and write + attach your first `.odin` script (a Node that moves
-  on `_process`). It's a real, copy-pasteable hello-world, and for multiplayer, the
-  [quickstart](kit/quickstart.md) is the next stop.
+  on `_process`). Continue to the [quickstart](kit/quickstart.md) for multiplayer.
 - **[The onboarding series](onboarding/index.md)** collects seven posts for Godot developers
-  coming from GDScript/C#: why compiled scripts, the struct mental model, and the multiplayer
-  shift (state-not-messages, verbs-not-RPCs, the two timelines). It's the *why* behind
-  everything below. Read it alongside your first build, or whenever the toolkit's way of
-  structuring a game feels alien.
+  coming from GDScript/C#: compiled scripts, struct composition, replicated state,
+  predicted commands, and presentation timing. Read it alongside your first build.
 
 ## Reference
 
@@ -41,7 +38,7 @@ use → ship.**
   - live editing: recompile-and-reload on save, plus the manual `script.reload(true)` fallback
   - editor DX: live error squiggles (`_validate`), autocomplete (`ols`), syntax highlighting
   - debugging: `gd.print` / `gd.error`, `lldb`, reading crash backtraces
-  - **the honest AOT limitations** (no in-editor breakpoints, recompile-on-save latency, …)
+  - **AOT limitations** (no in-editor breakpoints, recompile-on-save latency, …)
 - **[Debugging](debugging.md)**: the deep `lldb` + crash-backtrace reference (what Workflow
   summarizes).
 - **[Pure-Odin Events](events.md)**: `events.Event(T)` provides typed one-to-many dispatch at
@@ -121,8 +118,8 @@ independently runnable.
 - **[Exporting](exporting.md)**: native desktop export (the `OdinExportPlugin`) and web/WASM
   export (the Emscripten SIDE_MODULE + COOP/COEP serving).
 - **[Distribution](distribution.md)**: building the drop-in addon with `nix build`,
-  cross-compiling the core for Linux/Windows, the consumer install workflow, and the honest
-  per-platform build-vs-runtime status.
+  cross-compiling the core for Linux/Windows, the consumer install workflow, and the
+  per-platform build and runtime verification status.
 - **[Publishing](publishing.md)** is the Godot Asset Library runbook: the `release` branch
   (`build/release.sh`), the submission form values, and consumer-facing quirks.
 

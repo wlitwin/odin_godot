@@ -9,15 +9,15 @@
 returns <code>Buffer_Too_Small</code> and retains it. The pump stops and tries again with a
 fresh allowance next time. An exactly exhausted budget stops before another read.
 Packet count and byte limits are unchanged.</p>
-<p>The previous loops read into the full 64 KiB buffer and checked the budget only
+<p>Before the receive-budget fix, loops read into the full 64 KiB buffer and checked the budget only
 after dequeueing. The crossing packet was then discarded, even on a reliable
 channel. Reliability cannot recover a packet already accepted and removed from
 the transport&#39;s receive queue. Large actions could stall until application retry;
 large fact batches could leave observer event history incomplete.</p>
 <p>Every legal packet fits a fresh pump: <code>transport.MAX_PACKET_BYTES</code> is 65,536, and
-network configuration already requires <code>bytes_per_pump &gt;= 65,536</code>. The fix uses
-the existing receive-retention contract, without another buffer, an unbounded
-queue, a larger byte budget, or a new retry path. <code>Buffer_Too_Small</code> is not a
+network configuration already requires <code>bytes_per_pump &gt;= 65,536</code>. This uses
+the existing receive-retention contract and existing buffers, queue bounds, byte
+budgets and retry paths. <code>Buffer_Too_Small</code> is not a
 malformed-packet rejection. Authority traffic counters still count successfully
 received authority packets; client traffic from other senders consumes the work
 budget before being rejected, without being attributed to the authority.</p>
@@ -38,5 +38,5 @@ observer-effect failure. The historical failure has no captured delivery schedul
 and its cause remains unestablished. A current fault run with complete effects and
 strict replay is a regression check, not retrospective proof of that cause.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/receive_budget.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/receive_budget.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/receive_budget.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -84,7 +84,7 @@ kills before/after commit, and `tests/replay_p2p_provision_service/run.sh` for t
 native Godot TLS service/client fixture. The fixture provisions three members
 through one client process; it is not a three-player gameplay or browser test.
 
-The reusable [P2P party owner](../../godot/p2p_party.md) now connects these APIs
+The reusable [P2P party owner](../../godot/p2p_party.md) connects these APIs
 to Duel's browser and native create/join/rejoin flows. Local tests cover RTC and
 encrypted ENet gameplay, plus fresh-process archive return. Public deployment,
 broader recovery and human account integration remain open.

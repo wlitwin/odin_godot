@@ -1,6 +1,7 @@
 # Fixed-roster P2P admission
 
-This package authenticates a participant against a trusted match provider before a
+Use this package to authenticate a participant against a trusted match provider
+before a
 physical connection is bound to a P2P roster slot. It does not supply gameplay
 state, elect a simulation authority or choose a winning checksum.
 
@@ -28,7 +29,7 @@ client proof does not authenticate an arbitrary server to the client.
 ## Godot integration
 
 The existing bounded `Rendezvous` frontend implements the challenge lifecycle,
-rate/size limits and continuation reservations. It now accepts an explicit
+rate/size limits and continuation reservations. It accepts an explicit
 `Rendezvous_Provider`; ordinary `rendezvous_init` keeps the authority Service policy.
 For a P2P registry:
 
@@ -69,7 +70,7 @@ fixed-roster match. Changing the roster requires a new match contract. There is 
 claim that a peer can be trusted to simulate honestly merely because it authenticated.
 
 The signaling frontend retains the first member as the room creator. Its browser
-process may now return from a compatible archive while peers retain their runners.
+process may return from a compatible archive while peers retain their runners.
 The creator keeps numeric RTC ID 1; the survivor detects the new connection
 generation and the transport wrappers discard retired buffered work. This requires
 the same live provider/match scope; it does not elect a different roster member

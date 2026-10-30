@@ -1,10 +1,14 @@
 # Cavecrawl social detail acceptance
 
+Check scoreboard latency, name editing and positional pings without treating
+those displays as gameplay state. The native and Chrome cases below cover
+different UI and authority-change boundaries.
+
 ```sh
 REPLAY_CAVE_SOCIAL_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_social/run.sh
 ```
 
-The runner builds an isolated Cavecrawl copy, runs native host/client/observer
+The test harness builds an isolated Cavecrawl copy, runs native host/client/observer
 processes with 120 ms receive delay, and exports a separate Chrome project with
 the existing coordinator-backed migration fixture. The unchanged shared telemetry
 and Comms unit gates can also be run with `tests/replay_telemetry/run.sh` and

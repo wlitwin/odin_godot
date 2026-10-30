@@ -7,13 +7,14 @@
 <article class="reading-body "><blockquote>
 <p><strong>Building a co-op game? Use the <a href="../../docs/kit/index.html">Kit multiplayer toolkit</a>
 instead</strong> — <code>examples/cavecrawl</code> and <code>examples/slopball</code> are its references.
-This example predates the toolkit and is kept as the demonstration of the RAW
-engine surface the toolkit absorbs: <code>MultiplayerSynchronizer</code>, <code>@(gd_rpc)</code>,
-and ~1,100 lines of hand-rolled netcode the kit games never write.</p>
+Use this example to study Godot&#39;s engine APIs directly:
+<code>MultiplayerSynchronizer</code>, <code>@(gd_rpc)</code>, and ~1,100 lines of networking code
+that Kit supplies for its examples.</p>
 </blockquote>
-<p>A pure-Odin / Polygon2D co-op survivors example where <strong>ONE gameplay codebase runs in THREE
-modes</strong> — single-player, co-op over native ENet, and co-op in the browser over WebRTC — and the
-netcode is <strong>owner / peer-authoritative</strong> so your own actions are instant (no host round-trip).</p>
+<p>This pure-Odin / Polygon2D survivors game runs in three modes: single-player,
+native ENet co-op, and browser WebRTC co-op. Each player simulates their own pawn
+and projectiles locally, so movement and firing do not wait for a host round-trip.
+Peers trust the firing player&#39;s damage reports.</p>
 <p><code>examples/survivors</code> remains the single-player gameplay reference; its co-op layer is
 retained as the <em>host-authoritative</em> engine-native variant + the regression tests for the
 engine replication interop (see its README).</p>
@@ -22,12 +23,12 @@ nix develop --command bash -c 'bash examples/coop_arena/coop_native_run.sh'  # c
 nix develop --command bash -c 'bash examples/coop_arena/coop_web_run.sh'     # co-op WebRTC    -&gt; ARENA_WEB_OK</code></pre></div><p>To play windowed: open the project in Godot and press <strong>Single Player</strong>, <strong>Host</strong>, or <strong>Join</strong>
 on the start screen (WASD to move; weapons auto-fire at the nearest enemy).</p>
 <h2 id="one-codebase-three-modes">One codebase, three modes<a class="heading-anchor" href="#one-codebase-three-modes" aria-label="Link to this section">#</a></h2>
-<p>There is no separate &quot;single-player game&quot; and &quot;co-op game&quot;. The SAME <code>arena_player.odin</code>,
+<p>The same <code>arena_player.odin</code>,
 <code>arena_bullet.odin</code>, <code>arena_enemy.odin</code> and the <code>ArenaGame</code> orchestrator (<code>arena.odin</code>) run in
 all three modes:</p>
 <ul>
 <li><strong>Single-player == host-with-no-peers.</strong> Single mode opens no transport at all; the
-authoritative simulation runs exactly as the host&#39;s does, the broadcasts simply reach nobody.</li>
+authoritative simulation runs exactly as the host&#39;s does, the broadcasts have no remote recipients.</li>
 <li><strong>Transport is chosen at compile time by platform</strong>: native builds use ENet (<code>gd.host</code> /
 <code>gd.join</code>); the web build uses WebRTC (<code>gd.webrtc_host</code> / <code>gd.webrtc_join</code> / <code>gd.webrtc_poll</code>).
 The same <code>@(gd_rpc)</code> methods and <code>gd.rpc</code> calls work over either, once connected.</li>
@@ -38,24 +39,24 @@ deterministic proofs the tests assert; with no role it shows the windowed start 
 <p><strong>Pawns are OWNER-authoritative.</strong> Each player&#39;s pawn has its multiplayer authority set to the
 owning peer (recursively, so the child <code>MultiplayerSynchronizer</code> streams <em>from</em> the owner). The
 owner simulates its OWN pawn locally every frame — movement (with momentum) and auto-fire — with
-<strong>zero round-trip</strong>. Non-owners run none of that; they just render the synchronized transform.
-So your pawn answers your input the same frame you press a key, while still appearing, smoothly
-synced, on the other screen. (See the gate in <code>arena_player.odin</code>:
+<strong>zero round-trip</strong>. Other peers render the synchronized transform instead of simulating that pawn&#39;s
+input. Your pawn therefore answers input in the same frame while remote screens
+receive its updated position. (See the gate in <code>arena_player.odin</code>:
 <code>if !node_is_multiplayer_authority(owner) { return }</code>.)</p>
 <p><strong>Projectiles are OWNER-authoritative + deterministic-local.</strong> When a peer auto-fires, it spawns
 its bullet <strong>locally, immediately</strong> (it sees its own shot with no network delay) and <em>then</em>
 broadcasts <code>fired(origin, dir)</code>; every other peer spawns a matching <strong>ghost</strong> bullet that flies
 the same path. Only the firing peer&#39;s own bullet resolves hits — when it overlaps an enemy it
 authoritatively applies + <strong>broadcasts</strong> the damage/kill (<code>damage</code>, <code>call_local</code>), and peers
-<strong>trust it</strong> (no anti-cheat — by design). This is the opposite of the host-authoritative
-anti-pattern (client RPCs the host to spawn its bullet, then waits for it to come back).</p>
+<strong>trust it</strong> (no anti-cheat — by design). This policy favors local response and trusts peers; it does not validate hits
+on the host.</p>
 <p><strong>Enemies are a shared horde: HOST-authoritative spawn + movement, PEER-authoritative damage.</strong>
 The host spawns enemies through a <code>MultiplayerSpawner</code> (auto-instantiated on every client) and
 moves them toward the nearest pawn; a <code>MultiplayerSynchronizer</code> streams the host&#39;s <code>position</code> +
 the spawn-once <code>id</code>. Because a horde isn&#39;t something a player <em>inputs</em>, host authority there is
 not perceived as input lag. <strong>Damage/death is peer-authoritative</strong>: <code>hp</code> is tracked locally on
 every peer and decremented by the broadcast <code>damage</code> RPC (whoever&#39;s bullet hit), so both peers
-agree on every death; the host (the node owner) frees the node and the spawner replicates the
+agree on every death; the host, which controls the enemy&#39;s multiplayer authority, frees the node and the spawner replicates the
 despawn. <code>hp</code> is therefore deliberately <em>not</em> in the synchronizer config.</p>
 <blockquote>
 <p>Scaling note: for hundreds of enemies you&#39;d switch to <em>deterministic-local</em> enemies (host
@@ -97,13 +98,13 @@ spawner replicates the despawn; an explicit RPC would double-free (<code>ERR_UNA
 <td>the same owner-auth guarantees, in two real browsers over a browser-native WebRTC data channel (gated: <code>ARENA_WEB_BUNDLED</code> skip when no Chrome/puppeteer)</td>
 </tr>
 </tbody></table>
-</div><p>The &quot;OWNER-LOCAL IMMEDIACY&quot; proof is the crux: the firer (the <strong>client</strong>, to make the strongest
+</div><p>The &quot;OWNER-LOCAL IMMEDIACY&quot; check observes when the shot appears: the firer (the <strong>client</strong>, to make the strongest
 case) logs <code>BULLET_LOCAL</code> the same frame its local auto-fire timer fires — a direct local spawn,
 not a request sent to the host — and the host only later logs <code>BULLET_REMOTE</code> when the broadcast
 arrives. No round-trip gates the owner seeing its own shot.</p>
 <h2 id="deploying-internet-co-op-room-code-lobby">Deploying internet co-op (room-code lobby)<a class="heading-anchor" href="#deploying-internet-co-op-room-code-lobby" aria-label="Link to this section">#</a></h2>
-<p>The web build pairs two friends through a <strong>room-code lobby</strong> over a real signaling server — the
-deployable path, not a localhost-only demo:</p>
+<p>The web build pairs two players through a <strong>room-code lobby</strong>. To use it across
+networks, provide a signaling server reachable by both players:</p>
 <ol>
 <li><strong>Stand up a signaling relay</strong> reachable by both players at a public <code>wss://HOST/rtc</code>. ANY
 server speaking the small JSON wire protocol below works; a Node reference implementation
@@ -156,5 +157,5 @@ replication config lives in the pawn/enemy <code>.tscn</code>).</li>
 <li><code>run.sh</code>, <code>coop_native_run.sh</code>, <code>coop_web_run.sh</code>, <code>coop_drive.mjs</code> — the three test harnesses.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/index.html"><span>Kit multiplayer toolkit</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/coop_arena/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/index.html"><span>Kit multiplayer toolkit</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/coop_arena/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#one-codebase-three-modes" class="">One codebase, three modes</a><a href="#the-authority-model-the-whole-point" class="">The authority model (the whole point)</a><a href="#replication-gotchas-honored-from-testsrepl_spike" class="">Replication gotchas honored (from tests/repl_spike)</a><a href="#what-the-headless-tests-prove" class="">What the headless tests prove</a><a href="#deploying-internet-co-op-room-code-lobby" class="">Deploying internet co-op (room-code lobby)</a><a href="#signaling-wire-protocol-raw-websocket-json-text-frames-server-path-rtc" class="subsection">Signaling wire protocol (raw WebSocket, JSON text frames; server path /rtc)</a><a href="#stun--turn" class="subsection">STUN / TURN</a><a href="#what-still-needs-a-human" class="">What still needs a human</a><a href="#files" class="">Files</a></nav><div class="outline-actions"><a href="../../../reference/examples/coop_arena/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

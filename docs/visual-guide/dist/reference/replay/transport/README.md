@@ -1,6 +1,7 @@
 # Replay transports
 
-`Transport` is a borrowed interface over a concrete adapter. It provides `send`,
+Use `Transport` to drive packet delivery independently of the simulation and its
+network policy. It is a borrowed interface over a concrete adapter. It provides `send`,
 `receive`, `poll`, `status`, `peer_connected`, and `close`. Accepted sends copy payloads; receive
 copies into caller storage. `Buffer_Too_Small` retains the pending packet and
 reports the required size. A peer ID identifies a transport connection, not a
@@ -62,8 +63,9 @@ do not poll again, so adding consumers cannot multiply the ingress budget.
 Bounded packet and byte rings preserve metadata and retain too-small reads.
 Unreliable overflow drops only that lane's datagram. Reliable overflow retains one
 pending packet until its lane drains, so reliable delivery is not silently weakened;
-this can temporarily hold up the underlying queue. The recovery link only routes
-unreliable checkpoint messages to its background lane.
+this can temporarily hold up the underlying queue. The recovery link routes
+checkpoint messages to its background lane and negotiates their delivery channel
+as described in the [recovery contract](../recovery/README.md#checkpoint-delivery-channel).
 
 Both views share a token bucket and per-pump output limit. Background sends also
 leave `primary_reserve` bytes available for gameplay. Callers receive backpressure
@@ -73,7 +75,7 @@ wrapped byte storage, small receives, aggregate output bounds, and reserved capa
 
 ## Godot ENet adapter
 
-`replay/godot.Enet` owns a directly polled `ENetMultiplayerPeer`. It does not
+`Enet` from `replay/godot/transport` owns a directly polled `ENetMultiplayerPeer`. It does not
 install SceneMultiplayer or use Kit. Construct it with `enet_host`/`enet_join`,
 then use `enet_transport`. `enet_id` returns the current connection's ID after it
 connects. Host bind defaults to all interfaces; tests explicitly bind loopback.
@@ -118,8 +120,9 @@ The [Godot RTC adapter](../godot/transport/rtc.md) composes fragmentation with r
 data channels and receiver credit. This additional credit prevents Godot's finite
 JS ring from dropping already SCTP-delivered reliable data. `rtc_transport` is a
 normal Replay interface; `Session_Options.backend = .Rtc` uses it through the same
-server/client gameplay runner. Browser migration and deployed relay/TURN acceptance
-remain separate work.
+server/client gameplay runner. Browser migration has separate
+[Room acceptance](../godot/room.md); public relay/TURN deployment still needs its
+own acceptance.
 
 Fragment transmission selects queued messages by acceptance order and skips a
 blocked peer/channel for the current poll. Reused array slots do not determine

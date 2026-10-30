@@ -1,8 +1,8 @@
 # hello_net — the co-op quickstart's living copy
 
-The smallest complete kit game: two windows, one colored square each, moving
-on both screens. Two authored files (`scripts/hello.odin`,
-`scripts/player.odin`), two 15-line scenes. The walkthrough is
+This small Kit game opens two windows with one colored square per player; both
+screens display both players' movement. `scripts/hello.odin` handles the session
+and `scripts/player.odin` defines the moving player entity, with two 15-line scenes. The walkthrough is
 [docs/kit/quickstart.md](../../docs/kit/quickstart.md); the server-authority
 promotion of this exact game is `examples/hello_sim`.
 
@@ -12,11 +12,13 @@ $GODOT --path examples/hello_net &          # window 1: press Host
 $GODOT --path examples/hello_net            # window 2: press Join
 ```
 
-`HELLO_LATENCY=120` on either window injects a 120ms bad link.
+`HELLO_LATENCY=120` on either window injects 120ms of network latency.
 `bash examples/hello_net/run.sh` is the same scenario headless: two
-processes under latency, read through GENERATED probes
-(`probe_player_count` / `probe_my_player` / `probe_player_x`), one verdict —
-the smallest consumer of the integration harness and scriptgen's probes.
+processes under latency, observed through generated read-only probes
+(`probe_player_count` / `probe_my_player` / `probe_player_x`). It demonstrates
+how to drive a game through the integration harness and scriptgen's probes.
 
-The generated attach names `.Friends_Coop`: entity owners author their streamed
-movement, while the host owns shared state and validates commands.
+The generated attach selects `.Friends_Coop`: each entity owner—the player
+allowed to write that entity's owner-controlled fields—streams their movement.
+The host controls shared state and validates Kit commands, the generated requests
+that change entity state.

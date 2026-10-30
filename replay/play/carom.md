@@ -1,6 +1,7 @@
 # Carom and beam queries
 
-`Carom2` is a value-owned position/velocity pair. `carom2_step` advances it against
+Use `Carom2` for the defined bouncing-shell motion rule and beam helpers for
+closed-segment hit queries. `Carom2` is a value-owned position/velocity pair. `carom2_step` advances it against
 static AABBs and arena bounds, with caller-provided time, restitution and face
 clearance. It implements the original Scrapyard shell law: up to three cover legs,
 axis-normal reflection, then arena-wall clamp/reflection. The caller owns fuse,

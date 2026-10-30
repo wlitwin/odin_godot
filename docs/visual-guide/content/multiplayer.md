@@ -52,7 +52,7 @@ observations according to the game you are building.
 ## Test one contested interaction
 
 Give two players one item. Let both predict taking it, delay the connection, and
-make one request lose. Check the inventories, entity lifetime, and effect journal.
+make one request lose. Check the inventories, entity lifetime, and the record of presented effects.
 This exposes the state and presentation boundaries before a large game makes
 the failure difficult to isolate.
 

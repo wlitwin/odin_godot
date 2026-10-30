@@ -1,6 +1,7 @@
 # Replayable party lobbies
 
-`Lobby(N)` is a value inside the game's World. It contains bounded display names,
+Use `Lobby(N)` for replayable readiness, leader and run-start rules. It is a
+value inside the game's `World`. It contains bounded display names,
 present/ready masks, a party leader, Waiting/Playing phase and a run counter.
 Transport ownership and credentials stay in Session/Room. A party leader is a
 game permission; becoming a network authority does not itself execute Start.

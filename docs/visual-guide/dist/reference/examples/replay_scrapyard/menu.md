@@ -22,7 +22,9 @@ column remains zero here too. Telemetry is session metadata from the current
 authority, with zero for its local seat and `--` until a peer has a fresh sample.
 The [telemetry component](../../replay/telemetry/README.md) measures application
 queues/pump time as well as transit. It is independent of the gameplay world,
-actions, events and checkpoints; content remains 45.
+actions, events and checkpoints. The menu/tally assessment used content 45;
+adding telemetry did not change that gameplay contract. See the [save guide](saves.md)
+for current content and conversion.
 
 ```sh
 nix develop --command bash examples/replay_scrapyard/menu_run.sh

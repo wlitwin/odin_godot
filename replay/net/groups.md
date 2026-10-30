@@ -1,7 +1,9 @@
 # Authored prediction groups
 
-The default client predicts the complete public world. `Model.group` optionally
-defines a closed subset using the same value carrier:
+Use a prediction group when a client should simulate only a declared subset of
+the world. The default client predicts the complete public world; `Model.group`
+defines a closed subset using the same value carrier, including every mutable
+dependency needed by its gameplay rules:
 
 ```odin
 Prediction_Group(State){
@@ -68,7 +70,7 @@ One group per player client is implemented, with one to eight seats in the
 existing runner. The carrier type is still the authority's `State`; zeroing absent
 members establishes semantics, not sparse memory storage or a bandwidth reduction.
 Claimball's boundary fields also increase that carrier. Different projected state types, multiple independent groups and automatic
-dependency analysis remain unimplemented. [Recipient views](replication.md) now
+dependency analysis remain unimplemented. [Recipient views](replication.md)
 filter state/controls/events before transmission. Prediction with omitted
 authority-only fields requires both that explicit policy and a validated group;
 unscoped prediction remains rejected.

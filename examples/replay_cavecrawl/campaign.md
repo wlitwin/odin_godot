@@ -1,5 +1,9 @@
 # Full co-op campaign acceptance
 
+Run this harness to check Replay Cavecrawl's scripted two-floor campaign. It
+compares gameplay state across a host, client and observer; its result does not
+establish visual parity or ordinary human play behavior.
+
 ```sh
 nix develop --command bash examples/replay_cavecrawl/campaign_run.sh
 REPLAY_CAVE_JITTER=20 REPLAY_CAVE_LOSS=500 REPLAY_CAVE_DUPLICATE=500 \

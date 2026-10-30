@@ -1,7 +1,8 @@
 # Aim and historical queries
 
-`Model.step_view` is the simulation callback for games that need the view associated
-with each control sample. It replaces `Model.step` for that model; existing models
+Use `Model.step_view` when hit judgment or another historical query must refer to
+the remote state a player aimed at. It is the simulation callback for games that
+need the displayed view associated with each control sample. It replaces `Model.step` for that model; existing models
 can keep `step`. Both execute the same complete-world prediction/correction loop.
 
 Draw remote players with `client_present(&client)`. It returns two authoritative
@@ -63,7 +64,7 @@ view statuses stay unavailable. There is no live fallback. Read `value` only whe
 `available` is true. The helper does not authenticate raw client stamps; the runner
 does that before supplying `View_Time` to `step_view`.
 
-The game supplies a pure `blend(a, b, fraction)` for its collision snapshot and
+The game supplies a pure `blend(a, b, fraction)` for its collision-history value and
 checks the resulting lifetime IDs against current entities before applying effects.
 Quickdraw and Scrapyard use this helper with different proxy representations.
 History values, including generation changes, remain part of rollback/checkpoints.

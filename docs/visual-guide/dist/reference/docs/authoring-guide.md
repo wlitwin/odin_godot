@@ -6,11 +6,11 @@ cross-script access, the `gd.*` helper catalog, and editor tooling. New to odin_
 **[Getting Started](getting-started.md)** first for setup and a hello-world; this page is the
 deep dive. For the build/edit/debug loop, see **[Workflow](workflow.md)**.
 
-You write `<name>.odin` in the clean authoring form below; a preprocessor (`scriptgen`, run
-by `build/build_scripts.sh`) reads its struct tags + markers and emits the registration
-boilerplate (Variant trampolines, backing arrays, `@(init)` registration) into a generated
-file you never edit. Both compile together into the scripts dll, so you author the nice form
-and get the full typed dispatch for free.
+Write `<name>.odin` using the struct and procedure conventions below. The
+`scriptgen` preprocessor, run by `build/build_scripts.sh`, reads its tags and
+markers and generates registration code, including Variant argument wrappers,
+backing arrays, and `@(init)` registration. The authored and generated files
+compile together into the scripts library. Edit the authored source.
 
 ## API conventions shared by Kit and Replay
 
@@ -181,10 +181,9 @@ in exactly those cases.
 
 ### The tag vocabulary
 
-Every `` `gd:"…"` `` tag opens with ONE token that selects what the field is. The full
-set, and who consumes each, is the human projection of `decl/decl.odin`'s `FIELD_TOKENS`,
-the schema both scriptgen and the runtime's reflection registrar read, so this page, the
-parser, the boot-time "unknown gd tag" error, and the skip list stay in agreement:
+Every `` `gd:"…"` `` tag starts with a token selecting the field kind. The table
+below follows `FIELD_TOKENS` in `decl/decl.odin`, the schema shared by scriptgen
+and the runtime reflection registrar:
 
 | First token | What it declares | Consumed by | In the wire fingerprint |
 | --- | --- | --- | --- |
@@ -198,10 +197,10 @@ parser, the boot-time "unknown gd tag" error, and the skip list stay in agreemen
 | `profile=T` | the per-player profile row type | scriptgen | yes |
 | `entity=Name:id` | a spawnable entity type and its stable id | both | yes |
 
-One token rides BEHIND a first token as a spec: `args=a,b` (a signal payload's
-parameter names). "In the wire fingerprint" means the declaration's shape folds into
-`NET_FINGERPRINT`, so two builds that disagree about it are refused at the join door
-rather than misparsing each other's packets.
+`args=a,b` follows the first token and names a signal payload's parameters.
+"In the wire fingerprint" means the declaration contributes to
+`NET_FINGERPRINT`. Peers compare that fingerprint at join and reject mismatched
+builds before interpreting gameplay packets.
 
 **`backup` is not in the fingerprint.** A backup is guarded by the codec's own
 `fnv1a32` format stamp at the LOAD door, so a save written by a drifted build is refused
@@ -683,9 +682,8 @@ menu_on_choice :: proc(self: ^Menu, idx: gd.Int) {
 }
 ```
 
-This replaces the N one-line stub handlers (`pick0`, `pick1`, `pick2`) the bank pattern
-used to force. Index 0 must exist — a declaration that wires nothing is a loud
-`push_error`, not a silent no-op.
+This lets `pick0`, `pick1`, and `pick2` share a handler. Index 0 must exist;
+a declaration that connects nothing reports `push_error`.
 
 Scene-unique names work in the path part too, with the same rules as `onready=`
 (segment-start `%` = unique-name marker, mid-name `%d` = the indexed template):
@@ -709,7 +707,7 @@ whole set.
 | `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender, so a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
 | typed entity params before `mine` | an `@(gd_event)` `_fx` proc | concrete entities used by presentation; one is the inferred anchor, while several require `anchor=PARAM`. The anchor chooses the session or sim clock | an unknown/non-entity anchor, ambiguous list, or entity outside the selected runtime is a build error |
 | `mine: bool` | an `@(gd_event)` body's `_fx` proc, and a tick's `_fx` half | `true` on the anchor owner/source timeline, `false` on observers; audience policy can omit either side | position and name are both checked; the error names the slot |
-| `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the param is simply not passed |
+| `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the parameter is omitted |
 | `l: ^ksim.Lane` | reserved *against* you: a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
 | a `kit/boot` `Boot` field on the script struct | the game shell | declares the four standard transport forwards (`on_packet` / `on_peer_left` / `on_net_up` / `on_net_down`) | see the note below |
 
@@ -721,8 +719,7 @@ different package fails to declare the shell.
 ## Manual overrides
 
 Wherever scriptgen generates a proc *for your convenience*, **a hand-written proc of that
-name wins.** That is the one override mechanism; there is no opt-out tag, no config token,
-no magic path.
+name wins.** That is the one override mechanism; there is no separate opt-out tag or configuration token.
 
 | Generated | Yields to a hand-written… |
 | --- | --- |
@@ -976,8 +973,8 @@ lobby_process :: proc(self: ^Lobby, _delta: f64) {
 }
 ```
 
-Once connected, **the same `@(gd_rpc)` methods + `gd.rpc` / `gd.rpc_id` used over ENet just
-work**: a `WebRTCMultiplayerPeer` is a `MultiplayerPeer` like any other, and the high-level
+Once connected, **the same `@(gd_rpc)` methods and `gd.rpc` / `gd.rpc_id` calls used over ENet
+use the WebRTC peer**: a `WebRTCMultiplayerPeer` is a `MultiplayerPeer` like any other, and the high-level
 RPC layer is transport-agnostic. Nothing about your RPC code changes; only the transport
 setup does.
 
@@ -1110,7 +1107,7 @@ calls almost always use.
 
 ### Common 2D transforms — moving / rotating a Node2D
 
-`gd.Vector2` is just an Odin `[2]f32`, so you get Odin's vector math for free: component access
+`gd.Vector2` is an Odin `[2]f32`, so it supports Odin's vector operations: component access
 (`pos.x`), compound assignment (`pos.x += 10`), and whole-vector arithmetic (`pos += other`,
 `pos * delta`). The only round-trip is the get/set across the engine boundary. For the
 common "move/rotate/scale by a delta" cases, Godot's own one-call methods skip even that, so you
@@ -1364,7 +1361,7 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
 - **Resource-typed `@export`.** A field `data: ^gd.Resource
   `gd:"export,resource=ItemData"`` on a *node* script gives a resource-picker slot
   that accepts a custom `ItemData` `.tres`. The `resource=` hint string filters the
-  picker, and because `ItemData` is now registered as a global class (see below) the
+  picker, and because `ItemData` is registered as a global class (see below) the
   editor knows it as a type.
 
 ## Global class names
@@ -1374,7 +1371,7 @@ type, exactly like a GDScript `class_name`. No extra annotation is needed; the c
 name you already declare becomes the global name.
 
 The marker is optional. Without it, the script still attaches, instantiates, reloads,
-and supports typed `rt.script_of` access through its source-path identity; it simply does
+and supports typed `rt.script_of` access through its source-path identity. It does
 not reserve a project-wide global type name. Use it when another editor surface needs a
 named type (for example a custom `Resource` picker), not as routine binding boilerplate.
 The editor's new-script template therefore leaves it out by default.
@@ -1427,8 +1424,9 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
   GDScript-style by-name path is `gd.vcall` (below); `script_of` is the zero-overhead
   typed path within the shared scripts dll.
 
-**Typed spawning.** The instantiate → add_child → `script_of` → poke ritual is three
-helpers, split by WHEN the spawnee's `_ready` should see your pokes:
+**Typed spawning.** These three helpers combine scene instantiation and typed
+script lookup. Choose one according to whether the new instance's `_ready`
+needs to see the initial field values:
 
 ```odin
 // poke-first (fields visible to the spawnee's _ready): spawn_scripted + add_child

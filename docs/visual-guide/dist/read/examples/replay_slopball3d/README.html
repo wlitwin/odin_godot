@@ -5,8 +5,9 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay Slopball3D</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_slopball3d/README.md" download>Page source ↓</a></div></div>
 
 <article class="reading-body "><p>A separate initial port of <a href="../slopball3d/README.html">Slopball3D</a>, preserving its original
-project. The new version uses Replay owner observations, real CharacterBody3D kickers
-and a RigidBody3D ball with gravity, loft and tumble. Reused pitch, camera, materials
+project. Each entity owner—the player permitted to submit its body state—sends
+pose and momentum observations to Replay. Kickers use CharacterBody3D nodes and
+the ball uses RigidBody3D with gravity, loft and tumble. Reused pitch, camera, materials
 and body scenes have <a href="assets.html">asset provenance</a>.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_slopball3d/play.sh
 RS3_ROLE=host nix develop --<span class="hljs-built_in">command</span> bash examples/replay_slopball3d/play.sh
@@ -25,7 +26,8 @@ physics path. The network gate uses host + client striker + observer and 120 ms
 receive delay per process, requiring ownership transfer, one goal per screen,
 vertical motion, tumble and settled convergence within 10 cm near tick 600.</p>
 <p>The game reducer records accepted observations, ownership and scoring without engine
-calls. Body3 handles solver preparation/seeding, frozen observers, quaternion-aware
+calls. Body3, the adapter between a Godot physics body and those recorded
+observations, handles solver preparation/seeding, frozen observers, quaternion-aware
 view interpolation and skin smoothing. The moving/spinning handoff probe checks all
 velocity components and orientation. Planned/crash Room gates compare the exact
 approved checkpoint, validate the new solver seed, require new kicks and a goal for
@@ -59,5 +61,5 @@ kick impulses, collision settings or the replicated game model.</p>
 <p>Published progress also supports <a href="online.html#reopening-a-saved-party">whole-party recovery</a>,
 including restoration by another trusted member before the creator returns.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../slopball3d/README.html"><span>slopball3d — co-op physics soccer, third dimension on</span><span aria-hidden="true">→</span></a><a href="assets.html"><span>Replay Slopball3D assets</span><span aria-hidden="true">→</span></a><a href="session-ui.html"><span>Slopball3D session UI</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_slopball3d/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../slopball3d/README.html"><span>slopball3d — co-op physics soccer, third dimension on</span><span aria-hidden="true">→</span></a><a href="assets.html"><span>Replay Slopball3D assets</span><span aria-hidden="true">→</span></a><a href="session-ui.html"><span>Slopball3D session UI</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_slopball3d/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_slopball3d/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

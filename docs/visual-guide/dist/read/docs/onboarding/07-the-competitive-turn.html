@@ -6,15 +6,12 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#predict-self-your-avatar-on-both-timelines">Predict-self: your avatar on both timelines</a><a href="#choosing-per-object-predict-self-and-contested">Choosing per object: predict-self and contested</a><a href="#the-claim">The claim</a><a href="#lag-compensation">Lag compensation</a><a href="#what-carries-over">What carries over</a></nav></details>
 <article class="reading-body "><p>The co-op model gives each player authority over their own avatar: you write
 your position, everyone else reads it. That works when you trust the other
-players. A client lying about where it stands is a social problem, not a
-netcode one.</p>
-<p>Competitive games invert that. In a duel, a ranked arena, or a fighting game the
-opponent is not a friend, and &quot;trust the client&#39;s own position&quot; is the first
-thing a cheater breaks. So the <strong>server</strong> simulates the truth, every client
-<strong>predicts</strong> it locally so the game still feels instant, and when a prediction
-turns out wrong the server&#39;s word wins: the screen <strong>rolls back and
-resimulates</strong> to match. This is rollback netcode, the model that fighting games
-and Rocket League are built on.</p>
+players. The authority accepts their motion, so this policy cannot prevent a
+modified client from inventing a position.</p>
+<p>For contested motion, the <strong>server</strong> runs the authoritative simulation. A
+client <strong>predicts</strong> its own input before the server replies. When an update
+disagrees, the client restores historical state and reruns subsequent ticks
+with the correction. Presentation then blends toward that result.</p>
 <p>The competitive lane is <code>kit/sim</code>, and it is the same declarative surface as the
 co-op lane. You do not learn a new engine; you tag a different handful of fields,
 and the two-timelines discipline carries over. The lane is chosen per <strong>field</strong>,
@@ -34,10 +31,10 @@ fighter_tick :: <span class="hljs-keyword">proc</span>(self: ^Fighter, input: Fi
 	<span class="hljs-comment">// read the stick, write intent. That&#x27;s it. Runs live on my screen every</span>
 	<span class="hljs-comment">// frame, re-runs during a resim when the server corrects me, and runs on</span>
 	<span class="hljs-comment">// the server as the one truth. No is_host, no role branches.</span>
-}</code></pre></div><p><code>@(gd_tick)</code> is the entire opt-in. Your fighter runs on your predicted timeline
-(instant to your hand) and on the server (the truth), and the lane reconciles
-the two behind your back. The input you read is delivered by the lane. You
-never send a packet.</p>
+}</code></pre></div><p><code>@(gd_tick)</code> registers the tick procedure. With the session and predicted
+fields configured, the simulation lane runs it locally and on the authority.
+It delivers typed input, retains history, and applies corrections; gameplay
+code does not send the input packets directly.</p>
 <h2 id="choosing-per-object-predict-self-and-contested">Choosing per object: predict-self and contested<a class="heading-anchor" href="#choosing-per-object-predict-self-and-contested" aria-label="Link to this section">#</a></h2>
 <p>A remote avatar renders in the past (see <a href="../kit/timelines.html">timelines</a>).
 Competitive games make you choose, per object, whether to keep it that way:</p>
@@ -49,7 +46,8 @@ what quickdraw ships.</li>
 <li><strong>Contested</strong>: <code>@(gd_tick = &quot;contested&quot;)</code>. For a shared object both players
 hit: a ball, a flag, a bomb. Marking it <code>contested</code> makes <strong>every</strong> peer
 predict it, so your touch resolves on your screen the instant you make it. The
-server still owns the truth; a disagreement rolls back and glides.</li>
+server remains authoritative. A disagreement restores and replays the
+predicted state, while presentation blends toward the corrected result.</li>
 </ul>
 <p>The soccer example ships three times, one game per model, so you can read the
 difference side by side:</p>
@@ -84,8 +82,9 @@ the other two models avoid. The ball runs on <em>your</em> predicted timeline, b
 prediction, a shot your opponent takes appears a whole interp-delay <em>before</em>
 their avatar visibly kicks it. The result is a predicted ball, a past-rendered
 player, and one shared screen.</p>
-<p>The fix is one boolean, asked continuously: <strong>is my simulation the one driving
-this ball right now?</strong></p>
+<p>A <strong>presentation claim</strong> chooses the local predicted view while the local
+player drives the ball. It does not transfer network authority. Update it
+continuously from the local influence on the ball:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// in the world pass, every tick MY fighter is influencing the ball:</span>
 <span class="hljs-keyword">if</span> ksim.lane_live(&amp;g.lane) {          <span class="hljs-comment">// presentation — live pass only, never a resim</span>
 	<span class="hljs-keyword">if</span> my_kicker_in_reach || ball_still_fast_from_my_kick {
@@ -109,10 +108,13 @@ keeps every entity&#39;s recent history:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">judged := ksim.lane_rewound_begin(&amp;g.lane, shooter) <span class="hljs-comment">// wind every OTHER entity</span>
 g.hit = trace_shot(g)                               <span class="hljs-comment">// back to the shooter&#x27;s view</span>
 ksim.lane_rewound_end(&amp;g.lane)</code></pre></div><h2 id="what-carries-over">What carries over<a class="heading-anchor" href="#what-carries-over" aria-label="Link to this section">#</a></h2>
-<p>Everything from the co-op lane still holds: reconnects, drop-in joins, saves,
-host migration, the wire-version door, Steam. The sim lane rides the same
-session: a game is co-op in its lobby and its chat and server-authoritative in
-its hitboxes, and the reconnect path treats them the same.</p>
+<p>Reconnects, drop-in joins, saves, wire-version compatibility checks, and
+transports use the same session. A game can keep cooperative lobby/chat state
+and authoritative hitboxes together. Live host migration is supported only
+for the cooperative lane; <code>boot_migration</code> requires that no simulation lane is
+installed.
+A simulation save can resume under a restarted authority, with fresh lane
+history; see <a href="../kit/save.html">the save contract</a>.</p>
 <p><strong>Run it:</strong></p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">nix develop --command bash -c 'bash examples/claimball/native_run.sh'  # CLAIMBALL_NATIVE_OK</code></pre></div><p>Three headless processes at 240ms round-trip: a striker drives a ball it
 predicts to a goal, <em>claiming</em> it the whole way (so it presents from the
@@ -123,5 +125,5 @@ timelines, and one screen each.</p>
 <a href="../kit/timelines.html">timelines</a> for the per-field guide to deciding what&#39;s
 co-op and what&#39;s contested in <em>your</em> game.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/07-the-competitive-turn.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../kit/save.html"><span>kit/save — quit and resume a run</span><span aria-hidden="true">→</span></a><a href="../kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/07-the-competitive-turn.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#predict-self-your-avatar-on-both-timelines" class="">Predict-self: your avatar on both timelines</a><a href="#choosing-per-object-predict-self-and-contested" class="">Choosing per object: predict-self and contested</a><a href="#the-claim" class="">The claim</a><a href="#lag-compensation" class="">Lag compensation</a><a href="#what-carries-over" class="">What carries over</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/07-the-competitive-turn.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

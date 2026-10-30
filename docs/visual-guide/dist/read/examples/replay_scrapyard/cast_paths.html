@@ -27,12 +27,14 @@ positions are recorded facts, so later target motion or deletion cannot redirect
 a bolt to a new occupant. Correction/removal/expiry controls visibility; recovery
 continues the saved lifetime rather than replaying an old launch.</p>
 <h2 id="compatibility">Compatibility<a class="heading-anchor" href="#compatibility" aria-label="Link to this section">#</a></h2>
-<p>Arc paths introduced content <strong><code>0x5253435241503046</code></strong>; <a href="controls.html">dash actions</a> now use content <strong><code>0x5253435241503047</code></strong>. Adding the Arc enum member changes
-the canonical schema/contract even though the world stays 52,600 bytes. Gameplay
-protocol 7 and checkpoint layout 4 are unchanged. Older peers fail admission;
-older saves require the explicit <a href="saves.html#converting-older-replay-runs">offline converter</a>.</p>
-<p>The converter accepts contents 42–45 with frozen old world/Flash and event/action
-descriptors, maps the world fields and pending actions, and retains the existing
+<p>Arc paths introduced content <strong><code>0x5253435241503046</code></strong>; <a href="controls.html">dash actions</a>
+subsequently introduced <strong><code>0x5253435241503047</code></strong>. Adding the Arc enum member changed
+the canonical schema/contract while the World remained 52,600 bytes. Gameplay
+protocol 7 and checkpoint layout 4 were unchanged by that transition. Older peers
+fail admission; older saves require the explicit <a href="saves.html#converting-older-replay-runs">offline converter</a>.
+The save guide records the current content identity and accepted input formats.</p>
+<p>The converter paths for contents 42–45 use frozen old World/Flash and event/action
+descriptors, map World fields and pending actions, and retain the existing
 identity, outcomes, inputs and asset checks. The content-45 fixture was created
 with the actual old converter before the enum changed. Existing destinations and
 source files are never overwritten. Earlier shared value types remain reused
@@ -56,5 +58,5 @@ visibility, lifetimes and simulation formats remain unchanged. This avoids the
 stock web renderer&#39;s Polygon2D index-update path, including during viewport resize.
 See the <span class="local-reference" title="docs/replay/results/immutable-polygons-2026-09-13/README.md · available in the repository">rendering audit</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="roadmap.html"><span>Scrapyard port ledger</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/cast_paths.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="roadmap.html"><span>Scrapyard port ledger</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/cast_paths.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#compatibility" class="">Compatibility</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/cast_paths.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

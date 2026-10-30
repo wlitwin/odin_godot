@@ -1,6 +1,6 @@
 # Wave pacing and compatibility
 
-C4 restores the original active-floor director's timing at 20 Hz. A new floor
+The active-floor director follows the original game's timing at 20 Hz. A new floor
 starts with wave zero. Its first active tick announces wave one; spawning starts
 on the following tick, one dweller per tick. Completing a wave means both all
 scheduled spawns and all live dwellers are gone. The last actual death starts the
@@ -12,7 +12,7 @@ call. A started director continues if players temporarily disconnect. A direct
 server with no started party waits for its first connected player before announcing
 wave one. Each new floor resets den selection to Den1 and alternates thereafter.
 
-The previous Replay implementation waited 20 ticks for its first spawn, then ten
+Before C4, Replay waited 20 ticks for its first spawn, then ten
 ticks between spawns, invented rest periods for empty waves, paused the running
 director when everyone left and carried the den cursor across floors. Those
 behaviors did not match the original `kit/ai` director and Cavecrawl host wiring.
@@ -21,7 +21,7 @@ Replay's implementation remains independent of Kit; only the oracle imports Kit.
 ## Values, rollback and capacity
 
 The director stays wholly inside `World`. Its existing `next_spawn` field also
-retains a pending deadline imported from an older save. Normal C4 pacing emits one
+retains a pending deadline imported from an older save. The corrected pacing emits one
 spawn per invocation; the game calls the director once per simulation tick.
 Announcement/remaining/live counts, rest deadlines, entity generations and den
 selection all participate in replay. A death near u64 exhaustion cannot wrap its
@@ -35,15 +35,16 @@ unchanged by this increment.
 
 ## Existing saves
 
-C4 introduced the changed director simulation. Current content C9
-(`0x4341564552504c39`) also corrects [avatar transition rules](floor-state.md) and
-[relic lifetime](relic.md). C8 adds authority observation fields to the world; network/checkpoint protocol
-versions are unchanged. Update both game and
-coordinated service before starting a current-content room. Existing C1–C7 files are not silently
-loaded as new gameplay.
+C4 introduced the corrected director simulation. The server-motion profile uses
+content C9 (`0x4341564552504c39`), retaining the [avatar transition rules](floor-state.md)
+and [relic lifetime](relic.md). C8 introduced authority observation fields;
+network/checkpoint protocol versions are unchanged. Update both the game and
+coordinated service before opening a room. Ordinary loads require matching content.
 
-The existing `tools/upgrade_save` accepts C1–C7 and requires a new
-destination. C3 retains every frame and session value, including live dwellers,
+The C1–C7 paths in `tools/upgrade_save` use frozen source descriptors and require
+a new destination. See the [current conversion guide](authoring.md#existing-replay-saves)
+for the complete accepted format list. C3 conversion retains every frame and
+session value, including live dwellers,
 current wave, den cursor, and pending spawn/rest deadlines. Once those deadlines
 are reached, subsequent spawns use the corrected cadence; a later floor starts
 from the corrected fresh-floor state. A waiting lobby starts fresh when Start is

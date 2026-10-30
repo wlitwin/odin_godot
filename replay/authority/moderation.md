@@ -1,7 +1,8 @@
 # Durable room removal
 
-`rpc_remove(client, epoch, target_identity)` is an optional authenticated extension.
-Only the current live authority may disable another exact member/incarnation.
+Use `rpc_remove(client, epoch, target_identity)` to durably remove a member from
+a room. This optional authenticated extension lets only the current live
+authority disable another exact member/incarnation.
 Self-removal, stale epochs, changed incarnations, expired ownership and requests
 after release are refused. Trusted administration can still manage membership
 through `coordinator_member`.

@@ -70,7 +70,7 @@ session-event half without running the generated cooperative step. Use it with
 of event dispatch.</p>
 <p>The lower-level <code>boot_attach</code>, <code>&lt;game&gt;_entities</code>, <code>&lt;game&gt;_messages</code>,
 <code>&lt;game&gt;_lane_init</code>, <code>boot_lane</code>, <code>boot_pump</code>, and <code>&lt;game&gt;_events</code> procedures
-are primitives for a genuinely custom frame graph, not alternate spellings of
+are primitives for custom frame ordering, not alternate spellings of
 <code>&lt;game&gt;_net_frame</code>. Use them only when event dispatch or lane installation must
 occur at a custom point. A shell with multiple direct sessions or lanes is left
 on these explicit APIs because the generator cannot safely guess a graph.</p>
@@ -160,8 +160,8 @@ teardown using the session/comms/lane pointers retained by <code>Boot</code>.
 <code>boot_detach(b)</code> releases only the state created by <code>boot_attach</code> and the Boot
 doors; it deliberately leaves caller-owned lane, comms, and session values to
 their matching destroy procedures. All three forms are idempotent.</p>
-<p><strong>The ownership rule</strong>, one line per layer: boot lives as long as its node;
-below boot, X destroys what X inits; node trees belong to the scene. Boot
+<p><strong>Lifetime and teardown:</strong> Boot lives as long as its node. Each lower layer
+destroys the resources it initializes; node trees belong to the scene. Boot
 created the container nodes (<code>ui_layer</code> / <code>stage</code> / <code>world</code>), so <code>boot_detach</code>
 queue-frees those, and the widgets, the legend, and the world&#39;s entities
 parented under them ride the subtree down with one free each. The <a href="ui.html">kui
@@ -183,25 +183,24 @@ engine&#39;s normal vsync policy in development, or set <code>Options.max_fps</c
 a different development cap.</p>
 <h2 id="connecting-the-doors">Connecting: the doors<a class="heading-anchor" href="#connecting-the-doors" aria-label="Link to this section">#</a></h2>
 <p><code>boot_host(b, port, name)</code> and <code>boot_join(b, addr, port, token, name)</code> do
-transport-up, session-start, and the menu/status/chat ritual (via
-<code>netgd.begin_host</code> / <code>netgd.begin_join</code>, which exist separately if you want the
-ritual your way).</p>
+transport setup, session start, and menu/status/chat updates. They call
+<code>netgd.begin_host</code> / <code>netgd.begin_join</code>, which remain available for custom
+lifecycle ordering.</p>
 <p>Under both is one door per direction, parameterized by transport:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">boot_open_host(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token = <span class="hljs-number">0</span>, dedicated = <span class="hljs-literal">false</span>) -&gt; <span class="hljs-type">bool</span>
-boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = <span class="hljs-literal">false</span>, status = <span class="hljs-string">&quot;Joining...&quot;</span>) -&gt; <span class="hljs-type">bool</span></code></pre></div><p>Every named door on this page is those two plus a status line. The ritual,
+boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = <span class="hljs-literal">false</span>, status = <span class="hljs-string">&quot;Joining...&quot;</span>) -&gt; <span class="hljs-type">bool</span></code></pre></div><p>Every named host/join entry point combines those two operations with a status
+line. The lifecycle setup,
 reconnect identity, <a href="netgd.html#swapping-transports">host-migration</a> config (its
 flavor comes from the transport&#39;s own record, so a door is never told twice),
 phase, menu, chat, and roster, is written once, and a new transport inherits
-all of it by filling a <code>netgd.Transport</code>. Steam gets both doors for the price
-of one record (<code>ksteam.TRANSPORT</code>, documented in <a href="steamgd.html">steamgd.md</a>).</p>
+all of it by filling a <code>netgd.Transport</code>. Steam supplies both entry points through
+one record (<code>ksteam.TRANSPORT</code>, documented in <a href="steamgd.html">steamgd.md</a>).</p>
 <h3 id="single-player-the-solo-door">Single player (the solo door)<a class="heading-anchor" href="#single-player-the-solo-door" aria-label="Link to this section">#</a></h3>
 <p><code>boot_single(b, name)</code> is the same game, alone: a full authority session over
 <code>netgd.OFFLINE</code> — an <code>OfflineMultiplayerPeer</code> seats you as host id 1 and your
-per-tick broadcasts cleanly reach nobody (without one, <code>send_bytes</code> with no
-peer installed spams &quot;peer isn&#39;t set&quot; every tick — the gotcha every
-hand-rolled solo path re-derived). The whole authoritative sim runs exactly
-as it does with friends, the door ritual included, so solo stops being the
-one path that bypassed <code>boot_open_host</code>. Succession never arms (nobody to
+per-tick broadcasts have no remote recipients. Without that peer, <code>send_bytes</code>
+reports &quot;peer isn&#39;t set&quot; every tick. The authoritative simulation and
+<code>boot_open_host</code> setup run as they do in a multiplayer session. Succession never arms (nobody to
 migrate to); works identically on native and web.</p>
 <h3 id="dedicated-server">Dedicated server<a class="heading-anchor" href="#dedicated-server" aria-label="Link to this section">#</a></h3>
 <p><code>boot_serve(b, port, name)</code> is the dedicated-server door: same transport, but
@@ -251,8 +250,8 @@ AOI pressure. Pass it directly to <code>netgraph_refresh</code>.</p>
 <p>A game with a <a href="xfer.html">kit/xfer album</a> (sprays, skins) hands it to boot once —
 <code>boot_album(b, &amp;album)</code> after <code>album_init</code> — and both of its chores become the
 kit&#39;s: <code>boot_pump</code> pumps it once per net tick, and every <code>Ev_Player_Joined</code>
-replays the kept payloads to the newcomer (<code>album_welcome</code>), so a late joiner
-never again sees a blank spray wall because a game forgot the host&#39;s half.</p>
+replays the retained payloads to the newcomer (<code>album_welcome</code>). The game does
+not need a separate player-joined handler to populate the spray wall.</p>
 <h2 id="the-web-room-surfaced">The web room, surfaced<a class="heading-anchor" href="#the-web-room-surfaced" aria-label="Link to this section">#</a></h2>
 <p>The WebRTC door&#39;s rendezvous is pumped like the join-code phonebook&#39;s:
 <code>boot_web_pulse</code> (inside <code>boot_pump</code>) logs <code>BOOT_ROOM_CODE &lt;code&gt;</code> the moment
@@ -382,5 +381,5 @@ once. The detailed hook contract is in
 <p>Host migration is available for the session-replication model. A simulation
 lane authority restarts; it does not migrate its live rollback state.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="fx.html"><span>kit/fx — bursts, flashes, tracers</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/boot.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="fx.html"><span>kit/fx — bursts, flashes, tracers</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/boot.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-generated-game-network-facade" class="">The generated game-network facade</a><a href="#standard-signal-methods" class="">Standard signal methods</a><a href="#count-time-in-net-ticks-not-frames" class="">Count time in net ticks, not frames</a><a href="#widgets-and-containers" class="">Widgets and containers</a><a href="#the-generated-event-loop" class="">The generated event loop</a><a href="#lifecycle-boot_phase" class="">Lifecycle: boot_phase</a><a href="#teardown" class="">Teardown</a><a href="#desktop-unthrottle" class="">Desktop unthrottle</a><a href="#connecting-the-doors" class="">Connecting: the doors</a><a href="#transport-forwards" class="">Transport forwards</a><a href="#identity-from-an-env-prefix" class="">Identity from an env prefix</a><a href="#identity-and-tokens" class="">Identity and tokens</a><a href="#chat-keys-and-net-stats" class="">Chat, keys, and net stats</a><a href="#the-album-payload-catch-up-registered" class="">The album (payload catch-up), registered</a><a href="#the-web-room-surfaced" class="">The web room, surfaced</a><a href="#the-entity-factory" class="">The entity factory</a><a href="#entity-queries" class="">Entity queries</a><a href="#host-migration" class="">Host migration</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/boot.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

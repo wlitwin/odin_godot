@@ -9,8 +9,8 @@ a file and wraps it in a versioned envelope.
 **Lane compatibility: lane-agnostic (session-level).** The envelope wraps the session
 snapshot: delta-lane and `gd:"backup"` state. Sim-lane runtime state (ledgers, inputs in
 flight) is not saved: a resumed sim restarts its lane fresh from the saved authoritative
-fields, the correct semantics for a server-authority run. The sim lane refuses host
-*migration* (see [sim.md](sim.md)); resuming from disk restarts the authority.
+fields. Live host *migration* is supported only for the cooperative lane
+(see [sim.md](sim.md)); resuming a simulation save from disk restarts the authority.
 
 ```odin
 import ksave "godot:kit/save"

@@ -2,8 +2,9 @@
 
 This is an explicit cooperative motion profile beside the original Kit game and
 the server-simulated [Replay Cavecrawl](../replay_cavecrawl/README.md). It reuses
-that port's gameplay reducer, scenes and interface. A local producer moves its
-avatar and carried relic; authenticated, versioned pose samples become values in
+that port's gameplay reducer—the function that applies inputs to world state—
+along with its scenes and interface. A local pose producer samples the player's
+locally simulated avatar and carried relic; authenticated, versioned pose samples become values in
 the authoritative replayable world. Inventory, combat, AI, progression and room
 authority remain server decisions.
 

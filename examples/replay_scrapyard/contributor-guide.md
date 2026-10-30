@@ -3,7 +3,10 @@
 Scrapyard has three main pieces: **authored Godot content**, **replayable gameplay
 state and rules**, and **a Godot adapter that turns input into requests and state
 into scenes**. Learn one feature across those boundaries before trying to read
-every subsystem. The shared turret is a compact, complete example.
+every subsystem. The shared turret is a compact, complete example. A `Session`
+runs the simulation with network input and history; a `Room` adds coordinated
+membership and authority recovery. Scrapyard's player characters are called
+runners, distinct from Replay's runtime that schedules simulation steps.
 
 This guide describes the current Replay game. The sibling original Scrapyard and
 Kit remain separate. For a file-by-file reference, use the [code guide](code-guide.md).
@@ -160,7 +163,8 @@ prediction; remote runners use observed poses. Turrets use the shared predicted
 world for seated clients and the observed world for spectators. Prediction does
 not grant authority: an occupied-turret claim can be refused and corrected.
 
-Events have a separate presentation lifecycle. A speculative effect may begin,
+A recorded occurrence pairs an event payload with an identity that presentation
+uses to match it across replay. Occurrences have a separate presentation lifecycle. A speculative effect may begin,
 be confirmed, or be cancelled. Follow [session_events.odin](scripts/session_events.odin)
 for audio, feedback and action outcomes. Replaying rules must not directly repeat
 Godot audio calls or particle creation.
@@ -260,7 +264,8 @@ python3 examples/replay_scrapyard/tools/stock.py --check
 ```
 
 The existing [test guide](../../tests/replay_turret/README.md) describes the turret
-fixtures. The [code guide](code-guide.md) records recent refactor verification.
+fixtures. The [code guide](code-guide.md) maps current file responsibilities and
+explains formatting and verification.
 For appearance changes, run the affected scene; for changed input paths, use real
 Godot input; for saved gameplay state, check correction and checkpoint recovery.
 

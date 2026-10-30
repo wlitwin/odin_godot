@@ -1,7 +1,8 @@
 # Create/join protocol and Godot connection
 
-The admission backend now has a canonical request/reply protocol, a bounded room
-hub and a Godot client connection that requires verified TLS by default. Native
+Use this protocol to create rooms and issue, consume or revoke invitations
+through the admission backend. It provides canonical request/reply messages, a
+bounded room hub and a Godot client connection requiring verified TLS by default. Native
 processes create rooms, issue/use invites, authenticate authority RPCs, reconnect,
 and recover the same credentials after a server kill/restart. The
 [recorded gate](../../docs/replay/results/provision-tls-2026-09-07/README.md) separates
@@ -126,12 +127,12 @@ game inputs. Membership and hosting permission do not confer a live authority le
 
 ## Remaining integration
 
-The [client enrollment journal](enrollment.md) now persists pending requests before
+The [client enrollment journal](enrollment.md) persists pending requests before
 submission and successful credentials before use, with native SQLite and browser
 IndexedDB acceptance. The older TLS fixture still uses predetermined test claims
 and fingerprints; the enrollment fixture generates fresh claims and exercises the
 actual journal. The [room service](../../examples/replay_room_service/README.md)
-and the Cavecrawl/Scrapyard party menus now integrate it with per-room RTC signaling and a
+and the Cavecrawl/Scrapyard party menus integrate it with per-room RTC signaling and a
 reproducible co-op invite. Other game menus, general invite-operation persistence,
 public TLS/relay deployment and account/room lifecycle remain work.
 Original games and their existing fixture provisioning remain separately runnable.

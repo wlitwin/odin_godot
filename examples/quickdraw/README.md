@@ -1,19 +1,19 @@
 # quickdraw — the kit/sim showcase
 
-A top-down western duel whose PREMISE is lag compensation: a quickdraw is
-unplayable unless your shots land where YOUR screen aimed. This is the
-server-authority resim companion's reference game, the way cavecrawl and
-slopball are the coop kit's:
+Run this top-down western duel to study lag compensation: the server judges a
+shot against the target positions the shooter saw when firing. Quickdraw uses
+Kit's server-authority simulation, with local prediction and replay after
+correction:
 
 - **Movement** is `gd:"predict"` state stepped by one `@(gd_tick)`
   proc — server-simulated from inputs, predicted on your screen (strafe and
-  dash answer the stick at any latency), reconciled when they disagree, the
-  corrections glided by the render-error smoother.
+  dash respond locally), corrected when authority state disagrees, and replayed
+  from that accepted state. The render-error smoother eases the visible correction.
 - **The revolver** is hitscan judged by `ksim.lane_rewound`: the server winds
   every target back to what the shooter's screen was drawing — the view is
   bound to the very input packet that pulled the trigger.
-- **hp, score, chat, roster** ride the coop kit's delta lane beside it,
-  unchanged — one game, both netcodes.
+- **hp, score, chat, roster** use the co-op Kit's delta lane, which replicates
+  changed fields alongside the simulation.
 
 The generated attach starts from `.Listen_Server_Action` and overrides only
 Quickdraw's deliberate half-second favor-the-shooter rewind and teleport cut.

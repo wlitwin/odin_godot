@@ -1,8 +1,9 @@
 # Replay Slopball3D
 
 A separate initial port of [Slopball3D](../slopball3d/README.md), preserving its original
-project. The new version uses Replay owner observations, real CharacterBody3D kickers
-and a RigidBody3D ball with gravity, loft and tumble. Reused pitch, camera, materials
+project. Each entity owner—the player permitted to submit its body state—sends
+pose and momentum observations to Replay. Kickers use CharacterBody3D nodes and
+the ball uses RigidBody3D with gravity, loft and tumble. Reused pitch, camera, materials
 and body scenes have [asset provenance](assets.md).
 
 ```sh
@@ -27,7 +28,8 @@ receive delay per process, requiring ownership transfer, one goal per screen,
 vertical motion, tumble and settled convergence within 10 cm near tick 600.
 
 The game reducer records accepted observations, ownership and scoring without engine
-calls. Body3 handles solver preparation/seeding, frozen observers, quaternion-aware
+calls. Body3, the adapter between a Godot physics body and those recorded
+observations, handles solver preparation/seeding, frozen observers, quaternion-aware
 view interpolation and skin smoothing. The moving/spinning handoff probe checks all
 velocity components and orientation. Planned/crash Room gates compare the exact
 approved checkpoint, validate the new solver seed, require new kicks and a goal for

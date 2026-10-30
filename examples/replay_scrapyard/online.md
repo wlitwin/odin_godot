@@ -1,6 +1,6 @@
 # Online party menus
 
-Replay Scrapyard now uses the shared `replay/godot.Party` flow with the standalone
+Replay Scrapyard uses the shared `replay/godot.Party` flow with the standalone
 [room service](../replay_room_service/README.md). Configure `RSY_ROOM_SERVICE` to
 enable Create Party, Join Party, Watch with an invite, Rejoin Recent, and Copy Party
 Invite. Copy is also available in the Escape menu during play. The existing
@@ -9,7 +9,7 @@ solo/direct/preconfigured-room paths remain available without this setting.
 For local testing, run the service with Scrapyard's content ID:
 
 ```sh
-REPLAY_ROOM_CONTENT=0x5253435241503048 \
+REPLAY_ROOM_CONTENT=0x525343524150304b \
 REPLAY_ROOM_DB="$PWD/.replay-room-data/scrapyard.sqlite3" \
 REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
 nix develop --command bash examples/replay_room_service/run.sh
@@ -61,7 +61,7 @@ incarnation, its original seat/loadout and an accepted new shot.
 
 This does not change competitive trust, progression-authority rules, duplicate-live-
 identity policy or the simulation model. A stored credential is not a game save or
-authority lease. All-participants-gone recovery, fuller connection failure UX,
+authority lease. Broader all-participants-gone recovery cases and connection failure UX,
 Steam, public deployment and the remaining parity/comparison ledger remain work.
 The original sibling Scrapyard stays independently runnable and untouched.
 
@@ -74,7 +74,7 @@ See [integration evidence](../../docs/replay/results/scrapyard-party-2026-09-07/
 and the [shared Party API](../../replay/godot/party.md).
 ## Durable party progress and sprays
 
-The online host can now use the save action/menu to store a complete checkpoint
+The online host can use the save action/menu to store a complete checkpoint
 with its required spray PNGs. The game and service enumerate current sprays plus
 executable pending declarations; missing or invalid dependencies prevent publication.
 The checkpoint and package commit atomically under one room publication revision.

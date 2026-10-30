@@ -1,41 +1,36 @@
 # The onboarding series
 
-You have shipped Godot games in GDScript or C#. This series is the bridge from
-there to here: writing your gameplay in compiled Odin, and structuring it so
-multiplayer is a property of your code instead of a feature bolted onto it.
+This series shows how to write Godot gameplay in compiled Odin and organize
+shared state for multiplayer. It assumes you know scenes, nodes, callbacks, and
+ordinary game development; it introduces the Odin and Kit conventions as they
+appear.
 
-It is not a reference (that's the [Authoring Guide](../authoring-guide.md))
-and not a recipe (that's [Build a game in a day](../kit/build-a-game-in-a-day.md)).
-It is the *why*: each post takes one mental-model shift, shows what it buys
-you, and leaves you with something running. Read it in order; each post leans
-on the one before.
+Read the posts in order: each introduces a mechanism used by the next. Keep
+the [Authoring Guide](../authoring-guide.md) open for API details, and use
+[Build a game in a day](../kit/build-a-game-in-a-day.md) for a step-by-step project.
 
 1. **[What if your scripts were compiled?](01-what-if-your-scripts-were-compiled.md)**
-   covers what stays exactly the same (almost everything), what changes (your `.gd`
-   files), and why the trade is worth examining at all. It ends with a moving node.
-2. **[Thinking in structs](02-thinking-in-structs.md)** is the reflex map. Every
-   GDScript habit (`@export`, `@onready`, signals, inheritance, autoloads) has a
-   direct counterpart; this post translates them one by one, including the one
-   trap everyone hits (`self` vs `self.owner`).
+   covers the scene workflow, the compile step, and the script layout. It ends
+   with a moving node.
+2. **[Thinking in structs](02-thinking-in-structs.md)** maps the script conventions. Each
+   GDScript feature (`@export`, `@onready`, signals, inheritance, autoloads) maps
+   to an Odin convention or an explicit alternative. It also distinguishes
+   the script struct (`self`) from the engine node (`self.owner`).
 3. **[State, not messages](03-state-not-messages.md)** is the multiplayer
-   mental-model shift. Stop thinking "which peer do I send this to" and start
-   thinking "this field replicates." It builds a hosted, joinable game in one `ready()`.
+   model: declare which fields replicate and which peer writes them. It builds
+   a hosted, joinable game in one `ready()`.
 4. **[Verbs, not RPCs](04-verbs-not-rpcs.md)** treats player actions as predicted
-   commands: single-player-looking procs with zero role branches, where races,
-   rejection, and cheating are handled by the pipeline instead of by you.
-5. **[The two timelines](05-the-two-timelines.md)** is the deepest shift: your
-   screen and a remote screen do not show the same moment. It explains why effects fire
-   "too early" or "too late", and the one-boolean discipline that fixes every
-   case.
+   commands. The generated pipeline handles submission and rejection; the
+   command supplies the game-specific validation and target mutation.
+5. **[The two timelines](05-the-two-timelines.md)** explains why local and remote
+   screens show different moments, and how to schedule an effect beside its
+   visible cause.
 6. **[The shape of a shippable game](06-the-shape-of-a-shippable-game.md)** covers
-   what you get for free once the model holds: reconnects, drop-in joins,
-   saves, host migration, and Steam, plus the testing habit that keeps it all true.
-7. **[The competitive turn](07-the-competitive-turn.md)**: the co-op model
-   trusts your friends, but a duel can't. The authority inverts (server truth,
-   client prediction, rollback) but the surface barely moves: one tag makes an
-   avatar predict-self, one makes a ball contested, and the two-timelines
-   discipline from post 5 carries straight over. It ends with the same soccer game,
-   shipped a third way with predict-self plus the claim, running.
+   persistent identity, drop-in joins, saves, host migration, and Steam,
+   including the setup and integration tests those features need.
+7. **[The competitive turn](07-the-competitive-turn.md)** moves motion authority
+   to the server. It introduces local input prediction, correction, and
+   presentation for contested objects, using three versions of a soccer game.
 
 Posts 1–6 are the co-op path; post 7 is the turn onto the competitive one. Both
 ride the same declarative surface, chosen per FIELD, so a game can be co-op in
@@ -43,7 +38,5 @@ its lobby and server-authoritative in its hitboxes. The deeper references are
 [kit/sim](../kit/sim.md) (the full lane) and [timelines](../kit/timelines.md)
 (the per-field choosing guide).
 
-**Who this is for:** Godot developers comfortable with the editor, scenes, and
-nodes. No Odin experience is assumed: the language is small enough to learn from
-the code in front of you. No netcode experience is assumed either; in fact, the
-less RPC muscle memory you have, the easier post 3 lands.
+**Prerequisites:** familiarity with the Godot editor, scenes, and nodes. The
+examples introduce the Odin syntax and networking concepts they use.

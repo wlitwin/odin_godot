@@ -1,25 +1,24 @@
 # cavecrawl — the co-op reference
 
-This is the broadest co-op Kit example: a drop-in cave crawler that exercises
-sessions with reconnect
-identity, declarative replication, predicted commands with `_then`
-consequences, the generated entity factory, items and chests, host-validated
+This co-op cave crawler combines Kit's session, replication and interaction APIs
+in one runnable game. Sessions retain player identity across reconnects; tagged
+entity fields replicate state; predicted Kit commands give local feedback before
+the host validates them. A command's `_then` hook applies accepted consequences
+that affect other entities. The game also includes items and chests, host-validated
 combat, hostile AI, positional pings, quit-and-resume saves, host migration,
-and the ENet↔Steam transport swap. It was grown one phase at a time (lobby →
-chat → lootable world → predicted combat → dwellers → saves), and
-[build-a-game-in-a-day](../../docs/kit/build-a-game-in-a-day.md) retraces
-that arc brick by brick — when a step there feels terse, the corresponding
-file here is the long answer.
+and the ENet↔Steam transport swap. Follow
+[build-a-game-in-a-day](../../docs/kit/build-a-game-in-a-day.md) for a staged
+walkthrough, then use the file table below to find each feature's implementation.
 
-The example contains about 4,500 hand-written lines and is deliberately the largest
-example — the place to see every pattern coexisting in one game. For the
+The example contains about 4,500 hand-written lines and shows these patterns
+working together. For the
 smallest complete kit game read [slopball](../slopball/) first; for the
 server-authority model read [quickdraw](../quickdraw/) and
 [speedball](../speedball/) ([choosing a model](../../docs/kit/timelines.md)).
 
-The multiplayer author surface is the entity files — a struct with
-`gd:"replicate"` tags, verbs as `@(gd_command)` procs, a `_process` that
-dresses from fields:
+Author multiplayer behavior in the entity files: a struct declares replicated
+fields with `gd:"replicate"` tags, `@(gd_command)` procedures request validated
+changes, and `_process` updates the Godot view from those fields:
 
 ```odin
 @(gd_command = knet.ACTION_OWNER_PREDICTED)
@@ -30,7 +29,7 @@ door_toggle :: proc(self: ^Door, px: f32, py: f32) -> bool {
 }
 ```
 
-One class, many files, split the way a real game is:
+The lobby class spans several files; each entity has its own file:
 
 | file | owns |
 | --- | --- |
@@ -38,10 +37,10 @@ One class, many files, split the way a real game is:
 | `net.odin` | identity + the Host/Join/Steam doors (the transport forwards are generated) |
 | `world.odin` | census hooks, spawns, the interact prompt |
 | `input.odin` | keys/mouse and the player verbs they drive |
-| `rocks.odin` | peer-owned projectile visuals — the zero-felt-lag story |
+| `rocks.odin` | projectile visuals spawned locally by the firing peer |
 | `host.odin` | the authority: game tick, dweller brains |
 | `save.odin` | the run on disk (session snapshot + game blob) |
-| `queries.odin` | read-only windows for HUDs and test drivers |
+| `queries.odin` | read-only queries for HUDs and test drivers |
 | `spelunker/chest/door/pickup/dweller/relic.odin` | the entities, a file each |
 
 ```sh

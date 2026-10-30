@@ -4,7 +4,8 @@ Replay Scrapyard now has an optional **Replay** editor dock and an F6 ability
 workbench. The first complete example is Salvefield: a placed zone with radius,
 duration, pulse timing and a referenced healing status. Its existing rules and
 stock balance are preserved; drafts exercise additions without entering the
-canonical catalog until reviewed.
+canonical catalog until reviewed. Baking validates the saved Resources and copies
+their gameplay values into the catalog used by runs and headless tests.
 
 ## One-time setup
 

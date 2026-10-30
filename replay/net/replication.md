@@ -1,6 +1,7 @@
 # Recipient views and interest management
 
-`Model.replication` is an optional server-side transmission policy. It changes what
+Use `Model.replication` to control which state, held inputs and occurrences each
+recipient receives. It is an optional server-side transmission policy. It changes what
 a recipient receives, independently of the client's `Prediction_Group`. The
 server still simulates and archives the complete World.
 
@@ -58,7 +59,7 @@ The framework validates the authored invariant, not arbitrary Odin information f
 ## Prediction and presentation
 
 A player using a nonzero replication policy must also supply a nonzero prediction
-group. The group's `project` now receives the filtered replica. Include every
+group. The group's `project` receives the filtered replica. Include every
 mutable dependency required by the predicted step/action or use explicit timestamped
 boundary values. A received view alone does not establish a closed simulation group.
 Existing full-world clients keep their default behavior when replication is disabled.

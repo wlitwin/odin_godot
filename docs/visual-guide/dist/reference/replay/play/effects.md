@@ -1,7 +1,8 @@
 # Effect clocks and telegraphs
 
-`Effect` stores a game-defined kind, stack count and remaining ticks in four value
-bytes. `effect_stack` refreshes an existing kind up to a supplied stack cap and
+Use `Effect` for replayable status durations and stacks, and `Telegraph` for a
+wind-up that applies gameplay on a chosen tick. `Effect` stores a game-defined
+kind, stack count and remaining ticks in four value bytes. `effect_stack` refreshes an existing kind up to a supplied stack cap and
 keeps the longer duration; otherwise it uses the first empty slot. It returns the
 affected slot index so a game can attach frame-owned attribution alongside it.
 Invalid arguments or full storage reject without mutation. `effects_tick` clears

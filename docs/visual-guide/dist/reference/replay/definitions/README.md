@@ -1,9 +1,11 @@
 # Immutable authored definitions
 
-`definitions.Store(Value)` publishes bounded canonical values under a `Ref` containing
-semantic version, schema fingerprint and content checksum. Resource handles, nodes,
-strings, slices and pointers cannot enter Value. Reads return copies. The store is
-an owner outside World; do not copy it or mutate its metadata/entries directly.
+Use `definitions.Store(Value)` to retain immutable authored values across live
+state, history and checkpoints. It publishes bounded canonical values under a
+`Ref` containing semantic version, schema fingerprint and content checksum.
+Resource handles, nodes, strings, slices and pointers cannot enter Value. Reads
+return copies. The store owns allocations outside `World`; do not copy it or
+mutate its metadata/entries directly.
 
 ```odin
 store: defs.Store(Weapon_Definition)

@@ -1,5 +1,9 @@
 # Web / WASM target — Odin scripts in the browser
 
+Historical implementation record for the Godot 4.6.2 browser target. The measured
+results and resolved blockers below retain that version and test scope. Use
+[Exporting](../exporting.md) for the current toolchain and commands.
+
 ## Verdict: 🟢 GREEN
 
 The **full** odin_godot extension (core `ScriptLanguageExtension` + the generated

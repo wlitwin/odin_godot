@@ -1,9 +1,15 @@
 # Scrapyard port ledger
 
+This ledger records port requirements, dated comparisons and remaining validation.
+Use the [contributor guide](contributor-guide.md) for the current authoring workflow;
+individual receipts below retain their original workloads and failures.
+
 Original repository: `../../../scrapyard`, revision
 `6bdef4f437d9a4e2c98f1d49472f840879301ccf`. Its project, source, saves and run commands
 remain independent. This project is a reimplementation against Replay, not a renamed
-Kit shell. The full [Replay roadmap](../../docs/replay/roadmap.md) remains the goal.
+Kit shell. The full [Replay roadmap](../../docs/replay/roadmap.md) records the
+original parity scope. The later [framework completion plan](../../docs/replay/framework-completion.md)
+defers exhaustive game parity and governs the framework's release scope.
 
 | Slice | Concrete requirements | Status |
 | --- | --- | --- |
@@ -16,7 +22,9 @@ Kit shell. The full [Replay roadmap](../../docs/replay/roadmap.md) remains the g
 | Deployment/comparison | Web/Steam paths, matched old/new acts, measurements and human playtests | Local Chrome party enrollment/asset-aware migration, world equality, profiles/run/spray persistence pass; optimized paired idle and firing/reload comparisons pass; public deployment, Steam, full combat comparisons and human playtests pending |
 
 The original harness acts map to the new implementation as follows. “Pending”
-remains a requirement; it is not an intentional omission or agreed parity gap.
+identifies an unmet item in that original parity scope. It does not claim an
+intentional gameplay difference, and it does not independently block the revised
+framework release scope.
 
 | Original act | Replay acceptance |
 | --- | --- |

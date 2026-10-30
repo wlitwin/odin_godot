@@ -1,10 +1,10 @@
 # Getting started
 
-This walks you from nothing to a running Odin script: install the toolchain, build the
-extension, wire it into a Godot project, then write, attach, and run your first `.odin`
-script. By the end you'll have a Node that prints on `_ready` and moves every frame.
+Install the toolchain, build the extension, add it to a Godot project, then
+write and attach an Odin script. The resulting `Node2D` prints on `_ready` and
+moves every frame.
 
-> **Want to skip ahead?** `examples/survivors/` and `tests/showcase/` are complete, working
+> **Run an existing project:** `examples/survivors/` and `tests/showcase/` are complete, working
 > projects. The fastest way to a running Odin script is to copy one and edit it:
 > ```sh
 > nix develop
@@ -166,9 +166,9 @@ A few rules this demonstrates (full details in the [Authoring Guide](authoring-g
   the base or an ancestor of it), and `//gd:extends` may be omitted entirely, in which case the
   base is derived from the handle.
 
-You do **not** write the registration boilerplate: `build/build_scripts.sh` runs `scriptgen`,
-which emits it into `scripts/odin_godot_scripts.gen.odin`, one generated file for the whole
-directory (a build artifact you never edit, hidden in the FileSystem dock).
+`build/build_scripts.sh` runs `scriptgen` to generate registration in
+`scripts/odin_godot_scripts.gen.odin`, one file for the directory. Edit the
+authored scripts; this build output is regenerated and hidden in the FileSystem dock.
 
 ## 4. Build
 

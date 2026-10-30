@@ -1,9 +1,10 @@
 # Replay: an experimental simulation-first library
 
-Replay explores a multiplayer authoring model built around a complete, replayable
-Odin world. It lives beside Kit and uses none of Kit's replication, simulation,
-or session runtime. **Both implementations and both versions of each ported game
-must remain available.**
+Replay runs gameplay rules against a complete Odin world that can be saved and
+replayed. Use it when local simulation, prediction or recovery needs to reproduce
+a game's state from recorded inputs. It lives beside Kit and uses its own
+replication, simulation and session runtimes. **Both implementations and both
+versions of each ported game must remain available.**
 
 Replay implements local simulation, server-authoritative prediction/reconciliation,
 cooperative owner streams, and deterministic P2P rollback. Its shared foundations
@@ -14,7 +15,7 @@ Godot owns scenes/input/output; the simulation packages run without Godot.
 Start with [getting started](getting-started.md), the
 [Session starter project](../build/template/replay/README.md), and the
 [checked lifecycle recipes](../examples/replay_recipes/README.md). Most games
-need one Timeline, Session or Room owner; the package reference below includes
+need one Timeline, Session or Room runtime owner; the package reference below includes
 advanced mechanisms and tools, not a checklist of required imports. Kit (v1)
 and Replay (v2) share [Odin/API conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
 while retaining their different gameplay models.
@@ -105,8 +106,8 @@ returned by `current` or `read`; presentation never writes into simulation.
 The value-storage implementation supports scalars, enums, bit sets, fixed
 arrays, ordinary structs and supported tagged unions containing those values. Initialization recursively
 rejects pointers, slices, strings, maps, procedures, and other unsupported types.
-Struct padding is allowed: these are typed, same-process snapshots, **not wire
-packets**. Canonical wire codecs live in `replay/schema`; dynamic collections
+Struct padding is allowed: frames copy typed values within one process; they
+are **not wire packets**. Canonical wire codecs live in `replay/schema`; dynamic collections
 remain future storage work.
 
 Treat a live `Timeline` as a single owner of allocations: keep it in one place,

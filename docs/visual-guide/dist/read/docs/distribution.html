@@ -8,7 +8,7 @@
 <strong>how a user installs it</strong> into a Godot project, compiles their scripts, and exports for
 all platforms. For the export pipeline internals see <a href="exporting.html">exporting.md</a>.</p>
 <blockquote>
-<p><strong>Honesty about platform status</strong> (this repo is developed on macOS):</p>
+<p><strong>Platform verification status</strong> (this repo is developed on macOS):</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -41,8 +41,8 @@ all platforms. For the export pipeline internals see <a href="exporting.html">ex
 </div><p>&quot;Cross-build verified&quot; means <code>nix build .#dist-cross</code> (and <code>build/build_cross.sh</code>)
 produce a <code>.so</code>/<code>.dll</code> of the right format/arch that <strong>exports the <code>odin_godot_init</code>
 entry</strong> (and the scripts dll exports <code>odin_scripts_boot</code>). The C-ABI gdext boundary is
-identical across platforms, so there is high confidence, but a Linux/Windows Godot has
-not loaded these binaries on this macOS host. See <strong>Runtime-confirming</strong> below.</p>
+shared across platforms. This build check does not establish that Linux or Windows
+Godot can load and run the binaries; those runs need a target host. See <strong>Runtime-confirming</strong> below.</p>
 </blockquote>
 <h2 id="the-two-dll-model">The two-dll model<a class="heading-anchor" href="#the-two-dll-model" aria-label="Link to this section">#</a></h2>
 <p>odin_godot is a <strong>stable CORE dll</strong> (<code>libodin_godot.&lt;ext&gt;</code>, a pure-C-ABI
@@ -73,7 +73,7 @@ nix build .#dist-cross    <span class="hljs-comment"># -&gt; ./result/addons/odi
   extension_api.json
   gdextension_interface.h</code></pre></div><p>The addon root mirrors the repo&#39;s collection layout, so the bundled build scripts resolve
 <code>-collection:godot=$ODIN_GODOT_ROOT</code> (pointing at the addon) exactly as they do in-repo.</p>
-<p>Replay now ships as an experimental source collection beside Kit, with a separate
+<p>Replay ships as an experimental source collection beside Kit, with a separate
 <code>template/replay/</code> project and a download-oriented <code>docs/replay.md</code> guide. Source
 collections are hidden from Godot&#39;s scene scanner using <code>.gdignore</code>; the Odin
 compiler still resolves imports from them. The default Hello starter is unchanged.</p>
@@ -199,5 +199,5 @@ nix develop .#build-parity --<span class="hljs-built_in">command</span> bash tes
                                                             <span class="hljs-comment"># Bash + PowerShell helper contract</span>
 nix build                                                   <span class="hljs-comment"># macOS addon</span>
 nix build .#dist-cross                                      <span class="hljs-comment"># + Linux/Windows cores</span></code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../tests/replay_distribution/README.html"><span>Replay consumer distribution gate</span><span aria-hidden="true">→</span></a><a href="design/native-boundary.html"><span>Native core ↔ scripts boundary</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/distribution.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../tests/replay_distribution/README.html"><span>Replay consumer distribution gate</span><span aria-hidden="true">→</span></a><a href="design/native-boundary.html"><span>Native core ↔ scripts boundary</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/distribution.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-two-dll-model" class="">The two-dll model</a><a href="#build-the-distributable" class="">Build the distributable</a><a href="#cross-compiling-directly-without-nix-build" class="">Cross-compiling directly (without nix build)</a><a href="#build-verification-evidence" class="subsection">Build-verification evidence</a><a href="#install-into-a-godot-project" class="">Install into a Godot project</a><a href="#export-your-game" class="">Export your game</a><a href="#runtime-confirming-linux--windows" class="">Runtime-confirming Linux / Windows</a><a href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found" class="">Troubleshooting: failed to load scripts dll / No loader found</a><a href="#verify-in-repo" class="">Verify (in-repo)</a></nav><div class="outline-actions"><a href="../../reference/docs/distribution.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -43,11 +43,13 @@ is needed only when you choose a framework that owns that part of the game.
 ## Choose a multiplayer model
 
 Kit declares how fields on registered entities are synchronized. Its commands
-handle shared interactions, and its simulation lane adds authoritative
-prediction for fast state.
+handle shared interactions. Its simulation lane advances fast state at fixed
+ticks, predicts local input, and applies authority corrections.
 
-Replay keeps gameplay in a complete typed frame and steps it from recorded
-inputs. The runner owns history and correction; Godot draws detached views.
+Replay keeps gameplay in a typed World and steps it from recorded inputs. Each
+retained frame captures the World at one tick. The runner owns this history and
+applies corrections; Godot nodes display the result without owning simulation
+state.
 Replay also has cooperative owner streams and a deterministic peer-input runner.
 It remains experimental; use its documented support envelope when choosing a
 shipping configuration.

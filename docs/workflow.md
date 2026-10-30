@@ -6,8 +6,7 @@ limitations first, since they shape everything else.
 ## Odin scripts are AOT-compiled
 
 Your `.odin` scripts compile to a native shared library (`.dylib` / `.so` / `.dll`) that the
-engine loads through the GDExtension boundary. **There is no interpreter.** GDScript is
-interpreted; Odin is not. That single fact decides what works and what doesn't:
+engine loads through the GDExtension boundary. **There is no interpreter.** The compile and library-loading steps determine the workflow:
 
 | Capability | Odin scripts | Why |
 |---|---|---|
@@ -68,7 +67,7 @@ the scripts dll for you:
 
 1. **On save**, the editor (and only the editor, since a running/exported game never
    recompiles) kicks a **background** rebuild of the scripts dll on a worker thread, so the UI
-   never freezes while `odin build` runs (a few seconds). Rapid saves coalesce into one rebuild.
+   can continue processing while `odin build` runs (a few seconds). Rapid saves coalesce into one rebuild.
 2. **When the build finishes**, on the next editor frame the dll is hot-swapped in place: live
    instances re-bind and **keep their state**, and the Inspector's property lists refresh, so
    a freshly-added `@export` appears **without restarting the editor**.
@@ -97,8 +96,7 @@ nor hashes unrelated modules before rebuilding + swapping **only the module(s) w
 changed**. Coalesced saves retain every affected root. A save in `res://modules/enemies/`
 recompiles that one dll, leaving the main module and every other module's dll (instances,
 package globals, all of it) untouched. A slower background reconciliation still catches
-external edits and deletions that did not produce a save callback. That's what keeps save
-latency flat in large projects; the swapped module's own package globals reset (fresh dll).
+external edits and deletions that did not produce a save callback. This avoids rebuilding unrelated modules; the swapped module's own package globals reset (fresh dll).
 The one exception is a save under
 `res://shared/`, the [read-only vocabulary tree](modules.md#shared) every module may import:
 that rebuilds and swaps **every** module, because any of them may be compiled against it.
@@ -185,7 +183,7 @@ A script class gets a custom icon via the **`//gd:icon <res-path>`** marker (sho
 `.odin` scripts are recognizable rather than showing the generic script glyph. Override the
 default per project with the **`odin_godot/default_icon`** setting (point it at your own icon,
 or `""` to use the engine generic). The default is existence-checked, so a non-standard install
-without the icon simply shows the generic one.
+without the icon shows the generic one.
 
 ### Find in Files
 

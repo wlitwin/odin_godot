@@ -2,8 +2,9 @@
 
 Claimball can run through Replay's existing authenticated Room lifecycle. A trusted
 connected player receives complete authority checkpoints and can become host after
-planned handoff or owner loss. Prediction remains local-avatar-plus-ball; the
-checkpoint is the complete authority world, including outsiders.
+planned handoff or loss of the current host. Prediction remains local-avatar-plus-ball; the
+checkpoint is the complete authority world, including remote players excluded
+from each client's prediction group.
 
 The fixed-coordinator entry point below remains useful for development.
 [Party menus and browser RTC](online.md) now provide a provisioned Room path and

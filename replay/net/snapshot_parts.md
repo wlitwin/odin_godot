@@ -1,6 +1,7 @@
 # Negotiated snapshot parts
 
-Large snapshots can now travel as bounded unreliable datagrams. The initial
+Use negotiated snapshot parts to send large snapshots as bounded unreliable
+datagrams after bootstrap. The initial
 snapshot still establishes a reliable baseline. After that, a capable recipient
 can receive full or delta snapshots in pieces without waiting for the previous
 large snapshot's acknowledgment. Reliable facts remain the confirmation gate.

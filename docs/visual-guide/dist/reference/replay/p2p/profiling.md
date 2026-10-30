@@ -1,6 +1,7 @@
 # P2P timing and benchmark contract
 
-Profiling is optional runtime state. It is excluded from the match contract,
+Use P2P profiling to measure step, replay, checksum and pump costs, and the delay
+between local input capture and simulation. Profiling is optional runtime state. It is excluded from the match contract,
 canonical state, archives and checksums. Enable it with a monotonic microsecond
 clock after creating or restoring the Runner:
 

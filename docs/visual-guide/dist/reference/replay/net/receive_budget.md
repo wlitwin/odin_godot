@@ -6,16 +6,16 @@ returns `Buffer_Too_Small` and retains it. The pump stops and tries again with a
 fresh allowance next time. An exactly exhausted budget stops before another read.
 Packet count and byte limits are unchanged.
 
-The previous loops read into the full 64 KiB buffer and checked the budget only
+Before the receive-budget fix, loops read into the full 64 KiB buffer and checked the budget only
 after dequeueing. The crossing packet was then discarded, even on a reliable
 channel. Reliability cannot recover a packet already accepted and removed from
 the transport's receive queue. Large actions could stall until application retry;
 large fact batches could leave observer event history incomplete.
 
 Every legal packet fits a fresh pump: `transport.MAX_PACKET_BYTES` is 65,536, and
-network configuration already requires `bytes_per_pump >= 65,536`. The fix uses
-the existing receive-retention contract, without another buffer, an unbounded
-queue, a larger byte budget, or a new retry path. `Buffer_Too_Small` is not a
+network configuration already requires `bytes_per_pump >= 65,536`. This uses
+the existing receive-retention contract and existing buffers, queue bounds, byte
+budgets and retry paths. `Buffer_Too_Small` is not a
 malformed-packet rejection. Authority traffic counters still count successfully
 received authority packets; client traffic from other senders consumes the work
 budget before being rejected, without being attributed to the authority.

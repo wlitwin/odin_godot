@@ -6,8 +6,11 @@ a Node, and its lifecycle (`_ready`, `_process`, signals, exported vars…) runs
 compiled Odin. The goal is to **fully replace GDScript**, with **native + WASM**
 compilation, made reproducible with **Nix flakes**.
 
-Modeled on the sibling project `~/data/code/ocaml/miniml_godot` (a `ScriptLanguageExtension`
-that embeds the MiniML interpreter). This document is the implementation plan.
+This is the original implementation plan, with decisions recorded on 2026-06-22.
+It preserves the intended architecture and milestones rather than describing the
+current support contract. Use [the documentation index](docs/index.md) for current
+setup and APIs. The plan draws on the sibling `~/data/code/ocaml/miniml_godot`
+project, a `ScriptLanguageExtension` that embeds the MiniML interpreter.
 
 ### Locked decisions (2026-06-22)
 - **Godot pin:** **4.7.1 stable** (matches the installed `/Applications/Godot.app`).
@@ -174,7 +177,7 @@ register :: proc() {
 The core's registry maps `"Player"` → a `ClassDesc` with typed proc pointers; engine
 lifecycle/method/signal calls are dispatched through it with the node pointer + typed
 args — **no per-call string marshalling**. `@(init)` procs run automatically on dll load,
-so loading the scripts lib populates the registry for free.
+so loading the scripts library populates the registry.
 
 The core's registry maps `"Player"` → a `ClassDesc` with typed proc pointers; engine
 lifecycle/method/signal calls are dispatched through it. The codegen preprocessor lives in

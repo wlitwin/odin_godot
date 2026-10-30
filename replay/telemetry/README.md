@@ -1,6 +1,7 @@
 # Session round-trip telemetry
 
-`Diagnostics` owns optional connection measurements outside the simulation,
+Use `Diagnostics` to display recent application round-trip measurements for
+admitted peers. It owns optional connection measurements outside the simulation,
 checkpoint and rollback timeline. Initialize/destroy it beside the session, add
 `session_diagnostics_enable(&options)` before opening, and call
 `session_diagnostics_frame(&diagnostics, &session)` after each outer session pump.

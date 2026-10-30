@@ -1,9 +1,9 @@
 # Replay canonical schema and message codecs
 
-`replay/schema` builds a bounded scalar-field program from Odin compiler type
-information. It encodes logical values independently of struct padding, native
-offsets, and endian-qualified scalar storage. This is the initial backend for
-future generated schema/codecs; no new scriptgen attributes are required yet.
+Use `replay/schema` to encode portable values for packets, archives and
+diagnostics. It builds a bounded scalar-field program from Odin compiler type
+information and encodes logical values independently of struct padding, native
+offsets and endian-qualified scalar storage. No scriptgen attributes are required.
 
 Initialization also compiles validation indices and contiguous copy spans. The
 codec still validates constrained values before writing; adjacent canonical bytes
@@ -89,8 +89,8 @@ transactionally. Its returned tick still needs the session's timing validation;
 `inspect` only reads untrusted routing metadata. It is not a substitute for
 `unpack` or for checking transport sender identity. FNV fingerprints/checksums
 detect compatibility changes and accidental corruption; they are not signatures,
-authentication, or encryption. Envelopes are not yet a durable-save versioning or
-host-migration protocol.
+authentication, or encryption. Envelopes supply framing; durable-save versioning
+and host migration require their separate archive and authority protocols.
 
 ## Verification
 
@@ -101,8 +101,9 @@ nix develop --command bash tests/replay_schema/run.sh
 Native tests pin bytes, padding/endian equivalence, projections, enum/bit-set
 validation, field diagnostics, transactional failure, allocation ownership, and
 envelope mutation/truncation rejection. The gate also type-checks the instantiated
-schema/correction/transport/adapter surface for WASM. Actual cross-platform replay
-and execution parity remain a later milestone.
+schema/correction/transport/adapter surface for WASM. That type-check alone does
+not establish cross-platform replay or execution parity; see the separate
+[tagged-union execution evidence](unions.md#acceptance) for its tested corpus.
 
 ## Field differences
 
@@ -117,7 +118,7 @@ lifetimes and an example that connects a local audit failure to field paths.
 
 ## Compiled validation
 
-Flat schemas now compile a compact validation program alongside their copy spans.
+Flat schemas compile a compact validation program alongside their copy spans.
 The hot loop reads offsets, widths and validation rules directly, without copying
 full diagnostic field descriptors. Boolean and finite-float checks retain their
 existing rules. Bit sets use their declared mask; small enums use exact bit sets,
@@ -137,7 +138,7 @@ and timing with an explicitly retained reference implementation. Use game-level
 profiles and workload comparisons to assess the practical benefit.
 
 The FNV-1a compatibility digest keeps its exact historical bytes/seed behavior.
-Its scan now recognizes bounded eight-byte zero blocks and applies `prime^8`
+Its scan recognizes bounded eight-byte zero blocks and applies `prime^8`
 modulo 2^64; dense blocks and tails retain the ordered byte fold. Loads are explicitly
 unaligned, and the zero test is endian-independent. This changes scan cost, not
 fingerprints, envelope validation or cryptographic guarantees.

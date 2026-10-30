@@ -5,16 +5,15 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Process registration and gameplay identity</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/registration.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#registration-contract">Registration contract</a><a href="#gameplay-binding">Gameplay binding</a><a href="#extended-recovery-policy-and-evidence">Extended recovery policy and evidence</a></nav></details>
 <article class="reading-body "><p>A control key identifies an authorized member. A process incarnation identifies
-one running instance of that member. The service now assigns fresh incarnations
+one running instance of that member. The service assigns fresh incarnations
 through authenticated Challenge/Rebind RPCs; callers do not need to guess the next
 counter or reuse an old process identity.</p>
 <p>The initial member, key, permissions, game-token hash, and endpoint are
-provisioned by a trusted room/admission provider. The new
+provisioned by a trusted room/admission provider. The
 <a href="../provision/README.html">admission backend</a> persists those credentials together
 with invite consumption. Its bounded create/join protocol has native TLS acceptance;
-the client journal now adds durable native/browser enrollment. Public deployment
-and game UI remain pending.
-Registration preserves those
+the client journal adds durable native/browser enrollment. Public deployment
+remains separate from these local acceptance gates. Registration preserves those
 permissions and the game-token binding. It can update the endpoint using an
 explicit request, but it cannot enable hosting or create an unknown member.</p>
 <h2 id="registration-contract">Registration contract<a class="heading-anchor" href="#registration-contract" aria-label="Link to this section">#</a></h2>
@@ -87,8 +86,9 @@ with conserved guest inventory and a fresh acknowledged action.</li>
 <p>The partition injection pauses the old host&#39;s control pumping; its gameplay
 connection remains present. This establishes the lease/room behavior under that
 specific partition, not every network topology or every crash instruction boundary.
-Broader combat coverage, competitive migration, lobby/invite provisioning, and
-other platform/reachability profiles remain roadmap work.</p>
+These gates do not establish broader combat coverage, competitive migration,
+lobby/invite provisioning or other platform/reachability profiles; consult each
+feature&#39;s own acceptance results.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/registration.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/registration.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#registration-contract" class="">Registration contract</a><a href="#gameplay-binding" class="">Gameplay binding</a><a href="#extended-recovery-policy-and-evidence" class="">Extended recovery policy and evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/registration.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

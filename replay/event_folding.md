@@ -1,7 +1,9 @@
 # Folding feedback within a tick
 
-Ordinary `emit` rejects duplicate semantic IDs. `emit_fold` explicitly combines
-contributions to one occurrence, using a pure caller-provided reducer:
+Use `emit_fold` when several operations in one tick should contribute to the
+same feedback event, such as damage feedback for one target. It combines their
+payloads with a pure caller-provided reducer under one occurrence identity.
+Ordinary `emit` rejects duplicate semantic IDs:
 
 ```odin
 r.emit_fold(ctx, source, key, damage, proc(a, b: u32) -> (u32, bool) {

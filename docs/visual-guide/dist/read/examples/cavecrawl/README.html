@@ -4,30 +4,29 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>cavecrawl — the co-op reference</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/cavecrawl/README.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>This is the broadest co-op Kit example: a drop-in cave crawler that exercises
-sessions with reconnect
-identity, declarative replication, predicted commands with <code>_then</code>
-consequences, the generated entity factory, items and chests, host-validated
+<article class="reading-body "><p>This co-op cave crawler combines Kit&#39;s session, replication and interaction APIs
+in one runnable game. Sessions retain player identity across reconnects; tagged
+entity fields replicate state; predicted Kit commands give local feedback before
+the host validates them. A command&#39;s <code>_then</code> hook applies accepted consequences
+that affect other entities. The game also includes items and chests, host-validated
 combat, hostile AI, positional pings, quit-and-resume saves, host migration,
-and the ENet↔Steam transport swap. It was grown one phase at a time (lobby →
-chat → lootable world → predicted combat → dwellers → saves), and
-<a href="../../docs/kit/build-a-game-in-a-day.html">build-a-game-in-a-day</a> retraces
-that arc brick by brick — when a step there feels terse, the corresponding
-file here is the long answer.</p>
-<p>The example contains about 4,500 hand-written lines and is deliberately the largest
-example — the place to see every pattern coexisting in one game. For the
+and the ENet↔Steam transport swap. Follow
+<a href="../../docs/kit/build-a-game-in-a-day.html">build-a-game-in-a-day</a> for a staged
+walkthrough, then use the file table below to find each feature&#39;s implementation.</p>
+<p>The example contains about 4,500 hand-written lines and shows these patterns
+working together. For the
 smallest complete kit game read <span class="local-reference" title="examples/slopball/ · available in the repository">slopball</span> first; for the
 server-authority model read <span class="local-reference" title="examples/quickdraw/ · available in the repository">quickdraw</span> and
 <span class="local-reference" title="examples/speedball/ · available in the repository">speedball</span> (<a href="../../docs/kit/timelines.html">choosing a model</a>).</p>
-<p>The multiplayer author surface is the entity files — a struct with
-<code>gd:&quot;replicate&quot;</code> tags, verbs as <code>@(gd_command)</code> procs, a <code>_process</code> that
-dresses from fields:</p>
+<p>Author multiplayer behavior in the entity files: a struct declares replicated
+fields with <code>gd:&quot;replicate&quot;</code> tags, <code>@(gd_command)</code> procedures request validated
+changes, and <code>_process</code> updates the Godot view from those fields:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_OWNER_PREDICTED)</span>
 door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
 	self.open = !self.open
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
-}</code></pre></div><p>One class, many files, split the way a real game is:</p>
+}</code></pre></div><p>The lobby class spans several files; each entity has its own file:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -53,7 +52,7 @@ door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span cla
 </tr>
 <tr>
 <td><code>rocks.odin</code></td>
-<td>peer-owned projectile visuals — the zero-felt-lag story</td>
+<td>projectile visuals spawned locally by the firing peer</td>
 </tr>
 <tr>
 <td><code>host.odin</code></td>
@@ -65,7 +64,7 @@ door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span cla
 </tr>
 <tr>
 <td><code>queries.odin</code></td>
-<td>read-only windows for HUDs and test drivers</td>
+<td>read-only queries for HUDs and test drivers</td>
 </tr>
 <tr>
 <td><code>spelunker/chest/door/pickup/dweller/relic.odin</code></td>
@@ -87,5 +86,5 @@ same-machine identities) · <code>CAVE_STEAM=0</code> (force ENet when Steam is
 running; Steam lobbies use the Spacewar app id, see
 <a href="../../docs/kit/steamgd.html">steamgd</a>).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/cavecrawl/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/cavecrawl/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/cavecrawl/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

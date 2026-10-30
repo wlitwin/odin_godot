@@ -9,11 +9,11 @@ markers, every <code>@export</code> form, lifecycle, methods, signals, resources
 cross-script access, the <code>gd.*</code> helper catalog, and editor tooling. New to odin_godot? Read
 <strong><a href="getting-started.html">Getting Started</a></strong> first for setup and a hello-world; this page is the
 deep dive. For the build/edit/debug loop, see <strong><a href="workflow.html">Workflow</a></strong>.</p>
-<p>You write <code>&lt;name&gt;.odin</code> in the clean authoring form below; a preprocessor (<code>scriptgen</code>, run
-by <code>build/build_scripts.sh</code>) reads its struct tags + markers and emits the registration
-boilerplate (Variant trampolines, backing arrays, <code>@(init)</code> registration) into a generated
-file you never edit. Both compile together into the scripts dll, so you author the nice form
-and get the full typed dispatch for free.</p>
+<p>Write <code>&lt;name&gt;.odin</code> using the struct and procedure conventions below. The
+<code>scriptgen</code> preprocessor, run by <code>build/build_scripts.sh</code>, reads its tags and
+markers and generates registration code, including Variant argument wrappers,
+backing arrays, and <code>@(init)</code> registration. The authored and generated files
+compile together into the scripts library. Edit the authored source.</p>
 <h2 id="api-conventions-shared-by-kit-and-replay">API conventions shared by Kit and Replay<a class="heading-anchor" href="#api-conventions-shared-by-kit-and-replay" aria-label="Link to this section">#</a></h2>
 <p>Use <a href="https://github.com/odin-lang/examples/wiki/Naming-and-style-convention" rel="noreferrer">Odin&#39;s naming and style conventions</a>:
 <code>Ada_Case</code> for types and enum members, <code>snake_case</code> for procedures and fields,
@@ -194,10 +194,9 @@ Coin :: <span class="hljs-keyword">struct</span> { owner: gd.Area2d }     <span 
 <code>-godot:</code> root, or a type that isn&#39;t a ClassDB class), and the check stays silent
 in exactly those cases.</p>
 <h3 id="the-tag-vocabulary">The tag vocabulary<a class="heading-anchor" href="#the-tag-vocabulary" aria-label="Link to this section">#</a></h3>
-<p>Every <code>`gd:&quot;…&quot;`</code> tag opens with ONE token that selects what the field is. The full
-set, and who consumes each, is the human projection of <code>decl/decl.odin</code>&#39;s <code>FIELD_TOKENS</code>,
-the schema both scriptgen and the runtime&#39;s reflection registrar read, so this page, the
-parser, the boot-time &quot;unknown gd tag&quot; error, and the skip list stay in agreement:</p>
+<p>Every <code>`gd:&quot;…&quot;`</code> tag starts with a token selecting the field kind. The table
+below follows <code>FIELD_TOKENS</code> in <code>decl/decl.odin</code>, the schema shared by scriptgen
+and the runtime reflection registrar:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -262,10 +261,10 @@ parser, the boot-time &quot;unknown gd tag&quot; error, and the skip list stay i
 <td>yes</td>
 </tr>
 </tbody></table>
-</div><p>One token rides BEHIND a first token as a spec: <code>args=a,b</code> (a signal payload&#39;s
-parameter names). &quot;In the wire fingerprint&quot; means the declaration&#39;s shape folds into
-<code>NET_FINGERPRINT</code>, so two builds that disagree about it are refused at the join door
-rather than misparsing each other&#39;s packets.</p>
+</div><p><code>args=a,b</code> follows the first token and names a signal payload&#39;s parameters.
+&quot;In the wire fingerprint&quot; means the declaration contributes to
+<code>NET_FINGERPRINT</code>. Peers compare that fingerprint at join and reject mismatched
+builds before interpreting gameplay packets.</p>
 <p><strong><code>backup</code> is not in the fingerprint.</strong> A backup is guarded by the codec&#39;s own
 <code>fnv1a32</code> format stamp at the LOAD door, so a save written by a drifted build is refused
 rather than misread; it is not guarded at the JOIN door. Two peers whose save files
@@ -718,9 +717,8 @@ after the signal&#39;s own args on every dispatch:</p>
 <span class="hljs-meta">@(gd_method, gd_connect = &quot;Panel/Choice%d:pressed&quot;)</span>
 menu_on_choice :: <span class="hljs-keyword">proc</span>(self: ^Menu, idx: gd.Int) {
 	menu_pick(self, <span class="hljs-type">int</span>(idx))
-}</code></pre></div><p>This replaces the N one-line stub handlers (<code>pick0</code>, <code>pick1</code>, <code>pick2</code>) the bank pattern
-used to force. Index 0 must exist — a declaration that wires nothing is a loud
-<code>push_error</code>, not a silent no-op.</p>
+}</code></pre></div><p>This lets <code>pick0</code>, <code>pick1</code>, and <code>pick2</code> share a handler. Index 0 must exist;
+a declaration that connects nothing reports <code>push_error</code>.</p>
 <p>Scene-unique names work in the path part too, with the same rules as <code>onready=</code>
 (segment-start <code>%</code> = unique-name marker, mid-name <code>%d</code> = the indexed template):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method, gd_connect = &quot;%SavePanel:saved&quot;)</span>     <span class="hljs-comment">// unique-name emitter</span>
@@ -772,7 +770,7 @@ whole set.</p>
 <td><code>tick: u64</code></td>
 <td><code>@(gd_sample)</code> (required, second), <code>@(gd_step)</code> (optional, second)</td>
 <td>the lane&#39;s tick number</td>
-<td>on a sample, a build error; on a step, the param is simply not passed</td>
+<td>on a sample, a build error; on a step, the parameter is omitted</td>
 </tr>
 <tr>
 <td><code>l: ^ksim.Lane</code></td>
@@ -793,8 +791,7 @@ it as): the import PATH is what is checked, not the spelling. Only a <code>Boot<
 different package fails to declare the shell.</p>
 <h2 id="manual-overrides">Manual overrides<a class="heading-anchor" href="#manual-overrides" aria-label="Link to this section">#</a></h2>
 <p>Wherever scriptgen generates a proc <em>for your convenience</em>, <strong>a hand-written proc of that
-name wins.</strong> That is the one override mechanism; there is no opt-out tag, no config token,
-no magic path.</p>
+name wins.</strong> That is the one override mechanism; there is no separate opt-out tag or configuration token.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -1091,8 +1088,8 @@ the peer, so a game only writes:</p>
 lobby_process :: <span class="hljs-keyword">proc</span>(self: ^Lobby, _delta: <span class="hljs-type">f64</span>) {
     gd.webrtc_poll(self.owner)
     code := gd.webrtc_room_code(self.owner) <span class="hljs-comment">// host: &quot;&quot; until the server assigns it — display to share</span>
-}</code></pre></div><p>Once connected, <strong>the same <code>@(gd_rpc)</code> methods + <code>gd.rpc</code> / <code>gd.rpc_id</code> used over ENet just
-work</strong>: a <code>WebRTCMultiplayerPeer</code> is a <code>MultiplayerPeer</code> like any other, and the high-level
+}</code></pre></div><p>Once connected, <strong>the same <code>@(gd_rpc)</code> methods and <code>gd.rpc</code> / <code>gd.rpc_id</code> calls used over ENet
+use the WebRTC peer</strong>: a <code>WebRTCMultiplayerPeer</code> is a <code>MultiplayerPeer</code> like any other, and the high-level
 RPC layer is transport-agnostic. Nothing about your RPC code changes; only the transport
 setup does.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
@@ -1341,7 +1338,7 @@ helper first. When you call a <em>raw</em> bound method that has no wrapper, it 
 }</code></pre></div><p><code>gd.sname</code> uses <code>static = true</code> (intern once, keep), correct for the string <em>literals</em> these
 calls almost always use.</p>
 <h3 id="common-2d-transforms--moving--rotating-a-node2d">Common 2D transforms — moving / rotating a Node2D<a class="heading-anchor" href="#common-2d-transforms--moving--rotating-a-node2d" aria-label="Link to this section">#</a></h3>
-<p><code>gd.Vector2</code> is just an Odin <code>[2]f32</code>, so you get Odin&#39;s vector math for free: component access
+<p><code>gd.Vector2</code> is an Odin <code>[2]f32</code>, so it supports Odin&#39;s vector operations: component access
 (<code>pos.x</code>), compound assignment (<code>pos.x += 10</code>), and whole-vector arithmetic (<code>pos += other</code>,
 <code>pos * delta</code>). The only round-trip is the get/set across the engine boundary. For the
 common &quot;move/rotate/scale by a delta&quot; cases, Godot&#39;s own one-call methods skip even that, so you
@@ -1631,7 +1628,7 @@ in the Inspector and persist on save.</p>
 </li>
 <li><p><strong>Resource-typed <code>@export</code>.</strong> A field <code>data: ^gd.Resource </code>gd:&quot;export,resource=ItemData&quot;`` on a <em>node</em> script gives a resource-picker slot
 that accepts a custom <code>ItemData</code> <code>.tres</code>. The <code>resource=</code> hint string filters the
-picker, and because <code>ItemData</code> is now registered as a global class (see below) the
+picker, and because <code>ItemData</code> is registered as a global class (see below) the
 editor knows it as a type.</p>
 </li>
 </ul>
@@ -1640,7 +1637,7 @@ editor knows it as a type.</p>
 type, exactly like a GDScript <code>class_name</code>. No extra annotation is needed; the class
 name you already declare becomes the global name.</p>
 <p>The marker is optional. Without it, the script still attaches, instantiates, reloads,
-and supports typed <code>rt.script_of</code> access through its source-path identity; it simply does
+and supports typed <code>rt.script_of</code> access through its source-path identity. It does
 not reserve a project-wide global type name. Use it when another editor surface needs a
 named type (for example a custom <code>Resource</code> picker), not as routine binding boilerplate.
 The editor&#39;s new-script template therefore leaves it out by default.</p>
@@ -1687,8 +1684,9 @@ engine (signals, name-based calls, autoloads). See <a href="modules.html">Script
 GDScript-style by-name path is <code>gd.vcall</code> (below); <code>script_of</code> is the zero-overhead
 typed path within the shared scripts dll.</li>
 </ul>
-<p><strong>Typed spawning.</strong> The instantiate → add_child → <code>script_of</code> → poke ritual is three
-helpers, split by WHEN the spawnee&#39;s <code>_ready</code> should see your pokes:</p>
+<p><strong>Typed spawning.</strong> These three helpers combine scene instantiation and typed
+script lookup. Choose one according to whether the new instance&#39;s <code>_ready</code>
+needs to see the initial field values:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// poke-first (fields visible to the spawnee&#x27;s _ready): spawn_scripted + add_child</span>
 node, b := rt.spawn_scripted(self.bullet_scene, Bullet)
 <span class="hljs-keyword">if</span> b == <span class="hljs-literal">nil</span> { <span class="hljs-keyword">return</span> }
@@ -1939,5 +1937,5 @@ handwritten descriptors share the same implementation. See
 <a href="../replay/godot/scene/adapter-bindings.html">adapter bindings</a> for ownership, lifetimes,
 scene validation and the distinct permanent-runner and entity-enemy examples.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="kit/conventions.html"><span>Kit API conventions</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/authoring-guide.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="kit/conventions.html"><span>Kit API conventions</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/authoring-guide.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-conventions-shared-by-kit-and-replay" class="">API conventions shared by Kit and Replay</a><a href="#single-file-authoring" class="">Single-file authoring</a><a href="#anatomy-of-a-script" class="">Anatomy of a script</a><a href="#reserved-shapes" class="">Reserved shapes</a><a href="#manual-overrides" class="">Manual overrides</a><a href="#generated-names" class="">Generated names</a><a href="#multiplayer-rpcs-gd_rpc" class="">Multiplayer RPCs (@(gd_rpc))</a><a href="#ergonomic-helpers" class="">Ergonomic helpers</a><a href="#supported-odin--variant-types" class="">Supported Odin → Variant types</a><a href="#threads--memory" class="">Threads &amp; memory</a><a href="#building" class="">Building</a><a href="#multiple-scripts-in-one-package" class="">Multiple scripts in one package</a><a href="#custom-resources" class="">Custom resources</a><a href="#global-class-names" class="">Global class names</a><a href="#typed-cross-script-references" class="">Typed cross-script references</a><a href="#autoload-singletons" class="">Autoload singletons</a><a href="#editor-tooling" class="">Editor tooling</a></nav><div class="outline-actions"><a href="../../reference/docs/authoring-guide.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

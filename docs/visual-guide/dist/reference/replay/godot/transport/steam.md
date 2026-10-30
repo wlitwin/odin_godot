@@ -1,16 +1,16 @@
 # Steam packet transport
 
-Replay has an explicit Steam Session backend built over GodotSteam's
+Use the Steam Session backend to carry Replay packets through GodotSteam's
 `SteamMultiplayerPeer`. It uses the same typed handshake, seat admission, input/
 action protocol, snapshots and checkpoint machinery as the other transports.
 The adapter retains a peer directly; it does not install SceneMultiplayer or rely
-on Kit. ENet now shares its bounded packet/lifetime adapter.
+on Kit. ENet shares its bounded packet/lifetime adapter.
 
 The interface was checked against GodotSteam 4.22.1, upstream commit
 [`5853a7741d174cfa37edee1ca44a11581a989d0b`](https://codeberg.org/godotsteam/godotsteam/src/commit/5853a7741d174cfa37edee1ca44a11581a989d0b/godotsteam_multiplayer_peer.cpp).
 The separately released GDExtension loaded under Godot 4.7.1 and exposed the
 expected native class/methods without initializing Steam. This is ABI/capability
-evidence, not successful Steam network delivery. The current verified envelope is
+evidence, not successful Steam network delivery. The tested configurations are
 listed below.
 
 ```odin
@@ -91,7 +91,7 @@ for two logged-in Steam accounts/devices. Its output uses a separate live sentin
 contract or capability success cannot satisfy that gate.
 
 Live Valve relay/P2P behavior, invitations/lobby UX, entitlement/account boundaries,
-SteamGameServer support and broader platforms remain pending. [Room endpoint/recovery integration](../steam_room.md) now supplies explicit Steam
+SteamGameServer support and broader platforms remain pending. [Room endpoint/recovery integration](../steam_room.md) supplies explicit Steam
 addresses and fresh peer construction through takeover/rejoin. Its local contract
 fixture remains distinct from live multi-account acceptance. Existing ENet/RTC Room
 profiles remain available. These gaps stay

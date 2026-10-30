@@ -4,14 +4,15 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authenticated authority service and durable storage</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/service.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#trust-and-message-contract">Trust and message contract</a><a href="#atomic-replay-protection">Atomic replay protection</a><a href="#sqlite-adapter">SQLite adapter</a><a href="#evidence">Evidence</a></nav></details>
-<article class="reading-body "><p><code>Service</code> exposes the coordinator through the borrowed Replay transport interface.
-<code>Rpc_Client</code> correlates replies with a <code>Lease</code>; the SQLite adapter implements the
-durable compare-and-swap callback. The library and real-process fixture now exercise
-planned transfer of an actual replayed simulation and coordinator crash/restart.
-The Room driver additionally passes live-client planned/crash, repeated, returned-
-host, partition, and successor-loss gates. <a href="registration.html">Process registration</a>
-now supplies fresh incarnations for known members. General room/invite provisioning
-and broader combat/platform acceptance remain open.</p>
+<article class="reading-body "><p>Use <code>Service</code> to expose a room&#39;s authority coordinator over Replay&#39;s transport
+interface. <code>Rpc_Client</code> correlates replies with a time-limited <code>Lease</code>; the SQLite
+adapter durably commits each coordinator decision with compare-and-swap.
+<a href="registration.html">Process registration</a> supplies fresh incarnations for known
+members, and the <a href="../godot/room.html">Room driver</a> connects these decisions to live
+gameplay.</p>
+<p>The evidence below describes the service fixture&#39;s tests, including planned
+simulation transfer and coordinator crash/restart. Broader integration results
+belong to the Room gates and <a href="../../docs/replay/framework-audit.html">framework audit</a>.</p>
 <h2 id="trust-and-message-contract">Trust and message contract<a class="heading-anchor" href="#trust-and-message-contract" aria-label="Link to this section">#</a></h2>
 <p>Provision enabled <code>Member</code> records and distinct, unpredictable 32-byte keys for
 their member IDs. Keep keys in the admission/secret provider, not the public
@@ -73,7 +74,7 @@ durability boundary and synchronization behavior in its
 <a href="https://www.sqlite.org/wal.html" rel="noreferrer">WAL documentation</a> and
 <a href="https://www.sqlite.org/pragma.html#pragma_synchronous" rel="noreferrer">synchronous pragma documentation</a>.</p>
 <p>The current adapter supports native macOS and Linux and links SQLite. The Nix dev
-shell now includes it. The runtime tests here ran on macOS. This is a local-file
+shell includes it. The runtime tests here ran on macOS. This is a local-file
 backend, not a replicated coordinator database; use one authoritative database on
 a supported local filesystem. The implementation relies on SQLite and the storage
 stack honoring their synchronization contract. Tests kill processes and verify
@@ -87,7 +88,7 @@ the claimant must actually possess it. Neither path revives the old epoch.</p>
 <h2 id="evidence">Evidence<a class="heading-anchor" href="#evidence" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority/run.sh
 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_sqlite/run.sh
-nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_service/run.sh</code></pre></div><p>The authority suite now has 19 native tests plus a WASM type-check. New cases cover
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_service/run.sh</code></pre></div><p>The service assessment recorded 19 native tests plus a WASM type-check. Cases cover
 MAC forgery/cross-identity requests, nonce-bound replies, oversized ingress, durable
 replay frontiers across newer reads/restart, lost replies, storage failures, and
 recovery of an unconsumed committed grant. SQLite tests reopen the database, race
@@ -102,9 +103,9 @@ then kills the coordinator, reopens its SQLite record as generation 2, keeps the
 successor alive, waits through quarantine, and resumes its retained world at epoch 3.</p>
 <p>This proves the decision service, durability, and simulation transfer components.
 The fixture uses explicit test provisioning and a separate checkpoint connection.
-It does not yet prove migration of live Cavecrawl clients, gameplay rendezvous,
-or every M5 crash/partition scenario. That driver and its acceptance cases remain
-the next work.</p>
+This fixture does not prove migration of live Cavecrawl clients, gameplay
+rendezvous or every M5 crash/partition scenario. Consult the
+<a href="../godot/room.html">Room driver</a> and its acceptance cases for those integrations.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/service.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/service.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#trust-and-message-contract" class="">Trust and message contract</a><a href="#atomic-replay-protection" class="">Atomic replay protection</a><a href="#sqlite-adapter" class="">SQLite adapter</a><a href="#evidence" class="">Evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/service.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

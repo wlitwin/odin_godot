@@ -1,6 +1,8 @@
 # Raw WebSocket transport
 
-`websocket_host` owns a native TCP listener and bounded WebSocketPeer connections.
+Use the raw WebSocket adapter for reliable messages, including binary control
+RPCs and text signaling. `websocket_host` owns a native TCP listener and bounded
+WebSocketPeer connections.
 `websocket_join` works natively and in browser exports. The adapter uses no
 MultiplayerAPI or Godot scene RPCs. Keep the owner at a stable address; close its
 public transport or call `websocket_close` to release it.
@@ -29,6 +31,9 @@ URL. Its default remains Enet. Control reconnection preserves the RPC client and
 request frontier. Gameplay may use ENet or the [authenticated RTC path](../rendezvous.md);
 selecting WebSocket control alone does not configure the gameplay destination.
 
-The native listener currently accepts plain WebSocket connections. Browser clients
-can use `wss://` with a deployment's TLS endpoint/reverse proxy. Public TLS/origin
-configuration is not established by the loopback acceptance fixture.
+The native listener accepts plain WebSocket connections by default. Supply server
+TLS options to `websocket_host` to terminate TLS in the adapter, or use a
+deployment's TLS endpoint/reverse proxy for `wss://` clients. The
+[provisioning connection](../../provision/protocol.md#godot-connection-and-tls)
+describes the verified-TLS contract. Public TLS/origin configuration still needs
+deployment acceptance beyond the local fixture.

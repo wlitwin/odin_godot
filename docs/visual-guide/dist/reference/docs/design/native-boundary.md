@@ -23,8 +23,9 @@ the old hot-reload generation remains active.
 
 This does not promise that every Odin release can compile every odin_godot checkout. Source
 and compiler API changes are ordinary build-time compatibility constraints. The Nix-pinned
-compiler remains the tested recommendation, especially before Odin 1.0, but it is no longer an
-artificial binary lock when the produced ABI is demonstrably identical.
+compiler remains the tested recommendation, especially before Odin 1.0. The loader
+checks binary compatibility through the ABI contract rather than requiring an
+identical compiler version string.
 
 ## Boundary inventory and ownership
 

@@ -1,6 +1,7 @@
 # Local diagnostic overlay
 
-The opt-in `Debug_Overlay` provides live runtime metadata and bounded local audits.
+Use the opt-in `Debug_Overlay` to inspect runtime counters and audit whether
+recent recorded inputs reproduce the retained state and events.
 It is a presentation/debugging component, separate from simulation state and wire
 schemas. It sends no requests to peers, writes no files, and does not issue game
 actions or apply corrected state.
@@ -72,7 +73,8 @@ same controls on Hello and real host/client Cavecrawl processes; the client audi
 starts after its correction boundary. A rendered panel capture is retained in
 [the live diagnostic evidence](../../../docs/replay/results/live-diagnostics-2026-09-07/README.md).
 
-The separate [local history dock](scrubber.md) now supports retained-frame
-inspection, original-future resume and explicit branching in Replay Hello. The
-audit overlay remains read-only. Field editing, graph views, persistent failure
-recordings and richer Room/P2P-specific panels remain additional roadmap work.
+The separate [local history dock](scrubber.md) supports retained-frame inspection,
+field editing, original-future resume and explicit branching in Replay Hello.
+[Portable recordings](../../diagnostic/recording.md) retain replayable history
+windows for later verification. The audit overlay remains read-only; graph views
+and richer Room/P2P-specific panels remain additional roadmap work.

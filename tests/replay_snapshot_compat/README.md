@@ -4,8 +4,9 @@
 nix develop --command bash tests/replay_snapshot_compat/run.sh
 ```
 
-The `reference/` directory freezes Replay's network runner immediately before the
-snapshot-parts extension. Its package declaration alone is renamed so both versions
+The `reference/` directory freezes Replay's network runner—the runtime that
+schedules simulation steps and manages network input/history—immediately before
+the snapshot-parts extension, which splits snapshots for transfer. Its package declaration alone is renamed so both versions
 can be linked in one process; the script verifies original and adapted hashes.
 Do not silently refresh this reference when changing the current protocol.
 

@@ -1,6 +1,8 @@
 # Explicit checkpoint conversion
 
-`checkpoint_decode` and `server_restore` continue to require the current protocol,
+Use an explicit checkpoint converter when a saved archive's protocol or game
+schema differs from the current model. `checkpoint_decode` and `server_restore`
+require the current protocol,
 archive layout, schemas, model and application-supplied content ID. A failed load
 never guesses a conversion or changes the source bytes.
 
@@ -44,7 +46,7 @@ Conversion grants no authority and does not advance the epoch. Permit requiremen
 and custom policy IDs remain present. `server_restore` still needs a newer epoch,
 a valid permit when required and the application's admission callback. Converting
 bytes changes their digest: an existing coordinator-approved checkpoint point or
-sealed handoff cannot simply be replaced by these bytes. Coordinated upgrade needs
+sealed handoff cannot be replaced by these bytes. Coordinated upgrade needs
 its own approved transition and publication under the new contract.
 
 For a bundle, validate its old container, convert its root, then call

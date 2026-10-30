@@ -6,7 +6,7 @@ The addon ships an integration-test harness in the template:
 `build/template/test/`, and every example's `run.sh` sources
 `build/template/test/harness.sh`.) scriptgen generates the probes the
 driver reads the world through. Reach for the harness whenever you need to
-prove a multiplayer behavior holds across real processes on a real network.
+check multiplayer behavior across real processes on a real network.
 The reference consumer is `examples/cavecrawl/run.sh`, a four-act test
 covering the story, save/resume, match flow plus moderation, and host
 migration under `kill -9`. All of its plumbing is the harness.
@@ -111,7 +111,7 @@ probe_<kind>_<field>(id)       # any replicated SCALAR field; id 0 = mine
 So `game.probe_kicker_hp(0)` in `driver.gd` reads what this peer's screen
 believes, with zero game code. Probes read the same replicated state your
 HUD renders (on a sim-lane game: presentation truth, after `lane_present`).
-Hand-write only the genuinely game-shaped reads: a derived view (a
+Hand-write the game-specific reads: a derived view (a
 predicted-hp overlay), a nearest-scan, a formatted compound. A hand-written
 proc that takes a probe's name suppresses the generated probe of that name.
 

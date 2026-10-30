@@ -1,7 +1,8 @@
 # Typed scene adapters
 
-The adapter chooses presentation data and game lifetime boundaries. Shared owners
-handle script resolution, borrowed pointers, asset retention, callback configuration,
+Use typed scene adapters to pass detached gameplay display values into ordinary
+Godot scripts. The game chooses those values and their lifetime boundaries; shared
+runtime owners handle script resolution, borrowed pointers, asset retention, callback configuration,
 entity membership and diagnostics. Scrapyard uses the same binding declarations
 for authored enemy scenes and permanent runner scenes.
 

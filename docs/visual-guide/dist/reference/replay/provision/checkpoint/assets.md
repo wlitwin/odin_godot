@@ -1,7 +1,8 @@
 # Durable checkpoint assets
 
-A room publication can now include its complete external asset set in the same
-transaction as its checkpoint. The authority Point continues to name the raw typed
+Use a checkpoint package when restoring gameplay requires external assets as
+well as state. A room publication can include its complete external asset set in
+the same transaction as its checkpoint. The authority Point continues to name the raw typed
 checkpoint. A separate signed payload descriptor names the transferred package;
 the package verifies its root against that Point and checks every asset's content
 hash. Restore grants still select the exact checkpoint publication.
@@ -50,7 +51,7 @@ The transfer package is a canonical envelope around the existing asset bundle.
 The full payload, including checkpoint and assets, is limited to **1 MiB** and **32
 unique references**, matching the room transfer profile. Each asset remains subject
 to its game/cache limits. The local-file bundle profile retains its separate 16 MiB
-limit. `bundle_encode` now accepts a lower caller-selected bound and checks it before
+limit. `bundle_encode` accepts a lower caller-selected bound and checks it before
 allocating the output; room packaging uses that preflight.
 
 The SQLite store adds `replay_room_checkpoint_package`. Raw checkpoint, publication

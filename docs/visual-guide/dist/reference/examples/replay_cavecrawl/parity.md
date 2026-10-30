@@ -37,7 +37,8 @@ The [owner-motion companion](../replay_cavecrawl_owned/README.md) now supplies a
 separate latest-observation profile using the same gameplay reducer. Native
 movement, relic handoff, carrier recovery and service checkpoints have acceptance
 cases. O2 adds scoped command origins, Chrome migration/saves, and a matched quiet
-comparison. The C8 profile above remains server-simulated. Broader original rules,
+comparison. C8 introduced authority adoption to the server-simulated profile
+above; [the impact contract](impacts.md) records its current content identity. Broader original rules,
 remote presentation, combat/stress and human ergonomic comparison remain open.
 
 The original Act 3 removal/ban path now has a [host moderation control](moderation.md).

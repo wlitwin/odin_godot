@@ -4,8 +4,8 @@ An exported game has **no Odin compiler**. So `.odin` scripts are compiled **ahe
 export**, by an editor export plugin, and the resulting library is bundled into the build. This
 covers the two targets: native desktop and web/WASM.
 
-The internals (how the plugin is registered, per-platform bundling, the `when WEB` split, every
-wasm blocker found and fixed) live in
+Implementation notes on plugin registration, per-platform bundling, and the
+`when WEB` split are in
 [design/export-internals.md](design/export-internals.md) and
 [design/web-internals.md](design/web-internals.md). This page is the user-facing how-to.
 
@@ -127,7 +127,7 @@ present; if you installed the addon into your own project, set them up once:
    - `odin_godot/odin_bin` → your `odin`
    - `odin_godot/emcc_bin` → `…/emsdk/upstream/emscripten/emcc`
 
-   With those set, **web export Just Works from the export dialog**: the plugin finds the
+   With those set, **the export dialog can build and package the web game**: the plugin finds the
    tools, builds the wasm, and bundles it. Alternatively, launch the editor from a terminal
    where both are already on `PATH` (e.g. after `source ./emsdk/emsdk_env.sh`).
 

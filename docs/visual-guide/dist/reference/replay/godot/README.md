@@ -1,7 +1,8 @@
 # Replay Godot integration
 
-`Session(State, Control, Action, Event, Seats)` owns the routine local/network
-lifecycle around the engine-free runner. The application supplies a typed model,
+Use `Session(State, Control, Action, Event, Seats)` to drive a local or networked
+game from Godot. It owns the lifecycle around the engine-free runner, which
+schedules simulation steps and manages input and history. The application supplies a typed model,
 initial frame, options, sampled controls/actions, and presentation.
 
 ## Choose an import
@@ -136,7 +137,7 @@ client. Consume `session_changes` before the next frame. It carries gameplay
 effects and action verdicts; an authoritative verdict is a `Confirm`, or a change
 whose `confirmed` flag is set. Simulation never renders or accesses device state.
 The facade drains the lower-level duplicate outcome convenience queue so normal
-games have one presentation-consumer door.
+games consume outcomes through `session_changes`.
 
 The caller supplies the `changes` scratch array. Drain until zero even when that
 array is smaller than the pending batch; leaving changes queued makes the next
@@ -182,7 +183,7 @@ the co-op recovery gate replaces both host and guest and checks stable-seat loot
 and continued actions. See [recovery](../../docs/replay/recovery.md) for API examples
 and the distinction between local recovery and the Room migration driver.
 
-Network sessions now share an ENet connection between gameplay and checkpoint
+Network sessions share an ENet connection between gameplay and checkpoint
 replication through `recovery.Link`. To accept complete authority backups, set
 `options.replication.accept_checkpoints=true` before opening a client. On the
 authority, `session_backup_seat(session, seat, interval_ticks)` explicitly authorizes
@@ -196,12 +197,12 @@ an elected host. Connection replacement requires explicit authorization of the n
 live binding. The Room driver adds coordinator fencing and tested surviving-client
 takeover; broader M5 cases remain open.
 
-The authority model and permit enforcement are now available in `replay/authority`.
+The authority model and permit enforcement are available in `replay/authority`.
 For a leased session, set `options.network.require_permit=true` and supply
 `options.permit`. `session.fenced` reports an expected pause when it is unavailable;
 fixed-step backlog is discarded while fenced. The application must continue its
 coordinator/UI loop separately. The authenticated decision service and durable store
-are now available, along with the initial Room takeover driver. See the
+are available, along with the Room takeover driver. See the
 [service contract](../authority/service.md).
 
 The facade is experimental. It supports full-public and authored group prediction with

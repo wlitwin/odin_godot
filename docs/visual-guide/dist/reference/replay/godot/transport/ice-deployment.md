@@ -1,6 +1,8 @@
 # ICE settings for party and Room connections
 
-`Party_Config.ice_json` supplies a bounded RTC configuration, copied when Party
+Use `Party_Config.ice_json` to configure STUN discovery and TURN relay services
+for RTC connections. ICE is WebRTC's process for selecting a reachable connection
+path. The field supplies a bounded RTC configuration, copied when Party
 opens and carried into `Room_Options.session.rtc.ice_json`. Room keeps that copy
 through authority changes and reconnects. Direct `Rtc_Config` / `Session_Options`
 users can continue supplying `ice_json` themselves. An empty value retains the
@@ -43,7 +45,7 @@ configuration object or its JSON string. The game calls `rtc_ice_settings`, vali
 and copies the value during setup. It is intentionally not read from URL query
 parameters, party invitations or saved enrollment records.
 
-The optional [authenticated relay provider](../../relay/README.md) now mints short-lived
+The optional [authenticated relay provider](../../relay/README.md) mints short-lived
 TURN credentials for enrolled members. `Party_Config.relay_credentials` enables
 background refresh and a source that refuses expired credentials when building new
 connections. Static ICE JSON remains available for other provider channels. Never
@@ -56,7 +58,7 @@ Errors shown by the games describe the configuration failure without echoing the
 JSON. The configuration's strings are owned by Party/Room/Rtc for their respective
 lifetimes; changing the caller's original buffer cannot alter a live configuration.
 
-Same-term gameplay reconnect now retains the authenticated RTC reservation in
+Same-term gameplay reconnect retains the authenticated RTC reservation in
 memory when scope/incarnation match. Actual relay-stop/restart gates preserve the
 logical peer ID and action ledger while rebuilding data channels. See
 [RTC recovery](rtc-recovery.md). This does not renew expired TURN credentials.

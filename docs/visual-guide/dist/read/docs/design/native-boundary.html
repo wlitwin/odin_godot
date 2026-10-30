@@ -24,8 +24,9 @@ generation or any layout fact differs, the library is rejected before <code>odin
 the old hot-reload generation remains active.</p>
 <p>This does not promise that every Odin release can compile every odin_godot checkout. Source
 and compiler API changes are ordinary build-time compatibility constraints. The Nix-pinned
-compiler remains the tested recommendation, especially before Odin 1.0, but it is no longer an
-artificial binary lock when the produced ABI is demonstrably identical.</p>
+compiler remains the tested recommendation, especially before Odin 1.0. The loader
+checks binary compatibility through the ABI contract rather than requiring an
+identical compiler version string.</p>
 <h2 id="boundary-inventory-and-ownership">Boundary inventory and ownership<a class="heading-anchor" href="#boundary-inventory-and-ownership" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -107,5 +108,5 @@ or allocator to a boundary type.</li>
 identical fingerprint loads, while a doctored descriptor layout is refused and the running
 generation remains intact.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/native-boundary.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/native-boundary.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#compatibility-rule" class="">Compatibility rule</a><a href="#boundary-inventory-and-ownership" class="">Boundary inventory and ownership</a><a href="#performance" class="">Performance</a><a href="#changing-the-contract" class="">Changing the contract</a></nav><div class="outline-actions"><a href="../../../reference/docs/design/native-boundary.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

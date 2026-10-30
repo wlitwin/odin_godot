@@ -1,6 +1,8 @@
 # Compact latest observations
 
-Latest-observation models can negotiate protocol-7 feature value **2048** and
+Compact observations reduce wire size for canonical values with many zero bytes.
+Latest-observation models, which submit a current sample for the next authority
+tick, can negotiate protocol-7 feature value **2048** and
 envelope kind **26**, `Observation_Compact`. The logical Observation schema,
 model contract, accepted controls, scheduling, view validation and checkpoints
 are unchanged. The sender keeps the same observation cadence.

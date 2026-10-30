@@ -1,7 +1,9 @@
 # Checked API recipes
 
-`recipes.odin` instantiates the documented Session, Party→Room and admitted
-P2P→Runner flows with the existing Hello/Duel models. It is a compile-checked
+`recipes.odin` instantiates three documented flows with the existing Hello/Duel
+models. Session runs a direct network simulation; Party stores enrollment before
+opening a Room for coordinated authority recovery; admitted P2P binds authenticated
+peers to a runtime that exchanges inputs and retains simulation history. It is a compile-checked
 reference, not another game or a claim that compilation validates networking.
 The actual runnable counterparts are linked in [getting started](../../replay/getting-started.md).
 
@@ -9,7 +11,7 @@ The actual runnable counterparts are linked in [getting started](../../replay/ge
 nix develop --command bash tests/replay_recipes/run.sh
 ```
 
-Owners must remain at stable addresses. Pump Party before using its grant and
+The structs that own these runtimes must remain at stable memory addresses. Pump Party before using its grant and
 keep it alive while RTC/Direct borrows authorization. Consume all presentation
 changes before the next frame. Use Room for elected authority recovery; a direct
 Session save/resume does not elect or fence hosts. The examples return errors;

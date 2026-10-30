@@ -1,6 +1,7 @@
 # Build a game with Kit
 
-Kit starts from registered game entities. Their fields declare which machine
+Kit registers game objects as entities: script structs with a network identity.
+Their fields declare which machine
 writes each value and how it is synchronized. Commands express a player action
 that the authority can accept or reject. Use this path when the game's natural
 authoring unit is a Godot script entity.
@@ -52,7 +53,9 @@ item before adding an inventory, quest reward, or ownership transfer.
 
 ## Move fast state to authority when needed
 
-Hello Sim runs the square through Kit's simulation lane. Predicted fields use
+Hello Sim runs the square through Kit's simulation lane, which advances
+authoritative state at fixed ticks and replays local input after a correction.
+Predicted fields use
 `gd:"predict,interp"`; a pure `@(gd_tick)` procedure advances them from typed input.
 The authority runs the same tick and supplies corrections.
 

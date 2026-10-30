@@ -2,7 +2,8 @@
 
 `Simulation_Body2` / `Simulation_Body3` are for replayable World-owned motion.
 `Body2` / `Body3` plus `session_body*_frame/sample` are for cooperative Godot solver
-motion accepted through the existing ownership protocol. Keep one owner per node;
+motion accepted through the entity-ownership protocol. Keep one motion adapter
+per node;
 do not use both contracts concurrently or let an unrelated controller write its
 transform. Authored collision geometry/scale remains separate from the pose.
 

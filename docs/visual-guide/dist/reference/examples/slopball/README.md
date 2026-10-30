@@ -1,9 +1,10 @@
 # slopball — co-op physics soccer with Kit
 
-The kit's **engine-physics** exercise: everything the other examples replicate is
-hand-rolled kinematics; slopball's ball is a real `RigidBody2D` and its players are real
-`CharacterBody2D`s. It answers the question every Godot dev asks the kit first — *"can I
-just use physics bodies?"* — with `play.Puppet` plus one ownership rule.
+Use this Kit example to replicate Godot physics bodies: the ball uses
+`RigidBody2D` and the players use `CharacterBody2D`. `play.Puppet` connects the
+ball's solver state to Kit's owner stream. The entity owner—the player permitted
+to write its owner-controlled fields—simulates the ball and sends its pose and
+velocity to the other peers.
 
 ## The model
 
@@ -21,7 +22,8 @@ just use physics bodies?"* — with `play.Puppet` plus one ownership rule.
 
 ## Run it
 
-Two windows on one machine (build once with `bash ../../build/build_scripts.sh .`):
+From `examples/slopball`, build once with `bash ../../build/build_scripts.sh .`,
+then open two windows on one machine:
 
 ```sh
 SLOP_NAME=lefty  godot --path .    # Host
@@ -33,8 +35,8 @@ defend the left goal, even the right.
 
 ## The feel ledger
 
-Seven layers of stutter hid under each other, each found by live playtest and
-fixed at the right layer. The short version, for the next physics game:
+The example applies seven measures to avoid stutter during ownership changes
+and display frames:
 
 1. **RigidBody2D ignores node transform writes** — live ones are stomped by the
    server sync; frozen ones vanish when the freeze lifts. Every imposed pose
@@ -49,7 +51,7 @@ fixed at the right layer. The short version, for the next physics game:
 5. **Smooth corrections, never authority**: the body snaps to truth; the drawn
    skin glides in (~63ms half-life). Deliberate cuts snap outright.
 6. **Predict possession**: `puppet_claim` seizes the sim the frame your screen
-   sees the touch; the host confirms (seamless) or denies (smoothed snap).
+   sees the touch; the host confirms it or denies it with a smoothed correction.
 7. **The last stutter wasn't netcode**: physics-tick stepping vs display
    refresh. `physics/common/physics_interpolation=true`, reset it at cuts,
    and never lerp an angle across the ±π wrap.
@@ -57,7 +59,7 @@ fixed at the right layer. The short version, for the next physics game:
 ## Automated tests
 
 - `run.sh` — solo gate (`SLOPBALL_SINGLE_OK`): the striker bot runs the whole loop
-  headless. The repo's only exercise of the 2D physics *solver* under `--headless`.
+  headless, exercising the 2D physics *solver* under `--headless`.
 - `native_run.sh` — 3-peer integration test (`SLOPBALL_NATIVE_OK`): host + striker + watcher. The
   seat transfer lands on all three screens, the striker's local solver scores, and the
   three screens agree on the ball within a few pixels at the same session tick.

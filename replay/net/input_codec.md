@@ -1,6 +1,8 @@
 # Compact scheduled-input windows
 
-Protocol 7 adds envelope kind 15, `Inputs_Compact`. It carries the same generation,
+Compact scheduled-input windows reduce repeated control and aim data without
+changing the ticks a client submits. Protocol 7 adds envelope kind 15,
+`Inputs_Compact`. It carries the same generation,
 checkpoint serial, ordered ticks, controls and view stamps as the full kind-4
 packet. The sender keeps the same eight-sample redundancy window and sends at the
 same cadence. Every packet contains its own first sample, so dropping or reordering

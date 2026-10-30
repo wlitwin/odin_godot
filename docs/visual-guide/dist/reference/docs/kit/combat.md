@@ -83,7 +83,7 @@ with doomed commands. [kit/ui](ui.md)'s ability bar renders the same `cds` and d
 For the common cases the [`play`](play.md) blocks are the default:
 
 - **`play.Health`** instead of a raw hp field plus `hit`: you get max, the damage edge,
-  and frac for free.
+  and the current health fraction in one block.
 - **`play.Ability`** instead of a `Cooldowns` slot plus a hand-written command: the cast
   command is generated onto the embedding entity, the cooldown knob replicates, and the
   applied-vs-rejected semantics are already right.
@@ -165,7 +165,8 @@ the throw command carries the caster's own origin, leashed:
 leash :: proc "contextless" (claimed, anchor: [3]f32, r: f32) -> [3]f32
 ```
 
-Honest latency offsets pass untouched; teleport-cheese gets dragged back to arm's length.
+Origins within the permitted latency offset pass unchanged; larger displacements
+are clamped to the allowed distance.
 Run it in the command proc itself: on the caster's own prediction `claimed == anchor` and
 it is a no-op, so there is no role branch (`spelunker_throw` in `spelunker.odin`).
 
@@ -223,12 +224,11 @@ invoking callbacks: the handler only *files* into
 [`ksess.App_Queue`](session.md#the-riders-queue-appq) (the same queue
 comms, xfer, and the album use), and the game drains with `fire_poll` each frame on its
 own stack. The lane reaches **every screen, the host's included**: `fire_announce` loops
-the announcement back into the host's own route (the same drain every client uses), so
-nobody hand-draws other players' fires at the announce site anymore. What lands in the
-queue is exactly "a fire this screen has not drawn yet": a `predicted` fire skips only
-its own shooter's echo, a host-authored instant (`predicted = false` — a nova, a
-reaction) draws everywhere under its causer's honest name (the lane used to force
-`shooter = host` to reach the caster's screen), and non-host authors are dropped.
+the announcement back into the host's own route, using the same drain as clients.
+The queue receives fires this screen has not drawn yet: a `predicted` fire skips
+its own shooter's echo, while a host-authored instant (`predicted = false`, such
+as a nova or reaction) draws everywhere with its actual causer. Announcements
+from non-host authors are dropped.
 
 ```odin
 // host, when the command hook confirms a cast:
@@ -259,8 +259,8 @@ session's lifetime.
 ## Predicted hp
 
 When your local rock visually contacts a body, the health you *display* may dip
-immediately, but the replicated hp field is never touched, so phantom damage is
-impossible. The dip lives in an overlay:
+immediately. The dip lives in a presentation overlay and cannot change
+authoritative health:
 
 ```odin
 Predicted_Hp :: struct {

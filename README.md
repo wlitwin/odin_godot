@@ -1,13 +1,12 @@
 # odin_godot
 
 **Write Godot scripts in [Odin](https://odin-lang.org/).** odin_godot is a Godot 4.7
-GDExtension that implements the full `ScriptLanguageExtension` API, so a `.odin` file is a
-**first-class Godot script**: attach one to a Node, and its `_ready` / `_process` / signals /
-`@export` vars run as **compiled, AOT native Odin**, dispatched through a typed registry (no
-interpreter, no per-call string marshalling). It is built to **replace GDScript** for a
-project: lifecycle, `@export` of every Variant type, custom methods, signals, `extends` any
-class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, hot reload, and
-**native + WebAssembly** export, all reproducible from a single Nix flake.
+GDExtension implementing the `ScriptLanguageExtension` API. Attach a `.odin` file
+to a Godot node; generated registration connects its lifecycle procedures,
+methods, signals, and Inspector properties to the engine. Scripts compile ahead
+of time to native code and dispatch through a typed registry. The SDK supports
+custom resources, autoloads, editor tools, multiplayer RPCs, hot reload, and
+native and WebAssembly exports. A Nix flake pins the development toolchain.
 
 > **Status: working engine.** `nix develop --command bash tests/run_all.sh` is green across a
 > 39-test end-to-end suite (every feature below, plus the showcase, the examples' co-op runs,
@@ -49,9 +48,8 @@ coin_collect :: proc(self: ^Coin, body: gd.Node2d) {
 }
 ```
 
-You get the **whole engine API** as typed Odin (the generated `godot` binding), a curated
-`gd.*` ergonomic layer for the common one-liners, and GDScript parity for the things that
-matter:
+The generated `godot` binding exposes the engine API as typed Odin. The `gd.*`
+helpers wrap common engine calls and their argument conversions:
 
 | | |
 |---|---|
@@ -63,7 +61,7 @@ matter:
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
 | **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)); [named profiles](docs/kit/profiles.md) validate coherent co-op, listen-server, or dedicated settings. `@(gd_rpc)` remains available for Godot's engine-native path. |
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
-| **Scale it** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
+| **Scale it** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules |
 
 Because Odin is **ahead-of-time compiled**, it differs from interpreted GDScript in a few
 ways: no `eval`/REPL, no in-editor breakpoints (use `lldb`), and `@export` changes need a
@@ -93,7 +91,7 @@ New here? Start with **[Getting Started](docs/getting-started.md)**: it installs
 toolchain, wires the extension into a Godot project, and walks you through your first Odin
 script from empty file to a moving node. Here for multiplayer? The
 **[quickstart](docs/kit/quickstart.md)** goes zero-to-two-windows in two small files, and
-its **[sim twin](docs/kit/quickstart-sim.md)** promotes the same game to server authority.
+its **[simulation version](docs/kit/quickstart-sim.md)** moves motion to server authority.
 Choose its trust and timing baseline from the **[network profiles](docs/kit/profiles.md)**.
 
 ## Documentation
@@ -107,7 +105,7 @@ searchable reference. For a playable example, **[try Scrapyard in your browser](
 | **[docs/index.md](docs/index.md)** | The documentation map: start here to navigate |
 | **[Getting Started](docs/getting-started.md)** | Install the toolchain, add the extension to a project, write + attach your first script |
 | **[Authoring Guide](docs/authoring-guide.md)** | The feature reference: struct convention, `//gd:` markers, `@export` (all types/hints/groups/defaults), lifecycle, methods, signals, `@(gd_connect)`, `@(gd_rpc)`, `@onready`, resources, autoloads, cross-script, the `gd.*` helper catalog, editor tooling |
-| **[Workflow](docs/workflow.md)** | The dev loop: build, live-edit (show-on-save recompile), editor DX (validation/autocomplete/highlighting), debugging (`gd.print`, `lldb`, crash backtraces), and the honest AOT limitations |
+| **[Workflow](docs/workflow.md)** | The development loop: build, reload on save, editor validation/completion/highlighting, debugging (`gd.print`, `lldb`, crash backtraces), and AOT limitations |
 | **[Exporting](docs/exporting.md)** | Shipping: native desktop export and web/WASM export (COOP/COEP) |
 | **[Distribution](docs/distribution.md)** | Building the drop-in addon (`nix build`), cross-compiling the core for Linux/Windows, the consumer install workflow, per-platform status |
 | **[Debugging](docs/debugging.md)** | The full `lldb` + crash-backtrace reference |
@@ -119,7 +117,7 @@ searchable reference. For a playable example, **[try Scrapyard in your browser](
 **[Play Scrapyard on itch.io](https://itchyitches.itch.io/scrapyard)** to try an Odin +
 Godot arena shooter in the browser. The repository also includes the
 [Replay Scrapyard port](examples/replay_scrapyard/contributor-guide.md), with a visual
-guide to its authored scenes, replayable world, input, and presentation.
+guide to its authored scenes, replayable World, input, and presentation.
 
 **Building multiplayer? Start with the [Kit overview](docs/kit/index.md).** These
 three are its references:
@@ -131,8 +129,8 @@ three are its references:
 - **`examples/slopball/`** is the smallest complete kit game: a physics co-op ball pitch
   (~850 lines), engine physics replicated through `play.Puppet`. Start here to see the
   whole multiplayer surface in one sitting.
-- **`examples/slopball3d/`** is the same pitch in 3D: proof the toolkit's model is
-  dimension-blind (`play.Puppet3`, Node3D containers).
+- **`examples/slopball3d/`** uses the same replication model with 3D bodies
+  (`play.Puppet3`, Node3D containers).
 
 Single-player and engine-plumbing references:
 

@@ -1,7 +1,8 @@
 # Angular correction smoothing
 
-`Smoother2` and `Smoother3` now retain rotational correction error as local
-presentation state, alongside positional error. Read complete detached poses:
+Use `Smoother2` and `Smoother3` to ease displayed poses toward same-tick
+corrections. They retain rotational correction error as local presentation state,
+alongside positional error. Read complete detached poses:
 
 ```odin
 // before and after belong to the SAME simulation tick.
@@ -13,7 +14,7 @@ shown2 := view.smooth_present(&smoother2, current2, render_dt)
 shown3 := view.smooth3_present(&smoother3, current3, render_dt)
 ```
 
-The new correction calls return false on invalid inputs without changing the
+The correction calls return false on invalid inputs without changing the
 smoother. Initialize by presenting a valid pose before applying corrections.
 2D uses radians and the shortest signed angular difference. 3D uses x/y/z/w
 quaternions, normalizes valid nonzero values and treats q and −q as equivalent.

@@ -1,7 +1,9 @@
 # Owner-streamed values
 
-`State(Value)` stores ownership, current value, sample frontiers and pending handoff
-in ordinary replayable world state. `Sample(Value)` is an external observation;
+Use owner streams when an authenticated participant produces observations, such
+as a Godot solver pose, that the authority accepts into replayable state.
+`State(Value)` stores entity ownership, current value, sample frontiers and
+pending handoff in ordinary replayable world state. `Sample(Value)` is an external observation;
 the library never invokes a physics solver during replay. `Rules(Value)` supplies
 immutable validation policy outside the saved state.
 
@@ -44,7 +46,7 @@ The Godot [Body2](../godot/scene/body2.md) and [Body3](../godot/scene/body3.md) 
 actual rigid/character handling.
 The [profile design](../../docs/replay/owner-streams.md) and separate
 [Replay Slopball](../../examples/replay_slopball/README.md) describe integration and
-the tested envelope. This supports cooperative trust models. It does not make Godot
+the tested configurations. This supports cooperative trust models. It does not make Godot
 contact solving deterministic, provide competitive anti-cheat, or turn live engine
 casts into historical collision queries.
 

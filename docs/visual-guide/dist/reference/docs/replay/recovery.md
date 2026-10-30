@@ -1,19 +1,20 @@
 # Replay checkpoint and recovery contract
 
-Replay now has a durable authority archive and explicit save/resume APIs. A saved
-world can be restored by a fresh process with its player reservations, room rules,
-and action frontiers intact. This is the shared foundation for M4 saves and M5
-migration. Bounded checkpoint replication to an explicitly trusted peer now has
-native and real ENet gates. The coordinator decision model and runner permits now
-also have native/Godot gates. Authenticated control RPCs, a SQLite backend, and a
-real-process simulation handoff/coordinator-restart gate now exist. The Room driver
-also has native/browser planned/crash, old-owner return, repeated handoff,
-control-partition and successor-loss gates. Durable provisioning, checkpoint
-publication and cold restore are implemented. See the [framework audit](framework-audit.md)
-for evidence and remaining deployment/recovery limits.
+A Replay authority archive lets a fresh process restore the World, player
+reservations, room rules, and action frontiers from a checkpoint. Recovery
+combines that state with an authorized successor, a newer authority epoch, and
+a handshake that reconciles surviving clients. An archive alone does not elect
+an authority or recover work accepted after its capture tick.
+
+The implementation includes bounded replication to an explicitly trusted peer,
+authenticated coordinator RPCs with SQLite storage, durable provisioning,
+checkpoint publication, and cold restore. Native and browser gates cover planned
+and crash handoff, old-owner return, repeated handoff, control partition, and
+successor loss. The [framework audit](framework-audit.md) records the evidence
+and remaining deployment/recovery limits.
 
 The [explicit protocol-6 to 7 archive bridge](../../replay/net/checkpoint_upgrade.md)
-now preserves compatible worlds while validating the old contract. It grants no
+preserves compatible Worlds while validating the old contract. It grants no
 new lease; coordinated upgrade remains an application transition. Normal loaders
 continue to reject incompatible versions.
 
@@ -102,7 +103,7 @@ replay of every input after a crash requires a separate accepted-decision log.
 Already executed gameplay is in the frame. Recent verdicts and settled/received
 frontiers prevent accepted sequence IDs from being applied again. Lost work after
 the archive tick is outside this guarantee. A surviving client that observed such
-work needs the planned recovery handshake to reconcile its newer frontier; simply
+work needs the recovery handshake to reconcile its newer frontier;
 changing its epoch is not a complete abrupt-recovery protocol.
 
 ## Wire/file format
@@ -123,7 +124,7 @@ malformed/truncated/oversized/wrong-content archive cannot partially install a
 world. The checksum detects accidental corruption; it is not authentication.
 
 Schema/content/version mismatches currently reject the archive. There is no
-automatic schema upgrade. Future converters must explicitly decode an old schema,
+automatic schema upgrade. Converters must explicitly decode an old schema,
 convert the complete frame/session contract, validate the new result, and retain
 the old file until a new archive has been successfully written.
 

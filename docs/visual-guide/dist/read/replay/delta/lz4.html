@@ -12,8 +12,8 @@ or cross-message compression dependency beyond the acknowledged base.</p>
 <p>The encoder stages one complete pass in its workspace before changing output.
 Its workspace contains the 16,384-byte hash table and a 65,808-byte output bound
 (82,192 bytes total). Short encoder output returns the required size without
-writing the caller&#39;s destination. This replaces the previous second match-search
-pass with a copy of the completed block. The decoder still preflights before writing. The decoder bounds literal/match lengths, validates
+writing the caller&#39;s destination. A successful encode copies the completed block
+to the destination. The decoder bounds literal/match lengths, validates
 backreferences and the exact decoded length, and checks the LZ4 terminal conditions
 before writing. Output may not overlap inputs; the encoder workspace may not overlap
 any input/output. A failed operation may change scratch workspace, never output.</p>
@@ -32,5 +32,5 @@ implementation as an exact-byte reference. Explicit decoder word-copy/XOR experi
 were slower in the synthetic corpus and were not adopted; decoder behavior/code
 remains unchanged by the staging optimization.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_lz4_staging/README.html"><span>LZ4 staging comparison</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/delta/lz4.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_lz4_staging/README.html"><span>LZ4 staging comparison</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/delta/lz4.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/delta/lz4.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

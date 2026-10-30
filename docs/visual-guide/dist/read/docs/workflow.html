@@ -8,8 +8,7 @@
 limitations first, since they shape everything else.</p>
 <h2 id="odin-scripts-are-aot-compiled">Odin scripts are AOT-compiled<a class="heading-anchor" href="#odin-scripts-are-aot-compiled" aria-label="Link to this section">#</a></h2>
 <p>Your <code>.odin</code> scripts compile to a native shared library (<code>.dylib</code> / <code>.so</code> / <code>.dll</code>) that the
-engine loads through the GDExtension boundary. <strong>There is no interpreter.</strong> GDScript is
-interpreted; Odin is not. That single fact decides what works and what doesn&#39;t:</p>
+engine loads through the GDExtension boundary. <strong>There is no interpreter.</strong> The compile and library-loading steps determine the workflow:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -90,7 +89,7 @@ the scripts dll for you:</p>
 <ol>
 <li><strong>On save</strong>, the editor (and only the editor, since a running/exported game never
 recompiles) kicks a <strong>background</strong> rebuild of the scripts dll on a worker thread, so the UI
-never freezes while <code>odin build</code> runs (a few seconds). Rapid saves coalesce into one rebuild.</li>
+can continue processing while <code>odin build</code> runs (a few seconds). Rapid saves coalesce into one rebuild.</li>
 <li><strong>When the build finishes</strong>, on the next editor frame the dll is hot-swapped in place: live
 instances re-bind and <strong>keep their state</strong>, and the Inspector&#39;s property lists refresh, so
 a freshly-added <code>@export</code> appears <strong>without restarting the editor</strong>.</li>
@@ -116,8 +115,7 @@ nor hashes unrelated modules before rebuilding + swapping <strong>only the modul
 changed</strong>. Coalesced saves retain every affected root. A save in <code>res://modules/enemies/</code>
 recompiles that one dll, leaving the main module and every other module&#39;s dll (instances,
 package globals, all of it) untouched. A slower background reconciliation still catches
-external edits and deletions that did not produce a save callback. That&#39;s what keeps save
-latency flat in large projects; the swapped module&#39;s own package globals reset (fresh dll).
+external edits and deletions that did not produce a save callback. This avoids rebuilding unrelated modules; the swapped module&#39;s own package globals reset (fresh dll).
 The one exception is a save under
 <code>res://shared/</code>, the <a href="modules.html#shared">read-only vocabulary tree</a> every module may import:
 that rebuilds and swaps <strong>every</strong> module, because any of them may be compiled against it.
@@ -194,7 +192,7 @@ lines isn&#39;t tracked across them.</p>
 <code>.odin</code> scripts are recognizable rather than showing the generic script glyph. Override the
 default per project with the <strong><code>odin_godot/default_icon</code></strong> setting (point it at your own icon,
 or <code>&quot;&quot;</code> to use the engine generic). The default is existence-checked, so a non-standard install
-without the icon simply shows the generic one.</p>
+without the icon shows the generic one.</p>
 <h3 id="find-in-files">Find in Files<a class="heading-anchor" href="#find-in-files" aria-label="Link to this section">#</a></h3>
 <p>The script editor&#39;s <strong>Find in Files</strong> (Ctrl/Cmd+Shift+F) searches <code>.odin</code> files. Godot&#39;s
 search file-type list is a hardcoded set (<code>gd</code>, <code>cs</code>, <code>gdshader</code>) with no hook for a
@@ -335,5 +333,5 @@ your day-to-day stack view. See <a href="debugging.html">Debugging</a> for the f
 (<code>gd.print</code> → the JS console) and browser devtools. See <a href="exporting.html">Exporting</a>.
 &lt;/content&gt;</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="debugging.html"><span>Debugging Odin scripts</span><span aria-hidden="true">→</span></a><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/workflow.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="debugging.html"><span>Debugging Odin scripts</span><span aria-hidden="true">→</span></a><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/workflow.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#odin-scripts-are-aot-compiled" class="">Odin scripts are AOT-compiled</a><a href="#building" class="">Building</a><a href="#live-editing-show-on-save" class="">Live editing (show-on-save)</a><a href="#editor-dx-validation-autocomplete-highlighting" class="">Editor DX (validation, autocomplete, highlighting)</a><a href="#live-error-squiggles-_validate" class="subsection">Live error squiggles (_validate)</a><a href="#autocomplete-_complete_code-backed-by-ols" class="subsection">Autocomplete (_complete_code, backed by ols)</a><a href="#syntax-highlighting" class="subsection">Syntax highlighting</a><a href="#icons" class="subsection">Icons</a><a href="#find-in-files" class="subsection">Find in Files</a><a href="#generated-files-are-hidden-in-the-filesystem-dock" class="subsection">Generated files are hidden in the FileSystem dock</a><a href="#editor-settings-reference" class="subsection">Editor settings reference</a><a href="#debugging" class="">Debugging</a><a href="#logging-gdprint--gderror--gdwarn" class="subsection">Logging: gd.print / gd.error / gd.warn</a><a href="#native-debugging-with-lldb" class="subsection">Native debugging with lldb</a><a href="#other-editors-and-ides" class="subsection">Other editors and IDEs</a><a href="#crashes-and-panics-are-reported-automatically" class="subsection">Crashes and panics are reported automatically</a><a href="#web--wasm" class="subsection">Web / wasm</a></nav><div class="outline-actions"><a href="../../reference/docs/workflow.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

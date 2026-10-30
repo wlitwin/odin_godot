@@ -1,10 +1,18 @@
 # Replay implementation progress
 
-The active priority is [framework completion](framework-completion.md), following
-the user's 2026-09-20 direction to defer exhaustive parity across every game.
-The original [roadmap](roadmap.md), separate ports and comparisons remain references.
-Preserve the original frameworks/projects and their separately runnable Replay ports.
-Update this file with actual evidence, not planned capability.
+This is a dated implementation record for framework contributors. Each entry
+records the APIs, tests, failures, and open work at that point; words such as
+"current", "now", and "remaining" refer to the entry's date. Older entries can
+therefore describe gaps that later entries close. Test counts, timings, hashes,
+and compatibility scopes are retained as evidence, not current guarantees.
+
+The 2026-09-20 [framework completion](framework-completion.md) scope defers
+exhaustive parity across every game. Use the [release assessment](release-assessment.md)
+and [support envelope](../../replay/support.md) for that decision and its limits;
+use [getting started](../../replay/getting-started.md) for the current authoring path.
+The original [roadmap](roadmap.md), separate ports, and comparisons remain references.
+Keep original projects and their Replay ports independently runnable. Add only
+observed evidence to this log.
 
 ## Framework-first closure assessment — 2026-09-20
 

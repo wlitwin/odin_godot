@@ -1,6 +1,12 @@
 # Replay Scrapyard — canonical editor-first example
 
-**New contributor? Start with the [visual contributor guide](contributor-guide.md):**
+Run `nix develop --command bash examples/replay_scrapyard/play.sh` from the
+repository root, then choose Solo to try the game. Scrapyard calls its player
+characters **runners** and its guns **irons**. Replay's runtime runner is separate:
+it schedules simulation steps and manages input/history. Godot presents the
+resulting state and effects through authored scenes.
+
+**Start with the [visual contributor guide](contributor-guide.md):**
 run the game, learn the state boundaries, follow a turret from input to scene,
 and choose a first change with the right tests.
 
@@ -168,10 +174,11 @@ Equip shared turret to deploy one; press T nearby to mount/release, then aim/fir
 normally. Its last round despawns it and automatically dismounts the operator.
 Project name, custom user-data directory and port are separate from the original.
 
-One value-world reducer handles roster/profile actions, readiness, start/drop-in,
+One reducer—a function that applies inputs to gameplay values—handles
+roster/profile actions, readiness, start/drop-in,
 movement, dash, gun mechanisms, enemies, projectiles, drops and events. Server
 authority and local prediction replace the original's owner-streamed movement;
-remote runners use the observed view clock.
+remote player characters are displayed using the observed view clock.
 The model never calls Godot. Arena rendering and collision use the same saved cover
 list, and camera/animation/smoothing do not modify it.
 

@@ -1,10 +1,14 @@
 # Replay server/client runner
 
-`replay/net` connects a complete-world simulation to canonical codecs,
-transport-owned peer identities, prediction, authoritative correction, and the
-presentation journal. It is an experimental M3 implementation with acknowledged
-snapshot deltas and compact facts. Broader admission/recovery review and the later
-roadmap capabilities remain open work.
+Use `replay/net` to run a game with an authority that accepts shared gameplay
+results and clients that predict local state. The runner schedules simulation
+steps and manages input, history, network delivery and correction. It connects a
+complete-world simulation to canonical codecs, transport-owned peer identities
+and an identity-aware presentation journal.
+
+The API remains experimental. The sections below describe implemented contracts
+and their tests; the [framework audit](../../docs/replay/framework-audit.md) tracks
+broader admission, recovery and release acceptance.
 
 `Model.control_timing` defaults to `Scheduled`. The explicit `Latest_Observation`
 profile sends one current control sample, coalesces newer producer ticks into the
@@ -48,7 +52,7 @@ observers. It refuses unscoped player prediction when the public projection omit
 state. [Recipient views](replication.md) can filter snapshots, controls and events
 for players with validated prediction groups, or for observers.
 Authored group projection, footprint validation and timestamped boundary values
-now have initial native and Claimball gates. Broader group policies remain M6 work.
+have initial native and Claimball gates. Broader group policies remain M6 work.
 
 On authority correction, the current full-world runner replaces older remote
 held-input guesses in the replayed suffix using the snapshot's held-input boundary.
@@ -70,7 +74,7 @@ An optional [profiling clock](profiling.md) records replay wall time/depth and
 histogram bounds without entering simulation or the network contract. Godot
 Sessions install it automatically.
 
-A complete snapshot ahead of a briefly stalled client can now be adopted directly
+A complete snapshot ahead of a briefly stalled client can be adopted directly
 when all intervening authoritative facts remain available. The runner preserves
 the journal and action queues, reprojects the group and rebuilds bounded prediction
 lead. `Stats.snapshot_catchups` records this path; it does not require a full
@@ -128,11 +132,11 @@ their existing reliability policy.
 - Tokens are bearer reconnect credentials, not account authentication or transport
   encryption. Supply unpredictable tokens and the appropriate transport/deployment
   policy. The Godot sample uses random tokens normally and deterministic labels
-  only for tests. `replay/godot.session_profile` now persists a local credential
+  only for tests. `session_profile` from `replay/godot/storage` persists a local credential
   separately from the checkpoint's roster of token hashes.
 - A stable seat is reserved across disconnect/reconnect. This initial version
   reserves seats until explicit release. `server_set_locked`, custom admission,
-  kick, ban/unban, and `server_release_seat` now supply basic room controls. Release
+  kick, ban/unban, and `server_release_seat` supply basic room controls. Release
   requires a disconnected seat with settled actions and a model `reset_player`
   callback; initialization for the next occupant occurs inside its joining tick.
   Bans survive reservation release and durable checkpoint recovery. Custom
@@ -182,7 +186,7 @@ action/event types and seat count, then pass it as `codec` to encode/decode.
 Destroy it once with `checkpoint_codec_destroy`. It retains schema programs, not
 game state. Every call still validates content, policy, values, and runtime contract;
 using a cache for a different type set is rejected. The uncached convenience path
-remains available and emits identical bytes. Recovery receivers and `Link` now
+remains available and emits identical bytes. Recovery receivers and `Link`
 keep these programs warm automatically.
 
 `client_authority` transitions a surviving client to an approved newer epoch.
@@ -219,9 +223,10 @@ match actual sent IDs/hashes within the current connection/checkpoint context.
 Facts encode only active occurrences, so empty ticks have a small header.
 
 `egress_bytes_per_second` and `egress_bytes_per_pump` bound outbound traffic. Peer
-iteration rotates; checkpoints/facts precede optional snapshots. The per-peer
-burst permits two seconds of traffic or at least one complete message. Deferral
-retains reliable work and lets newer state supersede unsent snapshots. Stats expose
+iteration rotates; checkpoints/facts precede optional snapshots. Per-peer burst
+credit is capped at a quarter-second of the configured rate or one complete
+protocol packet, whichever is larger; see [delivery under transport loss](#delivery-under-transport-loss).
+Deferral retains reliable work and lets newer state supersede unsent snapshots. Stats expose
 full/delta counts, saved bytes, baseline misses, rejected ACKs, and egress deferral.
 The protocol contract is now version 7, including compact scheduled-input windows,
 removal, fresh-seat semantics,
@@ -236,9 +241,9 @@ Snapshots larger than `unreliable_packet_limit` (1,200 bytes by default) use rel
 delivery so large full snapshots do not depend on lossy UDP fragmentation. Small
 deltas continue to use the superseding unreliable path. Each peer has at most one
 unacknowledged large snapshot; new large snapshots wait for its acknowledgement.
-Facts and small deltas may continue. Large snapshots receive reliable ACKs, with
-the usual heartbeat ACK as a fallback. A validated baseline miss releases the
-gate so an undecodable in-flight delta cannot prevent a replacement full state.
+Facts and small deltas may continue. Large snapshots use the same unreliable
+latest-state ACKs as smaller snapshots, with the periodic heartbeat ACK as a
+fallback. A validated baseline miss releases the gate so an undecodable in-flight delta cannot prevent a replacement full state.
 This bounds ordered state backlog during bootstrap and on slow connections;
 large-state update frequency is consequently limited by acknowledgement latency.
 
@@ -275,7 +280,7 @@ a Welcome/journal reset. The Godot Session facade presents those as confirmed
 action-result changes, so a stale/future action verdict survives a full resync.
 Ordinary fact-delivered results retain their existing presentation route.
 
-A same-epoch Welcome now rebases the existing presentation journal. Queued changes
+A same-epoch Welcome rebases the existing presentation journal. Queued changes
 survive, already confirmed watched effects mature at the new checkpoint, and
 abandoned speculative effects receive cancellations. The runner checks output
 capacity before installing the checkpoint; a full queue defers installation until
@@ -285,7 +290,7 @@ verdicts. First admission and authorized epoch changes retain their distinct
 initialization/reset behavior. Unknown effects in missing history are not invented;
 this preserves known obligations, not a complete effect log across arbitrary gaps.
 
-Scheduled clients now refine their welcome-time prediction lead from
+Scheduled clients refine their welcome-time prediction lead from
 [acknowledged-input turnaround and arrival margin](input_timing.md). Local send
 history is bounded, stale samples are rejected, and large excess lead can drain
 without retiming queued controls/actions. The existing `clock_scale` contract
@@ -309,7 +314,7 @@ the journal after pumping/stepping; the diagnostic record is not error recovery.
 
 A receive batch may itself span more than the fact ring, even when the transport
 retained complete snapshots and every needed event. Before an incoming valid fact
-would overflow that ring, the receiver now tries to apply a usable retained
+would overflow that ring, the receiver tries to apply a usable retained
 snapshot, mature its watched effects and rebuild prediction lead. This can release
 an older complete prefix even when a later fact is still delayed. Mid-batch work
 uses zero elapsed presentation time; the pump advances that clock once at its end.
@@ -407,7 +412,7 @@ the game UI. See the [save/discovery result](../../docs/replay/results/speedball
 
 ## Prediction limits and cooperative action timing
 
-Reaching `max_prediction` now returns `Capacity` from `client_step` and increments
+Reaching `max_prediction` returns `Capacity` from `client_step` and increments
 `Stats.stalls` while preserving the readable world, journal and queued actions.
 Continue pumping. An ordinary correction or complete ahead snapshot can resume
 prediction using retained facts; actual fact/history exhaustion still requests a
@@ -530,6 +535,6 @@ queued for the next pump. Crossing the budget no longer discards reliable facts 
 actions. Existing packet/byte limits and transport storage bounds remain intact.
 
 
-Latest-observation clients now negotiate [packet-local sparse observations](observations.md)
+Latest-observation clients negotiate [packet-local sparse observations](observations.md)
 when both peers support them. Canonical values, cadence, admission and checkpoint
 contracts stay unchanged; old peers and dense values use the full packet.

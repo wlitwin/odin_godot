@@ -1,9 +1,12 @@
 # View pool foundations
 
-The [Godot bridge goal](../../../docs/replay/godot-bridge-plan.md) adds typed
-entity bindings and detached projections above the existing `Nodes2` owner.
+Use view pools to give live entities Godot scenes and retire those scenes when
+the entity identity ends. `Nodes2` manages scene instances by key; typed pools
+add entity generation handles, detached display values and callback bindings.
+The [Godot bridge goal](../../../docs/replay/godot-bridge-plan.md) describes that
+layering.
 
-`Nodes2` now uses bounded indexed identity lookup, with a separate preflight index
+`Nodes2` uses bounded indexed identity lookup, with a separate preflight index
 for each presentation batch. Zero and duplicate keys are rejected before changing
 scene instances. Retained keys retain their node; absent identities retire before
 new ones allocate, so a full pool can replace every identity in one call. The map

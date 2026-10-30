@@ -22,17 +22,15 @@ Chest :: struct {
 }
 ```
 
-Inventory replication comes for free: slots ride the [kit/net](net.md) shadow-delta walk
-like any other POD field, so chest state reaches every peer without one line of new wire
-code, and reject-truth snapshots carry the whole inventory back when a prediction loses a
-race.
+Tag the inventory as replicated state. Slots then use the [kit/net](net.md)
+shadow-delta walk like other fixed-layout fields. Predicate rejections carry
+authoritative inventory state back when a prediction loses a race.
 
 Every operation is **deterministic and allocation-free**. They run inside `@(gd_command)`
 procs, so the predicting client and the host execute the same op from byte-identical args
 and land on identical slots. Two players grabbing the same last item both predict success;
 the host runs them in arrival order, the second op finds the slot empty and rejects, and the
-loser's optimistic state reverts. Conflict resolution is just the intent pipeline: there is
-no separate reconciliation code.
+loser's optimistic state reverts. The command pipeline returns the verdict and applies the correction.
 
 Item **definitions are code, not wire**: every peer registers the same table in `ready()`
 (ids are game constants), so only 4-byte slots ever ship.
@@ -164,7 +162,7 @@ table.
 
 For inventories where the SHAPE matters (2x3 rifles, 3x3 crates, attaché-case
 Tetris), `packing.odin` adds a second board type with the same replication
-story: a packed inventory is a fixed array of 10-byte `Packed_Entry` values
+mechanism: a packed inventory is a fixed array of 10-byte `Packed_Entry` values
 inside a replicated struct, and board dimensions are game constants passed to
 the ops.
 

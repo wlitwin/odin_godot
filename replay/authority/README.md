@@ -1,14 +1,17 @@
 # Replay authority decisions and leases
 
-This package supplies the coordinator state machine, correlated leases, and owned
-takeover preparation for M5. The network runner now enforces the resulting permit
-at gameplay boundaries. An authenticated coordinator service and SQLite durable
-store now have native and real-process gates. The [Room driver](../godot/room.md)
-now passes initial planned/crash migration gates with surviving Cavecrawl clients;
-the full M5 failure matrix and provisioning flow remain open.
-See [service and storage](service.md) for the new API and deployment contract.
-The [admission backend](../provision/README.md) now provides durable invite/join
-transactions and live service credential installation; public provisioning remains open.
+Use this package to decide which process may accept a room's gameplay results,
+and to transfer that authority when its process stops or hands off. A coordinator
+grants time-limited leases; the network runner checks their permits at gameplay
+boundaries. Prepared checkpoints let an eligible successor restore the exact
+state approved by the coordinator.
+
+See [service and storage](service.md) for authenticated RPC and SQLite storage,
+the [Room driver](../godot/room.md) for live-session integration, and the
+[admission backend](../provision/README.md) for durable invite/join transactions.
+The validation sections below retain the scope of the initial M5 integration
+gates. Use the [compatibility map](../compatibility.md) for current formats and the
+[framework audit](../../docs/replay/framework-audit.md) for the current failure matrix.
 
 ## Decision model
 
@@ -120,8 +123,8 @@ predicting/advancing ticks, and issuing gameplay sends. `Timeline.advance` also
 checks an optional `Commit_Gate` after simulation but **before** publishing the
 candidate. Rejection preserves the entire history ring, including its oldest slot,
 and the action frontier. Client prediction also restores its action's pending flag.
-This is deliberately not an advance-then-rewind workaround, which would already
-have overwritten the oldest frame when the ring is full.
+Checking before publication preserves the oldest frame even when the ring is
+full; rewinding after publication would be too late to recover it.
 
 `net.Error.Fenced` is an expected pause. Godot `Session` exposes `session.fenced`,
 stops ticking and clears clock backlog, and allows the application to keep its
@@ -135,13 +138,16 @@ participants and authenticated coordinator calls, not Byzantine host resistance.
 `Prepared` owns canonical archive bytes independently of the receiver's recyclable
 slots. `prepared_restore` requires a live owner lease whose recovery point exactly
 matches them, verifies the bytes, and restores a fresh server with the permit and
-new epoch. The caller provides the selected game seat/policy adapter; a future
-session driver will map the authenticated member to its stable game token/seat.
+new epoch. The caller provides the selected game seat/policy adapter. The
+[Room driver](../godot/room.md) maps the authenticated member to its stable game
+token and seat.
 
 Requiring permits is part of the handshake contract and survives checkpoints.
-The current experimental network protocol is **5**, archive format **3**, control
-RPC **2**, and decision record **3**. Earlier Replay archives are rejected; no automatic converter is
-claimed. Original Kit saves/projects are unaffected.
+The initial integration described here used experimental network protocol **5**,
+archive format **3**, control RPC **2**, and decision record **3**. Its loader
+rejected earlier Replay archives and provided no automatic converter. Original
+Kit saves/projects were unaffected. See the [compatibility map](../compatibility.md)
+for current rejection and conversion rules.
 
 ## Validation and remaining integration
 

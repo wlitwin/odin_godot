@@ -1,7 +1,8 @@
 # Authenticated checkpoint transfer
 
-`replay/provision/checkpoint` connects durable room storage to authenticated
-upload, download and status operations. It reuses `replay/transfer` for bounded,
+Use `replay/provision/checkpoint` to publish or retrieve a room checkpoint
+through authenticated upload, download and status operations. It connects those
+operations to durable room storage. It reuses `replay/transfer` for bounded,
 retriable chunks. A per-room `Server` borrows the existing authority service and a
 typed storage backend; a `Client` borrows the registered process's control
 connection. Ordinary transfer operations grant no authority. Protocol 2 adds a
@@ -127,14 +128,14 @@ protocol package also checks for WASM.
 
 ## Remaining integration
 
-The [standalone room service](../../../examples/replay_room_service/README.md) now
+The [standalone room service](../../../examples/replay_room_service/README.md)
 registers deployment-selected Cavecrawl, Speedball and Scrapyard backends through
 the bounded checkpoint Hub. Native TLS gates verify each actual game model across
-service restart. [Room/Party save handling](../../godot/room_save.md) now owns
+service restart. [Room/Party save handling](../../godot/room_save.md) owns
 status, capture, publication and retries, with native/browser Cavecrawl acceptance.
-Room/Party now drives the full guarded restore lifecycle, with actual Cavecrawl
+Room/Party drives the full guarded restore lifecycle, with actual Cavecrawl
 resume/retry UI and native/browser acceptance. Other game paths and durable external
-assets beyond the bounded package profile still need integration. Scrapyard now
+assets beyond the bounded package profile still need integration. Scrapyard
 declares and validates its current/pending spray dependencies. Download alone
 grants no authority. See the broader
 [all-members-gone recovery plan](../checkpoints.md).

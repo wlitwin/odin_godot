@@ -157,8 +157,8 @@ again at authority ingress:
 })
 ```
 
-The old comma strings remain accepted for migration, but new code should use
-the typed presets or literal so Odin can catch misspelled policy members.
+Quoted command-policy strings are rejected. Use a typed preset or literal so
+the compiler can check policy members.
 
 A successful command may invoke a name-paired `<verb>_then` half for
 authority-only cross-entity work such as spawning, crediting a player, or
@@ -474,7 +474,7 @@ so its mutations reach every peer in the same batch as the verb's own. The
 `runner_weapon_fire_then`: the block ships the verb and its state machine,
 the game keeps the consequence, and no index keying or entity-classifying
 switch ever appears. A composed verb's payload is the block's *offer*
-("a live round left the barrel"); a game that doesn't care simply declares no
+("a live round left the barrel"); a game that does not consume it declares no
 `_then`.
 
 **Build-time contract.** A mispaired consequence is a scriptgen error, not a
@@ -539,7 +539,7 @@ never collide (`weapon: Gun` + `sidearm: Gun` → `runner_weapon_fire` + `runner
 distinct command IDs). Issue it exactly like a direct command
 (`runner_weapon_fire_cmd(&boot, self, dx, dy)`); the owner is passed for you, so only the wire
 args appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block's
-replicated state for free (it's already in the entity's descriptor), and the block's
+replicated state because it is part of the entity's descriptor, and the block's
 cross-entity effects (spawning a projectile, applying damage) live in the game's
 `runner_weapon_fire_then` [consequence](#command-consequences), exactly as a direct command's
 do: the block ships the verb, the game keeps the "and then".
@@ -589,7 +589,7 @@ spelunker_hp_codec :: knet.Wire_Codec {
 The wire size is FIXED per field, which is what frees the representation:
 quantize, bit-pack, or ship an *index* into a structure both sides grow
 deterministically (a shared-seed table means the wire only needs to name an
-entry, not carry it). Two rules keep codecs honest: `decode(encode(x))` should
+entry, not carry it). Two codec requirements matter: `decode(encode(x))` should
 be stable (receivers hold decoded values; an unstable round trip makes confirmed
 predictions micro-snap), and dirtiness is still diffed on struct bytes: a change
 smaller than the wire precision still sends, so pick a precision at least as fine
@@ -603,8 +603,7 @@ bit in a u64 mask, a byte-identical apply on every peer. A dynamic's bytes are a
 header whose elements a memcpy would tear, and the deeper problem survives any
 encoding: **byte-diffing has no element identity**: insert one element at the
 front and every byte after it "changed", so the diff ships the world for a
-one-item edit. A variable-length ask is always one of three real shapes, and
-each already has first-class machinery:
+one-item edit. Choose a representation according to the collection's size and update pattern:
 
 - **Bounded** → a fixed array + count/sentinel: `bag: [6]kitems.Slot` with
   `ITEM_NONE` empties (cavecrawl). One field, one diff atom, edges and
@@ -816,7 +815,7 @@ game_whisper_send(&ses, msg, ksess.HOST_PEER)   // to a peer, or ksess.BROADCAST
 game_whisper_send_to(&ses, player, msg)         // to a PLAYER (seat resolved on the host)
 ```
 
-It is pure sugar over the runtime typed-route API
+It wraps the runtime typed-route API
 ([`session_app_send_typed`](session.md#app-messages) / `session_app_listen`),
 which stays available for hand-rolled routing. The generated payload has a
 **canonical raw ABI**: fixed-width, recursively validated, padding-free bytes;
@@ -830,7 +829,7 @@ schema. cavecrawl's arrival greeting is the worked example.
 The counter-rule, because it is the tempting mistake: **don't send state as a
 message.** "Player X's score is now 5" shipped as a message is lost to a peer who
 joins a second later, and gone forever on a dropped packet. Replicate the score
-instead and it is always correct, always caught up. Reach for a message only when you
+instead so a snapshot can restore its current value. Use a message when you
 *want* the opposite of those guarantees: a fire-and-forget signal to whoever is
 listening right now.
 
@@ -1038,8 +1037,9 @@ distinct: don't conflate them.
   guard the same doctrine: a direct call of a `@(gd_command)` proc is a
   scriptgen error pointing at the `<verb>_cmd` wrapper, and a gd-shaped tag
   under a typo'd namespace (`gs:"replicate"`) is named instead of silently
-  ignored. The whole runtime walk strips under `-disable-assert`, like every kit
-  guardrail.
+  ignored. Development builds assert on a violation. Under `-disable-assert`, the
+  session retains the walk and increments `session_guard_hits`; native builds
+  also log the first violation. See [session](session.md#gotchas).
 - **Deltas carry STATE, not events.** The walk memcmps entity-vs-shadow once per net tick;
   a replicated byte pulsed `1 → 0` *within* one tick equals its shadow when the diff runs
   and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl's

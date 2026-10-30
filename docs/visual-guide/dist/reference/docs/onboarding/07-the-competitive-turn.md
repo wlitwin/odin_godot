@@ -2,16 +2,13 @@
 
 The co-op model gives each player authority over their own avatar: you write
 your position, everyone else reads it. That works when you trust the other
-players. A client lying about where it stands is a social problem, not a
-netcode one.
+players. The authority accepts their motion, so this policy cannot prevent a
+modified client from inventing a position.
 
-Competitive games invert that. In a duel, a ranked arena, or a fighting game the
-opponent is not a friend, and "trust the client's own position" is the first
-thing a cheater breaks. So the **server** simulates the truth, every client
-**predicts** it locally so the game still feels instant, and when a prediction
-turns out wrong the server's word wins: the screen **rolls back and
-resimulates** to match. This is rollback netcode, the model that fighting games
-and Rocket League are built on.
+For contested motion, the **server** runs the authoritative simulation. A
+client **predicts** its own input before the server replies. When an update
+disagrees, the client restores historical state and reruns subsequent ticks
+with the correction. Presentation then blends toward that result.
 
 The competitive lane is `kit/sim`, and it is the same declarative surface as the
 co-op lane. You do not learn a new engine; you tag a different handful of fields,
@@ -39,10 +36,10 @@ fighter_tick :: proc(self: ^Fighter, input: Fighter_Input) {
 }
 ```
 
-`@(gd_tick)` is the entire opt-in. Your fighter runs on your predicted timeline
-(instant to your hand) and on the server (the truth), and the lane reconciles
-the two behind your back. The input you read is delivered by the lane. You
-never send a packet.
+`@(gd_tick)` registers the tick procedure. With the session and predicted
+fields configured, the simulation lane runs it locally and on the authority.
+It delivers typed input, retains history, and applies corrections; gameplay
+code does not send the input packets directly.
 
 ## Choosing per object: predict-self and contested
 
@@ -56,7 +53,8 @@ Competitive games make you choose, per object, whether to keep it that way:
 - **Contested**: `@(gd_tick = "contested")`. For a shared object both players
   hit: a ball, a flag, a bomb. Marking it `contested` makes **every** peer
   predict it, so your touch resolves on your screen the instant you make it. The
-  server still owns the truth; a disagreement rolls back and glides.
+  server remains authoritative. A disagreement restores and replays the
+  predicted state, while presentation blends toward the corrected result.
 
 The soccer example ships three times, one game per model, so you can read the
 difference side by side:
@@ -76,8 +74,9 @@ prediction, a shot your opponent takes appears a whole interp-delay *before*
 their avatar visibly kicks it. The result is a predicted ball, a past-rendered
 player, and one shared screen.
 
-The fix is one boolean, asked continuously: **is my simulation the one driving
-this ball right now?**
+A **presentation claim** chooses the local predicted view while the local
+player drives the ball. It does not transfer network authority. Update it
+continuously from the local influence on the ball:
 
 ```odin
 // in the world pass, every tick MY fighter is influencing the ball:
@@ -115,10 +114,13 @@ ksim.lane_rewound_end(&g.lane)
 
 ## What carries over
 
-Everything from the co-op lane still holds: reconnects, drop-in joins, saves,
-host migration, the wire-version door, Steam. The sim lane rides the same
-session: a game is co-op in its lobby and its chat and server-authoritative in
-its hitboxes, and the reconnect path treats them the same.
+Reconnects, drop-in joins, saves, wire-version compatibility checks, and
+transports use the same session. A game can keep cooperative lobby/chat state
+and authoritative hitboxes together. Live host migration is supported only
+for the cooperative lane; `boot_migration` requires that no simulation lane is
+installed.
+A simulation save can resume under a restarted authority, with fresh lane
+history; see [the save contract](../kit/save.md).
 
 **Run it:**
 

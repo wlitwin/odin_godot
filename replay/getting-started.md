@@ -1,7 +1,8 @@
 # Starting a Replay game
 
 Replay keeps gameplay in a typed Odin world and puts devices, networking, scenes
-and persistence around it. The same gameplay rules run offline and under a chosen
+and persistence around it. The world contains all mutable simulation state.
+The same gameplay rules run offline and under a chosen
 multiplayer policy. The framework handles history, delivery, correction and
 recovery; the game still chooses authority/trust, prediction scope and game rules.
 
@@ -101,16 +102,18 @@ ownership revisions and scheduled work. Use bounded value types and handles rath
 than pointers to nodes or another world's memory. Immutable authored data can live
 outside World, but it must be fixed and content-versioned while a session runs.
 
-Write a step that mutates World using its input and `Step.tick`; emit semantic
-occurrences through `emit`. Cross-entity actions are ordinary operations on that
+Write a step that mutates World using its input and `Step.tick`. Use `emit` for
+occurrences: recorded gameplay events whose identities let presentation match
+them across replay. Cross-entity actions are ordinary operations on that
 world. Do not read device state, wall time or live Godot transforms inside a replayed
 step, and do not play sounds or write files there.
 
 Start with `examples/replay_loot/main.odin` for the complete local lifecycle. For
 authoritative networking, expose a `net.Model` with step/action callbacks, input
 and state validators, and held-input behavior. Hello's
-`shared/hello/network.odin` is a compact complete implementation. A model is more
-than a toggle: define scheduled controls versus reliable actions explicitly.
+`shared/hello/network.odin` is a compact complete implementation. The model defines
+how scheduled controls and reliable actions affect the world; choose that
+distinction explicitly.
 
 ## Godot frame loop
 

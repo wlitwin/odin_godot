@@ -12,7 +12,7 @@ features introduced below.
 
 Generated wrappers handle routine authority, prediction, rejection, and
 presentation policy. Gameplay mutations can therefore remain direct and
-compact. Code that genuinely differs by role remains explicit in authority
+compact. Code that differs by role remains explicit in authority
 steps, command consequences, and presentation hooks.
 
 ## 0. The one struct
@@ -132,7 +132,7 @@ for tracked in chest_all(&self.boot) {
 ```
 
 A custom shell may call the entity installer directly. Typed `_spawned` and
-`_freed` hooks remain for genuinely game-shaped indexes or bookkeeping, not for
+`_freed` hooks remain for game-specific indexes or bookkeeping, not for
 recreating the registry.
 
 The host spawns typed. The tag generates a `chest_spawn` helper, so
@@ -144,9 +144,9 @@ chest.x, chest.y = 300, 180
 kboot.boot_spawn_send(&self.boot, id)
 ```
 
-Fields you change on the host after this ride the per-tick delta walk to
-everyone. That is the whole replication story: **you change a field, and you
-are done.**
+After replication starts, the per-tick delta walk sends changes to registered
+authority-written fields. Clients receive the current value; late joiners
+receive it in their snapshot.
 
 ## 3. Movement that feels right (30 minutes)
 
@@ -186,7 +186,8 @@ wrapper runs it authoritatively on the host and predictively
 on clients; a false first return means no: state auto-reverts on every peer,
 and a rejection carries the authoritative truth back. Two players race the
 last item: both predict success, the host runs them in arrival order, the
-loser reverts. Conflict resolution costs you nothing: it is the pipeline.
+loser reverts. The command pipeline serializes the attempts and returns the
+authority's verdict.
 
 A command may only mutate its target. The cross-entity half ("loot lands in my
 bag") is the verb's name-paired
@@ -351,7 +352,7 @@ two real
 processes, real ENet, 120ms injected latency, driving the real scene tree and
 grepping log lines (`examples/cavecrawl/run.sh` + `cave_test.gd`). When
 something feels wrong in play, reproduce it in the driver rather than in
-playtests. The greps show you exactly what shipped. Steal the pattern: your
+playtests. The log assertions check the behavior on each peer. Use the same pattern: your
 game's `@(gd_method)` surface is drivable by a test script exactly like keys
 drive it in play.
 

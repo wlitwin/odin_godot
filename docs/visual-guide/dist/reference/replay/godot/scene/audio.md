@@ -1,6 +1,8 @@
 # Bounded event audio
 
-`Audio_Pool` owns a fixed set of positional and screen-space Godot players.
+Use `Audio_Pool` to play presentation cues with bounded voices and to match
+replayed events by identity. It owns a fixed set of positional and screen-space
+Godot players.
 `audio_pool_init` accepts their parent and capacities (12 world / 3 screen by
 default). The parent must outlive the pool. `audio_pool_destroy` stops playback,
 releases player-held streams and queues the child players for deletion.

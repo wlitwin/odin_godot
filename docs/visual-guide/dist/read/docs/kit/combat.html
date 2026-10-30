@@ -71,7 +71,7 @@ with doomed commands. <a href="ui.html">kit/ui</a>&#39;s ability bar renders the
 <p>For the common cases the <a href="play.html"><code>play</code></a> blocks are the default:</p>
 <ul>
 <li><strong><code>play.Health</code></strong> instead of a raw hp field plus <code>hit</code>: you get max, the damage edge,
-and frac for free.</li>
+and the current health fraction in one block.</li>
 <li><strong><code>play.Ability</code></strong> instead of a <code>Cooldowns</code> slot plus a hand-written command: the cast
 command is generated onto the embedding entity, the cooldown knob replicates, and the
 applied-vs-rejected semantics are already right.</li>
@@ -133,7 +133,8 @@ owner-streamed, so the host&#39;s copy lags a stream behind. Launching from the 
 makes the authoritative rock fly a different line than the one the shooter <em>saw</em> hit. So
 the throw command carries the caster&#39;s own origin, leashed:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// leash clamps a CLAIMED point into a disc of radius r around anchor.</span>
-leash :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (claimed, anchor: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, r: <span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span></code></pre></div><p>Honest latency offsets pass untouched; teleport-cheese gets dragged back to arm&#39;s length.
+leash :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (claimed, anchor: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, r: <span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span></code></pre></div><p>Origins within the permitted latency offset pass unchanged; larger displacements
+are clamped to the allowed distance.
 Run it in the command proc itself: on the caster&#39;s own prediction <code>claimed == anchor</code> and
 it is a no-op, so there is no role branch (<code>spelunker_throw</code> in <code>spelunker.odin</code>).</p>
 <h2 id="fire-announcements">Fire announcements<a class="heading-anchor" href="#fire-announcements" aria-label="Link to this section">#</a></h2>
@@ -178,12 +179,11 @@ invoking callbacks: the handler only <em>files</em> into
 <a href="session.html#the-riders-queue-appq"><code>ksess.App_Queue</code></a> (the same queue
 comms, xfer, and the album use), and the game drains with <code>fire_poll</code> each frame on its
 own stack. The lane reaches <strong>every screen, the host&#39;s included</strong>: <code>fire_announce</code> loops
-the announcement back into the host&#39;s own route (the same drain every client uses), so
-nobody hand-draws other players&#39; fires at the announce site anymore. What lands in the
-queue is exactly &quot;a fire this screen has not drawn yet&quot;: a <code>predicted</code> fire skips only
-its own shooter&#39;s echo, a host-authored instant (<code>predicted = false</code> — a nova, a
-reaction) draws everywhere under its causer&#39;s honest name (the lane used to force
-<code>shooter = host</code> to reach the caster&#39;s screen), and non-host authors are dropped.</p>
+the announcement back into the host&#39;s own route, using the same drain as clients.
+The queue receives fires this screen has not drawn yet: a <code>predicted</code> fire skips
+its own shooter&#39;s echo, while a host-authored instant (<code>predicted = false</code>, such
+as a nova or reaction) draws everywhere with its actual causer. Announcements
+from non-host authors are dropped.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, when the command hook confirms a cast:</span>
 kcombat.fire_announce(&amp;self.ses, f)
 
@@ -206,8 +206,8 @@ saves): that one must be the game&#39;s own, because the session&#39;s tick is l
 session&#39;s lifetime.</p>
 <h2 id="predicted-hp">Predicted hp<a class="heading-anchor" href="#predicted-hp" aria-label="Link to this section">#</a></h2>
 <p>When your local rock visually contacts a body, the health you <em>display</em> may dip
-immediately, but the replicated hp field is never touched, so phantom damage is
-impossible. The dip lives in an overlay:</p>
+immediately. The dip lives in a presentation overlay and cannot change
+authoritative health:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Predicted_Hp :: <span class="hljs-keyword">struct</span> {
 	pending: <span class="hljs-type">i32</span>, <span class="hljs-comment">// damage shown locally but not yet confirmed by a delta</span>
 	basis:   <span class="hljs-type">i32</span>, <span class="hljs-comment">// the authoritative hp when the overlay was last squared</span>
@@ -266,5 +266,5 @@ and test the segment even when it returns false, since that tick still happened.
 hits miss.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/combat.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/combat.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#health-and-abilities" class="">Health and abilities</a><a href="#blocks-or-low-level-helpers" class="">Blocks or low-level helpers</a><a href="#status-effects" class="">Status effects</a><a href="#projectiles" class="">Projectiles</a><a href="#cast-origin-and-leash" class="">Cast origin and leash</a><a href="#fire-announcements" class="">Fire announcements</a><a href="#predicted-hp" class="">Predicted hp</a><a href="#auto-published-combat-stats" class="">Auto-published combat stats</a><a href="#pools" class="">Pools</a><a href="#worked-example" class="">Worked example</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/combat.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

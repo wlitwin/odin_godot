@@ -1,5 +1,9 @@
 # Loaded browser host migration
 
+Check approved checkpoint recovery while a sustained Scrapyard browser workload
+continues. The fixtures measure exact restored state and resumed play under
+declared local faults; their network and performance scopes are stated below.
+
 ```sh
 REPLAY_LOADED_OUT=/absolute/fresh/planned REPLAY_LOADED_MODE=planned \
   nix develop --command bash tests/replay_loaded_migration/run.sh

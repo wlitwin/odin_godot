@@ -1,14 +1,14 @@
 # Script modules — splitting a project into per-module dlls
 
 By default all of a project's Odin scripts belong to **one script module**, `res://scripts/`,
-compiled into **one scripts dll**, and for most projects that is the right shape. **Script
-modules** are the opt-in scaling tool for when it stops being right: split scripts into
+compiled into **one scripts dll**. When rebuilding that library becomes expensive,
+**script modules** let you split scripts into
 `res://modules/<name>/` directories, each its own Odin package compiled into its **own dll**
 (`libodinscripts_<name>.dylib` / `.so` / `.dll`), loaded beside the main dll and
 **hot-swapped independently**: a save recompiles only the module you edited, so
-rebuild-on-save latency stays flat as the project grows.
+an ordinary save avoids rebuilding unrelated modules.
 
-Modules buy that flat save latency with slower full builds and a hard isolation rule. Read
+Modules trade smaller scoped rebuilds for slower full builds and a hard isolation rule. Read
 the cost model first. **Most projects should not start with modules.**
 
 Two things on this page are not about splitting into dlls and apply to every project,
@@ -78,10 +78,10 @@ your_project/
 | `odin_godot_guard.gen.odin` | the module root only | the staleness guard (one compile-time `#load_hash` per authored source in the whole tree) plus the import manifest that links the script subpackages |
 | `odin_godot_boot.gen.odin` | the module root only | the `odin_scripts_boot` export the core calls after it loads the dll |
 
-You never write or edit these, and the loader ignores `*.gen.odin` as attachable scripts.
-Anything else matching `*.gen.odin` under a module is swept on the next build, which is also
-how a project built before the consolidated layout migrates: its old per-source
-`<name>.gen.odin` files are simply deleted the first time the new `scriptgen` runs.
+The build owns these files, and the loader ignores `*.gen.odin` as attachable
+scripts. Each build removes other `*.gen.odin` files under the module, including
+obsolete per-source `<name>.gen.odin` outputs. Keep authored source outside this
+filename pattern.
 
 ### Creating a module
 
@@ -391,7 +391,7 @@ package tree and in `godot:` collection packages only, so tags on a shared struc
 would never register. An untagged plain-data struct from `shared/` is fine.
 
 Plain shared types may also be aliases, including generic runtime owners such as
-`Timeline :: replay.Timeline(World, Input, Event)`. Scriptgen now follows the named
+`Timeline :: replay.Timeline(World, Input, Event)`. Scriptgen follows the named
 shape and its inline fields before deciding that no Godot metadata would be lost.
 Generic arguments retain the package/import context where they were supplied;
 aliases cannot hide tagged fields, typed signals or composed methods/ticks. Cyclic,

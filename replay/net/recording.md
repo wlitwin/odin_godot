@@ -1,6 +1,7 @@
 # Replaying recorded network simulation
 
-`net.recording_model(&model)` adapts a network `Model(State, Control, Action,
+Use `net.recording_model(&model)` to verify recorded network simulation without
+opening a session or replaying its transport. It adapts a network `Model(State, Control, Action,
 Event, Seats)` to the engine-free recording verifier. Use `Batch(Control, Action,
 Seats)` as the recorded input and `Net_Event(Event)` as the event type. This is
 the same simulation contract used by server and client timelines.
@@ -20,7 +21,7 @@ checked := d.recording_verify(&archive, identity, net.recording_model(&model), &
 Keep `model` and its immutable `user` data alive at a stable address throughout
 verification. The adapter preflights all recorded controls, seat masks, prediction
 group/seat identifiers, view shapes, action sequences and executable action
-payloads before any simulation step. The new optional
+payloads before any simulation step. The optional
 `Recording_Model.input_check(input, tick, user)` supplies context-aware preflight
 without changing existing models that use `input_valid` or neither callback.
 

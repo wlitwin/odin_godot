@@ -1,7 +1,8 @@
 # Dweller impacts: C9 and O3
 
-Every rock contact now emits a replayable Hit for its dweller, including the
-nonlethal first hit. Damage, collision ordering, kills, drops and motion are
+Every rock contact emits a recorded occurrence for its dweller, including the
+nonlethal first hit. An occurrence pairs an event payload with an identity used
+to match it across replay; here the payload is Hit. Damage, collision ordering, kills, drops and motion are
 unchanged. The existing Hit payload uses seat zero for a dweller; player hits
 retain their existing seat. Its position is copied before removal, and amount
 retains the rock's 35-point damage value.

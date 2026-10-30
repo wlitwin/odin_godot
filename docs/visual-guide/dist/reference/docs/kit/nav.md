@@ -1,8 +1,8 @@
 # kit/nav — pathfinding adapters
 
 Reach for `kit/nav` when a brain needs to walk around walls instead of through them. The
-engine already owns the hard parts (nav meshes, region merging, funnel pathfinding);
-kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.
+engine owns navigation meshes, region merging, and pathfinding. Kit supplies
+2D and 3D query adapters that return positions in its `[3]f32` convention.
 
 **Lane compatibility: never call these queries inside a resimulating pass; the module
 enforces it.** These calls query the NavigationServer, which holds live engine state that

@@ -1,7 +1,8 @@
 # Replay presentation
 
-Simulation state stays in `replay.Timeline`; presentation reads detached frames
-and owns its own smoothing, scene nodes, and effect state.
+Use Replay's presentation helpers to draw copied simulation state and reconcile
+effects after correction. Simulation state stays in `replay.Timeline`; presentation
+reads detached frames and owns its own smoothing, scene nodes and effect state.
 
 ## Frames and poses
 
@@ -29,7 +30,10 @@ err = view.advance_time(&journal, confirmed_tick, watched_tick)
 count := view.drain(&journal, changes[:])
 ```
 
-Each new occurrence chooses a policy. Existing IDs keep their policy:
+An occurrence is a recorded gameplay event with an identity used to match it
+across replay. Its payload holds game-specific data; its identity lets the journal
+update, confirm or cancel the same effect. Each new occurrence receives a policy.
+Existing IDs keep their policy:
 
 | Policy | When it begins |
 | --- | --- |
@@ -74,9 +78,11 @@ the required notifications cannot fit even in an empty queue. A **new epoch**
 still uses `journal_reset`, with its separate old-scope cancellation contract.
 
 `replay.confirm_through` separately protects the simulation frontier. A runner
-must establish authority before calling it. Neither counter elects a host,
+must establish that the ticks are settled under its authority or peer-commit
+protocol before calling it. Neither counter elects a host,
 authenticates packets, or guarantees durable external effects; those belong to
-the upcoming network/session/outbox layers.
+the network/session authority contract and any application outbox or external
+service.
 
 
 `One_Shots` retains consumed event IDs independently of active effects. It prevents

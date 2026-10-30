@@ -6,8 +6,9 @@ including both processes' queues and pump cadence. The local authority reads zer
 unmeasured/stale rows show `--`. Observers receive measurements without acquiring
 a player row. Departed player rows are hidden.
 
-The game initializes the optional shared `telemetry.Diagnostics` owner and adds
-its application lane when opening Solo/Session/Room. It updates diagnostics after
+The game initializes the optional shared `telemetry.Diagnostics` runtime, which
+collects local diagnostic measurements, and adds its application lane when opening
+Solo/Session/Room. It updates diagnostics after
 the outer session pump and reads the result only for presentation. Measurements
 are not world state, saved progress or host-migration data. Fencing and authority/
 connection changes invalidate them; the new authority measures again. Leaving a

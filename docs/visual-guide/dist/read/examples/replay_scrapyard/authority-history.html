@@ -4,8 +4,10 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authority-only rewind history</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/authority-history.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Introduced in content <code>0x5253435241503048</code> and retained in current content 49, Replay keeps the 32-tick <code>hit_history</code> in the authority&#39;s
-complete world and checkpoints, while omitting it from ordinary public snapshots.
+<article class="reading-body "><p>Introduced in content <code>0x5253435241503048</code> and retained through content 49 and
+later revisions, Replay keeps the 32-tick <code>hit_history</code> in the authority&#39;s
+complete World and checkpoints, while omitting it from ordinary public snapshots.
+The <a href="saves.html">save guide</a> records the current content and conversion contract.
 Current players, mobs, projectiles, health, equipment and other gameplay state
 remain public. The captured loaded-workload delta that motivated this change had
 7,581 of its 7,861 changed bytes in this historical cache.</p>
@@ -20,10 +22,12 @@ geometry.</p>
 <p>Checkpoint capture uses the complete authority projection. Host migration,
 saves and offline conversion therefore retain the history needed for subsequent
 rewind queries. Tests compare complete restored history and continue simulation.
-The game version changes because projection/schema contracts changed. Content-47
-rooms require matching old clients; content-48 clients use new rooms/databases.
-Older offline saves use the explicit converter, which now accepts contents 42–48 and seeds the recorded takeover epoch.
-It verifies full-world preservation and reports the new public digest separately.</p>
+The content-48 transition changed the projection/schema contract: content-47
+rooms required matching old clients, while content-48 clients used new rooms and
+databases. The converter paths for contents 42–48 retain those source contracts
+and seed the recorded takeover epoch. They verify full-world preservation and
+report the new public digest separately. Use the <a href="saves.html#converting-older-replay-runs">current offline conversion
+procedure</a> for the complete accepted format list.</p>
 <p>The loaded fixture checks public payload reduction and real compression support
 and delivery. Adaptive compression is allowed to choose sparse or ordinary LZ4
 deltas when grouping would not help; it does not require a larger encoding to be
@@ -36,5 +40,5 @@ refuses placement. These coordinates do not grant hit authority or transmit the
 private rewind cache. The editor-first migration&#39;s revive gate exposed and verified
 this correction to the older presentation path.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/authority-history.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/authority-history.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/authority-history.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

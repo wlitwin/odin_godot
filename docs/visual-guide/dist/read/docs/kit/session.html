@@ -158,19 +158,18 @@ whatever <code>context.allocator</code> was in force when it started.</p>
 and allocate straight from <code>context.allocator</code>. A game driving them under a custom allocator
 must keep <code>context.allocator</code> STABLE across each subsystem&#39;s init, use, and destroy, because
 their frees inherit whatever ambient is in force at teardown.</p>
-<p>The middle tier is verified by machinery, not by reading. <code>tests/kitsession</code>&#39;s
+<p>An allocator-isolation test checks the stored-and-rebound allocator convention. <code>tests/kitsession</code>&#39;s
 <code>the_session_never_spends_the_ambient_allocator</code> runs a full lifecycle (start, join, both
 spawn paths, blobs, interest, stats, profiles, ticks, kick, leave, disconnect, a re-init,
 destroy) with a tracking allocator handed to the session and a <em>watching</em> allocator
 installed as the ambient, then asserts the session touched the ambient ZERO times. It is the
 only way to catch a newly added root that forgot to rebind, because the omission is silent:
-the session still works, it just spends memory it does not own.</p>
+the session can appear to work while allocating through the wrong allocator.</p>
 <h2 id="start-drive-drain">Start, drive, drain<a class="heading-anchor" href="#start-drive-drain" aria-label="Link to this section">#</a></h2>
 <p>(<a href="boot.html">kit/boot</a> drives this whole section for you: <code>boot_host</code>/
 <code>boot_join</code> call the starts, and generated <code>&lt;game&gt;_net_frame</code> ticks and drains
 through Boot. What follows is
-the layer underneath, which stays public for games that want the ritual
-their own way.)</p>
+the lower-level API, available for games that need custom lifecycle ordering.)</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_host_start :: <span class="hljs-keyword">proc</span>(s: ^Session, name: <span class="hljs-type">string</span>, token: <span class="hljs-type">u64</span> = <span class="hljs-number">0</span>, dedicated := <span class="hljs-literal">false</span>)
 session_client_start :: <span class="hljs-keyword">proc</span>(s: ^Session, token: <span class="hljs-type">u64</span>, name: <span class="hljs-type">string</span>)
 session_client_join :: <span class="hljs-keyword">proc</span>(s: ^Session)     <span class="hljs-comment">// transport is connected: ask for a seat</span>
@@ -184,9 +183,8 @@ SERVER, not a player. Its seat is flagged <code>Player.dedicated</code> on every
 carries it, so clients know too): games skip it when spawning avatars
 (<code>if p.dedicated {continue}</code>), the kit lobby/scoreboard hide it, <code>session_count()</code> does not
 count it, and <code>max_players</code> caps humans only. Host migration never arms: a dead dedicated
-server restarts; migration is the peer model&#39;s answer to a <em>player</em>-host leaving. This is
-the always-on/public escape hatch; the friends-host-for-friends model is unchanged. There is
-one call door: <a href="boot.html"><code>kboot.boot_serve</code></a>. See <code>examples/slopball/server_run.sh</code>.</p>
+server restarts; migration is the peer model&#39;s answer to a <em>player</em>-host leaving. Use this role when infrastructure runs the authority. The player-hosted
+role remains available. The Boot entry point is <a href="boot.html"><code>kboot.boot_serve</code></a>. See <code>examples/slopball/server_run.sh</code>.</p>
 <p>Clients call <code>session_client_start</code> when they begin connecting and <code>session_client_join</code>
 once the transport handshake completes; no WELCOME within <code>join_timeout</code> produces
 <code>Ev_Join_Failed</code> instead of hanging on &quot;Joining…&quot; forever.</p>
@@ -481,7 +479,7 @@ AFTER the verb&#39;s <code>_then</code>. It survives session starts, like everyt
 <h2 id="interest-management-area-of-interest">Interest management (area of interest)<a class="heading-anchor" href="#interest-management-area-of-interest" aria-label="Link to this section">#</a></h2>
 <p><strong>Existence global, freshness local.</strong> Every peer still knows every entity: spawns,
 despawns, joins, saves, and migration backups are never filtered, so
-everything those give you for free stays free. What interest filters is the
+those lifecycle operations continue to include the complete registry. Interest filters the
 per-tick STATE traffic: a peer only receives deltas and owner-stream samples
 for entities near its <strong>focus</strong>, and it is off by default.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, once — before start or mid-run alike; the locator lends the session</span>
@@ -539,7 +537,7 @@ batches ride <code>SES_APP</code> on exactly this lane): the receive side routes
 identically, but nothing re-delivers a dropped <code>.Stream</code> message and nothing orders it
 against the reliable lane.</p>
 <h3 id="host-relay">Host relay<a class="heading-anchor" href="#host-relay" aria-label="Link to this section">#</a></h3>
-<p>Almost every app-channel citizen wants the same shape. A client sends its word <strong>up</strong> to the
+<p>Several app-channel subsystems use the same relay pattern. A client sends its word <strong>up</strong> to the
 host; the host <strong>stamps</strong> the sender it already vouched for and rebroadcasts; a peer that
 receives a stamped cast from anyone but the host is looking at a <strong>spoof</strong> and drops it; and
 the author&#39;s own copy comes back, or does not, by policy.</p>
@@ -575,7 +573,7 @@ payload it is holding. (Tier 2 above, and the reason tier 3 exists.)</li>
 </ul>
 <p>Tags are one byte and collisions are LOUD: <code>relay_route</code> asserts on a tag already relayed by
 a different subsystem, naming the taken ones (comms 0, <a href="combat.html">combat</a>&#39;s fires 1, xfer
-2, <a href="sim.html">kit/sim</a> 3). Not every citizen needs the relay: the fire lane is cast-only with
+2, <a href="sim.html">kit/sim</a> 3). Not every subsystem needs the relay: the fire lane is cast-only with
 no upload arm, and kit/sim&#39;s lane rides <code>SES_APP</code> directly on the stream channel with its
 own tick semantics.</p>
 <h3 id="the-riders-queue-appq">The rider&#39;s queue (appq)<a class="heading-anchor" href="#the-riders-queue-appq" aria-label="Link to this section">#</a></h3>
@@ -659,8 +657,10 @@ session_set_successor_info :: <span class="hljs-keyword">proc</span>(s: ^Session
 session_successor :: <span class="hljs-keyword">proc</span>(s: ^Session) -&gt; (knet.Player_Id, []<span class="hljs-type">u8</span>)
 Ev_Succession :: <span class="hljs-keyword">struct</span> { successor: knet.Player_Id } <span class="hljs-comment">// (client) host gone, successor named</span>
 session_backup_parts :: <span class="hljs-keyword">proc</span>(...) -&gt; (game_blob, snapshot: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>) <span class="hljs-comment">// copies</span></code></pre></div><p>The session names WHO; the info blob is opaque to it (a Steam lobby id fits where an
-<code>addr:port</code> does). Migration is coop-lane only: <code>boot_migration</code> refuses a sim lane
-(the lane&#39;s authority cannot migrate without a rebuild; a dead sim server restarts).</p>
+<code>addr:port</code> does). Live migration is supported only for the cooperative lane.
+<code>boot_migration</code> requires that no simulation lane is installed; this precondition
+is asserted in development builds. Simulation-lane recovery restarts the authority
+with fresh lane history rather than migrating live rollback state.</p>
 <h2 id="ownership-transfer">Ownership transfer<a class="heading-anchor" href="#ownership-transfer" aria-label="Link to this section">#</a></h2>
 <p>Ownership is <em>which peer&#39;s writes stream out</em> of an entity&#39;s owner-stream fields:
 carrying, mounting, possession, and dragging a downed friend are all one call, usually
@@ -711,8 +711,9 @@ authority hook.</strong></li>
 <p>The tie-breaker, applied in that order: <em>if the same meaning survives being queued and
 drained next frame, it must be queued.</em></p>
 <h3 id="tier-1--pull-callbacks-the-session-is-asking-a-question">Tier 1 — pull callbacks (the session is asking a question)<a class="heading-anchor" href="#tier-1--pull-callbacks-the-session-is-asking-a-question" aria-label="Link to this section">#</a></h3>
-<p>The session lends you its eyes and its memory. It calls, you answer, it continues. Keep them
-<strong>total and cheap</strong>: answer the question, return. Do not mutate the world, send, spawn, or
+<p>These callbacks return information the session needs before it can continue.
+Keep them <strong>total and cheap</strong>: return a valid answer promptly, including for
+empty or unavailable input. Do not mutate the world, send, spawn, or
 despawn inside one: the session is mid-operation and holding invariants.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -963,10 +964,10 @@ trade_confirm_then :: <span class="hljs-keyword">proc</span>(game: ^MyGame, self
 	} <span class="hljs-keyword">else</span> {
 		self.state = TRADE_FAILED <span class="hljs-comment">// the run words it; the goods never moved</span>
 	}
-}</code></pre></div><p>What falls out for free: the trade is an entity, so a mid-trade host
+}</code></pre></div><p>The trade is an entity, so a mid-trade host
 migration resumes with the window intact, a reconnecting player finds their
 table where they left it, and a late joiner spectating the market sees it:
-zero catch-up code. <code>Ev_Player_Left</code> is the one edge you own: the host
+the ordinary snapshot restores its fields. <code>Ev_Player_Left</code> is the one edge you own: the host
 despawns any table naming the departed (their seat may reclaim it later, but
 an open offer must not outlive its owner&#39;s presence). Escrow is the variant
 when a promised item must not be double-promised to two windows: the offer&#39;s
@@ -1038,5 +1039,5 @@ identity through moderation, works unchanged beside it), <a href="comms.html">ki
 <a href="combat.html">kit/combat</a>, <a href="items.html">kit/items</a>, <a href="ui.html">kit/ui</a>, <a href="save.html">kit/save</a>,
 <a href="steamgd.html">kit/steamgd</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/session.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/session.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#wire-it-up-before-_start" class="">Wire it up (before *_start)</a><a href="#start-drive-drain" class="">Start, drive, drain</a><a href="#the-replicated-world" class="">The replicated world</a><a href="#roster-moderation-stats" class="">Roster, moderation, stats</a><a href="#command-hooks" class="">Command hooks</a><a href="#interest-management-area-of-interest" class="">Interest management (area of interest)</a><a href="#app-messages" class="">App messages</a><a href="#backup-hosting-and-resume" class="">Backup hosting and resume</a><a href="#ownership-transfer" class="">Ownership transfer</a><a href="#coop-lag-compensation-session_rewound" class="">Coop lag compensation (session_rewound)</a><a href="#three-tiers-of-entry-into-your-code" class="">Three tiers of entry into your code</a><a href="#gotchas" class="">Gotchas</a><a href="#internals-and-design-notes" class="">Internals and design notes</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/session.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

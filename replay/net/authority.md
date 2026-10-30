@@ -1,6 +1,8 @@
 # Recorded authority observations
 
-`Model.authority` opts a game into a pure simulation policy:
+Use `Model.authority` when gameplay must react to a change in the authorized
+runner's local player seat, such as a host's carried item changing hands. It opts
+the game into a pure simulation policy driven by recorded observations:
 
 ```odin
 authority = {id = 1, apply = observe_authority}

@@ -1,7 +1,8 @@
 # Device controls and signal actions
 
-`Input_Binding(Control)` interns InputMap names once and maps buffered button
-values to your ordinary game Control type. It stays outside World. A mapper can
+Use `Input_Binding(Control)` to preserve button edges between Godot frames and
+simulation ticks. It interns InputMap names once and maps buffered button values
+to your ordinary game Control type. It stays outside World. A mapper can
 also read presentation-owned aim/device data through its borrowed user pointer;
 it must return a detached value and must not mutate the simulation.
 
@@ -23,9 +24,9 @@ inputgd.input_binding_consume(&controls)
 Up to 64 unique actions map to unique bits. Capture coalesces repeated presses of
 the same button within one simulation tick, while preserving simultaneous press
 and release. Reading does not consume; failed simulation steps keep their edges.
-Held state remains after consuming edges. For a Session that accepts controls once
-per render frame, consume only after successful submission according to that
-runner's input contract; this helper does not change its scheduling.
+Held state remains after consuming edges. For a Session, consume when `session.control_consumed` reports that an actual
+simulation step used the control. A successful frame call alone does not establish
+that. This helper does not change the runner's scheduling.
 
 `Paused`, `Unfocused`, `Menu` and `Inspecting` gates return the supplied neutral
 Control and discard buffered edges. A button held across a gate transition must

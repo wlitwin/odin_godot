@@ -33,12 +33,16 @@ values and event sequence; no external reset bookkeeping is needed.
 
 ## Compatibility
 
-C5 introduced these avatar rules; current content C9 (`0x4341564552504c39`) also
-fixes [relic floor lifetime](relic.md). Current peers and service launchers use C8;
-normal loads reject C1–C7 saves. C8 adds authority observation fields to the world; network/checkpoint protocol
-versions are unchanged.
+C5 introduced these avatar rules. The server-motion profile uses content C9
+(`0x4341564552504c39`), retaining the [relic floor-lifetime rules](relic.md).
+Update game peers and service launchers together. Ordinary loads reject older
+content rather than converting it silently. C8 introduced authority observation
+fields; network/checkpoint protocol versions are unchanged.
 
-`tools/upgrade_save` explicitly converts C1–C7 into a new file. C4 conversion keeps
+The C1–C7 paths in `tools/upgrade_save` convert into a new file using frozen old
+descriptors. C8 imports retain their existing authority observation. See the
+[current save-conversion guide](authoring.md#existing-replay-saves) for accepted
+formats and the command. C4 conversion keeps
 every saved frame/session field. Future descents/restarts follow current rules. If an
 old save was already healed by a C4 descent, the converter cannot reconstruct its
 prior injury or cooldowns; it preserves the saved values. Conversion does not

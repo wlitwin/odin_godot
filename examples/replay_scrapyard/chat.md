@@ -17,7 +17,7 @@ The authority stamps player names from approved world state; older lines retain
 their stamped names. Legacy Scrapyard profiles allow a few Unicode characters
 that communications forbids. Chat trims valid names and substitutes `runner N`
 for incompatible/empty names without changing the saved profile or gameplay
-validation. Observers currently use the generic `Observer` label.
+validation. Named-observer behavior and its legacy fallback are described below.
 
 The authority visits each newly confirmed timeline tick and derives roster,
 start, wave, horde/Titan, clear, gate, descent and wipe/reset announcements.
@@ -52,7 +52,7 @@ and crash migration. [Evidence](../../docs/replay/results/scrapyard-chat-2026-09
 records actual outcomes and the setup correction.
 
 [Positional pings](pings.md) now have input, presentation, expiry and scope checks.
-Named-observer metadata and broader chat layout/feel parity remain work. Browser
+Broader chat layout/feel parity remains work. Browser
 interaction, additional platforms, hardware audio, playtests and the full framework
 comparison remain requirements.
 

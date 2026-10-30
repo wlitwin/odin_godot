@@ -1,7 +1,9 @@
 # Owner-streamed Godot bodies
 
-`Body2` borrows a scene body and optional skin node. It supports RigidBody2D and
-CharacterBody2D. Its driver and visual smoothing live outside simulation state.
+Use `Body2` for cooperative motion produced by a Godot solver and accepted
+through Replay's entity-ownership protocol. It borrows a RigidBody2D or
+CharacterBody2D and an optional skin node. Its driver and visual smoothing live
+outside simulation state.
 
 ```odin
 body2_attach(&adapter, physics_body, .Rigid, skin)

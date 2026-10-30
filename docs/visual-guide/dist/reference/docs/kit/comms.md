@@ -2,8 +2,8 @@
 
 How players talk while they play: text chat, positional pings/markers, and host-authored
 system lines ("alice joined the cave"). It rides the [session](session.md)'s SES_APP
-extension point on the reliable channel, so a game wires **zero** extra networking for chat:
-it needs no packet type, no kind byte, and no route of its own.
+extension point on the reliable channel. The package supplies the chat packet
+format and route; the game supplies the UI and system-line wording.
 
 **Lane compatibility: lane-agnostic.** Chat is session-level: it works identically
 beside the coop lane, the sim lane, or both. Nothing here touches ticks or prediction.
@@ -58,7 +58,7 @@ comms_say :: proc(c: ^Comms, text: string)                  // clipped to MAX_SA
 comms_ping :: proc(c: ^Comms, kind: u8, pos: [3]f32)        // kind is game-defined; 2D leaves z zero
 ```
 
-**Narrate:** only the host may call this. The GAME words these lines ("bob joined the cave"); comms just ships them:
+**Narrate:** only the host may call this. The game supplies the text ("bob joined the cave"); comms transports it:
 
 ```odin
 comms_system :: proc(c: ^Comms, text: string)
@@ -126,7 +126,7 @@ case ksess.Ev_Player_Joined:
   line is about to be minted and broadcast to everyone *including* the joiner; replay the log
   first or the joiner sees their own arrival twice. Rejoins skip catchup (a same-session
   reconnect may still hold this run's log). Use `comms_catchup`/`comms_system` directly only
-  when your ritual differs.
+  when your join lifecycle differs.
 - **Your own line does not echo locally** (on a client). It lands when the host's broadcast
   comes back. Don't paint an optimistic local copy or you'll double it.
 - **`comms_system` asserts `is_host`.** System lines come from the authority; clients that

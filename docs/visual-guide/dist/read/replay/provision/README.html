@@ -8,16 +8,15 @@
 an authority-controlled room. <code>Room</code> owns an existing <code>authority.Service</code>; its
 durable <code>Bundle</code> contains the authority record, member credentials, enrollment
 retry records and invite consumption. Every change uses the same revision CAS.
-This closes the previous gap between durable membership and separately configured
-service keys. The game simulation and host-migration protocol are unchanged.</p>
+Membership and its service keys therefore commit together. The game simulation and host-migration protocol are unchanged.</p>
 <p>The SQLite store also provides <a href="checkpoints.html">durable room checkpoint publication</a>
 with separate revision CAS, typed validation and atomic metadata/bytes. The
 <a href="checkpoint/README.html">authenticated transfer endpoints</a> have native TLS restart
-acceptance. The standalone service now registers the three compiled game models;
+acceptance. The standalone service registers the three compiled game models;
 Room/Party owns publication and authenticated cold restore with native/browser
 acceptance. Game models/dependencies must still opt into the typed service contract;
 see <a href="../godot/room_restore.html">published restore</a>.</p>
-<p>The <a href="protocol.html">create/join protocol and Godot connection</a> now expose this
+<p>The <a href="protocol.html">create/join protocol and Godot connection</a> expose this
 backend through a bounded room hub and verified TLS. Native create/join/restart
 acceptance passes on loopback. The <a href="enrollment.html">client journal</a> adds durable
 native/browser enrollment. Shared Party menus and Room recovery are integrated into
@@ -140,5 +139,5 @@ and private file modes. Separate process-kill fixtures interrupt a real join bef
 and after SQLite commit and verify the corresponding retry behavior in fresh
 processes. See <span class="local-reference" title="docs/replay/results/room-provisioning-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/README.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-and-ownership" class="">API and ownership</a><a href="#invite-and-retry-rules" class="">Invite and retry rules</a><a href="#client-handoff" class="">Client handoff</a><a href="#storage-and-compatibility" class="">Storage and compatibility</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

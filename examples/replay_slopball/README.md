@@ -1,7 +1,8 @@
 # Replay Slopball
 
-A separate initial port of the original [Slopball](../slopball/README.md). Kickers
-are real CharacterBody2D nodes and the ball is a real RigidBody2D. Kit and all original
+Run this [Slopball](../slopball/README.md) port to use Godot physics with Replay.
+Kickers use CharacterBody2D nodes and the ball uses a RigidBody2D. The entity owner
+is the player permitted to submit that body's pose and momentum observations. Kit and all original
 projects remain intact. Reused scenes and modifications are recorded in [assets](assets.md).
 
 ```sh
@@ -31,10 +32,11 @@ scope and records accepted values. The game reducer contains joins/leaves, owner
 arbitration, score and kickoff decisions; it never calls Godot. Owner scopes, pending
 offers, sample frontiers and full pose/momentum are part of the saved world.
 
-The local solver prepares an authority-issued handoff before its first valid sample
+The shared Body2 adapter connects a Godot physics body to these recorded
+observations. The local solver prepares an authority-issued handoff before its first valid sample
 commits the reserved revision. The old revision then loses admission. Local possession
 preview, authoritative reseeding, observer freezing and skin smoothing are handled
-by the shared Body2 adapter. Goals use a persistent confirmed event policy, including
+by that adapter. Goals use a persistent confirmed event policy, including
 after Welcome/resync/recovery journal reconstruction. The initial 2D solo, normal
 three-process and jitter/loss/duplication gates pass with one goal occurrence per
 screen. The separate solver probe checks nonzero linear/angular velocity at handoff.

@@ -4,15 +4,12 @@ Picture a co-op game with a powerup gem on the course. When the host's ball
 rolls over it, the gem disappears too early for clients. When a client's ball
 rolls over it, the gem disappears too late.
 
-Nothing is out of sync. Every machine agrees on the state, promptly. The game
-still looks wrong on every screen but the picker-upper's: the gem vanishes
+Replicated state can be correct while presentation looks wrong to observers: the gem vanishes
 while the rolling ball is still visibly half a meter away, or lingers after
 the ball has visibly rolled through it.
 
-This is a mental-model shift, and it isn't about the toolkit: it's about
-physics. **Your screen and a remote screen do not show the same moment.**
-Once you stop fighting that, one small discipline fixes every "the effect
-fired at the wrong time" bug.
+**Local prediction and remote interpolation display different moments.**
+Schedule a spatial effect on the same timeline as its visible cause.
 
 ## Why remote motion renders behind
 
@@ -29,9 +26,8 @@ timelines:
 
 That explains the symptom. The gem's disappearance was keyed to state time;
 the cause you can *see* (the ball rolling into it) plays out in render
-time. React to the state delta and the effect precedes its visible cause. No
-amount of "better netcode" fixes it, because nothing is broken. The state was
-never wrong; it was *early*.
+time. Reacting immediately to the state delta makes the effect precede its
+visible cause. Changing packet delivery alone does not align those clocks.
 
 The picker-upper's own screen is different again: their prediction ran the
 pickup *this frame*, in local time, and it stays that way. That instant
@@ -43,8 +39,8 @@ One rule covers it: **present a consequence on the timeline of its visible
 cause.**
 
 The toolkit gives this a primitive. Instead of showing an effect where you
-detect the state change, hand it to the session with one honest boolean:
-*was this my own simulation's doing?*
+detect the state change, pass a callback to the session and indicate whether
+the cause came from the local simulation:
 
 ```odin
 // The taken-edge, ONE place, identical on every peer:
@@ -60,9 +56,8 @@ touches it, on every screen, and `present_gem_gone` neither knows nor cares
 which timing path it took. The same presentation proc handles every peer and
 every case.
 
-The instinct carried over from GDScript (hide the gem in the setter the
-moment the value changes) is exactly the bug. State changes are facts;
-showings are scheduled.
+Hiding the gem in a field setter ties presentation to packet arrival. Keep
+the state update immediate and schedule the visible disappearance separately.
 
 ## What delays and what doesn't
 
@@ -71,15 +66,15 @@ catalog lives in [kit/net](../kit/net.md):
 
 | The consequence of… | …presents |
 | --- | --- |
-| my own sim / my prediction | **now**: responsiveness is sacred |
+| my own simulation / my prediction | **now**, with local input |
 | a remote *moving* cause (ball hits gem, avatar steps on plate) | at **render time** (`session_present`) |
-| no spatial cause at all (score, hp bar, chat, UI) | **wire-fresh, never delayed**: delaying truth with no visible cause is just lag you added |
+| no spatial cause at all (score, hp bar, chat, UI) | when the authoritative update arrives |
 | a per-peer local flourish (muzzle flash, footsteps) | from local fx hooks (it never rode the wire at all) |
 | a global transition (level change, round end) | after a **dwell** (see below) |
 
-The third row bites people who over-learn the lesson: your scoreboard should
-never wait for a render clock. Delay is a tool for *reconciling an effect with
-its visible cause*; where there's no cause on screen, fresh truth wins.
+A scoreboard has no spatial cause to align with a moving object, so update
+it when state arrives. Reserve the render delay for effects that need that
+spatial alignment.
 
 ## Edges must outlive the slowest observer
 
@@ -111,13 +106,11 @@ spawn it twice.
 
 Spawn the burst inside `present_gem_gone` instead: post 4's hook and this
 post's scheduling deliver it to every peer, exactly once, at each screen's
-correct moment. When you find yourself asking *"where do I put the juice?"*,
-the answer is always in the presentation proc, next to the state edge it
-decorates.
+correct moment. Keep particles, sounds, and other visible consequences beside
+the presentation callback for the state change.
 
-That completes the model: state that converges (post 3), verbs that predict
-(post 4), and showings that respect the render clock (this post). What remains
-is the encouraging part: seeing how far those three ideas carry a real,
-shippable game, and what the toolkit hands you at the finish line.
+The first three pieces now fit together: replicated state (post 3), predicted
+commands (post 4), and effects scheduled for each screen's presentation clock.
+The next post adds persistent identity, recovery, and deployment checks.
 
 *Next: [The shape of a shippable game →](06-the-shape-of-a-shippable-game.md)*

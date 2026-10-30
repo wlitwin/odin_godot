@@ -4,22 +4,19 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>odin_godot documentation</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../reference/docs/index.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#start-here">Start here</a><a href="#reference">Reference</a><a href="#use-it-day-to-day">Use it day-to-day</a><a href="#build-multiplayer-with-kit">Build multiplayer with Kit</a><a href="#learn-from-the-examples">Learn from the examples</a><a href="#ship-it">Ship it</a><a href="#design-history--internals">Design history &amp; internals</a></nav></details>
-<article class="reading-body "><p>Write Godot scripts in compiled Odin. These docs are organized as a path: <strong>learn → build →
-use → ship.</strong></p>
+<article class="reading-body "><p>Use these guides to install odin_godot, write compiled Odin scripts, choose a
+multiplayer framework, and export a game.</p>
 <h2 id="start-here">Start here<a class="heading-anchor" href="#start-here" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong><a href="visual-guide/README.html">SDK documentation site</a></strong> provides task-based guides for
+<li><strong><a href="https://wlitwin.github.io/odin_godot/" rel="noreferrer">SDK documentation site</a></strong> provides task-based guides for
 setup, scripting, Kit, Replay, and export, plus system diagrams, an interactive
 correction lab, examples, and searchable reference.</li>
 <li><strong><a href="getting-started.html">Getting Started</a></strong>: install the Nix toolchain, build the extension,
 add it to a Godot project, and write + attach your first <code>.odin</code> script (a Node that moves
-on <code>_process</code>). It&#39;s a real, copy-pasteable hello-world, and for multiplayer, the
-<a href="kit/quickstart.html">quickstart</a> is the next stop.</li>
+on <code>_process</code>). Continue to the <a href="kit/quickstart.html">quickstart</a> for multiplayer.</li>
 <li><strong><a href="onboarding/index.html">The onboarding series</a></strong> collects seven posts for Godot developers
-coming from GDScript/C#: why compiled scripts, the struct mental model, and the multiplayer
-shift (state-not-messages, verbs-not-RPCs, the two timelines). It&#39;s the <em>why</em> behind
-everything below. Read it alongside your first build, or whenever the toolkit&#39;s way of
-structuring a game feels alien.</li>
+coming from GDScript/C#: compiled scripts, struct composition, replicated state,
+predicted commands, and presentation timing. Read it alongside your first build.</li>
 </ul>
 <h2 id="reference">Reference<a class="heading-anchor" href="#reference" aria-label="Link to this section">#</a></h2>
 <ul>
@@ -46,7 +43,7 @@ Odin names, generated prefixes, owner lifetimes, and the normal Kit/Replay frame
 <li>live editing: recompile-and-reload on save, plus the manual <code>script.reload(true)</code> fallback</li>
 <li>editor DX: live error squiggles (<code>_validate</code>), autocomplete (<code>ols</code>), syntax highlighting</li>
 <li>debugging: <code>gd.print</code> / <code>gd.error</code>, <code>lldb</code>, reading crash backtraces</li>
-<li><strong>the honest AOT limitations</strong> (no in-editor breakpoints, recompile-on-save latency, …)</li>
+<li><strong>AOT limitations</strong> (no in-editor breakpoints, recompile-on-save latency, …)</li>
 </ul>
 </li>
 <li><strong><a href="debugging.html">Debugging</a></strong>: the deep <code>lldb</code> + crash-backtrace reference (what Workflow
@@ -127,8 +124,8 @@ surface the kit absorbs.</li>
 <li><strong><a href="exporting.html">Exporting</a></strong>: native desktop export (the <code>OdinExportPlugin</code>) and web/WASM
 export (the Emscripten SIDE_MODULE + COOP/COEP serving).</li>
 <li><strong><a href="distribution.html">Distribution</a></strong>: building the drop-in addon with <code>nix build</code>,
-cross-compiling the core for Linux/Windows, the consumer install workflow, and the honest
-per-platform build-vs-runtime status.</li>
+cross-compiling the core for Linux/Windows, the consumer install workflow, and the
+per-platform build and runtime verification status.</li>
 <li><strong><a href="publishing.html">Publishing</a></strong> is the Godot Asset Library runbook: the <code>release</code> branch
 (<code>build/release.sh</code>), the submission form values, and consumer-facing quirks.</li>
 </ul>
@@ -157,5 +154,5 @@ proof-of-concept.</p>
 </li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="visual-guide/README.html"><span>odin_godot documentation website</span><span aria-hidden="true">→</span></a><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="kit/quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/index.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="kit/quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="onboarding/index.html"><span>The onboarding series</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/index.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#start-here" class="">Start here</a><a href="#reference" class="">Reference</a><a href="#use-it-day-to-day" class="">Use it day-to-day</a><a href="#build-multiplayer-with-kit" class="">Build multiplayer with Kit</a><a href="#learn-from-the-examples" class="">Learn from the examples</a><a href="#ship-it" class="">Ship it</a><a href="#design-history--internals" class="">Design history &amp; internals</a></nav><div class="outline-actions"><a href="../../reference/docs/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

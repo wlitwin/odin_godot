@@ -1,6 +1,7 @@
 # Browser identities and local checkpoints
 
-`Browser_Identity` reads or creates a persistent 16-byte Session token through
+Use `Browser_Identity` to retain a player's Session credential across browser
+launches. It reads or creates a persistent 16-byte Session token through
 IndexedDB. Keep it at a stable address, poll it before opening a runner, and obtain
 the token through `browser_identity_token`. A token is published only in Ready.
 Missing records are created with CAS(0); a competing creator reads the winning

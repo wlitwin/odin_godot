@@ -1,18 +1,21 @@
 # Odin Survivors
 
-A complete **survivors-like** game (Vampire Survivors / Brotato / Soulstone Survivors style),
-written entirely in **Odin** with **zero GDScript gameplay code**. It is the headline example
-for [odin_godot](../../README.md) and a deliberate stress-test of the binding: every node in
-`game.tscn` carries a compiled `.odin` script, all visuals are plain `Polygon2D` geometry (no
-art assets), and the project leans on the binding's features heavily and idiomatically.
+This survival arena game uses compiled Odin scripts for gameplay. It demonstrates
+[odin_godot](../../README.md) input, signals, custom Resources, and scene spawning
+through a move, fight, upgrade, and restart loop. The visuals use `Polygon2D`
+geometry without external art assets.
 
 ## The loop
 
-Move (arrows / WASD) → your weapons **auto-attack** nearby enemies → enemies die and drop **XP
-gems** → collect gems to fill the **XP bar** → **LEVEL UP** pauses the game and offers a choice
-of **3 random upgrades** → pick one (stronger stats / a new weapon) → resume → enemies **scale
-up** (faster spawns, tougher + more varied mix) → survive as long as you can → at 0 HP the run
-ends on a **game-over** screen (time / level / kills / score) → **Restart**.
+Move with the arrow keys or WASD. Weapons attack nearby enemies automatically;
+defeated enemies drop XP gems. Collect gems to fill the XP bar.
+
+Each level-up pauses the game and offers three random upgrades. Pick a stat
+upgrade or a weapon, then play resumes. Enemy spawning becomes faster and the mix
+of enemies changes as the run progresses.
+
+At 0 HP, the game-over screen shows time, level, kills, and score. Restart reloads
+the scene and resets the run.
 
 ## Run it
 
@@ -23,36 +26,34 @@ nix develop --command bash -c 'bash build/build_scripts.sh examples/survivors'
 ```
 
 - **Arrows / WASD** move the blue hero.
-- Weapons fire automatically — keep moving and dodging.
+- Weapons fire automatically while you move and dodge.
 - Walk over the green **XP gems** (they magnet toward you within pickup range).
 - On **LEVEL UP**, click one of the three upgrade buttons.
 - Four enemy types ramp in over time: **swarmer** (fast/weak), **grunt** (baseline), **brute**
   (tanky), **tank** (huge/slow) — each a different `EnemyConfig` `.tres`.
 
-> The windowed *feel* (juice, pacing, "is it fun") can only be judged by a human — the headless
-> harness proves the **loop works**, not that it is fun.
+The headless checks below verify the gameplay loop. Use a windowed run to assess
+pacing, feedback, and controls.
 
 ## Co-op — the HOST-authoritative variant
 
-> **Looking for the co-op reference?** The canonical, peer-authoritative co-op example is
-> [`examples/coop_arena`](../coop_arena/README.md) — one codebase, three modes, owner-auth
-> netcode (your own actions are instant, no host round-trip). The co-op layer below is
-> **retained** as the *host-authoritative* variant and as regression tests for the
-> MultiplayerSpawner / MultiplayerSynchronizer / `@(gd_rpc)` machinery; read coop_arena's
-> README for why peer authority is the recommended model.
+> For peer-authoritative engine-native co-op, read
+> [`examples/coop_arena`](../coop_arena/README.md). It simulates player actions locally
+> and trusts peer damage reports. This project retains the *host-authoritative*
+> variant and regression tests for MultiplayerSpawner / MultiplayerSynchronizer /
+> `@(gd_rpc)`.
 
-The same project also ships a **2-player co-op** built from ONE codebase that runs in **three
-modes**, selected from a start screen (`coop.tscn`, the project's main scene): **Single
-Player** / **Host** / **Join**. Transport is auto-selected by platform — **native → ENet**,
-**web (wasm) → WebRTC** — behind one UI. The KEY UNIFICATION: **single-player == host with
-zero peers**, so the authoritative simulation (enemy spawning, enemy deaths, score) runs
-identically whether or not a client is present; Single mode just never opens a transport.
+The project’s main scene, `coop.tscn`, offers three modes: Single Player, Host,
+and Join. The two-player co-op example uses Godot’s engine-native replication
+nodes. Native builds select ENet; web builds select WebRTC. Single Player uses
+the same host-owned enemy spawning, deaths, and score with zero peers and no
+open transport.
 
-The classic single-player example above (`game.tscn` + `test_survivors.gd`) is **unchanged** —
-it remains the canonical full-loop regression (`SURVIVORS_OK`). The co-op game is a separate
-scene/orchestrator (`scripts/net.odin`, `coop_player.tscn`, `coop_enemy.tscn`).
+`game.tscn` is the separate single-player scene exercised by
+`test_survivors.gd` (`SURVIVORS_OK`). The co-op game uses `scripts/net.odin`,
+`coop_player.tscn`, and `coop_enemy.tscn`.
 
-**Replication uses Godot's high-level nodes (proven to work with Odin scripts):**
+Replication uses these Godot facilities:
 - **MultiplayerSpawner** — the host spawns `coop_enemy.tscn` into `Enemies`; the engine
   auto-instantiates (and auto-despawns) it on every client.
 - **MultiplayerSynchronizer** — streams continuous state from the authority: each player's
@@ -61,9 +62,9 @@ scene/orchestrator (`scripts/net.odin`, `coop_player.tscn`, `coop_enemy.tscn`).
 - **`@(gd_rpc)`** carries discrete events: player spawn (peer→authority), the client's
   `request_damage`, shared score, and per-player level-up XP grants.
 
-The host is authoritative: enemies, waves, and enemy deaths are host-owned; a client hit is a
-`request_damage` RPC the host applies to the authoritative enemy. Each player levels
-independently from XP awarded on shared kills.
+The host owns enemies, waves, and enemy deaths. A client submits a
+`request_damage` RPC, which the host applies to its enemy state. Each player
+levels independently from XP awarded on shared kills.
 
 ```sh
 # co-op native (two ENet processes): prints COOP_NATIVE_OK
@@ -77,8 +78,8 @@ nix develop --command bash -c 'bash examples/survivors/coop_web_run.sh'
 > root script's `_ready` is too late — `on_replication_start` fires during `add_child` and
 > errors `ERR_UNCONFIGURED`, so nothing syncs. See `tests/repl_spike` for the minimal proof.
 >
-> The two-window / two-browser co-op *feel* (latency, juice) still needs a human; the headless
-> harnesses prove the **sync loop** holds over both ENet and WebRTC.
+These checks exercise synchronization over native ENet and browser WebRTC.
+Use two interactive clients to assess the effect of latency on play.
 
 ## Verify it (headless)
 
@@ -86,10 +87,10 @@ nix develop --command bash -c 'bash examples/survivors/coop_web_run.sh'
 nix develop --command bash -c 'bash examples/survivors/run.sh'   # prints SURVIVORS_OK
 ```
 
-`run.sh` runs three gates: (1) a headless **editor-open** smoke test (no crash / missing
+`run.sh` runs four checks: (1) a headless **editor-open** smoke test (no crash / missing
 virtual), (2) a **live `game.tscn`** run for 600 frames that must log no script/engine errors,
 (3) `test_survivors.gd`, which drives the **real** loop through actual physics overlaps +
-frame stepping (never faked `emit_signal`) and asserts each link; and (4) a **unified
+frame stepping, rather than manually emitting signals, and asserts each link; and (4) a **unified
 single-mode** smoke of `coop.tscn` (`COOP_ROLE=single`, host-with-no-net) that must boot + run
 clean (`SINGLE_DONE`):
 
@@ -111,7 +112,8 @@ It is also wired into the repo-wide suite (`tests/run_all.sh`, as `survivors | S
 ## Feature map — which odin_godot feature each file demonstrates
 
 Scripts live in `scripts/` (each a single authored `.odin`; its `*.gen.odin` sibling is
-generated boilerplate). `game_state.odin` / `util.odin` are owner-less *module* files.
+generated boilerplate). `game_state.odin` / `util.odin` are shared *module* files without an attached
+Godot node or script-state owner.
 
 ### Custom Resources (data-driven; `//gd:extends Resource` + `.tres` instances)
 
@@ -132,13 +134,13 @@ generated boilerplate). `game_state.odin` / `util.odin` are owner-less *module* 
 
 | Script | Features |
 | --- | --- |
-| **`game.odin`** | the root **orchestrator + state machine**: `@onready` child refs; tree **PAUSE** (`gd.scene_tree_set_pause`); the **Input** ergonomics (`gd.action_add_key`) to bind WASD onto the `ui_*` actions; typed cross-script **connects** (player `leveled_up`/`died`) + calls into the menus/player; `@(gd_method)` accessors so GDScript/the test can read the module's state. |
+| **`game.odin`** | the root scene controller and state machine: `@onready` child refs; scene-tree pausing (`gd.scene_tree_set_pause`); the **Input** ergonomics (`gd.action_add_key`) to bind WASD onto the `ui_*` actions; typed cross-script **connects** (player `leveled_up`/`died`) + calls into the menus/player; `@(gd_method)` accessors so GDScript/the test can read the module's state. |
 | **`player.odin`** | **input** axes; `@export` stats + combat **multipliers** (groups) that upgrades mutate; PackedScene + WeaponConfig slots; spawns Weapon children; XP/leveling (`player_gain_xp` → emits `leveled_up`); `@(gd_method) apply_upgrade` (the `Upgrade_Kind`/`Upgrade_Stat` switch — observable effect); signals `health_changed`/`leveled_up`/`died`; `@(gd_method) take_damage`. |
-| **`weapon.odin`** | **one script, three behaviours** switched on the WeaponConfig enum: Projectile (auto-fires bullets at the nearest in-range enemy, multishot fan), Orbit (runtime-built spinning blade `Polygon2D`s + area damage), Aura (periodic radius damage). Typed READ of the WeaponConfig **and** of the parent Player's live mults each shot; runtime node construction. |
+| **`weapon.odin`** | **one script, three behaviors** switched on the WeaponConfig enum: Projectile (auto-fires bullets at the nearest in-range enemy, multishot fan), Orbit (runtime-built spinning blade `Polygon2D`s + area damage), Aura (periodic radius damage). Reads the WeaponConfig and the parent Player’s current multipliers for each shot; constructs nodes at runtime. |
 | **`bullet.odin`** | `@export` damage/speed/**pierce**; `_physics_process`; `@(gd_connect="area_entered")`; typed cross-script (`rt.script_of → Enemy`) so it only damages enemies and pierces N before despawning. |
-| **`enemy.odin`** | `@export` of a custom-Resource slot **and** a PackedScene (gem); typed READ of EnemyConfig; runtime restyle (`node2d_set_scale` + recolor from config); `_physics_process` chase; `@(gd_method) take_damage`; `@(gd_connect="body_entered")` contact; **`gd.add_child_deferred`** to drop the gem safely during a physics flush; the `died` signal field. |
+| **`enemy.odin`** | `@export` of a custom-Resource slot **and** a PackedScene (gem); reads EnemyConfig; runtime restyle (`node2d_set_scale` + recolor from config); `_physics_process` chase; `@(gd_method) take_damage`; `@(gd_connect="body_entered")` contact; **`gd.add_child_deferred`** to drop the gem safely during a physics flush; the `died` signal field. |
 | **`xp_gem.odin`** | `@export value`; `_physics_process` magnet that reads the player's live `pickup_range` (typed); `@(gd_connect="body_entered")` collect → `player_gain_xp` (typed, may level up). |
-| **`spawner.odin`** | `@export` PackedScene + four EnemyConfig slots; **difficulty scaling** (`interval_at(t)` + a time-shifted weighted type pick); typed WRITE of the chosen config onto a fresh enemy before `add_child`; `@(gd_method) interval_at` exposed for the test. |
+| **`spawner.odin`** | `@export` PackedScene + four EnemyConfig slots; **difficulty scaling** (`interval_at(t)` + a time-shifted weighted type pick); writes the chosen config onto a fresh enemy before `add_child`; `@(gd_method) interval_at` exposed for the test. |
 | **`hud.odin`** | `@onready` auto-wired child refs (XP/Health `ProgressBar` + info `Label`); reads the shared module each frame; property helpers (`gd.set_float`/`gd.set_string`); typed cross-script signal **connect** to `health_changed`. |
 | **`levelup_menu.odin`** | a bank of 10 typed custom-resource `@export` slots (the pool); `@onready` button refs; `gd.connect_to` wiring each Button's `pressed` to a `@(gd_method)`; reading a resource's String fields generically (`gd.get_string`); typed calls into the player (`apply_upgrade`) and Game (`after_pick`). `process_mode=Always` keeps it live while paused. |
 | **`game_over.odin`** | `@onready` refs; reads the module for the run summary; `gd.connect_to` on the Restart button; a typed call into `game_restart` (reload + reset). |
@@ -155,13 +157,14 @@ generated boilerplate). `game_state.odin` / `util.odin` are owner-less *module* 
 
 ```
 examples/survivors/
-  project.godot            # 640x360, main scene = game.tscn
+  project.godot            # 640x360, main scene = coop.tscn
+  coop.tscn                # Single Player / Host / Join start screen
   game.tscn                # Game root + Player + Spawner + Hud + LevelUpMenu + GameOver
   enemy.tscn bullet.tscn   # spawnable Area2Ds (Polygon2D + collision)
   xp_gem.tscn weapon.tscn  # the pickup + the weapon node
   config/*.tres            # EnemyConfig (4), WeaponConfig (3), UpgradeConfig (10) data assets
   scripts/*.odin           # the authored scripts (+ generated *.gen.odin)
-  run.sh test_survivors.gd # build + 3 headless gates (the ONLY GDScript is the test harness)
+  run.sh test_survivors.gd # build + 4 headless checks
 ```
 
 ## Notes / scope
@@ -171,8 +174,6 @@ examples/survivors/
 - **Orbit / Aura** weapons apply damage by a group + distance query (`damage_enemies_in_radius`)
   rather than per-blade `Area2D`s; the **Projectile** weapon uses real `Area2D` bullets, which is
   the physics path the headless test asserts the kill through.
-- A real binding bug was found and fixed while building this (a zero-arg `@(gd_method)` emitted an
-  `_ensure_ctors()` call with no matching definition) — see the repo notes. Spawning the XP gem
-  during a bullet's `area_entered` also needed `gd.add_child_deferred` (a new ergonomic helper) to
-  avoid Godot's "change monitoring state while flushing queries" guard.
-```
+- Spawn an XP gem with `gd.add_child_deferred` when handling a bullet’s
+  `area_entered` signal. Godot cannot change collision monitoring while flushing
+  physics queries.

@@ -1,6 +1,7 @@
 # Coordinator-backed RTC signaling
 
-`Rendezvous` is a bounded JSON frontend alongside the native authority Service.
+Use `Rendezvous` to admit authenticated room members to RTC signaling. It is a
+bounded JSON frontend alongside the native authority Service.
 It borrows that Service and a raw Websocket listener. Poll the listener once,
 route binary messages to `auth.service_receive`, route text to
 `rendezvous_receive`, and call `rendezvous_pump` every frame. Close the frontend

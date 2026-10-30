@@ -1,7 +1,8 @@
 # Replay authoring tools
 
-Optional Godot-native editor UI over explicit project authoring commands. The
-library/editor tools do not infer gameplay policy or change a live match.
+Use the optional Godot editor panel to run a project's authoring commands and
+inspect their validation results. The tools require explicit gameplay policy
+and operate outside a live match.
 Scrapyard is the complete worked example; model, extractors and validation remain
 Odin. The small EditorPlugin/preview controls use GDScript for normal Godot UI.
 

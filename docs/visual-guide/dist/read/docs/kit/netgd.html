@@ -13,7 +13,7 @@ This lets the toolkit work over every transport those support, and <a href="stea
 in the same way. Riding SceneMultiplayer, rather than owning the peer and polling it, keeps
 <code>@(gd_rpc)</code> and the engine&#39;s spawner/synchronizer interop working alongside the toolkit.</p>
 <p>State ownership rule (same as the events package): <strong>no package globals</strong>. A session&#39;s
-transport state lives in the owning script&#39;s struct. The procs here are stateless sugar.</p>
+transport state lives in the owning script&#39;s struct. The procedures operate on that supplied state.</p>
 <h2 id="the-channel-plan">The channel plan<a class="heading-anchor" href="#the-channel-plan" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><strong>channel 0</strong> is untouched: the engine&#39;s own RPC/replication traffic.</li>
@@ -98,7 +98,7 @@ returns. The relay assigns it async. Pump <code>web_poll</code> each frame and r
 ends the moment the multiplayer peer installs.</p>
 <p><a href="boot.html">kit/boot</a> wraps both flavors with the stock lobby ceremony: <code>boot_host</code> /
 <code>boot_join</code> and their <code>boot_host_web</code> / <code>boot_join_web</code> twins.</p>
-<p>All four <code>begin_*</code> calls are <strong>sugar</strong> over one mechanism: <code>transport_host</code> /
+<p>All four <code>begin_*</code> calls use one mechanism: <code>transport_host</code> /
 <code>transport_join</code> with the flavor picked for you. They are the shortest way to spell the common
 case and the names games already say; reach for the generic pair when the transport is a
 <em>variable</em> (a settings menu, a fallback chain, kit/boot&#39;s doors). See <a href="#swapping-transports">Swapping
@@ -136,9 +136,9 @@ proves the full loop against a local relay; with <code>HELLO_RELAY</code> set, i
 field). <strong>NAT coverage:</strong> this covers the same-LAN pair, the port-forwarded or public host,
 and the common port-preserving home NAT (the relay hands the host each joiner&#39;s observed
 endpoint and <code>wire_punch</code> warms the mapping with a few UDP packets). Symmetric NATs it does
-NOT cover: there is no TURN for raw ENet. When the connect times out, say so and offer the
-browser build (WebRTC + TURN) and Steam, which always work. A copyable code serves most
-players; the two spare doors serve the rest.</p>
+NOT cover: there is no TURN for raw ENet. When the connection times out, report the failure and offer another configured
+transport, such as WebRTC with TURN or Steam. Verify reachability for those
+transports in the deployment you support.</p>
 <h2 id="the-disconnect-signals-are-required">The disconnect signals are required<a class="heading-anchor" href="#the-disconnect-signals-are-required" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>Unwired <code>peer_disconnected</code>: an alt-F4&#39;d client haunts the roster forever, and the host
@@ -186,7 +186,7 @@ The toolkit&#39;s integration tests run at 120 ms to verify that prediction resp
 while confirms measurably ride the slow wire.</p>
 <p><code>jitter_ms</code> adds a uniform extra <code>[0, jitter)</code> per packet, with one constraint: delivery stays
 FIFO per sender (the shim sits above ENet&#39;s already-ordered channels, and reordering here
-would break the ordered-reliable contract). <code>loss_pct</code> is channel-honest the same way: a
+would break the ordered-reliable contract). <code>loss_pct</code> also preserves the channel contract: a
 <strong>stream</strong> batch rolls the dice and vanishes (last-value semantics: the next batch supersedes
 it, which is the real behavior of the unreliable channel), while <strong>reliable</strong> traffic must
 arrive, so its &quot;loss&quot; costs what loss really costs a reliable channel: a retransmit&#39;s worth of
@@ -327,5 +327,5 @@ would port; the door glue (a platform&#39;s session/invite API as a <code>Multip
 is the real work, and nobody has done it.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/netgd.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/netgd.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-channel-plan" class="">The channel plan</a><a href="#session_wire-and-the-four-forwarding-methods" class="">Session_Wire and the four forwarding methods</a><a href="#hosting-and-joining" class="">Hosting and joining</a><a href="#native-enet-join-codes" class="subsection">Native ENet join codes</a><a href="#the-disconnect-signals-are-required" class="">The disconnect signals are required</a><a href="#host-migration" class="">Host migration</a><a href="#wire_receive-and-the-kind-byte" class="">wire_receive and the kind byte</a><a href="#link-simulation" class="">Link simulation</a><a href="#traffic-and-link-stats" class="">Traffic and link stats</a><a href="#kicks-wire_drop" class="">Kicks: wire_drop</a><a href="#pba_view" class="">pba_view</a><a href="#swapping-transports" class="">Swapping transports</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/netgd.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

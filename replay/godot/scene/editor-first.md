@@ -1,5 +1,9 @@
 # Editor-first Replay authoring
 
+Author Replay scenes in Godot while keeping gameplay state in replayable Odin
+values. This page describes how scene scripts, immutable definitions and typed
+display values meet that boundary.
+
 [Replay Scrapyard](../../../examples/replay_scrapyard/editor-first.md) is the canonical
 worked example for this workflow. It demonstrates server authority, local prediction,
 observed remote presentation, typed scene composition and recovery. Other network
@@ -9,7 +13,7 @@ architecture or a claim of production certification.
 ## Two compositions, one explicit boundary
 
 Compose gameplay from owned state and pure procedures: movement, health, gun
-mechanisms, inventory, cooldowns and AI. The World is the complete snapshot boundary;
+mechanisms, inventory, cooldowns and AI. A frame stores the complete `World` state at one tick;
 it can contain many typed components and modules. Godot nodes, Resources, device
 state, animation clocks and I/O remain outside it. `examples/replay_recipes/components.odin`
 is a compile-checked small composition; Scrapyard's Player/Gun_State/Cooldown and
@@ -43,7 +47,7 @@ low-level `Script_View`/`View_Pool2` composition below remains available.
 existing typed `View_Pool2`. Keep the configuration and pool at stable addresses.
 The scene instance enters its parent before binding, so its children and `_ready`
 state are available. The framework resolves the exact script type; a missing/wrong
-script or failed `valid` callback rejects attachment and cleans up the pool.
+script or failed scene validation rejects attachment and cleans up the pool.
 
 ```odin
 binding: scenegd.Script_View(Enemy_Display, Enemy_View)

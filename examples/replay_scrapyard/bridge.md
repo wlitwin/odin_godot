@@ -1,9 +1,10 @@
 # Using the new Replay bridge in Scrapyard
 
-Scrapyard already used the original Replay runner, journals and audio pool. It now
-also uses the new authoring bridge for **enemies, loot and gameplay audio**. The
-original sibling game remains untouched. This is a substantial integration slice,
-not a second full-game rewrite or a claim that every adapter is migrated.
+This record covers Scrapyard's initial authoring-bridge integration for
+**enemies, loot and gameplay audio**, including its lifetime changes, measured
+presentation costs and focused checks. For the current scene composition, follow
+the [editor-first guide](editor-first.md). The original sibling game remains
+separate; the measurements below do not cover every adapter.
 
 ## Data and lifetime boundary
 
@@ -77,9 +78,8 @@ productivity superiority claim.
 
 The complete observed World is still used elsewhere in Scrapyard's paint function.
 Detached mob values reduce what rigs receive; they do not remove all World copies
-from the game or change history memory. Pure callbacks and shared ownership make
-the seam easier to reason about, while future conversions should justify their
-own costs.
+from the game or change history memory. The callbacks receive copied display data and the bridge manages scene lifetimes.
+Future conversions should measure their own costs.
 
 ## Verification and remaining scope
 

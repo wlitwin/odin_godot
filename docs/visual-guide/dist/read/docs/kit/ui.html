@@ -22,8 +22,8 @@ for the HUD, which the owner repaints live); <code>*_destroy</code> frees only t
 the node tree belongs to the scene and is freed with the owner.</p>
 <p>Refresh procs reuse their row Labels across repaints and hide extras; nothing reallocates
 per frame.</p>
-<p>The package&#39;s <strong>public API speaks <code>string</code>, not <code>cstring</code></strong>: callers use <code>fmt.tprintf</code> and
-never think about NUL termination or c-allocator lifetimes.</p>
+<p>The package&#39;s <strong>public API takes <code>string</code>, not <code>cstring</code></strong>. Callers can pass
+<code>fmt.tprintf</code> results; the widget implementation handles engine string conversion.</p>
 <h2 id="api-by-task">API by task<a class="heading-anchor" href="#api-by-task" aria-label="Link to this section">#</a></h2>
 <p><strong>Lobby</strong> provides a title, status line, live roster, and three buttons:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">lobby_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node, title: <span class="hljs-type">string</span>) -&gt; Lobby
@@ -88,7 +88,7 @@ def vocabulary at every layer. A slot-array game passes its <code>Cooldowns</cod
 a play-block game gathers its blocks&#39; countdowns into a local array beside the same def rows
 (<code>[]u16{r.slime.cd, r.ignite.cd}</code>). With <code>selected</code>, the inventory row doubles as a hotbar.</p>
 <h2 id="adopting-your-own-scenes">Adopting your own scenes<a class="heading-anchor" href="#adopting-your-own-scenes" aria-label="Link to this section">#</a></h2>
-<p>The kit provides the implementation, never the final look. A game that wants its own
+<p>The stock implementation can also drive authored scenes. A game that wants its own
 lobby/chat/scoreboard authors a scene in the editor and hands it to boot
 (<code>Options.lobby_scene</code> / <code>chat_scene</code> / <code>score_scene</code>, see <a href="boot.html">boot.md</a>); the kit
 ADOPTS it: instances the scene, resolves the nodes it drives <strong>by NAME, at any depth</strong>
@@ -209,5 +209,5 @@ apart.</p>
 <a href="items.html">items.md</a> (<code>Slot</code>, <code>Table</code>) · <a href="netgd.html">netgd.md</a> (the shim + gauge the
 netgraph draws).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="comms.html"><span>kit/comms — chat, pings, system lines</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ui.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="comms.html"><span>kit/comms — chat, pings, system lines</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ui.md · source 7a95747172ae with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api-by-task" class="">API by task</a><a href="#adopting-your-own-scenes" class="">Adopting your own scenes</a><a href="#worked-example-cavecrawl" class="">Worked example (cavecrawl)</a><a href="#gotchas" class="">Gotchas</a><a href="#netgraph" class="">Netgraph</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/ui.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,6 +1,6 @@
 # Old-host prop adoption
 
-C8 observes the authority's local player seat through Replay's
+Introduced in C8, this policy observes the authority's local player seat through Replay's
 [recorded authority policy](../../replay/net/authority.md). World keeps the last
 known seat independently of lobby leadership. On a change from one player-host
 to another, a relic carried by the former host transfers to the successor and
@@ -24,10 +24,12 @@ Current content is `0x4341564552504c39`, with authority policy revision 1. C8 ad
 `authority_known` and `authority_seat` to World. The old C3–C7 world descriptor is
 frozen in the converter; C1/C2 retain their earlier descriptors.
 
-`tools/upgrade_save` accepts C1–C7 into a new destination. It preserves previous
-world/peer fields and seeds the new observation from the validated checkpoint
-header's `local_seat`. It does not infer authority from the party leader or edit
-the old file. A new host's first resumed tick applies adoption. Network protocol
+For C1–C7 imports, `tools/upgrade_save` preserves previous world/peer fields and
+seeds the new observation from the validated checkpoint header's `local_seat`.
+C8 imports already contain that observation and retain it unchanged. See the
+[current conversion guide](authoring.md#existing-replay-saves) for accepted
+formats and the command. Conversion requires a new destination; it neither
+infers authority from the party leader nor edits the old file. A new host's first resumed tick applies adoption. Network protocol
 7 and checkpoint envelope version 4 remain unchanged; the world schema and
 negotiated policy contract change explicitly.
 

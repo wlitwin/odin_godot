@@ -1,6 +1,7 @@
 # Restoring a published checkpoint
 
-Checkpoint protocol **3** retains the explicit `Restore` decision introduced in
+Use a Restore decision when no live authority remains and a trusted member
+needs to resume a published checkpoint. Checkpoint protocol **3** retains the explicit `Restore` decision introduced in
 version 2 and adds complete asset-package transfer. Upload/download do
 not grant authority. A restore selects one exact durable publication and obtains a
 new authority epoch only after current membership, policy, lease and storage checks.
@@ -122,11 +123,11 @@ dedicated infrastructure/final-release rules. Real processes killed before/after
 the restore commit recover respectively epoch 1/request 2 or epoch 2/request 3,
 while publication 1 remains intact; fresh coordinator startup is inactive.
 
-Godot Room/Party now drives the complete download/preparation/restore lifecycle and
+Godot Room/Party drives the complete download/preparation/restore lifecycle and
 Cavecrawl exposes resume/retry UI. Separate native and browser gates resume actual
 saved cave play and accept new guests after all original processes have exited.
 Room distinguishes service-known rollback from local confirmation history.
-Atomic asset packages now cover declared dependencies including Scrapyard sprays.
+Atomic asset packages cover declared dependencies including Scrapyard sprays.
 Broader asset profiles, other game acceptance and broader loss reporting remain
 integration work. See [Room restoration](../../godot/room_restore.md) and the
 [M5 plan](../checkpoints.md).
