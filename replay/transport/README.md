@@ -12,6 +12,26 @@ recipients. `Reliable` is ordered per direction/channel; `Unreliable` may lose,
 duplicate, or reorder messages. Check `Backpressure` and retry according to the
 session's delivery policy.
 
+## Closing transport wrappers
+
+A `Transport` value is a borrowed handle, so copying it never creates another
+connection owner. Closing a handle invokes its adapter's close callback. Wrapper
+callbacks have these specific effects:
+
+| Wrapper interface | Effect of `close` |
+| --- | --- |
+| `delay_transport` | Closes its base and frees the delay queue. |
+| `remap_transport` | Closes its base and clears the mapping. |
+| `fragments_transport` | Frees fragmentation storage; leaves its base open. |
+| `router_transport` | Closes that lane; leaves the router and base open. |
+
+Close a forwarding wrapper as one stack; do not separately close stale copies of
+its base handle. For a borrowing wrapper, destroy its dependent runners first,
+close/destroy the wrapper, then close the base adapter. After closing all router
+lanes, call `router_destroy` to free the router's buffers, then close its base.
+These rules also apply when wrappers are composed: closing Fragments over Delay
+leaves Delay open until its own handle is closed.
+
 ## Deterministic memory adapter
 
 `Memory` owns preallocated packet storage, endpoint registration, RNG, and bounded

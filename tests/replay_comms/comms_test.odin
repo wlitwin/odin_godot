@@ -6,6 +6,24 @@ import tr "godot:replay/transport"
 import sc "godot:replay/schema"
 import lb "godot:replay/lobby"
 
+// The adversarial fixture describes the wire independently of package internals.
+// Schema type names are not part of the fingerprint; logical field names are.
+WIRE_PACKET_KIND :: u16(0x434d)
+Wire_Kind :: enum u8 {None, Request, Ack, Deliver}
+Wire_Delivery :: struct {entry: co.Entry, historical: bool}
+Wire_Packet :: struct {
+	version: u16,
+	room, binding, request: u64,
+	kind: Wire_Kind,
+	result: co.Result,
+	delivery: Wire_Delivery,
+}
+
+wire_schema :: proc(schema: ^sc.Schema, chat: ^co.Comms) {
+	assert(sc.init(schema, Wire_Packet).error == .None)
+	assert(schema.fingerprint == chat.codec.fingerprint)
+}
+
 Fixture :: struct {memory:tr.Memory,ep:[3]tr.Memory_Endpoint,chat:[3]co.Comms,tick:u64,epoch:u64,observer_generation:u64,observer_names:bool,observer_name:lb.Name}
 HOST :: co.Binding{peer=1,generation=11,seat=1,identity={0=1}}
 GUEST :: co.Binding{peer=2,generation=22,seat=2,identity={0=2}}
@@ -59,9 +77,10 @@ canonical_text_and_marker_validation :: proc(t:^testing.T) {
 forged_speaker_stale_binding_and_duplicate_ack_are_rejected :: proc(t:^testing.T) {
 	f:Fixture;start(&f);defer finish(&f)
 	payload,_:=co.text_payload("forged")
-	packet:=co.Packet{version=2,room=4,binding=22,request=1,kind=.Request,delivery={entry={seat=1,value=payload}}}
-	bytes:[1024]u8;codec:=&f.chat[0].codec;size:=codec.wire_size+sc.HEADER_BYTES
-	pack :: proc(codec:^sc.Schema,p:co.Packet,bytes:[]u8) {assert(sc.pack(codec,p,{kind=co.PACKET_KIND,epoch=1,content=19},bytes).error==.None)}
+	packet:=Wire_Packet{version=2,room=4,binding=22,request=1,kind=.Request,delivery={entry={seat=1,value=payload}}}
+	codec_storage: sc.Schema; wire_schema(&codec_storage, &f.chat[0]); defer sc.destroy(&codec_storage)
+	bytes:[1024]u8;codec:=&codec_storage;size:=codec.wire_size+sc.HEADER_BYTES
+	pack :: proc(codec:^sc.Schema,p:Wire_Packet,bytes:[]u8) {assert(sc.pack(codec,p,{kind=WIRE_PACKET_KIND,epoch=1,content=19},bytes).error==.None)}
 	pack(codec,packet,bytes[:]);co.receive(&f.chat[0],2,.Reliable,bytes[:size]);testing.expect_value(t,f.chat[0].line_count,0)
 	packet.delivery.entry.seat=0;packet.binding=21;pack(codec,packet,bytes[:]);co.receive(&f.chat[0],2,.Reliable,bytes[:size])
 	packet.binding=22;pack(codec,packet,bytes[:]);co.receive(&f.chat[0],99,.Reliable,bytes[:size]);testing.expect_value(t,f.chat[0].rejected,u64(3))
@@ -145,7 +164,7 @@ observer_display_metadata_cannot_forge_players_or_bypass_name_validation :: proc
  for mode in 0..<6 {
   f:Fixture;start(&f);defer finish(&f);f.observer_names=mode!=1;step(&f)
   name,_:=lb.name("claimed");payload,_:=co.text_payload("message")
-  packet:=co.Packet{version=2,room=4,binding=33,request=1,kind=.Request,delivery={entry={name=name,value=payload}}}
+  packet:=Wire_Packet{version=2,room=4,binding=33,request=1,kind=.Request,delivery={entry={name=name,value=payload}}}
   from:=tr.Peer_Id(3)
   switch mode {
   case 0:
@@ -157,7 +176,8 @@ observer_display_metadata_cannot_forge_players_or_bypass_name_validation :: proc
   case 4:packet.delivery.entry.identity=HOST.identity
   case 5:packet.delivery.entry.seat=1
   }
-  bytes:[1024]u8;codec:=&f.chat[0].codec;assert(sc.pack(codec,packet,{kind=co.PACKET_KIND,epoch=1,content=19},bytes[:]).error==.None)
+  codec_storage: sc.Schema; wire_schema(&codec_storage, &f.chat[0]); defer sc.destroy(&codec_storage)
+  bytes:[1024]u8;codec:=&codec_storage;assert(sc.pack(codec,packet,{kind=WIRE_PACKET_KIND,epoch=1,content=19},bytes[:]).error==.None)
   co.receive(&f.chat[0],from,.Reliable,bytes[:sc.HEADER_BYTES+codec.wire_size]);testing.expect(t,f.chat[0].rejected>0 && f.chat[0].line_count==0)
  }
 }

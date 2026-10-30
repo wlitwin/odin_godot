@@ -17,6 +17,7 @@ View_Binding :: struct($Value,$Rig:typeid) {
     diagnose:proc(rawptr)->d.Report,
 }
 View_Pool_Error :: enum {None,Invalid,Capacity,Duplicate,Attach,Scene}
+@(private)
 View_Pool_Entry :: struct($Value,$Rig:typeid) {key:u64,node:gd.Node2d,rig:Rig,last:Value,painted:bool}
 // One simulation pool per view owner. Value must be detached/value-safe; Rig may
 // borrow Godot child nodes and own presentation resources through detach.

@@ -183,7 +183,7 @@ The kit allocates in three tiers, and the session sits in the middle one.
 `allocator` argument; the caller names where every byte lives.
 
 **Stored and rebound**: kit/sim's `Lane` and this `Session` each keep ONE allocator
-(`Session_Wiring.allocator`, adopted from `context.allocator` at the first `*_start` and
+(`Session.allocator`, adopted from `context.allocator` at the first `*_start` and
 held across every re-init) and reinstall it as `context.allocator` at the top of EVERY root:
 the starts, resume, destroy, `session_tick`, the packet entry, `session_present`, the
 spawn/blob/owner/despawn mutators, and the subsystem writers (`session_stat_column`,

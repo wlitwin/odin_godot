@@ -12,7 +12,66 @@ boilerplate (Variant trampolines, backing arrays, `@(init)` registration) into a
 file you never edit. Both compile together into the scripts dll, so you author the nice form
 and get the full typed dispatch for free.
 
-### Single-file authoring
+## API conventions shared by Kit and Replay
+
+Use [Odin's naming and style conventions](https://github.com/odin-lang/examples/wiki/Naming-and-style-convention):
+`Ada_Case` for types and enum members, `snake_case` for procedures and fields,
+and `SCREAMING_SNAKE_CASE` for constants. Prefer a short, meaningful import alias.
+Use tabs for indentation, spaces for alignment, and explicit error handling in
+examples. Generated Godot bindings retain their existing engine-derived names,
+such as `gd.Node2d` and `gd.node2d_set_position`.
+
+Script helpers use the snake-case script type as their prefix:
+`Player_Controller` and the existing `PlayerController` spelling both produce
+`player_controller_*`; `HUD_View` produces `hud_view_*`. A lifecycle proc is
+therefore `player_controller_ready`; an exposed `player_controller_jump` method
+appears as `jump` to Godot. Two script types in one package must have distinct
+snake-case prefixes. Regenerate scripts after changing a type name. Existing
+acronym spellings that depended on one underscore per capital must migrate to
+the whole-word prefix, such as `http_server_*` for `HTTPServer`.
+
+| Rule | Kit (v1) | Replay (v2) |
+| --- | --- | --- |
+| Normal game loop | Generated `<game>_net_attach`, `<game>_net_frame`, `<game>_net_detach` | `session_open`, `session_frame`, `session_close`; use Room when authority can migrate |
+| Gameplay mutation | Tagged fields and generated command wrappers | A typed value World and model step/action callbacks |
+| Presentation | Generated event handlers and typed entity queries | Drain all presentation changes, then present copied state |
+| Additional mechanisms | Raw session/lane/transport APIs for custom integrations | Raw net/P2P/transport APIs for custom policies |
+
+Choose one normal owner path for a game. Higher-level owners drive their lower
+layers; do not also pump those layers yourself. Keep live owners at stable
+addresses and pass them by pointer. Configuration and copied World/frame values
+may be copied; live owners with allocations, callbacks or connections may not.
+Start configuration from the documented defaults, rather than assuming every
+empty options struct is usable.
+
+Match setup and teardown: `init`/`destroy` for owned Odin storage,
+`open`/`close` for a live session, and `attach`/`detach` for an engine
+attachment. Packages with several owners add a type prefix, such as
+`session_open`. These verbs describe ownership. In a Godot script, release live
+owners in `*_exit_tree`. A `defer` in
+`*_ready` would run when that callback returns, not when the node leaves the tree.
+Borrowed readers, handles and views do not acquire ownership merely by being
+returned from a procedure. A query may return copied values, an owner-borrowed
+slice, or a frame-temporary view of live entity handles. Check its lifetime
+before retaining a result. Initialization can allocate diagnostics even when it
+fails; perform the documented cleanup on failure too. Fixed-value World
+components such as Pool and owned state need no independent destructor.
+
+The ordinary call sequence is setup, frame/service, drain, read, teardown.
+Queries read current state; frame/service calls advance it; queue consumers
+must drain until empty. Configuration fields and documented observations form
+the supported author surface of a runtime owner. Its other fields are storage
+for the implementation, not another way to drive it.
+
+Successful action or chat submission can mean that work was queued locally.
+Use the authoritative receipt or confirmed presentation change when game logic
+needs an accepted outcome; a successful send alone does not establish it.
+
+See [Kit conventions](kit/conventions.md) and the
+[Replay starting path](../replay/getting-started.md) for each model's concrete
+lifetimes, defaults and extension points.
+
+## Single-file authoring
 
 There is exactly **one file per script**: the `.odin` you write is also the resource
 you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)

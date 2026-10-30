@@ -41,6 +41,7 @@ configure :: proc(c:^Comms,wire:tr.Transport,scope:Scope,authority:bool,local:Bi
 	return true
 }
 
+@(private)
 broadcast :: proc(c:^Comms,value:Payload,author:Binding)->Result {
 	if !c.ready || !c.enabled || !c.authority {return .Not_Ready}
 	if c.sequence==max(u64) {return .Capacity}
@@ -52,21 +53,26 @@ broadcast :: proc(c:^Comms,value:Payload,author:Binding)->Result {
 	}}
 	record(c,delivery);return .None
 }
+@(private)
 consume_token :: proc(tokens:^f64,at:^u64,now:u64)->bool {
 	tokens^=min(f64(4),tokens^+f64(now-at^)*0.002);at^=now
 	if tokens^<1 {return false};tokens^-=1;return true
 }
+@(private)
 settle :: proc(c:^Comms,result:Result) {
 	assert(c.receipt_count<PENDING)
 	c.receipts[(c.receipt_head+c.receipt_count)%PENDING]={c.pending_ids[c.pending_head],result,c.pending[c.pending_head]};c.receipt_count+=1
 	c.pending_head=(c.pending_head+1)%PENDING;c.pending_count-=1
 	c.last_result=result;c.result_serial+=1;c.next_send=0;c.request_active=false
 }
+@(private)
 send :: proc(c:^Comms,peer:^Peer,packet:Packet)->tr.Send_Result {
 	p:=packet;p.version=2;p.room=c.scope.room;p.binding=peer.binding.generation
 	if sc.pack(&c.codec,p,{kind=PACKET_KIND,epoch=c.scope.epoch,content=c.scope.content},c.txb[:]).error!=.None {return .Invalid}
 	return tr.send(&c.wire,peer.binding.peer,.Reliable,c.txb[:c.codec.wire_size+sc.HEADER_BYTES])
 }
+// Advanced ingress for a caller-owned packet router. Ordinary consumers use
+// configure/frame; this entry point still validates the complete wire packet.
 receive :: proc(c:^Comms,from:tr.Peer_Id,channel:tr.Channel,bytes:[]u8) {
 	if !c.enabled || channel!=.Reliable {c.rejected+=1;return}
 	peer:^Peer
@@ -142,4 +148,5 @@ frame :: proc(c:^Comms) {
 
 // Display metadata can change without changing the admitted connection or its
 // retry frontier. Queued/history entries retain their original stamped name.
+@(private)
 same_binding :: proc(a,b:Binding)->bool {return a.peer==b.peer && a.generation==b.generation && a.seat==b.seat && a.identity==b.identity && a.spectator==b.spectator}

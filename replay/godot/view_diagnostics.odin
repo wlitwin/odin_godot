@@ -5,6 +5,7 @@ import d "godot:replay/definitions"
 
 // Called only on error. Owned diagnostics remain readable after nodes/resources
 // are retired. This is local reporting, never part of a replayable value.
+@(private)
 view_pool_fail :: proc(p:^View_Pool2($Entity,$Value,$Rig),error:View_Pool_Error,key:u64,detail:d.Report={})->View_Pool_Error {
     detail:=detail;key:=key
     if error==.Scene && p.nodes.invalid_root_key!=0 {key=p.nodes.invalid_root_key;detail=d.problem(.Invalid,"$scene.root","expected Node2D scene root")}

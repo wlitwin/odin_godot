@@ -4,7 +4,9 @@ import "core:mem"
 import r "godot:replay"
 
 Once_Result :: enum {New, Duplicate, Expired, Wrong_Epoch, Capacity, Invalid}
+@(private)
 Once_Key :: struct {source,key,slot:u64}
+@(private)
 Once_Batch :: struct {tick:u64,count:int,valid:bool}
 // A bounded consumption ledger for irreversible presentation. Cancellation may
 // stop an active voice but does not make a heard event new again after replay.

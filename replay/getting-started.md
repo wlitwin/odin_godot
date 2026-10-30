@@ -5,8 +5,31 @@ and persistence around it. The same gameplay rules run offline and under a chose
 multiplayer policy. The framework handles history, delivery, correction and
 recovery; the game still chooses authority/trust, prediction scope and game rules.
 
-Start with the [Scrapyard authoring guide](../examples/replay_scrapyard/editor-first.md)
-for the recommended editor/gameplay split and a complete game example.
+Start with the [Session starter](../build/template/replay/README.md) for a small
+Godot project that runs offline or as a native host/client. Use
+[Loot](../examples/replay_loot/README.md) for engine-free gameplay, and the
+[checked recipes](../examples/replay_recipes/README.md) for compact typed
+lifecycles. The [Scrapyard authoring guide](../examples/replay_scrapyard/editor-first.md)
+shows how those ideas grow into a complete editor-authored game.
+
+## The everyday surface
+
+| Owner | Setup | Per frame or tick | Read / submit | Teardown |
+| --- | --- | --- | --- | --- |
+| Local `Timeline` | `init` | `advance` | `current` / `read`; `emit` inside a step | `destroy` |
+| Godot `Session` | `session_open` | `session_frame` | Drain `session_changes`, read `session_state`; `session_issue` for actions | `session_close` |
+| Recoverable `Room` | `room_open` | `room_frame` | Use `room.session` changes/state; submit with `room_issue` | `room_close` |
+
+Session owns its clock, transport and runner. Room owns and drives its Session.
+Pump only the owner you chose. Party is the separate enrollment owner: drive it
+with `party_frame` and open Room from `party_room_options` after admission. Add
+it when invitations/rejoin are needed; a local or direct Session does not need it.
+
+Zero-initialize runtime owners, copy `SESSION_OPTIONS` for Session settings,
+and check setup errors before starting the frame loop. Keep an owner at a stable
+address until teardown. The
+[shared conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
+explain names, borrowed values and Godot exit cleanup.
 
 ## Choose the owner
 
@@ -14,7 +37,7 @@ for the recommended editor/gameplay split and a complete game example.
 | --- | --- | --- |
 | Offline deterministic/value simulation | `Timeline`, `advance`, `revise_input` | [Loot](../examples/replay_loot/README.md) |
 | Godot input, scenes and replay presentation | `Session` or a local Timeline plus view adapters | [Hello](../examples/replay_hello/README.md) |
-| Listen host or dedicated authoritative server | `Session` with Host/Server/Client/Observer roles | Hello's network scene |
+| Listen host or dedicated authoritative server | `Session` with Host/Server/Client/Observer roles | [Session starter](../build/template/replay/README.md) |
 | Co-op with invitations, reconnect and host migration | `Party` → `Room` | [Cavecrawl](../examples/replay_cavecrawl/README.md) |
 | Cooperative live Godot body ownership | `owned` plus Body2/Body3 and the authority runner | [Slopball](../examples/replay_slopball/README.md) |
 | Competitive authority/prediction and historical queries | `net.Model` policies through Session/Room | [Quickdraw](../examples/replay_quickdraw/README.md), [Claimball](../examples/replay_claimball/README.md) |
@@ -23,6 +46,10 @@ for the recommended editor/gameplay split and a complete game example.
 Use the existing example closest to your network policy. Their game-specific
 content is not required to use the library. Kit and its original games remain
 separate and independently runnable.
+
+Hello's network scene deliberately builds the lower-level Enet/Delay/Server/Client
+loop directly. Use it when implementing a custom runner integration; the Session
+starter is the normal lifecycle example.
 
 [Checked API recipes](../examples/replay_recipes/README.md) instantiate the Session,
 Party→Room and admitted P2P→Runner lifecycle calls against the actual public API.
@@ -93,6 +120,13 @@ For Room, call `room_frame` and consume changes/state from `room.session`.
 `room_issue` submits actions and `room_handoff` requests a planned transfer. A
 fenced Room must keep pumping control/UI while gameplay waits. Do not make another
 authority by changing an epoch yourself. [Room](godot/room.md) owns that transition.
+
+Player identifiers and array indexes are different. Authoritative `net` seats
+start at 1; zero means no local player (for example a dedicated server or
+observer). P2P roster slots start at 0. Owner streams reserve owner 0 for no
+producer and map nonzero IDs through the application's authenticated roster.
+Convert a seat to an array index only after validating it; use the runner's
+documented identity mapping rather than treating a peer ID as an index.
 
 Presentation journals report Begin/Update/Confirm/Cancel. Use their identity-aware
 one-shot/cue helpers so correction does not replay a sound or attach a death effect

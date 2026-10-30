@@ -10,6 +10,7 @@ HISTORY :: 64
 OUTBOX :: 128
 MAX_PEERS :: 32
 PENDING :: 8
+@(private)
 PACKET_KIND :: u16(0x434d)
 Kind :: enum u8 {None, Say, Marker, System}
 Result :: enum u8 {None, Not_Ready, Invalid, Capacity, Rate_Limited, Permission, Scope_Changed}
@@ -19,9 +20,13 @@ Entry :: struct {id:Id,seat:u16,identity:[32]u8,name:lb.Name,value:Payload}
 Scope :: struct {room,epoch,content:u64}
 Binding :: struct {peer:tr.Peer_Id,generation:u64,seat:u16,identity:[32]u8,spectator:bool,name:lb.Name,observer_name_allowed:bool}
 Receipt :: struct {submission:u64,result:Result,value:Payload}
+@(private)
 Delivery :: struct {entry:Entry,historical:bool}
+@(private)
 Wire_Kind :: enum u8 {None,Request,Ack,Deliver}
+@(private)
 Packet :: struct {version:u16,room,binding,request:u64,kind:Wire_Kind,result:Result,delivery:Delivery}
+@(private)
 Peer :: struct {
 	binding:Binding,
 	queue:[OUTBOX]Delivery,head,count:int,

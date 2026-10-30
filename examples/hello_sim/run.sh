@@ -52,5 +52,14 @@ two_windows() {
 	fi
 }
 
+scene_lifecycle() {
+	local log="$FSLP_LOGS/scene_exit.log"
+	if ! bash "$ROOT/tests/kitboot/scene_exit.sh" hello_sim "$1" >"$log" 2>&1; then
+		tail -35 "$log"
+		return 1
+	fi
+}
+
+fslp_act "scene lifecycle" 1 scene_lifecycle
 fslp_act "two predicted windows" 3 two_windows
 fslp_verdict HELLO_SIM

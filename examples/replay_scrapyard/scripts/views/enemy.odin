@@ -92,10 +92,6 @@ enemy_view_validate :: proc(self: ^ScrapEnemyView) -> d.Report {
 	return {}
 }
 
-enemy_view_valid :: proc(self: ^ScrapEnemyView) -> bool {
-	return self.ready && enemy_style_valid(self.skin)
-}
-
 enemy_view_retire :: proc(self: ^ScrapEnemyView) {
 	self.retired = true
 	self.impact = {}

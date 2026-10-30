@@ -48,6 +48,7 @@ Party :: struct {
 	invite: p.Ticket,
 	code: [p.INVITE_CODE_BYTES]u8,
 }
+@(private)
 party_scope :: proc(service: string) -> string {
 	hash := rec.hash(transmute([]u8)service); alphabet := "0123456789abcdef"; bytes: [64]u8
 	for b, i in hash {bytes[2 * i], bytes[2 * i + 1] = alphabet[b >> 4], alphabet[b & 15]}

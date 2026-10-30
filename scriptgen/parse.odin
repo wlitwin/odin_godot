@@ -93,18 +93,62 @@ godot_import_alias :: proc(file: ^ast.File) -> string {
 	return ""
 }
 
-// snake_case a PascalCase identifier: Ping -> ping, ToolProbe -> tool_probe.
+// Convert Ada_Case and PascalCase identifiers to snake_case. Existing word
+// separators stay single; acronym runs form one word (HUD_View -> hud_view).
 to_snake :: proc(s: string) -> string {
 	b := strings.builder_make()
 	for r, i in s {
 		if r >= 'A' && r <= 'Z' {
-			if i != 0 {strings.write_rune(&b, '_')}
+			if i > 0 && s[i-1] != '_' {
+				previous_lower := s[i-1] >= 'a' && s[i-1] <= 'z'
+				previous_digit := s[i-1] >= '0' && s[i-1] <= '9'
+				next_lower := i+1 < len(s) && s[i+1] >= 'a' && s[i+1] <= 'z'
+				previous_upper := s[i-1] >= 'A' && s[i-1] <= 'Z'
+				if previous_lower || ((previous_upper || previous_digit) && next_lower) {
+					strings.write_rune(&b, '_')
+				}
+			}
 			strings.write_rune(&b, r + ('a' - 'A'))
 		} else {
 			strings.write_rune(&b, r)
 		}
 	}
 	return strings.to_string(b)
+}
+
+// Recognize the former per-capital spelling only to report a migration. It
+// must not silently turn an existing lifecycle callback into an unused helper.
+@(private = "file")
+legacy_script_prefix :: proc(s: string) -> string {
+	b := strings.builder_make(context.temp_allocator)
+	for r, i in s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {strings.write_rune(&b, '_')}
+			strings.write_rune(&b, r + ('a' - 'A'))
+		} else {
+			strings.write_rune(&b, r)
+		}
+	}
+	strings.write_rune(&b, '_')
+	return strings.to_string(b)
+}
+
+@(private = "file")
+validate_struct_prefix :: proc(proc_name, struct_name: string, loc: Loc) -> bool {
+	prefix := strings.concatenate({to_snake(struct_name), "_"})
+	legacy_prefix := legacy_script_prefix(struct_name)
+	if prefix == legacy_prefix || !strings.has_prefix(proc_name, legacy_prefix) {
+		return true
+	}
+	error_at(
+		loc,
+		"%s now uses the snake_case prefix %q; rename %q to %q and regenerate scripts",
+		struct_name,
+		prefix,
+		proc_name,
+		strings.concatenate({prefix, proc_name[len(legacy_prefix):]}),
+	)
+	return false
 }
 
 // Public facade names normally read `<game>_net_<verb>`. A class already
@@ -1422,6 +1466,7 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 		if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
 		first := pt.params.list[0]
 		if node_text(src, first.type) != self_type {continue}
+		if !validate_struct_prefix(proc_name, s.struct_name, Loc{path, name_ident.pos.line}) {continue}
 
 		// PRIMARY-attribute exclusivity, checked before the dispatch chain
 		// below: that chain takes the FIRST matching attribute and stops, so
@@ -2332,6 +2377,7 @@ build_command_info :: proc(
 	Command_Info,
 	bool
 ) {
+	if !validate_struct_prefix(proc_name, struct_name, loc) {return {}, false}
 	cmd := Command_Info {
 		proc_name       = proc_name,
 		loc             = loc,
@@ -3961,6 +4007,7 @@ build_method_info :: proc(
 	Method_Info,
 	bool
 ) {
+	if !validate_struct_prefix(proc_name, struct_name, loc) {return {}, false}
 	m := Method_Info {
 		proc_name = proc_name,
 		gd_name   = strip_struct_prefix(proc_name, struct_name),

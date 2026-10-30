@@ -11,6 +11,13 @@ file write/read pairs, and waits for 64 hit-flash tweens to finish. Live-object 
 reference-count growth must be zero, and shutdown must report no leaked objects.
 The same script package is type-checked for WASM.
 
+WebRTC signaling is also exercised before any remote handshake: 32 open/close
+pairs, duplicate-start rejection, synchronous URL refusal, asynchronous connection
+refusal, double close, and peer/API replacement. Owned MultiplayerAPI references
+and closed signaling sockets must return to their baseline counts. These native
+checks use a non-listening loopback WebSocket address and need no WebRTC extension;
+they do not establish a successful remote WebRTC handshake.
+
 `gd.release_ref` consumes one owned RefCounted reference. It is nil-safe and does
 not clear the caller's handle. Use it for owned factory/getter results, including
 `gd.node_get_multiplayer` and the `gd.multiplayer` convenience function. Do not

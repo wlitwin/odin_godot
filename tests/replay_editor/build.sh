@@ -13,6 +13,7 @@ if os.environ.get('REPLAY_ADAPTER_PROBES')=='1':
  shutil.copy2(root/'tests/replay_adapter/probe.odin',out/'project/scripts/adapter_probe.odin')
  for p in (root/'tests/replay_adapter').glob('*.gd'):shutil.copy2(p,out/'project'/('adapter_'+p.name))
 (out/'project/dev/invalid_enemy.tscn').write_text('[gd_scene format=3]\n[ext_resource type="PackedScene" path="res://entities/mob.tscn" id="enemy"]\n[node name="InvalidEnemy" instance=ExtResource("enemy")]\npreview = true\nappearance = null\n')
+(out/'project/dev/invalid_enemy_appearance.tscn').write_text('[gd_scene format=3]\n[ext_resource type="PackedScene" path="res://entities/mob.tscn" id="enemy"]\n[node name="InvalidEnemyAppearance" instance=ExtResource("enemy")]\npreview = false\nappearance = null\n')
 PY
 project="$work/project";case "$(uname -s)" in Darwin) ext=dylib;;*) ext=so;;esac
 export ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext"

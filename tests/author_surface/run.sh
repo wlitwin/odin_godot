@@ -103,4 +103,28 @@ if rg -n 'gd_cue|gd_fact' "$ROOT/build" "$ROOT/core" "$ROOT/decl" "$ROOT/docs" "
 	fail "retired attributes remain registered or documented"
 fi
 
+# Package implementation records and frame helpers must not become part of
+# autocomplete or the supported import surface just to serve white-box tests.
+mkdir -p "$work/private"
+for entry in \
+	'kit/session|Interest_Key' \
+	'kit/session|Profile_Table' \
+	'kit/session|Session_Run' \
+	'kit/session|Session_Wiring' \
+	'kit/xfer|Xfer_Key' \
+	'kit/boot|boot_succ_pulse' \
+	'godot|Webrtc_Conn' \
+	'godot|Webrtc_Session' \
+; do
+	package_path="${entry%|*}"
+	symbol="${entry#*|}"
+	printf '%s\n' 'package private_surface' "import kit \"godot:$package_path\"" \
+		"Leaked :: kit.$symbol" >"$work/private/private.odin"
+	if "$ODIN" check "$work/private" -collection:godot="$ROOT" -no-entry-point >"$work/private.log" 2>&1; then
+		fail "internal $package_path.$symbol is exported"
+	fi
+	grep -qE "'$symbol' is not (exported|declared) by 'kit'" "$work/private.log" \
+		|| fail "privacy fixture for $package_path.$symbol failed for an unrelated reason"
+done
+
 echo "AUTHOR_SURFACE_OK"

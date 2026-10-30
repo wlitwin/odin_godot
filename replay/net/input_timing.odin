@@ -2,7 +2,9 @@ package replay_net
 
 // Runtime observations only: no timing estimates or local clock values enter a
 // gameplay frame, checkpoint, action schedule or protocol contract.
+@(private)
 Input_Sent :: struct {tick, at_ms:u64, valid:bool}
+@(private)
 Input_Timing :: struct {
  last_echo,window_at,peak_ms,previous_peak_ms,turnaround_ms:u64,
  samples:u32,

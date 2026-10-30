@@ -111,6 +111,7 @@ Xfer :: struct {
 // A struct key, never a packed int: `u32(from) << 8 | id` kept only 24 bits of
 // the u64 Player_Id — two players colliding mod 2^24 would cross-assemble each
 // other's transfers. Same rule as the session's Interest_Key.
+@(private)
 Xfer_Key :: struct {
 	from: knet.Player_Id,
 	id:   u8,

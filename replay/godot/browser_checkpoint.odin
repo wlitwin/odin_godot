@@ -27,11 +27,14 @@ browser_checkpoint_open :: proc(p:^Browser_Checkpoint($S,$C,$A,$E,$N),namespace,
 	if !browser_store_read(&p.op,p.namespace,p.key,net.MAX_CHECKPOINT_BYTES) {browser_checkpoint_fail(p,.Store);return false}
 	p.phase=.Reading;return true
 }
+@(private)
 browser_checkpoint_fail :: proc(p:^Browser_Checkpoint($S,$C,$A,$E,$N),error:Browser_Save_Error) {
 	if p.phase==.Writing {p.receipt_serial+=1;p.last_success=false}
 	p.error,p.store_error=error,p.op.error;p.phase=.Failed
 	browser_store_close(&p.op);net.checkpoint_destroy(&p.writing)
 }
+// Checks whether a decoded archive belongs to this local profile and uses the
+// supported local recovery policy. This does not open or adopt the archive.
 browser_checkpoint_validate :: proc(p:^Browser_Checkpoint($S,$C,$A,$E,$N),cp:^net.Checkpoint(S,C,A,N))->Browser_Save_Error {
 	if cp.settings.require_permit || cp.header.policy_id!=0 {return .Policy}
 	_,found:=net.checkpoint_seat(cp,p.token);return found ? .None : .Identity

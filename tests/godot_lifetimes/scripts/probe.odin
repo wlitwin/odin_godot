@@ -30,6 +30,7 @@ godot_lifetimes_probe_ready :: proc(self:^GodotLifetimesProbe) {
 	mp_growth:=gd.ref_counted_get_reference_count(mp)-mp_before;peer_growth:=gd.ref_counted_get_reference_count(peer)-peer_before
 	gd.print_str(fmt.tprintf("GODOT_LIFETIMES input_growth=%.0f multiplayer_growth=%d peer_growth=%d",input_growth,mp_growth,peer_growth))
 	if input_growth!=0 || mp_growth!=0 || peer_growth!=0 {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
+	if !webrtc_helper_lifetimes(self.owner) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
 	// Each offline installation replaces the previous peer. Only the API's
 	// reference and this query's reference may remain after the helper returns.
 	session:ks.Session;defer ks.session_destroy(&session)

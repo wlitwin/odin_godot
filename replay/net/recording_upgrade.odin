@@ -5,6 +5,7 @@ import d "godot:replay/diagnostic"
 
 // Frozen pre-authority-observation diagnostic input schema. Gameplay packets and
 // checkpoints never encode Batch and do not require this recording conversion.
+@(private)
 Batch_Before_Authority :: struct($Control,$Action:typeid,$Seats:int) {
  prediction_group:u64,
  prediction_seat:u16,

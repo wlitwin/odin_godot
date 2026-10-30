@@ -6,6 +6,7 @@ func run():
 	assert(game.editor_binding_check("res://entities/mob.tscn",true),"script ready/present/retire")
 	assert(game.editor_binding_check("res://entities/scrap.tscn",false),"wrong script rejection")
 	assert(game.editor_binding_check("res://dev/invalid_enemy.tscn",false),"invalid component rejection")
+	assert(game.editor_binding_check("res://dev/invalid_enemy_appearance.tscn",false),"invalid appearance rejection with valid components")
 	var before:int=game.editor_catalog_hash();assert(before!=-1)
 	var definition:Resource=load("res://data/mobs/scrapbot.tres")
 	var hp:int=definition.hp

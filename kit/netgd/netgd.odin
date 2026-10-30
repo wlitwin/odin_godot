@@ -8,8 +8,8 @@ package kit_netgd
 // MultiplayerPeer the game installed — the existing ergonomic wrappers
 // (gd.host/gd.join for ENet, gd.webrtc_host/webrtc_join for browser room codes)
 // already handle peer creation, so the toolkit works over every transport those
-// support, and Steam later slots in the same way. Riding SceneMultiplayer (rather
-// than owning the peer and polling it) keeps @(gd_rpc) and the engine's
+// support, and Steam later slots in the same way. Using SceneMultiplayer's
+// packet path keeps @(gd_rpc) and the engine's
 // spawner/synchronizer interop working alongside the toolkit.
 //
 // CHANNEL PLAN (see the design doc's wire model):

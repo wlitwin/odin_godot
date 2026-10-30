@@ -832,6 +832,7 @@ session_mix_fingerprint :: proc(base: u64, s: string) -> u64 {
 // dies wholesale at every re-init. New fields must pick a struct — there is
 // no third place to leak from (the profile-table leak was a field parked in
 // the wrong scope with a hand-maintained teardown list to forget it in).
+@(private)
 Session_Wiring :: struct {
 	// The allocator every ROOT reinstalls as context.allocator — the session's
 	// tier of the kit's three-allocator rule (docs/kit/session.md, "The
@@ -922,6 +923,7 @@ Session_Wiring :: struct {
 // Everything one RUN creates. Reset is wholesale — run_destroy frees the owned
 // containers, then `s.run = {}` zeroes every field at once, so a new field
 // can never leak stale state across a rehost by being missed in a list.
+@(private)
 Session_Run :: struct {
 	is_host:         bool,
 	dedicated:       bool, // this authority is a DEDICATED SERVER: its seat is

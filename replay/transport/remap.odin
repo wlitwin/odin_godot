@@ -4,6 +4,7 @@ Peer_Mapping :: struct {logical, physical: Peer_Id}
 
 // Explicit trusted bindings for a fresh transport instance. Stable logical
 // identities can survive ENet connection-ID changes; this is not authentication.
+// Closing remap_transport forwards close to base, then clears the mapping.
 Remap :: struct {ready: bool, base: Transport, mappings: [16]Peer_Mapping, count: int}
 
 remap_init :: proc(m: ^Remap, base: Transport, bindings: []Peer_Mapping) -> bool {

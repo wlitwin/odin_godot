@@ -83,6 +83,7 @@ interest_on :: proc(s: ^Session) -> bool {
 // A struct key, not a packed u64: `u64(player) << 32 | u64(id)` silently
 // truncated Player_Id to 32 bits — safe only while ids stay small, which is
 // exactly the kind of invariant nobody re-checks when it breaks.
+@(private)
 Interest_Key :: struct {
 	player: knet.Player_Id,
 	id:     knet.Net_Id,

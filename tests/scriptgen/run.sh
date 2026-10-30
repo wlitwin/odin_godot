@@ -2214,4 +2214,157 @@ ODIN
 if "$SGEN" "$mv" -godot:"$ROOT" >"$work/native-export.log" 2>&1; then fail "native string export accepted incompatible storage"; fi
 grep -q 'native string exports' "$work/native-export.log" || fail "missing native string export diagnostic"
 
+# Odin type names and their generated snake-case API must agree. Cover the Kit
+# command path, Godot lifecycle/method/signal bindings, and the Replay descriptor.
+names="$work/odin_names"
+mkdir -p "$names"
+cat >"$names/player.odin" <<'ODIN'
+//gd:extends Node
+package odin_names
+import gd "godot:godot"
+import knet "godot:kit/net"
+Player_Controller :: struct {
+	owner: gd.Node,
+	net_id: knet.Net_Id,
+	hp: i32 `gd:"replicate"`,
+	changed: gd.Signal1(i64),
+}
+player_controller_ready :: proc(self: ^Player_Controller) {}
+@(gd_method)
+player_controller_add :: proc(self: ^Player_Controller, amount: i64) -> i64 {return amount}
+@(gd_command)
+player_controller_heal :: proc(self: ^Player_Controller, amount: i32) -> bool {
+	self.hp += amount
+	return true
+}
+ODIN
+cat >"$names/view.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:replay_view value=value,present=hud_view_present
+package odin_names
+import gd "godot:godot"
+HUD_View :: struct {owner: gd.Node2d, value: u8}
+hud_view_ready :: proc(self: ^HUD_View) {}
+hud_view_present :: proc(self: ^HUD_View, value: u8) {self.value = value}
+ODIN
+cat >"$names/camel.odin" <<'ODIN'
+//gd:extends Node
+package odin_names
+import gd "godot:godot"
+HttpServer :: struct {owner: gd.Node}
+http_server_ready :: proc(self: ^HttpServer) {}
+ODIN
+cat >"$names/acronym.odin" <<'ODIN'
+//gd:extends Node
+package odin_names
+import gd "godot:godot"
+HTTPServer :: struct {owner: gd.Node}
+http_server_ready :: proc(self: ^HTTPServer) {}
+ODIN
+# PascalCase compatibility is checked independently because both spellings
+# intentionally produce the same generated symbol prefix.
+mv "$names/acronym.odin" "$work/acronym.odin"
+"$SGEN" "$names" -godot:"$ROOT" >"$work/odin-names.log" 2>&1 || fail "Odin naming fixture generation"
+ngen="$names/odin_godot_scripts.gen.odin"
+for expected in \
+	'player_controller_heal_cmd :: proc' \
+	'player_controller_emit_changed :: proc' \
+	'name = "add", trampoline = _player_controller_m_add' \
+	'ready = _player_controller_lc_ready' \
+	'hud_view_replay_binding :: proc' \
+	'ready = _hud_view_lc_ready' \
+	'ready = _http_server_lc_ready'; do
+	grep -qF "$expected" "$ngen" || fail "missing canonical Odin name: $expected"
+done
+"$ODIN" check "$names" -collection:godot="$ROOT" -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_command || fail "Odin naming fixture compilation"
+"$ODIN" check "$names" -collection:godot="$ROOT" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_command || fail "Odin naming fixture WASM compilation"
+mv "$names/camel.odin" "$work/camel.odin"
+mv "$work/acronym.odin" "$names/acronym.odin"
+"$SGEN" "$names" -godot:"$ROOT" >"$work/odin-acronym.log" 2>&1 || fail "acronym naming fixture generation"
+grep -qF 'ready = _http_server_lc_ready' "$ngen" || fail "acronym runs must form one word"
+"$ODIN" check "$names" -collection:godot="$ROOT" -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_command || fail "acronym naming fixture compilation"
+mv "$work/camel.odin" "$names/camel.odin"
+if "$SGEN" "$names" -godot:"$ROOT" >"$work/odin-name-collision.log" 2>&1; then
+	fail "script types with the same generated prefix were accepted"
+fi
+grep -qF 'generate the same snake_case prefix "http_server"' "$work/odin-name-collision.log" \
+	|| fail "generated-prefix collision must name the conflicting prefix"
+
+# Former per-capital prefixes fail with a migration instead of silently losing
+# their lifecycle or changing the exposed Godot method name.
+legacy_names="$work/legacy_names"
+mkdir -p "$legacy_names"
+for suffix in ready add; do
+	cat >"$legacy_names/server.odin" <<'ODIN'
+//gd:extends Node
+package legacy_names
+import gd "godot:godot"
+HTTP_Server :: struct {owner: gd.Node}
+ODIN
+	if [[ "$suffix" == add ]]; then printf '@(gd_method)\n' >>"$legacy_names/server.odin"; fi
+	printf 'h_t_t_p__server_%s :: proc(self: ^HTTP_Server) {}\n' "$suffix" >>"$legacy_names/server.odin"
+	if "$SGEN" "$legacy_names" -godot:"$ROOT" >"$work/legacy-$suffix.log" 2>&1; then
+		fail "legacy $suffix prefix was silently accepted"
+	fi
+	grep -qF "HTTP_Server now uses the snake_case prefix \"http_server_\"" "$work/legacy-$suffix.log" \
+		|| fail "legacy $suffix lacks a prefix migration diagnostic"
+	grep -qF "http_server_$suffix" "$work/legacy-$suffix.log" \
+		|| fail "legacy $suffix diagnostic lacks the corrected name"
+done
+
+# Composed components use the same prefixes as directly attached scripts.
+composed_names="$work/composed_names"
+composed_collection="$work/composed_collection"
+python3 - "$ROOT" "$composed_collection" <<'PY'
+from pathlib import Path
+import sys
+root, collection = map(Path, sys.argv[1:])
+collection.mkdir()
+for source in root.iterdir():
+    if not source.name.startswith('.'):
+        (collection/source.name).symlink_to(source, target_is_directory=source.is_dir())
+PY
+composed_blocks="$composed_collection/naming_blocks"
+mkdir -p "$composed_names" "$composed_blocks"
+cat >"$composed_blocks/block.odin" <<'ODIN'
+package composed_blocks
+HTTP_Server :: struct {value: i32 `gd:"replicate"`}
+@(gd_method)
+http_server_title :: proc(self: ^HTTP_Server) -> i64 {return i64(self.value)}
+@(gd_command)
+http_server_add :: proc(self: ^HTTP_Server, amount: i32) -> bool {
+	self.value += amount
+	return true
+}
+ODIN
+cat >"$composed_names/player.odin" <<'ODIN'
+//gd:extends Node
+package composed_names
+import gd "godot:godot"
+import knet "godot:kit/net"
+import blocks "godot:naming_blocks"
+Player :: struct {owner: gd.Node, net_id: knet.Net_Id, server: blocks.HTTP_Server}
+ODIN
+"$SGEN" "$composed_names" -godot:"$composed_collection" >"$work/composed-names.log" 2>&1 || { cat "$work/composed-names.log"; fail "composed Odin naming fixture generation"; }
+cngen="$composed_names/odin_godot_scripts.gen.odin"
+grep -qF 'name = "server_title"' "$cngen" || fail "composed method did not strip its Ada_Case prefix"
+grep -qF 'player_server_add_cmd :: proc' "$cngen" || fail "composed command did not strip its Ada_Case prefix"
+"$ODIN" check "$composed_names" -collection:godot="$composed_collection" -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_command || fail "composed Odin naming fixture compilation"
+"$ODIN" check "$composed_names" -collection:godot="$composed_collection" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_command || fail "composed Odin naming fixture WASM compilation"
+for verb in title add; do
+	python3 - "$composed_blocks/block.odin" "$verb" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text().replace('h_t_t_p__server_', 'http_server_')
+s = s.replace('http_server_' + sys.argv[2], 'h_t_t_p__server_' + sys.argv[2])
+p.write_text(s)
+PY
+	if "$SGEN" "$composed_names" -godot:"$composed_collection" >"$work/composed-legacy-$verb.log" 2>&1; then
+		fail "legacy composed $verb prefix was silently accepted"
+	fi
+	grep -qF 'HTTP_Server now uses the snake_case prefix "http_server_"' "$work/composed-legacy-$verb.log" \
+		|| fail "legacy composed $verb lacks a prefix migration diagnostic"
+done
+
 echo "SCRIPTGEN_OK"

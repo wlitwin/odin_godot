@@ -102,6 +102,7 @@ Webrtc_Error :: enum {
 // ID: the engine owns post-connect teardown (its poll reaps dead channels and frees the
 // object), so before touching `conn` on a signaling message the slot must prove the object
 // still exists — instance ids are never reused, a nil lookup means freed.
+@(private = "file")
 Webrtc_Conn :: struct {
 	used:      bool,
 	remote_id: int,
@@ -125,6 +126,7 @@ _WEBRTC_MAX_REMOTES :: 8
 // A live WebRTC signaling+connection session, owned by these helpers (one per hosting/joining
 // node). Stored in a small fixed global pool so the helpers stay contextless + allocation-free
 // (like the rest of the binding) — there is realistically one lobby per game, a handful at most.
+@(private = "file")
 Webrtc_Session :: struct {
 	active:    bool,
 	is_host:   bool,
@@ -132,9 +134,10 @@ Webrtc_Session :: struct {
 	// node's pointer can be reused by a new allocation, which would alias a stale session
 	// slot onto an unrelated node. Instance ids are never reused.
 	node_id:   u64,
-	mp:        Multiplayer_Api,
-	ws:        Web_Socket_Peer,
-	rtc:       Web_Rtc_Multiplayer_Peer,
+	mp:        Multiplayer_Api, // owned reference to the API used at start
+	ws:        Web_Socket_Peer, // owned signaling reference
+	rtc:       Web_Rtc_Multiplayer_Peer, // borrowed after installation
+	rtc_id:    u64, // borrowed peer may be freed when another installer replaces it
 	conns:     [_WEBRTC_MAX_REMOTES]Webrtc_Conn,
 	my_id:     int,
 	state:     Webrtc_State,
@@ -205,8 +208,9 @@ _conn_count :: proc "contextless" (s: ^Webrtc_Session) -> int {
 // migration pre-arranges tomorrow's room this way, so survivors can chase a code they already
 // know; webrtc_room_code always reports the code that actually opened). The handshake begins
 // when the joining peer appears. Returns false if a session slot / the MultiplayerAPI / the
-// socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once connected,
-// use `gd.rpc`.
+// socket could not be set up. Each node owns at most one session; an existing
+// session also returns false. Close it before retrying, including after failure.
+// Pump it with `gd.webrtc_poll(node)` every frame; once connected, use `gd.rpc`.
 webrtc_host :: proc "contextless" (node: Node, url: cstring, room: cstring = "") -> bool {
 	return _webrtc_start(node, url, room, true)
 }
@@ -221,16 +225,22 @@ webrtc_join :: proc "contextless" (node: Node, url: cstring, room: cstring) -> b
 
 @(private = "file")
 _webrtc_start :: proc "contextless" (node: Node, url: cstring, room: cstring, is_host: bool) -> bool {
+	if _find(node) != nil {return false}
 	s := _find_free()
 	if s == nil {return false}
 	mp := node_get_multiplayer(node)
 	if cast(rawptr)mp == nil {return false}
 	ws := new_web_socket_peer()
-	if cast(rawptr)ws == nil {return false}
+	if cast(rawptr)ws == nil {release_ref(mp); return false}
+	ref_counted_init_ref(ws)
 	tls: Tls_Options
 	u := new_string_cstring(url)
 	defer free_string(u)
-	if web_socket_peer_connect_to_url(ws, u, tls) != .Ok {return false}
+	if web_socket_peer_connect_to_url(ws, u, tls) != .Ok {
+		release_ref(ws)
+		release_ref(mp)
+		return false
+	}
 	s^ = Webrtc_Session {
 		active  = true,
 		is_host = is_host,
@@ -316,12 +326,11 @@ webrtc_poll :: proc "contextless" (node: Node) {
 	}
 }
 
-// webrtc_close tears down `node`'s WebRTC session COMPLETELY so a fresh webrtc_host/webrtc_join
-// can start clean: it sends `leave`, closes the signaling socket, DETACHES the installed WebRTC
-// multiplayer peer from the MultiplayerAPI (back to offline), and zeroes the pool slot (clearing
-// the room/ICE buffers + the peer-connection handles). This is what lets a failed connection
-// attempt recover and be retried in-place (no page reload): after webrtc_close the slot is free
-// and the MultiplayerAPI has no stale peer, so a re-host/re-join installs a brand-new one.
+// webrtc_close sends `leave`, closes signaling/connections, releases its owned
+// references, and frees the session slot for another host/join attempt. It
+// detaches its WebRTC peer only if that peer is still installed on the original
+// MultiplayerAPI; a peer installed by another owner survives. Safe after failed
+// setup and on repeated calls. Close before the owning node leaves the tree.
 webrtc_close :: proc "contextless" (node: Node) {
 	s := _find(node)
 	if s == nil {return}
@@ -345,9 +354,18 @@ webrtc_close :: proc "contextless" (node: Node) {
 		}
 	}
 	if cast(rawptr)s.mp != nil {
-		none: Multiplayer_Peer
-		multiplayer_api_set_multiplayer_peer(s.mp, none)
+		current := multiplayer_api_get_multiplayer_peer(s.mp)
+		if current != nil {
+			// The retained API is the one used at start, even if the node is
+			// reassigned. Do not detach a peer another owner installed there.
+			if object_get_instance_id(cast(Object)current) == s.rtc_id {
+				multiplayer_api_set_multiplayer_peer(s.mp, nil)
+			}
+			release_ref(current)
+		}
 	}
+	release_ref(s.ws)
+	release_ref(s.mp)
 	// Zero the slot: clears active/state/err, the room + ICE buffers, and the ws/rtc/conn handles,
 	// so the pool slot is fully reusable by a subsequent webrtc_host/webrtc_join.
 	s^ = Webrtc_Session{}
@@ -464,6 +482,7 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 @(private = "file")
 _install_peer :: proc "contextless" (s: ^Webrtc_Session, server: bool) {
 	s.rtc = new_web_rtc_multiplayer_peer()
+	s.rtc_id = object_get_instance_id(cast(Object)s.rtc)
 	// The toolkit (kit/netgd) sends on channel 1 (RELIABLE — commands,
 	// snapshots) and channel 2 (UNRELIABLE_ORDERED — owner streams), beyond
 	// the engine's own channel 0. A WebRTCMultiplayerPeer created with an

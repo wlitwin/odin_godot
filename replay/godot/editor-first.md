@@ -51,7 +51,7 @@ views: rgd.View_Pool2(Enemy, Enemy_Display, ^Enemy_View)
 
 binding = {
     present = enemy_view_present,
-    valid = enemy_view_valid,
+    validate = enemy_view_validate,
     retired = enemy_view_retire,
 }
 ok := rgd.view_pool_load(&views, parent, "res://enemy.tscn", capacity,
@@ -60,12 +60,17 @@ error := rgd.view_pool_present(&views, scope, items)
 ```
 
 `present` receives a value, not a World pointer. It may delegate to typed child
-view scripts. `valid` checks the scene's required components/assets. `retired` is
+view scripts. `validate` returns a `definitions.Report` describing missing or
+invalid scene components/assets. `retired` is
 optional and can stop local processing or discard pending visual notices before
 queued node deletion; it must also tolerate a partially initialized script after
 failed validation. Godot owns the script instance; the rig borrows its pointer and
 must never delete it. Parent, configuration and compiled script module must outlive
 the pool. Destroy/rebind across scene or script-module replacement.
+
+`validate` is the only validation callback. Older `valid = boolean_check`
+descriptors must migrate to a report-returning validator, preserving their
+component and appearance checks. See the [migration example](adapter-bindings.md#script-descriptors).
 
 The ordinary Godot process callback advances animations even when unchanged data
 skips `present`. Do not additionally call the framework frame hook for the same

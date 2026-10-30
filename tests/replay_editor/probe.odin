@@ -6,6 +6,7 @@ import rt "godot:runtime"
 import "godot:gdext"
 import r "godot:replay"
 import rgd "godot:replay/godot"
+import d "godot:replay/definitions"
 import v "godot:replay/view"
 import views "views"
 import game "../shared/game"
@@ -14,7 +15,17 @@ import content "../shared/content"
 
 @(gd_method)
 replay_scrapyard_editor_binding_check :: proc(self:^ReplayScrapyard,path:string,expected:bool)->bool {
-    config:=rgd.Script_View(display.Mob_View,views.ScrapEnemyView){present=views.enemy_view_present,valid=views.enemy_view_valid,retired=views.enemy_view_retire}
+    // A directly loaded scene must already own a valid appearance. Archetype
+    // pools instead validate components before their configure callback runs.
+    config:=rgd.Script_View(display.Mob_View,views.ScrapEnemyView){
+        present=views.enemy_view_present,
+        validate=proc(script:^views.ScrapEnemyView)->d.Report {
+            if report:=views.enemy_view_validate(script);report.error!=.None {return report}
+            if !views.enemy_style_valid(script.skin) {return d.problem(.Invalid,"$appearance","invalid ScrapEnemyStyle frames, texture or timing")}
+            return {}
+        },
+        retired=views.enemy_view_retire,
+    }
     pool:rgd.View_Pool2(game.Mob,display.Mob_View,^views.ScrapEnemyView)
     if !rgd.view_pool_load(&pool,self.world_node,fmt.ctprintf("%s",path),1,rgd.script_view_binding(&config)) {return false};defer rgd.view_pool_destroy(&pool)
     items:=[1]v.View_Item(game.Mob,display.Mob_View){{handle={0,1},source=.Observed,view={scale={1,1},color={1,1,1,1},value={hp=10,scale=2,tint={1,1,1,1}}}}}

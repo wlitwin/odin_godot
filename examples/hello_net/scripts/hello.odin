@@ -91,6 +91,11 @@ hello_net_ready :: proc(self: ^HelloNet) {
 	}
 }
 
+hello_net_exit_tree :: proc(self: ^HelloNet) {
+	hello_net_detach(self)
+	ksess.session_destroy(&self.ses)
+}
+
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	// THE LIFECYCLE, read not kept. `.Menu` is "no seat and none coming" — the
 	// old `running` bool, except this one is derived from the session, so it

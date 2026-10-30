@@ -4,6 +4,24 @@
 lifecycle around the engine-free runner. The application supplies a typed model,
 initial frame, options, sampled controls/actions, and presentation.
 
+Start with a zero-initialized owner and copy `SESSION_OPTIONS` for its settings;
+an empty `Session_Options{}` does not contain the network defaults. Keep the live
+owner at a stable address, usually a field on the game's Godot script. Call
+`session_close` from that script's exit lifecycle. Do not copy an open Session or
+defer its close in `_ready`, which would close it as soon as `_ready` returns.
+
+| Task | Normal API |
+| --- | --- |
+| Direct local or authoritative game | `session_open`, `session_frame`, `session_close` |
+| Submit a discrete action | `session_issue`; use `Action_Intent` when retaining and tracking a pending action |
+| Read presentation | Drain `session_changes`, then read the copied `session_state` |
+| Invitations and durable enrollment | `party_open`, `party_begin`, `party_frame`, `party_room_options`, `party_close` |
+| Coordinator-owned recovery | `room_open`, `room_frame`, `room_issue`, `room_close`; read changes/state through `room.session` |
+
+Use one Session or Room owner for a game. Room owns its Session and drives it;
+do not call `session_frame` separately on `room.session`. Party remains alive
+while Room borrows its authorization. Close Room before Party and its storage.
+
 [Editor-first authoring](editor-first.md) connects ordinary scene-local scripts to
 typed display values. Replay Scrapyard is the canonical composition example, with
 standalone actor/HUD previews and validated Resource baking.
@@ -54,11 +72,29 @@ options := replaygd.SESSION_OPTIONS
 options.role = .Host // Solo, Host, Server, Client, Observer
 options.network.hz = 20
 error := replaygd.session_open(&session, initial_frame, model, options)
+if error != .None {
+	replaygd.session_close(&session)
+	return error
+}
 
 // Each frame: sample devices outside simulation.
 error = replaygd.session_frame(&session, delta_seconds, controls)
-count := replaygd.session_changes(&session, changes[:])
+if error != .None {
+	return error
+}
+for {
+	count := replaygd.session_changes(&session, changes[:])
+	if count == 0 {
+		break
+	}
+	for change in changes[:count] {
+		present_change(change) // Application presentation callback.
+	}
+}
 frame, valid := replaygd.session_state(&session)
+if valid {
+	present_state(frame.state) // Application presentation callback.
+}
 ```
 
 `session_issue` routes a local player's action to the authority or predicting
@@ -67,6 +103,12 @@ effects and action verdicts; an authoritative verdict is a `Confirm`, or a chang
 whose `confirmed` flag is set. Simulation never renders or accesses device state.
 The facade drains the lower-level duplicate outcome convenience queue so normal
 games have one presentation-consumer door.
+
+The caller supplies the `changes` scratch array. Drain until zero even when that
+array is smaller than the pending batch; leaving changes queued makes the next
+`session_frame` return `.Presentation`. The checked
+[lifecycle recipes](../../examples/replay_recipes/recipes.odin) show this complete
+loop with concrete types.
 
 [Typed InputMap and signal bindings](controls.md) buffer tick edges, apply explicit
 pause/focus/menu gates and capture copied UI actions.

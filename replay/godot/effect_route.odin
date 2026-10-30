@@ -11,6 +11,7 @@ Effect_Binding :: struct($Event,$Value,$Rig:typeid) {
     animate:proc(v.Entity_View(Value),f64,f64)->v.Entity_View(Value),
     view:View_Binding(Effect_State(Value),Rig),
 }
+@(private)
 Effect_Identity :: struct {}
 Effect_Route2 :: struct($Event,$Value,$Rig:typeid) {
     route:v.Cue_Route(Event,v.Entity_View(Value)),

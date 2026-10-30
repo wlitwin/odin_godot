@@ -332,6 +332,23 @@ peers, but the host cannot use these coordinates as cheat-resistant truth. Use
 the [simulation quickstart](quickstart-sim.md) when the authority must derive
 movement from validated inputs.
 
+## 8. Release the stack on scene exit
+
+The scene owns the Godot nodes; your script owns the Kit allocations. Pair
+attachment with teardown when replacing or freeing the game scene:
+
+```odin
+hello_net_exit_tree :: proc(self: ^HelloNet) {
+	hello_net_detach(self)
+	ksess.session_destroy(&self.ses)
+}
+```
+
+The generated detach stops the network stack in dependency order and resets
+the Session's run. `session_destroy` also releases its retained wiring. Use
+detach alone when the same game owner will attach again; use both calls for
+final scene removal. Both operations are safe after an earlier detach.
+
 ## Test with latency and packet loss
 
 `Options.env` enables the built-in link simulator:

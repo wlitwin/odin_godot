@@ -9,6 +9,7 @@ Delayed_Packet :: struct {active: bool, due, sequence: u64, received: Received}
 // A bounded receive-delay decorator for real transports. It preserves their
 // delivery guarantees, copies packet ownership, and never silently drops a full
 // queue. Loss/retry simulation belongs to Memory or a real network fault tool.
+// Closing delay_transport forwards close to base, then frees this queue.
 Delay :: struct {
 	allocator: mem.Allocator,
 	base: Transport,

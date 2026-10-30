@@ -17,5 +17,13 @@ the embedding chooses UI/retry behavior and supplies its own content IDs.
 
 `bridge.odin` also checks detached actor display, typed scene baking and Room signal-action submission/results. Actual node, input, effect and body lifecycle checks live in `tests/replay_nodes`.
 
+The recipe gate checks native and WASM builds with Odin's unused/shadowing, style,
+semicolon and tab checks scoped to `replay_recipes`, with warnings treated as
+errors. Imported generated bindings have their own style; global `-strict-style`
+and `-disallow-do` would also apply to those imports.
+
+The bake example returns a copied definition. Its temporary Store's `Ref` remains
+local and expires when the Store is destroyed.
+
 `components.odin` demonstrates an owned actor composed from health, movement and
 the shared gun mechanism. It introduces no engine state or component registry.

@@ -197,6 +197,12 @@ The automated two-process test checks both behaviors under injected latency:
 bash examples/hello_sim/run.sh
 ```
 
+The simulation example pairs setup with `hello_sim_net_detach(self)` followed
+by `ksess.session_destroy(&self.ses)` in `hello_sim_exit_tree`. The generated
+detach destroys the lane before its Session. Follow the same
+[scene-exit rule](quickstart.md#8-release-the-stack-on-scene-exit) when replacing
+the game scene.
+
 ## Run a dedicated authority
 
 The example also exposes a headless server role:

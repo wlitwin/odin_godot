@@ -7,9 +7,8 @@ for authored enemy scenes and permanent runner scenes.
 
 ## Script descriptors
 
-Existing `Script_View(Value, Script)` remains available. Its optional `validate`
-callback returns a `definitions.Report` identifying the exact failed component;
-`valid` remains supported for existing boolean validators. The display type must
+`Script_View(Value, Script)` has one optional `validate` callback returning a
+`definitions.Report` identifying the exact failed component. The display type must
 be a bounded replayable value. Script pointers, local clocks and Godot objects
 belong to the view script, not its display value.
 
@@ -19,6 +18,14 @@ descriptor := rgd.Script_View(Runner_Display, Runner_View){
     validate = runner_validate,
 }
 ```
+
+When migrating an older descriptor, replace `valid = check` with
+`validate = validate_view`. Return `{}` on success or
+`definitions.problem(.Invalid, field, message)` on failure; retain every check
+from the old predicate. `valid` is no longer a descriptor field and old
+initializers fail compilation. In an archetype binding, validation checks scene
+components before `configure` supplies the appearance. A directly bound scene
+that requires an authored appearance must validate that appearance as well.
 
 `Script_Binding(Value, Script)` stores that descriptor by value and borrows a
 permanent authored node. `script_bind` resolves and validates its script;

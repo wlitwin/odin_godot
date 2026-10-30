@@ -63,6 +63,7 @@ Ev_Profile_Changed :: struct {
 }
 
 // The byte-level table (one per session; the typed views below wrap it).
+@(private)
 Profile_Table :: struct {
 	size:   int, // 0 = never installed
 	rows:   map[knet.Player_Id][]u8,

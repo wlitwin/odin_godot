@@ -2118,6 +2118,8 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		script: Script,
 	}
 	pending := make([dynamic]Pending)
+	script_prefixes := make(map[string]string)
+	defer delete(script_prefixes)
 	helpers := make([dynamic]Helper)
 	lintable := make([dynamic]Helper) // EVERY package file — scripts and helpers both
 	for fi in files {
@@ -2148,6 +2150,18 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		if !has {
 			append(&helpers, Helper{path = path, src = src})
 			continue
+		}
+		prefix := to_snake(script.struct_name)
+		if previous, exists := script_prefixes[prefix]; exists {
+			error_at(
+				Loc{path = path},
+				"script types %q and %q generate the same snake_case prefix %q; rename one type so generated helpers are distinct",
+				previous,
+				script.struct_name,
+				prefix,
+			)
+		} else {
+			script_prefixes[prefix] = script.struct_name
 		}
 		rel_path := rel_to_root(ctx.project_root, path)
 		if rel_path == norm_path(path) || rel_path == "" {

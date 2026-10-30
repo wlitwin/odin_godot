@@ -30,8 +30,14 @@ one-variant union. `album_poll` and `fire_poll` follow this rule.
 
 ### Current state
 
-A proc such as `boot_phase` or `code_poll` reports current state rather than
-draining a history. Callers may read it whenever they need the latest value.
+Queries such as `boot_phase` and `session_count` read current state without
+advancing the owner or draining an event queue.
+
+Drive the owner once per frame before reading its state or draining events.
+The generated `<game>_net_frame` is the normal game loop. The lower-level
+`code_poll` both advances a join-code rendezvous and returns its current
+`Code_State`; it is a service call, not a read-only query or an event drain.
+Boot calls it for games using the generated frame loop.
 
 ### Synchronous callbacks
 
@@ -83,10 +89,13 @@ its zero value.
 
 Constructor names indicate who supplies and owns storage:
 
-- `_make` returns a new value whose Kit-owned allocations must later be released
-  with the matching `_destroy` proc. Examples: `registry_make`, `chat_make`.
-- `_init` initializes caller-owned storage in place. Examples: `session_init`,
-  `comms_init`, `lane_init`.
+- `_make` returns a value. If it owns Odin allocations, release them with the
+  matching `_destroy` proc. Examples: `registry_make`, `chat_make`. A value
+  such as `reader_make` only borrows its input and needs no destructor.
+- `_init` initializes caller-owned storage in place. Examples: `comms_init`,
+  `xfer_init`, `lane_init`. A zero `Session` is configured before
+  `session_host_start` or `session_client_start`; these start procedures
+  initialize its live run. `session_init` is an internal helper.
 - `_attach` binds state to a Godot node or engine object whose lifetime remains
   owned by the scene. Examples: `wire_attach`, `boot_attach`.
 
@@ -98,6 +107,12 @@ Teardown names distinguish operations:
   storage.
 - `_close` ends a connection or external session.
 - `_detach` removes an attachment and disconnects its engine-facing state.
+
+Keep owners such as `Session`, `Boot`, `Comms`, and `Lane` at stable addresses
+from attachment/start until teardown; they retain pointers and callbacks to one
+another. Use the generated `<game>_net_detach` for a complete live-stack reset.
+It tears down the lane, comms, and Boot before resetting the Session's run;
+`session_destroy` also releases the Session's retained wiring allocations.
 
 Configuration structs use zero as the documented default for optional fields.
 Check the package reference before assuming that an arbitrary runtime value is

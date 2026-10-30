@@ -89,6 +89,15 @@ join_by_code() {
 	fi
 }
 
+scene_lifecycle() {
+	local log="$FSLP_LOGS/scene_exit.log"
+	if ! bash "$ROOT/tests/kitboot/scene_exit.sh" hello_net "$1" >"$log" 2>&1; then
+		tail -35 "$log"
+		return 1
+	fi
+}
+
+fslp_act "scene lifecycle" 1 scene_lifecycle
 fslp_act "two windows" 3 two_windows
 if command -v node >/dev/null 2>&1; then
 	fslp_act "join by code" 2 join_by_code

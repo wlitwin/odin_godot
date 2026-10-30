@@ -42,6 +42,9 @@ Session_Wire :: struct {
 	node:     gd.Node,
 	ses:      ^ksess.Session,
 	transport: ^Transport, // which control plane opened this wire (nil = the raw path; reads as ENet — see transport_of)
+	installed_peer_id: u64, // identity of the peer installed by a synchronous transport door; 0 = borrowed/async
+	installed_mp: gd.Multiplayer_Api, // owned reference to that peer's exact MultiplayerAPI
+	signals: Wire_Signals,
 	kind:     u8, // the game's one message byte for session traffic
 	latency:  f64, // injected one-way receive delay, seconds (0 = off)
 	jitter:   f64, // extra per-packet delay, uniform [0, jitter) seconds
@@ -55,6 +58,19 @@ Session_Wire :: struct {
 	delayed:  [dynamic]Wire_Delayed,
 	dropping: [dynamic]Wire_Drop, // sockets scheduled to close (kicks)
 	gauge:    Wire_Gauge,
+}
+
+@(private)
+Wire_Signals :: struct {
+	mp: gd.Multiplayer_Api, // owned reference to the exact emitter used at listen time
+	callbacks: [5]gd.Callable,
+	owned: [5]bool,
+}
+
+@(private = "file")
+WIRE_SIGNAL_NAMES :: [5]cstring {
+	"peer_packet", "peer_disconnected", "connected_to_server",
+	"connection_failed", "server_disconnected",
 }
 
 // ---- the wire gauge: bytes by message kind, windowed per second -----------
@@ -209,14 +225,15 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 // re-hosting/re-joining in the same run (kboot.boot_detach's wire slice). It
 // frees everything the wire OWNS: the gauge's per-tag windows, the bad-link
 // shim's per-peer state and its still-queued receive copies, and the pending-
-// kick queue; then closes a live WebRTC relay session so a fresh begin_*_web
-// can bind clean (web_close no-ops on native — nothing is installed for this
-// node). Safe on a half-attached OR already-zeroed wire: deleting nil
-// containers is a no-op and the node guard skips the socket close. It does NOT
+// kick queue; then closes the transport opened through this wire's doors.
+// A raw wire_attach borrows its engine peer and does not close it. Safe on a
+// half-attached OR already-zeroed wire: deleting nil containers is a no-op.
+// It does NOT
 // unregister the session's transport — the session pointer is the game's, and
 // a re-host re-runs wire_attach (which re-registers) — it just returns the
 // wire to its zero value.
 wire_detach :: proc(wire: ^Session_Wire) {
+	wire_unlisten(wire)
 	// The bad-link shim's still-queued receives each own a copied byte slice.
 	for d in wire.delayed {
 		delete(d.data)
@@ -231,10 +248,8 @@ wire_detach :: proc(wire: ^Session_Wire) {
 	delete(wire.gauge.app_out_acc)
 	delete(wire.gauge.app_in_rate)
 	delete(wire.gauge.app_out_rate)
-	// A live web relay session, if any — no-op on native / no-web (webrtc_close
-	// finds no session installed for this node and returns).
-	if cast(rawptr)wire.node != nil {
-		web_close(wire)
+	if wire.transport != nil || wire.installed_mp != nil {
+		transport_close(wire)
 	}
 	wire^ = {}
 }
@@ -295,35 +310,49 @@ wire_listen :: proc "contextless" (
 	on_net_up: cstring = "",
 	on_net_down: cstring = "",
 ) -> gd.Error {
+	wire_unlisten(wire)
 	mp := gd.node_get_multiplayer(wire.node)
-	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
-	obj := cast(gd.Object)wire.node
-	if err := gd.connect_to(cast(gd.Object)mp, "peer_packet", obj, on_packet); err != .Ok {
-		return err
-	}
-	// The optional signals propagate failures too: a typo'd method name that
-	// failed silently here produces exactly the bug this file's header warns
-	// about — an unwired peer_disconnected means ghosts haunt rosters forever.
-	if on_peer_left != "" {
-		if err := gd.connect_to(cast(gd.Object)mp, "peer_disconnected", obj, on_peer_left); err != .Ok {
+	wire.signals.mp = mp
+	methods := [5]cstring{on_packet, on_peer_left, on_net_up, on_net_down, on_net_down}
+	signal_names := WIRE_SIGNAL_NAMES
+	for method, i in methods {
+		if method == "" {continue}
+		callback := gd.callable(cast(gd.Object)wire.node, method)
+		signal := gd.sname(signal_names[i])
+		if gd.object_is_connected(cast(gd.Object)mp, signal, callback) {
+			// A pre-existing connection belongs to its installer.
+			gd.free_callable(callback)
+			continue
+		}
+		if err := gd.object_connect(cast(gd.Object)mp, signal, callback, 0); err != .Ok {
+			gd.free_callable(callback)
+			wire_unlisten(wire)
 			return err
 		}
-	}
-	if on_net_up != "" {
-		if err := gd.connect_to(cast(gd.Object)mp, "connected_to_server", obj, on_net_up); err != .Ok {
-			return err
-		}
-	}
-	if on_net_down != "" {
-		if err := gd.connect_to(cast(gd.Object)mp, "connection_failed", obj, on_net_down); err != .Ok {
-			return err
-		}
-		if err := gd.connect_to(cast(gd.Object)mp, "server_disconnected", obj, on_net_down); err != .Ok {
-			return err
-		}
+		wire.signals.callbacks[i] = callback
+		wire.signals.owned[i] = true
 	}
 	return .Ok
+}
+
+@(private = "file")
+wire_unlisten :: proc "contextless" (wire: ^Session_Wire) {
+	signals := &wire.signals
+	if signals.mp == nil {return}
+	emitter := cast(gd.Object)signals.mp
+	signal_names := WIRE_SIGNAL_NAMES
+	for owned, i in signals.owned {
+		if !owned {continue}
+		signal := gd.sname(signal_names[i])
+		callback := signals.callbacks[i]
+		if gd.object_is_connected(emitter, signal, callback) {
+			gd.object_disconnect(emitter, signal, callback)
+		}
+		gd.free_callable(callback)
+	}
+	gd.release_ref(signals.mp)
+	signals^ = {}
 }
 
 // Route one received packet: strip the kind byte (other kinds are not ours —

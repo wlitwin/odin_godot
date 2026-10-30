@@ -4488,7 +4488,7 @@ stream_budget_bounds_and_rotates :: proc(t: ^testing.T) {
 	seen := 0
 	max_stale := u64(0)
 	for i in 0 ..< N {
-		if sent, ok := host.s.stream_sent[ksess.Interest_Key{alice.s.me, ids[i]}]; ok {
+		if sent, ok := host.s.stream_sent[{alice.s.me, ids[i]}]; ok {
 			seen += 1
 			if tk - sent > max_stale {max_stale = tk - sent}
 		}

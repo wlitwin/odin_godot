@@ -101,6 +101,7 @@ transport_host :: proc(
 		return false
 	}
 	wire.transport = t
+	transport_note_peer(wire)
 	return true
 }
 
@@ -118,6 +119,7 @@ transport_join :: proc(
 		return false
 	}
 	wire.transport = t
+	transport_note_peer(wire)
 	return true
 }
 
@@ -142,12 +144,50 @@ transport_service :: proc(wire: ^Session_Wire) {
 	}
 }
 
-// Fold whatever the transport holds open, so a fresh transport_host/join can
-// bind clean (the retry after a failed join, a successor raising a new room).
+// Fold the transport's control state and the peer installed by this wire, so
+// a fresh host can bind the same port. A replacement peer belongs to its new
+// installer and is left alone. A raw wire_attach does not acquire a peer.
 transport_close :: proc(wire: ^Session_Wire) {
 	t := transport_of(wire)
-	if t.close != nil {
+	if t.close != nil && cast(rawptr)wire.node != nil {
 		t.close(wire)
+	}
+	mp := wire.installed_mp
+	installed_id := wire.installed_peer_id
+	wire.installed_mp = nil
+	wire.installed_peer_id = 0
+	defer gd.release_ref(mp)
+	if mp != nil && installed_id != 0 {
+		peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+		defer gd.release_ref(peer)
+		if peer != nil && gd.object_get_instance_id(cast(gd.Object)peer) == installed_id {
+			gd.multiplayer_peer_close(peer)
+			gd.multiplayer_api_set_multiplayer_peer(mp, nil)
+		}
+	}
+}
+
+@(private = "file")
+transport_note_peer :: proc(wire: ^Session_Wire) {
+	gd.release_ref(wire.installed_mp)
+	wire.installed_mp = nil
+	wire.installed_peer_id = 0
+	// WebRTC installs its peer asynchronously; its close callback owns that
+	// per-node signaling/peer lifecycle. Do not claim a pre-existing peer.
+	if wire.transport.rendezvous == .Web_Room {
+		return
+	}
+	mp := gd.node_get_multiplayer(wire.node)
+	if mp == nil {
+		return
+	}
+	peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(peer)
+	if peer != nil {
+		wire.installed_mp = mp
+		wire.installed_peer_id = gd.object_get_instance_id(cast(gd.Object)peer)
+	} else {
+		gd.release_ref(mp)
 	}
 }
 
@@ -185,7 +225,7 @@ ENET := Transport {
 	open_host  = enet_open_host,
 	open_join  = enet_open_join,
 	// pump: the engine polls ENet inside its own multiplayer step.
-	// close: the peer IS the whole holding; installing a new one replaces it.
+	// close: no separate control state; transport_close releases the owned peer.
 	link       = enet_link,
 	address    = enet_address,
 }
@@ -236,8 +276,8 @@ OFFLINE := Transport {
 	rendezvous = .None,
 	open_host  = offline_open_host,
 	// open_join: a solo door has no join half — transport_join asserts.
-	// pump/close/link/address: nothing to service or fold; the peer is inert
-	// (installing the next door's real peer replaces it, like ENet's).
+	// pump/close/link/address: no separate control state; transport_close
+	// releases the installed peer.
 }
 
 @(private = "file")

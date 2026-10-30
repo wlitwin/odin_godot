@@ -11,6 +11,14 @@ include bounded typed history, entity pools/RNG, canonical codecs, presentation
 journals, recipient views, checkpoints, durable enrollment and host migration.
 Godot owns scenes/input/output; the simulation packages run without Godot.
 
+Start with [getting started](getting-started.md), the
+[Session starter project](../build/template/replay/README.md), and the
+[checked lifecycle recipes](../examples/replay_recipes/README.md). Most games
+need one Timeline, Session or Room owner; the package reference below includes
+advanced mechanisms and tools, not a checklist of required imports. Kit (v1)
+and Replay (v2) share [Odin/API conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
+while retaining their different gameplay models.
+
 The library remains experimental. Use the [framework completion audit](../docs/replay/framework-audit.md)
 to distinguish implemented contracts, tested combinations and remaining framework
 work. Full parity across every ported game is not its completion gate.

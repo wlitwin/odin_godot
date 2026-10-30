@@ -33,6 +33,7 @@ system :: proc(c:^Comms,text:string)->Result {
 	p,ok:=text_payload(text,true);if !ok {return .Invalid}
 	return broadcast(c,p,Binding{})
 }
+@(private)
 issue :: proc(c:^Comms,p:Payload)->Result {
 	if !c.ready || !c.bound || !c.enabled {return .Not_Ready}
 	if !valid(p) {return .Invalid}
@@ -41,7 +42,9 @@ issue :: proc(c:^Comms,p:Payload)->Result {
 	at:=(c.pending_head+c.pending_count)%PENDING;c.issued+=1
 	c.pending[at]=p;c.pending_names[at]=c.local.spectator && c.local.observer_name_allowed ? c.local.name : {};c.pending_ids[at]=c.issued;c.pending_count+=1;return .None
 }
+@(private)
 newer :: proc(a,b:Id)->bool {return a.epoch>b.epoch || (a.epoch==b.epoch && a.sequence>b.sequence)}
+@(private)
 record :: proc(c:^Comms,delivery:Delivery) {
 	e:=delivery.entry
 	if !newer(e.id,c.last_id) {c.duplicates+=1;return}

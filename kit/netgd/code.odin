@@ -92,10 +92,12 @@ _code_open :: proc(cr: ^Code_Rendezvous, url: cstring, udp_port: int, room: stri
 	if cast(rawptr)ws == nil {
 		return false
 	}
+	gd.ref_counted_init_ref(ws)
 	gurl := gd.new_string_odin(string(url))
 	defer gd.free_string(gurl)
 	tls: gd.Tls_Options // zero = defaults (system CAs for wss://; ws:// ignores it)
 	if gd.web_socket_peer_connect_to_url(ws, gurl, tls) != .Ok {
+		gd.release_ref(ws)
 		return false
 	}
 	cr^ = {}
@@ -166,10 +168,11 @@ code_poll :: proc(cr: ^Code_Rendezvous, wire: ^Session_Wire = nil) -> Code_State
 }
 
 code_close :: proc(cr: ^Code_Rendezvous) {
-	if !cr.active {
-		return
+	if cr.ws != nil {
+		gd.web_socket_peer_close(cr.ws, 1000, gd.string_empty())
+		gd.release_ref(cr.ws)
+		cr.ws = nil
 	}
-	gd.web_socket_peer_close(cr.ws, 1000, gd.string_empty())
 	cr.active = false
 }
 

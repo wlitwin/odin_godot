@@ -109,7 +109,7 @@ the role gate and the loop:
 
 ```odin
 @(gd_step = "authority")
-my_game_tick :: proc(self: ^MyGame) { /* decrement authority timers */ }
+my_game_tick :: proc(self: ^My_Game) { /* decrement authority timers */ }
 
 // process():
 frame := my_game_net_frame(self, delta, now_s())
@@ -179,10 +179,20 @@ live run and registry. Pre-start session wiring and configuration survive, so a
 fresh `<game>_net_attach` plus Host/Join starts from a clean run without losing
 the game's settings. The operation is idempotent.
 
-The generated detach is an explicit game verb, not a scene-exit callback. When
-the engine tears the whole node down, it frees the node tree and the Odin
-process memory ends with it. Use detach for the flow that keeps the process
-alive across a complete network-stack reset.
+The generated detach is not called automatically on scene exit. Godot frees
+its node tree, but Odin maps, slices, and other allocations still need their
+matching teardown when the process stays alive. On final scene removal, detach
+the stack and destroy the retained Session wiring:
+
+```odin
+my_game_exit_tree :: proc(self: ^My_Game) {
+	my_game_net_detach(self)
+	ksess.session_destroy(&self.ses)
+}
+```
+
+Use detach alone when the same owner will attach again; use both calls when
+that owner is finished. HelloNet and HelloSim include this exit callback.
 
 At the lower level, `boot_net_detach(b)` performs the same full ordered
 teardown using the session/comms/lane pointers retained by `Boot`.
@@ -197,7 +207,10 @@ queue-frees those, and the widgets, the legend, and the world's entities
 parented under them ride the subtree down with one free each. The [kui
 `*_destroy`](ui.md) calls free only their Odin-side tracking arrays (the nodes
 belong to the container, i.e. boot); `netgd.wire_detach` frees the wire's own
-gauge and shim containers. Nothing is freed twice.
+gauge and shim containers. Transport doors close the peer they installed;
+teardown leaves a peer installed by another owner alone. A raw `wire_attach`
+only borrows its peer, so the caller closes that peer separately. Nothing is
+freed twice.
 
 ## Desktop unthrottle
 

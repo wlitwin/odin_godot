@@ -78,6 +78,11 @@ hello_sim_ready :: proc(self: ^HelloSim) {
 	}
 }
 
+hello_sim_exit_tree :: proc(self: ^HelloSim) {
+	hello_sim_net_detach(self)
+	ksess.session_destroy(&self.ses)
+}
+
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 	was := kboot.boot_phase(&self.boot)
 	if was == .Menu {return}

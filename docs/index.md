@@ -28,6 +28,8 @@ use → ship.**
   - custom resources, global class names, typed cross-script references, autoloads
   - the full `gd.*` ergonomic-helper catalog (a task → one-liner table)
   - editor tooling: `@tool`, `gd.is_editor()`, custom icons, EditorPlugin
+- **[Shared API conventions](authoring-guide.md#api-conventions-shared-by-kit-and-replay)**:
+  Odin names, generated prefixes, owner lifetimes, and the normal Kit/Replay frame loops.
 
 ## Use it day-to-day
 
@@ -79,12 +81,17 @@ use → ship.**
 
 ## Learn from the examples
 
-The experimental [Replay library](../replay/README.md) explores a complete-world
-simulation model alongside Kit. Its [roadmap](replay/roadmap.md) and
-[comparison plan](replay/comparison.md) preserve both versions of future game
-ports. [Replay loot](../examples/replay_loot/README.md) is the headless model;
-[Replay Hello and Loot](../examples/replay_hello/README.md) add tested Godot views.
-Networking and full-game ports are planned.
+The experimental [Replay library](../replay/getting-started.md) provides a
+complete-world simulation model alongside Kit. Start with its local Timeline or
+Godot Session lifecycle; add Party/Room for enrollment and host migration, or
+P2P for deterministic peer rollback. The
+[starter project](../build/template/replay/README.md) uses Session for offline
+and native server/client play. [Replay Loot](../examples/replay_loot/README.md)
+is the headless model; [Hello](../examples/replay_hello/README.md) demonstrates
+lower-level runners and diagnostics. The
+[support envelope](../replay/support.md) distinguishes implemented policies
+from deployment and full-game parity claims. Kit and the original games remain
+independently runnable.
 
 - `examples/cavecrawl` is the **co-op reference** (see [kit/](kit/index.md)):
   the main Kit packages in one game, covered by a latency-injected,

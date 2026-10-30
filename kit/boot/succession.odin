@@ -183,6 +183,7 @@ boot_succ_end :: proc(b: ^Boot) {
 // POLICY lives here now — netgd only dials; the machine decides when. The
 // heir needs a moment to open the reserved room and a browser cannot block,
 // so each knock folds the failed socket and dials fresh on the gap timer.
+@(private)
 boot_succ_pulse :: proc(b: ^Boot, now: f64) {
 	if !b.succ_armed || b.succ_phase != .Chasing || b.succ_room == "" {
 		return
