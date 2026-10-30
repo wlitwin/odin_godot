@@ -5,7 +5,7 @@ use → ship.**
 
 ## Start here
 
-- **[SDK documentation site](visual-guide/README.md)** provides task-based guides for
+- **[SDK documentation site](https://wlitwin.github.io/odin_godot/)** provides task-based guides for
   setup, scripting, Kit, Replay, and export, plus system diagrams, an interactive
   correction lab, examples, and searchable reference.
 - **[Getting Started](getting-started.md)**: install the Nix toolchain, build the extension,

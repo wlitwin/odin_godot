@@ -98,7 +98,7 @@ Choose its trust and timing baseline from the **[network profiles](docs/kit/prof
 
 ## Documentation
 
-The **[SDK documentation site](docs/visual-guide/README.md)** has guides for setup,
+The **[SDK documentation site](https://wlitwin.github.io/odin_godot/)** has guides for setup,
 Odin scripting, Kit, Replay, and export, plus an illustrated multiplayer guide and
 searchable reference. For a playable example, **[try Scrapyard in your browser](https://itchyitches.itch.io/scrapyard)**.
 
