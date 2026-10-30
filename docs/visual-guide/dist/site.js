@@ -14,14 +14,14 @@
   const dialog = document.createElement('dialog');
   dialog.className = 'search-dialog';
   dialog.setAttribute('aria-label', 'Search documentation');
-  dialog.innerHTML = '<div class="search-input-row"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><input id="docs-search-input" type="search" placeholder="Search documentation…" autocomplete="off" aria-label="Search documentation" aria-controls="docs-search-results"><button type="button" aria-label="Close search">Esc</button></div><div class="search-results" id="docs-search-results" role="list"></div><div class="search-help"><span>↑ ↓ to select</span><span>↵ to open</span><a href="'+new URL('reading.html',base).href+'">Browse all docs →</a></div>';
+  dialog.innerHTML = '<div class="search-input-row"><svg width="19" height="19" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><input id="docs-search-input" type="search" placeholder="Search documentation…" autocomplete="off" aria-label="Search documentation" aria-controls="docs-search-results"><button type="button" aria-label="Close search">Esc</button></div><div class="search-results" id="docs-search-results" role="list"></div><div class="search-help"><span>↑ ↓ to select</span><span>↵ to open</span><a href="'+new URL('reading.html',base).href+'">Browse the index →</a></div>';
   document.body.append(dialog);
   const input = dialog.querySelector('input');
   const results = dialog.querySelector('.search-results');
   let records, loading, selected = 0, lastFocus;
   async function loadIndex() {
     if (records) return records;
-    if (!loading) loading = fetch(new URL('search-index.json', base)).then(response => { if (!response.ok) throw new Error('Search is unavailable. Browse the documentation library below.'); return response.json(); });
+    if (!loading) loading = fetch(new URL('search-index.json', base)).then(response => { if (!response.ok) throw new Error('Search is unavailable. Browse the documentation index below.'); return response.json(); });
     records = await loading; return records;
   }
   function render() {

@@ -16,7 +16,10 @@ save PDF on an article for a paper copy.
 
 The main entry points are [SDK docs](dist/docs.html), [examples](dist/examples.html),
 the [multiplayer field guide](dist/guide.html), and the
-[complete library](dist/reading.html). Existing article URLs remain valid.
+[documentation index](dist/reading.html). The index lists every published page
+by topic, with no collapsed sections. It is generated from the same inventory as
+the articles; the site checker verifies that each source appears exactly once.
+Existing article URLs remain valid.
 
 The [desk reference](dist/field-guide.md), [print edition](dist/field-guide.pdf),
 and six [SVG diagrams](dist/diagrams) are standalone artifacts. `dist/` is the
@@ -51,7 +54,8 @@ node docs/visual-guide/prepare.mjs
 ```
 
 `build-readers.mjs` follows links from the guide's selected references and generates
-the supplemental reading library. New Mermaid diagrams are rendered to static SVG
+the documentation pages. `build-index.mjs` groups the complete page inventory
+into the browsable index. New Mermaid diagrams are rendered to static SVG
 using Chrome; set `GUIDE_CHROME` if Chrome is installed at a nonstandard path.
 Cached SVGs do not require a browser. Newly rendered diagrams are serialized as
 XML and decoded as images before publication. The link checker also rejects

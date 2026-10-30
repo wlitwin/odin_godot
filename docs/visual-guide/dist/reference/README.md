@@ -100,6 +100,9 @@ The **[SDK documentation site](https://wlitwin.github.io/odin_godot/)** has guid
 Odin scripting, Kit, Replay, and export, plus an illustrated multiplayer guide and
 searchable reference. For a playable example, **[try Scrapyard in your browser](https://itchyitches.itch.io/scrapyard)**.
 
+Use the **[documentation index](https://wlitwin.github.io/odin_godot/reading.html)**
+to browse every published guide, reference page, example, and source listing by topic.
+
 | Doc | What it covers |
 |---|---|
 | **[docs/index.md](docs/index.md)** | The documentation map: start here to navigate |

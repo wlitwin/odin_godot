@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { Marked, Renderer } from 'marked';
 import GithubSlugger from 'github-slugger';
 import hljs from 'highlight.js';
+import { documentationIndex } from './build-index.mjs';
 import { readerPath, relative, siteHeader, docsSidebar, siteFooter, contentFiles, contentRoot, navigationFiles, navGroups } from './site-structure.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -171,7 +172,7 @@ export async function buildReaders({ root, dist, seeds, revision, dirty, date })
 ${toc.length ? `<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav>${toc.filter(h => h.depth === 2).map(h => `<a href="#${escape(h.id)}">${escape(h.text)}</a>`).join('')}</nav></details>` : ''}
 <article class="reading-body ${doc.isMarkdown ? '' : 'source-article'}">${content}</article>
 <div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p>${related.map(file => `<a href="${url(pages[file])}"><span>${escape(files.get(file).title)}</span><span aria-hidden="true">→</span></a>`).join('')}<a href="${url('guide.html')}"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">${escape(doc.file)} · source ${revision.slice(0, 12)}${dirty ? ' with local changes' : ''}.</p>${siteFooter(page,true)}</main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav>${outline || '<a href="#article">Source example</a>'}</nav><div class="outline-actions"><a href="${url(sourceFile)}" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="${url('reading.html')}">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>`;
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav>${outline || '<a href="#article">Source example</a>'}</nav><div class="outline-actions"><a href="${url(sourceFile)}" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="${url('reading.html')}">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>`;
     const destination = path.join(dist, page); await mkdir(path.dirname(destination), { recursive: true }); await writeFile(destination, html);
     const copy = path.join(dist, sourceFile); await mkdir(path.dirname(copy), { recursive: true }); await writeFile(copy, doc.text);
   }
@@ -183,13 +184,17 @@ ${toc.length ? `<details class="mobile-toc"><summary>On this page <span>↓</spa
   const featured = [...contentFiles, ...seeds.filter(file => /contributor-guide|quickstart-sim|replay\/getting-started/.test(file))];
   const manifest = { revision, dirty, date, featured, files: [...files.keys()], pages, titles };
   await writeFile(path.join(dist, 'reference-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  await writeFile(path.join(dist, 'reading.html'), libraryPage(files, featured, pages));
+  await writeFile(path.join(dist, 'reading.html'), documentationIndex(files, pages));
   console.log(`Built ${files.size} reading pages (${[...files.values()].filter(doc => doc.isMarkdown).length} documents), ${diagramJobs.size} diagrams, and the reading library.`);
   const primary = new Set(navigationFiles);
   const search = [...files.values()].map(doc => {
     const description = featureInfo[doc.file]?.[1] || doc.text.replace(/```[\s\S]*?```/g, '').replace(/^#+.*$/gm, '').replace(/[\[\]`*_]/g, '').trim().replace(/\s+/g, ' ').slice(0, 180);
     return { title: doc.title, category: category(doc.file), file: doc.file, path: pages[doc.file], description, primary: primary.has(doc.file), search: [doc.title, category(doc.file), doc.file, description, ...doc.headings.map(h => h.text)].join(' ').toLowerCase() };
   });
+  search.unshift(
+    { title: 'Documentation index', category: 'Site navigation', file: 'reading.html', path: 'reading.html', description: 'Every guide, reference page, game example, and source listing, grouped by topic.', primary: true, search: 'documentation index site map sitemap all pages browse guides references examples source listings' },
+    { title: 'Illustrated multiplayer field guide', category: 'Guides', file: 'guide.html', path: 'guide.html', description: 'System diagrams and a correction you can step through, comparing Kit and Replay.', primary: true, search: 'illustrated multiplayer field guide kit replay diagrams correction lab' }
+  );
   await writeFile(path.join(dist, 'search-index.json'), JSON.stringify(search));
   return manifest;
 }
@@ -244,9 +249,4 @@ async function renderDiagrams(jobs, dist) {
       await writeFile(path.join(dist, job.asset), svg);
     }
   } finally { if (browser) await browser.close(); await new Promise(resolve => server.close(resolve)); }
-}
-
-function libraryPage(files, featured, pages) {
-  const groups = [...new Set([...files.keys()].map(category))];
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Documentation library · odin_godot</title><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="reader.css"><link rel="stylesheet" href="sdk.css"><script src="reader.js" defer></script><script src="site.js" defer></script></head><body class="sdk-library">${siteHeader('reading.html','docs')}<main class="reading-library"><p class="eyebrow">DOCUMENTATION / GUIDES AND REFERENCE</p><h1>Documentation library</h1><p class="reader-dek">Guides, API references, and source examples for building with Odin and Godot.</p><label class="library-search">Filter the library<input type="search" id="library-search" placeholder="Try: prediction, commands, frames…" autocomplete="off"></label><p id="library-count" role="status">${files.size} documents and source examples</p><section><h2>Start here</h2><div class="library-list">${featured.map(file => `<a class="library-item" data-search="${escape((files.get(file).title + ' ' + file).toLowerCase())}" href="${pages[file]}"><small>${escape(category(file))}</small><strong>${escape(files.get(file).title)}</strong><span aria-hidden="true">→</span></a>`).join('')}</div></section><details class="library-all"><summary>All guides, reference, and implementation notes <span>+</span></summary>${groups.map(group => { const docs = [...files.values()].filter(doc => category(doc.file) === group && !featured.includes(doc.file)); return docs.length ? `<section class="library-group"><h2>${escape(group)}</h2><div class="library-list">${docs.sort((a,b) => a.title.localeCompare(b.title)).map(doc => `<a class="library-item" data-search="${escape((doc.title + ' ' + doc.file).toLowerCase())}" href="${pages[doc.file]}"><strong>${escape(doc.title)}</strong><small>${escape(doc.file)}</small><span aria-hidden="true">↗</span></a>`).join('')}</div></section>` : ''; }).join('')}</details><p id="library-empty" hidden>No documents match. Try a framework name or a shorter term.</p></main>${siteFooter('reading.html')}<div id="toast" role="status" aria-live="polite"></div></body></html>`;
 }

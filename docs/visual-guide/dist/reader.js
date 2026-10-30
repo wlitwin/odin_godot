@@ -28,13 +28,29 @@ $$('.mobile-toc a').forEach(link => link.addEventListener('click', () => { $('.m
 const search = $('#library-search');
 if (search) {
   const all = $$('.library-item');
+  const countLabel = $('#library-count');
+  const summary = countLabel.dataset.summary || countLabel.textContent;
+  const legacyGroup = $('.library-all');
+  if (legacyGroup) legacyGroup.open = true;
   search.addEventListener('input', () => {
     const terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     let count = 0;
     all.forEach(item => { item.hidden = !terms.every(term => item.dataset.search.includes(term)); if (!item.hidden) count++; });
     $$('.library-group').forEach(group => { group.hidden = ![...group.querySelectorAll('.library-item')].some(item => !item.hidden); });
-    $('.library-all').open = terms.length > 0;
-    $('#library-count').textContent = `${count} ${count === 1 ? 'document' : 'documents and source examples'}${terms.length ? ' found' : ''}`;
+    $$('[data-index-subgroup]').forEach(group => {
+      const visible = [...group.querySelectorAll('.library-item')].filter(item => !item.hidden).length;
+      group.hidden = visible === 0;
+      const label = group.querySelector('[data-subgroup-count]');
+      if (label) label.textContent = visible;
+    });
+    $$('[data-index-section]').forEach(section => {
+      const visible = [...section.querySelectorAll('.library-item')].filter(item => !item.hidden).length;
+      section.hidden = visible === 0;
+      section.querySelector('[data-section-count]').textContent = visible;
+      const topic = document.querySelector(`[data-index-target="${section.id}"]`);
+      if (topic) { topic.hidden = visible === 0; topic.querySelector('[data-topic-count]').textContent = visible; }
+    });
+    countLabel.textContent = terms.length ? `${count} of ${all.length} pages match` : summary;
     $('#library-empty').hidden = count > 0;
   });
 }

@@ -3,6 +3,8 @@
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from collections import Counter
+import json
 import sys
 import xml.etree.ElementTree as ET
 
@@ -12,6 +14,7 @@ class Page(HTMLParser):
         super().__init__()
         self.ids = set()
         self.links = []
+        self.index_entries = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -20,6 +23,8 @@ class Page(HTMLParser):
         for key in ("href", "src"):
             if attrs.get(key):
                 self.links.append(attrs[key])
+        if tag == "a" and attrs.get("data-source-file"):
+            self.index_entries.append((attrs["data-source-file"], attrs.get("href", "")))
 
 
 def check(root):
@@ -40,6 +45,21 @@ def check(root):
     links = 0
     if root / "index.html" not in pages:
         failures.append("Missing index.html")
+    manifest_file = root / "reference-manifest.json"
+    if manifest_file.is_file() and root / "reading.html" in pages:
+        manifest = json.loads(manifest_file.read_text())
+        entries = pages[root / "reading.html"].index_entries
+        counts = Counter(source for source, _ in entries)
+        for source in set(manifest["files"]) - set(counts):
+            failures.append(f"Documentation index is missing {source}")
+        for source, count in counts.items():
+            if source not in manifest["pages"]:
+                failures.append(f"Documentation index has an unknown source: {source}")
+            if count != 1:
+                failures.append(f"Documentation index lists {source} {count} times")
+        for source, href in entries:
+            if source in manifest["pages"] and href != manifest["pages"][source]:
+                failures.append(f"Documentation index has the wrong target for {source}")
     for filename, page in pages.items():
         for href in page.links:
             url = urlsplit(href)
