@@ -46,22 +46,22 @@ Continue from recording. It returns commands; the application owns its clock,
 input buffering, rendering and branch operation.
 
 ```odin
-rgd.debug_playback_init(&viewer, owner)
-action := rgd.debug_playback_frame(&viewer, identity, model, render_dt)
+debuggd.debug_playback_init(&viewer, owner)
+action := debuggd.debug_playback_frame(&viewer, identity, model, render_dt)
 switch action {
 case .Enter: // Save previous pause, pause the local clock, clear device edges.
 case .Leave: // Restore previous pause and gate held input until released.
 case .Branch:
-    frame, ok := rgd.debug_playback_read(&viewer)
+    frame, ok := debuggd.debug_playback_read(&viewer)
     // Copy first. If accepted, initialize a new local timeline/presentation epoch
     // at frame.tick, then end playback. Never replay the file's historical effects.
 case .None:
 }
-frame, showing := rgd.debug_playback_read(&viewer)
+frame, showing := debuggd.debug_playback_read(&viewer)
 // Paint frame while showing. While owns_pause but no frame is loaded, keep the
 // original world paused and visible while the chooser is pending.
-rgd.debug_playback_end(&viewer)     // Explicit reset; owner restores its clock.
-rgd.debug_playback_destroy(&viewer) // Disconnect callbacks and release imports.
+debuggd.debug_playback_end(&viewer)     // Explicit reset; owner restores its clock.
+debuggd.debug_playback_destroy(&viewer) // Disconnect callbacks and release imports.
 ```
 
 Keep the widget at a stable address until destroy. `owns_pause` covers both file

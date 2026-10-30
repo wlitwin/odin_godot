@@ -5,11 +5,12 @@ import gd "godot:godot"
 import game "../shared/game"
 import rgd "godot:replay/godot"
 import dg "godot:replay/telemetry"
+import inputgd "godot:replay/godot/input"
 
 flow_ready :: proc(self: ^ReplayScrapyard) {
 	recording_ready(self)
-	rgd.bind_key("rsy_menu", .Escape)
-	rgd.bind_key("rsy_tally", .Tab)
+	inputgd.bind_key("rsy_menu", .Escape)
+	inputgd.bind_key("rsy_tally", .Tab)
 	for row in 0 ..< game.SEATS {
 		for column in 0 ..< 8 {
 			self.tally_cells[row][column] = cast(gd.Label)gd.get_node(

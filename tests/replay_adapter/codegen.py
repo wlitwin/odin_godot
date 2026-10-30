@@ -30,13 +30,15 @@ def case(name,text,generation=True,compilation=True,diagnostic=''):
   return
  output=(project/'odin_godot_scripts.gen.odin').read_text()
  assert 'demo_view_replay_binding' in output and 'godot:kit/' not in output
+ assert 'import rview "godot:replay/godot/scene"' in output
  assert 'rview.Script_Archetype(type_of(DemoView{}.value),DemoView,type_of(DemoView{}.style^))' in output
  second=subprocess.run([str(sg),str(project),f'-godot:{root}'],capture_output=True,text=True,check=True)
  assert (project/'odin_godot_scripts.gen.odin').read_text()==output
- checked=subprocess.run([os.environ.get('ODIN','odin'),'check',str(project),f'-collection:godot={root}','-no-entry-point','-target:freestanding_wasm32'],capture_output=True,text=True)
- (project/'compile.log').write_text(checked.stdout+checked.stderr)
- assert (checked.returncode==0)==compilation,(name,checked.stderr)
- if not compilation:assert diagnostic in checked.stdout+checked.stderr
+ for target,flags in [('native',[]),('wasm',['-target:freestanding_wasm32'])]:
+  checked=subprocess.run([os.environ.get('ODIN','odin'),'check',str(project),f'-collection:godot={root}','-no-entry-point',*flags],capture_output=True,text=True)
+  (project/f'compile-{target}.log').write_text(checked.stdout+checked.stderr)
+  assert (checked.returncode==0)==compilation,(name,target,checked.stderr)
+  if not compilation:assert diagnostic in checked.stdout+checked.stderr
 case('valid',source)
 case('unknown',source.replace('value=value,','values=value,'),generation=False,diagnostic='unknown replay_view option')
 case('missing_field',source.replace('value=value,','value=absent,'),generation=False,diagnostic='display field "absent" does not exist')
@@ -44,4 +46,4 @@ case('unpaired',source.replace(',configure=demo_configure',''),generation=False,
 case('duplicate',source.replace('value=value,','value=value,value=value,'),generation=False,diagnostic='duplicate replay_view option')
 case('bad_present',source.replace('proc(self:^DemoView,value:u8)','proc(self:^DemoView,value:u16)'),compilation=False,diagnostic='incompatible present callback signature')
 case('bad_configure',source.replace('proc(self:^DemoView,style:^Style)','proc(self:^DemoView,style:gd.Resource)').replace('self.style=style;',''),compilation=False,diagnostic='incompatible configure callback signature')
-print('REPLAY_VIEW_CODEGEN_OK cases=7 stable=true wasm=true no_kit_import=true')
+print('REPLAY_VIEW_CODEGEN_OK cases=7 stable=true native=true wasm=true scene_import=true no_kit_import=true')

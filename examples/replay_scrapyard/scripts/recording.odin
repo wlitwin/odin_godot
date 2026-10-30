@@ -2,15 +2,15 @@ package replay_scrapyard
 
 import "core:fmt"
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import recording "../shared/recording"
+import debuggd "godot:replay/godot/debug"
 
 recording_ready :: proc(self: ^ReplayScrapyard) {
 	if !self.development {
 		return
 	}
 	parent := gd.get_node(self.owner, "UI/Menu/Scroll/Column")
-	if !rgd.debug_recording_init(&self.recording, parent) {
+	if !debuggd.debug_recording_init(&self.recording, parent) {
 		return
 	}
 	save := gd.get_node(self.owner, "UI/Menu/Scroll/Column/Save")
@@ -33,7 +33,7 @@ recording_frame :: proc(self: ^ReplayScrapyard) {
 	started := gd.time_get_ticks_usec(gd.singleton_time())
 	path := scrap_param("RSY_RECORDING_PATH", "user://scrapyard.rplrec")
 	if self.session.authority {
-		rgd.debug_recording_frame(
+		debuggd.debug_recording_frame(
 			&self.recording,
 			&self.session.server.timeline,
 			recording.CONTEXT,
@@ -41,7 +41,7 @@ recording_frame :: proc(self: ^ReplayScrapyard) {
 			"scrapyard.rplrec",
 		)
 	} else {
-		rgd.debug_recording_frame(
+		debuggd.debug_recording_frame(
 			&self.recording,
 			&self.session.client.timeline,
 			recording.CONTEXT,

@@ -8,6 +8,7 @@ import co "godot:replay/comms"
 import lb "godot:replay/lobby"
 import game "../shared/game"
 import flow "../shared/flow"
+import scenegd "godot:replay/godot/scene"
 
 Ping_Rig :: struct {
 	node: gd.Node2d,
@@ -103,7 +104,7 @@ pings_frame :: proc(self: ^ReplayScrapyard, world: ^game.World) {
 		for p in ([4]gd.Vector2{{0, -9}, {7, 0}, {0, 9}, {-7, 0}}) {
 			gd.packed_vector2_array_append(&points, p)
 		}
-		rgd.mesh2_polygon(rig.diamond, points)
+		scenegd.mesh2_polygon(rig.diamond, points)
 		gd.free_packed_vector2_array(points)
 		gd.canvas_item_set_self_modulate(rig.diamond, {1, 0.85, 0.25, 0.95})
 		rig.label = gd.new_label()

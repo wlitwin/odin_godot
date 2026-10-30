@@ -6,6 +6,7 @@ import gd "godot:godot"
 import auth "godot:replay/authority"
 import lk "godot:replay/p2p/link"
 import tr "godot:replay/transport"
+import transportgd "godot:replay/godot/transport"
 
 P2P_Direct_Error :: enum {None, Configuration, Transport, Provision, Entropy, Clock, Capacity}
 P2P_Direct_Options :: struct {
@@ -29,7 +30,7 @@ P2P_Direct :: struct {
     ready,hosting,waiting,admitted:bool,
     error:P2P_Direct_Error,
     party:^P2P_Party,
-    socket:Enet,
+    socket:transportgd.Enet,
     link:lk.Link,
     peer:tr.Peer_Id,
     remote:u64,
@@ -49,13 +50,13 @@ p2p_direct_open :: proc(d:^P2P_Direct,party:^P2P_Party,options:P2P_Direct_Option
             ep:=d.listen_endpoint;host:=p2p_direct_address(ep)
             if host=="" {d.error=.Configuration;return false}
             name:=strings.clone_to_cstring(host);defer delete(name)
-            if !enet_host(&d.socket,ep.port,8,bind_ip=name) {d.error=.Transport;return false}
+            if !transportgd.enet_host(&d.socket,ep.port,8,bind_ip=name) {d.error=.Transport;return false}
         }
         d.ready=true;return true
     }
 }
 p2p_direct_close :: proc(d:^P2P_Direct) {
-    lk.close(&d.link);wire:=enet_transport(&d.socket);tr.close(&wire)
+    lk.close(&d.link);wire:=transportgd.enet_transport(&d.socket);tr.close(&wire)
     crypto.zero_explicit(d,size_of(P2P_Direct))
 }
 p2p_direct_transport :: proc(d:^P2P_Direct)->tr.Transport {
@@ -73,7 +74,7 @@ p2p_direct_frame :: proc(d:^P2P_Direct) {
     if d.party.registration.phase==.Failed && (d.party.registration.error==.Denied || d.party.registration.error==.Invalid) {
         lk.close(&d.link);d.admitted=false;d.error=.Provision;return
     }
-    base:=enet_transport(&d.socket);tr.poll(&base)
+    base:=transportgd.enet_transport(&d.socket);tr.poll(&base)
     if d.link.phase!=.Closed {
         lk.pump(&d.link)
         // A newer signed roster read retires an old incarnation. A pair reply
@@ -103,7 +104,7 @@ p2p_direct_frame :: proc(d:^P2P_Direct) {
             tr.close(&base);d.peer=0;d.endpoint=reply.endpoint
             host:=p2p_direct_address(d.endpoint);if host=="" {d.error=.Configuration;return}
             name:=strings.clone_to_cstring(host);defer delete(name)
-            if !enet_join(&d.socket,name,d.endpoint.port) {d.error=.Transport;return}
+            if !transportgd.enet_join(&d.socket,name,d.endpoint.port) {d.error=.Transport;return}
             d.connecting_at=now;return
         }
         if d.peer==0 || !tr.peer_connected(&base,d.peer) {d.retry_at=now+250;return}
@@ -130,9 +131,9 @@ p2p_direct_frame :: proc(d:^P2P_Direct) {
 @(private)
 p2p_direct_retire :: proc(d:^P2P_Direct) {
     lk.close(&d.link);d.admitted=false
-    base:=enet_transport(&d.socket)
+    base:=transportgd.enet_transport(&d.socket)
     if d.hosting && d.socket.peer!=nil && d.peer!=0 && tr.peer_connected(&base,d.peer) {gd.multiplayer_peer_disconnect_peer(d.socket.peer,gd.Int(d.peer),true)}
-    if !d.hosting {base:=enet_transport(&d.socket);tr.close(&base)}
+    if !d.hosting {base:=transportgd.enet_transport(&d.socket);tr.close(&base)}
     d.peer=0;d.retry_at=d.now+500
 }
 @(private)

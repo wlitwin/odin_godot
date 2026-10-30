@@ -1,11 +1,11 @@
 package replay_scrapyard
 
-import rgd "godot:replay/godot"
 
 import "core:math"
 import gd "godot:godot"
 import game "../shared/game"
 import flow "../shared/flow"
+import scenegd "godot:replay/godot/scene"
 
 area_disc_make :: proc(self: ^ReplayScrapyard, name: string, depth: int) -> gd.Mesh_Instance2d {
 	node := gd.new_mesh_instance2d()
@@ -16,7 +16,7 @@ area_disc_make :: proc(self: ^ReplayScrapyard, name: string, depth: int) -> gd.M
 		angle := f32(i) / 24 * math.TAU
 		gd.packed_vector2_array_append(&points, {math.cos(angle), math.sin(angle)})
 	}
-	rgd.mesh2_polygon(node, points)
+	scenegd.mesh2_polygon(node, points)
 	gd.free_packed_vector2_array(points)
 	gd.canvas_item_set_z_index(node, gd.Int(depth))
 	gd.canvas_item_set_visible(node, false)

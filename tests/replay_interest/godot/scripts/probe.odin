@@ -10,6 +10,7 @@ import net "godot:replay/net"
 import r "godot:replay"
 import v "godot:replay/view"
 import game "../shared/arena"
+import storagegd "godot:replay/godot/storage"
 
 InterestProbe :: struct {
 	owner:gd.Node2d,
@@ -21,7 +22,7 @@ interest_probe_ready :: proc(self:^InterestProbe) {
 	self.role=strings.clone(gd.env_string("INTEREST_ROLE","host"))
 	options:=rgd.SESSION_OPTIONS;options.network.content=game.CONTENT;options.network.history=256;options.network.snapshot_every=2
 	options.latency_ms,options.jitter_ms,options.loss_permyriad,options.duplicate_permyriad=120,20,500,500
-	options.port=u16(gd.env_int("INTEREST_PORT",49712));options.token=rgd.session_token(self.role)
+	options.port=u16(gd.env_int("INTEREST_PORT",49712));options.token=storagegd.session_token(self.role)
 	switch self.role {case "host":options.role=.Host;case "client":options.role=.Client;case "observer":options.role=.Observer}
 	if err:=rgd.session_open(&self.session,r.Frame(game.World){state=game.initial()},game.player_model(),options);err!=.None {fail(self,fmt.ctprintf("open %v",err));return}
 	self.started=gd.time_get_ticks_msec(gd.singleton_time())

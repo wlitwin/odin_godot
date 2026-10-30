@@ -8,6 +8,7 @@ import r "godot:replay"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/duel"
+import storagegd "godot:replay/godot/storage"
 
 save_path :: proc(self:^ReplayQuickdraw)->string {
  value:=gd.line_edit_get_text(self.ui[0].save_path);defer gd.free_string(value)
@@ -39,7 +40,7 @@ resume_duel :: proc(self:^ReplayQuickdraw,opts:rgd.Session_Options)->net.Error {
   return restore_duel(self,&slot.checkpoint,opts)
  } else {
  cp:net.Checkpoint(game.World,game.Controls,game.Action,game.SEATS);defer net.checkpoint_destroy(&cp)
- result:=rgd.checkpoint_read(&cp,game.model(),save_path(self),game.CONTENT)
+ result:=storagegd.checkpoint_read(&cp,game.model(),save_path(self),game.CONTENT)
  if result.error!=.None {
   ui_notice(self,result.error==.Open ? "Could not open the saved duel. Check the file path." : "The saved duel is damaged or from a different version.")
   return result.network!=.None ? result.network : net.Error.Invalid_Checkpoint

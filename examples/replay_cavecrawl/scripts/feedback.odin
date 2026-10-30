@@ -5,11 +5,12 @@ import v "godot:replay/view"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
+import scenegd "godot:replay/godot/scene"
 
 Cave_Cue :: struct {position:[2]f32,color:[4]f32,seat:u16,flash:bool,target_key:u64}
 Cave_Feedback :: struct {
  cues:v.Cues(Cave_Cue),
- nodes:rgd.Nodes2,
+ nodes:scenegd.Nodes2,
  ready:bool,
  floor_tick:u64,
  depth:u8,
@@ -18,7 +19,7 @@ Cave_Feedback :: struct {
 }
 
 cave_feedback_destroy :: proc(self:^ReplayCave) {
- rgd.nodes_destroy(&self.feedback.nodes);v.cues_destroy(&self.feedback.cues);self.feedback={}
+ scenegd.nodes_destroy(&self.feedback.nodes);v.cues_destroy(&self.feedback.cues);self.feedback={}
 }
 cave_feedback_prepare :: proc(self:^ReplayCave,dt:f64) {
  if !self.session.ready {return}
@@ -35,11 +36,11 @@ cave_feedback_prepare :: proc(self:^ReplayCave,dt:f64) {
  if oldest!=max(u64) {baseline=min(baseline,oldest-1)}
  if !f.ready {
   if !v.cues_init(&f.cues,epoch,baseline) {return}
-  if !rgd.nodes_load(&f.nodes,self.stage,"res://views/burst.tscn",128) {v.cues_destroy(&f.cues);return}
+  if !scenegd.nodes_load(&f.nodes,self.stage,"res://views/burst.tscn",128) {v.cues_destroy(&f.cues);return}
   f.ready=true
  } else if epoch!=f.cues.ledger.epoch {
   if !v.cues_epoch(&f.cues,epoch,baseline) {return}
-  rgd.nodes_clear(&f.nodes);f.depth,f.run,f.floor_tick=0,0,0
+  scenegd.nodes_clear(&f.nodes);f.depth,f.run,f.floor_tick=0,0,0
  }
  v.cues_advance(&f.cues,dt)
  through:=frontier>256 ? frontier-256 : 0
@@ -48,7 +49,7 @@ cave_feedback_prepare :: proc(self:^ReplayCave,dt:f64) {
  frame,ok:=rgd.session_authority_state(self.session)
  if ok {
   if f.depth!=0 && (f.depth!=frame.state.depth || f.run!=frame.state.lobby.run) {
-   v.cues_clear(&f.cues);rgd.nodes_clear(&f.nodes);f.floor_tick=frame.tick
+   v.cues_clear(&f.cues);scenegd.nodes_clear(&f.nodes);f.floor_tick=frame.tick
   }
   f.depth,f.run=frame.state.depth,frame.state.lobby.run
  }
@@ -75,13 +76,13 @@ cave_feedback_change :: proc(self:^ReplayCave,change:v.Change(net.Net_Event(game
 }
 cave_feedback_paint :: proc(self:^ReplayCave) {
  f:=&self.feedback;if !f.ready {return}
- instances:[128]rgd.Instance2;count:=0
+ instances:[128]scenegd.Instance2;count:=0
  starts:[128]u64;start_count:=0
  flash:[game.SEATS]f32
  dweller_flash:[16]struct{key:u64,amount:f32}
  for cue in f.cues.slots {if cue.active {
   instances[count]={key=cue.key,pose={position=cue.value.position},scale={1,1},color={1,1,1,1}};count+=1
-  if _,exists:=rgd.nodes_get(&f.nodes,cue.key);!exists {starts[start_count]=cue.key;start_count+=1}
+  if _,exists:=scenegd.nodes_get(&f.nodes,cue.key);!exists {starts[start_count]=cue.key;start_count+=1}
   if cue.value.flash && cue.value.target_key!=0 && cue.age<.3 {
    index:=int(u32(cue.value.target_key))-1
    if index>=0 && index<len(dweller_flash) {
@@ -95,9 +96,9 @@ cave_feedback_paint :: proc(self:^ReplayCave) {
    index:=int(cue.value.seat)-1;flash[index]=max(flash[index],f32(1-cue.age/.3))
   }
  }}
- if !rgd.nodes_present(&f.nodes,instances[:count]) {return}
+ if !scenegd.nodes_present(&f.nodes,instances[:count]) {return}
  for cue in f.cues.slots {if cue.active {
-  node,exists:=rgd.nodes_get(&f.nodes,cue.key);if !exists {continue}
+  node,exists:=scenegd.nodes_get(&f.nodes,cue.key);if !exists {continue}
   emitter:=cast(gd.Cpu_Particles2d)gd.get_node(node,"Particles")
   gd.cpu_particles2d_set_color(emitter,gd.Color(cue.value.color))
   for key in starts[:start_count] {if key==cue.key {gd.cpu_particles2d_restart(emitter,false);f.started+=1;break}}
@@ -108,7 +109,7 @@ cave_feedback_paint :: proc(self:^ReplayCave) {
   gd.canvas_item_set_modulate(entry.node,{1,1-.65*amount,1-.65*amount,1})
  }}
  for amount,index in flash {
-  node,exists:=rgd.nodes_get(&self.players,u64(index+1));if !exists {continue}
+  node,exists:=scenegd.nodes_get(&self.players,u64(index+1));if !exists {continue}
   gd.canvas_item_set_modulate(node,{1,1-.65*amount,1-.65*amount,1})
  }
 }

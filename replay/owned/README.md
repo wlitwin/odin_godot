@@ -40,7 +40,7 @@ and local solver; a fresh producer rebases sequence/tick counters from accepted 
 `capture` cannot publish from an observer. Producer ticks order that producer's
 lineage; `accepted_at` is the authority's history timestamp.
 
-The Godot [Body2](../godot/body2.md) and [Body3](../godot/body3.md) adapters supply
+The Godot [Body2](../godot/scene/body2.md) and [Body3](../godot/scene/body3.md) adapters supply
 actual rigid/character handling.
 The [profile design](../../docs/replay/owner-streams.md) and separate
 [Replay Slopball](../../examples/replay_slopball/README.md) describe integration and

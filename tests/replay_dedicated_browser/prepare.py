@@ -4,7 +4,7 @@ root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve();out.mkd
 ignore=shutil.ignore_patterns('.godot','bin','out','addons','*.gen.odin','*.uid','*.import','__pycache__')
 project=out/'game/project';shutil.copytree(root/'tests/replay_dedicated_room',project,ignore=ignore)
 shutil.copy2(root/'examples/replay_scrapyard/odin_godot.gdextension',project/'odin_godot.gdextension')
-p=project/'scripts/probe.odin';s=p.read_text().replace('import "core:os"','import "core:strconv"\nimport "core:strings"').replace('import db "godot:replay/authority/sqlite"\n','').replace(' store:db.Store,service:auth.Service,control:rgd.Enet,\n','')
+p=project/'scripts/probe.odin';s=p.read_text().replace('import "core:os"','import "core:strconv"\nimport "core:strings"').replace('import db "godot:replay/authority/sqlite"\n','').replace(' store:db.Store,service:auth.Service,control:transportgd.Enet,\n','')
 start=s.index('mark ::');end=s.index('fail ::',start)
 s=s[:start]+'''web_bool :: proc(text:string)->bool {
  code:=gd.new_string_odin(text);defer gd.free_string(code)
@@ -22,7 +22,7 @@ s=s.replace('coordinator="127.0.0.1",control_port=port','coordinator=url,control
 s=s.replace(' if self.member==0 {if auth.service_pump(&self.service)!=.None {fail(self,"coordinator pump")};if seen(self,"finished-1") && seen(self,"finished-2") && seen(self,"finished-3") && seen(self,"finished-4") {mark(self,"exit-all")};return}\n','')
 s=s.replace('>40000 {fail(self,"timeout")','>120000 {fail(self,"timeout")')
 s=s.replace(' self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),0);return}', ' self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),0);return}')
-s=s.replace('dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);auth.service_destroy(&self.service);wire:=rgd.enet_transport(&self.control);tr.close(&wire);db.close(&self.store)}','dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);delete(self.mode)}')
+s=s.replace('dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);auth.service_destroy(&self.service);wire:=transportgd.enet_transport(&self.control);tr.close(&wire);db.close(&self.store)}','dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);delete(self.mode)}')
 # Keep large checkpoint/frame values out of the per-frame control-flow function.
 # These helpers preserve the exact native assertions and are not inlined.
 start=s.index(' if self.room.prepared.ready && self.point!=self.room.prepared.point {')

@@ -35,7 +35,7 @@ At the exactly-180-degree ambiguity a canonical quaternion sign chooses a stable
 error axis, so equivalent signs follow the same visual path. Simulation values
 and their checksums are never changed by these functions.
 
-The [Godot Body2](../godot/body2.md) and [Body3](../godot/body3.md) adapters use
+The [Godot Body2](../godot/scene/body2.md) and [Body3](../godot/scene/body3.md) adapters use
 these corrections and preserve the skin's authored local offset and rotation.
 Their physics publication still reads PhysicsServer. Their skin correction reads
 the node transform because a frozen kinematic solver can retain its previous

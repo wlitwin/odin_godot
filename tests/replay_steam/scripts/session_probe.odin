@@ -8,31 +8,33 @@ import rgd "godot:replay/godot"
 import net "godot:replay/net"
 import r "godot:replay"
 import v "godot:replay/view"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 Test_World :: struct {present:u8,chest:u16,bags:[2]u16}
 Test_Control :: struct {unused:bool}
 Test_Action :: struct {take:bool}
 Test_Event :: struct {seat:u16,amount:u16}
-SteamSessionProbe :: struct {owner:gd.Node,runtime:rgd.Steam_Runtime,session:rgd.Session(Test_World,Test_Control,Test_Action,Test_Event,2),role:string,started,completed_at:u64,issued,done,live:bool}
+SteamSessionProbe :: struct {owner:gd.Node,runtime:transportgd.Steam_Runtime,session:rgd.Session(Test_World,Test_Control,Test_Action,Test_Event,2),role:string,started,completed_at:u64,issued,done,live:bool}
 steam_session_probe_ready :: proc(self:^SteamSessionProbe) {
 	self.role=strings.clone(gd.env_string("STEAM_TEST_ROLE","host"))
 	self.live=gd.env_int("STEAM_LIVE",0)==1
 	peer:gd.Variant;defer gd.variant_destroy(&peer)
 	if self.live {
 		app:=gd.env_int("STEAM_APP_ID",0)
-		if app<1 || u64(app)>u64(max(u32)) || rgd.steam_runtime_init(&self.runtime,u32(app))!=.None {session_fail(self,"Steam initialization");return}
+		if app<1 || u64(app)>u64(max(u32)) || transportgd.steam_runtime_init(&self.runtime,u32(app))!=.None {session_fail(self,"Steam initialization");return}
 		gd.print_str(fmt.tprintf("REPLAY_STEAM_LIVE_ID %d",self.runtime.steam_id))
 	} else {
 		fake:=cast(gd.Object)gd.get_node(self.owner,"FakeSteam")
-		if rgd.steam_runtime_initialize(&self.runtime,fake,480)!=.None {session_fail(self,"runtime");return}
+		if transportgd.steam_runtime_initialize(&self.runtime,fake,480)!=.None {session_fail(self,"runtime");return}
 		method:=gd.new_string_name("new_peer");defer gd.free_string_name(method);peer=gd.object_call(fake,method)
 	}
 	options:=rgd.SESSION_OPTIONS;options.role=self.role=="host" ? .Host : .Client;options.backend=.Steam
-	options.steam=rgd.STEAM_CONFIG;options.steam.runtime=&self.runtime;if !self.live {options.steam.peer=cast(gd.Multiplayer_Peer)gd.variant_to_object(&peer)}
+	options.steam=transportgd.STEAM_CONFIG;options.steam.runtime=&self.runtime;if !self.live {options.steam.peer=cast(gd.Multiplayer_Peer)gd.variant_to_object(&peer)}
 	options.steam.host_steam_id=76561198000000001
-	if self.live && self.role!="host" {id,ok:=rgd.steam_parse_id(gd.env_string("STEAM_HOST_ID",""));if !ok || id==0 {session_fail(self,"host Steam ID");return};options.steam.host_steam_id=id}
+	if self.live && self.role!="host" {id,ok:=transportgd.steam_parse_id(gd.env_string("STEAM_HOST_ID",""));if !ok || id==0 {session_fail(self,"host Steam ID");return};options.steam.host_steam_id=id}
 	options.steam.virtual_port=u16(gd.env_int("STEAM_TEST_PORT",49499))
-	options.token=rgd.session_token(self.role);options.network.content=0x535445414d31;options.latency_ms=120
+	options.token=storagegd.session_token(self.role);options.network.content=0x535445414d31;options.latency_ms=120
 	model:=net.Model(Test_World,Test_Control,Test_Action,Test_Event,2){
 		state_valid=proc(w:Test_World)->bool{return w.chest+w.bags[0]+w.bags[1]==5},control_valid=proc(_:Test_Control)->bool{return true},action_valid=proc(a:Test_Action)->bool{return a.take},hold=proc(c:Test_Control)->Test_Control{return c},
 		step=proc(w:^Test_World,_:[2]Test_Control,joins,leaves:u64,_:^r.Step(Test_Event)){w.present=(w.present & ~u8(leaves))|u8(joins)},
@@ -59,4 +61,4 @@ steam_session_probe_process :: proc(self:^SteamSessionProbe,dt:f64) {
 		gd.print_str(fmt.tprintf("%s role=%s retained=5",self.live ? "REPLAY_STEAM_LIVE_OK" : "REPLAY_STEAM_SESSION_OK",self.role));self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),0)
 	}
 }
-steam_session_probe_exit_tree :: proc(self:^SteamSessionProbe) {rgd.session_close(&self.session);rgd.steam_runtime_release(&self.runtime);delete(self.role)}
+steam_session_probe_exit_tree :: proc(self:^SteamSessionProbe) {rgd.session_close(&self.session);transportgd.steam_runtime_release(&self.runtime);delete(self.role)}

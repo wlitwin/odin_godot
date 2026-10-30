@@ -14,7 +14,7 @@ import flow "../shared/flow"
 import display "../shared/presentation"
 import views "views"
 import rt "godot:runtime"
-import rgd "godot:replay/godot"
+import scenegd "godot:replay/godot/scene"
 
 Textures :: struct {
 	idle, run: [3]gd.Texture2d,
@@ -124,8 +124,8 @@ build_arena :: proc(self: ^ReplayScrapyard, layout: arena.Layout) {
 
 runner_scenes_init :: proc(self: ^ReplayScrapyard) -> bool {
 	for &view, i in self.rigs {
-		node := rgd.scene_instance(self.world_node, "res://entities/runner.tscn")
-		report := rgd.script_bind(
+		node := scenegd.scene_instance(self.world_node, "res://entities/runner.tscn")
+		report := scenegd.script_bind(
 			&self.runner_bindings[i],
 			cast(gd.Node2d)node,
 			views.scrap_runner_view_replay_binding(),
@@ -225,7 +225,7 @@ paint_runner_views :: proc(
 			player = predicted_players[i]
 		}
 		pose := v.smooth_present(&self.smoothing[i], {position = player.position}, dt)
-		rgd.script_present(
+		scenegd.script_present(
 			&self.runner_bindings[i],
 			display.runner(turret_world^, player, pose.position, epoch, u16(i + 1)),
 		)
@@ -264,7 +264,7 @@ unit :: proc(vector: [2]f32) -> [2]f32 {
 
 runner_scenes_close :: proc(self: ^ReplayScrapyard) {
 	for &binding in self.runner_bindings {
-		rgd.script_release(&binding)
+		scenegd.script_release(&binding)
 	}
 	self.rigs = {}
 }

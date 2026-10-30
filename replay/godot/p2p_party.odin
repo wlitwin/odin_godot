@@ -7,6 +7,7 @@ import pp "godot:replay/p2p/provision"
 import p "godot:replay/provision"
 import tr "godot:replay/transport"
 import sc "godot:replay/schema"
+import transportgd "godot:replay/godot/transport"
 
 // Composes persistent enrollment with fixed-roster registration. This owns no
 // gameplay runner or transport. Close it before its borrowed native Party_Storage.
@@ -83,7 +84,7 @@ p2p_party_pair_begin :: proc(o:^P2P_Party,remote:u64)->bool {
     nonce:auth.Nonce;copy(nonce[:],secret[:len(nonce)])
     return ok && pp.pair_client_begin(&o.pairs,remote,nonce)
 }
-p2p_party_rtc :: proc(o: ^P2P_Party) -> (Rtc_Config, bool) {
+p2p_party_rtc :: proc(o: ^P2P_Party) -> (transportgd.Rtc_Config, bool) {
     if !o.ready || o.failed {return {}, false}
     cfg := rtc_p2p_config(&o.authorization, o.party.config.service, o.authorization.identity.member == o.authorization.match.members[0])
     cfg.wait_for_host = !cfg.host

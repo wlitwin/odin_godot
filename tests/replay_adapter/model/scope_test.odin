@@ -1,7 +1,7 @@
 package adapter_test
 import "core:testing"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
+import scenegd "godot:replay/godot/scene"
 Key :: struct {run:u32,floor:u8}
 @(test)
 scope_policy_is_explicit_and_failures_preserve_tracker :: proc(t:^testing.T) {
@@ -21,13 +21,13 @@ scope_policy_is_explicit_and_failures_preserve_tracker :: proc(t:^testing.T) {
 
 @(test)
 explicit_bake_bounds_reject_narrowing_and_preserve_first_diagnostic :: proc(t:^testing.T) {
- ctx:rgd.Bake_Context
- testing.expect_value(t,rgd.bake_integer(&ctx,u8,255,0,255,"$.damage"),u8(255))
+ ctx:scenegd.Bake_Context
+ testing.expect_value(t,scenegd.bake_integer(&ctx,u8,255,0,255,"$.damage"),u8(255))
  testing.expect(t,ctx.report.error==.None)
- testing.expect_value(t,rgd.bake_integer(&ctx,u8,256,0,255,"$.damage"),u8(0))
+ testing.expect_value(t,scenegd.bake_integer(&ctx,u8,256,0,255,"$.damage"),u8(0))
  before:=ctx.report
- testing.expect_value(t,rgd.bake_integer(&ctx,u16,10,0,100,"$.other"),u16(0))
+ testing.expect_value(t,scenegd.bake_integer(&ctx,u16,10,0,100,"$.other"),u16(0))
  testing.expect_value(t,ctx.report,before)
- ctx={};rgd.bake_integer(&ctx,u8,1,0,1000,"$.bad_bounds")
+ ctx={};scenegd.bake_integer(&ctx,u8,1,0,1000,"$.bad_bounds")
  testing.expect(t,ctx.report.error!=.None)
 }

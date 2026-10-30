@@ -1,8 +1,8 @@
 package replay_quickdraw
 
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import flow "../shared/feedback"
+import scenegd "godot:replay/godot/scene"
 
 feedback_prepare :: proc(self:^ReplayQuickdraw,dt:f64) {
  f:=&self.feedback[0];flow.advance(f,dt)
@@ -20,20 +20,20 @@ feedback_prepare :: proc(self:^ReplayQuickdraw,dt:f64) {
 }
 feedback_rings :: proc(self:^ReplayQuickdraw) {
  colors:=[4]gd.Color{{0.35,0.65,1,1},{1,0.62,0.2,1},{0.5,0.9,0.4,1},{0.9,0.45,0.9,1}}
- for player,i in self.drawn {if node,present:=rgd.nodes_get(&self.gunners,u64(i+1));present {
+ for player,i in self.drawn {if node,present:=scenegd.nodes_get(&self.gunners,u64(i+1));present {
   h:=self.feedback[0].health[i]
   flashing:=h.left>0 && h.life==player.life
   color:=flashing ? gd.Color{1,0.25,0.2,1} : player.hp>0 ? colors[i] : gd.Color{0.35,0.32,0.3,0.55}
   gd.canvas_item_set_self_modulate(cast(gd.Canvas_Item)gd.get_node(node,"Skin"),color)
  }}
- instances:[flow.RING_LIMIT]rgd.Instance2;n:=0
+ instances:[flow.RING_LIMIT]scenegd.Instance2;n:=0
  for ring,i in self.feedback[0].rings {if ring.left>0 {
   instances[n]={key=u64(i+1),pose={position=ring.position},scale={1,1},color={1,0.82,0.32,f32(ring.left/flow.RING_SECONDS)}};n+=1
  }}
- rgd.nodes_present(&self.rings,instances[:n])
+ scenegd.nodes_present(&self.rings,instances[:n])
 }
 feedback_restart :: proc(self:^ReplayQuickdraw) {
- flow.destroy(&self.feedback[0]);flow.init(&self.feedback[0]);rgd.nodes_clear(&self.rings)
+ flow.destroy(&self.feedback[0]);flow.init(&self.feedback[0]);scenegd.nodes_clear(&self.rings)
 }
 @(gd_method)
 replay_quickdraw_feedback_probe :: proc(self:^ReplayQuickdraw,key:string,seat:gd.Int=1)->gd.Float {
@@ -55,7 +55,7 @@ replay_quickdraw_feedback_probe :: proc(self:^ReplayQuickdraw,key:string,seat:gd
 @(gd_method)
 replay_quickdraw_feedback_view :: proc(self:^ReplayQuickdraw,kind:string,key:gd.Int)->gd.Node2d {
  if key<1 {return nil}
- if kind=="gunner" {node,_:=rgd.nodes_get(&self.gunners,u64(key));return node}
- if kind=="ring" {node,_:=rgd.nodes_get(&self.rings,u64(key));return node}
+ if kind=="gunner" {node,_:=scenegd.nodes_get(&self.gunners,u64(key));return node}
+ if kind=="ring" {node,_:=scenegd.nodes_get(&self.rings,u64(key));return node}
  return nil
 }

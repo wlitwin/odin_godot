@@ -3,9 +3,10 @@ package replay_scrapyard
 import gd "godot:godot"
 import "godot:gdext"
 import "core:fmt"
-import rgd "godot:replay/godot"
 import a "godot:replay/assets"
 import game "../shared/game"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 web_spray_pick :: proc() {
 	when gd.IS_WEB {
@@ -84,7 +85,7 @@ Browser_Spray_Phase :: enum {
 
 Browser_Spray :: struct {
 	phase: Browser_Spray_Phase,
-	op: rgd.Browser_Store_Op,
+	op: storagegd.Browser_Store_Op,
 	revision: u64,
 	known: bool,
 	bytes: []u8,
@@ -95,7 +96,7 @@ web_spray_error :: proc(self: ^ReplayScrapyard) {
 	local := &self.spray_local[0]
 	web := &local.web
 	gd.print_str(fmt.tprintf("RSY_SPRAY_BAD storage=%v", web.op.error))
-	rgd.browser_store_close(&web.op)
+	storagegd.browser_store_close(&web.op)
 	delete(web.bytes)
 	web.bytes = nil
 	web.phase = .Idle
@@ -112,7 +113,7 @@ web_spray_load :: proc(self: ^ReplayScrapyard) {
 	if web.phase != .Idle {
 		return
 	}
-	if !rgd.browser_store_read(
+	if !storagegd.browser_store_read(
 		&web.op,
 		browser_data_namespace(self),
 		browser_data_key(self, "spray"),
@@ -126,7 +127,7 @@ web_spray_load :: proc(self: ^ReplayScrapyard) {
 
 web_spray_write :: proc(self: ^ReplayScrapyard) -> bool {
 	web := &self.spray_local[0].web
-	if !rgd.browser_store_write(
+	if !storagegd.browser_store_write(
 		&web.op,
 		browser_data_namespace(self),
 		browser_data_key(self, "spray"),
@@ -146,7 +147,7 @@ web_spray_save :: proc(self: ^ReplayScrapyard, bytes: []u8) -> bool {
 	if web.phase != .Idle {
 		return false
 	}
-	if !rgd.asset_png_valid(nil, {}, bytes) {
+	if !scenegd.asset_png_valid(nil, {}, bytes) {
 		web.op.error = .Corrupt
 		web_spray_error(self)
 		return false
@@ -163,7 +164,7 @@ web_spray_save :: proc(self: ^ReplayScrapyard, bytes: []u8) -> bool {
 	if web.known {
 		return web_spray_write(self)
 	}
-	if !rgd.browser_store_read(
+	if !storagegd.browser_store_read(
 		&web.op,
 		browser_data_namespace(self),
 		browser_data_key(self, "spray"),
@@ -180,7 +181,7 @@ web_spray_store_poll :: proc(self: ^ReplayScrapyard) {
 	when gd.IS_WEB {
 		local := &self.spray_local[0]
 		web := &local.web
-		if web.phase == .Idle || rgd.browser_store_poll(&web.op) != .Complete {
+		if web.phase == .Idle || storagegd.browser_store_poll(&web.op) != .Complete {
 			return
 		}
 		phase := web.phase
@@ -192,7 +193,7 @@ web_spray_store_poll :: proc(self: ^ReplayScrapyard) {
 			web.revision = web.op.error == .Missing ? 0 : web.op.revision
 			web.known = true
 			if phase == .Loading && web.op.error == .None {
-				bytes, err := rgd.browser_store_bytes(&web.op)
+				bytes, err := storagegd.browser_store_bytes(&web.op)
 				defer delete(bytes)
 				if err != .None {
 					web.op.error = err
@@ -205,7 +206,7 @@ web_spray_store_poll :: proc(self: ^ReplayScrapyard) {
 					return
 				}
 			}
-			rgd.browser_store_close(&web.op)
+			storagegd.browser_store_close(&web.op)
 			web.phase = .Idle
 			if phase == .Checking {
 				web_spray_write(self)
@@ -224,7 +225,7 @@ web_spray_store_poll :: proc(self: ^ReplayScrapyard) {
 		}
 		delete(web.bytes)
 		web.bytes = nil
-		rgd.browser_store_close(&web.op)
+		storagegd.browser_store_close(&web.op)
 		web.phase = .Idle
 		if web.pinned != (a.Ref{}) {
 			a.cache_unpin(&self.assets[0].cache, web.pinned)

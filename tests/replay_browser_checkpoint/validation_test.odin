@@ -4,6 +4,7 @@ import r "godot:replay"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "godot:examples/replay_cavecrawl/shared/cave"
+import storagegd "godot:replay/godot/storage"
 
 @(test)
 local_slot_requires_owning_profile_and_rejects_coordinated_policy :: proc(t:^testing.T) {
@@ -22,8 +23,8 @@ local_slot_requires_owning_profile_and_rejects_coordinated_policy :: proc(t:^tes
 }
 @(test)
 identity_is_not_exposed_before_storage_completion :: proc(t:^testing.T) {
-	identity:=rgd.Browser_Identity{phase=.Creating,token={0=1}}
-	token,ok:=rgd.browser_identity_token(&identity);testing.expect(t,!ok && token==(net.Token{}))
-	identity.phase=.Ready;token,ok=rgd.browser_identity_token(&identity);testing.expect(t,ok && token[0]==1)
-	testing.expect(t,!rgd.browser_identity_valid(net.Token{}))
+	identity:=storagegd.Browser_Identity{phase=.Creating,token={0=1}}
+	token,ok:=storagegd.browser_identity_token(&identity);testing.expect(t,!ok && token==(net.Token{}))
+	identity.phase=.Ready;token,ok=storagegd.browser_identity_token(&identity);testing.expect(t,ok && token[0]==1)
+	testing.expect(t,!storagegd.browser_identity_valid(net.Token{}))
 }

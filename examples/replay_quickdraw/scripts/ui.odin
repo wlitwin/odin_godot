@@ -8,6 +8,9 @@ import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
 import game "../shared/duel"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 Quickdraw_UI :: struct {
  lobby,score_panel:gd.Control,
@@ -32,7 +35,7 @@ ui_ready :: proc(self:^ReplayQuickdraw) {
  for label,i in ([2]cstring{"Solo","Host"}) {u.resume[i]=cast(gd.Button)gd.get_node(self.owner,fmt.ctprintf("UI/Lobby/Column/Resume/%s",label))}
  gd.connect_to(u.resume[0],"pressed",self.owner,"on_resume_solo");gd.connect_to(u.resume[1],"pressed",self.owner,"on_resume_host")
  gd.set_string(u.save_path,"text",fmt.ctprintf("%s",gd.IS_WEB ? quickdraw_param("RQ_SAVE_SLOT","duel") : quickdraw_param("RQ_SAVE","user://quickdraw.replay")))
- rgd.bind_key("rq_save",.F5)
+ inputgd.bind_key("rq_save",.F5)
  u.lobby=cast(gd.Control)gd.get_node(self.owner,"UI/Lobby")
  u.name=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Name/Value")
  u.address=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Address/Value")
@@ -56,7 +59,7 @@ ui_ready :: proc(self:^ReplayQuickdraw) {
  for method,i in ([4]cstring{"on_solo","on_host","on_join","on_watch"}) {gd.connect_to(u.doors[i],"pressed",self.owner,method)}
  gd.connect_to(u.start,"pressed",self.owner,"on_start");gd.connect_to(u.leave,"pressed",self.owner,"on_leave")
  gd.connect_to(u.chat_input,"text_submitted",self.owner,"on_chat")
- rgd.bind_key("rq_chat",.Enter);rgd.bind_key("rq_scores",.Tab)
+ inputgd.bind_key("rq_chat",.Enter);inputgd.bind_key("rq_scores",.Tab)
  profile_ready(self)
  gd.set_string(u.address,"text",fmt.ctprintf("%s",quickdraw_param("RQ_ADDRESS","127.0.0.1")))
  gd.range_set_value(u.port,f64(quickdraw_int("RQ_PORT",49460)))
@@ -90,7 +93,7 @@ replay_quickdraw_on_leave :: proc(self:^ReplayQuickdraw) {
  self.local_shots,self.watched_shots,self.local_lobs,self.speculative_lobs=0,0,0,0
  self.last_lob,self.lob_pending_key,self.lob_visible_max_ms,self.lob_visible_count=0,0,0,0
  self.lob_held,self.lob_waiting=false,false;self.recovery_probe={}
- rgd.nodes_clear(&self.gunners);rgd.nodes_clear(&self.drones);rgd.nodes_clear(&self.bullets)
+ scenegd.nodes_clear(&self.gunners);scenegd.nodes_clear(&self.drones);scenegd.nodes_clear(&self.bullets)
  self.saved_tick,self.saved_hash,self.restored_tick,self.restored_hash=0,0,0,0;self.restored_exact=false
  gd.set_string(self.ui[0].save_notice,"text","")
  self.ui[0].revision=0;self.ui[0].submitted=false;self.ui[0].was_playing=false
@@ -161,7 +164,7 @@ ui_frame :: proc(self:^ReplayQuickdraw) {
 social_frame :: proc(self:^ReplayQuickdraw) {
  frame,ok:=rgd.session_authority_state(self.session)
  rgd.session_comms_frame(&self.comms,self.session,ok ? frame.state.names[:] : nil,self.display_name)
- rgd.session_diagnostics_frame(&self.diagnostics,self.session)
+ debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
  u:=&self.ui[0]
  if u.revision!=self.comms.history_serial {
   builder:strings.Builder;defer strings.builder_destroy(&builder)

@@ -3,6 +3,7 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
 import p "godot:replay/play"
+import scenegd "godot:replay/godot/scene"
 
 bench_active:bool
 bench_times:[4096]u64
@@ -65,7 +66,7 @@ replay_cave_bench_value :: proc(self:^ReplayCave,key:string,remote:bool)->gd.Flo
  case "y":return gd.Float(player.position[1])
  case "hp":return gd.Float(player.hp)
  case "bag":bag:=player.bag;return gd.Float(p.inventory_count(bag[:],game.GEM))
- case "render_x","render_y":node,found:=rgd.nodes_get(&self.players,u64(seat));if found {return gd.Float(gd.node2d_get_position(cast(gd.Node2d)node)[key=="render_x" ? 0 : 1])}
+ case "render_x","render_y":node,found:=scenegd.nodes_get(&self.players,u64(seat));if found {return gd.Float(gd.node2d_get_position(cast(gd.Node2d)node)[key=="render_x" ? 0 : 1])}
  }
  return -1
 }

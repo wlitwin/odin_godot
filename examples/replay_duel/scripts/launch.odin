@@ -7,6 +7,7 @@ import gd "godot:godot"
 import r "godot:replay"
 import tr "godot:replay/transport"
 import rgd "godot:replay/godot"
+import transportgd "godot:replay/godot/transport"
 
 // Reuse the binding's platform-neutral launch parser. Native RDP_FOO maps to
 // ?foo= in the browser. Values used beyond this call are explicitly cloned.
@@ -21,7 +22,7 @@ duel_int :: proc(key:cstring,fallback:int)->int {
 }
 
 duel_remotes :: proc(self:^ReplayDuel,watch:bool,dst:[]tr.Peer_Id)->int {
- when gd.IS_WEB {return rgd.rtc_peers(watch ? &self.watch_rtc : &self.rtc,dst)} else {
+ when gd.IS_WEB {return transportgd.rtc_peers(watch ? &self.watch_rtc : &self.rtc,dst)} else {
   if self.online_enabled && !watch {
    identity,ok:=rgd.p2p_direct_identity(&self.direct)
    if !ok || len(dst)==0 {return 0};dst[0]=tr.Peer_Id(identity.member);return 1

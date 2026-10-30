@@ -15,6 +15,10 @@ import game "../shared/pitch"
 import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 ReplaySlopball :: struct {
 	owner: gd.Node2d,
@@ -24,9 +28,9 @@ ReplaySlopball :: struct {
 	browser_save:[1]Slopball_Browser_Save,
 	identity:net.Token,
 	display_name:lb.Name,
-	name_profile:rgd.Name_Profile,
+	name_profile:storagegd.Name_Profile,
 	online:Slopball_Online,
-	browser_identity:rgd.Browser_Identity,
+	browser_identity:storagegd.Browser_Identity,
 	profile_identity_ready,profile_name_loaded:bool,
 	browser_launch:string,
 	views_ready,keyboard_captured,profile_enabled,name_submitted:bool,
@@ -39,7 +43,7 @@ ReplaySlopball :: struct {
 	standalone: rgd.Session(game.World, game.Control, game.Action, game.Event, game.SEATS),
 	room: rgd.Room(game.World, game.Control, game.Action, game.Event, game.SEATS),
 	recovery_probe: [1]Physics_Recovery,
-	bodies: [game.SEATS + 1]rgd.Body2,
+	bodies: [game.SEATS + 1]scenegd.Body2,
 	body_layers:[game.SEATS+1][2]gd.Int,
 	world: [1]game.World,
 	intent: [2]i8,
@@ -55,15 +59,15 @@ ReplaySlopball :: struct {
 replay_slopball_ready :: proc(self: ^ReplaySlopball) {
 	self.session = &self.standalone
 	if !gd.has_action("rsl_left") {
-		rgd.bind_key("rsl_left", .A); rgd.bind_key("rsl_right", .D)
-		rgd.bind_key("rsl_up", .W); rgd.bind_key("rsl_down", .S); rgd.bind_key("rsl_kick", .Space)
+		inputgd.bind_key("rsl_left", .A); inputgd.bind_key("rsl_right", .D)
+		inputgd.bind_key("rsl_up", .W); inputgd.bind_key("rsl_down", .S); inputgd.bind_key("rsl_kick", .Space)
 	}
 	for &body, i in self.bodies {
 		path: cstring = i == game.SEATS ? "res://views/ball.tscn" : "res://views/kicker.tscn"
-		node := rgd.scene_instance(self.owner, path)
+		node := scenegd.scene_instance(self.owner, path)
 		if node == nil {slop_fail(self, "scene"); return}
 		skin := cast(gd.Node2d)gd.get_node(node, i == game.SEATS ? "Look" : "Skin")
-		if !rgd.body2_attach(&body, cast(gd.Physics_Body2d)node, i == game.SEATS ? .Rigid : .Character, skin) {slop_fail(self, "body"); return}
+		if !scenegd.body2_attach(&body, cast(gd.Physics_Body2d)node, i == game.SEATS ? .Rigid : .Character, skin) {slop_fail(self, "body"); return}
 		self.body_layers[i]={gd.Int(gd.collision_object2d_get_collision_layer(cast(gd.Collision_Object2d)node)),gd.Int(gd.collision_object2d_get_collision_mask(cast(gd.Collision_Object2d)node))}
 		if i != game.SEATS {
 			gd.canvas_item_set_modulate(cast(gd.Canvas_Item)node, gd.peer_color(i + 1))
@@ -73,7 +77,7 @@ replay_slopball_ready :: proc(self: ^ReplaySlopball) {
 		}
 	}
 	if !self.bot_selected {self.bot = strings.clone(slopball_param("RSL_BOT", ""))}
- self.identity=rgd.session_token(slopball_param("RSL_TOKEN",""))
+ self.identity=storagegd.session_token(slopball_param("RSL_TOKEN",""))
  self.views_ready=true;co.init(&self.comms);dg.init(&self.diagnostics)
  reset_bodies(self);ui_ready(self);online_ready(self)
  role:=slopball_param("RSL_ROLE",slopball_int("RSL_COORD_PORT",0)!=0 ? "host" : "")
@@ -100,7 +104,7 @@ connect_pitch :: proc(self:^ReplaySlopball,role:string,manual:bool,resume:bool=f
  options.network.content,options.network.hz,options.network.lead=game.CONTENT,60,4
  options.network.snapshot_every,options.network.watch_delay=1,3
  options.discover_epoch=slopball_int("RSL_COORD_PORT",0)==0 && !self.online.launch
- if !rgd.session_comms_enable(&options) || !rgd.session_diagnostics_enable(&options) {ui_notice(self,"Could not configure social channels.");return}
+ if !rgd.session_comms_enable(&options) || !debuggd.session_diagnostics_enable(&options) {ui_notice(self,"Could not configure social channels.");return}
  minimum:=u8(clamp(slopball_int("RSL_PLAYERS",manual || options.role==.Solo ? 1 : 2),1,game.SEATS))
  goals:=u8(clamp(slopball_int("RSL_GOALS",3),1,255))
  gd.engine_set_physics_ticks_per_second(gd.singleton_engine(),60)
@@ -125,8 +129,8 @@ replay_slopball_process :: proc(self: ^ReplaySlopball, dt: f64) {
 	seat := rgd.session_seat(self.session)
 	physics_frame := gd.engine_get_physics_frames(gd.singleton_engine())
 	if seat != 0 && self.have_world {
-		control.player, _ = rgd.body2_sample(&self.bodies[seat - 1], physics_frame)
-		control.ball, _ = rgd.body2_sample(&self.bodies[game.SEATS], physics_frame)
+		control.player, _ = scenegd.body2_sample(&self.bodies[seat - 1], physics_frame)
+		control.ball, _ = scenegd.body2_sample(&self.bodies[game.SEATS], physics_frame)
 	}
 	err := self.room.ready ? rgd.room_frame(&self.room, dt, control) : rgd.session_frame(self.session, dt, control)
 	if err != .None {slop_fail(self, fmt.tprintf("frame %v", err)); return}
@@ -165,10 +169,10 @@ replay_slopball_process :: proc(self: ^ReplaySlopball, dt: f64) {
 			if i == game.SEATS && frame.tick < frame.state.kickoff_until {eligible = false}
 			old_scope := body.driver.scope
 			old_role := body.driver.role
-			if err := rgd.body2_sync(&body, state, seat, self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch, frame.tick, eligible, dt, &shown); err != .None {slop_fail(self, fmt.tprintf("sync %v", err)); return}
+			if err := scenegd.body2_sync(&body, state, seat, self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch, frame.tick, eligible, dt, &shown); err != .None {slop_fail(self, fmt.tprintf("sync %v", err)); return}
 			// Enabling a previously observed scope also reseeds the solver. Room
 			// installation can publish its scope before the local seat is visible.
-			if i == game.SEATS && body.driver.role == .Owner && (body.driver.scope != old_scope || old_role == .Observer) {observe_physics_seed(self, state, rgd.body2_read(&body));observe_save_seed(self,state,rgd.body2_read(&body))}
+			if i == game.SEATS && body.driver.role == .Owner && (body.driver.scope != old_scope || old_role == .Observer) {observe_physics_seed(self, state, scenegd.body2_read(&body));observe_save_seed(self,state,scenegd.body2_read(&body))}
 		}
 		if frame.state.ball.revision != self.last_revision {
 			self.last_revision = frame.state.ball.revision
@@ -177,7 +181,7 @@ replay_slopball_process :: proc(self: ^ReplaySlopball, dt: f64) {
 		}
 		gd.set_string(cast(gd.Object)self.status, "text", fmt.ctprintf("Slopball   %d : %d   Ball owner %d", frame.state.left, frame.state.right, frame.state.ball.owner))
 	} else if self.have_world {
-		for &body in self.bodies {rgd.body2_suspend(&body, dt)}
+		for &body in self.bodies {scenegd.body2_suspend(&body, dt)}
 	}
 	changes: [320]v.Change(net.Net_Event(game.Event))
 	for {
@@ -209,8 +213,8 @@ replay_slopball_physics_process :: proc(self: ^ReplaySlopball, dt: f64) {
 	seat := rgd.session_seat(self.session)
 	if seat == 0 || !self.world[0].started || !self.world[0].players[seat - 1].connected {return}
 	actor, ball := &self.bodies[seat - 1], &self.bodies[game.SEATS]
-	if !rgd.body2_simulating(actor) {return}
-	me, target := rgd.body2_read(actor), rgd.body2_read(ball)
+	if !scenegd.body2_simulating(actor) {return}
+	me, target := scenegd.body2_read(actor), scenegd.body2_read(ball)
 	direction: [2]f32
 	if self.bot == "striker" && self.world[0].won == 0 {
 		goal := [2]f32{game.team(seat) == 1 ? f32(640) : 0, 180}
@@ -226,17 +230,17 @@ replay_slopball_physics_process :: proc(self: ^ReplaySlopball, dt: f64) {
 	for axis in 0 ..< 2 {if direction[axis] > 0.1 {self.intent[axis] = 1} else if direction[axis] < -0.1 {self.intent[axis] = -1}}
 	gd.character_body2d_set_velocity(cast(gd.Character_Body2d)actor.body, {direction[0] * game.KICKER_SPEED, direction[1] * game.KICKER_SPEED})
 	gd.character_body2d_move_and_slide(cast(gd.Character_Body2d)actor.body)
-	me = rgd.body2_read(actor)
+	me = scenegd.body2_read(actor)
 	distance := p.length_sq2(target.position - me.position)
 	playing := self.world[0].won == 0 && self.world[0].tick >= self.world[0].kickoff_until
 	if playing && distance <= game.DRIBBLE_R * game.DRIBBLE_R && p.length_sq2(direction) > 0 {
-		if slopball_int("RSL_PREVIEW", 1) == 1 && rgd.body2_preview(ball, self.world[0].ball) {self.previews += 1}
-		if rgd.body2_simulating(ball) && p.length_sq2(target.linear) < game.KICKER_SPEED * game.KICKER_SPEED * 2 {
+		if slopball_int("RSL_PREVIEW", 1) == 1 && scenegd.body2_preview(ball, self.world[0].ball) {self.previews += 1}
+		if scenegd.body2_simulating(ball) && p.length_sq2(target.linear) < game.KICKER_SPEED * game.KICKER_SPEED * 2 {
 			gd.rigid_body2d_apply_central_impulse(cast(gd.Rigid_Body2d)ball.body, {direction[0] * game.DRIBBLE_NUDGE, direction[1] * game.DRIBBLE_NUDGE})
 		}
 	}
 	want := !self.keyboard_captured && ((self.bot == "striker" && playing) || (self.bot == "" && self.buttons.pressed & 1 != 0))
-	if want && self.kick_left == 0 && rgd.body2_simulating(ball) && distance <= game.KICK_REACH * game.KICK_REACH {
+	if want && self.kick_left == 0 && scenegd.body2_simulating(ball) && distance <= game.KICK_REACH * game.KICK_REACH {
 		aim := p.unit2(target.position - me.position)
 		if self.bot == "striker" {aim = p.unit2([2]f32{game.team(seat) == 1 ? f32(640) : 0, 180} - target.position)}
 		gd.rigid_body2d_apply_central_impulse(cast(gd.Rigid_Body2d)ball.body, {aim[0] * game.KICK_POWER, aim[1] * game.KICK_POWER})
@@ -258,9 +262,9 @@ blended :: proc(a, b: own.State(own.Pose2), alpha: f32) -> own.State(own.Pose2) 
 
 slop_fail :: proc(self: ^ReplaySlopball, message: string) {gd.print_str(fmt.tprintf("REPLAY_SLOPBALL_FAIL %s", message)); gd.scene_tree_quit(gd.get_tree(self.owner), 1)}
 replay_slopball_exit_tree :: proc(self: ^ReplaySlopball) {
-	for &body in self.bodies {rgd.body2_destroy(&body)}
+	for &body in self.bodies {scenegd.body2_destroy(&body)}
 	if self.room.ready {rgd.room_close(&self.room)} else if self.session != nil {rgd.session_close(self.session)}
-	online_close(self);browser_save_close(self);rgd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
-	co.destroy(&self.comms);dg.destroy(&self.diagnostics);rgd.name_profile_close(&self.name_profile)
+	online_close(self);browser_save_close(self);storagegd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
+	co.destroy(&self.comms);dg.destroy(&self.diagnostics);storagegd.name_profile_close(&self.name_profile)
 	delete(self.bot)
 }

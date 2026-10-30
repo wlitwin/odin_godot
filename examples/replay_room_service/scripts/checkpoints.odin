@@ -11,7 +11,7 @@ import slopball3d "godot:examples/replay_slopball3d/shared/pitch"
 import claimball "godot:examples/replay_claimball/shared/pitch"
 import duel "godot:examples/replay_quickdraw/shared/duel"
 import scrapyard "godot:examples/replay_scrapyard/shared/game"
-import rgd "godot:replay/godot"
+import scenegd "godot:replay/godot/scene"
 
 // The operator-selected content ID determines executable validation code.
 // Request fields never select a model. Unknown content remains admission-only
@@ -37,7 +37,7 @@ checkpoint_open :: proc(self:^ReplayRoomService,content:u64)->(string,bool) {
 	case pitch.CONTENT:
 		name="speedball";self.pitch_backend={store=&self.store,model=pitch.model()};backend=db.checkpoint_backend(&self.pitch_backend)
 	case scrapyard.CONTENT:
-		name="scrapyard";self.scrapyard_backend={store=&self.store,model=scrapyard.model(),assets={collect=scrapyard.checkpoint_assets,validate=rgd.asset_png_valid}};backend=db.checkpoint_backend(&self.scrapyard_backend)
+		name="scrapyard";self.scrapyard_backend={store=&self.store,model=scrapyard.model(),assets={collect=scrapyard.checkpoint_assets,validate=scenegd.asset_png_valid}};backend=db.checkpoint_backend(&self.scrapyard_backend)
 	}
 	return name,ck.hub_open(&self.checkpoints,&self.hub,backend)==.None
 }

@@ -1769,5 +1769,5 @@ script pointer. `present` is required, `validate`/`retired` are optional, and
 `appearance`/`configure` must be paired. Unknown/duplicate options, missing fields
 and incompatible callbacks fail generation/compilation. Generated descriptors and
 handwritten descriptors share the same implementation. See
-[adapter bindings](../replay/godot/adapter-bindings.md) for ownership, lifetimes,
+[adapter bindings](../replay/godot/scene/adapter-bindings.md) for ownership, lifetimes,
 scene validation and the distinct permanent-runner and entity-enemy examples.

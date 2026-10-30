@@ -196,4 +196,4 @@ an authority projection, rejects inactive leaves and union-tag changes, and
 preserves the destination on any failure. Integer parsing checks overflow before
 arithmetic; float narrowing rejects overflow and nonfinite values. It supports
 packed/endian-qualified values through canonical bytes, without a wire-format
-change. See the [Godot preview editor](../godot/scrubber.md#editing-a-preview).
+change. See the [Godot preview editor](../godot/debug/scrubber.md#editing-a-preview).

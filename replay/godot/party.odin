@@ -7,6 +7,8 @@ import gd "godot:godot"
 import auth "godot:replay/authority"
 import p "godot:replay/provision"
 import rec "godot:replay/recovery"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 Party_Action :: enum {Create, Join, Rejoin}
 Party_Error :: enum {None, Config, Storage, Conflict, Missing, Invite, Transport, Entropy, Enrollment, Relay}
@@ -41,7 +43,7 @@ Party :: struct {
 	profile: Enrollment_Profile,
 	connection: Provision_Connection,
 	relay: Relay_Connection,
-	recent_op: Browser_Store_Op,
+	recent_op: storagegd.Browser_Store_Op,
 	recent_room, recent_revision, target: u64,
 	request: p.Request,
 	grant: p.Grant,
@@ -56,11 +58,11 @@ party_scope :: proc(service: string) -> string {
 }
 party_open :: proc(o: ^Party, cfg: Party_Config) -> bool {
 	if cfg.checkpoint_interval_ms!=0 && (cfg.checkpoint_interval_ms<1000 || cfg.checkpoint_interval_ms>120000) {return false}
-	if o.initialized || !p.service_url_valid(cfg.service, cfg.local_development) || !browser_store_key(cfg.namespace) ||
+	if o.initialized || !p.service_url_valid(cfg.service, cfg.local_development) || !storagegd.browser_store_key_valid(cfg.namespace) ||
 	   cfg.content == 0 || cfg.invite_role > .Trusted_Peer || cfg.invite_uses == 0 || cfg.invite_uses >= auth.MAX_MEMBERS {return false}
 	probe := auth.record_make(1, cfg.content, {1, 1}); probe.members[0] = {identity = {1, 1}, endpoint = cfg.endpoint}
 	if !auth.record_valid(probe) {return false}
-	if rtc_ice_validate(cfg.ice_json) != .None {return false}
+	if transportgd.rtc_ice_validate(cfg.ice_json) != .None {return false}
 	if cfg.relay_credentials && cfg.ice_json != "" {return false}
 	when !gd.IS_WEB {if cfg.storage.open == nil || cfg.storage.recent == nil || cfg.storage.select == nil {return false}}
 	o.config = cfg; o.config.service = strings.clone(cfg.service); o.config.namespace = strings.clone(cfg.namespace)
@@ -68,7 +70,7 @@ party_open :: proc(o: ^Party, cfg: Party_Config) -> bool {
 	if cfg.tls != nil {gd.ref_counted_reference(cfg.tls)}
 	o.scope, o.initialized = party_scope(cfg.service), true
 	when gd.IS_WEB {
-		if !browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8) {party_fail(o, .Storage); return false}
+		if !storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8) {party_fail(o, .Storage); return false}
 	} else {
 		o.recent_room, o.recent_revision, o.error = cfg.storage.recent(cfg.storage.user, o.scope)
 		if o.error != .None {party_fail(o, o.error); return false}
@@ -119,7 +121,7 @@ party_frame :: proc(o: ^Party) {
 				when gd.IS_WEB {
 					if !o.recent_writing {
 						bytes: [8]u8; for i in 0 ..< 8 {bytes[i] = u8(o.target >> uint(8 * i))}
-						if !browser_store_write(&o.recent_op, o.config.namespace, o.scope, bytes[:], o.recent_revision, 8) {party_fail(o, .Storage); return}
+						if !storagegd.browser_store_write(&o.recent_op, o.config.namespace, o.scope, bytes[:], o.recent_revision, 8) {party_fail(o, .Storage); return}
 						o.recent_writing = true
 					}
 				} else {
@@ -171,8 +173,8 @@ party_room_options :: proc(o: ^Party, session: Session_Options) -> (Room_Options
 	return room_with_grant(options, grant)
 }
 party_close :: proc(o: ^Party) {
-	provision_disconnect(&o.connection); relay_close(&o.relay); enrollment_profile_close(&o.profile); browser_store_close(&o.recent_op)
-	if o.config.tls != nil {websocket_unref(o.config.tls)}
+	provision_disconnect(&o.connection); relay_close(&o.relay); enrollment_profile_close(&o.profile); storagegd.browser_store_close(&o.recent_op)
+	if o.config.tls != nil {gd.release_ref(o.config.tls)}
 	delete(o.config.service); delete(o.config.namespace); delete(o.config.ice_json); delete(o.scope); crypto.zero_explicit(o, size_of(Party))
 }
 party_message :: proc(o: ^Party) -> string {
@@ -197,7 +199,7 @@ party_fail :: proc(o: ^Party, error: Party_Error) {o.failed, o.active, o.ready, 
 party_random :: proc(entropy: p.Entropy) -> (p.Secret, u64, bool) {
 	bytes: [40]u8
 	if entropy.read != nil {if !entropy.read(entropy.user, bytes[:]) {return {}, 0, false}} else {
-		crypto := gd.new_crypto(); gd.ref_counted_init_ref(crypto); defer websocket_unref(crypto)
+		crypto := gd.new_crypto(); gd.ref_counted_init_ref(crypto); defer gd.release_ref(crypto)
 		packet := gd.crypto_generate_random_bytes(crypto, 40); defer gd.free_packed_byte_array(packet)
 		view := gd.packed_byte_array_view(&packet); if len(view) != len(bytes) {return {}, 0, false}; copy(bytes[:], view)
 	}
@@ -209,20 +211,20 @@ party_random :: proc(entropy: p.Entropy) -> (p.Secret, u64, bool) {
 party_recent_frame :: proc(o: ^Party) {
 	when gd.IS_WEB {
 		if !o.recent_loaded {
-			if browser_store_poll(&o.recent_op) != .Complete {return}
+			if storagegd.browser_store_poll(&o.recent_op) != .Complete {return}
 			if o.recent_op.error == .None {
-				bytes, error := browser_store_bytes(&o.recent_op); defer delete(bytes)
+				bytes, error := storagegd.browser_store_bytes(&o.recent_op); defer delete(bytes)
 				if error != .None || len(bytes) != 8 {party_fail(o, .Storage); return}
 				for i in 0 ..< 8 {o.recent_room |= u64(bytes[i]) << uint(8 * i)}
 				if o.recent_room == 0 {party_fail(o, .Storage); return}
 				o.recent_revision = o.recent_op.revision
 			} else if o.recent_op.error != .Missing {party_fail(o, .Storage); return}
-			browser_store_close(&o.recent_op); o.recent_loaded = true
+			storagegd.browser_store_close(&o.recent_op); o.recent_loaded = true
 		}
-		if o.recent_writing && browser_store_poll(&o.recent_op) == .Complete {
+		if o.recent_writing && storagegd.browser_store_poll(&o.recent_op) == .Complete {
 			if o.recent_op.error != .None {party_fail(o, o.recent_op.error == .Conflict ? .Conflict : .Storage); return}
 			o.recent_revision, o.recent_room, o.recent_saved, o.recent_writing = o.recent_op.revision, o.target, true, false
-			browser_store_close(&o.recent_op)
+			storagegd.browser_store_close(&o.recent_op)
 		}
 	}
 }

@@ -1,12 +1,12 @@
 package replay_scrapyard
 
-import rgd "godot:replay/godot"
 
 import "core:fmt"
 import gd "godot:godot"
 import game "../shared/game"
 import flow "../shared/flow"
 import play "godot:replay/play"
+import scenegd "godot:replay/godot/scene"
 
 Flame_Rig :: struct {
 	labels: [5]gd.Label,
@@ -131,7 +131,7 @@ arc_paths_paint :: proc(self: ^ReplayScrapyard, observed: ^game.World) {
 			for point in polygon {
 				gd.packed_vector2_array_append(&points, point)
 			}
-			rgd.mesh2_polygon(node, points)
+			scenegd.mesh2_polygon(node, points)
 			gd.free_packed_vector2_array(points)
 		}
 		view := flow.disc_view(observed.clock, f.until, 1, area_color(observed, f.status, {0.75, 0.85, 1, 0.8}))

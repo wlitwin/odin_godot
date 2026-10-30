@@ -6,10 +6,11 @@ import auth "godot:replay/authority"
 import p "godot:replay/provision"
 import net "godot:replay/net"
 import tr "godot:replay/transport"
+import transportgd "godot:replay/godot/transport"
 
 Provision_Connection :: struct {
 	ready: bool,
-	socket: Websocket,
+	socket: transportgd.Websocket,
 	client: p.Client,
 	browser_clock: Browser_Lease_Clock,
 	url: string,
@@ -23,18 +24,18 @@ Provision_Connection :: struct {
 // development opt-in and a literal loopback authority without userinfo.
 provision_connect :: proc(c: ^Provision_Connection, url: string, tls: gd.Tls_Options = nil, local_development: bool = false) -> p.Error {
 	if c.ready || !provision_url_valid(url, local_development) {return .Invalid}
-	if !websocket_join(&c.socket, url, tls = tls) {return .Not_Ready}
+	if !transportgd.websocket_join(&c.socket, url, tls = tls) {return .Not_Ready}
 	clock: auth.Clock_Source
 	when gd.IS_WEB {clock = browser_lease_clock(&c.browser_clock)} else {clock = auth.native_clock()}
-	if !p.client_open(&c.client, websocket_transport(&c.socket), clock) {websocket_close(&c.socket); return .Invalid}
+	if !p.client_open(&c.client, transportgd.websocket_transport(&c.socket), clock) {transportgd.websocket_close(&c.socket); return .Invalid}
 	c.url = strings.clone(url)
 	if tls != nil {gd.ref_counted_reference(tls); c.tls = tls}
 	c.ready = true
 	return .None
 }
 provision_disconnect :: proc(c: ^Provision_Connection) {
-	p.client_close(&c.client); websocket_close(&c.socket)
-	if c.tls != nil {websocket_unref(c.tls)}
+	p.client_close(&c.client); transportgd.websocket_close(&c.socket)
+	if c.tls != nil {gd.release_ref(c.tls)}
 	delete(c.url); c^ = {}
 }
 provision_request :: proc(c: ^Provision_Connection, request: p.Request) -> p.Error {
@@ -46,8 +47,8 @@ provision_frame :: proc(c: ^Provision_Connection) -> p.Error {
 	now, ok := c.client.clock.read(c.client.clock.user)
 	if !ok {return .Clock}
 	if tr.status(&c.client.wire) == .Disconnected && now >= c.last_reconnect && now - c.last_reconnect >= 500 {
-		websocket_close(&c.socket)
-		if !websocket_join(&c.socket, c.url, tls = c.tls) {return .Not_Ready}
+		transportgd.websocket_close(&c.socket)
+		if !transportgd.websocket_join(&c.socket, c.url, tls = c.tls) {return .Not_Ready}
 		c.last_reconnect = now
 	}
 	return p.client_pump(&c.client)

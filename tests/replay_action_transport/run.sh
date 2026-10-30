@@ -15,7 +15,7 @@ python3 - "$ROOT" "$project" "$work" "$ext" <<'PY'
 from pathlib import Path
 import hashlib,json,subprocess,sys
 root,project,work=map(Path,sys.argv[1:4]);sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-sources=[*sorted((root/'replay/net').glob('*.odin')),*sorted((root/'replay/transport').glob('*.odin')),root/'replay/godot/multiplayer_peer.odin',root/'replay/godot/enet.odin',project/'scripts/probe.odin',project/'driver.gd',project/'proxy.py']
+sources=[*sorted((root/'replay/net').glob('*.odin')),*sorted((root/'replay/transport').glob('*.odin')),root/'replay/godot/transport/multiplayer_peer.odin',root/'replay/godot/transport/enet.odin',project/'scripts/probe.odin',project/'driver.gd',project/'proxy.py']
 (work/'build-manifest.json').write_text(json.dumps({'odin':subprocess.check_output(['odin','version'],text=True).strip(),'source_sha256':{str(p.relative_to(root)):sha(p) for p in sources},'binaries':{p.name:sha(p) for p in (project/'bin').glob('*.'+sys.argv[4])}},indent=2)+'\n')
 PY
 read -r backend front < <(python3 - <<'PY'

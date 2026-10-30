@@ -6,11 +6,11 @@ package scrap_views
 import "core:fmt"
 import gd "godot:godot"
 import d "godot:replay/definitions"
-import rgd "godot:replay/godot"
 import r "godot:replay"
 import v "godot:replay/view"
 import flow "../../shared/flow"
 import display "../../shared/presentation"
+import scenegd "godot:replay/godot/scene"
 
 // A view represents a roster seat across body respawns. Its immutable display
 // carries body generation/warp; rebind resets only local transient presentation.
@@ -42,7 +42,7 @@ scrap_runner_view_ready :: proc(self: ^ScrapRunnerView) {
 	for i in 0 ..< gd.array_size(&self.appearances) {
 		value := gd.array_get(&self.appearances, i)
 		resource := gd.variant_to_object(&value)
-		style, report := rgd.resource_script(cast(gd.Resource)resource, ScrapRunnerStyle, "$appearances")
+		style, report := scenegd.resource_script(cast(gd.Resource)resource, ScrapRunnerStyle, "$appearances")
 		gd.variant_destroy(&value)
 		if report.error != .None || style.id < 0 || style.id >= len(seen) || seen[style.id] {
 			gd.print_str("SCRAP_RUNNER_STYLE_INVALID duplicate/missing/out-of-range style ID")

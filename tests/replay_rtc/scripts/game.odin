@@ -10,6 +10,7 @@ import sc "godot:replay/schema"
 import view "godot:replay/view"
 import rgd "godot:replay/godot"
 import game "godot:examples/replay_hello/shared/hello"
+import storagegd "godot:replay/godot/storage"
 
 ReplayRtcGame :: struct {
  owner:gd.Node,
@@ -24,7 +25,7 @@ replay_rtc_game_start :: proc(self:^ReplayRtcGame,role,url,room:gd.String) {
  options:=rgd.SESSION_OPTIONS
  options.role=a=="host" ? .Host : a=="observer" ? .Observer : .Client
  options.backend=.Rtc;options.rtc={url=b,room=c}
- options.token=rgd.session_token(a);options.network.content=0x5245504c41594831
+ options.token=storagegd.session_token(a);options.network.content=0x5245504c41594831
  if sc.init(&self.schema,game.World).error!=.None {game_fail(self,"schema");return}
  if err:=rgd.session_open(&self.session,r.Frame(game.World){},game.network_model(),options);err!=.None {game_fail(self,fmt.tprintf("open %v",err));return}
  self.started=u64(gd.time_get_ticks_msec(gd.singleton_time()));self.ready=true

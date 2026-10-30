@@ -12,6 +12,7 @@ out = Path(sys.argv[1]).resolve()
 out.mkdir(parents=True, exist_ok=True)
 if (out / 'summary.json').exists(): raise SystemExit('Use a fresh output directory.')
 gates = [
+    ('replay_packages', 'REPLAY_PACKAGES_OK'),
     ('replay_recipes', 'REPLAY_RECIPES_OK'),
     ('replay', 'REPLAY_OK'),
     ('replay_schema', 'REPLAY_SCHEMA_OK'),

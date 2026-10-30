@@ -15,6 +15,10 @@ import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
 import flow "../shared/feedback"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 ReplayQuickdraw :: struct {
 	owner: gd.Node2d,
@@ -25,9 +29,9 @@ ReplayQuickdraw :: struct {
 	display_name: lb.Name,
 	name_sequence: u64,
 	identity: net.Token,
-	name_profile: rgd.Name_Profile,
+	name_profile: storagegd.Name_Profile,
 	profile_enabled,profile_name_loaded,profile_identity_ready: bool,
-	browser_identity:rgd.Browser_Identity,
+	browser_identity:storagegd.Browser_Identity,
 	browser_launch:string,
 	browser_save:[1]Quickdraw_Browser_Save,
 	online:Quickdraw_Online,
@@ -37,7 +41,7 @@ ReplayQuickdraw :: struct {
 	session: ^rgd.Session(game.World, game.Controls, game.Action, game.Event, game.SEATS),
 	standalone: rgd.Session(game.World, game.Controls, game.Action, game.Event, game.SEATS),
 	room: rgd.Room(game.World, game.Controls, game.Action, game.Event, game.SEATS),
-	gunners, drones, bullets, rings: rgd.Nodes2,
+	gunners, drones, bullets, rings: scenegd.Nodes2,
 	feedback: [1]flow.Feedback,
 	drawn: [game.SEATS]game.Player,
 	beam_time: [game.SEATS]f64,
@@ -65,12 +69,12 @@ ReplayQuickdraw :: struct {
 
 replay_quickdraw_ready :: proc(self: ^ReplayQuickdraw) {
  self.session=&self.standalone;controls()
- self.views_ready=rgd.nodes_load(&self.gunners,self.owner,"res://views/gunner.tscn",game.SEATS) &&
-                  rgd.nodes_load(&self.drones,self.owner,"res://views/drone.tscn",game.SEATS) &&
-                  rgd.nodes_load(&self.bullets,self.owner,"res://views/bullet.tscn",64) &&
-                  rgd.nodes_load(&self.rings,self.owner,"res://views/landing_ring.tscn",flow.RING_LIMIT) && flow.init(&self.feedback[0])
+ self.views_ready=scenegd.nodes_load(&self.gunners,self.owner,"res://views/gunner.tscn",game.SEATS) &&
+                  scenegd.nodes_load(&self.drones,self.owner,"res://views/drone.tscn",game.SEATS) &&
+                  scenegd.nodes_load(&self.bullets,self.owner,"res://views/bullet.tscn",64) &&
+                  scenegd.nodes_load(&self.rings,self.owner,"res://views/landing_ring.tscn",flow.RING_LIMIT) && flow.init(&self.feedback[0])
  if !self.views_ready || !co.init(&self.comms) || !dg.init(&self.diagnostics) {gd.print_str("REPLAY_QUICKDRAW_FAIL views/social");return}
- self.bot=strings.clone(quickdraw_param("RQ_BOT",""));self.identity=rgd.session_token(quickdraw_param("RQ_TOKEN",""))
+ self.bot=strings.clone(quickdraw_param("RQ_BOT",""));self.identity=storagegd.session_token(quickdraw_param("RQ_TOKEN",""))
  ui_ready(self);online_ready(self)
  role:=quickdraw_param("RQ_ROLE","")
  // Existing coordinated launchers select the Room through these credentials.
@@ -99,7 +103,7 @@ connect_duel :: proc(self:^ReplayQuickdraw,role:string,manual_start:bool,resume:
  opts.discover_epoch=quickdraw_int("RQ_COORD_PORT",0)==0 && !self.online.launch
  opts.latency_ms=u32(quickdraw_int("RQ_LATENCY",0));opts.jitter_ms=u32(quickdraw_int("RQ_JITTER",0))
  opts.loss_permyriad=u32(quickdraw_int("RQ_LOSS",0));opts.duplicate_permyriad=u32(quickdraw_int("RQ_DUPLICATE",0))
- if !rgd.session_comms_enable(&opts) || !rgd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
+ if !rgd.session_comms_enable(&opts) || !debuggd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
  initial:=game.initial(quickdraw_int("RQ_NOREWIND",0)==0,opts.role==.Server,u8(clamp(quickdraw_int("RQ_GOLD",0),0,255)),manual_start)
  err:=resume ? resume_duel(self,opts) : open_session(self,initial,opts)
  if err!=.None {if !resume {ui_notice(self,fmt.tprintf("Connection failed: %v",err))};gd.print_str(fmt.tprintf("RQ_CONNECT_FAILED %v",err));return}
@@ -113,9 +117,9 @@ controls :: proc() {
 	if gd.has_action("rq_left") {return}
 	names := [9]cstring{"rq_left", "rq_right", "rq_up", "rq_down", "rq_buy", "rq_drone_left", "rq_drone_right", "rq_drone_up", "rq_drone_down"}
 	keys := [9]u8{'A', 'D', 'W', 'S', 'B', 'J', 'L', 'I', 'K'}
-	for name, i in names {rgd.bind_key(name, gd.Key(keys[i]))}
-	rgd.bind_key("rq_dash", .Space)
-	rgd.bind_mouse("rq_fire", .Left); rgd.bind_mouse("rq_lob", .Right)
+	for name, i in names {inputgd.bind_key(name, gd.Key(keys[i]))}
+	inputgd.bind_key("rq_dash", .Space)
+	inputgd.bind_mouse("rq_fire", .Left); inputgd.bind_mouse("rq_lob", .Right)
 }
 
 sample :: proc(self: ^ReplayQuickdraw, tick: u64, seat: u16) -> game.Controls {
@@ -190,7 +194,7 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
 	if reset {
 		self.view_epoch = epoch
 		self.name_submitted=false;self.name_sequence=0;self.last_receipt=0
-		rgd.nodes_clear(&self.gunners); rgd.nodes_clear(&self.drones); rgd.nodes_clear(&self.bullets)
+		scenegd.nodes_clear(&self.gunners); scenegd.nodes_clear(&self.drones); scenegd.nodes_clear(&self.bullets)
 		self.beam_time, self.beam_id, self.last_lob, self.lob_pending_key, self.lob_waiting = {}, {}, 0, 0, false
 	}
 	if !self.session.authority && self.painted_epoch != self.session.client.view_reset {
@@ -237,7 +241,7 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
 	social_frame(self)
 	if self.room.ready && (self.manual || quickdraw_int("RQ_PROBE",0)==1) {observe_recovery(self)}
 	if self.lob_pending_key != 0 {
-		if _, exists := rgd.nodes_get(&self.bullets, self.lob_pending_key); exists {
+		if _, exists := scenegd.nodes_get(&self.bullets, self.lob_pending_key); exists {
 			self.lob_visible_count += 1
 			self.lob_visible_max_ms = max(self.lob_visible_max_ms, gd.time_get_ticks_msec(gd.singleton_time()) - self.lob_requested_ms)
 			self.lob_pending_key = 0
@@ -270,7 +274,7 @@ paint :: proc(self: ^ReplayQuickdraw) {
 	if !ok {gd.set_text(cast(gd.Object)self.status, "Riding into town…"); return}
 	seat := rgd.session_seat(self.session)
 	if !frame.state.started {
-		rgd.nodes_clear(&self.gunners);rgd.nodes_clear(&self.drones);rgd.nodes_clear(&self.bullets)
+		scenegd.nodes_clear(&self.gunners);scenegd.nodes_clear(&self.drones);scenegd.nodes_clear(&self.bullets)
 		gd.set_string(self.status,"text","Waiting for the match leader to start.");return
 	}
 	w := frame.state
@@ -299,7 +303,7 @@ paint :: proc(self: ^ReplayQuickdraw) {
 			}
 		}
 	}
-	instances: [64]rgd.Instance2
+	instances: [64]scenegd.Instance2
 	bullet_colors:[64]gd.Color
 	n := 0
 	colors := [4]gd.Color{{0.35, 0.65, 1, 1}, {1, 0.62, 0.2, 1}, {0.5, 0.9, 0.4, 1}, {0.9, 0.45, 0.9, 1}}
@@ -307,7 +311,7 @@ paint :: proc(self: ^ReplayQuickdraw) {
 		if !player.connected {continue}
 		instances[n] = {key = u64(i + 1), pose = {position = player.position}, scale = {1, 1}, color = {1,1,1,1}}; n += 1
 	}
-	rgd.nodes_present(&self.gunners, instances[:n])
+	scenegd.nodes_present(&self.gunners, instances[:n])
 	authority,authority_ok:=rgd.session_authority_state(self.session)
 	for player, i in self.drawn {
 		health:=player
@@ -315,7 +319,7 @@ paint :: proc(self: ^ReplayQuickdraw) {
 		if self.session.authority || (i+1==int(seat) && authority_ok) || (i+1!=int(seat) && watched_available) {
 			flow.health(&self.feedback[0],i,health.life,health.hp,health.connected)
 		}
-		if node, present := rgd.nodes_get(&self.gunners, u64(i + 1)); present {
+		if node, present := scenegd.nodes_get(&self.gunners, u64(i + 1)); present {
 			gd.node2d_set_rotation(cast(gd.Node2d)gd.get_node(node, "Gun"), f64(game.angle(player.aim)))
 			beam := gd.get_node(node, "Beam")
 			gd.set_bool(cast(gd.Object)beam, "visible", self.beam_time[i] > 0)
@@ -325,8 +329,8 @@ paint :: proc(self: ^ReplayQuickdraw) {
 	}
 	n = 0
 	for player, i in self.drawn {if player.connected {instances[n] = {key = u64(i + 1), pose = {position = player.drone}, scale = {1, 1}, color = {1,1,1,1}}; n += 1}}
-	rgd.nodes_present(&self.drones, instances[:n])
-	for player,i in self.drawn {if node,present:=rgd.nodes_get(&self.drones,u64(i+1));present {gd.canvas_item_set_self_modulate(cast(gd.Canvas_Item)gd.get_node(node,"Skin"),colors[i])}}
+	scenegd.nodes_present(&self.drones, instances[:n])
+	for player,i in self.drawn {if node,present:=scenegd.nodes_get(&self.drones,u64(i+1));present {gd.canvas_item_set_self_modulate(cast(gd.Canvas_Item)gd.get_node(node,"Skin"),colors[i])}}
 	n = 0
 	for bullet, i in w.bullets.values {if w.bullets.alive[i] && (self.session.authority || int(bullet.owner) == int(seat)) {
 		bullet_colors[n]=colors[bullet.owner-1]
@@ -338,9 +342,9 @@ paint :: proc(self: ^ReplayQuickdraw) {
 		bullet_colors[n]=colors[bullet.owner-1]
 		instances[n] = {key = bullet.key, pose = {position = position}, scale = {1, 1}, color = {1,1,1,1}}; n += 1
 	}}}
-	rgd.nodes_present(&self.bullets, instances[:n])
+	scenegd.nodes_present(&self.bullets, instances[:n])
 	for instance,i in instances[:n] {
-		if node,present:=rgd.nodes_get(&self.bullets,instance.key);present {gd.canvas_item_set_self_modulate(cast(gd.Canvas_Item)gd.get_node(node,"Skin"),bullet_colors[i])}
+		if node,present:=scenegd.nodes_get(&self.bullets,instance.key);present {gd.canvas_item_set_self_modulate(cast(gd.Canvas_Item)gd.get_node(node,"Skin"),bullet_colors[i])}
 	}
 	if seat != 0 {player := w.players[seat - 1]; gd.set_string(cast(gd.Object)self.status, "text", fmt.ctprintf("HP %d   Gold %d   Kills %d   Deaths %d   %s", player.hp, player.gold, player.kills, player.deaths, player.boots ? "BOOTS" : ""))}
 	if seat==0 {gd.set_string(self.status,"text","Watching the duel · Enter chat · Tab scores")}
@@ -350,10 +354,10 @@ paint :: proc(self: ^ReplayQuickdraw) {
 }
 
 replay_quickdraw_exit_tree :: proc(self: ^ReplayQuickdraw) {
-	flow.destroy(&self.feedback[0]);rgd.nodes_destroy(&self.rings)
-	co.destroy(&self.comms);dg.destroy(&self.diagnostics);rgd.name_profile_close(&self.name_profile)
-	rgd.nodes_destroy(&self.gunners); rgd.nodes_destroy(&self.drones); rgd.nodes_destroy(&self.bullets)
+	flow.destroy(&self.feedback[0]);scenegd.nodes_destroy(&self.rings)
+	co.destroy(&self.comms);dg.destroy(&self.diagnostics);storagegd.name_profile_close(&self.name_profile)
+	scenegd.nodes_destroy(&self.gunners); scenegd.nodes_destroy(&self.drones); scenegd.nodes_destroy(&self.bullets)
 	if self.room.ready {rgd.room_close(&self.room)} else if self.session != nil {rgd.session_close(self.session)}
-	online_close(self);browser_save_close(self);rgd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
+	online_close(self);browser_save_close(self);storagegd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
 	delete(self.bot)
 }

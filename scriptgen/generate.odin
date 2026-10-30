@@ -340,7 +340,7 @@ emit_imports :: proc(b: ^strings.Builder, sections: []Gen_Section) {
 	if need.ksess {import_add(&t, "ksess", "godot:kit/session")}
 	if need.kboot {import_add(&t, "kboot", "godot:kit/boot")}
 	if need.netgd {import_add(&t, "netgd", "godot:kit/netgd")}
-	if need.replay_view {import_add(&t,"rview","godot:replay/godot")}
+	if need.replay_view {import_add(&t,"rview","godot:replay/godot/scene")}
 	fixed := len(t.lines)
 
 	// verb-composition: import each package a COMPOSED command's/method's/block

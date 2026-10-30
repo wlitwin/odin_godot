@@ -6,6 +6,7 @@ import p2p "godot:replay/p2p"
 import transport "godot:replay/transport"
 import view "godot:replay/view"
 import replaygd "godot:replay/godot"
+import storagegd "godot:replay/godot/storage"
 import hello "godot:examples/replay_hello/shared/hello"
 import duel "godot:examples/replay_duel/shared/duel"
 
@@ -73,7 +74,7 @@ open_p2p_after_native_admission :: proc(peer: ^p2p.Runner(duel.World, duel.Input
 
 // Authoritative archives and P2P participant archives are intentionally different
 // APIs. Neither operation replaces the application's storage/authority decision.
-save_authority :: proc(session: ^Hello_Session, path: string) -> replaygd.Storage_Result {
+save_authority :: proc(session: ^Hello_Session, path: string) -> storagegd.Storage_Result {
 	return replaygd.session_save(session, path)
 }
 

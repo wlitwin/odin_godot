@@ -3,10 +3,10 @@ import "core:fmt"
 import "core:mem"
 import "core:time"
 import content "../../../examples/replay_scrapyard/shared/content"
-import rgd "godot:replay/godot"
 import v "godot:replay/view"
 import game "../../../examples/replay_scrapyard/shared/game"
 import display "../../../examples/replay_scrapyard/shared/presentation"
+import scenegd "godot:replay/godot/scene"
 
 main :: proc() {
  tracking:mem.Tracking_Allocator;mem.tracking_allocator_init(&tracking,context.allocator);defer mem.tracking_allocator_destroy(&tracking)
@@ -17,7 +17,7 @@ main :: proc() {
  fmt.printf("STOCK_LOAD samples=100 ns=%d checksum=%d live=%d peak=%d total=%d\n",i64(elapsed),sum,tracking.current_memory_allocated,tracking.peak_memory_allocated,tracking.total_memory_allocated)
  // Exact Odin buffer payload sizes (excludes allocator metadata and Godot-owned
  // resources/nodes). All scene pools have the same configured entity capacity.
- P :: rgd.View_Pool2(game.Mob,display.Mob_View,rawptr)
+ P :: scenegd.View_Pool2(game.Mob,display.Mob_View,rawptr)
  p:P
  capacity:=game.MAX_MOBS;buckets:=2;for buckets<capacity*2 {buckets*=2}
  index:=buckets*(size_of(u64)+size_of(int))+capacity*size_of(u32)

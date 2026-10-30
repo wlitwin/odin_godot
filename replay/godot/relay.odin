@@ -6,10 +6,13 @@ import auth "godot:replay/authority"
 import p "godot:replay/provision"
 import rel "godot:replay/relay"
 import tr "godot:replay/transport"
+import wiregd "godot:replay/godot/internal/wire"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 Relay_Connection :: struct {
 	ready: bool,
-	socket: Websocket,
+	socket: transportgd.Websocket,
 	client: rel.Client,
 	browser_clock: Browser_Lease_Clock,
 	url, ice_json: string,
@@ -19,17 +22,17 @@ Relay_Connection :: struct {
 }
 relay_connect :: proc(c: ^Relay_Connection, url: string, grant: p.Grant, tls: gd.Tls_Options = nil, local_development: bool = false) -> bool {
 	if c.ready || !p.service_url_valid(url, local_development) || grant.room == 0 || grant.content == 0 || !auth.identity_valid(grant.identity) {return false}
-	if !websocket_join(&c.socket, url, tls = tls) {return false}
+	if !transportgd.websocket_join(&c.socket, url, tls = tls) {return false}
 	clock: auth.Clock_Source
 	when gd.IS_WEB {clock = browser_lease_clock(&c.browser_clock)} else {clock = auth.native_clock()}
-	nonce := session_token()
-	if !rel.client_open(&c.client, grant.room, grant.content, grant.identity.member, grant.key, nonce, clock, websocket_transport(&c.socket)) {websocket_close(&c.socket); return false}
+	nonce := storagegd.session_token()
+	if !rel.client_open(&c.client, grant.room, grant.content, grant.identity.member, grant.key, nonce, clock, transportgd.websocket_transport(&c.socket)) {transportgd.websocket_close(&c.socket); return false}
 	c.url = strings.clone(url); c.tls = tls; if tls != nil {gd.ref_counted_reference(tls)}
 	c.ready = true; return true
 }
 relay_close :: proc(c: ^Relay_Connection) {
-	rel.client_close(&c.client); websocket_close(&c.socket)
-	if c.tls != nil {websocket_unref(c.tls)}
+	rel.client_close(&c.client); transportgd.websocket_close(&c.socket)
+	if c.tls != nil {gd.release_ref(c.tls)}
 	delete(c.url); delete(c.ice_json); c^ = {}
 }
 relay_frame :: proc(c: ^Relay_Connection) {
@@ -37,8 +40,8 @@ relay_frame :: proc(c: ^Relay_Connection) {
 	now, ok := c.client.clock.read(c.client.clock.user)
 	if !ok {c.error = .Clock; return}
 	if tr.status(&c.client.wire) == .Disconnected && now >= c.last_reconnect && now - c.last_reconnect >= 500 {
-		websocket_close(&c.socket)
-		if !websocket_join(&c.socket, c.url, tls = c.tls) {c.error = .Unavailable; return}
+		transportgd.websocket_close(&c.socket)
+		if !transportgd.websocket_join(&c.socket, c.url, tls = c.tls) {c.error = .Unavailable; return}
 		// A challenge belongs to the old physical connection. Start a new one.
 		c.client.pending, c.client.complete = false, false; c.last_reconnect = now
 	}
@@ -72,17 +75,17 @@ relay_ice_json :: proc(grant: rel.Grant) -> (string, bool) {
 		value := gd.variant_from_string(&text); defer gd.variant_destroy(&value); gd.array_append(&urls, value)
 	}
 	server := gd.new_dictionary_default(); defer gd.free_dictionary(server)
-	values := gd.variant_from_array(&urls); rtc_set(&server, "urls", values)
-	rtc_set_string(&server, "username", string(g.username[:rel.fixed_count(g.username)]))
-	rtc_set_string(&server, "credential", string(g.credential[:rel.fixed_count(g.credential)]))
+	values := gd.variant_from_array(&urls); wiregd.set(&server, "urls", values)
+	wiregd.set_string(&server, "username", string(g.username[:rel.fixed_count(g.username)]))
+	wiregd.set_string(&server, "credential", string(g.credential[:rel.fixed_count(g.credential)]))
 	servers := gd.new_array_default(); defer gd.free_array(servers)
 	entry := gd.variant_from_dictionary(&server); defer gd.variant_destroy(&entry); gd.array_append(&servers, entry)
 	config := gd.new_dictionary_default(); defer gd.free_dictionary(config)
-	list := gd.variant_from_array(&servers); rtc_set(&config, "iceServers", list)
-	rtc_set_string(&config, "iceTransportPolicy", g.relay_only ? "relay" : "all")
+	list := gd.variant_from_array(&servers); wiregd.set(&config, "iceServers", list)
+	wiregd.set_string(&config, "iceTransportPolicy", g.relay_only ? "relay" : "all")
 	value := gd.variant_from_dictionary(&config); defer gd.variant_destroy(&value)
 	text := gd.json_stringify(value, gd.string_empty(), false, false); defer gd.free_string(text)
 	json := gd.gd_string_to_odin(text, context.allocator)
-	if rtc_ice_validate(json) != .None {delete(json); return "", false}
+	if transportgd.rtc_ice_validate(json) != .None {delete(json); return "", false}
 	return json, true
 }

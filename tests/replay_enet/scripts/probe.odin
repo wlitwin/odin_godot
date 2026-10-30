@@ -7,12 +7,12 @@ import gd "godot:godot"
 import r "godot:replay"
 import sc "godot:replay/schema"
 import tr "godot:replay/transport"
-import netgd "godot:replay/godot"
 import game "godot:examples/replay_hello/shared/hello"
+import transportgd "godot:replay/godot/transport"
 
 ReplayWireProbe :: struct {
 	owner: gd.Node,
-	enet: netgd.Enet,
+	enet: transportgd.Enet,
 	transport: tr.Transport,
 	schema: sc.Schema,
 	server, ready, failed: bool,
@@ -32,9 +32,9 @@ replay_wire_probe_ready :: proc(self: ^ReplayWireProbe) {
 		replay_wire_probe_fail(self, "schema"); return
 	}
 	ok: bool
-	if self.server {ok = netgd.enet_host(&self.enet, u16(port), 2, bind_ip = "127.0.0.1")} else {ok = netgd.enet_join(&self.enet, "127.0.0.1", u16(port))}
+	if self.server {ok = transportgd.enet_host(&self.enet, u16(port), 2, bind_ip = "127.0.0.1")} else {ok = transportgd.enet_join(&self.enet, "127.0.0.1", u16(port))}
 	if !ok {replay_wire_probe_fail(self, "open"); return}
-	self.transport = netgd.enet_transport(&self.enet)
+	self.transport = transportgd.enet_transport(&self.enet)
 	self.ready = true
 	if self.server {gd.print_str("REPLAY_ENET_HOST_READY")}
 }
@@ -106,7 +106,7 @@ replay_wire_probe_process :: proc(self: ^ReplayWireProbe, dt: f64) {
 		if self.budget_deferrals<2 {replay_wire_probe_fail(self,"receive retention not exercised");return}
 		ack := [1]u8{2}
 		tr.send(&self.transport, 1, .Reliable, ack[:])
-		gd.print_str(fmt.tprintf("REPLAY_ENET_CLIENT_OK id=%d retained=%d", netgd.enet_id(&self.enet),self.budget_deferrals))
+		gd.print_str(fmt.tprintf("REPLAY_ENET_CLIENT_OK id=%d retained=%d", transportgd.enet_id(&self.enet),self.budget_deferrals))
 		self.done_at = now + 500
 	}
 }

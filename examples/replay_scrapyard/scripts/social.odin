@@ -9,6 +9,7 @@ import co "godot:replay/comms"
 import lb "godot:replay/lobby"
 import game "../shared/game"
 import flow "../shared/flow"
+import inputgd "godot:replay/godot/input"
 
 Scrap_Social :: struct {
 	comms: co.Comms,
@@ -29,8 +30,8 @@ social_ready :: proc(self: ^ReplayScrapyard) -> bool {
 	if !co.init(&self.social[0].comms) {
 		return false
 	}
-	rgd.bind_key("rsy_chat", .Enter)
-	rgd.bind_mouse("rsy_ping", .Middle)
+	inputgd.bind_key("rsy_chat", .Enter)
+	inputgd.bind_mouse("rsy_ping", .Middle)
 	self.ping_root = gd.new_node2d()
 	scenery_name(self.ping_root, "Pings")
 	gd.add_child(self.world_node, self.ping_root)

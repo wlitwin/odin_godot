@@ -135,7 +135,7 @@ unions now have replay, canonical codec, native/WASM/x86-64 and ENet acceptance.
 Immutable asset handles need their own complete storage contract. Owned audit capture and
 canonical field diagnostics now have native/WASM checks and a real-save inspection
 tool. An opt-in live Godot overlay now exposes local/Session status and bounded
-audit reports in Hello and Cavecrawl. The [local history dock](../../replay/godot/scrubber.md)
+audit reports in Hello and Cavecrawl. The [local history dock](../../replay/godot/debug/scrubber.md)
 now inspects retained frames and explicitly resumes or branches Hello's offline
 timeline, with native/browser view and input checks. A generic scalar editor now
 validates changes to a copied preview before an explicit local branch; see the
@@ -235,7 +235,7 @@ Implementation:
    projections; hidden state must not leak through normal snapshots.
 3. Build a transport interface and deterministic in-memory fault simulator.
    Adapt ENet first; add WebRTC/Steam through the same packet interface.
-   WebRTC is exercised by browser games; the [Steam adapter](../../replay/godot/steam.md)
+   WebRTC is exercised by browser games; the [Steam adapter](../../replay/godot/transport/steam.md)
    now has contract/native-capability checks, with live-account acceptance pending.
 4. Implement session handshake, stable seats, input ownership, input windows,
    action sequencing/deduplication, timing bounds, and validated admission.

@@ -10,7 +10,9 @@ shutil.copytree(root/'tests/replay_nodes',out/'current',ignore=shutil.ignore_pat
 if sys.argv[3]:
  collection=out/'baseline-collection';collection.mkdir()
  shutil.copytree(root/'replay',collection/'replay')
- shutil.copy2(sys.argv[3],collection/'replay/godot/nodes.odin')
+ baseline=Path(sys.argv[3]).read_text()
+ baseline=baseline.replace('package replay_godot\n','package replay_godot_scene\n',1)
+ (collection/'replay/godot/scene/nodes.odin').write_text(baseline)
  for name in ['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','scriptgen','build']:
   (collection/name).symlink_to(root/name,target_is_directory=True)
  shutil.copytree(root/'tests/replay_nodes',out/'baseline',ignore=shutil.ignore_patterns('bin','.godot','*.gen.odin'))

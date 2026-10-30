@@ -74,7 +74,7 @@ identity/epoch/inventory and a new authority-confirmed guest action. It requires
 the current Cavecrawl export. `REPLAY_TURN_DOWNTIME_MS` selects 1,000–30,000 ms of
 deliberate downtime before relay startup; actual downtime includes startup time.
 The same fixture can run with UDP or TCP relay transport. See
-[RTC continuation](../../replay/godot/rtc-recovery.md) for the reconnect mechanism.
+[RTC continuation](../../replay/godot/transport/rtc-recovery.md) for the reconnect mechanism.
 
 ## Evidence handling
 

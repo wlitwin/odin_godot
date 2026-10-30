@@ -9,6 +9,7 @@ import tr "godot:replay/transport"
 import sc "godot:replay/schema"
 import rgd "godot:replay/godot"
 import v "godot:replay/view"
+import inputgd "godot:replay/godot/input"
 World :: struct {presses:u32}
 Control :: struct {pulse:bool}
 ReplayInputCapture :: struct {owner:gd.Node,network:tr.Memory,endpoints:[2]tr.Memory_Endpoint,server:net.Server(World,Control,u8,u8,1),session:rgd.Session(World,Control,u8,u8,1),tick:u64,receipt_sequence:u64,receipt_results:u32,await_receipt:bool,deadline:u64,intent:[1]net.Action_Intent(u8)}
@@ -20,7 +21,7 @@ drain :: proc(self:^ReplayInputCapture) {
  changes:[256]v.Change(net.Net_Event(u8))
  for {n:=rgd.session_changes(&self.session,changes[:]);if n==0 {break}
   for change in changes[:n] {event:=change.occurrence.value
-   if rgd.intent_observe(&self.intent[0],&self.session,change) {assert(event.applied && !rgd.intent_observe(&self.intent[0],&self.session,change));self.receipt_results+=1}
+   if inputgd.intent_observe(&self.intent[0],&self.session,change) {assert(event.applied && !inputgd.intent_observe(&self.intent[0],&self.session,change));self.receipt_results+=1}
   }
  }
 }
@@ -32,7 +33,7 @@ server_frame :: proc(self:^ReplayInputCapture) {
 replay_input_capture_ready :: proc(self:^ReplayInputCapture) {
  room:=new(rgd.Room(World,Control,u8,u8,1));defer free(room)
  room_intent:net.Action_Intent(u8);assert(net.intent_capture(&room_intent,u8(3))==.None)
- _,blocked:=rgd.room_intent(room,&room_intent);assert(blocked==.Fenced && room_intent.captured)
+ _,blocked:=inputgd.room_intent(room,&room_intent);assert(blocked==.Fenced && room_intent.captured)
 
  room.session.control_consumed=true;assert(rgd.room_frame(room,0,Control{})==.Not_Initialized && !room.session.control_consumed)
  room.ready=true;room.phase=.Failed;room.error=.Fenced;room.session.control_consumed=true
@@ -85,12 +86,12 @@ replay_input_capture_ready :: proc(self:^ReplayInputCapture) {
  assert(c.phase==.Resyncing);_,readable:=rgd.session_authority_state(s);assert(!readable)
  _,scheduled:=rgd.session_issue(s,u8(1));assert(scheduled==.Wrong_Phase && c.action_count==0)
  assert(net.intent_capture(&self.intent[0],u8(3))==.None)
- sent:=c.stats.tx_packets;sequence,error:=rgd.session_intent(s,&self.intent[0]);assert(error==.None && sequence!=0 && c.stats.tx_packets==sent && !self.intent[0].captured)
+ sent:=c.stats.tx_packets;sequence,error:=inputgd.session_intent(s,&self.intent[0]);assert(error==.None && sequence!=0 && c.stats.tx_packets==sent && !self.intent[0].captured)
  fake:=v.Change(net.Net_Event(u8)){kind=.Begin,occurrence={id={epoch=c.cfg.epoch,tick=1},value={kind=.Action_Result,seat=c.seat,sequence=sequence,applied=true}}}
- assert(!rgd.intent_observe(&self.intent[0],s,fake))
- fake.confirmed=true;fake.kind=.Cancel;assert(!rgd.intent_observe(&self.intent[0],s,fake))
- fake.kind=.Begin;fake.occurrence.value.seat+=1;assert(!rgd.intent_observe(&self.intent[0],s,fake))
- fake.occurrence.value.seat=c.seat;fake.occurrence.id.epoch+=1;assert(!rgd.intent_observe(&self.intent[0],s,fake))
+ assert(!inputgd.intent_observe(&self.intent[0],s,fake))
+ fake.confirmed=true;fake.kind=.Cancel;assert(!inputgd.intent_observe(&self.intent[0],s,fake))
+ fake.kind=.Begin;fake.occurrence.value.seat+=1;assert(!inputgd.intent_observe(&self.intent[0],s,fake))
+ fake.occurrence.value.seat=c.seat;fake.occurrence.id.epoch+=1;assert(!inputgd.intent_observe(&self.intent[0],s,fake))
  assert(self.intent[0].pending_count==1 && self.intent[0].confirmed==0)
  self.receipt_sequence=sequence
  self.await_receipt=true;self.deadline=gd.time_get_ticks_msec(gd.singleton_time())+5000
@@ -113,14 +114,14 @@ replay_input_capture_process :: proc(self:^ReplayInputCapture,dt:f64) {
 intent_room_recovery :: proc(self:^ReplayInputCapture) {
  c:=&self.session.client;i:=&self.intent[0]
  assert(net.intent_capture(i,u8(3))==.None)
- retained,error:=rgd.session_intent(&self.session,i);assert(error==.None)
+ retained,error:=inputgd.session_intent(&self.session,i);assert(error==.None)
  assert(tr.memory_advance(&self.network,self.tick))
  assert(net.server_pump(&self.server,gd.time_get_ticks_msec(gd.singleton_time()))==.None)
  cp:net.Checkpoint(World,Control,u8,1);defer net.checkpoint_destroy(&cp)
  assert(net.checkpoint_capture(&self.server,&cp)==.None && len(cp.actions)==1)
  // A later old-epoch request is not in this durable frontier.
  assert(net.intent_capture(i,u8(3))==.None)
- retired,error2:=rgd.session_intent(&self.session,i);assert(error2==.None && retired==retained+1)
+ retired,error2:=inputgd.session_intent(&self.session,i);assert(error2==.None && retired==retained+1)
  report,valid:=net.client_checkpoint_recovery(c,&cp,2);assert(valid)
  room:=new(rgd.Room(World,Control,u8,u8,1));defer free(room)
  room.ready=true;room.phase=.Hosting;room.session.ready=true;room.session.authority=true
@@ -128,15 +129,15 @@ intent_room_recovery :: proc(self:^ReplayInputCapture) {
  assert(net.server_restore(&room.session.server,&cp,model(),{}, {epoch=2,local_seat=1,preserve_pending=true,retain_membership=true})==.None)
  defer net.server_destroy(&room.session.server)
  intent:=i^
- none,recovered:=rgd.room_intent(room,&intent);assert(none==0 && recovered==.None && intent.retired==1 && intent.pending_count==1)
+ none,recovered:=inputgd.room_intent(room,&intent);assert(none==0 && recovered==.None && intent.retired==1 && intent.pending_count==1)
  assert(net.intent_capture(&intent,u8(3))==.None)
- fresh,issued:=rgd.room_intent(room,&intent);assert(issued==.None && fresh==retired)
+ fresh,issued:=inputgd.room_intent(room,&intent);assert(issued==.None && fresh==retired)
  old:=v.Change(net.Net_Event(u8)){kind=.Begin,confirmed=true,occurrence={id={epoch=1,tick=cp.frame.tick+1},value={kind=.Action_Result,seat=1,sequence=fresh,applied=true}}}
- assert(!rgd.intent_observe(&intent,&room.session,old))
+ assert(!inputgd.intent_observe(&intent,&room.session,old))
  for _ in 0..<2 {
   assert(net.server_step(&room.session.server)==.None)
   events:[net.WIRE_EVENTS]r.Occurrence(net.Net_Event(u8));n,result:=r.copy_events(&room.session.server.timeline,room.session.server.timeline.head,events[:]);assert(result==.None)
-  for event in events[:n] {if event.value.kind==.Action_Result {assert(rgd.intent_observe(&intent,&room.session,v.Change(net.Net_Event(u8)){kind=.Begin,confirmed=true,occurrence=event}))}}
+  for event in events[:n] {if event.value.kind==.Action_Result {assert(inputgd.intent_observe(&intent,&room.session,v.Change(net.Net_Event(u8)){kind=.Begin,confirmed=true,occurrence=event}))}}
  }
  frame,_:=r.current(&room.session.server.timeline)
  assert(frame.state.presses==11 && intent.confirmed==3 && intent.retired==1 && intent.pending_count==0 && intent.unknown==0)

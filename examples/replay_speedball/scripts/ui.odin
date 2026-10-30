@@ -7,6 +7,9 @@ import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
 import game "../shared/pitch"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 Speedball_UI :: struct {
  lobby,score_panel:gd.Control,
@@ -34,7 +37,7 @@ ui_ready :: proc(self:^ReplaySpeedball) {
  for label,i in ([2]cstring{"Solo","Host"}) {u.resume[i]=cast(gd.Button)gd.get_node(self.owner,fmt.ctprintf("UI/Lobby/Column/Resume/%s",label))}
  gd.connect_to(u.resume[0],"pressed",self.owner,"on_resume_solo");gd.connect_to(u.resume[1],"pressed",self.owner,"on_resume_host")
  gd.set_string(u.save_path,"text",fmt.ctprintf("%s",gd.IS_WEB ? speedball_param("RSB_SAVE_SLOT","pitch") : speedball_param("RSB_SAVE","user://speedball.replay")))
- rgd.bind_key("rsb_save",.F5)
+ inputgd.bind_key("rsb_save",.F5)
  u.lobby=cast(gd.Control)gd.get_node(self.owner,"UI/Lobby")
  u.name=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Name/Value")
  u.address=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Address/Value")
@@ -63,7 +66,7 @@ ui_ready :: proc(self:^ReplaySpeedball) {
  gd.connect_to(gd.get_node(self.owner,"UI/Handoff"),"pressed",self.owner,"handoff")
  gd.connect_to(u.start,"pressed",self.owner,"on_start");gd.connect_to(u.leave,"pressed",self.owner,"on_leave")
  gd.connect_to(u.chat_input,"text_submitted",self.owner,"on_chat")
- rgd.bind_key("rsb_chat",.Enter);rgd.bind_key("rsb_scores",.Tab)
+ inputgd.bind_key("rsb_chat",.Enter);inputgd.bind_key("rsb_scores",.Tab)
  profile_ready(self)
  gd.set_string(u.address,"text",fmt.ctprintf("%s",speedball_param("RSB_ADDRESS","127.0.0.1")))
  gd.range_set_value(u.port,f64(speedball_int("RSB_PORT",49480)))
@@ -107,7 +110,7 @@ replay_speedball_on_leave :: proc(self:^ReplaySpeedball) {
  self.local_canceled,self.remote_canceled=0,0;self.correction_count=0;self.correction_sum,self.correction_max=0,0
  self.ui[0].submitted,self.ui[0].announce_host,self.ui[0].was_playing=false,false,false
  self.ui[0].revision,self.ui[0].joined=0,0;self.ui[0].started_seen=false;self.ui[0].score_seen={}
- rgd.nodes_present(&self.players,nil);rgd.nodes_present(&self.ball,nil)
+ scenegd.nodes_present(&self.players,nil);scenegd.nodes_present(&self.ball,nil)
  gd.set_string(self.ui[0].chat_lines,"text","");gd.set_string(self.ui[0].chat_notice,"text","");gd.set_string(self.ui[0].chat_input,"text","")
  gd.control_release_focus(self.ui[0].chat_input);gd.canvas_item_set_visible(self.ui[0].score_panel,false)
  ui_notice(self,"Host a pitch or join one.");ui_frame(self)
@@ -170,7 +173,7 @@ ui_frame :: proc(self:^ReplaySpeedball) {
 social_frame :: proc(self:^ReplaySpeedball) {
  frame,ok:=rgd.session_authority_state(self.session)
  rgd.session_comms_frame(&self.comms,self.session,ok ? frame.state.names[:] : nil)
- rgd.session_diagnostics_frame(&self.diagnostics,self.session)
+ debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
  u:=&self.ui[0]
  if ok && self.session.authority && self.comms.enabled {
   if u.round_seen!=frame.state.round {

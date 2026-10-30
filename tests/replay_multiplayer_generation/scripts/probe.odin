@@ -2,13 +2,13 @@
 //gd:class MultiplayerGenerationProbe
 package multiplayer_generation
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import tr "godot:replay/transport"
-MultiplayerGenerationProbe :: struct {owner:gd.Node,transport:rgd.Multiplayer_Transport,wire:tr.Transport,last:tr.Received,first:u8,delay:tr.Delay,delayed:bool}
+import transportgd "godot:replay/godot/transport"
+MultiplayerGenerationProbe :: struct {owner:gd.Node,transport:transportgd.Multiplayer_Transport,wire:tr.Transport,last:tr.Received,first:u8,delay:tr.Delay,delayed:bool}
 @(gd_method)
 multiplayer_generation_probe_attach :: proc(self:^MultiplayerGenerationProbe,peer:gd.Multiplayer_Peer)->bool {
- if !rgd.multiplayer_attach(&self.transport,peer,2) {return false}
- self.wire=rgd.multiplayer_transport(&self.transport);return true
+ if !transportgd.multiplayer_attach(&self.transport,peer,2) {return false}
+ self.wire=transportgd.multiplayer_transport(&self.transport);return true
 }
 @(gd_method)
 multiplayer_generation_probe_generation :: proc(self:^MultiplayerGenerationProbe,id:gd.Int)->gd.Int {return gd.Int(tr.peer_generation(&self.wire,tr.Peer_Id(id)))}

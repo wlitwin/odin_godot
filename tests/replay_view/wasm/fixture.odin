@@ -2,9 +2,9 @@ package replay_view_wasm
 
 import r "godot:replay"
 import v "godot:replay/view"
-import gd "godot:replay/godot"
 import engine "godot:godot"
 import game "../../../examples/replay_hello/shared/hello"
+import scenegd "godot:replay/godot/scene"
 
 @(require)
 instantiate :: proc() {
@@ -14,11 +14,11 @@ instantiate :: proc() {
  v.project_pool(&projection,world.actors,{1,0},0,.Predicted,proc(actor:game.Actor)->(v.Entity_View(u8),bool) {
   return {pose={position=actor.body.position},scale={1,1},color={1,1,1,1},value=actor.owner},true
  })
- typed:gd.View_Pool2(game.Actor,u8,u32)
- gd.view_pool_load(&typed,nil,"",game.CAPACITY,gd.View_Binding(u8,u32){attach=proc(_:rawptr,node:engine.Node2d)->(u32,bool){return 0,true},paint=proc(_:rawptr,rig:^u32,value:u8){}})
- gd.view_pool_present(&typed,projection.scope,v.projection_values(&projection))
- gd.view_pool_invalidate(&typed)
- gd.view_pool_destroy(&typed);v.projection_destroy(&projection)
+ typed:scenegd.View_Pool2(game.Actor,u8,u32)
+ scenegd.view_pool_load(&typed,nil,"",game.CAPACITY,scenegd.View_Binding(u8,u32){attach=proc(_:rawptr,node:engine.Node2d)->(u32,bool){return 0,true},paint=proc(_:rawptr,rig:^u32,value:u8){}})
+ scenegd.view_pool_present(&typed,projection.scope,v.projection_values(&projection))
+ scenegd.view_pool_invalidate(&typed)
+ scenegd.view_pool_destroy(&typed);v.projection_destroy(&projection)
 	phase:v.Tick_Phase
 	v.tick_phase(&phase,1,0,1,.5,.025,20)
 	v.linear_preview2({1,2},{12,0},phase.fraction)
@@ -53,8 +53,8 @@ instantiate :: proc() {
 	v.smooth_rebase(&s, {})
 	v.smooth_present(&s, {}, 0.01)
 	v.pose_blend({}, {}, 0.5)
-	nodes: gd.Nodes2
-	gd.nodes_load(&nodes, nil, "", 32)
-	gd.nodes_present(&nodes, nil)
-	gd.nodes_destroy(&nodes)
+	nodes: scenegd.Nodes2
+	scenegd.nodes_load(&nodes, nil, "", 32)
+	scenegd.nodes_present(&nodes, nil)
+	scenegd.nodes_destroy(&nodes)
 }

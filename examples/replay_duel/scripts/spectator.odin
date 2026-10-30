@@ -8,9 +8,10 @@ import rb "godot:replay/p2p"
 import rec "godot:replay/recovery"
 import tr "godot:replay/transport"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import game "../shared/duel"
 import sc "godot:replay/schema"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 duel_watch_source :: proc(self: ^ReplayDuel, now: u64) {
 	if self.watch_source_failed {return}
@@ -117,7 +118,7 @@ duel_watch_anchor_read :: proc()->(rb.Watch_Anchor,rb.Error) {
 	path:=duel_param("RDP_WATCH_CONTROL","");if len(path)==0 {return {},.Invalid_Config}
 	name:=gd.new_string_odin(path);exists:=gd.file_access_file_exists(name);gd.free_string(name)
 	if !exists {return {},.Waiting}
-	bytes,error:=rgd.storage_read(path,128);defer delete(bytes);if error!=.None {return {},.Invalid_Archive}
+	bytes,error:=storagegd.storage_read(path,128);defer delete(bytes);if error!=.None {return {},.Invalid_Archive}
 	schema:sc.Schema;defer sc.destroy(&schema);if sc.init(&schema,rb.Watch_Anchor).error!=.None {return {},.Schema}
 	point:rb.Watch_Anchor;if sc.decode(&schema,&point,bytes).error!=.None {return {},.Invalid_Archive}
 	return point,.None
@@ -128,8 +129,8 @@ duel_watch_switch :: proc(self:^ReplayDuel,now:u64)->bool {
 		before,known:=rb.watch_current(&self.watch);if !known {return false}
 		tr.close(&self.wire)
 		port:=duel_int("RDP_PORT",49520)
-		if !rgd.enet_join(&self.enet,"127.0.0.1",u16(port+2)) {duel_fail(self,"replacement spectator connection");return false}
-		base:=rgd.enet_transport(&self.enet)
+		if !transportgd.enet_join(&self.enet,"127.0.0.1",u16(port+2)) {duel_fail(self,"replacement spectator connection");return false}
+		base:=transportgd.enet_transport(&self.enet)
 		if !tr.delay_init(&self.delay,base,u32(duel_int("RDP_LATENCY",0))) {tr.close(&base);duel_fail(self,"replacement spectator delay");return false}
 		tr.delay_faults(&self.delay,u32(duel_int("RDP_JITTER",0)),u32(duel_int("RDP_LOSS",0)),u32(duel_int("RDP_DUPLICATE",0)),78)
 		tr.delay_time(&self.delay,now)
@@ -140,7 +141,7 @@ duel_watch_switch :: proc(self:^ReplayDuel,now:u64)->bool {
 		if !valid || !reflect.equal(after,before) || point.tick!=before.tick {duel_fail(self,"watch retained frame");return false}
 		schema:sc.Schema;defer sc.destroy(&schema)
 		bytes:[128]u8
-		if sc.init(&schema,rb.Watch_Anchor).error!=.None || sc.encode(&schema,point,bytes[:schema.wire_size]).error!=.None || rgd.storage_write(duel_param("RDP_WATCH_CONTROL",""),bytes[:schema.wire_size],128)!=.None {duel_fail(self,"spectator anchor publication");return false}
+		if sc.init(&schema,rb.Watch_Anchor).error!=.None || sc.encode(&schema,point,bytes[:schema.wire_size]).error!=.None || storagegd.storage_write(duel_param("RDP_WATCH_CONTROL",""),bytes[:schema.wire_size],128)!=.None {duel_fail(self,"spectator anchor publication");return false}
 		self.watch_rebound=true
 		gd.print_str(fmt.tprintf("RDP_WATCH_REBOUND tick=%d chain=%d binding=78 retained=true",point.tick,point.chain));return true
 	}

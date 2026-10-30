@@ -82,7 +82,7 @@ the upcoming network/session/outbox layers.
 `One_Shots` retains consumed event IDs independently of active effects. It prevents
 an already heard one-shot from replaying when a cancelled occurrence reappears.
 Retirement is explicit and monotonic; retired IDs remain expired after their ring
-slots are reused. See the [Godot audio adapter](../godot/audio.md) for the consumer
+slots are reused. See the [Godot audio adapter](../godot/scene/audio.md) for the consumer
 contract, bounded capacities and voice-reuse behavior.
 
 [Visual cues](cues.md) turn journal changes into bounded, detached render instances

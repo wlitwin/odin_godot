@@ -114,7 +114,7 @@ and retains reliable data through receiver backpressure. The live peer count mus
 fit `Fragment_Config.messages`, which also bounds delivery-frontier tracking.
 Closing this wrapper does not close its borrowed base.
 
-The [Godot RTC adapter](../godot/rtc.md) composes fragmentation with raw negotiated
+The [Godot RTC adapter](../godot/transport/rtc.md) composes fragmentation with raw negotiated
 data channels and receiver credit. This additional credit prevents Godot's finite
 JS ring from dropping already SCTP-delivered reliable data. `rtc_transport` is a
 normal Replay interface; `Session_Options.backend = .Rtc` uses it through the same

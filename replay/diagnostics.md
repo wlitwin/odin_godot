@@ -80,7 +80,7 @@ JSON without modifying either save or opening a network session.
 values. It stops at an initial/corrected checkpoint or retained-history edge.
 `audit_recent` captures a failure from that suffix. This is useful for clients,
 whose authority correction did not come from locally recorded generating input.
-The [Godot overlay](godot/debug.md) uses these boundaries and the owned plain-text
+The [Godot overlay](godot/debug/debug.md) uses these boundaries and the owned plain-text
 formatter in `replay/diagnostic` for explicit developer audits.
 
 ## Persistent gameplay windows

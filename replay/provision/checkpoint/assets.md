@@ -13,7 +13,7 @@ The deployment and game supply the same `Asset_Policy`:
 ```odin
 policy := checkpoint.Asset_Policy{
     collect = game.checkpoint_assets,
-    validate = replaygd.asset_png_valid,
+    validate = scenegd.asset_png_valid,
 }
 backend.assets = policy
 room_options.checkpoint_assets = policy

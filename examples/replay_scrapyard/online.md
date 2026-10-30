@@ -37,7 +37,7 @@ loopback development; Internet deployment is not established by these local gate
 
 Browser hosts set `globalThis.replayIceConfig` before Godot starts, keeping relay
 credentials out of query parameters. The asset-aware party flow also passes an
-actual relay-only TURN gate; [deployment settings](../../replay/godot/ice-deployment.md)
+actual relay-only TURN gate; [deployment settings](../../replay/godot/transport/ice-deployment.md)
 describe configuration, ownership and remaining Internet/expiry acceptance.
 
 The credential file is separate from the progression profile. The game's personal

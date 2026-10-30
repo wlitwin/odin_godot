@@ -39,7 +39,7 @@ It exports a separate copy and drives real Chrome keyboard, slider and button
 input. The test-only bridge reports state and controls only fixture pause/teardown;
 it does not edit game values or implement the inspection/branch operations.
 
-The [API guide](../../replay/godot/scrubber.md) describes exclusive local pause,
+The [API guide](../../replay/godot/debug/scrubber.md) describes exclusive local pause,
 presentation ownership and remaining boundaries. These controls are not enabled
 on Session or P2P games and do not claim network time-travel editing.
 

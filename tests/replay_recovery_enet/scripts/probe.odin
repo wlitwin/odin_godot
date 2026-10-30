@@ -9,12 +9,13 @@ import r "godot:replay"
 import net "godot:replay/net"
 import rec "godot:replay/recovery"
 import tr "godot:replay/transport"
-import rgd "godot:replay/godot"
 import sample "godot:tests/replay_recovery/shared/archive"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 ReplayReplicaProbe :: struct {
 	owner: gd.Node,
-	enet: rgd.Enet,
+	enet: transportgd.Enet,
 	delay: tr.Delay,
 	wire: tr.Transport,
 	sender: rec.Sender,
@@ -29,12 +30,12 @@ ReplayReplicaProbe :: struct {
 replay_replica_probe_ready :: proc(self: ^ReplayReplicaProbe) {
 	self.started = gd.time_get_ticks_msec(gd.singleton_time())
 	self.host = gd.env_string("REPLAY_REPLICA_ROLE", "successor") == "host"
-	self.token = rgd.session_token(gd.env_string("REPLAY_REPLICA_KEY", "replica-fixture-only"))
+	self.token = storagegd.session_token(gd.env_string("REPLAY_REPLICA_KEY", "replica-fixture-only"))
 	port := gd.env_int("REPLAY_REPLICA_PORT", 49430)
 	if port < 1 || port > 65535 {replay_replica_probe_fail(self, "port"); return}
-	ok := self.host ? rgd.enet_host(&self.enet, u16(port), 1, bind_ip = "127.0.0.1") : rgd.enet_join(&self.enet, "127.0.0.1", u16(port))
+	ok := self.host ? transportgd.enet_host(&self.enet, u16(port), 1, bind_ip = "127.0.0.1") : transportgd.enet_join(&self.enet, "127.0.0.1", u16(port))
 	if !ok {replay_replica_probe_fail(self, "transport"); return}
-	self.wire = rgd.enet_transport(&self.enet)
+	self.wire = transportgd.enet_transport(&self.enet)
 	if !tr.delay_init(&self.delay, self.wire, 120) || !tr.delay_faults(&self.delay, 20, 1000, 1000, self.host ? 81 : 93) {
 		replay_replica_probe_fail(self, "fault configuration"); return
 	}

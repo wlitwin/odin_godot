@@ -11,6 +11,8 @@ import auth "godot:replay/authority"
 import tr "godot:replay/transport"
 import ck "godot:replay/provision/checkpoint"
 import a "godot:replay/assets"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 Room_Control :: enum {Enet, Websocket}
 
@@ -67,11 +69,11 @@ Room :: struct($S, $C, $A, $E: typeid, $N: int) {
 	control_error: auth.Error,
 	clock: auth.Clock_Source,
 	browser_clock: Browser_Lease_Clock,
-	rtc_authorization: Rtc_Grant_Auth,
+	rtc_authorization: transportgd.Rtc_Grant_Auth,
 	lease: auth.Lease,
 	rpc: auth.Rpc_Client,
-	control: Enet,
-	control_websocket: Websocket,
+	control: transportgd.Enet,
+	control_websocket: transportgd.Websocket,
 	control_wire: tr.Transport,
 	model: net.Model(S, C, A, E, N),
 	initial: r.Frame(S),
@@ -102,7 +104,7 @@ room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: n
   when gd.IS_WEB {return .Invalid_Config}
   config:=options.session.steam
   if config.runtime==nil || !config.runtime.ready || config.runtime.steam_id==0 || config.peer!=nil || config.max_peers<1 || config.max_peers>4095 {return .Invalid_Config}
-  endpoint,valid:=steam_endpoint(config.runtime.steam_id,config.virtual_port);if !valid {return .Invalid_Config}
+  endpoint,valid:=transportgd.steam_endpoint(config.runtime.steam_id,config.virtual_port);if !valid {return .Invalid_Config}
   if options.registration_endpoint!=(auth.Endpoint{}) && options.registration_endpoint!=endpoint {return .Invalid_Config}
   options.registration_endpoint=endpoint
  }
@@ -124,7 +126,7 @@ room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: n
 	if !room_control_connect(room) {room_close(room); return .Transport}
 	nonce: auth.Nonce
 	ok := true
-	when gd.IS_WEB {nonce = auth.Nonce(session_token())} else {nonce, ok = auth.rpc_nonce()}
+	when gd.IS_WEB {nonce = auth.Nonce(storagegd.session_token())} else {nonce, ok = auth.rpc_nonce()}
 	if !ok || !auth.rpc_client_init(&room.rpc, &room.lease, options.key, nonce, room.control_wire) {room_close(room); return .Invalid_Config}
 	room.ready, room.phase = true, .Connecting
 	room.registered = options.provisioned_incarnation
@@ -140,7 +142,7 @@ room_close :: proc(room: ^Room($S, $C, $A, $E, $N)) {
 	auth.rpc_client_destroy(&room.rpc)
 	auth.prepared_destroy(&room.prepared); auth.prepared_destroy(&room.candidate)
 	tr.close(&room.control_wire)
-	if room.options.control_tls != nil {websocket_unref(room.options.control_tls)}
+	if room.options.control_tls != nil {gd.release_ref(room.options.control_tls)}
 	delete(room.options.coordinator, room.allocator)
 	delete(room.options.session.rtc.url, room.allocator)
 	delete(room.options.session.rtc.ice_json, room.allocator)
@@ -487,11 +489,11 @@ room_recovered :: proc(room: ^Room($S, $C, $A, $E, $N), old_epoch, confirmed: u6
 room_control_connect :: proc(room:^Room($S,$C,$A,$E,$N))->bool {
  switch room.options.control_backend {
  case .Enet:
-  if !enet_join(&room.control,fmt.ctprintf("%s",room.options.coordinator),room.options.control_port) {return false}
-  room.control_wire=enet_transport(&room.control)
+  if !transportgd.enet_join(&room.control,fmt.ctprintf("%s",room.options.coordinator),room.options.control_port) {return false}
+  room.control_wire=transportgd.enet_transport(&room.control)
  case .Websocket:
-  if !websocket_join(&room.control_websocket,room.options.coordinator,tls=room.options.control_tls) {return false}
-  room.control_wire=websocket_transport(&room.control_websocket)
+  if !transportgd.websocket_join(&room.control_websocket,room.options.coordinator,tls=room.options.control_tls) {return false}
+  room.control_wire=transportgd.websocket_transport(&room.control_websocket)
  }
  return true
 }
@@ -503,7 +505,7 @@ room_transport :: proc(room:^Room($S,$C,$A,$E,$N),view:auth.View)->Migration_Tra
  if target.backend==.Steam {target.steam=room.options.session.steam}
  if target.backend==.Rtc {
   room.rtc_authorization={view=view,identity=room.options.identity,key=room.options.key}
-  target.rtc=rtc_grant_config(&room.rtc_authorization,room.options.session.rtc.url,view.owner==room.options.identity)
+  target.rtc=transportgd.rtc_grant_config(&room.rtc_authorization,room.options.session.rtc.url,view.owner==room.options.identity)
   target.rtc.ice_json=room.options.session.rtc.ice_json
   target.rtc.ice_user,target.rtc.ice_source=room.options.session.rtc.ice_user,room.options.session.rtc.ice_source
   target.rtc.native_extension=room.options.session.rtc.native_extension

@@ -14,6 +14,7 @@ import p "godot:replay/provision"
 import rec "godot:replay/recovery"
 import rgd "godot:replay/godot"
 import tr "godot:replay/transport"
+import transportgd "godot:replay/godot/transport"
 
 ReplayProvisionPeer :: struct {
     owner:gd.Node,
@@ -21,7 +22,7 @@ ReplayProvisionPeer :: struct {
     started:u64,
     phase:int,
     tls:gd.Tls_Options,
-    socket:rgd.Websocket,
+    socket:transportgd.Websocket,
     wire:tr.Transport,
     store:db.Store,
     hub:pp.Hub,
@@ -41,8 +42,8 @@ replay_provision_peer_ready :: proc(self:^ReplayProvisionPeer) {
         if db.open(&self.store,gd.env_string("RPP_DB",""),!self.resume)!=.None {fail(self,"store");return}
         existing:[2]pp.Bundle
         count,error:=db.load_all(&self.store,55,existing[:]);if error!=.None {fail(self,"inventory");return}
-        if !rgd.websocket_host(&self.socket,u16(gd.env_int("RPP_PORT",49740)),tls=self.tls) {fail(self,"listen");return}
-        self.wire=rgd.websocket_transport(&self.socket)
+        if !transportgd.websocket_host(&self.socket,u16(gd.env_int("RPP_PORT",49740)),tls=self.tls) {fail(self,"listen");return}
+        self.wire=transportgd.websocket_transport(&self.socket)
         cfg:=pp.HUB_CONFIG;cfg.content,cfg.players,cfg.rooms=55,3,2
         if pp.hub_open(&self.hub,cfg,existing[:count],db.commit,&self.store,auth.native_clock(),self.wire)!=.None {fail(self,"hub");return}
         gd.print_str(fmt.tprintf("P2P_PROVISION_SERVICE_READY rooms=%d",count))
@@ -67,7 +68,7 @@ replay_provision_peer_process :: proc(self:^ReplayProvisionPeer,dt:f64) {
     if self.server {
         tr.poll(&self.wire);buffer:[tr.MAX_PACKET_BYTES]u8
         for _ in 0..<32 {
-            packet:=rgd.websocket_receive(&self.socket,buffer[:]);if packet.state!=.Received {break}
+            packet:=transportgd.websocket_receive(&self.socket,buffer[:]);if packet.state!=.Received {break}
             if !packet.text && !pp.hub_receive(&self.hub,packet.from,buffer[:packet.count]) {pp.hub_control_receive(&self.hub,packet.from,buffer[:packet.count])}
         }
         path:=gd.new_string_odin(gd.env_string("RPP_DONE",""));defer gd.free_string(path)
@@ -127,7 +128,7 @@ replay_provision_peer_process :: proc(self:^ReplayProvisionPeer,dt:f64) {
 }
 replay_provision_peer_exit_tree :: proc(self:^ReplayProvisionPeer) {
     auth.rpc_client_destroy(&self.rpc);rgd.provision_disconnect(&self.connection)
-    pp.hub_close(&self.hub);rgd.websocket_close(&self.socket);db.close(&self.store)
+    pp.hub_close(&self.hub);transportgd.websocket_close(&self.socket);db.close(&self.store)
     unref(self.tls)
 }
 fail :: proc(self:^ReplayProvisionPeer,reason:string) {gd.print_str(fmt.tprintf("P2P_PROVISION_FAIL %s",reason));self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),1)}

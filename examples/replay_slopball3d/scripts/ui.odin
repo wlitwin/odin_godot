@@ -10,6 +10,9 @@ import lb "godot:replay/lobby"
 import net "godot:replay/net"
 import own "godot:replay/owned"
 import game "../shared/pitch"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 Slopball3D_UI :: struct {
  lobby,score_panel:gd.Control,
@@ -38,7 +41,7 @@ ui_ready :: proc(self:^ReplaySlopball3d) {
  for label,i in ([2]cstring{"Solo","Host"}) {u.resume[i]=cast(gd.Button)gd.get_node(self.owner,fmt.ctprintf("UI/Lobby/Column/Resume/%s",label))}
  gd.connect_to(u.resume[0],"pressed",self.owner,"on_resume_solo");gd.connect_to(u.resume[1],"pressed",self.owner,"on_resume_host")
  gd.set_string(u.save_path,"text",fmt.ctprintf("%s",gd.IS_WEB ? slopball3d_param("RS3_SAVE_SLOT","pitch") : slopball3d_param("RS3_SAVE","user://slopball3d.replay")))
- rgd.bind_key("rsl_save",.F5)
+ inputgd.bind_key("rsl_save",.F5)
  u.name=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Name/Value")
  u.address=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Address/Value")
  u.port=cast(gd.Spin_Box)gd.get_node(self.owner,"UI/Lobby/Column/Address/Port")
@@ -62,7 +65,7 @@ ui_ready :: proc(self:^ReplaySlopball3d) {
  for method,i in ([4]cstring{"on_solo","on_host","on_join","on_watch"}) {gd.connect_to(u.doors[i],"pressed",self.owner,method)}
  gd.connect_to(u.start,"pressed",self.owner,"on_start");gd.connect_to(u.leave,"pressed",self.owner,"on_leave")
  gd.connect_to(u.chat_input,"text_submitted",self.owner,"on_chat")
- rgd.bind_key("rsl_chat",.Enter);rgd.bind_key("rsl_scores",.Tab)
+ inputgd.bind_key("rsl_chat",.Enter);inputgd.bind_key("rsl_scores",.Tab)
  profile_ready(self)
  gd.set_string(u.address,"text",fmt.ctprintf("%s",slopball3d_param("RS3_ADDRESS","127.0.0.1")))
  gd.range_set_value(u.port,f64(slopball3d_int("RS3_PORT",49580)))
@@ -183,7 +186,7 @@ ui_frame :: proc(self:^ReplaySlopball3d) {
 social_frame :: proc(self:^ReplaySlopball3d) {
  frame,ok:=rgd.session_authority_state(self.session)
  rgd.session_comms_frame(&self.comms,self.session,ok ? frame.state.names[:] : nil,self.display_name)
- rgd.session_diagnostics_frame(&self.diagnostics,self.session)
+ debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
  u:=&self.ui[0]
  if ok && self.session.authority && self.comms.enabled && u.round_seen!=frame.state.round {
   if u.round_seen!=0 {co.system(&self.comms,fmt.tprintf("Match %d starts",frame.state.round))}
@@ -216,7 +219,7 @@ social_frame :: proc(self:^ReplaySlopball3d) {
 @(gd_method)
 replay_slopball3d_ui_probe :: proc(self:^ReplaySlopball3d,key:string,wanted:gd.Int=1)->gd.Int {
  if key=="ready" {return gd.Int(self.ready)}
- if key=="ball_solver" {return gd.Int(rgd.body3_simulating(&self.bodies[game.SEATS]))}
+ if key=="ball_solver" {return gd.Int(scenegd.body3_simulating(&self.bodies[game.SEATS]))}
  if key=="chat_ready" {return gd.Int(self.comms.enabled)}
  if key=="named_observer" {return gd.Int(self.comms.local.spectator && self.comms.local.observer_name_allowed)}
  if key=="typing" {return gd.Int(gd.control_has_focus(self.ui[0].chat_input,false))}
@@ -229,7 +232,7 @@ replay_slopball3d_ui_probe :: proc(self:^ReplaySlopball3d,key:string,wanted:gd.I
    if i<game.SEATS && !w.players[i].connected {continue}
    state:=i==game.SEATS ? w.ball : w.players[i].body
    expected:=i==game.SEATS ? own.Pose3{position={8,0.2,4.5},rotation={0,0,0,1}} : game.spawn(u16(i+1))
-   actual:=rgd.body3_read(&body)
+   actual:=scenegd.body3_read(&body)
    if body.driver.scope!=own.scope(state) || body.preview {return 0}
    for value,axis in actual.position {if abs(value-expected.position[axis])>0.001 {return 0}}
    for value in actual.linear {if abs(value)>0.001 {return 0}}
@@ -258,10 +261,10 @@ reset_bodies :: proc(self:^ReplaySlopball3d) {
  for &body in self.bodies {
   if !body.ready {continue}
   node,kind,skin,origin,angle:=body.body,body.kind,body.skin,body.skin_origin,body.skin_rotation
-  rgd.body3_suspend(&body)
+  scenegd.body3_suspend(&body)
   if skin!=nil {gd.node3d_set_position(skin,origin);gd.node3d_set_quaternion(skin,angle)}
-  rgd.body3_destroy(&body)
-  assert(rgd.body3_attach(&body,node,kind,skin));rgd.body3_suspend(&body)
+  scenegd.body3_destroy(&body)
+  assert(scenegd.body3_attach(&body,node,kind,skin));scenegd.body3_suspend(&body)
   gd.node3d_set_visible(cast(gd.Node3d)node,false)
   gd.collision_object3d_set_collision_layer(cast(gd.Collision_Object3d)node,0)
   gd.collision_object3d_set_collision_mask(cast(gd.Collision_Object3d)node,0)

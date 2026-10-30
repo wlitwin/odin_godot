@@ -3,7 +3,7 @@
 Scrapyard is the canonical example for these optional Replay helpers. The Godot
 editor owns composition and local appearance; Odin value types own gameplay state,
 decisions and configuration. Stormcaller exercises all four parts of the workflow. The
-[typed adapter layer](../../replay/godot/adapter-bindings.md) now owns binding
+[typed adapter layer](../../replay/godot/scene/adapter-bindings.md) now owns binding
 configuration, asset lifetimes, view traversal and contextual diagnostics.
 
 ## Register an enemy
@@ -22,7 +22,7 @@ The loader checks every catalog ID has a registration, rejects duplicates and
 invalid scene/style references, and retains the assets for the view owner's
 lifetime. The adapter selects by copied display ID; the view remains concerned
 with one enemy. New IDs still require deliberate gameplay/version decisions.
-[Framework API and bounds](../../replay/godot/archetypes.md).
+[Framework API and bounds](../../replay/godot/scene/archetypes.md).
 
 ## Bake content once
 

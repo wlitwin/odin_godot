@@ -8,6 +8,8 @@ import net "godot:replay/net"
 import auth "godot:replay/authority"
 import rgd "godot:replay/godot"
 import game "../shared/game"
+import scenegd "godot:replay/godot/scene"
+import transportgd "godot:replay/godot/transport"
 
 open_session :: proc(self: ^ReplayScrapyard, initial: game.World, options: rgd.Session_Options) -> net.Error {
 	if self.online.launch {
@@ -21,7 +23,7 @@ open_session :: proc(self: ^ReplayScrapyard, initial: game.World, options: rgd.S
 		opts.preparation_ready, opts.preparation_user = spray_preparation_ready, self
 		opts.checkpoint_assets = {
 			collect = game.checkpoint_assets,
-			validate = rgd.asset_png_valid,
+			validate = scenegd.asset_png_valid,
 		}
 		opts.checkpoint_cache = &self.assets[0].cache
 		self.session = &self.room.session
@@ -63,7 +65,7 @@ open_session :: proc(self: ^ReplayScrapyard, initial: game.World, options: rgd.S
 		opts.coordinator = url
 		opts.session.backend = .Rtc
 		opts.session.rtc.url = url
-		ice, ice_error := rgd.rtc_ice_settings("RSY_ICE_JSON")
+		ice, ice_error := transportgd.rtc_ice_settings("RSY_ICE_JSON")
 		if ice_error != .None {
 			return .Invalid_Config
 		}

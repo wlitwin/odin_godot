@@ -6,9 +6,10 @@ import gd "godot:godot"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
+import storagegd "godot:replay/godot/storage"
 
 Cave_Browser :: struct {
-	identity:rgd.Browser_Identity,
+	identity:storagegd.Browser_Identity,
 	save:rgd.Browser_Checkpoint(game.World,game.Control,game.Action,game.Event,game.SEATS),
 	token:net.Token,token_ready:bool,
 	pending_role:string,pending_resume:bool,seen_receipt:u64,
@@ -17,8 +18,8 @@ browser_cave_ready :: proc(self:^ReplayCave) {
 	when gd.IS_WEB {
 		io:=&self.browser
 		label:=cave_param("REPLAY_CAVE_TOKEN","")
-		if label!="" {io.token=rgd.session_token(label);io.token_ready=rgd.browser_identity_valid(io.token)} else {
-			rgd.browser_identity_open(&io.identity,cave_param("REPLAY_CAVE_PROFILE_NAMESPACE","replay-cavecrawl"))
+		if label!="" {io.token=storagegd.session_token(label);io.token_ready=storagegd.browser_identity_valid(io.token)} else {
+			storagegd.browser_identity_open(&io.identity,cave_param("REPLAY_CAVE_PROFILE_NAMESPACE","replay-cavecrawl"))
 		}
 	}
 }
@@ -49,8 +50,8 @@ browser_cave_frame :: proc(self:^ReplayCave) {
 	when gd.IS_WEB {
 		io:=&self.browser
 		if !io.token_ready && io.identity.phase!=.Closed {
-			rgd.browser_identity_frame(&io.identity)
-			if token,ok:=rgd.browser_identity_token(&io.identity);ok {io.token=token;io.token_ready=true}
+			storagegd.browser_identity_frame(&io.identity)
+			if token,ok:=storagegd.browser_identity_token(&io.identity);ok {io.token=token;io.token_ready=true}
 		}
 		browser_cave_slot_open(self);rgd.browser_checkpoint_frame(&io.save)
 		if io.save.receipt_serial!=io.seen_receipt {
@@ -92,7 +93,7 @@ browser_cave_status :: proc(self:^ReplayCave) {
 		gd.base_button_set_disabled(save,io.save.phase!=.Ready || self.session.fenced)
 	}
 }
-browser_cave_close :: proc(self:^ReplayCave) {rgd.browser_identity_close(&self.browser.identity);rgd.browser_checkpoint_close(&self.browser.save);delete(self.browser.pending_role);self.browser={}}
+browser_cave_close :: proc(self:^ReplayCave) {storagegd.browser_identity_close(&self.browser.identity);rgd.browser_checkpoint_close(&self.browser.save);delete(self.browser.pending_role);self.browser={}}
 @(gd_method)
 replay_cave_browser_probe :: proc(self:^ReplayCave,key:string)->gd.Int {
 	switch key {

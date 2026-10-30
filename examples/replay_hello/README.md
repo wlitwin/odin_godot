@@ -95,10 +95,10 @@ network comparison or a claim of human play-feel parity.
 
 
 Set the scene’s `debug_enabled` inspector property or launch with `REPLAY_DEBUG=1`
-for the [local diagnostic overlay](../../replay/godot/debug.md). F8 toggles the panel
+for the [local diagnostic overlay](../../replay/godot/debug/debug.md). F8 toggles the panel
 and F9 explicitly audits recent replayable history. It is disabled by default.
 
-The same option enables the [local history dock](../../replay/godot/scrubber.md).
+The same option enables the [local history dock](../../replay/godot/debug/scrubber.md).
 F10 pauses for inspection; its slider paints retained frames without changing the
 live world. Resume keeps the original future, while Branch starts from the selected
 frame under a fresh presentation epoch. F8 can hide the audit panel while leaving
@@ -109,7 +109,7 @@ scene and the original Hello projects.
 With `REPLAY_DEBUG=1`, F10 opens local history inspection. Choose a retained tick
 and a field, then Apply to preview. Reset or Resume discards edits; Branch starts
 from the edited frame. Game invariants are checked before accepting each edit.
-See [ownership, supported values and limits](../../replay/godot/scrubber.md).
+See [ownership, supported values and limits](../../replay/godot/debug/scrubber.md).
 
 The history dock also exports a portable recent recording: `user://hello.rplrec`
 on native (override with `REPLAY_RECORDING_PATH`), or a browser download. Export

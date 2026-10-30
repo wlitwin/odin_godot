@@ -95,7 +95,7 @@ other native storage platforms remain separate work. See the
 
 `Party_Config.ice_json` now carries validated deployment ICE settings into Room,
 including relay-only TURN configuration. The string is copied during open and
-retained across Room transitions. See [ICE configuration and relay evidence](ice-deployment.md).
+retained across Room transitions. See [ICE configuration and relay evidence](transport/ice-deployment.md).
 
 Alternatively set `relay_credentials=true` to use the authenticated
 [relay provider](../relay/README.md). Party obtains credentials before becoming

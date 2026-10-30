@@ -6,10 +6,11 @@ import "core:fmt"
 import gd "godot:godot"
 import auth "godot:replay/authority"
 import rgd "godot:replay/godot"
+import transportgd "godot:replay/godot/transport"
 
 IceValidation :: struct {owner: gd.Node}
 ice_validation_ready :: proc(self: ^IceValidation) {
-	Case :: struct {json: string, expected: rgd.Rtc_Ice_Error}
+	Case :: struct {json: string, expected: transportgd.Rtc_Ice_Error}
 	cases := [?]Case{
 		{"", .None}, {`{}`, .None}, {`{"iceServers":[]}`, .None},
 		{`{"iceTransportPolicy":"relay","iceServers":[]}`, .Policy},
@@ -30,11 +31,11 @@ ice_validation_ready :: proc(self: ^IceValidation) {
 		{`[]`, .Json}, {`{"iceServers":`, .Json},
 	}
 	for item, index in cases {
-		got := rgd.rtc_ice_validate(item.json)
+		got := transportgd.rtc_ice_validate(item.json)
 		if got != item.expected {gd.print_str(fmt.tprintf("RTC_ICE_FAIL case=%d expected=%v got=%v", index, item.expected, got)); gd.scene_tree_quit(gd.get_tree(self.owner), 1); return}
 	}
 	large: [8193]u8; for &b in large {b = ' '}
-	if rgd.rtc_ice_validate(string(large[:])) != .Size {gd.scene_tree_quit(gd.get_tree(self.owner), 1); return}
+	if transportgd.rtc_ice_validate(string(large[:])) != .Size {gd.scene_tree_quit(gd.get_tree(self.owner), 1); return}
 	party: rgd.Party; defer rgd.party_close(&party)
 	endpoint, _ := auth.endpoint("127.0.0.1", 45001)
 	text := `{"iceTransportPolicy":"relay","iceServers":[{"urls":"turn:127.0.0.1:3478","username":"u","credential":"p"}]}`

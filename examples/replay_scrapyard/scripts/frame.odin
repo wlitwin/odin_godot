@@ -5,6 +5,7 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import v "godot:replay/view"
 import game "../shared/game"
+import debuggd "godot:replay/godot/debug"
 
 // Preserve the old callback's deferred order, including on unavailable sessions
 // and frame failures. Re-check readiness between hooks just as each defer did.
@@ -17,7 +18,7 @@ finish_frame :: proc(self: ^ReplayScrapyard, dt: f64) {
 	}
 	self.menu_input_guard = false
 	if self.ready {
-		rgd.session_diagnostics_frame(&self.diagnostics[0], self.session)
+		debuggd.session_diagnostics_frame(&self.diagnostics[0], self.session)
 	}
 	if self.ready {
 		social_frame(self)

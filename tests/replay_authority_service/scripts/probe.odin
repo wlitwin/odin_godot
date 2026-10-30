@@ -12,8 +12,8 @@ import rec "godot:replay/recovery"
 import auth "godot:replay/authority"
 import db "godot:replay/authority/sqlite"
 import tr "godot:replay/transport"
-import rgd "godot:replay/godot"
 import sample "godot:tests/replay_recovery/shared/archive"
+import transportgd "godot:replay/godot/transport"
 
 OWNER :: auth.Identity{1, 101}
 SUCCESSOR :: auth.Identity{2, 102}
@@ -29,7 +29,7 @@ ReplayServiceProbe :: struct {
 	service: auth.Service,
 	lease: auth.Lease,
 	rpc: auth.Rpc_Client,
-	control, data: rgd.Enet,
+	control, data: transportgd.Enet,
 	control_wire, data_wire: tr.Transport,
 	sender: rec.Sender,
 	receiver: rec.Receiver(sample.World, sample.Control, sample.Action, sample.Event, sample.SEATS),
@@ -68,15 +68,15 @@ replay_service_probe_ready :: proc(self: ^ReplayServiceProbe) {
 				record.members[i] = {identity = key.identity, endpoint = address, enabled = true, can_host = true, trusted_authority = true}
 			}
 		}
-		if !rgd.enet_host(&self.control, self.port, 8, bind_ip = "127.0.0.1") {fail(self, "service socket"); return}
-		self.control_wire = rgd.enet_transport(&self.control)
+		if !transportgd.enet_host(&self.control, self.port, 8, bind_ip = "127.0.0.1") {fail(self, "service socket"); return}
+		self.control_wire = transportgd.enet_transport(&self.control)
 		if auth.service_init(&self.service, record, db.commit, &self.store, self.clock, self.control_wire, keys[:]) != .None {fail(self, "service init"); return}
 		gd.print_str(fmt.tprintf("REPLAY_SERVICE_READY generation=%d epoch=%d", self.service.coordinator.record.coordinator_generation, self.service.coordinator.record.epoch))
 	} else {
 		identity := self.owner_role ? OWNER : SUCCESSOR
 		auth.lease_init(&self.lease, identity, ROOM, sample.CONTENT, self.clock, self.owner_role)
-		if !rgd.enet_join(&self.control, "127.0.0.1", self.port) {fail(self, "control socket"); return}
-		self.control_wire = rgd.enet_transport(&self.control)
+		if !transportgd.enet_join(&self.control, "127.0.0.1", self.port) {fail(self, "control socket"); return}
+		self.control_wire = transportgd.enet_transport(&self.control)
 		nonce, generated := auth.rpc_nonce()
 		if !generated || !auth.rpc_client_init(&self.rpc, &self.lease, keys[self.owner_role ? 0 : 1].key, nonce, self.control_wire) {fail(self, "client init"); return}
 		self.phase = self.owner_role ? .Start : .Observe
@@ -103,8 +103,8 @@ replay_service_probe_process :: proc(self: ^ReplayServiceProbe, dt: f64) {
 	// Reconnect the transport, retaining request bytes/sequence and the client nonce.
 	if tr.status(&self.control_wire) == .Disconnected && now - self.last_hello > 300 {
 		tr.close(&self.control_wire)
-		if rgd.enet_join(&self.control, "127.0.0.1", self.port) {
-			self.control_wire = rgd.enet_transport(&self.control); self.rpc.wire = self.control_wire
+		if transportgd.enet_join(&self.control, "127.0.0.1", self.port) {
+			self.control_wire = transportgd.enet_transport(&self.control); self.rpc.wire = self.control_wire
 		}
 		self.last_hello = now
 	}
@@ -117,8 +117,8 @@ replay_service_probe_process :: proc(self: ^ReplayServiceProbe, dt: f64) {
 			case .Start:
 				if reply.view.owner == OWNER && reply.view.epoch == 1 {
 					if sample.authority(&self.server, auth.lease_permit(&self.lease)) != .None {fail(self, "source world"); return}
-					if !rgd.enet_host(&self.data, self.port + 1, 1, bind_ip = "127.0.0.1") {fail(self, "archive socket"); return}
-					self.data_wire = rgd.enet_transport(&self.data)
+					if !transportgd.enet_host(&self.data, self.port + 1, 1, bind_ip = "127.0.0.1") {fail(self, "archive socket"); return}
+					self.data_wire = transportgd.enet_transport(&self.data)
 					self.phase = .Nominate
 				}
 			case .Nominate:
@@ -133,8 +133,8 @@ replay_service_probe_process :: proc(self: ^ReplayServiceProbe, dt: f64) {
 				if reply.released {self.phase = .Await_Claim}
 			case .Observe:
 				if reply.view.owner == OWNER && reply.view.epoch == 1 && !self.receiver.ready {
-					if !rgd.enet_join(&self.data, "127.0.0.1", self.port + 1) {fail(self, "archive join"); return}
-					self.data_wire = rgd.enet_transport(&self.data)
+					if !transportgd.enet_join(&self.data, "127.0.0.1", self.port + 1) {fail(self, "archive join"); return}
+					self.data_wire = transportgd.enet_transport(&self.data)
 					if rec.receiver_init(&self.receiver, {ROOM, 1, 9, sample.CONTENT}, 1, self.data_wire, sample.model()) != .None {fail(self, "receiver"); return}
 				}
 			case .Prepare:

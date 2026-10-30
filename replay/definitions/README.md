@@ -49,17 +49,17 @@ must not mutate/reenter the same store.
 
 # Godot baking
 
-`replay_godot.bake` runs a typed extractor against an authored source and publishes
+`scenegd.bake` runs a typed extractor against an authored source and publishes
 only after complete success. Source can be a Resource pointer, typed script value,
 or a fixed batch. The source is borrowed synchronously; it must stay alive during
 extraction. The output has the store's pointer-free canonical value type.
 
 ```odin
-ref, report := rgd.bake(&store, source, GAME_CONTENT_VERSION,
-    proc(source: Source, ctx: ^rgd.Bake_Context) -> Definition {
-        root := rgd.bake_scene2(ctx, source.scene, "$.scene")
-        spawn, ok := rgd.bake_marker2(ctx, root, "Markers/Spawn")
-        count := rgd.bake_int(ctx, source.count, 0, 32, "$.count")
+ref, report := scenegd.bake(&store, source, GAME_CONTENT_VERSION,
+    proc(source: Source, ctx: ^scenegd.Bake_Context) -> Definition {
+        root := scenegd.bake_scene2(ctx, source.scene, "$.scene")
+        spawn, ok := scenegd.bake_marker2(ctx, root, "Markers/Spawn")
+        count := scenegd.bake_int(ctx, source.count, 0, 32, "$.count")
         return Definition{spawn=spawn, count=u16(count)}
     })
 ```
@@ -106,6 +106,6 @@ Its headless stock code decodes the committed artifact. Use `--check` in CI to
 reject changed nested resources or stale artifact/receipt pairs without Godot.
 See the [complete authoring workflow](../../examples/replay_scrapyard/authoring-tools.md).
 
-The [typed archetype registry](../godot/archetypes.md) associates these value
+The [typed archetype registry](../godot/scene/archetypes.md) associates these value
 contracts with separately owned local scenes. [Evolution tools](../evolution/README.md)
 freeze revision dependencies and scaffold explicit conversions.

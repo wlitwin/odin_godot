@@ -7,11 +7,11 @@ import abi "godot:tests/replay_ptrcall_abi/checks"
 import gd "godot:godot"
 import "godot:gdext"
 import tr "godot:replay/transport"
-import netgd "godot:replay/godot"
+import transportgd "godot:replay/godot/transport"
 
 ReplayRtcProbe :: struct {
  owner:gd.Node,
- rtc:netgd.Rtc,
+ rtc:transportgd.Rtc,
  wire:tr.Transport,
  ready,failed,room_reported,done:bool,
  started,last_send:u64,
@@ -23,8 +23,8 @@ ReplayRtcProbe :: struct {
 replay_rtc_probe_start :: proc(self:^ReplayRtcProbe,role,url,room:gd.String) {
  abi.run()
  a,b,c:=probe_string(role),probe_string(url),probe_string(room);defer delete(a);defer delete(b);defer delete(c)
- if !netgd.rtc_open(&self.rtc,{url=b,room=c,host=a=="host"}) {probe_fail(self,"open");return}
- self.wire=netgd.rtc_transport(&self.rtc);self.ready=true;self.started=u64(gd.time_get_ticks_msec(gd.singleton_time()))
+ if !transportgd.rtc_open(&self.rtc,{url=b,room=c,host=a=="host"}) {probe_fail(self,"open");return}
+ self.wire=transportgd.rtc_transport(&self.rtc);self.ready=true;self.started=u64(gd.time_get_ticks_msec(gd.singleton_time()))
  gd.print_str("REPLAY_RTC_BOOT")
 }
 replay_rtc_probe_process :: proc(self:^ReplayRtcProbe,dt:f64) {

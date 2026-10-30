@@ -14,6 +14,9 @@ import rgd "godot:replay/godot"
 import game "../shared/game"
 import views "views"
 import display "../shared/presentation"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 ReplayScrapyard :: struct {
 	owner: gd.Node2d,
@@ -77,7 +80,7 @@ ReplayScrapyard :: struct {
 	pending_role: rgd.Session_Role,
 	textures: Textures,
 	rigs: [game.SEATS]^views.ScrapRunnerView,
-	runner_bindings: [game.SEATS]rgd.Script_Binding(display.Runner_View, views.ScrapRunnerView),
+	runner_bindings: [game.SEATS]scenegd.Script_Binding(display.Runner_View, views.ScrapRunnerView),
 	combat_bridge: [1]Combat_Bridge,
 	turret_bridge: [1]Turret_Bridge,
 	turret_intent: [1]net.Action_Intent(game.Action),
@@ -101,7 +104,7 @@ ReplayScrapyard :: struct {
 	manual_move, manual_aim: [2]f32,
 	manual_fire, auto_combat, auto_gate, manual_revive: bool,
 	development, auto_walk: bool,
-	recording: rgd.Debug_Recording,
+	recording: debuggd.Debug_Recording,
 	walk_target: [2]f32,
 	development_sequence: u64,
 	development_result, development_reason: gd.Int,
@@ -132,8 +135,8 @@ replay_scrapyard_ready :: proc(self: ^ReplayScrapyard) {
 	}
 	settings_ready(self)
 	online_ready(self)
-	rgd.bind_key("rsy_save", .F5)
-	rgd.bind_key("rsy_stamp", .G)
+	inputgd.bind_key("rsy_save", .F5)
+	inputgd.bind_key("rsy_stamp", .G)
 	gd.connect_to(gd.get_node(self.owner, "UI/Lobby/Scroll/Layout/Doors/Resume"), "pressed", self.owner, "on_resume")
 	gd.connect_to(gd.get_node(self.owner, "UI/Lobby/Scroll/Layout/Spray"), "pressed", self.owner, "on_spray_pick")
 	role := scrap_param("RSY_ROLE", "")
@@ -185,7 +188,7 @@ fail :: proc(self: ^ReplayScrapyard, message: string) {
 }
 
 replay_scrapyard_exit_tree :: proc(self: ^ReplayScrapyard) {
-	rgd.debug_recording_destroy(&self.recording)
+	debuggd.debug_recording_destroy(&self.recording)
 	combat_bridge_close(self)
 	turret_bridge_close(self)
 	runner_scenes_close(self)

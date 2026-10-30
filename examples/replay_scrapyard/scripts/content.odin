@@ -5,8 +5,8 @@ import gd "godot:godot"
 import "defs"
 import content "../shared/content"
 import game "../shared/game"
-import rgd "godot:replay/godot"
 import d "godot:replay/definitions"
+import scenegd "godot:replay/godot/scene"
 
 // Resources are an authoring boundary. The resulting catalog owns only values;
 // the host's complete catalog travels in world snapshots and recovery archives.
@@ -18,7 +18,7 @@ content_load :: proc() -> (content.Catalog, bool) {
 		return {}, content_report(&report)
 	}
 	ref: d.Ref
-	ref, report = rgd.bake(&store, u8(0), game.CONTENT, content_extract)
+	ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
 	if report.error != .None {
 		return {}, content_report(&report)
 	}
@@ -30,21 +30,21 @@ content_report :: proc(report: ^d.Report) -> bool {
 	return false
 }
 
-content_error :: proc(ctx: ^rgd.Bake_Context, path, message: string) -> content.Catalog {
-	rgd.bake_fail(ctx, path, message)
+content_error :: proc(ctx: ^scenegd.Bake_Context, path, message: string) -> content.Catalog {
+	scenegd.bake_fail(ctx, path, message)
 	return {}
 }
 
-content_extract :: proc(_: u8, ctx: ^rgd.Bake_Context) -> content.Catalog {
+content_extract :: proc(_: u8, ctx: ^scenegd.Bake_Context) -> content.Catalog {
 	c: content.Catalog
 	for category in ([5]string{"guns", "mobs", "status", "combos", "abilities"}) {
 		seen: [256]bool
-		batch: rgd.Resource_Batch
-		report := rgd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
+		batch: scenegd.Resource_Batch
+		report := scenegd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
 		if report.error != .None {
 			return content_error(ctx, d.report_path(&report), d.report_message(&report))
 		}
-		defer rgd.resource_batch_destroy(&batch)
+		defer scenegd.resource_batch_destroy(&batch)
 		for resource in batch.resources[:batch.count] {
 			resource_path := gd.resource_get_path(resource)
 			defer gd.free_string(resource_path)
@@ -125,7 +125,7 @@ authoring_ability_catalog :: proc(catalog: content.Catalog, path: string) -> (co
 		return {}, false
 	}
 	defer gd.release_ref(resource)
-	ctx: rgd.Bake_Context
+	ctx: scenegd.Bake_Context
 	id, value := defs.bake_ability(resource, &ctx, path)
 	if ctx.report.error != .None {
 		content_report(&ctx.report)

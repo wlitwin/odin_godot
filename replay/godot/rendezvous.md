@@ -34,8 +34,8 @@ Client setup uses a stable `Rtc_Grant_Auth` containing a verified View, identity
 and provisioned key:
 
 ```odin
-cfg := rgd.rtc_grant_config(&authorization, signaling_url, is_owner)
-rgd.rtc_open(&rtc, cfg)
+cfg := transportgd.rtc_grant_config(&authorization, signaling_url, is_owner)
+transportgd.rtc_open(&rtc, cfg)
 ```
 
 The generic `Rtc_Config.authorize` callback can answer other compatible challenged

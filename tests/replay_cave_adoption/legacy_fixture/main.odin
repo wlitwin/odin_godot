@@ -3,8 +3,8 @@ import "core:fmt"
 import "core:os"
 import r "godot:replay"
 import net "godot:replay/net"
-import gd "godot:replay/godot"
 import cave "godot:examples/replay_cavecrawl/shared/cave"
+import storagegd "godot:replay/godot/storage"
 main :: proc() {
  assert(len(os.args)==2 && cave.CONTENT==0x4341564552504c37)
  names:=[1]string{"old-host-carrier"}
@@ -16,7 +16,7 @@ main :: proc() {
   
   server:net.Server(cave.World,cave.Control,cave.Action,cave.Event,cave.SEATS);cfg:=net.DEFAULT_CONFIG;cfg.content=cave.CONTENT;cfg.hz=cave.HZ
   assert(net.server_init(&server,r.Frame(cave.World){state=cave.initial()},cave.model(),{},cfg,local_seat=1)==.None)
-  assert(net.server_set_local_token(&server,gd.session_token("cave-adoption-legacy"))==.None);assert(net.server_step(&server)==.None)
+  assert(net.server_set_local_token(&server,storagegd.session_token("cave-adoption-legacy"))==.None);assert(net.server_step(&server)==.None)
   assert(r.reset_checkpoint(&server.timeline,r.Frame(cave.World){tick=100,state=w},1)==.None)
   cp:net.Checkpoint(cave.World,cave.Control,cave.Action,cave.SEATS);assert(net.checkpoint_capture(&server,&cp)==.None)
   bytes,error:=net.checkpoint_encode(&cp,cave.model());assert(error==.None)

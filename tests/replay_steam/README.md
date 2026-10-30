@@ -43,4 +43,4 @@ host is an automatic small acceptance game and exits after the shared loot resul
 
 The currently collected evidence has no live-network success claim. The user has
 been asked about availability of two-account testing; meanwhile other roadmap work
-can continue. See [the adapter contract](../../replay/godot/steam.md).
+can continue. See [the adapter contract](../../replay/godot/transport/steam.md).

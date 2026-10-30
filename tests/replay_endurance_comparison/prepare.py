@@ -8,7 +8,10 @@ for impl in ('kit','replay'):
  resource=project/'data/guns/bolter.tres';before=resource.read_text();after,n=re.subn(r'^mag = \d+$','mag = 8',before,flags=re.M);assert n==1;resource.write_text(after)
  (out/impl/'endurance-fixture.json').write_text(json.dumps({'data/guns/bolter.tres':{'before_sha256':hashlib.sha256(before.encode()).hexdigest(),'after_sha256':hashlib.sha256(after.encode()).hexdigest(),'setting':{'mag':8}}},indent=2)+'\n')
  if not baseline:
-  model=project/'shared/game/game.odin';before_model=model.read_text();after_model=before_model.replace('return {step_view = step_view, action = action,','return {action_timing = .Receipt, step_view = step_view, action = action,',1);assert after_model!=before_model;assert 'action_schedule = dash_schedule(),' in after_model;after_model=after_model.replace('action_schedule = dash_schedule(),','action_schedule = {},',1);model.write_text(after_model)
+  model=project/'shared/game/game.odin';before_model=model.read_text()
+  after_model,count=re.subn(r'(?m)^([ \t]*)step_view = step_view,',r'\1action_timing = .Receipt,\n\1step_view = step_view,',before_model,count=1)
+  assert count==1;assert 'action_schedule = dash_schedule(),' in after_model
+  after_model=after_model.replace('action_schedule = dash_schedule(),','action_schedule = {},',1);model.write_text(after_model)
   (out/impl/'action-policy.json').write_text(json.dumps({'policy':'Receipt','before_sha256':hashlib.sha256(before_model.encode()).hexdigest(),'after_sha256':hashlib.sha256(after_model.encode()).hexdigest()},indent=2)+'\n')
  p=project/'scripts/comparison_mixed.odin';s=p.read_text();s=s.replace('rally:bool}', 'rally:bool,burn,salve,surge:bool,dashes:u32,mode:u8}')
  s=s.replace('compare_chilled:u32','compare_chilled:u32\ncompare_dash_pending:bool\ncompare_hazard_pending:u8\ncompare_hazards_sent,compare_hazards_refused:u32')

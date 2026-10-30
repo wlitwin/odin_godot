@@ -7,11 +7,13 @@ import gd "godot:godot"
 import auth "godot:replay/authority"
 import tr "godot:replay/transport"
 import rgd "godot:replay/godot"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 AuthorizedRtcProbe :: struct {
- owner:gd.Node,socket:rgd.Websocket,wire:tr.Transport,
+ owner:gd.Node,socket:transportgd.Websocket,wire:tr.Transport,
  clock:rgd.Browser_Lease_Clock,lease:auth.Lease,rpc:auth.Rpc_Client,
- authorization:rgd.Rtc_Grant_Auth,rtc,attacker:rgd.Rtc,data:tr.Transport,
+ authorization:transportgd.Rtc_Grant_Auth,rtc,attacker:transportgd.Rtc,data:tr.Transport,
  ready,failed,opened,denied,sent,reported:bool,
  member:int,last_rpc,last_reply,started:u64,received:int,
  heartbeat_at,heartbeats,heartbeats_during_loss:u64,
@@ -20,11 +22,11 @@ AuthorizedRtcProbe :: struct {
 authorized_rtc_probe_ready :: proc(self:^AuthorizedRtcProbe) {
  member:=gd.web_query("member");self.member=member=="1" ? 1 : member=="2" ? 2 : member=="3" ? 3 : 4
  identity:=auth.Identity{u64(self.member),u64(self.member+100)}
- if !rgd.websocket_join(&self.socket,gd.web_query("url")) {signal_fail(self,"control socket");return}
- self.wire=rgd.websocket_transport(&self.socket)
+ if !transportgd.websocket_join(&self.socket,gd.web_query("url")) {signal_fail(self,"control socket");return}
+ self.wire=transportgd.websocket_transport(&self.socket)
  if auth.lease_init(&self.lease,identity,44,55,rgd.browser_lease_clock(&self.clock),self.member==1)!=.None {signal_fail(self,"lease");return}
  key:=auth.Key{0=u8(20+self.member)}
- if !auth.rpc_client_init(&self.rpc,&self.lease,key,auth.Nonce(rgd.session_token()),self.wire) {signal_fail(self,"RPC");return}
+ if !auth.rpc_client_init(&self.rpc,&self.lease,key,auth.Nonce(storagegd.session_token()),self.wire) {signal_fail(self,"RPC");return}
  self.authorization.identity,self.authorization.key=identity,key;self.ready=true
 }
 authorized_rtc_probe_process :: proc(self:^AuthorizedRtcProbe,dt:f64) {
@@ -44,16 +46,16 @@ authorized_rtc_probe_process :: proc(self:^AuthorizedRtcProbe,dt:f64) {
  self.authorization.view=self.lease.view
  if self.member==2 && !self.denied {
   if !self.attacker.ready {
-   if !rgd.rtc_open(&self.attacker,rgd.rtc_grant_config(&self.authorization,gd.web_query("url"),true)) {signal_fail(self,"attack setup");return}
+   if !transportgd.rtc_open(&self.attacker,transportgd.rtc_grant_config(&self.authorization,gd.web_query("url"),true)) {signal_fail(self,"attack setup");return}
   }
-  wire:=rgd.rtc_transport(&self.attacker);tr.poll(&wire)
-  if self.attacker.error==.Authentication {self.denied=true;rgd.rtc_close(&self.attacker);gd.print_str("RZA_NONOWNER_REJECTED")}
+  wire:=transportgd.rtc_transport(&self.attacker);tr.poll(&wire)
+  if self.attacker.error==.Authentication {self.denied=true;transportgd.rtc_close(&self.attacker);gd.print_str("RZA_NONOWNER_REJECTED")}
   else if self.attacker.error!=.None {signal_fail(self,"unexpected rejection");return}
   return
  }
  if !self.opened {
-  if !rgd.rtc_open(&self.rtc,rgd.rtc_grant_config(&self.authorization,gd.web_query("url"),self.member==1)) {signal_fail(self,"RTC open");return}
-  self.data=rgd.rtc_transport(&self.rtc);self.opened=true
+  if !transportgd.rtc_open(&self.rtc,transportgd.rtc_grant_config(&self.authorization,gd.web_query("url"),self.member==1)) {signal_fail(self,"RTC open");return}
+  self.data=transportgd.rtc_transport(&self.rtc);self.opened=true
  }
  tr.poll(&self.data)
  if self.rtc.error!=.None {signal_fail(self,fmt.tprintf("RTC %v",self.rtc.error));return}
@@ -86,13 +88,13 @@ authorized_rtc_probe_process :: proc(self:^AuthorizedRtcProbe,dt:f64) {
  }
 }
 authorized_rtc_probe_exit_tree :: proc(self:^AuthorizedRtcProbe) {
- rgd.rtc_close(&self.attacker);tr.close(&self.data);auth.rpc_client_destroy(&self.rpc);tr.close(&self.wire)
+ transportgd.rtc_close(&self.attacker);tr.close(&self.data);auth.rpc_client_destroy(&self.rpc);tr.close(&self.wire)
 }
 signal_fail :: proc(self:^AuthorizedRtcProbe,reason:string) {self.failed=true;gd.print_str(fmt.tprintf("RZA_FAIL %s",reason))}
 
 
 @(gd_method)
-authorized_rtc_probe_drop_signal :: proc(self:^AuthorizedRtcProbe) {rgd.rtc_drop_signaling(&self.rtc)}
+authorized_rtc_probe_drop_signal :: proc(self:^AuthorizedRtcProbe) {transportgd.rtc_drop_signaling(&self.rtc)}
 @(gd_method)
 authorized_rtc_probe_stat :: proc(self:^AuthorizedRtcProbe,field,peer:gd.Int)->gd.Int {
  switch field {
@@ -100,7 +102,7 @@ authorized_rtc_probe_stat :: proc(self:^AuthorizedRtcProbe,field,peer:gd.Int)->g
  case 1:return gd.Int(self.rtc.signaling_resumes)
  case 2:return gd.Int(self.heartbeats)
  case 3:return gd.Int(self.heartbeats_during_loss)
- case 4:return gd.Int(rgd.rtc_connection_serial(&self.rtc,tr.Peer_Id(peer)))
+ case 4:return gd.Int(transportgd.rtc_connection_serial(&self.rtc,tr.Peer_Id(peer)))
  case 5:return gd.Int(self.rtc.signaling_lost)
  }
  return 0
@@ -110,5 +112,5 @@ authorized_rtc_probe_stat :: proc(self:^AuthorizedRtcProbe,field,peer:gd.Int)->g
 @(gd_method)
 authorized_rtc_probe_hold_signal :: proc(self:^AuthorizedRtcProbe,hold:bool) {
  self.rtc.config.resume_signaling=!hold
- if hold {rgd.rtc_drop_signaling(&self.rtc)}
+ if hold {transportgd.rtc_drop_signaling(&self.rtc)}
 }

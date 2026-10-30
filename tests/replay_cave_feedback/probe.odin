@@ -2,9 +2,9 @@ package replay_cavecrawl
 import gd "godot:godot"
 import r "godot:replay"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import net "godot:replay/net"
 import game "../shared/cave"
+import scenegd "godot:replay/godot/scene"
 
 // Only the isolated fixture exposes synthetic presentation events. Gameplay
 // acceptance uses ordinary campaign actions and reads the same counters below.
@@ -36,15 +36,15 @@ replay_cave_feedback_probe :: proc(self:^ReplayCave,key:string)->gd.Int {
 }
 @(gd_method)
 replay_cave_feedback_node :: proc(self:^ReplayCave)->gd.Node2d {
- for cue in self.feedback.cues.slots {if cue.active {node,_:=rgd.nodes_get(&self.feedback.nodes,cue.key);return node}}
+ for cue in self.feedback.cues.slots {if cue.active {node,_:=scenegd.nodes_get(&self.feedback.nodes,cue.key);return node}}
  return nil
 }
 
 @(gd_method)
 replay_cave_feedback_stage_dweller :: proc(self:^ReplayCave,key:gd.Int)->gd.Node2d {
- instance:=[1]rgd.Instance2{{key=u64(key),pose={position={320,100}},scale={1,1},color={1,1,1,1}}}
- assert(rgd.nodes_present(&self.dwellers,instance[:]))
- node,_:=rgd.nodes_get(&self.dwellers,u64(key));return node
+ instance:=[1]scenegd.Instance2{{key=u64(key),pose={position={320,100}},scale={1,1},color={1,1,1,1}}}
+ assert(scenegd.nodes_present(&self.dwellers,instance[:]))
+ node,_:=scenegd.nodes_get(&self.dwellers,u64(key));return node
 }
 @(gd_method)
 replay_cave_feedback_dweller_inject :: proc(self:^ReplayCave,phase:gd.Int,key:gd.Int) {

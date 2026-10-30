@@ -6,6 +6,9 @@ import lb "godot:replay/lobby"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
 import co "godot:replay/comms"
+import debuggd "godot:replay/godot/debug"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 lobby_ready :: proc(self:^ReplayCave) {
 	gd.connect_to(self.lobby_name,"text_submitted",self.owner,"on_name_submit")
@@ -15,7 +18,7 @@ lobby_ready :: proc(self:^ReplayCave) {
 	initial,_:=lb.name(cave_param("REPLAY_CAVE_NAME","Spelunker"))
 	if !lb.name_valid(initial,false) {initial=lb.seat_name(1)}
 	enabled:=cave_int("REPLAY_CAVE_PERSIST",len(cave_param("REPLAY_CAVE_TOKEN",""))==0 && len(cave_param("REPLAY_CAVE_NAME",""))==0 ? 1 : 0)==1
-	rgd.name_profile_open(&self.name_profile,cave_param("REPLAY_CAVE_NAME_PATH","user://display_name"),cave_param("REPLAY_CAVE_PROFILE_NAMESPACE","replay-cavecrawl"),enabled,initial)
+	storagegd.name_profile_open(&self.name_profile,cave_param("REPLAY_CAVE_NAME_PATH","user://display_name"),cave_param("REPLAY_CAVE_PROFILE_NAMESPACE","replay-cavecrawl"),enabled,initial)
 	gd.set_string(self.lobby_address,"text",fmt.ctprintf("%s",cave_param("REPLAY_CAVE_ADDRESS","127.0.0.1")))
 	gd.range_set_value(self.lobby_port,f64(cave_int("REPLAY_CAVE_PORT",49422)))
 	lobby_frame(self)
@@ -29,7 +32,7 @@ lobby_update_name :: proc(self:^ReplayCave,text:string)->bool {
 	self.profile_name=name
 	// Corrupt/conflicting preference storage does not overwrite the old file.
 	// A session can still use the explicitly entered display name.
-	rgd.name_profile_set(&self.name_profile,name)
+	storagegd.name_profile_set(&self.name_profile,name)
 	return true
 }
 @(gd_method)
@@ -76,10 +79,10 @@ lobby_waiting :: proc(self:^ReplayCave)->bool {
 	return !ok || frame.state.lobby.phase==.Waiting
 }
 lobby_frame :: proc(self:^ReplayCave) {
-	rgd.name_profile_frame(&self.name_profile)
+	storagegd.name_profile_frame(&self.name_profile)
 	if !self.name_loaded && self.name_profile.phase!=.Reading {
 		self.profile_name=self.name_profile.value
-		if override:=cave_param("REPLAY_CAVE_NAME","");override!="" {if chosen,ok:=lb.name(override);ok {self.profile_name=chosen;rgd.name_profile_set(&self.name_profile,chosen)}}
+		if override:=cave_param("REPLAY_CAVE_NAME","");override!="" {if chosen,ok:=lb.name(override);ok {self.profile_name=chosen;storagegd.name_profile_set(&self.name_profile,chosen)}}
 		self.name_loaded=true
 		gd.set_string(self.lobby_name,"text",fmt.ctprintf("%s",lb.text(&self.profile_name)))
 	}
@@ -163,9 +166,9 @@ replay_cave_on_leave :: proc(self:^ReplayCave) {
 	if self.room.ready {rgd.room_close(&self.room)} else {rgd.session_close(self.session)}
 	rgd.relay_close(&self.online.relay)
 	self.session=&self.standalone
-	rgd.session_diagnostics_frame(&self.diagnostics,self.session)
-	rgd.nodes_destroy(&self.players);rgd.nodes_destroy(&self.chest);rgd.nodes_destroy(&self.door);rgd.nodes_destroy(&self.relic)
-	rgd.nodes_destroy(&self.dwellers);rgd.nodes_destroy(&self.pickups);rgd.nodes_destroy(&self.rocks)
+	debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
+	scenegd.nodes_destroy(&self.players);scenegd.nodes_destroy(&self.chest);scenegd.nodes_destroy(&self.door);scenegd.nodes_destroy(&self.relic)
+	scenegd.nodes_destroy(&self.dwellers);scenegd.nodes_destroy(&self.pickups);scenegd.nodes_destroy(&self.rocks)
 	if self.scenery!=nil {gd.node_queue_free(self.scenery)};self.scenery=nil;self.scenery_depth,self.scenery_seed=0,0
 	for &mark in self.marks {if mark.node!=nil {gd.node_queue_free(mark.node)};mark={}}
 	co.destroy(&self.comms);co.init(&self.comms)

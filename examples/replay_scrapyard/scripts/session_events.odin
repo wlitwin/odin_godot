@@ -7,6 +7,7 @@ import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import v "godot:replay/view"
 import game "../shared/game"
+import inputgd "godot:replay/godot/input"
 
 dispatch_session_changes :: proc(self: ^ReplayScrapyard) {
 	audio_prepare(self)
@@ -37,8 +38,8 @@ observe_action_results :: proc(self: ^ReplayScrapyard, change: v.Change(net.Net_
 		self.development_result = event.applied ? 1 : -1
 		self.development_reason = gd.Int(event.reason)
 	}
-	rgd.intent_observe(&self.dash_intent[0], self.session, change)
-	rgd.intent_observe(&self.turret_intent[0], self.session, change)
+	inputgd.intent_observe(&self.dash_intent[0], self.session, change)
+	inputgd.intent_observe(&self.turret_intent[0], self.session, change)
 	if event.kind == .Action_Result &&
 	   event.seat == rgd.session_seat(self.session) &&
 	   change.confirmed &&

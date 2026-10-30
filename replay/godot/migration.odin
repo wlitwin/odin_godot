@@ -8,6 +8,7 @@ import rec "godot:replay/recovery"
 import auth "godot:replay/authority"
 import tr "godot:replay/transport"
 import view "godot:replay/view"
+import transportgd "godot:replay/godot/transport"
 
 // Replace the gameplay connection only after receiving an authenticated live
 // coordinator view. The client runtime remains in place, with its pending action
@@ -24,7 +25,7 @@ session_redirect :: proc(s: ^Session($S, $C, $A, $E, $N), lease: ^auth.Lease, tr
 	// same authority term and exact signaling scope. New epochs use new rooms.
 	if options.backend == .Rtc && s.rtc.ready && lease.view.epoch == s.client.cfg.epoch &&
 	   lease.identity.incarnation == s.client.incarnation && options.rtc.url == s.rtc.config.url && options.rtc.room == s.rtc.room {
-		if continuation, ok := rtc_continuation(&s.rtc); ok {options.rtc.continuation = continuation}
+		if continuation, ok := transportgd.rtc_continuation(&s.rtc); ok {options.rtc.continuation = continuation}
 	}
 	policy_user, policy_valid := s.link.policy_user, s.link.policy_valid
 	session_disconnect(s)
@@ -128,7 +129,7 @@ session_rejoin :: proc(s: ^Session($S, $C, $A, $E, $N), lease: ^auth.Lease, tran
 // Explicit transport destination for a verified authority view. RTC room identity
 // is derived from that view; the provider URL is trusted embedding configuration.
 // This does not reinterpret the coordinator's existing native endpoint encoding.
-Migration_Transport :: struct {backend:Session_Backend,rtc:Rtc_Config,steam:Steam_Config}
+Migration_Transport :: struct {backend:Session_Backend,rtc:transportgd.Rtc_Config,steam:transportgd.Steam_Config}
 @(private)
 migration_transport :: proc(options:^Session_Options,lease:^auth.Lease,target:^Migration_Transport)->net.Error {
  if target==nil {return options.backend==.Enet ? .None : .Invalid_Config}
@@ -137,7 +138,7 @@ migration_transport :: proc(options:^Session_Options,lease:^auth.Lease,target:^M
   if target.rtc.authorize==nil || target.rtc.room!=string(code[:]) {return .Invalid_Config}
  } else if target.backend==.Steam {
   when gd.IS_WEB {return .Invalid_Config}
-  config,valid:=steam_target(target.steam,lease.view.endpoint,lease.require_owner)
+  config,valid:=transportgd.steam_target(target.steam,lease.view.endpoint,lease.require_owner)
   if !valid {return .Invalid_Config}
   options.steam=config
  } else if target.backend!=.Enet {return .Invalid_Config}

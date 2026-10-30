@@ -8,10 +8,10 @@ import sys,shutil
 root,project=map(Path,sys.argv[1:3]);mode=sys.argv[3]
 s=(root/'tests/replay_scrapyard_bridge/bench_probe.odin').read_text()
 if mode=='composed':
- s=s.replace('import game "../shared/game"','import game "../shared/game"\nimport views "views"')
+ s=s.replace('import game "../shared/game"','import game "../shared/game"\nimport views "views"\nimport scenegd "godot:replay/godot/scene"')
  s=s.replace('for _ in 0..<120 {paint(self,frame,frame,1.0/60)}','''for _ in 0..<120 {
             paint(self,frame,frame,1.0/60)
-            rgd.script_archetypes_visit(&self.combat_bridge[0].mobs,self,proc(self:^ReplayScrapyard,h:r.Handle(game.Mob),view:^views.ScrapEnemyView){views.scrap_enemy_view_process(view,1.0/60)})
+            scenegd.script_archetypes_visit(&self.combat_bridge[0].mobs,self,proc(self:^ReplayScrapyard,h:r.Handle(game.Mob),view:^views.ScrapEnemyView){views.scrap_enemy_view_process(view,1.0/60)})
             for view in self.rigs {
                 views.scrap_runner_view_process(view,1.0/60)
                 views.scrap_weapon_view_process(view.weapon,1.0/60)

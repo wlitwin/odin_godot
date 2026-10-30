@@ -7,22 +7,22 @@ import "core:fmt"
 import gd "godot:godot"
 import r "godot:replay"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import loot "godot:examples/replay_loot/game"
+import scenegd "godot:replay/godot/scene"
 
 ReplayLoot :: struct {
 	owner: gd.Node2d,
 	status: gd.Label `gd:"onready=Status"`,
 	timeline: r.Timeline(loot.World, loot.Input, loot.Event),
 	journal: v.Journal(loot.Event),
-	views: rgd.Nodes2,
+	views: scenegd.Nodes2,
 	epoch: u64,
 	begins, cancels: u32,
 	ready: bool,
 }
 
 replay_loot_ready :: proc(self: ^ReplayLoot) {
-	self.ready = rgd.nodes_load(&self.views, self.owner, "res://actor.tscn", 18)
+	self.ready = scenegd.nodes_load(&self.views, self.owner, "res://actor.tscn", 18)
 	if self.ready {replay_loot_contest(self)}
 }
 
@@ -82,7 +82,7 @@ replay_loot_sync :: proc(self: ^ReplayLoot) {
 replay_loot_paint :: proc(self: ^ReplayLoot) {
 	frame, ok := r.current(&self.timeline)
 	if !ok {return}
-	instances: [18]rgd.Instance2
+	instances: [18]scenegd.Instance2
 	for player, i in frame.state.players {
 		instances[i] = {
 			key = u64(i + 1), pose = {position = {320 + f32(player.x) * 80, 220}}, scale = {2, 2},
@@ -99,13 +99,13 @@ replay_loot_paint :: proc(self: ^ReplayLoot) {
 		}
 		n += 1
 	}
-	assert(rgd.nodes_present(&self.views, instances[:n]))
+	assert(scenegd.nodes_present(&self.views, instances[:n]))
 	gd.set_string(self.status, "text", fmt.ctprintf("REPLAY / LOOT\nBlue inventory: %d   Orange inventory: %d\nSpace corrects the winner   Esc restarts\nEffects begun: %d   canceled: %d", frame.state.players[0].bag, frame.state.players[1].bag, self.begins, self.cancels))
 }
 
 replay_loot_exit_tree :: proc(self: ^ReplayLoot) {
 	if !self.ready {return}
-	rgd.nodes_destroy(&self.views)
+	scenegd.nodes_destroy(&self.views)
 	v.journal_destroy(&self.journal)
 	r.destroy(&self.timeline)
 	self.ready = false

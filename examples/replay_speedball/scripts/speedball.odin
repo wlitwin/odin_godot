@@ -15,6 +15,10 @@ import game "../shared/pitch"
 import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 ReplaySpeedball :: struct {
 	owner: gd.Node2d,
@@ -32,16 +36,16 @@ ReplaySpeedball :: struct {
 	recovery_probe: [1]Pitch_Recovery,
 	view_epoch: u64,
 	view_round,paint_round: u32,
-	name_profile: rgd.Name_Profile,
+	name_profile: storagegd.Name_Profile,
 	profile_enabled,profile_name_loaded,profile_identity_ready: bool,
-	browser_identity:rgd.Browser_Identity,
+	browser_identity:storagegd.Browser_Identity,
 	browser_launch:string,
 	browser_save:[1]Speedball_Browser_Save,
 	online:Speedball_Online,
 	profile_token:net.Token,
 	save_tick,save_hash,restored_tick,restored_hash:u64,
 	restored_exact:bool,
-	players, ball: rgd.Nodes2,
+	players, ball: scenegd.Nodes2,
 	smoothing: [game.SEATS + 1]v.Smoother2,
 	ready, spiked, spike_visible, done: bool,
 	spike_node_start, own_spike_seen: bool,
@@ -62,7 +66,7 @@ ReplaySpeedball :: struct {
 replay_speedball_ready :: proc(self: ^ReplaySpeedball) {
  self.session=&self.standalone
  install_controls()
- self.views_ready=rgd.nodes_load(&self.players,self.owner,"res://views/kicker.tscn",game.SEATS) && rgd.nodes_load(&self.ball,self.owner,"res://views/ball.tscn",1)
+ self.views_ready=scenegd.nodes_load(&self.players,self.owner,"res://views/kicker.tscn",game.SEATS) && scenegd.nodes_load(&self.ball,self.owner,"res://views/ball.tscn",1)
  if !self.views_ready || !co.init(&self.comms) || !dg.init(&self.diagnostics) {gd.print_str("REPLAY_SPEEDBALL_FAIL views/social");return}
  self.bot=strings.clone(speedball_param("RSB_BOT",""));ui_ready(self);online_ready(self)
  role:=speedball_param("RSB_ROLE","")
@@ -89,7 +93,7 @@ connect_pitch :: proc(self:^ReplaySpeedball,role:string,manual:bool,resume:bool=
  opts.loss_permyriad=u32(speedball_int("RSB_LOSS",0));opts.duplicate_permyriad=u32(speedball_int("RSB_DUPLICATE",0))
  opts.discover_epoch=speedball_int("RSB_COORD_PORT",0)==0 && !self.online.launch
  opts.network.content=game.CONTENT;opts.network.hz,opts.network.lead,opts.network.snapshot_every=60,4,3
- if !rgd.session_comms_enable(&opts) || !rgd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
+ if !rgd.session_comms_enable(&opts) || !debuggd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
  minimum:=u8(clamp(speedball_int("RSB_PLAYERS",manual || opts.role==.Solo ? 1 : 2),1,game.SEATS))
  goals:=u8(clamp(speedball_int("RSB_GOALS",3),1,255))
  initial:=game.initial(opts.role==.Server,minimum,goals,manual && opts.role!=.Server)
@@ -108,8 +112,8 @@ effect_policy :: proc(e: net.Net_Event(game.Event)) -> v.Policy {
 
 install_controls :: proc() {
 	if gd.has_action("rsb_left") {return}
-	rgd.bind_key("rsb_left", .A); rgd.bind_key("rsb_right", .D); rgd.bind_key("rsb_up", .W); rgd.bind_key("rsb_down", .S)
-	rgd.bind_key("rsb_kick", .Space); rgd.bind_key("rsb_spike", .E)
+	inputgd.bind_key("rsb_left", .A); inputgd.bind_key("rsb_right", .D); inputgd.bind_key("rsb_up", .W); inputgd.bind_key("rsb_down", .S)
+	inputgd.bind_key("rsb_kick", .Space); inputgd.bind_key("rsb_spike", .E)
 }
 
 sample :: proc(self: ^ReplaySpeedball, w: game.World, seat: u16) -> game.Controls {
@@ -166,7 +170,7 @@ replay_speedball_process :: proc(self: ^ReplaySpeedball, dt: f64) {
 			if err == .None && !self.spiked {
 				self.spiked, self.spike_at_ms, self.spike_at_tick, self.spike_first_sequence = true, now, f.tick, seq
 				self.spike_from = f.state.ball.motion.position
-				if node, found := rgd.nodes_get(&self.ball, 1); found {self.spike_from = gd.node2d_get_position(node); self.spike_node_start = true}
+				if node, found := scenegd.nodes_get(&self.ball, 1); found {self.spike_from = gd.node2d_get_position(node); self.spike_node_start = true}
 				_, second := issue(self, game.Action{spike = true})
 				gd.print_str(fmt.tprintf("RSB_SPIKE_SENT tick=%d sequence=%d second=%v", f.tick, seq, second))
 			}
@@ -226,7 +230,7 @@ replay_speedball_process :: proc(self: ^ReplaySpeedball, dt: f64) {
 	if available {
 		paint(self, f, dt)
 		if self.spiked && self.spike_node_start && self.own_spike_seen && !self.spike_visible {
-			if node, found := rgd.nodes_get(&self.ball, 1); found && p.length_sq2(gd.node2d_get_position(node) - self.spike_from) > 12 * 12 {
+			if node, found := scenegd.nodes_get(&self.ball, 1); found && p.length_sq2(gd.node2d_get_position(node) - self.spike_from) > 12 * 12 {
 				self.spike_visible = true
 				gd.print_str(fmt.tprintf("RSB_SPIKE_LOCAL ticks=%d ms=%d acknowledged=%v", f.tick - self.spike_at_tick, gd.time_get_ticks_msec(gd.singleton_time()) - self.spike_at_ms, self.last_verdict >= self.spike_first_sequence))
 			}
@@ -263,24 +267,24 @@ paint :: proc(self: ^ReplaySpeedball, frame: r.Frame(game.World), dt: f64) {
 			if a.state.ball.reset == b.state.ball.reset {w.ball.motion.position = a.state.ball.motion.position + (b.state.ball.motion.position - a.state.ball.motion.position) * alpha}
 		}
 	}
-	instances: [game.SEATS]rgd.Instance2
+	instances: [game.SEATS]scenegd.Instance2
 	colors := [2]gd.Color{{0.35, 0.65, 1, 1}, {1, 0.62, 0.2, 1}}
 	n := 0
 	for player, i in w.players {if player.connected {
 		pose := v.smooth_present(&self.smoothing[i], {position = player.motion.position}, dt)
 		instances[n] = {key = u64(i + 1), pose = pose, scale = {1, 1}, color = colors[player.team - 1]}; n += 1
 	}}
-	rgd.nodes_present(&self.players, instances[:n])
+	scenegd.nodes_present(&self.players, instances[:n])
 	if self.ball_reset != w.ball.reset {self.ball_reset = w.ball.reset; self.smoothing[game.SEATS] = {}}
 	pose := v.smooth_present(&self.smoothing[game.SEATS], {position = w.ball.motion.position}, dt)
-	ball := [1]rgd.Instance2{{key = 1, pose = pose, scale = {1, 1}, color = self.flash_left > 0 ? gd.Color{1, 0.75, 0.2, 1} : gd.Color{1, 1, 1, 1}}}
-	rgd.nodes_present(&self.ball, ball[:])
+	ball := [1]scenegd.Instance2{{key = 1, pose = pose, scale = {1, 1}, color = self.flash_left > 0 ? gd.Color{1, 0.75, 0.2, 1} : gd.Color{1, 1, 1, 1}}}
+	scenegd.nodes_present(&self.ball, ball[:])
 	score := self.session.authority ? w.score : self.session.client.authority_frame.state.score
 	gd.set_string(cast(gd.Object)self.status, "text", fmt.ctprintf("LEFT %d — %d RIGHT   %s", score.left, score.right, score.winner == 0 ? "" : score.winner == 1 ? "LEFT WINS" : "RIGHT WINS"))
 }
 
 replay_speedball_exit_tree :: proc(self: ^ReplaySpeedball) {
-	rgd.nodes_destroy(&self.players); rgd.nodes_destroy(&self.ball)
+	scenegd.nodes_destroy(&self.players); scenegd.nodes_destroy(&self.ball)
 	co.destroy(&self.comms);dg.destroy(&self.diagnostics)
-	close_session(self);online_close(self);browser_save_close(self);rgd.browser_identity_close(&self.browser_identity);delete(self.browser_launch);rgd.name_profile_close(&self.name_profile);delete(self.bot)
+	close_session(self);online_close(self);browser_save_close(self);storagegd.browser_identity_close(&self.browser_identity);delete(self.browser_launch);storagegd.name_profile_close(&self.name_profile);delete(self.bot)
 }

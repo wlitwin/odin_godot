@@ -7,6 +7,7 @@ import r "godot:replay"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/game"
+import storagegd "godot:replay/godot/storage"
 
 BENCH_CAPACITY :: 32768
 
@@ -121,7 +122,7 @@ replay_scrapyard_bench_finish :: proc(self: ^ReplayScrapyard) -> bool {
 	}
 	role := scrap_param("RSY_ROLE", "")
 	text := strings.to_string(builder)
-	if rgd.storage_write(
+	if storagegd.storage_write(
 		   fmt.tprintf("%s/timing-%s.csv", scrap_param("RSY_RESULT_DIR", "user://"), role),
 		   transmute([]u8)text,
 		   8 * 1024 * 1024,

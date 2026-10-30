@@ -17,7 +17,7 @@ pending request. The lobby, spectators, typing and menus discard unsubmitted inp
 while leaving an overlay does not manufacture a new press. A request during an
 unreadable interval remains latched until the driver can capture its direction.
 
-The reusable [action-intent helper](../../replay/godot/intents.md) now owns the
+The reusable [action-intent helper](../../replay/godot/input/intents.md) now owns the
 copied payload, pending tickets and recovery bookkeeping. Tickets include their
 epoch, so a reused sequence after migration cannot consume an old result.
 

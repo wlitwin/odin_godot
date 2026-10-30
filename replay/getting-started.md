@@ -31,6 +31,12 @@ address until teardown. The
 [shared conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
 explain names, borrowed values and Godot exit cleanup.
 
+Use `import replaygd "godot:replay/godot"` for those lifecycle owners. Optional
+scene, input, storage, transport and debug features have separate imports in the
+[package map](godot/README.md#choose-an-import). Most Godot games add `scenegd`
+for their scenes and `inputgd` for device bindings. Debugging and low-level
+transport owners are opt-in; Session already drives its selected backend.
+
 ## Choose the owner
 
 | Game requirement | Public owner/API | Small runnable reference |
@@ -57,9 +63,9 @@ They are checked natively and for WASM by the framework smoke command.
 
 ## Author scenes around the World
 
-The [Godot bridge](godot/README.md) provides [typed views](godot/view-pools.md),
-[definition baking](definitions/README.md), [device/signal bindings](godot/controls.md),
-[effect routes](godot/effect-routes.md) and [body contracts](godot/body-bindings.md).
+The [Godot bridge](godot/README.md) provides [typed views](godot/scene/view-pools.md),
+[definition baking](definitions/README.md), [device/signal bindings](godot/input/controls.md),
+[effect routes](godot/scene/effect-routes.md) and [body contracts](godot/scene/body-bindings.md).
 These owners keep node references and presentation lifetimes outside World while
 reusing its replay, action, journal and ownership protocols. Start with explicit
 typed callbacks; code generation is not required.

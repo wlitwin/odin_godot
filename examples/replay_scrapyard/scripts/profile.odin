@@ -9,6 +9,7 @@ import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/game"
 import profile "../shared/profile"
+import storagegd "godot:replay/godot/storage"
 
 Local_Profile :: struct {
 	automatic, confirmed_automatic: u8,
@@ -22,7 +23,7 @@ Local_Profile :: struct {
 	web_phase: int,
 	namespace: string,
 	revision: u64,
-	op: rgd.Browser_Store_Op,
+	op: storagegd.Browser_Store_Op,
 	writing_record: profile.Record,
 }
 
@@ -34,7 +35,7 @@ profile_open :: proc(local: ^Local_Profile) -> (net.Token, bool) {
 	local.enabled = scrap_int("RSY_PERSIST", len(label) == 0 ? 1 : 0) != 0
 	if !local.enabled {
 		local.automatic, local.confirmed_automatic = profile.AUTOMATIC_ALL, profile.AUTOMATIC_ALL
-		local.token = rgd.session_token(label)
+		local.token = storagegd.session_token(label)
 		local.loaded = true
 		return local.token, true
 	}
@@ -43,9 +44,9 @@ profile_open :: proc(local: ^Local_Profile) -> (net.Token, bool) {
 	}
 	directory := strings.trim_suffix(scrap_param("RSY_PROFILE_DIR", "user://"), "/")
 	if len(label) > 0 {
-		local.token = rgd.session_token(label)
+		local.token = storagegd.session_token(label)
 	} else {
-		var_token, err := rgd.session_profile(fmt.tprintf("%s/replay_identity", directory))
+		var_token, err := storagegd.session_profile(fmt.tprintf("%s/replay_identity", directory))
 		if err != .None {
 			gd.print_str(fmt.tprintf("RSY_PROFILE_ERROR identity=%v", err))
 			return {}, false
@@ -62,7 +63,7 @@ profile_open :: proc(local: ^Local_Profile) -> (net.Token, bool) {
 	path := gd.new_string_odin(local.path)
 	defer gd.free_string(path)
 	if gd.file_access_file_exists(path) {
-		bytes, storage := rgd.storage_read(local.path, 4096)
+		bytes, storage := storagegd.storage_read(local.path, 4096)
 		defer delete(bytes)
 		if storage != .None {
 			gd.print_str(fmt.tprintf("RSY_PROFILE_ERROR read=%v", storage))
@@ -152,14 +153,14 @@ profile_sync :: proc(self: ^ReplayScrapyard, truth: ^r.Frame(game.World)) {
 		return
 	}
 	when gd.IS_WEB {
-		if !rgd.browser_store_write(&local.op, local.namespace, local.path, bytes, local.revision, 4096) {
+		if !storagegd.browser_store_write(&local.op, local.namespace, local.path, bytes, local.revision, 4096) {
 			profile_web_error(local)
 			return
 		}
 		local.writing_record, local.writing = record, true
 		return
 	}
-	if storage := rgd.storage_write(local.path, bytes, 4096); storage != .None {
+	if storage := storagegd.storage_write(local.path, bytes, 4096); storage != .None {
 		local.error = true
 		gd.print_str(fmt.tprintf("RSY_PROFILE_ERROR write=%v", storage))
 		return
@@ -178,7 +179,7 @@ profile_sync :: proc(self: ^ReplayScrapyard, truth: ^r.Frame(game.World)) {
 }
 
 profile_close :: proc(local: ^Local_Profile) {
-	rgd.browser_store_close(&local.op)
+	storagegd.browser_store_close(&local.op)
 	delete(local.namespace)
 	delete(local.path)
 	local^ = {}

@@ -7,9 +7,11 @@ import gd "godot:godot"
 import auth "godot:replay/authority"
 import tr "godot:replay/transport"
 import rgd "godot:replay/godot"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 WebAuthorityClient :: struct {
- owner:gd.Node,socket:rgd.Websocket,wire:tr.Transport,
+ owner:gd.Node,socket:transportgd.Websocket,wire:tr.Transport,
  clock:rgd.Browser_Lease_Clock,lease:auth.Lease,rpc:auth.Rpc_Client,
  ready,sent,large,text,retained,done,failed:bool,
  last_reply,started:u64,stage:int,
@@ -17,8 +19,8 @@ WebAuthorityClient :: struct {
 }
 web_authority_client_ready :: proc(self:^WebAuthorityClient) {
  url:=gd.web_query("url")
- if !rgd.websocket_join(&self.socket,url) {fail(self,"socket");return}
- self.wire=rgd.websocket_transport(&self.socket)
+ if !transportgd.websocket_join(&self.socket,url) {fail(self,"socket");return}
+ self.wire=transportgd.websocket_transport(&self.socket)
  if auth.lease_init(&self.lease,{1,101},44,55,rgd.browser_lease_clock(&self.clock),true)!=.None {fail(self,"clock");return}
  self.started,_=self.lease.clock.read(self.lease.clock.user)
  self.ready=true
@@ -31,12 +33,12 @@ web_authority_client_process :: proc(self:^WebAuthorityClient,dt:f64) {
   tr.poll(&self.wire)
   if !self.sent && tr.status(&self.wire)==.Connected {
    for &b,i in self.buffer {b=u8(i%251)};self.buffer[0]=0xa7
-   if tr.send(&self.wire,1,.Reliable,self.buffer[:])!=.Sent || rgd.websocket_send_text(&self.socket,1,"rendezvous-text-probe")!=.Sent {fail(self,"send");return}
+   if tr.send(&self.wire,1,.Reliable,self.buffer[:])!=.Sent || transportgd.websocket_send_text(&self.socket,1,"rendezvous-text-probe")!=.Sent {fail(self,"send");return}
    if tr.send(&self.wire,1,.Unreliable,self.buffer[:1])!=.Invalid {fail(self,"reliable-only contract");return}
    self.sent=true
   }
   for _ in 0..<8 {
-   packet:=rgd.websocket_receive(&self.socket,self.retained ? self.buffer[:] : self.buffer[:1])
+   packet:=transportgd.websocket_receive(&self.socket,self.retained ? self.buffer[:] : self.buffer[:1])
    if packet.state==.Empty {break}
    if packet.state==.Buffer_Too_Small {self.retained=true;continue}
    if packet.state!=.Received || packet.from!=1 {fail(self,"metadata");return}
@@ -46,7 +48,7 @@ web_authority_client_process :: proc(self:^WebAuthorityClient,dt:f64) {
    }
   }
   if !self.large || !self.text {return}
-  nonce:=auth.Nonce(rgd.session_token())
+  nonce:=auth.Nonce(storagegd.session_token())
   if !auth.rpc_client_init(&self.rpc,&self.lease,{0=21},nonce,self.wire) {fail(self,"RPC init");return}
   gd.print_str("WEB_AUTHORITY_TRANSPORT_OK")
  }
@@ -56,8 +58,8 @@ web_authority_client_process :: proc(self:^WebAuthorityClient,dt:f64) {
   if reply.result!=.None {fail(self,fmt.tprintf("reply %v",reply.result));return}
   if self.stage==1 {
    tr.close(&self.wire)
-   if !rgd.websocket_join(&self.socket,gd.web_query("url")) {fail(self,"control reconnect");return}
-   self.wire=rgd.websocket_transport(&self.socket);self.rpc.wire=self.wire
+   if !transportgd.websocket_join(&self.socket,gd.web_query("url")) {fail(self,"control reconnect");return}
+   self.wire=transportgd.websocket_transport(&self.socket);self.rpc.wire=self.wire
    gd.print_str("WEB_AUTHORITY_RECONNECTED")
   }
   if self.stage==2 {

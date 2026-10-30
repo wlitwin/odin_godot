@@ -13,12 +13,14 @@ import db "godot:replay/authority/sqlite"
 import tr "godot:replay/transport"
 import rgd "godot:replay/godot"
 import game "godot:examples/replay_scrapyard/shared/game"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 DedicatedRoomProbe :: struct {
  owner:gd.Node,
  member:int,folder,mode:string,started:u64,ready_sent,triggered,done,finishing:bool,
  room:rgd.Room(game.World,game.Control,game.Action,game.Event,game.SEATS),
- store:db.Store,service:auth.Service,control:rgd.Enet,
+ store:db.Store,service:auth.Service,control:transportgd.Enet,
  expected:r.Frame(game.World),point:auth.Point,expected_ready:bool,checked_epoch,diagnostic_at,durable_after:u64,
 }
 mark :: proc(self:^DedicatedRoomProbe,name:string) {if seen(self,name) {return};assert(os.write_entire_file(fmt.tprintf("%s/%s",self.folder,name),string("ready"))==nil)}
@@ -33,14 +35,14 @@ dedicated_room_probe_ready :: proc(self:^DedicatedRoomProbe) {
   record:=auth.record_make(92,game.CONTENT,{1,101},policy);keys:[4]auth.Credential
   for i in 0..<4 {
    id:=auth.Identity{u64(i+1),u64(i+101)};endpoint,_:=auth.endpoint("127.0.0.1",port+u16(i+1))
-   record.members[i]={identity=id,endpoint=endpoint,enabled=true,can_host=i<2,trusted_authority=i<2,infrastructure=i<2,game_token_hash=net.token_hash(rgd.session_token(fmt.tprintf("dedicated-room-%d",i+1)))}
+   record.members[i]={identity=id,endpoint=endpoint,enabled=true,can_host=i<2,trusted_authority=i<2,infrastructure=i<2,game_token_hash=net.token_hash(storagegd.session_token(fmt.tprintf("dedicated-room-%d",i+1)))}
    keys[i]={identity=id,key={0=u8(51+i)}}
   }
-  if !rgd.enet_host(&self.control,port,8,bind_ip="127.0.0.1") || auth.service_init(&self.service,record,db.commit,&self.store,auth.native_clock(),rgd.enet_transport(&self.control),keys[:])!=.None {fail(self,"coordinator");return}
+  if !transportgd.enet_host(&self.control,port,8,bind_ip="127.0.0.1") || auth.service_init(&self.service,record,db.commit,&self.store,auth.native_clock(),transportgd.enet_transport(&self.control),keys[:])!=.None {fail(self,"coordinator");return}
   gd.print_str("DEDICATED_ROOM_COORDINATOR_READY");return
  }
  opts:=rgd.SESSION_OPTIONS;opts.role=self.member<=2 ? .Server : .Client
- opts.network.content,opts.network.hz=game.CONTENT,game.HZ;opts.token=rgd.session_token(fmt.tprintf("dedicated-room-%d",self.member));opts.latency_ms=120
+ opts.network.content,opts.network.hz=game.CONTENT,game.HZ;opts.token=storagegd.session_token(fmt.tprintf("dedicated-room-%d",self.member));opts.latency_ms=120
  opts.replication.accept_checkpoints=self.member<=2
  options:=rgd.Room_Options{identity={u64(self.member),u64(self.member+100)},key={0=u8(self.member+50)},room=92,coordinator="127.0.0.1",control_port=port,bootstrap=self.member==1,automatic_successor=true,session=opts}
  if rgd.room_open(&self.room,r.Frame(game.World){state=game.initial(dedicated=true,encounter_count=0)},game.model(),options)!=.None {fail(self,"room open");return}
@@ -101,4 +103,4 @@ dedicated_room_probe_process :: proc(self:^DedicatedRoomProbe,dt:f64) {
   self.finishing=true;mark(self,fmt.tprintf("finished-%d",self.member))
  }
 }
-dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);auth.service_destroy(&self.service);wire:=rgd.enet_transport(&self.control);tr.close(&wire);db.close(&self.store)}
+dedicated_room_probe_exit_tree :: proc(self:^DedicatedRoomProbe) {rgd.room_close(&self.room);auth.service_destroy(&self.service);wire:=transportgd.enet_transport(&self.control);tr.close(&wire);db.close(&self.store)}

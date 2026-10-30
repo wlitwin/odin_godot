@@ -6,6 +6,7 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import game "../shared/game"
 import content "../shared/content"
+import debuggd "godot:replay/godot/debug"
 
 open :: proc(self: ^ReplayScrapyard, role: rgd.Session_Role) {
 	if self.session.ready {
@@ -56,7 +57,7 @@ configure_session_options :: proc(
 		fail(self, "asset channel")
 		return false
 	}
-	if !rgd.session_diagnostics_enable(options) {
+	if !debuggd.session_diagnostics_enable(options) {
 		fail(self, "diagnostics channel")
 		return false
 	}

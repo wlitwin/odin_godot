@@ -1,22 +1,22 @@
 package replay_godot
 
 import gd "godot:godot"
-import "godot:gdext"
-import "core:crypto/sha2"
 import r "godot:replay"
 import net "godot:replay/net"
 import rec "godot:replay/recovery"
 import tr "godot:replay/transport"
 import view "godot:replay/view"
 import "core:mem"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 Session_Role :: enum u8 {Solo, Host, Server, Client, Observer}
 Session_Backend :: enum u8 {Enet, Rtc, Steam}
 Session_Options :: struct {
 	role: Session_Role,
 	backend: Session_Backend,
-	steam:Steam_Config,
-	rtc: Rtc_Config, // strings are borrowed only during open/resume
+	steam:transportgd.Steam_Config,
+	rtc: transportgd.Rtc_Config, // strings are borrowed only during open/resume
 	port: u16,
 	address: cstring,
 	token: net.Token,
@@ -47,9 +47,9 @@ Session :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	role: Session_Role,
 	token: net.Token,
 	clock: r.Clock,
-	enet: Enet,
-	steam:Steam,
-	rtc: Rtc,
+	enet: transportgd.Enet,
+	steam:transportgd.Steam,
+	rtc: transportgd.Rtc,
 	delay: tr.Delay,
 	wire, base_wire: tr.Transport,
 	link: rec.Link(State, Control, Action, Event, Seats),
@@ -71,7 +71,7 @@ session_open :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats), ini
 	if err := session_connect(s, options); err != .None {return err}
 	s.token = options.token
 	empty_token: net.Token
-	if s.token == empty_token {s.token = session_token()}
+	if s.token == empty_token {s.token = storagegd.session_token()}
 	err: net.Error
 	if s.authority {
 		err = net.server_init(&s.server, initial, model, s.wire, options.network, local_seat = options.role == .Server ? 0 : 1, permit = options.permit, incarnation = options.incarnation)
@@ -79,7 +79,7 @@ session_open :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats), ini
 		if err == .None && s.server.local_seat != 0 {err = net.server_set_local_token(&s.server, s.token)}
 	} else {
 		err = net.client_init(&s.client, model, s.wire, s.token, spectator = options.role == .Observer, cfg = options.network, permit = options.permit, incarnation = options.incarnation)
-		if err==.None && options.discover_epoch {err=net.client_discover_epoch(&s.client,session_token())}
+		if err==.None && options.discover_epoch {err=net.client_discover_epoch(&s.client,storagegd.session_token())}
 		if err == .None {
 			s.client.lz4_snapshots_enabled = !options.disable_lz4
 			s.client.snapshot_erasure_enabled = !options.disable_snapshot_erasure
@@ -129,12 +129,12 @@ session_resume :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats),
 }
 
 session_save :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats), path: string,
-                     policy_id: u64 = 0, policy_data: []u8 = nil) -> Storage_Result {
+                     policy_id: u64 = 0, policy_data: []u8 = nil) -> storagegd.Storage_Result {
 	if !s.ready || !s.authority {return {.Codec, .Wrong_Phase}}
 	cp: net.Checkpoint(State, Control, Action, Seats)
 	defer net.checkpoint_destroy(&cp)
 	if err := net.checkpoint_capture(&s.server, &cp, policy_id, policy_data); err != .None {return {.Codec, err}}
-	return checkpoint_write(&cp, s.server.model, path, s.link.publish_codec.ready ? &s.link.publish_codec : nil)
+	return storagegd.checkpoint_write(&cp, s.server.model, path, s.link.publish_codec.ready ? &s.link.publish_codec : nil)
 }
 
 // Explicitly authorize one admitted remote player to receive complete authority
@@ -168,16 +168,16 @@ session_connect :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats), 
 	if options.role != .Solo {
 		switch options.backend {
 		case .Enet:
-			ok := s.authority ? enet_host(&s.enet, options.port, 16) : enet_join(&s.enet, options.address, options.port)
+			ok := s.authority ? transportgd.enet_host(&s.enet, options.port, 16) : transportgd.enet_join(&s.enet, options.address, options.port)
 			if !ok {return .Transport}
-			s.base_wire = enet_transport(&s.enet)
+			s.base_wire = transportgd.enet_transport(&s.enet)
 		case .Rtc:
 			cfg := options.rtc; cfg.host = s.authority
-			if !rtc_open(&s.rtc, cfg, s.allocator) {return .Transport}
-			s.base_wire = rtc_transport(&s.rtc)
+			if !transportgd.rtc_open(&s.rtc, cfg, s.allocator) {return .Transport}
+			s.base_wire = transportgd.rtc_transport(&s.rtc)
 		case .Steam:
-			if steam_open(&s.steam,options.steam,s.authority)!=.None {return .Transport}
-			s.base_wire=steam_transport(&s.steam)
+			if transportgd.steam_open(&s.steam,options.steam,s.authority)!=.None {return .Transport}
+			s.base_wire=transportgd.steam_transport(&s.steam)
 		case: return .Invalid_Config
 		}
 		if options.latency_ms > 0 || options.jitter_ms > 0 || options.loss_permyriad > 0 || options.duplicate_permyriad > 0 {
@@ -313,25 +313,4 @@ session_changes :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats), 
 	for i in n ..< s.change_count {s.changes[i - n] = s.changes[i]}
 	s.change_count -= n
 	return n
-}
-
-// Session tokens are random in normal play; deterministic labels are for tests.
-session_token :: proc(test_label: string = "") -> net.Token {
-	token: net.Token
-	if test_label != "" {
-		ctx: sha2.Context_256
-		sha2.init_256(&ctx)
-		sha2.update(&ctx, transmute([]u8)test_label)
-		digest: [32]u8
-		sha2.final(&ctx, digest[:])
-		copy(token[:], digest[:16])
-		return token
-	}
-	crypto := gd.new_crypto()
-	gd.ref_counted_init_ref(crypto)
-	bytes := gd.crypto_generate_random_bytes(crypto, 16)
-	copy(token[:], gd.packed_byte_array_view(&bytes))
-	gd.free_packed_byte_array(bytes)
-	if gd.ref_counted_unreference(crypto) {gdext.object_destroy(crypto)}
-	return token
 }

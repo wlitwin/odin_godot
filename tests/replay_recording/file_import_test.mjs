@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const source=fs.readFileSync(new URL('../../replay/godot/file_import.odin',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL('../../replay/godot/storage/file_import.odin',import.meta.url),'utf8');
 const script=source.match(/FILE_IMPORT_JS :: `([\s\S]*?)`/)[1];
 const inputs=[];
 const scope={document:{createElement(){const input={style:{},click(){},remove(){this.removed=true;}};inputs.push(input);return input;},body:{appendChild(){}}}};

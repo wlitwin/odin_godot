@@ -1,6 +1,5 @@
 package replay_scrapyard
 
-import rgd "godot:replay/godot"
 
 import "core:math"
 import "core:fmt"
@@ -9,6 +8,7 @@ import game "../shared/game"
 import p "godot:replay/play"
 import content "../shared/content"
 import arena "../shared/arena"
+import scenegd "godot:replay/godot/scene"
 
 combat_rigs_make :: proc(self: ^ReplayScrapyard) {
 	for &line in self.shot_rigs {
@@ -29,7 +29,7 @@ combat_rigs_make :: proc(self: ^ReplayScrapyard) {
 		for point in ([6]gd.Vector2{{5, 0}, {2, 4}, {-3, 3}, {-5, 0}, {-3, -3}, {2, -4}}) {
 			gd.packed_vector2_array_append(&points, point)
 		}
-		rgd.mesh2_polygon(shell, points)
+		scenegd.mesh2_polygon(shell, points)
 		gd.free_packed_vector2_array(points)
 		gd.canvas_item_set_self_modulate(shell, {0.62, 0.64, 0.46, 1})
 		gd.canvas_item_set_z_index(shell, 12)

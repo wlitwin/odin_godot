@@ -12,6 +12,9 @@ import tr "godot:replay/transport"
 import v "godot:replay/view"
 import rgd "godot:replay/godot"
 import game "../shared/duel"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import transportgd "godot:replay/godot/transport"
 
 ReplayDuel :: struct {
 	owner: gd.Node2d,
@@ -22,7 +25,7 @@ ReplayDuel :: struct {
 	online_storage: rawptr,
 	online_tls: gd.Tls_Options,
 	online_enabled, online_launched: bool,
-	rtc, watch_rtc: rgd.Rtc,
+	rtc, watch_rtc: transportgd.Rtc,
  admission:rgd.Rtc_P2P_Auth,authenticated:bool,
 	room_reported, watch_room_reported: bool,
 	player_paused, player_resumed, player_stall_reported: bool,
@@ -36,7 +39,7 @@ ReplayDuel :: struct {
 	native_rejoining:bool,
 	native_retry_at:u64,
 	native_rejoin_attempts:u32,
-	enet: rgd.Enet,
+	enet: transportgd.Enet,
 	delay: tr.Delay,
 	identities: tr.Remap,
 	wire: tr.Transport,
@@ -44,7 +47,7 @@ ReplayDuel :: struct {
 	journal: v.Journal(game.Event),
 	clock: r.Clock,
 	buttons: r.Buttons,
-	fighters, bullets: rgd.Nodes2,
+	fighters, bullets: scenegd.Nodes2,
 	listening, ready, test, reported: bool,
 	started, done_at, test_until, neutral_until: u64,
 	shots_begun, shots_canceled: u32,
@@ -53,7 +56,7 @@ ReplayDuel :: struct {
 	archive_path: string,
 	spectator, watch_enabled, watch_join_reported, watch_paused, watch_resumed, watch_source_failed: bool,
 	watch_pause_until, watch_reset: u64,
-	watch_enet: rgd.Enet,
+	watch_enet: transportgd.Enet,
 	watch_delay: tr.Delay,
 	watch_wire: tr.Transport,
 	watch: rb.Watch(game.World, game.Input, game.Event, 2),
@@ -91,17 +94,17 @@ duel_start :: proc(self: ^ReplayDuel) {
   if !valid {duel_fail(self,"admission credential");return}
   if !self.authenticated {config={url=url,room=room,host=self.listening}}
   config.ice_json=duel_param("RDP_ICE", "")
-  if !rgd.rtc_open(&self.rtc, config) {duel_fail(self,"WebRTC open");return}
-		base=rgd.rtc_transport(&self.rtc)
+  if !transportgd.rtc_open(&self.rtc, config) {duel_fail(self,"WebRTC open");return}
+		base=transportgd.rtc_transport(&self.rtc)
 	} else {
 		if self.online_enabled {
 			options,valid:=duel_direct_options()
 			if !valid || !rgd.p2p_direct_open(&self.direct,&self.online,options) {duel_fail(self,"native authenticated transport");return}
 			base=rgd.p2p_direct_transport(&self.direct)
 		} else {
-		connected := self.listening ? rgd.enet_host(&self.enet, u16(port), 1, bind_ip = "127.0.0.1") : rgd.enet_join(&self.enet, "127.0.0.1", u16(self.spectator ? port + 1 : port))
+		connected := self.listening ? transportgd.enet_host(&self.enet, u16(port), 1, bind_ip = "127.0.0.1") : transportgd.enet_join(&self.enet, "127.0.0.1", u16(self.spectator ? port + 1 : port))
 		if !connected {duel_fail(self, "transport"); return}
-		base = rgd.enet_transport(&self.enet)
+		base = transportgd.enet_transport(&self.enet)
 		}
 	}
 	if !tr.delay_init(&self.delay, base, u32(duel_int("RDP_LATENCY", 0))) {tr.close(&base); duel_fail(self, "delay"); return}
@@ -110,20 +113,20 @@ duel_start :: proc(self: ^ReplayDuel) {
 	if !self.spectator && self.watch_enabled && (self.listening || self.watch_failover) {
 		watch_base: tr.Transport
 		when gd.IS_WEB {
-			if !rgd.rtc_open(&self.watch_rtc, {url=duel_param("RDP_URL", "ws://127.0.0.1:9080/rtc"),host=true,ice_json=duel_param("RDP_ICE", "")}) {duel_fail(self,"spectator WebRTC open");return}
-			watch_base=rgd.rtc_transport(&self.watch_rtc)
+			if !transportgd.rtc_open(&self.watch_rtc, {url=duel_param("RDP_URL", "ws://127.0.0.1:9080/rtc"),host=true,ice_json=duel_param("RDP_ICE", "")}) {duel_fail(self,"spectator WebRTC open");return}
+			watch_base=transportgd.rtc_transport(&self.watch_rtc)
 		} else {
-			if !rgd.enet_host(&self.watch_enet, u16(port + (self.listening ? 1 : 2)), 1, bind_ip = "127.0.0.1") {duel_fail(self, "spectator transport"); return}
-			watch_base=rgd.enet_transport(&self.watch_enet)
+			if !transportgd.enet_host(&self.watch_enet, u16(port + (self.listening ? 1 : 2)), 1, bind_ip = "127.0.0.1") {duel_fail(self, "spectator transport"); return}
+			watch_base=transportgd.enet_transport(&self.watch_enet)
 		}
 		if !tr.delay_init(&self.watch_delay, watch_base, u32(duel_int("RDP_LATENCY", 0))) {tr.close(&watch_base);duel_fail(self, "spectator delay"); return}
 		tr.delay_faults(&self.watch_delay, u32(duel_int("RDP_JITTER", 0)), u32(duel_int("RDP_LOSS", 0)), u32(duel_int("RDP_DUPLICATE", 0)), 77)
 		self.watch_wire = tr.delay_transport(&self.watch_delay)
 	}
-	self.ready = rgd.nodes_load(&self.fighters, self.owner, "res://views/fighter.tscn", 2) && rgd.nodes_load(&self.bullets, self.owner, "res://views/bullet.tscn", 16)
+	self.ready = scenegd.nodes_load(&self.fighters, self.owner, "res://views/fighter.tscn", 2) && scenegd.nodes_load(&self.bullets, self.owner, "res://views/bullet.tscn", 16)
 	if !gd.has_action("rdp_left") {
-		rgd.bind_key("rdp_left", .A); rgd.bind_key("rdp_right", .D)
-		rgd.bind_key("rdp_jump", .Space); rgd.bind_key("rdp_fire", .J)
+		inputgd.bind_key("rdp_left", .A); inputgd.bind_key("rdp_right", .D)
+		inputgd.bind_key("rdp_jump", .Space); inputgd.bind_key("rdp_fire", .J)
 	}
 	r.clock_init(&self.clock, 60)
 	if self.listening {gd.print_str("REPLAY_DUEL_LISTENING")}
@@ -144,7 +147,7 @@ replay_duel_process :: proc(self: ^ReplayDuel, dt: f64) {
 		if tr.status(&self.wire) != .Connected || duel_remotes(self,false,remotes[:]) != 1 {return}
 		if self.resuming && !duel_archive_ready(self) {return}
 		if !duel_admitted_remote(self,remotes[0]) {return}
-		physical := self.online_enabled && !gd.IS_WEB ? tr.Peer_Id(2) : self.listening ? remotes[0] : gd.IS_WEB ? self.rtc.id : rgd.enet_id(&self.enet)
+		physical := self.online_enabled && !gd.IS_WEB ? tr.Peer_Id(2) : self.listening ? remotes[0] : gd.IS_WEB ? self.rtc.id : transportgd.enet_id(&self.enet)
 		self.rejoin_physical=remotes[0]
   self.rejoin_generation=tr.peer_generation(&self.delay.base,remotes[0])
 		bindings := [2]tr.Peer_Mapping{{1, 1}, {2, physical}}
@@ -288,17 +291,17 @@ reference_equal :: proc(actual: game.World, until: u64 = 600, neutral_until: u64
 }
 
 paint :: proc(self: ^ReplayDuel, w: game.World) {
-	players: [2]rgd.Instance2
+	players: [2]scenegd.Instance2
 	colors := [2]gd.Color{{0.4, 0.65, 1, 1}, {1, 0.55, 0.25, 1}}
 	for f, i in w.fighters {players[i] = {key = u64(i + 1), pose = {position = {f32(f.position[0]) / 256, f32(f.position[1]) / 256}},
 	                         scale = {f32(f.facing), 1}, color = f.hp == 0 ? gd.Color{0.3, 0.3, 0.3, 0.5} : colors[i]}}
-	rgd.nodes_present(&self.fighters, players[:])
-	shots: [16]rgd.Instance2; count := 0
+	scenegd.nodes_present(&self.fighters, players[:])
+	shots: [16]scenegd.Instance2; count := 0
 	for bullet, i in w.bullets.values {if w.bullets.alive[i] {
 		shots[count] = {key = u64(bullet.id), pose = {position = {f32(bullet.position[0]) / 256, f32(bullet.position[1]) / 256}}, scale = {1, 1}, color = colors[bullet.owner]}
 		count += 1
 	}}
-	rgd.nodes_present(&self.bullets, shots[:count])
+	scenegd.nodes_present(&self.bullets, shots[:count])
 	gd.set_string(cast(gd.Object)self.status, "text", fmt.ctprintf("HP %d : %d   Kills %d : %d   Confirmed %d", w.fighters[0].hp, w.fighters[1].hp, w.kills[0], w.kills[1], self.peer.timeline.confirmed))
 }
 
@@ -308,7 +311,7 @@ duel_fail :: proc(self: ^ReplayDuel, message: string) {
  when !gd.IS_WEB {gd.scene_tree_quit(gd.get_tree(self.owner),1)}
 }
 replay_duel_exit_tree :: proc(self: ^ReplayDuel) {
-	rgd.nodes_destroy(&self.fighters); rgd.nodes_destroy(&self.bullets)
+	scenegd.nodes_destroy(&self.fighters); scenegd.nodes_destroy(&self.bullets)
 	v.journal_destroy(&self.journal); rb.destroy(&self.peer); tr.close(&self.wire)
 	rb.watch_destroy(&self.watch); rb.watch_source_destroy(&self.watch_source); tr.close(&self.watch_wire)
 	delete(self.archive_path)
@@ -334,7 +337,7 @@ duel_live_rejoin :: proc(self:^ReplayDuel,now:u64) {
  chain,local,roster:=self.peer.chain,self.peer.local,self.peer.roster
  inputs,hashes:=raw_data(self.peer.inputs),raw_data(self.peer.hashes)
  self.identities={}
- player_two:=self.online_enabled && !gd.IS_WEB ? tr.Peer_Id(2) : self.listening ? remotes[0] : gd.IS_WEB ? self.rtc.id : rgd.enet_id(&self.enet)
+ player_two:=self.online_enabled && !gd.IS_WEB ? tr.Peer_Id(2) : self.listening ? remotes[0] : gd.IS_WEB ? self.rtc.id : transportgd.enet_id(&self.enet)
  bindings:=[2]tr.Peer_Mapping{{1,1},{2,player_two}}
  if !tr.remap_init(&self.identities,tr.delay_transport(&self.delay),bindings[:]) {duel_fail(self,"rejoin mapping");return}
  self.wire=tr.remap_transport(&self.identities)

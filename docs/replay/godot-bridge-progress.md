@@ -19,7 +19,7 @@ workload. These are not rendered-frame/GPU or whole-game timings. Extra bounded
 index/cache memory is a tradeoff; sparse and very small pools need separate
 measurement before universal performance claims.
 
-See [API/lifetime contract](../../replay/godot/view-pools.md) and
+See [API/lifetime contract](../../replay/godot/scene/view-pools.md) and
 [focused evidence](results/view-index-2026-09-20/README.md).
 
 ## B2 typed views and projections — 2026-09-20
@@ -62,7 +62,7 @@ accepted tickets while UI submission is paused.
 33 core tests/Loot/WASM and actual Godot input/signal/retry/epoch/recovery/disconnect
 checks pass. Complete native fixture scripts also compile for WASM. See
 [evidence](results/input-bindings-2026-09-20/README.md) and
-[API contracts](../../replay/godot/controls.md).
+[API contracts](../../replay/godot/input/controls.md).
 
 ## B5 visual/audio routes — 2026-09-20
 
@@ -75,7 +75,7 @@ view generations.
 30 view tests/WASM, a shared native/executed WASM lifecycle corpus, and actual
 Godot scene/audio identity, cancellation and cleanup checks pass. Complete engine
 fixture scripts compile for WASM. See [evidence](results/effect-routes-2026-09-20/README.md)
-and [route contracts](../../replay/godot/effect-routes.md).
+and [route contracts](../../replay/godot/scene/effect-routes.md).
 
 ## B6 body contracts — 2026-09-20
 
@@ -88,7 +88,7 @@ reseed, correction and admission semantics remain in the owned-body protocol.
 authored offsets, freeze, invalid input, preparing/accepted transfer, cuts,
 fencing, recovered epochs and pause. Complete fixture scripts compile for WASM.
 See [evidence](results/body-bindings-2026-09-20/README.md) and
-[body contracts](../../replay/godot/body-bindings.md).
+[body contracts](../../replay/godot/scene/body-bindings.md).
 
 ## B7 measurement and delivery — 2026-09-20
 

@@ -54,12 +54,12 @@ It stores a display name, not a credential or gameplay checkpoint. Godot's
 `Name_Profile` adapter reads/writes that preference outside simulation:
 
 ```odin
-rgd.name_profile_open(&profile, "user://display_name", "my-game", true, initial_name)
+storagegd.name_profile_open(&profile, "user://display_name", "my-game", true, initial_name)
 // Poll even while a session is connecting or while the main menu is showing.
-rgd.name_profile_frame(&profile)
-rgd.name_profile_set(&profile, edited_name)
+storagegd.name_profile_frame(&profile)
+storagegd.name_profile_set(&profile, edited_name)
 // At owner teardown:
-rgd.name_profile_close(&profile)
+storagegd.name_profile_close(&profile)
 ```
 
 Native storage uses a flushed staging file and rename, with one writer per path.

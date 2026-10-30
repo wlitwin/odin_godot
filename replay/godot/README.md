@@ -4,6 +4,40 @@
 lifecycle around the engine-free runner. The application supplies a typed model,
 initial frame, options, sampled controls/actions, and presentation.
 
+## Choose an import
+
+| Package | Import alias | Owns |
+| --- | --- | --- |
+| `godot:replay/godot` | `replaygd` | Session, Party, Room, enrollment, recovery and their checkpoint operations |
+| [`godot:replay/godot/scene`](scene/README.md) | `scenegd` | Scene/view pools, typed script bindings, baking, resources, effects, audio and body adapters |
+| [`godot:replay/godot/input`](input/README.md) | `inputgd` | Device bindings, captured controls, signal actions and tracked action intents |
+| [`godot:replay/godot/storage`](storage/README.md) | `storagegd` | Files, browser stores, persistent profiles, tokens and archive encoding |
+| [`godot:replay/godot/transport`](transport/README.md) | `transportgd` | Direct ENet, RTC, Steam and WebSocket adapters |
+| [`godot:replay/godot/debug`](debug/README.md) | `debuggd` | Optional overlays, history inspection, recording, playback and telemetry |
+
+Start with the root import for a Session or Room. Its selected transport is
+managed internally; using Session does not require driving a transport adapter.
+Add a feature import when the game uses that feature's owners directly.
+Scene, input and debug packages extend the lifecycle package. Storage and
+transport are independent foundations. The internal wire helpers are implementation
+details shared by the lifecycle and transport packages.
+
+### Migrating the earlier single-package API
+
+Types and procedures retain their names in their owning feature package. Add
+that import and change the qualifier, for example `replaygd.Script_View` to
+`scenegd.Script_View`, `replaygd.Enet` to `transportgd.Enet`, and
+`replaygd.storage_read` to `storagegd.storage_read`. Generated scene descriptors
+use the scene package automatically after regeneration. The root package does
+not re-export feature APIs; old qualified names fail compilation.
+
+`session_open`, `session_frame`, `session_close` and the Party/Room lifecycle
+stay at root. Session-specific `Browser_Checkpoint` also stays at root because
+it checks the live Session's authority, identity and recovery policy; it uses
+the storage package for I/O.
+
+## The lifecycle
+
 Start with a zero-initialized owner and copy `SESSION_OPTIONS` for its settings;
 an empty `Session_Options{}` does not contain the network defaults. Keep the live
 owner at a stable address, usually a field on the game's Godot script. Call
@@ -13,7 +47,7 @@ defer its close in `_ready`, which would close it as soon as `_ready` returns.
 | Task | Normal API |
 | --- | --- |
 | Direct local or authoritative game | `session_open`, `session_frame`, `session_close` |
-| Submit a discrete action | `session_issue`; use `Action_Intent` when retaining and tracking a pending action |
+| Submit a discrete action | `session_issue`; add [input intents](input/intents.md) when retaining and tracking a pending action |
 | Read presentation | Drain `session_changes`, then read the copied `session_state` |
 | Invitations and durable enrollment | `party_open`, `party_begin`, `party_frame`, `party_room_options`, `party_close` |
 | Coordinator-owned recovery | `room_open`, `room_frame`, `room_issue`, `room_close`; read changes/state through `room.session` |
@@ -22,21 +56,21 @@ Use one Session or Room owner for a game. Room owns its Session and drives it;
 do not call `session_frame` separately on `room.session`. Party remains alive
 while Room borrows its authorization. Close Room before Party and its storage.
 
-[Editor-first authoring](editor-first.md) connects ordinary scene-local scripts to
+[Editor-first authoring](scene/editor-first.md) connects ordinary scene-local scripts to
 typed display values. Replay Scrapyard is the canonical composition example, with
 standalone actor/HUD previews and validated Resource baking.
 
-[Typed view pools](view-pools.md) bind generation-safe entity projections to cached
+[Typed view pools](scene/view-pools.md) bind generation-safe entity projections to cached
 Godot child references and skip unchanged property writes.
 
 [Definition baking](../definitions/README.md) converts authored Resources and scene
 markers to validated immutable values with content identity and retained versions.
 Further boundary work is tracked in the [bridge plan](../../docs/replay/godot-bridge-plan.md).
 
-[Local diagnostic overlay](debug.md) adds optional runtime counters and explicit
+[Local diagnostic overlay](debug/debug.md) adds optional runtime counters and explicit
 recent-history audits without game-specific reporting code.
 
-[Local history inspection](scrubber.md) adds a retained-frame slider with explicit
+[Local history inspection](debug/scrubber.md) adds a retained-frame slider with explicit
 resume/branch commands and validated scalar edits to a copied preview. Replay Hello demonstrates pause, historical views, input
 guards and a new presentation epoch for an alternate local future.
 
@@ -45,25 +79,25 @@ windows from the history dock and verify them in a separate headless process.
 [Loaded recording playback](../diagnostic/playback.md) opens those files in Godot,
 shows recorded frames and mismatch details, and returns explicit branch commands.
 
-[Explicit body contracts](body-bindings.md) distinguish World-driven bodies from
+[Explicit body contracts](scene/body-bindings.md) distinguish World-driven bodies from
 authority-gated cooperative Godot solver observations.
 
-[Declarative effect routes](effect-routes.md) bind events to typed scene/paint
+[Declarative effect routes](scene/effect-routes.md) bind events to typed scene/paint
 callbacks or sound cues with bounded lifetime and rollback handling.
 
-[Bounded event audio](audio.md) consumes presentation changes with retained
+[Bounded event audio](scene/audio.md) consumes presentation changes with retained
 one-shot IDs and bounded Godot voice pools.
 
-[Steam packet transport](steam.md) adds an explicit Session backend with separate
+[Steam packet transport](transport/steam.md) adds an explicit Session backend with separate
 contract, native-capability and live-account acceptance gates.
 
-[Connection generations](multiplayer-generations.md) distinguish successive
+[Connection generations](transport/multiplayer-generations.md) distinguish successive
 MultiplayerPeer connections and fence queued data when numeric IDs are reused.
 
 [Browser identities and local checkpoints](browser_checkpoint.md) add persistent
 credentials, validated archive loading and save completion receipts.
 
-[Browser blob storage](browser_store.md) provides asynchronous commit receipts and
+[Browser blob storage](storage/browser_store.md) provides asynchronous commit receipts and
 revision-checked IndexedDB writes for local identities, profiles and serialized
 data. Storage runs outside the simulation contract.
 
@@ -110,10 +144,10 @@ array is smaller than the pending batch; leaving changes queued makes the next
 [lifecycle recipes](../../examples/replay_recipes/recipes.odin) show this complete
 loop with concrete types.
 
-[Typed InputMap and signal bindings](controls.md) buffer tick edges, apply explicit
+[Typed InputMap and signal bindings](input/controls.md) buffer tick edges, apply explicit
 pause/focus/menu gates and capture copied UI actions.
 
-[Copied action intents](intents.md) retain a pending payload through submission
+[Copied action intents](input/intents.md) retain a pending payload through submission
 failure and track epoch-scoped tickets through confirmation and recovery. They
 provide the common latch/result bookkeeping without changing gameplay policy.
 
@@ -125,17 +159,18 @@ old-host rejoin. Bind aiming input to the displayed remote frames using
 the default runner predicts the complete public world. `Model.group` can opt into
 an authored closed group; see [prediction groups](../net/groups.md).
 
-`Nodes2` maintains bounded scene instances by presentation identity, with retained
-scene ownership. `nodes_get` supports game-specific dressing of child nodes.
-`scene_instance` loads/instances an authored stage and releases the temporary
-resource reference. `bind_key`/`bind_mouse` release constructor references after
-InputMap retains the events. `session_token` uses random credentials normally;
-deterministic labels are for tests. `session_profile(path)` creates or reads a
+`scenegd.Nodes2` maintains bounded scene instances by presentation identity, with
+retained scene ownership. `scenegd.nodes_get` supports game-specific dressing of
+child nodes. `scenegd.scene_instance` loads/instances an authored stage and
+releases the temporary resource reference. `inputgd.bind_key`/`inputgd.bind_mouse`
+release constructor references after InputMap retains the events.
+`storagegd.session_token` uses random credentials normally; deterministic labels
+are for tests. `storagegd.session_profile(path)` creates or reads a
 persistent local token. Use a separate profile for each player running on one
 machine; malformed existing profiles fail instead of silently changing identity.
 
 `session_save(session, path)` captures and writes a complete authority archive.
-`checkpoint_read` validates one against the game's model/content, and
+`storagegd.checkpoint_read` validates one against the game's model/content, and
 `session_resume` opens a fresh authority using explicit newer-epoch/local-seat
 options. Host/solo resume verifies that the profile token owns the selected seat.
 Writes close a flushed staging file before replacing the destination. Existing
@@ -175,7 +210,7 @@ and crash migration with surviving-client reconnection in tested Cavecrawl and
 Quickdraw combat scenarios.
 [Session communications](../comms/README.md) adds optional bounded chat and markers
 through an independent application lane. Owner-streamed physics has separate
-[2D](body2.md) and [3D](body3.md) adapters. Matchmaking and a complete lobby UI remain
+[2D](scene/body2.md) and [3D](scene/body3.md) adapters. Matchmaking and a complete lobby UI remain
 roadmap work rather than implicit guarantees of the convenience wrapper.
 
 
@@ -208,7 +243,7 @@ error = replaygd.session_frame(&session, dt, control)
 if session.control_consumed {replay.buttons_consume(&buttons)}
 ```
 
-Immutable procedural polygons can use [mesh2_polygon](mesh2.md), with ordinary
+Immutable procedural polygons can use [mesh2_polygon](scene/mesh2.md), with ordinary
 Godot node transforms and instance tint for animation.
 
 Room clients can display [recovery-backup status](room_backup.md), including
@@ -227,9 +262,9 @@ recovery. Direct Session bans retain their checkpoint durability contract.
 encoding and fresh peer construction through recovery. Local contract acceptance
 is recorded separately from still-pending live multi-account Steam validation.
 
-[Typed archetype registries and scene pools](archetypes.md) connect stable gameplay
+[Typed archetype registries and scene pools](scene/archetypes.md) connect stable gameplay
 IDs and baked definitions to independently authored local scenes and appearances.
 
-[Typed scene adapters and optional view codegen](adapter-bindings.md) provide
+[Typed scene adapters and optional view codegen](scene/adapter-bindings.md) provide
 owned script/archetype bindings, permanent scene bindings, scope tracking, typed
 visitation, contextual errors and checked Resource/bake helpers.

@@ -1,11 +1,11 @@
 package replay_scrapyard
 
-import rgd "godot:replay/godot"
 
 import "core:math"
 import gd "godot:godot"
 import arena "../shared/arena"
 import game "../shared/game"
+import scenegd "godot:replay/godot/scene"
 
 // Original scripts/arena.odin and fx/gate_arrow.tscn presentation, derived from
 // the floor key and confirmed stage. These nodes never enter a checkpoint.
@@ -90,7 +90,7 @@ scenery_gate :: proc(self: ^ReplayScrapyard) -> (art: Gate_Art) {
 	gd.packed_vector2_array_append(&points, {14, 0})
 	gd.packed_vector2_array_append(&points, {-7, -8})
 	gd.packed_vector2_array_append(&points, {-7, 8})
-	rgd.mesh2_polygon(art.arrow, points)
+	scenegd.mesh2_polygon(art.arrow, points)
 	gd.free_packed_vector2_array(points)
 	gd.canvas_item_set_self_modulate(art.arrow, {0.45, 0.95, 0.9, 0.85})
 	gd.canvas_item_set_z_index(art.arrow, 30)

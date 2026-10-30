@@ -4,7 +4,7 @@ import "core:fmt"
 import gd "godot:godot"
 import "godot:gdext"
 import rb "godot:replay/p2p"
-import rgd "godot:replay/godot"
+import storagegd "godot:replay/godot/storage"
 
 // The browser upload is asynchronous. Wait before installing transport mappings
 // or a runner so repeated frames cannot partially install a restored session.
@@ -17,7 +17,7 @@ duel_archive_ready :: proc(self:^ReplayDuel)->bool {
   return status==1
  } else {return true}
 }
-duel_archive_read :: proc(self:^ReplayDuel)->([]u8,rgd.Storage_Error) {
+duel_archive_read :: proc(self:^ReplayDuel)->([]u8,storagegd.Storage_Error) {
  when gd.IS_WEB {
   js:=gd.singleton_java_script_bridge()
   name:=gd.new_string_odin("replayDuelArchive");defer gd.free_string(name)
@@ -29,9 +29,9 @@ duel_archive_read :: proc(self:^ReplayDuel)->([]u8,rgd.Storage_Error) {
   bytes:=gd.packed_byte_array_view(&packet)
   if len(bytes)==0 || len(bytes)>rb.MAX_ARCHIVE_BYTES {return nil,.Size}
   owned:=make([]u8,len(bytes));copy(owned,bytes);return owned,.None
- } else {return rgd.storage_read(self.archive_path,rb.MAX_ARCHIVE_BYTES)}
+ } else {return storagegd.storage_read(self.archive_path,rb.MAX_ARCHIVE_BYTES)}
 }
-duel_archive_write :: proc(self:^ReplayDuel,bytes:[]u8)->rgd.Storage_Error {
+duel_archive_write :: proc(self:^ReplayDuel,bytes:[]u8)->storagegd.Storage_Error {
  when gd.IS_WEB {
   if len(bytes)==0 || len(bytes)>rb.MAX_ARCHIVE_BYTES {return .Size}
   packet:=gd.new_packed_byte_array();defer gd.free_packed_byte_array(packet)
@@ -42,5 +42,5 @@ duel_archive_write :: proc(self:^ReplayDuel,bytes:[]u8)->rgd.Storage_Error {
   // Request accepted by the engine, not a filesystem durability receipt. The
   // browser/user owns download completion; the acceptance driver verifies files.
   return .None
- } else {return rgd.storage_write(self.archive_path,bytes,rb.MAX_ARCHIVE_BYTES)}
+ } else {return storagegd.storage_write(self.archive_path,bytes,rb.MAX_ARCHIVE_BYTES)}
 }

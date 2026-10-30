@@ -2,6 +2,8 @@ package replay_godot
 
 import auth "godot:replay/authority"
 import adm "godot:replay/p2p/admission"
+import wiregd "godot:replay/godot/internal/wire"
+import transportgd "godot:replay/godot/transport"
 
 Rendezvous_State :: struct {epoch: u64, code: [64]u8, active: bool}
 // A trusted provider owns credential storage, roster updates and revocation.
@@ -50,15 +52,15 @@ rendezvous_p2p_provider :: proc(registry: ^adm.Registry, clock: auth.Clock_Sourc
 }
 
 Rtc_P2P_Auth :: struct {match: adm.Match, identity: auth.Identity, key: auth.Key}
-rtc_p2p_config :: proc(a: ^Rtc_P2P_Auth, url: string, create: bool) -> Rtc_Config {
+rtc_p2p_config :: proc(a: ^Rtc_P2P_Auth, url: string, create: bool) -> transportgd.Rtc_Config {
     code := adm.code(a.match); room := make([]u8, len(code), context.temp_allocator); copy(room, code[:])
     return {url = url, room = string(room), host = create, require_identity = true,
         resume_signaling = true, authorization_user = a, authorize = proc(user: rawptr, challenge, room: string, create: bool) -> string {
             a := cast(^Rtc_P2P_Auth)user; nonce: auth.Nonce
-            if !adm.match_valid(a.match) || !rtc_unhex(nonce[:], challenge) {return ""}
+            if !adm.match_valid(a.match) || !wiregd.hex_decode(nonce[:], challenge) {return ""}
             expected := adm.code(a.match); if room != string(expected[:]) {return ""}
             proof := adm.proof(a.match, a.identity, a.key, nonce, create)
-            return rtc_hex(proof[:])
+            return wiregd.hex_encode(proof[:])
         },
     }
 }

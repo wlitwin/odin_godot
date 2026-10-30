@@ -3,10 +3,10 @@
 package scrap_views
 
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import d "godot:replay/definitions"
 import defs "../defs"
 import display "../../shared/presentation"
+import scenegd "godot:replay/godot/scene"
 
 // Authored samples for the same detached view interface used during live play.
 // No Session/World and no kind-specific preview switch.
@@ -20,8 +20,8 @@ ScrapEnemyPreview :: struct {
 }
 
 enemy_preview_value :: proc(resource: gd.Resource) -> (display.Mob_View, d.Report) {
-	ctx: rgd.Bake_Context
-	source := rgd.bake_resource(&ctx, resource, ScrapEnemyPreview, "$preview")
+	ctx: scenegd.Bake_Context
+	source := scenegd.bake_resource(&ctx, resource, ScrapEnemyPreview, "$preview")
 	if source == nil {
 		return {}, ctx.report
 	}

@@ -4,19 +4,19 @@ package steam_probe
 import "core:fmt"
 import "core:strings"
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import tr "godot:replay/transport"
+import transportgd "godot:replay/godot/transport"
 
-SteamProbe :: struct {owner:gd.Node,steam:rgd.Steam,runtime:rgd.Steam_Runtime,wire:tr.Transport,role:string,started:u64,sent,received:u32,done:bool}
+SteamProbe :: struct {owner:gd.Node,steam:transportgd.Steam,runtime:transportgd.Steam_Runtime,wire:tr.Transport,role:string,started:u64,sent,received:u32,done:bool}
 steam_probe_ready :: proc(self:^SteamProbe) {
 	self.role=strings.clone(gd.env_string("STEAM_TEST_ROLE","host"))
 	fake:=gd.get_node(self.owner,"FakeSteam")
-	if rgd.steam_runtime_initialize(&self.runtime,cast(gd.Object)fake,480)!=.None {fail(self,"runtime");return}
+	if transportgd.steam_runtime_initialize(&self.runtime,cast(gd.Object)fake,480)!=.None {fail(self,"runtime");return}
 	method:=gd.new_string_name("new_peer");defer gd.free_string_name(method)
 	value:=gd.object_call(cast(gd.Object)fake,method);defer gd.variant_destroy(&value)
-	config:=rgd.STEAM_CONFIG;config.runtime=&self.runtime;config.host_steam_id=76561198000000001;config.virtual_port=u16(gd.env_int("STEAM_TEST_PORT",49499))
-	if rgd.steam_open_peer(&self.steam,cast(gd.Multiplayer_Peer)gd.variant_to_object(&value),config,self.role=="host")!=.None {fail(self,"open peer");return}
-	self.wire=rgd.steam_transport(&self.steam);self.started=gd.time_get_ticks_msec(gd.singleton_time())
+	config:=transportgd.STEAM_CONFIG;config.runtime=&self.runtime;config.host_steam_id=76561198000000001;config.virtual_port=u16(gd.env_int("STEAM_TEST_PORT",49499))
+	if transportgd.steam_open_peer(&self.steam,cast(gd.Multiplayer_Peer)gd.variant_to_object(&value),config,self.role=="host")!=.None {fail(self,"open peer");return}
+	self.wire=transportgd.steam_transport(&self.steam);self.started=gd.time_get_ticks_msec(gd.singleton_time())
 }
 fail :: proc(self:^SteamProbe,why:cstring) {gd.print_str(fmt.tprintf("REPLAY_STEAM_CONTRACT_FAIL role=%s %s",self.role,why));self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),1)}
 steam_probe_process :: proc(self:^SteamProbe,dt:f64) {
@@ -26,7 +26,7 @@ steam_probe_process :: proc(self:^SteamProbe,dt:f64) {
 	peer:tr.Peer_Id=0
 	if len(self.steam.packets.remotes)>0 {peer=self.steam.packets.remotes[0]}
 	if peer!=0 && self.sent==0 {
-		id,ok:=rgd.steam_remote_id(&self.steam,peer)
+		id,ok:=transportgd.steam_remote_id(&self.steam,peer)
 		if !ok || id!=(self.role=="host" ? u64(76561198000000002) : u64(76561198000000001)) {fail(self,"Steam ID mapping");return}
 		large:=[65536]u8{};for &byte,i in large {byte=u8(i*31+17)}
 		if tr.send(&self.wire,peer,.Reliable,large[:])!=.Sent {fail(self,"large send");return}
@@ -54,4 +54,4 @@ steam_probe_process :: proc(self:^SteamProbe,dt:f64) {
 		self.done=true;gd.scene_tree_quit(gd.get_tree(self.owner),0)
 	}
 }
-steam_probe_exit_tree :: proc(self:^SteamProbe) {tr.close(&self.wire);rgd.steam_runtime_release(&self.runtime);delete(self.role)}
+steam_probe_exit_tree :: proc(self:^SteamProbe) {tr.close(&self.wire);transportgd.steam_runtime_release(&self.runtime);delete(self.role)}

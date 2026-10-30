@@ -1,11 +1,11 @@
 package fixture
 import d "godot:replay/definitions"
-import rgd "godot:replay/godot"
 import gd "godot:godot"
+import scenegd "godot:replay/godot/scene"
 fixture :: proc() {
  store:d.Store([2]f32);d.init(&store,2)
- ref,report:=rgd.bake(&store,gd.Packed_Scene(nil),1,proc(scene:gd.Packed_Scene,ctx:^rgd.Bake_Context)->[2]f32 {
-  root:=rgd.bake_scene2(ctx,scene,"$.scene");point,_:=rgd.bake_marker2(ctx,root,"Spawn");return point
+ ref,report:=scenegd.bake(&store,gd.Packed_Scene(nil),1,proc(scene:gd.Packed_Scene,ctx:^scenegd.Bake_Context)->[2]f32 {
+  root:=scenegd.bake_scene2(ctx,scene,"$.scene");point,_:=scenegd.bake_marker2(ctx,root,"Spawn");return point
  })
  bytes,result:=d.artifact_export(&store,ref,7);defer delete(bytes)
  d.artifact_import(&store,bytes,1,7)

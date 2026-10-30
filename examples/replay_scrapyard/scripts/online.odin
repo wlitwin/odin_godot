@@ -7,6 +7,7 @@ import auth "godot:replay/authority"
 import p "godot:replay/provision"
 import rgd "godot:replay/godot"
 import game "../shared/game"
+import transportgd "godot:replay/godot/transport"
 
 Scrap_Online :: struct {
 	party: rgd.Party,
@@ -49,7 +50,7 @@ online_ready :: proc(self: ^ReplayScrapyard) {
 		return
 	}
 	storage, ok := online_native_init(self, local)
-	ice, ice_error := rgd.rtc_ice_settings("RSY_ICE_JSON")
+	ice, ice_error := transportgd.rtc_ice_settings("RSY_ICE_JSON")
 	if ice_error != .None {
 		online_error(self, "The relay configuration is invalid.")
 		return

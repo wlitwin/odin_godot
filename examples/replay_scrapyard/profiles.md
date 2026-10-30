@@ -1,6 +1,6 @@
 # Local co-op profiles
 
-Browser play uses the shared [asynchronous IndexedDB store](../../replay/godot/browser_store.md).
+Browser play uses the shared [asynchronous IndexedDB store](../../replay/godot/storage/browser_store.md).
 The game waits for its identity and profile before opening a runner. Identity
 creation uses a create-only transaction; a competing creator's identity is loaded
 instead of overwritten. Profile writes compare the last loaded revision and only

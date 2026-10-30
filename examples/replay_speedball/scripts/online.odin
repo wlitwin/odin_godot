@@ -8,6 +8,7 @@ import p "godot:replay/provision"
 import rgd "godot:replay/godot"
 import lb "godot:replay/lobby"
 import game "../shared/pitch"
+import transportgd "godot:replay/godot/transport"
 
 Speedball_Online :: struct {
  party:rgd.Party,
@@ -33,7 +34,7 @@ online_ready :: proc(self:^ReplaySpeedball) {
  endpoint,valid:=auth.endpoint(speedball_param("RSB_ROOM_ADDRESS","127.0.0.1"),u16(port))
  if !valid || port<1 || port>65535 || !p.service_url_valid(service,local) {online_error(self,"The party service or gameplay address is invalid.");return}
  storage,ok:=online_native_init(self,local)
- ice,ice_error:=rgd.rtc_ice_settings("RSB_ICE_JSON")
+ ice,ice_error:=transportgd.rtc_ice_settings("RSB_ICE_JSON")
  if ice_error!=.None {online_error(self,"The relay configuration is invalid.");return}
  cfg:=rgd.Party_Config{service=service,namespace="replay-speedball-rooms",content=game.CONTENT,endpoint=endpoint,storage=storage,tls=o.tls,
   local_development=local,invite_role=.Trusted_Peer,invite_uses=game.SEATS-1,ice_json=ice,relay_credentials=speedball_int("RSB_ROOM_RELAY",0)==1}

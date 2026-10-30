@@ -12,10 +12,10 @@ its observed storage revision. It uses the same canonical checkpoint codec as
 native save/resume. Open it before a new run or explicit resume:
 
 ```odin
-rgd.browser_identity_open(&identity, "my-game")
+storagegd.browser_identity_open(&identity, "my-game")
 // On subsequent frames:
-rgd.browser_identity_frame(&identity)
-token, ready := rgd.browser_identity_token(&identity)
+storagegd.browser_identity_frame(&identity)
+token, ready := storagegd.browser_identity_token(&identity)
 // Once ready, open one token-scoped slot with your model/content.
 rgd.browser_checkpoint_open(&slot, "my-game", slot_key, model, content, token)
 rgd.browser_checkpoint_frame(&slot)
@@ -54,7 +54,7 @@ has happened; it is not proof of rollback. Cavecrawl disables Leave while saving
 and reports success only after transaction completion. Browser termination can
 still interrupt a write, so reopening reads whichever revision actually committed.
 
-These helpers inherit the [browser store](browser_store.md) limits and durability
+These helpers inherit the [browser store](storage/browser_store.md) limits and durability
 boundary. Identity and save slots are separate transactions; a confirmed identity
 precedes session creation, so a completed save does not refer to an uncommitted
 new credential. Browser deletion/eviction and same-origin access still apply.

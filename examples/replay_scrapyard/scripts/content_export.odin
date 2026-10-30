@@ -5,10 +5,11 @@ package replay_scrapyard
 import "core:fmt"
 import gd "godot:godot"
 import d "godot:replay/definitions"
-import rgd "godot:replay/godot"
 import content "../shared/content"
 import game "../shared/game"
 import "defs"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 // Runs the exact extractor used by interactive play, including nested Resources.
 ScrapContentExport :: struct {
@@ -33,7 +34,7 @@ scrap_content_export_ready :: proc(self: ^ScrapContentExport) {
 		return
 	}
 	ref: d.Ref
-	ref, report = rgd.bake(&store, u8(0), game.CONTENT, content_extract)
+	ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
 	if report.error == .None && scrap_param("RSY_AUTHORING_ABILITY", "") != "" {
 		catalog, _ := d.get(&store, ref)
 		candidate, ok := authoring_ability_catalog(catalog, scrap_param("RSY_AUTHORING_ABILITY", ""))
@@ -42,7 +43,7 @@ scrap_content_export_ready :: proc(self: ^ScrapContentExport) {
 		}
 		resource := gd.load(fmt.ctprintf("%s", scrap_param("RSY_AUTHORING_ABILITY", "")))
 		defer gd.release_ref(resource)
-		ctx: rgd.Bake_Context
+		ctx: scenegd.Bake_Context
 		id, _ := defs.bake_ability(resource, &ctx, "$selection")
 		if ctx.report.error != .None {
 			return
@@ -62,7 +63,7 @@ scrap_content_export_ready :: proc(self: ^ScrapContentExport) {
 		return
 	}
 	defer delete(bytes)
-	if rgd.storage_write(scrap_param("RSY_BAKE_OUTPUT", "user://catalog.rpldef"), bytes, 1024 * 1024) != .None {
+	if storagegd.storage_write(scrap_param("RSY_BAKE_OUTPUT", "user://catalog.rpldef"), bytes, 1024 * 1024) != .None {
 		gd.print_str("RSY_BAKE_WRITE_FAILED")
 		return
 	}

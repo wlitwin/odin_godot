@@ -6,7 +6,6 @@ import gd "godot:godot"
 import auth "godot:replay/authority"
 import db "godot:replay/authority/sqlite"
 import tr "godot:replay/transport"
-import rgd "godot:replay/godot"
 import net "godot:replay/net"
 import scrapyard "godot:examples/replay_scrapyard/shared/game"
 import cave "godot:examples/replay_cavecrawl/shared/cave"
@@ -17,8 +16,10 @@ import speedball "godot:examples/replay_speedball/shared/pitch"
 import claimball "godot:examples/replay_claimball/shared/pitch"
 import quickdraw "godot:examples/replay_quickdraw/shared/duel"
 import "core:fmt"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
-ReplayMigrationCoordinator :: struct {owner: gd.Node, store: db.Store, service: auth.Service, enet: rgd.Enet, websocket: rgd.Websocket, wire: tr.Transport, ready: bool, trace_revision: u64}
+ReplayMigrationCoordinator :: struct {owner: gd.Node, store: db.Store, service: auth.Service, enet: transportgd.Enet, websocket: transportgd.Websocket, wire: tr.Transport, ready: bool, trace_revision: u64}
 
 replay_migration_coordinator_ready :: proc(self: ^ReplayMigrationCoordinator) {
 	port := gd.env_int("REPLAY_MIGRATION_PORT", 49500)
@@ -38,16 +39,16 @@ replay_migration_coordinator_ready :: proc(self: ^ReplayMigrationCoordinator) {
 	for i in 0 ..< 3 {
 		identity := auth.Identity{u64(i + 1), u64(i + 101)}
 		endpoint, _ := auth.endpoint("127.0.0.1", u16(port + i + 1))
-		token := rgd.session_token(fmt.tprintf("migration-%d", i + 1))
+		token := storagegd.session_token(fmt.tprintf("migration-%d", i + 1))
 		record.members[i] = {identity = identity, endpoint = endpoint, enabled = true, can_host = i < 2, trusted_authority = i < 2, game_token_hash = net.token_hash(token)}
 		keys[i] = {identity = identity, key = {0 = u8(21 + i)}} // fixture credentials only
 	}
 	if gd.env_int("REPLAY_CONTROL_WS",0)==1 {
-		if !rgd.websocket_host(&self.websocket,u16(port)) {return}
-		self.wire=rgd.websocket_transport(&self.websocket)
+		if !transportgd.websocket_host(&self.websocket,u16(port)) {return}
+		self.wire=transportgd.websocket_transport(&self.websocket)
 	} else {
-		if !rgd.enet_host(&self.enet, u16(port), 8, bind_ip = "127.0.0.1") {return}
-		self.wire = rgd.enet_transport(&self.enet)
+		if !transportgd.enet_host(&self.enet, u16(port), 8, bind_ip = "127.0.0.1") {return}
+		self.wire = transportgd.enet_transport(&self.enet)
 	}
 	if auth.service_init(&self.service, record, db.commit, &self.store, auth.native_clock(), self.wire, keys[:]) != .None {return}
 	self.ready = true

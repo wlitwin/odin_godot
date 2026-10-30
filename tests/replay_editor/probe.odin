@@ -12,12 +12,13 @@ import views "views"
 import game "../shared/game"
 import display "../shared/presentation"
 import content "../shared/content"
+import scenegd "godot:replay/godot/scene"
 
 @(gd_method)
 replay_scrapyard_editor_binding_check :: proc(self:^ReplayScrapyard,path:string,expected:bool)->bool {
     // A directly loaded scene must already own a valid appearance. Archetype
     // pools instead validate components before their configure callback runs.
-    config:=rgd.Script_View(display.Mob_View,views.ScrapEnemyView){
+    config:=scenegd.Script_View(display.Mob_View,views.ScrapEnemyView){
         present=views.enemy_view_present,
         validate=proc(script:^views.ScrapEnemyView)->d.Report {
             if report:=views.enemy_view_validate(script);report.error!=.None {return report}
@@ -26,14 +27,14 @@ replay_scrapyard_editor_binding_check :: proc(self:^ReplayScrapyard,path:string,
         },
         retired=views.enemy_view_retire,
     }
-    pool:rgd.View_Pool2(game.Mob,display.Mob_View,^views.ScrapEnemyView)
-    if !rgd.view_pool_load(&pool,self.world_node,fmt.ctprintf("%s",path),1,rgd.script_view_binding(&config)) {return false};defer rgd.view_pool_destroy(&pool)
+    pool:scenegd.View_Pool2(game.Mob,display.Mob_View,^views.ScrapEnemyView)
+    if !scenegd.view_pool_load(&pool,self.world_node,fmt.ctprintf("%s",path),1,scenegd.script_view_binding(&config)) {return false};defer scenegd.view_pool_destroy(&pool)
     items:=[1]v.View_Item(game.Mob,display.Mob_View){{handle={0,1},source=.Observed,view={scale={1,1},color={1,1,1,1},value={hp=10,scale=2,tint={1,1,1,1}}}}}
-    result:=rgd.view_pool_present(&pool,{1,0},items[:])
+    result:=scenegd.view_pool_present(&pool,{1,0},items[:])
     if !expected {return result==.Attach && pool.nodes.count==0}
     if result!=.None || pool.entries[0].rig==nil || !pool.entries[0].rig.ready || !pool.entries[0].rig.painted {return false}
     first:=pool.entries[0].rig
-    if rgd.view_pool_present(&pool,{2,0},items[:])!=.None {return false}
+    if scenegd.view_pool_present(&pool,{2,0},items[:])!=.None {return false}
     return first.retired && first!=pool.entries[0].rig
 }
 @(gd_method)
@@ -46,7 +47,7 @@ replay_scrapyard_editor_catalog_hash :: proc(self:^ReplayScrapyard)->gd.Int {
 }
 @(gd_method)
 replay_scrapyard_editor_registry_count :: proc(self:^ReplayScrapyard)->gd.Int {
-    owner:rgd.Archetype_Assets(content.Mob);defer rgd.archetype_assets_destroy(&owner)
+    owner:scenegd.Archetype_Assets(content.Mob);defer scenegd.archetype_assets_destroy(&owner)
     before,available:=rgd.session_authority_state(self.session)
     ok:=enemy_archetypes_load(&owner)
     after,still:=rgd.session_authority_state(self.session)

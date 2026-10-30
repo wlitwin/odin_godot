@@ -5,6 +5,7 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import a "godot:replay/assets"
 import net "godot:replay/net"
+import storagegd "godot:replay/godot/storage"
 
 browser_data_namespace :: proc(self: ^ReplayScrapyard) -> string {
 	return(
@@ -36,7 +37,7 @@ open_new :: proc(self: ^ReplayScrapyard, role: rgd.Session_Role) {
 }
 
 browser_run_close :: proc(record: ^Saved_Run) {
-	rgd.browser_store_close(&record.op)
+	storagegd.browser_store_close(&record.op)
 	delete(record.bytes)
 	record.bytes = nil
 }
@@ -52,7 +53,7 @@ browser_run_error :: proc(self: ^ReplayScrapyard, loading: bool) {
 
 browser_run_write :: proc(self: ^ReplayScrapyard) -> bool {
 	record := &self.saved_run[0]
-	if !rgd.browser_store_write(
+	if !storagegd.browser_store_write(
 		&record.op,
 		browser_data_namespace(self),
 		browser_run_key(self),
@@ -74,7 +75,7 @@ browser_run_submit :: proc(self: ^ReplayScrapyard) -> bool {
 	if record.revision_known {
 		return browser_run_write(self)
 	}
-	if !rgd.browser_store_read(&record.op, browser_data_namespace(self), browser_run_key(self), a.BUNDLE_LIMIT) {
+	if !storagegd.browser_store_read(&record.op, browser_data_namespace(self), browser_run_key(self), a.BUNDLE_LIMIT) {
 		browser_run_error(self, false)
 		return false
 	}
@@ -88,7 +89,7 @@ browser_run_poll :: proc(self: ^ReplayScrapyard) {
 		if record.phase != .Checking && record.phase != .Writing {
 			return
 		}
-		if rgd.browser_store_poll(&record.op) != .Complete {
+		if storagegd.browser_store_poll(&record.op) != .Complete {
 			return
 		}
 		if record.phase == .Checking {
@@ -98,7 +99,7 @@ browser_run_poll :: proc(self: ^ReplayScrapyard) {
 			}
 			record.revision = record.op.error == .Missing ? 0 : record.op.revision
 			record.revision_known = true
-			rgd.browser_store_close(&record.op)
+			storagegd.browser_store_close(&record.op)
 			browser_run_write(self)
 			return
 		}
@@ -110,7 +111,7 @@ browser_run_poll :: proc(self: ^ReplayScrapyard) {
 		record.saved_tick, record.saved_hash, record.ok = record.pending_tick, record.pending_hash, true
 		record.phase = .Idle
 		record.notice_until = gd.time_get_ticks_msec(gd.singleton_time()) + 3000
-		rgd.browser_store_close(&record.op)
+		storagegd.browser_store_close(&record.op)
 		gd.print_str(
 			fmt.tprintf(
 				"RSY_RUN_SAVED tick=%d hash=%d revision=%d",
@@ -133,28 +134,28 @@ browser_run_load_ready :: proc(self: ^ReplayScrapyard) -> bool {
 		return false
 	}
 	if record.phase == .Idle {
-		if !rgd.browser_store_read(&record.op, browser_data_namespace(self), browser_run_key(self), a.BUNDLE_LIMIT) {
+		if !storagegd.browser_store_read(&record.op, browser_data_namespace(self), browser_run_key(self), a.BUNDLE_LIMIT) {
 			browser_run_error(self, true)
 			return false
 		}
 		record.phase = .Loading
 		return false
 	}
-	if record.phase != .Loading || rgd.browser_store_poll(&record.op) != .Complete {
+	if record.phase != .Loading || storagegd.browser_store_poll(&record.op) != .Complete {
 		return false
 	}
 	if record.op.error != .None {
 		browser_run_error(self, true)
 		return false
 	}
-	bytes, err := rgd.browser_store_bytes(&record.op)
+	bytes, err := storagegd.browser_store_bytes(&record.op)
 	if err != .None {
 		record.op.error = err
 		browser_run_error(self, true)
 		return false
 	}
 	record.bytes, record.revision, record.revision_known = bytes, record.op.revision, true
-	rgd.browser_store_close(&record.op)
+	storagegd.browser_store_close(&record.op)
 	record.phase = .Loaded
 	return true
 }

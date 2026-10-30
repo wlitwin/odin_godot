@@ -8,6 +8,7 @@ import rt "godot:runtime"
 import rgd "godot:replay/godot"
 import game "../shared/game"
 import "defs"
+import scenegd "godot:replay/godot/scene"
 
 // F6 scene: boots the actual game, waits for normal admission/ready/start, then
 // submits recorded development actions. No renderer-only substitute world.
@@ -65,7 +66,7 @@ workbench_environment :: proc(self: ^ReplayWorkbench, key: cstring, value: strin
 
 replay_workbench_ready :: proc(self: ^ReplayWorkbench) {
 	if self.ability != nil {
-		ctx: rgd.Bake_Context
+		ctx: scenegd.Bake_Context
 		id, _ := defs.bake_ability(cast(gd.Resource)self.ability, &ctx, "$workbench.ability")
 		if ctx.report.error != .None {
 			content_report(&ctx.report)

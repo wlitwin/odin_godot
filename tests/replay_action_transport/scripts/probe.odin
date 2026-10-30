@@ -6,12 +6,12 @@ import r "godot:replay"
 import net "godot:replay/net"
 import tr "godot:replay/transport"
 import sc "godot:replay/schema"
-import rgd "godot:replay/godot"
 import v "godot:replay/view"
+import transportgd "godot:replay/godot/transport"
 
 World :: struct {tick:u64,actions:u32,padding:[4096]u8}
 ReplayActionProbe :: struct {
- owner:gd.Node,enet:rgd.Enet,base,wire:tr.Transport,clock:r.Clock,
+ owner:gd.Node,enet:transportgd.Enet,base,wire:tr.Transport,clock:r.Clock,
  server:net.Server(World,u8,u8,u8,1),client:net.Client(World,u8,u8,u8,1),
  authority,ready,done,armed:bool,sequence,sent_at,elapsed,heartbeat_reliable,heartbeat_unreliable,primary,copies:u64,
 }
@@ -41,8 +41,8 @@ generation :: proc(user:rawptr,id:tr.Peer_Id)->u64 {self:=cast(^ReplayActionProb
 replay_action_probe_ready :: proc(self:^ReplayActionProbe) {
  self.authority=gd.env_string("REPLAY_ACTION_ROLE","")=="host"
  port:=gd.env_int("REPLAY_ACTION_PORT",0);assert(port>0 && port<65536)
- assert(self.authority ? rgd.enet_host(&self.enet,u16(port),1,"127.0.0.1") : rgd.enet_join(&self.enet,"127.0.0.1",u16(port)))
- self.base=rgd.enet_transport(&self.enet);self.wire={user=self,send=send,receive=receive,poll=poll,status=status,connected=connected,generation=generation}
+ assert(self.authority ? transportgd.enet_host(&self.enet,u16(port),1,"127.0.0.1") : transportgd.enet_join(&self.enet,"127.0.0.1",u16(port)))
+ self.base=transportgd.enet_transport(&self.enet);self.wire={user=self,send=send,receive=receive,poll=poll,status=status,connected=connected,generation=generation}
  cfg:=net.DEFAULT_CONFIG;cfg.content=0x41434b5445535431;cfg.unreliable_packet_limit=512;cfg.delta_snapshots=false
  if self.authority {assert(net.server_init(&self.server,r.Frame(World){},model(),self.wire,cfg)==.None)} else {
   assert(net.client_init(&self.client,model(),self.wire,net.Token{0=31},cfg=cfg)==.None)

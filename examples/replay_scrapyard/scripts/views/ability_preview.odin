@@ -5,10 +5,10 @@ package scrap_views
 import "core:fmt"
 import "core:math"
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import d "godot:replay/definitions"
 import defs "../defs"
 import content "../../shared/content"
+import scenegd "godot:replay/godot/scene"
 
 // An isolated visual projection of an authored ability, not a second simulation.
 ScrapAbilityPreview :: struct {
@@ -32,16 +32,16 @@ scrap_ability_preview_ready :: proc(self: ^ScrapAbilityPreview) {
 
 @(gd_method)
 scrap_ability_preview_preview_refresh :: proc(self: ^ScrapAbilityPreview) -> bool {
-	ctx: rgd.Bake_Context
+	ctx: scenegd.Bake_Context
 	_, value := defs.bake_ability(cast(gd.Resource)self.definition, &ctx, "$ability")
 	self.report = ctx.report
 	if ctx.report.error != .None {
 		return false
 	}
 	color := gd.Color{.2, .9, .6, .8}
-	authored := rgd.bake_resource(&ctx, cast(gd.Resource)self.definition, defs.AbilityDef, "$ability")
+	authored := scenegd.bake_resource(&ctx, cast(gd.Resource)self.definition, defs.AbilityDef, "$ability")
 	if authored != nil && authored.status != nil {
-		status := rgd.bake_resource(&ctx, cast(gd.Resource)authored.status, defs.StatusDef, "$ability.status")
+		status := scenegd.bake_resource(&ctx, cast(gd.Resource)authored.status, defs.StatusDef, "$ability.status")
 		if status != nil {
 			color = status.tint
 			color.a = .85

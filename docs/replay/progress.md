@@ -4188,7 +4188,7 @@ movement and one firing action converge to canonical world hash
 native Cavecrawl co-op gate also pass. Logs include the initial buffer failure and
 the test driver's resolved cleanup issue; no retry hides a failed assertion.
 
-See the [adapter contract](../../replay/godot/rtc.md) and
+See the [adapter contract](../../replay/godot/transport/rtc.md) and
 [browser evidence](results/browser-rtc-2026-09-06/README.md). This is local Chrome
 acceptance using a loopback signaling fixture. Public room authentication,
 STUN/TURN reachability, browser migration, P2P browser gameplay, playable game UI
@@ -4805,7 +4805,7 @@ Welcome/reconnect regression and the rerun game gates pass. The failed receipt i
 retained alongside the successful results.
 
 See [results and limits](results/owner-streams-2026-09-05/README.md), [owner state](../../replay/owned/README.md)
-and [Body2](../../replay/godot/body2.md). Full Slopball parity, multi-goal/moving
+and [Body2](../../replay/godot/scene/body2.md). Full Slopball parity, multi-goal/moving
 contests, physics reconnect/migration, dedicated-server parity, scaled-hierarchy
 visual correction, 3D, lobby/feel review and the rest of M4/M8/M9 remain pending.
 The full goal stays active; original Kit, games and sibling Scrapyard remain intact.

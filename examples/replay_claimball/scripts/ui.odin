@@ -9,6 +9,9 @@ import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
 import net "godot:replay/net"
 import game "../shared/pitch"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 Claimball_UI :: struct {
  lobby,score_panel:gd.Control,
@@ -35,7 +38,7 @@ ui_ready :: proc(self:^ReplayClaimball) {
  for label,i in ([2]cstring{"Solo","Host"}) {u.resume[i]=cast(gd.Button)gd.get_node(self.owner,fmt.ctprintf("UI/Lobby/Column/Resume/%s",label))}
  gd.connect_to(u.resume[0],"pressed",self.owner,"on_resume_solo");gd.connect_to(u.resume[1],"pressed",self.owner,"on_resume_host")
  gd.set_string(u.save_path,"text",fmt.ctprintf("%s",gd.IS_WEB ? claimball_param("RCB_SAVE_SLOT","pitch") : claimball_param("RCB_SAVE","user://claimball.replay")))
- rgd.bind_key("rcb_save",.F5)
+ inputgd.bind_key("rcb_save",.F5)
  u.name=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Name/Value")
  u.address=cast(gd.Line_Edit)gd.get_node(self.owner,"UI/Lobby/Column/Address/Value")
  u.port=cast(gd.Spin_Box)gd.get_node(self.owner,"UI/Lobby/Column/Address/Port")
@@ -61,7 +64,7 @@ ui_ready :: proc(self:^ReplayClaimball) {
  for method,i in ([4]cstring{"on_solo","on_host","on_join","on_watch"}) {gd.connect_to(u.doors[i],"pressed",self.owner,method)}
  gd.connect_to(u.start,"pressed",self.owner,"on_start");gd.connect_to(u.leave,"pressed",self.owner,"on_leave")
  gd.connect_to(u.chat_input,"text_submitted",self.owner,"on_chat")
- rgd.bind_key("rcb_chat",.Enter);rgd.bind_key("rcb_scores",.Tab)
+ inputgd.bind_key("rcb_chat",.Enter);inputgd.bind_key("rcb_scores",.Tab)
  profile_ready(self)
  gd.set_string(u.address,"text",fmt.ctprintf("%s",claimball_param("RCB_ADDRESS","127.0.0.1")))
  gd.range_set_value(u.port,f64(claimball_int("RCB_PORT",49490)))
@@ -105,7 +108,7 @@ replay_claimball_on_leave :: proc(self:^ReplayClaimball) {
  self.fast_far_samples,self.watched_samples,self.predicted_samples=0,0,0;self.predicted_members,self.remote_kicks_while_claimed=0,0
  self.resync_seen=0;self.stall_injected=false
  self.ui[0].revision=0;self.ui[0].submitted=false;self.ui[0].was_playing=false;self.ui[0].announce_host=false
- rgd.nodes_clear(&self.players);rgd.nodes_clear(&self.ball)
+ scenegd.nodes_clear(&self.players);scenegd.nodes_clear(&self.ball)
  gd.set_string(self.ui[0].chat_lines,"text","");gd.set_string(self.ui[0].chat_notice,"text","");gd.set_string(self.ui[0].chat_input,"text","")
  gd.control_release_focus(self.ui[0].chat_input);gd.canvas_item_set_visible(self.ui[0].score_panel,false)
  ui_notice(self,"Host a pitch or join one.");ui_frame(self)
@@ -172,7 +175,7 @@ ui_frame :: proc(self:^ReplayClaimball) {
 social_frame :: proc(self:^ReplayClaimball) {
  frame,ok:=rgd.session_authority_state(self.session)
  rgd.session_comms_frame(&self.comms,self.session,ok ? frame.state.names[:] : nil,self.display_name)
- rgd.session_diagnostics_frame(&self.diagnostics,self.session)
+ debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
  u:=&self.ui[0]
  if ok && self.session.authority && self.comms.enabled && u.announce_host {if co.system(&self.comms,"The pitch has a new host")==.None {u.announce_host=false}}
  if ok && self.session.authority && u.round_seen!=frame.state.round {
@@ -226,9 +229,9 @@ replay_claimball_probe :: proc(self:^ReplayClaimball,key:string,wanted:gd.Int=1)
  case "right":return gd.Int(frame.state.score.right)
  case "winner":return gd.Int(frame.state.score.winner)
  }
- if key=="ball_draw_x" || key=="ball_draw_y" {if node,found:=rgd.nodes_get(&self.ball,1);found {return gd.Int(gd.node2d_get_position(node)[key=="ball_draw_x" ? 0 : 1])};return -1}
+ if key=="ball_draw_x" || key=="ball_draw_y" {if node,found:=scenegd.nodes_get(&self.ball,1);found {return gd.Int(gd.node2d_get_position(node)[key=="ball_draw_x" ? 0 : 1])};return -1}
  if wanted<1 || wanted>game.SEATS {return -1};player:=frame.state.players[wanted-1]
- if key=="draw_x" || key=="draw_y" {if node,found:=rgd.nodes_get(&self.players,u64(wanted));found {return gd.Int(gd.node2d_get_position(node)[key=="draw_x" ? 0 : 1])};return -1}
+ if key=="draw_x" || key=="draw_y" {if node,found:=scenegd.nodes_get(&self.players,u64(wanted));found {return gd.Int(gd.node2d_get_position(node)[key=="draw_x" ? 0 : 1])};return -1}
  switch key {case "connected":return gd.Int(player.connected);case "named":return gd.Int(player.named);case "team":return gd.Int(player.team);case "x":return gd.Int(player.motion.position[0]);case "y":return gd.Int(player.motion.position[1]);case "ping_known":return gd.Int(dg.read(&self.diagnostics,u16(wanted)).known)}
  return -1
 }

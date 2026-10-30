@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const file=new URL('../../replay/godot/browser_store.odin',import.meta.url);
+const file=new URL('../../replay/godot/storage/browser_store.odin',import.meta.url);
 const source=fs.readFileSync(file,'utf8').match(/BROWSER_STORE_JS :: `([\s\S]*?)`/)[1];
 assert.equal(vm.runInNewContext(source,{}),0);
 const denied={};Object.defineProperty(denied,'indexedDB',{get(){throw new Error('SecurityError');}});

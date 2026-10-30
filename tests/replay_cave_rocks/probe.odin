@@ -3,6 +3,7 @@ package replay_cavecrawl
 import gd "godot:godot"
 import rgd "godot:replay/godot"
 import r "godot:replay"
+import scenegd "godot:replay/godot/scene"
 
 @(gd_method)
 replay_cave_rock_probe :: proc(self:^ReplayCave,key:string,wanted:gd.Int=0)->gd.Float {
@@ -25,7 +26,7 @@ replay_cave_rock_probe :: proc(self:^ReplayCave,key:string,wanted:gd.Int=0)->gd.
  case "vy":return gd.Float(rock.velocity[1])
  case "left":return gd.Float(rock.left)
  }
- node,found:=rgd.nodes_get(&self.rocks,identity);if !found {return -1}
+ node,found:=scenegd.nodes_get(&self.rocks,identity);if !found {return -1}
  position:=gd.node2d_get_position(node)
  switch key {
  case "draw_x":return gd.Float(position[0])
@@ -40,7 +41,7 @@ replay_cave_rock_probe :: proc(self:^ReplayCave,key:string,wanted:gd.Int=0)->gd.
 
 @(gd_method)
 replay_cave_rock_view :: proc(self:^ReplayCave,key:gd.Int)->gd.Node2d {
- node,_:=rgd.nodes_get(&self.rocks,u64(key));return node
+ node,_:=scenegd.nodes_get(&self.rocks,u64(key));return node
 }
 
 @(gd_method)

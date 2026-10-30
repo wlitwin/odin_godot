@@ -2,7 +2,7 @@ package replay_scrapyard
 
 import gd "godot:godot"
 import net "godot:replay/net"
-import rgd "godot:replay/godot"
+import inputgd "godot:replay/godot/input"
 
 dash_reset :: proc(self: ^ReplayScrapyard) {
 	self.dash_next = false
@@ -14,9 +14,9 @@ dash_submit :: proc(self: ^ReplayScrapyard) {
 	sequence: u64
 	error: net.Error
 	if self.room.ready {
-		sequence, error = rgd.room_intent(&self.room, &self.dash_intent[0])
+		sequence, error = inputgd.room_intent(&self.room, &self.dash_intent[0])
 	} else {
-		sequence, error = rgd.session_intent(self.session, &self.dash_intent[0])
+		sequence, error = inputgd.session_intent(self.session, &self.dash_intent[0])
 	}
 	if error != .None || sequence == 0 {
 		return

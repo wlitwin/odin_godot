@@ -9,6 +9,8 @@ import auth "godot:replay/authority"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/game"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 Spray_Local :: struct {
 	ref: a.Ref,
@@ -33,7 +35,7 @@ Spray_Rig :: struct {
 }
 
 spray_open :: proc(self: ^ReplayScrapyard) -> bool {
-	if rgd.session_assets_init(&self.assets[0], validator = rgd.asset_png_valid) != .None {
+	if rgd.session_assets_init(&self.assets[0], validator = scenegd.asset_png_valid) != .None {
 		return false
 	}
 	for &rig, i in self.spray_rigs {
@@ -61,7 +63,7 @@ spray_open :: proc(self: ^ReplayScrapyard) -> bool {
 spray_adopt :: proc(self: ^ReplayScrapyard, bytes: []u8, persist: bool) -> bool {
 	local := &self.spray_local[0]
 	local.notice_until = gd.time_get_ticks_msec(gd.singleton_time()) + 3000
-	if !rgd.asset_png_valid(nil, {}, bytes) {
+	if !scenegd.asset_png_valid(nil, {}, bytes) {
 		local.error = true
 		gd.print_str("RSY_SPRAY_BAD image")
 		return false
@@ -73,7 +75,7 @@ spray_adopt :: proc(self: ^ReplayScrapyard, bytes: []u8, persist: bool) -> bool 
 		return false
 	}
 	if persist {
-		if err := rgd.storage_write(scrap_param("RSY_SPRAY_STORE", "user://spray.png"), bytes, game.SPRAY_MAX);
+		if err := storagegd.storage_write(scrap_param("RSY_SPRAY_STORE", "user://spray.png"), bytes, game.SPRAY_MAX);
 		   err != .None {
 			local.error = true
 			gd.print_str(fmt.tprintf("RSY_SPRAY_BAD write=%v", err))
@@ -95,7 +97,7 @@ spray_adopt :: proc(self: ^ReplayScrapyard, bytes: []u8, persist: bool) -> bool 
 }
 
 spray_load :: proc(self: ^ReplayScrapyard, path: string, persist: bool) -> bool {
-	bytes, err := rgd.storage_read(path, game.SPRAY_MAX)
+	bytes, err := storagegd.storage_read(path, game.SPRAY_MAX)
 	defer delete(bytes)
 	if err != .None {
 		gd.print_str(fmt.tprintf("RSY_SPRAY_BAD read=%v", err))
@@ -165,7 +167,7 @@ spray_frame :: proc(self: ^ReplayScrapyard, truth: r.Frame(game.World)) {
 		if spray.image != rig.ref && a.cache_has(&self.assets[0].cache, spray.image) {
 			bytes, err := a.cache_copy(&self.assets[0].cache, spray.image)
 			if err == .None {
-				image, ok := rgd.asset_png_image(bytes)
+				image, ok := scenegd.asset_png_image(bytes)
 				if ok {
 					texture := cast(gd.Texture2d)gd.image_texture_create_from_image(image)
 					if texture != nil {
@@ -236,7 +238,7 @@ replay_scrapyard_on_spray_pick :: proc(self: ^ReplayScrapyard) {
 }
 
 spray_close :: proc(self: ^ReplayScrapyard) {
-	rgd.browser_store_close(&self.spray_local[0].web.op)
+	storagegd.browser_store_close(&self.spray_local[0].web.op)
 	delete(self.spray_local[0].web.bytes)
 	if self.spray_local[0].web.pinned != (a.Ref{}) {
 		a.cache_unpin(&self.assets[0].cache, self.spray_local[0].web.pinned)

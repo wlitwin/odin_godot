@@ -32,7 +32,7 @@ resume after deleting the separate spray record. Stale-save conflicts, missing
 images, wrong identities and corruption preserve the source save. A slot named
 `profile` must preserve the profile and default run. The verified browser path is
 solo on local Chrome; Room worlds recover through leases/migration. Browser
-eviction/deletion and the [storage contract](../../replay/godot/browser_store.md) apply.
+eviction/deletion and the [storage contract](../../replay/godot/storage/browser_store.md) apply.
 
 On native, F5 writes the current uncoordinated solo/host authority checkpoint to
 `user://run.replay`. The menu's **Resume solo** opens it with the same local

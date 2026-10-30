@@ -3,29 +3,29 @@ package replay_scrapyard
 import gd "godot:godot"
 import rt "godot:runtime"
 import dg "godot:replay/telemetry"
-import rgd "godot:replay/godot"
+import inputgd "godot:replay/godot/input"
 
 bind_gameplay_actions :: proc() {
 	if !gd.has_action("rsy_left") {
-		rgd.bind_key("rsy_left", .A)
-		rgd.bind_key("rsy_right", .D)
-		rgd.bind_key("rsy_up", .W)
-		rgd.bind_key("rsy_down", .S)
-		rgd.bind_key("rsy_dash", .Shift)
-		rgd.bind_mouse("rsy_fire", .Left)
-		rgd.bind_key("rsy_cast0", .Q)
-		rgd.bind_key("rsy_cast1", .E)
-		rgd.bind_key("rsy_revive", .F)
-		rgd.bind_key("rsy_turret", .T)
-		rgd.bind_key("rsy_buy1", gd.Key('1'))
-		rgd.bind_key("rsy_buy2", gd.Key('2'))
-		rgd.bind_key("rsy_buy3", gd.Key('3'))
-		rgd.bind_key("rsy_buy4", gd.Key('4'))
-		rgd.bind_key("rsy_buy5", gd.Key('9'))
-		rgd.bind_key("rsy_part0", gd.Key('5'))
-		rgd.bind_key("rsy_part1", gd.Key('6'))
-		rgd.bind_key("rsy_part2", gd.Key('7'))
-		rgd.bind_key("rsy_part3", gd.Key('8'))
+		inputgd.bind_key("rsy_left", .A)
+		inputgd.bind_key("rsy_right", .D)
+		inputgd.bind_key("rsy_up", .W)
+		inputgd.bind_key("rsy_down", .S)
+		inputgd.bind_key("rsy_dash", .Shift)
+		inputgd.bind_mouse("rsy_fire", .Left)
+		inputgd.bind_key("rsy_cast0", .Q)
+		inputgd.bind_key("rsy_cast1", .E)
+		inputgd.bind_key("rsy_revive", .F)
+		inputgd.bind_key("rsy_turret", .T)
+		inputgd.bind_key("rsy_buy1", gd.Key('1'))
+		inputgd.bind_key("rsy_buy2", gd.Key('2'))
+		inputgd.bind_key("rsy_buy3", gd.Key('3'))
+		inputgd.bind_key("rsy_buy4", gd.Key('4'))
+		inputgd.bind_key("rsy_buy5", gd.Key('9'))
+		inputgd.bind_key("rsy_part0", gd.Key('5'))
+		inputgd.bind_key("rsy_part1", gd.Key('6'))
+		inputgd.bind_key("rsy_part2", gd.Key('7'))
+		inputgd.bind_key("rsy_part3", gd.Key('8'))
 	}
 }
 

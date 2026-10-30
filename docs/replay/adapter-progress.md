@@ -11,7 +11,7 @@ All six gates in [the plan](adapter-plan.md) are complete.
 | A5 | Optional view descriptors generated over public helpers; signature/declaration checks; existing Kit/scriptgen regression passes |
 | A6 | Public docs, 38 Odin tests, seven codegen cases, eight Godot scenes/adapter cases, low-level lifecycle, native/WASM equality, export/provenance, real revive and crash-takeover gates |
 
-The [API guide](../../replay/godot/adapter-bindings.md) and
+The [API guide](../../replay/godot/scene/adapter-bindings.md) and
 [canonical example](../../examples/replay_scrapyard/authoring-tools.md) describe
 manual/generated declarations, ownership and explicit policy boundaries.
 [Durable receipts](results/adapter-2026-09-21/README.md) record source hashes,

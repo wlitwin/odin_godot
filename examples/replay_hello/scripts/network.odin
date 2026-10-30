@@ -10,8 +10,9 @@ import r "godot:replay"
 import net "godot:replay/net"
 import tr "godot:replay/transport"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import game "../shared/hello"
+import scenegd "godot:replay/godot/scene"
+import transportgd "godot:replay/godot/transport"
 
 ReplayNetwork :: struct {
 	owner: gd.Node2d,
@@ -19,12 +20,12 @@ ReplayNetwork :: struct {
 	effect: gd.Node2d `gd:"onready=Flash"`,
 	clock: r.Clock,
 	buttons: r.Buttons,
-	enet: rgd.Enet,
+	enet: transportgd.Enet,
 	delay: tr.Delay,
 	wire: tr.Transport,
 	server: net.Server(game.World, game.Controls, game.Action, game.Event, 2),
 	client: net.Client(game.World, game.Controls, game.Action, game.Event, 2),
-	views: rgd.Nodes2,
+	views: scenegd.Nodes2,
 	hosting, spectating, dedicated, ready, failed: bool,
 	begins, cancels, applied, rejected: u32,
 	flash: f64,
@@ -43,12 +44,12 @@ replay_network_ready :: proc(self: ^ReplayNetwork) {
 	if port < 1 || port > 65535 || latency < 0 || latency > 10000 || jitter < 0 || jitter > 10000 ||
 	   loss < 0 || loss > 10000 || duplicate < 0 || duplicate > 10000 {replay_network_fail(self, "configuration"); return}
 	ok := false
-	if self.hosting {ok = rgd.enet_host(&self.enet, u16(port), 16)} else {
+	if self.hosting {ok = transportgd.enet_host(&self.enet, u16(port), 16)} else {
 		address := gd.env_string("REPLAY_ADDRESS", "127.0.0.1")
-		ok = rgd.enet_join(&self.enet, fmt.ctprintf("%s", address), u16(port))
+		ok = transportgd.enet_join(&self.enet, fmt.ctprintf("%s", address), u16(port))
 	}
 	if !ok {replay_network_fail(self, "transport"); return}
-	self.wire = rgd.enet_transport(&self.enet)
+	self.wire = transportgd.enet_transport(&self.enet)
 	if latency > 0 || jitter > 0 || loss > 0 || duplicate > 0 {
 		ok = tr.delay_init(&self.delay, self.wire, u32(latency))
 		if !ok {replay_network_fail(self, "delay"); return}
@@ -66,7 +67,7 @@ replay_network_ready :: proc(self: ^ReplayNetwork) {
 		err = net.client_init(&self.client, game.network_model(), self.wire, token, spectator = self.spectating, cfg = cfg)
 	}
 	if err != .None {replay_network_fail(self, fmt.tprintf("initialization %v", err)); return}
-	if !rgd.nodes_load(&self.views, self.owner, "res://actor.tscn", game.CAPACITY) {replay_network_fail(self, "views"); return}
+	if !scenegd.nodes_load(&self.views, self.owner, "res://actor.tscn", game.CAPACITY) {replay_network_fail(self, "views"); return}
 	r.clock_init(&self.clock, cfg.hz)
 	self.ready = true
 	if self.hosting {gd.print_str("REPLAY_NETWORK_HOST_READY")}
@@ -171,7 +172,7 @@ replay_network_paint :: proc(self: ^ReplayNetwork) {
 	if self.spectating {
 		if a, _, _, ok := net.client_observed(&self.client); ok {frame = a}
 	}
-	instances: [game.CAPACITY]rgd.Instance2
+	instances: [game.CAPACITY]scenegd.Instance2
 	n := 0
 	for actor, i in frame.state.actors.values {
 		if !frame.state.actors.alive[i] {continue}
@@ -180,7 +181,7 @@ replay_network_paint :: proc(self: ^ReplayNetwork) {
 			color = actor.owner == 0 ? gd.Color{0.35, 0.85, 1, 1} : gd.Color{1, 0.62, 0.3, 1}}
 		n += 1
 	}
-	assert(rgd.nodes_present(&self.views, instances[:n]))
+	assert(scenegd.nodes_present(&self.views, instances[:n]))
 	role := self.hosting ? "authority" : self.spectating ? "observer" : "predicted player"
 	gd.set_string(self.status, "text", fmt.ctprintf("REPLAY / NETWORK    %s    tick %d\nArrows move   Space fires\nShots %d   effects %d   accepted %d", role, frame.tick, frame.state.shots, self.begins, self.applied))
 }
@@ -193,7 +194,7 @@ replay_network_fail :: proc(self: ^ReplayNetwork, message: string) {
 replay_network_exit_tree :: proc(self: ^ReplayNetwork) {
 	net.server_destroy(&self.server)
 	net.client_destroy(&self.client)
-	rgd.nodes_destroy(&self.views)
+	scenegd.nodes_destroy(&self.views)
 	tr.close(&self.wire)
 }
 

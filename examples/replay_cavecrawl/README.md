@@ -172,7 +172,7 @@ TLS/TURN, richer browser workloads and other browser/OS combinations remain open
 
 
 Set the scene’s `debug_enabled` inspector property or launch with `REPLAY_DEBUG=1`
-for the [local diagnostic overlay](../../replay/godot/debug.md). F8 toggles the panel
+for the [local diagnostic overlay](../../replay/godot/debug/debug.md). F8 toggles the panel
 and F9 explicitly audits recent replayable history. It is disabled by default.
 
 

@@ -4,6 +4,7 @@ import "core:crypto"
 import "core:strings"
 import gd "godot:godot"
 import p "godot:replay/provision"
+import storagegd "godot:replay/godot/storage"
 
 // Native storage is supplied explicitly so using Replay/Godot does not impose a
 // SQLite dependency. The optional godot/provision_sqlite package provides it.
@@ -15,17 +16,17 @@ Enrollment_Backing :: struct {
 Enrollment_Profile :: struct {
 	value: p.Enrollment_Journal,
 	backing: Enrollment_Backing,
-	op: Browser_Store_Op,
+	op: storagegd.Browser_Store_Op,
 	namespace, key: string,
 }
 
 enrollment_profile_open :: proc(e: ^Enrollment_Profile, service: string, content: u64, namespace, key: string,
                                backing: Enrollment_Backing = {}, local_development: bool = false) -> bool {
-	if e.value.phase != .Closed || !browser_store_key(namespace) || !browser_store_key(key) ||
+	if e.value.phase != .Closed || !storagegd.browser_store_key_valid(namespace) || !storagegd.browser_store_key_valid(key) ||
 	   !p.enrollment_open(&e.value, service, content, local_development) {return false}
 	e.namespace, e.key, e.backing = strings.clone(namespace), strings.clone(key), backing
 	when gd.IS_WEB {
-		if !browser_store_read(&e.op, namespace, key, p.ENROLLMENT_BYTES) {
+		if !storagegd.browser_store_read(&e.op, namespace, key, p.ENROLLMENT_BYTES) {
 			p.enrollment_loaded(&e.value, {}, false, 0, .Store); return false
 		}
 	} else {
@@ -40,11 +41,11 @@ enrollment_profile_begin :: proc(e: ^Enrollment_Profile, request: p.Request) -> 
 enrollment_profile_frame :: proc(e: ^Enrollment_Profile) {
 	when gd.IS_WEB {
 		if e.value.phase == .Loading {
-			if browser_store_poll(&e.op) != .Complete {return}
-			defer browser_store_close(&e.op)
+			if storagegd.browser_store_poll(&e.op) != .Complete {return}
+			defer storagegd.browser_store_close(&e.op)
 			if e.op.error == .Missing {p.enrollment_loaded(&e.value, {}, false, 0); return}
 			if e.op.error != .None {p.enrollment_loaded(&e.value, {}, false, 0, enrollment_browser_error(e.op.error)); return}
-			bytes, err := browser_store_bytes(&e.op)
+			bytes, err := storagegd.browser_store_bytes(&e.op)
 			defer {if len(bytes) > 0 {crypto.zero_explicit(raw_data(bytes), len(bytes))}; delete(bytes)}
 			if err != .None {p.enrollment_loaded(&e.value, {}, false, 0, .Store); return}
 			record, ok := p.enrollment_decode(&e.value.codec, bytes, e.value.content, e.value.local_development)
@@ -57,13 +58,13 @@ enrollment_profile_frame :: proc(e: ^Enrollment_Profile) {
 	if !writing {return}
 	when gd.IS_WEB {
 		if e.op.phase == .Idle {
-			if !browser_store_write(&e.op, e.namespace, e.key, bytes, expected, p.ENROLLMENT_BYTES) {
-				p.enrollment_receipt(&e.value, 0, enrollment_browser_error(e.op.error)); browser_store_close(&e.op)
+			if !storagegd.browser_store_write(&e.op, e.namespace, e.key, bytes, expected, p.ENROLLMENT_BYTES) {
+				p.enrollment_receipt(&e.value, 0, enrollment_browser_error(e.op.error)); storagegd.browser_store_close(&e.op)
 			}
 			return
 		}
-		if browser_store_poll(&e.op) == .Complete {
-			p.enrollment_receipt(&e.value, e.op.revision, enrollment_browser_error(e.op.error)); browser_store_close(&e.op)
+		if storagegd.browser_store_poll(&e.op) == .Complete {
+			p.enrollment_receipt(&e.value, e.op.revision, enrollment_browser_error(e.op.error)); storagegd.browser_store_close(&e.op)
 		}
 	} else {
 		revision, error := e.backing.commit(e.backing.user, expected, e.value.candidate)
@@ -71,7 +72,7 @@ enrollment_profile_frame :: proc(e: ^Enrollment_Profile) {
 	}
 }
 enrollment_profile_close :: proc(e: ^Enrollment_Profile) {
-	browser_store_close(&e.op); p.enrollment_close(&e.value); delete(e.namespace); delete(e.key); e^ = {}
+	storagegd.browser_store_close(&e.op); p.enrollment_close(&e.value); delete(e.namespace); delete(e.key); e^ = {}
 }
 
 // The only outbound enrollment request comes from the durable Pending state.
@@ -97,7 +98,7 @@ provision_enrollment_frame :: proc(c: ^Provision_Connection, e: ^Enrollment_Prof
 }
 
 @(private)
-enrollment_browser_error :: proc(error: Browser_Store_Error) -> p.Enrollment_Error {
+enrollment_browser_error :: proc(error: storagegd.Browser_Store_Error) -> p.Enrollment_Error {
 	if error == .None {return .None}
 	if error == .Conflict {return .Conflict}
 	if error == .Corrupt || error == .Size {return .Corrupt}

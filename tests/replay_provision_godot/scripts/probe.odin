@@ -17,6 +17,7 @@ import ck "godot:replay/provision/checkpoint"
 import net "godot:replay/net"
 import r "godot:replay"
 import fixture "../shared/checkpoint_model"
+import transportgd "godot:replay/godot/transport"
 
 ADMIN :: p.Secret{0 = 41}
 INVITE :: p.Secret{0 = 42}
@@ -26,7 +27,7 @@ ProvisionProbe :: struct {
 	server, resume, done, negative, enrollment_mode: bool,
 	started: u64,
 	phase: int,
-	socket: rgd.Websocket,
+	socket: transportgd.Websocket,
 	wire: tr.Transport,
 	tls: gd.Tls_Options,
 	store: db.Store,
@@ -60,7 +61,7 @@ tls_options :: proc(server: bool, cert_path: string) -> gd.Tls_Options {
 connect :: proc(self: ^ProvisionProbe) -> bool {
 	name := self.negative && gd.env_string("PROVISION_NEGATIVE", "") == "hostname" ? "127.0.0.1" : "localhost"
 	url := fmt.tprintf("wss://%s:%d", name, gd.env_int("PROVISION_PORT", 49740))
-	if self.negative {return rgd.websocket_join(&self.socket, url, tls = self.tls)}
+	if self.negative {return transportgd.websocket_join(&self.socket, url, tls = self.tls)}
 	return rgd.provision_connect(&self.connection, url, tls = self.tls) == .None
 }
 provision_probe_ready :: proc(self: ^ProvisionProbe) {
@@ -77,9 +78,9 @@ provision_probe_ready :: proc(self: ^ProvisionProbe) {
 	if !plain {self.tls = tls_options(self.server, cert); if self.tls == nil {fail(self, "TLS options"); return}}
 	if self.negative && gd.env_string("PROVISION_NEGATIVE", "") == "options" {
 		unsafe := gd.tls_options_client_unsafe(nil); defer unref(unsafe)
-		probe: rgd.Websocket
-		if rgd.websocket_join(&probe, "wss://localhost:49740", tls = unsafe) || probe.ready ||
-		   rgd.websocket_host(&probe, 49740, tls = self.tls) || probe.ready {fail(self, "TLS option guards"); return}
+		probe: transportgd.Websocket
+		if transportgd.websocket_join(&probe, "wss://localhost:49740", tls = unsafe) || probe.ready ||
+		   transportgd.websocket_host(&probe, 49740, tls = self.tls) || probe.ready {fail(self, "TLS option guards"); return}
 		gd.print_str("PROVISION_TLS_REJECT_OK"); self.done = true; gd.scene_tree_quit(gd.get_tree(self.owner), 0); return
 	}
 	if self.server {
@@ -87,14 +88,14 @@ provision_probe_ready :: proc(self: ^ProvisionProbe) {
 		existing: [2]p.Bundle
 		count, err := db.load_all(&self.store, 55, existing[:])
 		if err != .None {fail(self, "inventory"); return}
-		if !rgd.websocket_host(&self.socket, u16(gd.env_int("PROVISION_PORT", 49740)), tls = self.tls) {fail(self, "TLS listen"); return}
-		self.wire = rgd.websocket_transport(&self.socket)
+		if !transportgd.websocket_host(&self.socket, u16(gd.env_int("PROVISION_PORT", 49740)), tls = self.tls) {fail(self, "TLS listen"); return}
+		self.wire = transportgd.websocket_transport(&self.socket)
 		cfg := p.HUB_CONFIG; cfg.content, cfg.rooms = 55, 2
 		if p.hub_open(&self.hub, cfg, existing[:count], db.commit, &self.store, auth.native_clock(), self.wire) != .None {fail(self, "hub"); return}
 		gd.print_str(fmt.tprintf("PROVISION_TLS_SERVER_READY rooms=%d", count))
 	} else {
 		if !connect(self) {fail(self, "TLS connect"); return}
-		self.wire = self.negative ? rgd.websocket_transport(&self.socket) : self.connection.client.wire
+		self.wire = self.negative ? transportgd.websocket_transport(&self.socket) : self.connection.client.wire
 	}
 }
 request :: proc(self: ^ProvisionProbe, verb: p.Verb) {
@@ -131,7 +132,7 @@ provision_probe_process :: proc(self: ^ProvisionProbe, dt: f64) {
 	if self.server {
 		tr.poll(&self.wire); buffer: [tr.MAX_PACKET_BYTES]u8
 		for _ in 0 ..< 32 {
-			packet := rgd.websocket_receive(&self.socket, buffer[:]); if packet.state != .Received {break}
+			packet := transportgd.websocket_receive(&self.socket, buffer[:]); if packet.state != .Received {break}
 			if packet.text {continue}
 			if !ck.server_receive(&self.checkpoint_server,packet.from,buffer[:packet.count]) && !p.hub_receive(&self.hub, packet.from, buffer[:packet.count]) {p.hub_control_receive(&self.hub, packet.from, buffer[:packet.count])}
 		}
@@ -218,7 +219,7 @@ provision_probe_process :: proc(self: ^ProvisionProbe, dt: f64) {
 			checkpoint_start(self);return
 		}
 		auth.rpc_client_destroy(&self.rpc)
-		rgd.websocket_close(&self.connection.socket)
+		transportgd.websocket_close(&self.connection.socket)
 		request(self, .Create); self.phase = 7
 	}
 }
@@ -227,7 +228,7 @@ provision_probe_exit_tree :: proc(self: ^ProvisionProbe) {
 	ck.client_close(&self.checkpoint_client);ck.server_close(&self.checkpoint_server)
 	net.server_destroy(&self.checkpoint_game);auth.prepared_destroy(&self.checkpoint_prepared)
 	auth.rpc_client_destroy(&self.rpc); rgd.provision_disconnect(&self.connection); p.hub_close(&self.hub)
-	rgd.websocket_close(&self.socket); db.close(&self.store); unref(self.tls)
+	transportgd.websocket_close(&self.socket); db.close(&self.store); unref(self.tls)
 }
 
 checkpoint_start :: proc(self:^ProvisionProbe) {
@@ -262,5 +263,5 @@ checkpoint_frame :: proc(self:^ProvisionProbe) {
 	if self.resume && self.lease.view.remaining_ms!=0 {fail(self,"download granted authority");return}
 	gd.print_str(fmt.tprintf("PROVISION_CHECKPOINT_DOWNLOAD_OK resume=%t publication=1 tick=1 value=8 incarnation=%d remaining_ms=%d",self.resume,self.lease.identity.incarnation,self.lease.view.remaining_ms))
 	ck.client_close(&self.checkpoint_client);auth.rpc_client_destroy(&self.rpc)
-	rgd.websocket_close(&self.connection.socket);request(self,.Create);self.phase=7
+	transportgd.websocket_close(&self.connection.socket);request(self,.Create);self.phase=7
 }

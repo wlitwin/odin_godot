@@ -56,7 +56,7 @@ deployment is still separate work.
 These remain required work; local planned/crash success does not establish the
 remaining failure matrix or public deployment envelope.
 
-See [WebSocket](../../replay/godot/websocket.md),
+See [WebSocket](../../replay/godot/transport/websocket.md),
 [paired clock](../../replay/authority/paired_clock.md) and
 [rendezvous](../../replay/authority/rendezvous.md) for current APIs and limits.
 This completes no additional milestone by declaration; all remaining gates are

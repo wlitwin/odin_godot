@@ -10,6 +10,7 @@ import sc "godot:replay/schema"
 import v "godot:replay/view"
 import rgd "godot:replay/godot"
 import game "../shared/game"
+import storagegd "godot:replay/godot/storage"
 
 ReplayUnionPeer :: struct {
 	owner:gd.Node,
@@ -22,7 +23,7 @@ ReplayUnionPeer :: struct {
 replay_union_peer_ready :: proc(self:^ReplayUnionPeer) {
 	self.host=gd.env_string("UNION_ROLE","")=="host";self.started=gd.time_get_ticks_msec(gd.singleton_time())
 	options:=rgd.SESSION_OPTIONS;options.role=self.host ? .Host : .Client;options.port=u16(gd.env_int("UNION_PORT",49123))
-	options.token=rgd.session_token(self.host ? "union-host" : "union-client");options.latency_ms=120;options.jitter_ms=20;options.loss_permyriad=500;options.duplicate_permyriad=500
+	options.token=storagegd.session_token(self.host ? "union-host" : "union-client");options.latency_ms=120;options.jitter_ms=20;options.loss_permyriad=500;options.duplicate_permyriad=500
 	err:=rgd.session_open(&self.session,r.Frame(game.Union_World){state={chest=5}},game.union_model(),options)
 	self.ready=err==.None;if !self.ready {gd.print_str(fmt.tprintf("UNION_NET_FAIL open=%v",err));gd.scene_tree_quit(gd.get_tree(self.owner),1)}
 }
@@ -54,7 +55,7 @@ replay_union_peer_process :: proc(self:^ReplayUnionPeer,dt:f64) {
 		codec:sc.Schema;sc.init(&codec,game.Union_World);defer sc.destroy(&codec);bytes:=make([]u8,codec.wire_size);defer delete(bytes)
 		sc.encode(&codec,frame.state,bytes)
 		role:=self.host ? "host" : "client";path:=fmt.tprintf("%s/%s.txt",gd.env_string("UNION_DIR",""),role)
-		text:=fmt.tprintf("%d",sc.digest(bytes));if rgd.storage_write(path,transmute([]u8)text)!=.None {return}
+		text:=fmt.tprintf("%d",sc.digest(bytes));if storagegd.storage_write(path,transmute([]u8)text)!=.None {return}
 		self.reported=true;gd.print_str(fmt.tprintf("UNION_NET_RESULT role=%s hash=%s events=%d verdicts=%d",role,text,self.events,self.verdicts))
 	}
 	if self.reported {

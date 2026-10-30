@@ -9,6 +9,7 @@ import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/game"
 import flow "../shared/flow"
+import scenegd "godot:replay/godot/scene"
 
 Feedback_Burst :: struct {
 	node: gd.Cpu_Particles2d,
@@ -221,7 +222,7 @@ feedback_explode :: proc(self: ^ReplayScrapyard, id: r.Event_Id, position: [2]f3
 			for point in ([3]gd.Vector2{{5, 0}, {-3, -2}, {-3, 2}}) {
 				gd.packed_vector2_array_append(&points, point)
 			}
-			rgd.mesh2_polygon(node, points)
+			scenegd.mesh2_polygon(node, points)
 			gd.free_packed_vector2_array(points)
 			gd.canvas_item_set_self_modulate(node, {0.75, 0.6, 0.4, 1})
 			gd.node2d_set_position(node, position)
@@ -375,7 +376,7 @@ feedback_wall :: proc(self: ^ReplayScrapyard, id: r.Event_Id, event: game.Event)
 			for point in ([3]gd.Vector2{{5, 0}, {-3, -2}, {-3, 2}}) {
 				gd.packed_vector2_array_append(&points, point)
 			}
-			rgd.mesh2_polygon(node, points)
+			scenegd.mesh2_polygon(node, points)
 			gd.free_packed_vector2_array(points)
 			gd.canvas_item_set_self_modulate(node, color)
 			gd.canvas_item_set_z_index(node, 24)
@@ -409,7 +410,7 @@ feedback_ember :: proc(self: ^ReplayScrapyard, id: r.Event_Id, position: [2]f32)
 			for point in ([4]gd.Vector2{{2, 0}, {0, 2}, {-2, 0}, {0, -2}}) {
 				gd.packed_vector2_array_append(&points, point)
 			}
-			rgd.mesh2_polygon(node, points)
+			scenegd.mesh2_polygon(node, points)
 			gd.free_packed_vector2_array(points)
 			gd.canvas_item_set_self_modulate(node, {1, 0.8, 0.45, 0.9})
 			gd.canvas_item_set_z_index(node, 12)
@@ -433,7 +434,7 @@ feedback_wound :: proc(self: ^ReplayScrapyard, id: r.Event_Id, wound: flow.Wound
 			for point in ([3]gd.Vector2{{16, 0}, {2, -7}, {2, 7}}) {
 				gd.packed_vector2_array_append(&points, point)
 			}
-			rgd.mesh2_polygon(node, points)
+			scenegd.mesh2_polygon(node, points)
 			gd.free_packed_vector2_array(points)
 			gd.canvas_item_set_self_modulate(node, {1, 0.24, 0.18, 0.95})
 			gd.canvas_item_set_z_index(node, 26)

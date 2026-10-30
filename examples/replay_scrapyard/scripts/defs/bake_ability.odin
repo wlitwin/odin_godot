@@ -2,45 +2,45 @@ package scrapyard_defs
 
 import "core:fmt"
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import content "../../shared/content"
+import scenegd "godot:replay/godot/scene"
 
-bake_ability :: proc(resource: gd.Resource, ctx: ^rgd.Bake_Context, path: string) -> (u8, content.Ability) {
-	source := rgd.bake_resource(ctx, resource, AbilityDef, path)
+bake_ability :: proc(resource: gd.Resource, ctx: ^scenegd.Bake_Context, path: string) -> (u8, content.Ability) {
+	source := scenegd.bake_resource(ctx, resource, AbilityDef, path)
 	if source == nil {
 		return 0, {}
 	}
-	id := rgd.bake_integer(ctx, u8, source.id, 1, content.MAX_ABILITIES - 1, fmt.tprintf("%s.id", path))
-	family := rgd.bake_integer(ctx, u8, source.family, 0, 5, fmt.tprintf("%s.family", path))
+	id := scenegd.bake_integer(ctx, u8, source.id, 1, content.MAX_ABILITIES - 1, fmt.tprintf("%s.id", path))
+	family := scenegd.bake_integer(ctx, u8, source.family, 0, 5, fmt.tprintf("%s.family", path))
 	result := content.Ability {
 		name = content.name(gd.gd_string_to_odin(source.name)),
 		family = content.Ability_Family(family),
-		cooldown = rgd.bake_integer(ctx, u16, source.cooldown, 1, 3600, fmt.tprintf("%s.cooldown", path)),
+		cooldown = scenegd.bake_integer(ctx, u16, source.cooldown, 1, 3600, fmt.tprintf("%s.cooldown", path)),
 		range = source.range,
 		radius = source.radius,
 		arc_cos = source.arc_cos,
 		speed = source.speed,
-		damage = rgd.bake_integer(ctx, u8, source.dmg, 0, 255, fmt.tprintf("%s.dmg", path)),
+		damage = scenegd.bake_integer(ctx, u8, source.dmg, 0, 255, fmt.tprintf("%s.dmg", path)),
 		status = status_reference(ctx, cast(gd.Resource)source.status, fmt.tprintf("%s.status", path)),
 		self_buff = source.self_buff,
-		duration = rgd.bake_integer(ctx, u16, source.duration, 0, 36000, fmt.tprintf("%s.duration", path)),
-		pulse = rgd.bake_integer(ctx, u16, source.pulse, 1, 600, fmt.tprintf("%s.pulse", path)),
+		duration = scenegd.bake_integer(ctx, u16, source.duration, 0, 36000, fmt.tprintf("%s.duration", path)),
+		pulse = scenegd.bake_integer(ctx, u16, source.pulse, 1, 600, fmt.tprintf("%s.pulse", path)),
 	}
 	if source.turret != nil {
-		turret := rgd.bake_resource(ctx, cast(gd.Resource)source.turret, TurretDef, fmt.tprintf("%s.turret", path))
+		turret := scenegd.bake_resource(ctx, cast(gd.Resource)source.turret, TurretDef, fmt.tprintf("%s.turret", path))
 		if turret == nil {
 			return 0, {}
 		}
 		result.turret = {
-			ammo = rgd.bake_integer(ctx, u16, turret.ammo, 1, 1000, fmt.tprintf("%s.turret.ammo", path)),
-			cadence = rgd.bake_integer(ctx, u16, turret.cadence, 1, 120, fmt.tprintf("%s.turret.cadence", path)),
-			damage = rgd.bake_integer(ctx, u8, turret.damage, 1, 100, fmt.tprintf("%s.turret.damage", path)),
+			ammo = scenegd.bake_integer(ctx, u16, turret.ammo, 1, 1000, fmt.tprintf("%s.turret.ammo", path)),
+			cadence = scenegd.bake_integer(ctx, u16, turret.cadence, 1, 120, fmt.tprintf("%s.turret.cadence", path)),
+			damage = scenegd.bake_integer(ctx, u8, turret.damage, 1, 100, fmt.tprintf("%s.turret.damage", path)),
 			speed = turret.speed,
-			ttl = rgd.bake_integer(ctx, u16, turret.ttl, 1, 600, fmt.tprintf("%s.turret.ttl", path)),
+			ttl = scenegd.bake_integer(ctx, u16, turret.ttl, 1, 600, fmt.tprintf("%s.turret.ttl", path)),
 			use_radius = turret.use_radius,
 		}
 		if !content.turret_valid(result.turret) {
-			rgd.bake_fail(ctx, fmt.tprintf("%s.turret", path), "invalid turret projectile or interaction radius")
+			scenegd.bake_fail(ctx, fmt.tprintf("%s.turret", path), "invalid turret projectile or interaction radius")
 		}
 	}
 	names := [4]string{"range", "radius", "arc_cos", "speed"}
@@ -49,14 +49,14 @@ bake_ability :: proc(resource: gd.Resource, ctx: ^rgd.Bake_Context, path: string
 		lower := i == 2 ? f32(-1) : i == 3 ? f32(1) : f32(0)
 		upper := i == 2 ? f32(1) : i == 3 ? f32(100) : f32(1000)
 		if !content.finite(value) || value < lower || value > upper {
-			rgd.bake_fail(ctx, fmt.tprintf("%s.%s", path, field), "value is nonfinite or outside gameplay bounds")
+			scenegd.bake_fail(ctx, fmt.tprintf("%s.%s", path, field), "value is nonfinite or outside gameplay bounds")
 		}
 	}
 	if result.family == .Zone && result.duration == 0 {
-		rgd.bake_fail(ctx, fmt.tprintf("%s.duration", path), "Zone abilities require a positive duration")
+		scenegd.bake_fail(ctx, fmt.tprintf("%s.duration", path), "Zone abilities require a positive duration")
 	}
 	if !content.ability_valid(result, content.MAX_STATUS) {
-		rgd.bake_fail(ctx, path, "invalid ability values")
+		scenegd.bake_fail(ctx, path, "invalid ability values")
 	}
 	return id, result
 }

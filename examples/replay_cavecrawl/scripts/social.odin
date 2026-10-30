@@ -8,10 +8,11 @@ import p "godot:replay/play"
 import game "../shared/cave"
 import lb "godot:replay/lobby"
 import dg "godot:replay/telemetry"
+import inputgd "godot:replay/godot/input"
 
 Cave_Mark :: struct {node:gd.Node2d,expires:u64,depth:u8,scope:co.Scope,run:u32}
 social_ready :: proc(self:^ReplayCave) {
-	rgd.bind_key("rc_chat",.Enter);rgd.bind_key("rc_scores",.Tab);rgd.bind_key("rc_ping",.F)
+	inputgd.bind_key("rc_chat",.Enter);inputgd.bind_key("rc_scores",.Tab);inputgd.bind_key("rc_ping",.F)
 	gd.connect_to(self.chat_input,"text_submitted",self.owner,"on_chat")
 	for row in 0..<game.SEATS {for column in 0..<8 {self.score_cells[row][column]=cast(gd.Label)gd.get_node(self.owner,fmt.ctprintf("Social/Scoreboard/Column/Grid/Row%d_%d",row,column))}}
 }

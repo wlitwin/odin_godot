@@ -10,9 +10,10 @@ import rgd "godot:replay/godot"
 import game "../shared/game"
 import sound "../shared/audio"
 import flow "../shared/flow"
+import scenegd "godot:replay/godot/scene"
 
 Audio :: struct {
-	route: rgd.Audio_Route(net.Net_Event(game.Event)),
+	route: scenegd.Audio_Route(net.Net_Event(game.Event)),
 	observer: sound.Observer,
 	streams: [sound.Sfx]gd.Audio_Stream,
 	music: [5]gd.Audio_Stream,
@@ -34,7 +35,7 @@ audio_ready :: proc(self: ^ReplayScrapyard) -> bool {
 	if scrap_int("RSY_AUDIO", 1) == 0 || scrap_param("RSY_ROLE", "") == "server" {
 		return true
 	}
-	if !rgd.audio_route_init_change(
+	if !scenegd.audio_route_init_change(
 		&a.route,
 		self.world_node,
 		1,
@@ -62,10 +63,10 @@ audio_ready :: proc(self: ^ReplayScrapyard) -> bool {
 
 audio_volume :: proc(self: ^ReplayScrapyard, volume: f32) {
 	self.audio[0].volume = volume
-	rgd.audio_pool_volume(&self.audio[0].route.pool, volume)
+	scenegd.audio_pool_volume(&self.audio[0].route.pool, volume)
 }
 
-audio_cue :: proc(self: ^ReplayScrapyard, cue: sound.Cue) -> rgd.Audio_Cue {
+audio_cue :: proc(self: ^ReplayScrapyard, cue: sound.Cue) -> scenegd.Audio_Cue {
 	return {
 		stream = self.audio[0].streams[cue.kind],
 		position = cue.position,
@@ -85,7 +86,7 @@ audio_direct :: proc(self: ^ReplayScrapyard, cue: sound.Cue) {
 		a.jitter = a.jitter * 1664525 + 1013904223
 		value.pitch = 0.92 + f32(a.jitter >> 16 & 255) / 255 * 0.16
 	}
-	if rgd.audio_play(&self.audio[0].route.pool, value) {
+	if scenegd.audio_play(&self.audio[0].route.pool, value) {
 		self.audio[0].played[cue.kind] += 1
 	}
 	self.audio[0].shake = min(self.audio[0].shake + cue.jolt, 8)
@@ -108,29 +109,29 @@ audio_prepare :: proc(self: ^ReplayScrapyard) {
 			}
 		}
 		if epoch == a.route.ledger.epoch {
-			rgd.audio_route_retire(&a.route, baseline)
+			scenegd.audio_route_retire(&a.route, baseline)
 		} else {
-			rgd.audio_route_epoch(&a.route, epoch, baseline)
+			scenegd.audio_route_epoch(&a.route, epoch, baseline)
 		}
-		rgd.audio_pool_clear(&a.route.pool)
+		scenegd.audio_pool_clear(&a.route.pool)
 		a.observer = {}
 		a.scoped = true
 	}
 	if !self.session.authority && self.session.client.view_reset != a.view_reset {
 		a.observer = {}
 		a.view_reset = self.session.client.view_reset
-		rgd.audio_pool_clear(&a.route.pool)
+		scenegd.audio_pool_clear(&a.route.pool)
 	}
 	frontier :=
 		self.session.authority ? self.session.server.timeline.head : min(self.session.client.journal.confirmed, self.session.client.journal.watch_tick)
 	floor := max(baseline, frontier > 512 ? frontier - 512 : 0)
 	if floor > a.route.ledger.floor {
-		rgd.audio_route_retire(&a.route, floor)
+		scenegd.audio_route_retire(&a.route, floor)
 	}
 }
 
 // Full change context preserves deterministic pitch and historical wound lookup.
-audio_project :: proc(raw: rawptr, change: v.Change(net.Net_Event(game.Event))) -> (rgd.Audio_Cue, bool) {
+audio_project :: proc(raw: rawptr, change: v.Change(net.Net_Event(game.Event))) -> (scenegd.Audio_Cue, bool) {
 	self := cast(^ReplayScrapyard)raw
 	if change.occurrence.value.kind != .Gameplay {
 		return {}, false
@@ -158,7 +159,7 @@ audio_event :: proc(self: ^ReplayScrapyard, change: v.Change(net.Net_Event(game.
 	if !a.ready {
 		return
 	}
-	if rgd.audio_route_change(&a.route, change) {
+	if scenegd.audio_route_change(&a.route, change) {
 		event := change.occurrence.value.value
 		cue, _ := sound.gameplay(event)
 		a.played[cue.kind] += 1
@@ -228,7 +229,7 @@ audio_frame :: proc(self: ^ReplayScrapyard, dt: f64) {
 
 audio_close :: proc(self: ^ReplayScrapyard) {
 	a := &self.audio[0]
-	rgd.audio_route_destroy(&a.route)
+	scenegd.audio_route_destroy(&a.route)
 	for deck in a.deck {
 		if deck != nil {
 			gd.audio_stream_player_stop(deck)

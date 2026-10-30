@@ -4,9 +4,10 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import tr "godot:replay/transport"
 import game "../shared/duel"
+import transportgd "godot:replay/godot/transport"
 // The embedding app supplies only this participant's provisioned credential in
 // sessionStorage, never in a join URL. The local gate uses explicitly test keys.
-duel_admission_open :: proc(self:^ReplayDuel,url:string)->(rgd.Rtc_Config,bool) {
+duel_admission_open :: proc(self:^ReplayDuel,url:string)->(transportgd.Rtc_Config,bool) {
  if self.online_enabled {return rgd.p2p_party_rtc(&self.online)}
  when gd.IS_WEB {
   self.authenticated=duel_int("RDP_AUTH",0)==1
@@ -36,7 +37,7 @@ duel_admitted_remote :: proc(self:^ReplayDuel,physical:tr.Peer_Id)->bool {
   gd.print_str(fmt.tprintf("RDP_ADMITTED physical=%d member=%d incarnation=%d encrypted=true",self.direct.peer,identity.member,identity.incarnation))
   return true
  } else {
- identity,ok:=rgd.rtc_peer_identity(&self.rtc,physical)
+ identity,ok:=transportgd.rtc_peer_identity(&self.rtc,physical)
  if !ok || identity.member!=(self.listening ? 2 : 1) {duel_fail(self,"unverified roster binding");return false}
  gd.print_str(fmt.tprintf("RDP_ADMITTED physical=%d member=%d incarnation=%d",physical,identity.member,identity.incarnation))
  return true

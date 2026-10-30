@@ -17,13 +17,18 @@ import v "godot:replay/view"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
 import lb "godot:replay/lobby"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
+import transportgd "godot:replay/godot/transport"
 
 ReplayCave :: struct {
 	owner: gd.Node2d,
 	browser:Cave_Browser,
 	online:Cave_Online,
 	online_code:gd.Line_Edit `gd:"onready=Lobby/Panel/Column/PartyCode"`,
-	name_profile:rgd.Name_Profile,
+	name_profile:storagegd.Name_Profile,
 	name_loaded,use_lobby,menu_launch,lobby_menu_open:bool,
 	profile_epoch,profile_retry:u64,
 	profile_name:lb.Name,
@@ -52,7 +57,7 @@ ReplayCave :: struct {
 	floor_scenes:[2]gd.Packed_Scene,
 	scatter_checksum:u32,
 	debug_enabled:bool `gd:"export"`,
-	debug:rgd.Debug_Overlay,
+	debug:debuggd.Debug_Overlay,
 	stage: gd.Node2d `gd:"onready=Stage"`,
 	status: gd.Label `gd:"onready=Status"`,
 	inventory: gd.Label `gd:"onready=Inventory"`,
@@ -60,7 +65,7 @@ ReplayCave :: struct {
 	session: ^rgd.Session(game.World, game.Control, game.Action, game.Event, game.SEATS),
 	standalone: rgd.Session(game.World, game.Control, game.Action, game.Event, game.SEATS),
 	room: rgd.Room(game.World, game.Control, game.Action, game.Event, game.SEATS),
-	players, chest, door, relic, dwellers, pickups, rocks: rgd.Nodes2,
+	players, chest, door, relic, dwellers, pickups, rocks: scenegd.Nodes2,
 	scenery: gd.Node,
 	scenery_depth: u8,
 	scenery_seed:u32,
@@ -79,7 +84,7 @@ ReplayCave :: struct {
 }
 
 replay_cave_ready :: proc(self: ^ReplayCave) {
-	if self.debug_enabled || gd.launch_param("REPLAY_DEBUG","debug","0")=="1" {rgd.debug_overlay_init(&self.debug,self.owner,true)}
+	if self.debug_enabled || gd.launch_param("REPLAY_DEBUG","debug","0")=="1" {debuggd.debug_overlay_init(&self.debug,self.owner,true)}
 	self.session = &self.standalone
 	if !comms.init(&self.comms) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
 	if !dg.init(&self.diagnostics) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
@@ -102,7 +107,7 @@ replay_cave_connect :: proc(self:^ReplayCave,role:string,resume:bool) {
 	if !definitions_load(self) {gd.set_string(self.lobby_status,"text","Floor definition is invalid.");return}
 	opts := rgd.SESSION_OPTIONS
 	if !rgd.session_comms_enable(&opts) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
-	if !rgd.session_diagnostics_enable(&opts) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
+	if !debuggd.session_diagnostics_enable(&opts) {gd.scene_tree_quit(gd.get_tree(self.owner),1);return}
 	switch role {
 	case "host": opts.role = .Host
 	case "server": opts.role = .Server
@@ -117,10 +122,10 @@ replay_cave_connect :: proc(self:^ReplayCave,role:string,resume:bool) {
 	if self.menu_launch {value:=gd.line_edit_get_text(self.lobby_address);address=gd.gd_string_to_odin(value,context.temp_allocator);gd.free_string(value)}
 	opts.address = fmt.ctprintf("%s",address)
 	label := cave_param("REPLAY_CAVE_TOKEN", "")
-	if self.online.launch {opts.token = self.online.grant.token} else if label != "" {opts.token = rgd.session_token(label)} else {
+	if self.online.launch {opts.token = self.online.grant.token} else if label != "" {opts.token = storagegd.session_token(label)} else {
 		when gd.IS_WEB {opts.token=self.browser.token} else {
 		profile := cave_param("REPLAY_CAVE_PROFILE", self.menu_launch ? "user://player.token" : fmt.tprintf("user://%s.token", role))
-		token, err := rgd.session_profile(profile)
+		token, err := storagegd.session_profile(profile)
 		if err != .None {gd.print_str(fmt.tprintf("REPLAY_CAVE_FAIL profile=%v", err)); return}
 		opts.token = token
 		}
@@ -170,7 +175,7 @@ replay_cave_connect :: proc(self:^ReplayCave,role:string,resume:bool) {
 			// The slot owns its archive. Borrow only for this synchronous resume.
 			cp=self.browser.save.checkpoint
 		} else {
-			result := rgd.checkpoint_read(&cp, game.model(), cave_param("REPLAY_CAVE_SAVE", "user://cave.replay"), opts.network.content)
+			result := storagegd.checkpoint_read(&cp, game.model(), cave_param("REPLAY_CAVE_SAVE", "user://cave.replay"), opts.network.content)
 			if result.error != .None {gd.set_string(self.lobby_status,"text",fmt.ctprintf("Cannot load save: %v",result.error));gd.print_str(fmt.tprintf("REPLAY_CAVE_FAIL load=%v", result)); return}
 		}
 		seat, _ := net.checkpoint_seat(&cp, opts.token)
@@ -184,13 +189,13 @@ replay_cave_connect :: proc(self:^ReplayCave,role:string,resume:bool) {
 	if err != .None {
 		gd.set_string(self.lobby_status,"text",fmt.ctprintf("Connection failed: %v",err));gd.print_str(fmt.tprintf("REPLAY_CAVE_FAIL init=%v", err)); return
 	}
-	self.ready = rgd.nodes_load(&self.players, self.stage, "res://views/spelunker.tscn", game.SEATS) &&
-	             rgd.nodes_load(&self.chest, self.stage, "res://views/chest.tscn", 1) &&
-	             rgd.nodes_load(&self.door, self.stage, "res://views/door.tscn", 1) &&
-	             rgd.nodes_load(&self.relic, self.stage, "res://views/relic.tscn", 1) &&
-	             rgd.nodes_load(&self.dwellers, self.stage, "res://views/dweller.tscn", 16) &&
-	             rgd.nodes_load(&self.pickups, self.stage, "res://views/pickup.tscn", 48) &&
-	             rgd.nodes_load(&self.rocks, self.stage, "res://views/rock.tscn", 64)
+	self.ready = scenegd.nodes_load(&self.players, self.stage, "res://views/spelunker.tscn", game.SEATS) &&
+	             scenegd.nodes_load(&self.chest, self.stage, "res://views/chest.tscn", 1) &&
+	             scenegd.nodes_load(&self.door, self.stage, "res://views/door.tscn", 1) &&
+	             scenegd.nodes_load(&self.relic, self.stage, "res://views/relic.tscn", 1) &&
+	             scenegd.nodes_load(&self.dwellers, self.stage, "res://views/dweller.tscn", 16) &&
+	             scenegd.nodes_load(&self.pickups, self.stage, "res://views/pickup.tscn", 48) &&
+	             scenegd.nodes_load(&self.rocks, self.stage, "res://views/rock.tscn", 64)
 	if self.ready {gd.print_str("REPLAY_CAVE_READY")}
 }
 
@@ -198,18 +203,18 @@ install_controls :: proc() {
 	if gd.has_action("rc_use") {return}
 	names := [7]cstring{"rc_left", "rc_right", "rc_up", "rc_down", "rc_use", "rc_drop", "rc_heal"}
 	keys := [7]i64{i64('A'), i64('D'), i64('W'), i64('S'), i64('E'), i64('Q'), i64('R')}
-	for name, i in names {rgd.bind_key(name, gd.Key(keys[i]))}
-	rgd.bind_key("rc_set_down", gd.Key('G'))
-	rgd.bind_mouse("rc_throw", .Left)
-	rgd.bind_key("rc_save", .F5)
+	for name, i in names {inputgd.bind_key(name, gd.Key(keys[i]))}
+	inputgd.bind_key("rc_set_down", gd.Key('G'))
+	inputgd.bind_mouse("rc_throw", .Left)
+	inputgd.bind_key("rc_save", .F5)
 }
 
 replay_cave_process :: proc(self: ^ReplayCave, dt: f64) {
-	defer rgd.debug_session_frame(&self.debug,self.session)
+	defer debuggd.debug_session_frame(&self.debug,self.session)
 	online_frame(self)
 	browser_cave_frame(self)
 	lobby_frame(self)
-	if !self.ready {rgd.session_diagnostics_frame(&self.diagnostics,self.session);return}
+	if !self.ready {debuggd.session_diagnostics_frame(&self.diagnostics,self.session);return}
 	if cave_moderation_removed(self) {return}
 	if gd.is_action_just_pressed("ui_cancel") && !gd.control_has_focus(self.chat_input,false) {self.lobby_menu_open=!self.lobby_menu_open}
 	typing:=social_input(self) || lobby_waiting(self) || self.lobby_menu_open
@@ -242,7 +247,7 @@ replay_cave_process :: proc(self: ^ReplayCave, dt: f64) {
 	cave_motion_control(self,dt,&control)
 	cave_motion_flush(self)
 	err := self.room.ready ? rgd.room_frame(&self.room, dt, control) : rgd.session_frame(self.session, dt, control)
-	rgd.session_diagnostics_frame(&self.diagnostics,self.session)
+	debuggd.session_diagnostics_frame(&self.diagnostics,self.session)
 	if cave_moderation_removed(self) {return}
 	if err != .None {
 		gd.print_str(fmt.tprintf("REPLAY_CAVE_FAIL frame=%v", err)); return
@@ -251,7 +256,7 @@ replay_cave_process :: proc(self: ^ReplayCave, dt: f64) {
 		self.noticed_migration = self.room.migrations
 		self.recovery_notice_until = gd.time_get_ticks_msec(gd.singleton_time()) + 4000
 	}
-	if !rgd.session_tick_phase(self.session,&self.rock_phase,dt) {self.rock_phase.fraction=0}
+	if !scenegd.session_tick_phase(self.session,&self.rock_phase,dt) {self.rock_phase.fraction=0}
 	cave_feedback_prepare(self,dt)
 	changes: [320]v.Change(net.Net_Event(game.Event))
 	n := rgd.session_changes(self.session, changes[:])
@@ -302,29 +307,29 @@ replay_cave_paint :: proc(self: ^ReplayCave) {
 		gd.print_str(fmt.tprintf("REPLAY_CAVE_SCATTER depth=%d sum=%d",w.depth,decoration.checksum))
 		self.scenery_depth,self.scenery_seed = w.depth,w.seed
 	}
-	instances: [64]rgd.Instance2
+	instances: [64]scenegd.Instance2
 	n := 0
 	for player, i in w.players {
 		if !player.connected {continue}
 		instances[n] = instance(u64(i + 1), player.position, {1, 1, 1, 1}); n += 1
 	}
-	rgd.nodes_present(&self.players, instances[:n])
+	scenegd.nodes_present(&self.players, instances[:n])
 	for player, i in w.players {
-		if node, found := rgd.nodes_get(&self.players, u64(i + 1)); found {gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), player.hp > 0 ? "⛏" : "💀")}
+		if node, found := scenegd.nodes_get(&self.players, u64(i + 1)); found {gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), player.hp > 0 ? "⛏" : "💀")}
 	}
-	instances[0] = instance(1, def.chest, {1, 1, 1, 1}); rgd.nodes_present(&self.chest, instances[:1])
-	instances[0] = instance(1, def.door, {1, 1, 1, 1}); rgd.nodes_present(&self.door, instances[:1])
-	if node, found := rgd.nodes_get(&self.door, 1); found {gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), w.door_open ? "🕳" : "🚪")}
-	instances[0] = instance(1, w.relic.position, {1, 1, 1, 1}); rgd.nodes_present(&self.relic, instances[:1])
+	instances[0] = instance(1, def.chest, {1, 1, 1, 1}); scenegd.nodes_present(&self.chest, instances[:1])
+	instances[0] = instance(1, def.door, {1, 1, 1, 1}); scenegd.nodes_present(&self.door, instances[:1])
+	if node, found := scenegd.nodes_get(&self.door, 1); found {gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), w.door_open ? "🕳" : "🚪")}
+	instances[0] = instance(1, w.relic.position, {1, 1, 1, 1}); scenegd.nodes_present(&self.relic, instances[:1])
 	n = 0
 	for entity, i in w.dwellers.values {
 		if !w.dwellers.alive[i] {continue}
 		instances[n] = instance(u64(w.dwellers.generations[i]) << 32 | u64(i + 1), entity.position, {1, 1, 1, 1}); n += 1
 	}
-	rgd.nodes_present(&self.dwellers, instances[:n])
+	scenegd.nodes_present(&self.dwellers, instances[:n])
 	for entity, i in w.dwellers.values {
 		if !w.dwellers.alive[i] {continue}
-		if node, found := rgd.nodes_get(&self.dwellers, u64(w.dwellers.generations[i]) << 32 | u64(i + 1)); found {
+		if node, found := scenegd.nodes_get(&self.dwellers, u64(w.dwellers.generations[i]) << 32 | u64(i + 1)); found {
 			gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), entity.mood == 1 ? "😈" : entity.mood == 2 ? "💨" : "🦇")
 		}
 	}
@@ -333,10 +338,10 @@ replay_cave_paint :: proc(self: ^ReplayCave) {
 		if !w.pickups.alive[i] {continue}
 		instances[n] = instance(u64(w.pickups.generations[i]) << 32 | u64(i + 1), entity.position, {1, 1, 1, 1}); n += 1
 	}
-	rgd.nodes_present(&self.pickups, instances[:n])
+	scenegd.nodes_present(&self.pickups, instances[:n])
 	for entity, i in w.pickups.values {
 		if !w.pickups.alive[i] {continue}
-		if node, found := rgd.nodes_get(&self.pickups, u64(w.pickups.generations[i]) << 32 | u64(i + 1)); found {
+		if node, found := scenegd.nodes_get(&self.pickups, u64(w.pickups.generations[i]) << 32 | u64(i + 1)); found {
 			gd.set_text(cast(gd.Object)gd.get_node(node, "Glyph"), entity.stack.item == game.GEM ? "💎" : "🔦")
 		}
 	}
@@ -346,8 +351,8 @@ replay_cave_paint :: proc(self: ^ReplayCave) {
 		position:=cave_rock_position(&w,i,self.rock_phase.fraction)
 		instances[n] = instance(u64(w.rocks.generations[i]) << 32 | u64(i + 1), position, {1, 1, 1, 1}); n += 1
 	}
-	rgd.nodes_present(&self.rocks, instances[:n])
-	for inst in instances[:n] {if node,exists:=rgd.nodes_get(&self.rocks,inst.key);exists {
+	scenegd.nodes_present(&self.rocks, instances[:n])
+	for inst in instances[:n] {if node,exists:=scenegd.nodes_get(&self.rocks,inst.key);exists {
 		glyph:=cast(gd.Control)gd.get_node(node,"Glyph")
 		gd.control_set_position(glyph,-gd.control_get_combined_minimum_size(glyph)*.5,false)
 	}}
@@ -380,20 +385,20 @@ replay_cave_paint :: proc(self: ^ReplayCave) {
 	}
 }
 
-instance :: proc(key: u64, position: [2]f32, color: gd.Color) -> rgd.Instance2 {return {key = key, pose = {position = position}, scale = {1, 1}, color = color}}
+instance :: proc(key: u64, position: [2]f32, color: gd.Color) -> scenegd.Instance2 {return {key = key, pose = {position = position}, scale = {1, 1}, color = color}}
 
 replay_cave_exit_tree :: proc(self: ^ReplayCave) {
 	cave_feedback_destroy(self)
 	browser_cave_close(self)
-	rgd.name_profile_close(&self.name_profile)
+	storagegd.name_profile_close(&self.name_profile)
 	comms.destroy(&self.comms)
 	dg.destroy(&self.diagnostics)
 	definitions_close(self)
-	rgd.debug_overlay_destroy(&self.debug)
+	debuggd.debug_overlay_destroy(&self.debug)
 	if self.room.ready {rgd.room_close(&self.room)} else if self.session != nil {rgd.session_close(self.session)}
 	online_close(self)
-	rgd.nodes_destroy(&self.players); rgd.nodes_destroy(&self.chest); rgd.nodes_destroy(&self.door)
-	rgd.nodes_destroy(&self.relic); rgd.nodes_destroy(&self.dwellers); rgd.nodes_destroy(&self.pickups); rgd.nodes_destroy(&self.rocks)
+	scenegd.nodes_destroy(&self.players); scenegd.nodes_destroy(&self.chest); scenegd.nodes_destroy(&self.door)
+	scenegd.nodes_destroy(&self.relic); scenegd.nodes_destroy(&self.dwellers); scenegd.nodes_destroy(&self.pickups); scenegd.nodes_destroy(&self.rocks)
 }
 
 @(gd_method)
@@ -592,7 +597,7 @@ replay_cave_probe_near :: proc(self:^ReplayCave,x,y:f64)->bool {
 }
 
 @(gd_method)
-replay_cave_drop_signaling :: proc(self:^ReplayCave) {rgd.rtc_drop_signaling(&self.session.rtc)}
+replay_cave_drop_signaling :: proc(self:^ReplayCave) {transportgd.rtc_drop_signaling(&self.session.rtc)}
 @(gd_method)
 replay_cave_probe_signaling :: proc(self:^ReplayCave,field:gd.Int)->gd.Int {
  switch field {

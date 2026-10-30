@@ -8,27 +8,29 @@ import v "godot:replay/view"
 import game "../shared/game"
 import display "../shared/presentation"
 import views "views"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
 
 Turret_Bridge :: struct {
-	pool: rgd.View_Pool2(game.Turret, display.Turret_View, ^views.ScrapTurretView),
-	binding: rgd.Script_View(display.Turret_View, views.ScrapTurretView),
+	pool: scenegd.View_Pool2(game.Turret, display.Turret_View, ^views.ScrapTurretView),
+	binding: scenegd.Script_View(display.Turret_View, views.ScrapTurretView),
 	scope: v.Scope_Tracker(Combat_View_Key),
 }
 
 turret_bridge_init :: proc(self: ^ReplayScrapyard) -> bool {
 	bridge := &self.turret_bridge[0]
 	bridge.binding = views.scrap_turret_view_replay_binding()
-	return rgd.view_pool_load(
+	return scenegd.view_pool_load(
 		&bridge.pool,
 		self.world_node,
 		"res://entities/turret.tscn",
 		game.MAX_TURRETS,
-		rgd.script_view_binding(&bridge.binding),
+		scenegd.script_view_binding(&bridge.binding),
 	)
 }
 
 turret_bridge_close :: proc(self: ^ReplayScrapyard) {
-	rgd.view_pool_destroy(&self.turret_bridge[0].pool)
+	scenegd.view_pool_destroy(&self.turret_bridge[0].pool)
 	self.turret_bridge[0] = {}
 }
 
@@ -47,8 +49,8 @@ turret_bridge_paint :: proc(self: ^ReplayScrapyard, world: game.World) {
 		return
 	}
 	batch := display.turrets(world)
-	if rgd.view_pool_present(&bridge.pool, scope, batch.items[:batch.count]) != .None {
-		report := rgd.view_pool_problem(&bridge.pool)
+	if scenegd.view_pool_present(&bridge.pool, scope, batch.items[:batch.count]) != .None {
+		report := scenegd.view_pool_problem(&bridge.pool)
 		content_report(&report)
 		fail(self, "turret view")
 	}
@@ -71,9 +73,9 @@ turret_intent_capture :: proc(self: ^ReplayScrapyard, world: ^game.World, seat: 
 
 turret_intent_submit :: proc(self: ^ReplayScrapyard) {
 	if self.room.ready {
-		rgd.room_intent(&self.room, &self.turret_intent[0])
+		inputgd.room_intent(&self.room, &self.turret_intent[0])
 	} else {
-		rgd.session_intent(self.session, &self.turret_intent[0])
+		inputgd.session_intent(self.session, &self.turret_intent[0])
 	}
 }
 
@@ -100,7 +102,7 @@ replay_scrapyard_turret_probe :: proc(self: ^ReplayScrapyard, key: string, seat:
 	case "count":
 		return gd.Int(frame.state.turrets.count)
 	case "views":
-		return gd.Int(rgd.view_pool_stats(&self.turret_bridge[0].pool).count)
+		return gd.Int(scenegd.view_pool_stats(&self.turret_bridge[0].pool).count)
 	case "pending":
 		return gd.Int(self.turret_intent[0].pending_count)
 	case "refused":

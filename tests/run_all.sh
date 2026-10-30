@@ -97,6 +97,7 @@ TESTS=(
     "kitsim|KITSIM_OK|tests/kitsim/run.sh"
     # Experimental whole-world replay: native behavior, WASM type-check, demo.
     "replay|REPLAY_OK|tests/replay/run.sh"
+    "replaypackages|REPLAY_PACKAGES_OK|tests/replay_packages/run.sh"
     "replaystormcaller|REPLAY_STORMCALLER_OK|tests/replay_stormcaller/run.sh"
     "replayeditor|REPLAY_EDITOR_OK|tests/replay_editor/run.sh"
     "replayscrapbridge|REPLAY_SCRAP_BRIDGE_OK|tests/replay_scrapyard_bridge/run.sh"

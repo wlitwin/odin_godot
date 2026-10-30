@@ -14,18 +14,18 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/current" "$work/legacy"
 cat >"$work/current/binding.odin" <<'ODIN'
 package script_view_contract
-import rgd "godot:replay/godot"
 import defs "godot:replay/definitions"
+import scenegd "godot:replay/godot/scene"
 Script :: struct {}
-binding :: proc() -> rgd.Script_View(u8, Script) {
+binding :: proc() -> scenegd.Script_View(u8, Script) {
 	return {validate = proc(_: ^Script) -> defs.Report {return {}}}
 }
 ODIN
 cat >"$work/legacy/binding.odin" <<'ODIN'
 package script_view_contract
-import rgd "godot:replay/godot"
+import scenegd "godot:replay/godot/scene"
 Script :: struct {}
-binding :: proc() -> rgd.Script_View(u8, Script) {
+binding :: proc() -> scenegd.Script_View(u8, Script) {
 	return {valid = proc(_: ^Script) -> bool {return true}}
 }
 ODIN
@@ -44,11 +44,15 @@ for target in native wasm; do
 done
 
 mkdir -p "$work/private"
-for symbol in browser_checkpoint_fail view_pool_fail party_scope script_view_resolve View_Pool_Entry Effect_Identity; do
-    printf 'package private_surface\nimport replaygd "godot:replay/godot"\nLeaked :: replaygd.%s\n' \
-        "$symbol" >"$work/private/probe.odin"
+for entry in \
+    'godot|browser_checkpoint_fail' 'godot|party_scope' \
+    'godot/scene|view_pool_fail' 'godot/scene|script_view_resolve' \
+    'godot/scene|View_Pool_Entry' 'godot/scene|Effect_Identity'; do
+    IFS='|' read -r package_path symbol <<<"$entry"
+    printf 'package private_surface\nimport api "godot:replay/%s"\nLeaked :: api.%s\n' \
+        "$package_path" "$symbol" >"$work/private/probe.odin"
     if odin check "$work/private" -collection:godot="$ROOT" -no-entry-point >"$work/private.log" 2>&1; then
-        echo "Unexpected public Replay Godot API: $symbol" >&2
+        echo "Unexpected public Replay Godot API: $package_path.$symbol" >&2
         exit 1
     fi
     if ! grep -Fq "'$symbol' is not exported" "$work/private.log"; then

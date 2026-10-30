@@ -6,7 +6,6 @@ import "core:testing"
 import auth "godot:replay/authority"
 import ck "godot:replay/provision/checkpoint"
 import db "godot:replay/provision/sqlite"
-import rgd "godot:replay/godot"
 import tr "godot:replay/transport"
 import f "publication_fixture"
 

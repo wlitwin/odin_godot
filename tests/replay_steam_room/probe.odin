@@ -1,11 +1,12 @@
 package replay_cavecrawl
 import gd "godot:godot"
 import rgd "godot:replay/godot"
+import transportgd "godot:replay/godot/transport"
 
 steam_room_configure :: proc(self:^ReplayCave,options:^rgd.Session_Options)->bool {
  fake:=cast(gd.Object)gd.get_node(self.owner,"FakeSteam")
- if !self.test_steam.ready && rgd.steam_runtime_initialize(&self.test_steam,fake,480)!=.None {return false}
- options.backend=.Steam;options.steam=rgd.STEAM_CONFIG
+ if !self.test_steam.ready && transportgd.steam_runtime_initialize(&self.test_steam,fake,480)!=.None {return false}
+ options.backend=.Steam;options.steam=transportgd.STEAM_CONFIG
  options.steam.runtime=&self.test_steam;options.steam.virtual_port=u16(cave_int("STEAM_VIRTUAL_PORT",0))
  options.steam.factory_user=self
  options.steam.peer_factory=proc(raw:rawptr)->gd.Variant {

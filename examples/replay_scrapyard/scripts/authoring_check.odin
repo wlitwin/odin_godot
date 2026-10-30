@@ -7,7 +7,6 @@ import "core:strings"
 import "core:encoding/json"
 import gd "godot:godot"
 import d "godot:replay/definitions"
-import rgd "godot:replay/godot"
 import r "godot:replay"
 import v "godot:replay/view"
 import "defs"
@@ -15,6 +14,8 @@ import content "../shared/content"
 import game "../shared/game"
 import display "../shared/presentation"
 import views "views"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 ScrapAuthoringCheck :: struct {
 	owner: gd.Node2d,
@@ -54,9 +55,9 @@ authoring_issue :: proc(result: ^Authoring_Report, source: string, report: d.Rep
 authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 	result: Authoring_Report
 	for category in ([5]string{"guns", "mobs", "status", "combos", "abilities"}) {
-		batch: rgd.Resource_Batch
-		defer rgd.resource_batch_destroy(&batch)
-		report := rgd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
+		batch: scenegd.Resource_Batch
+		defer scenegd.resource_batch_destroy(&batch)
+		report := scenegd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
 		if report.error != .None {
 			authoring_issue(&result, fmt.tprintf("res://data/%s", category), report)
 			continue
@@ -66,7 +67,7 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 			text := gd.resource_get_path(resource)
 			defer gd.free_string(text)
 			path := gd.gd_string_to_odin(text)
-			ctx: rgd.Bake_Context
+			ctx: scenegd.Bake_Context
 			id: u8
 			switch category {
 			case "guns":
@@ -96,7 +97,7 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 		report := d.init(&store, 1)
 		ref: d.Ref
 		if report.error == .None {
-			ref, report = rgd.bake(&store, u8(0), game.CONTENT, content_extract)
+			ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
 		}
 		authoring_issue(&result, "res://data", report)
 		if report.error == .None {
@@ -104,8 +105,8 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 		}
 	}
 	if len(result.issues) == 0 {
-		assets: rgd.Archetype_Assets(content.Mob)
-		defer rgd.archetype_assets_destroy(&assets)
+		assets: scenegd.Archetype_Assets(content.Mob)
+		defer scenegd.archetype_assets_destroy(&assets)
 		if !enemy_archetypes_load(&assets) {
 			authoring_issue(
 				&result,
@@ -117,9 +118,9 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 				),
 			)
 		} else {
-			owner: rgd.Script_Archetypes(game.Mob, display.Mob_View, views.ScrapEnemyView, views.ScrapEnemyStyle)
-			defer rgd.script_archetypes_destroy(&owner)
-			report := rgd.script_archetypes_init(
+			owner: scenegd.Script_Archetypes(game.Mob, display.Mob_View, views.ScrapEnemyView, views.ScrapEnemyStyle)
+			defer scenegd.script_archetypes_destroy(&owner)
+			report := scenegd.script_archetypes_init(
 				&owner,
 				&assets,
 				parent,
@@ -151,7 +152,7 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
 								},
 							},
 						}
-						report = rgd.script_archetypes_present(&owner, {1, 1}, items[:])
+						report = scenegd.script_archetypes_present(&owner, {1, 1}, items[:])
 						text := gd.resource_get_path(value.local.scene)
 						authoring_issue(&result, gd.gd_string_to_odin(text), report)
 						gd.free_string(text)
@@ -185,7 +186,7 @@ scrap_authoring_check_ready :: proc(self: ^ScrapAuthoringCheck) {
 	bytes, error := json.marshal(result)
 	defer delete(bytes)
 	if error != nil ||
-	   rgd.storage_write(scrap_param("RSY_AUTHORING_REPORT", "user://authoring-report.json"), bytes, 1024 * 1024) !=
+	   storagegd.storage_write(scrap_param("RSY_AUTHORING_REPORT", "user://authoring-report.json"), bytes, 1024 * 1024) !=
 		   .None {
 		gd.print_str("RSY_AUTHORING_WRITE_FAILED")
 		gd.scene_tree_quit(gd.get_tree(self.owner), 2)

@@ -7,17 +7,18 @@ import "core:reflect"
 import gd "godot:godot"
 import r "godot:replay"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import game "../shared/hello"
+import debuggd "godot:replay/godot/debug"
+import scenegd "godot:replay/godot/scene"
 
 ReplayHello :: struct {
 	owner: gd.Node2d,
 	debug_enabled:bool `gd:"export"`,
-	debug:rgd.Debug_Overlay,
-	scrubber:rgd.Debug_Scrubber,
-	field_editor:rgd.Debug_Field_Editor(game.World),
-	recording:rgd.Debug_Recording,
-	playback:rgd.Debug_Playback(game.World,game.Input,game.Event),
+	debug:debuggd.Debug_Overlay,
+	scrubber:debuggd.Debug_Scrubber,
+	field_editor:debuggd.Debug_Field_Editor(game.World),
+	recording:debuggd.Debug_Recording,
+	playback:debuggd.Debug_Playback(game.World,game.Input,game.Event),
 	playback_was_paused:bool,
 	inspect_was_paused,debug_input_gate:bool,
 	status: gd.Label `gd:"onready=Status"`,
@@ -26,7 +27,7 @@ ReplayHello :: struct {
 	buttons: r.Buttons,
 	timeline: game.Timeline,
 	journal: v.Journal(game.Event),
-	views: rgd.View_Pool2(game.Actor,u8,gd.Node2d),
+	views: scenegd.View_Pool2(game.Actor,u8,gd.Node2d),
 	epoch: u64,
 	begins, confirms: u32,
 	flash: f64,
@@ -34,8 +35,8 @@ ReplayHello :: struct {
 }
 
 replay_hello_ready :: proc(self: ^ReplayHello) {
-	if self.debug_enabled || gd.launch_param("REPLAY_DEBUG","debug","0")=="1" {rgd.debug_overlay_init(&self.debug,self.owner,true);rgd.debug_scrubber_init(&self.scrubber,self.owner);rgd.debug_field_editor_init(&self.field_editor,self.owner,game.network_state_valid);rgd.debug_recording_init(&self.recording,gd.node_get_parent(self.scrubber.branch));rgd.debug_playback_init(&self.playback,self.owner)}
-	if !rgd.view_pool_load(&self.views,self.owner,"res://actor.tscn",game.CAPACITY,rgd.View_Binding(u8,gd.Node2d){
+	if self.debug_enabled || gd.launch_param("REPLAY_DEBUG","debug","0")=="1" {debuggd.debug_overlay_init(&self.debug,self.owner,true);debuggd.debug_scrubber_init(&self.scrubber,self.owner);debuggd.debug_field_editor_init(&self.field_editor,self.owner,game.network_state_valid);debuggd.debug_recording_init(&self.recording,gd.node_get_parent(self.scrubber.branch));debuggd.debug_playback_init(&self.playback,self.owner)}
+	if !scenegd.view_pool_load(&self.views,self.owner,"res://actor.tscn",game.CAPACITY,scenegd.View_Binding(u8,gd.Node2d){
 		attach=proc(_:rawptr,node:gd.Node2d)->(gd.Node2d,bool){return node,true},
 		paint=proc(_:rawptr,node:^gd.Node2d,owner:u8){}, // root properties come from the projection
 	}) {return}
@@ -45,8 +46,8 @@ replay_hello_ready :: proc(self: ^ReplayHello) {
 }
 
 replay_hello_reset_to :: proc(self: ^ReplayHello, frame: r.Frame(game.World)) {
-	if self.playback.owns_pause {replay_hello_playback_leave(self);rgd.debug_playback_end(&self.playback)}
-	if self.scrubber.active {replay_hello_debug_leave(self);rgd.debug_scrubber_end(&self.scrubber)}
+	if self.playback.owns_pause {replay_hello_playback_leave(self);debuggd.debug_playback_end(&self.playback)}
+	if self.scrubber.active {replay_hello_debug_leave(self);debuggd.debug_scrubber_end(&self.scrubber)}
 	r.destroy(&self.timeline)
 	v.journal_destroy(&self.journal)
 	self.epoch += 1
@@ -61,15 +62,15 @@ replay_hello_reset_to :: proc(self: ^ReplayHello, frame: r.Frame(game.World)) {
 }
 
 replay_hello_process :: proc(self: ^ReplayHello, dt: f64) {
-	defer if !self.playback.owns_pause {rgd.debug_timeline_frame(&self.debug,&self.timeline)}
+	defer if !self.playback.owns_pause {debuggd.debug_timeline_frame(&self.debug,&self.timeline)}
 	if !self.ready {return}
-	switch rgd.debug_playback_frame(&self.playback,game.RECORDING_CONTEXT,game.recording_model(),dt) {
+	switch debuggd.debug_playback_frame(&self.playback,game.RECORDING_CONTEXT,game.recording_model(),dt) {
  case .Enter:
-  if self.scrubber.active {replay_hello_debug_leave(self);rgd.debug_scrubber_end(&self.scrubber)}
+  if self.scrubber.active {replay_hello_debug_leave(self);debuggd.debug_scrubber_end(&self.scrubber)}
   self.playback_was_paused=self.clock.paused;self.clock.paused=true;self.clock.accumulator=0;self.buttons={};self.flash=0
  case .Leave:replay_hello_playback_leave(self);replay_hello_paint(self);return
  case .Branch:
-  frame,ok:=rgd.debug_playback_read(&self.playback)
+  frame,ok:=debuggd.debug_playback_read(&self.playback)
   if ok && self.epoch<max(u64) {replay_hello_reset_to(self,frame)}
   replay_hello_paint(self);return
  case .None:
@@ -77,9 +78,9 @@ replay_hello_process :: proc(self: ^ReplayHello, dt: f64) {
  if self.debug.layer!=nil {gd.canvas_layer_set_visible(self.debug.layer,!self.playback.owns_pause && self.debug.visible)}
  if self.scrubber.layer!=nil {gd.canvas_layer_set_visible(self.scrubber.layer,!self.playback.owns_pause)}
  if self.playback.owns_pause {gd.canvas_item_set_visible(self.effect,false);replay_hello_paint(self);return}
-	if self.recording.pending {rgd.debug_recording_frame(&self.recording,&self.timeline,game.RECORDING_CONTEXT,gd.launch_param("REPLAY_RECORDING_PATH","recording_path","user://hello.rplrec"),"hello.rplrec")}
-	action:=rgd.debug_scrubber_frame(&self.scrubber,&self.timeline)
-	rgd.debug_field_editor_frame(&self.field_editor,&self.scrubber,&self.timeline)
+	if self.recording.pending {debuggd.debug_recording_frame(&self.recording,&self.timeline,game.RECORDING_CONTEXT,gd.launch_param("REPLAY_RECORDING_PATH","recording_path","user://hello.rplrec"),"hello.rplrec")}
+	action:=debuggd.debug_scrubber_frame(&self.scrubber,&self.timeline)
+	debuggd.debug_field_editor_frame(&self.field_editor,&self.scrubber,&self.timeline)
 	switch action {
 	case .Inspect:
 		self.inspect_was_paused=self.clock.paused;self.clock.paused=true
@@ -88,7 +89,7 @@ replay_hello_process :: proc(self: ^ReplayHello, dt: f64) {
 		replay_hello_debug_leave(self)
 		replay_hello_paint(self);return
 	case .Branch:
-		frame,ok:=rgd.debug_field_editor_read(&self.field_editor)
+		frame,ok:=debuggd.debug_field_editor_read(&self.field_editor)
 		if ok && self.epoch<max(u64) {replay_hello_reset_to(self,frame)}
 		replay_hello_paint(self);return
 	case .None:
@@ -140,7 +141,7 @@ replay_hello_process :: proc(self: ^ReplayHello, dt: f64) {
 }
 
 replay_hello_debug_leave :: proc(self:^ReplayHello) {
-	rgd.debug_field_editor_end(&self.field_editor)
+	debuggd.debug_field_editor_end(&self.field_editor)
 	self.clock.paused=self.inspect_was_paused;self.clock.accumulator=0
 	self.buttons={};self.flash=0;self.debug_input_gate=true
 	gd.canvas_item_set_visible(self.effect,false)
@@ -172,27 +173,27 @@ replay_hello_paint :: proc(self: ^ReplayHello) {
 	projected,error:=r.project(&self.timeline,tick,game.project_actor_views)
 	if error!=.None {return}
 	if self.scrubber.active {
-		frame,ok:=rgd.debug_field_editor_read(&self.field_editor);if !ok {return}
+		frame,ok:=debuggd.debug_field_editor_read(&self.field_editor);if !ok {return}
 		projected,tick=game.project_actor_views(frame.state),frame.tick
 	}
 	if self.playback.owns_pause && self.playback.player.recording.ready {
-		frame,ok:=rgd.debug_playback_read(&self.playback);if !ok {return}
+		frame,ok:=debuggd.debug_playback_read(&self.playback);if !ok {return}
 		projected,tick=game.project_actor_views(frame.state),frame.tick
 	}
 	for &item in projected.items[:projected.count] {item.tick=tick}
-	presented:=rgd.view_pool_present(&self.views,{self.epoch,0},projected.items[:projected.count])
+	presented:=scenegd.view_pool_present(&self.views,{self.epoch,0},projected.items[:projected.count])
 	assert(presented==.None)
 	gd.set_string(self.status, "text", fmt.ctprintf("REPLAY / HELLO    tick %d    shots %d\nArrows move   Space fires   Esc restarts", tick, projected.shots))
 }
 
 replay_hello_exit_tree :: proc(self: ^ReplayHello) {
- rgd.debug_playback_destroy(&self.playback)
-	rgd.debug_recording_destroy(&self.recording)
-	rgd.debug_field_editor_destroy(&self.field_editor)
-	rgd.debug_scrubber_destroy(&self.scrubber)
-	rgd.debug_overlay_destroy(&self.debug)
+ debuggd.debug_playback_destroy(&self.playback)
+	debuggd.debug_recording_destroy(&self.recording)
+	debuggd.debug_field_editor_destroy(&self.field_editor)
+	debuggd.debug_scrubber_destroy(&self.scrubber)
+	debuggd.debug_overlay_destroy(&self.debug)
 	if !self.ready {return}
-	rgd.view_pool_destroy(&self.views)
+	scenegd.view_pool_destroy(&self.views)
 	v.journal_destroy(&self.journal)
 	r.destroy(&self.timeline)
 	self.ready = false

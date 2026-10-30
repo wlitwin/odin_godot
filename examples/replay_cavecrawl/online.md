@@ -69,7 +69,7 @@ authority decisions, not game checkpoints.
 
 Browser hosts can supply `globalThis.replayIceConfig` before Godot starts. It is
 not a query parameter. Actual relay-only UDP/TCP tests now cover this party flow;
-see [ICE deployment settings](../../replay/godot/ice-deployment.md) for scope and limits.
+see [ICE deployment settings](../../replay/godot/transport/ice-deployment.md) for scope and limits.
 
 Native clients on the same machine need different gameplay ports and different
 credential databases when representing different players. For different machines,

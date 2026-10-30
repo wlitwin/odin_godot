@@ -8,6 +8,7 @@ import auth "godot:replay/authority"
 import prov "godot:replay/provision"
 import rgd "godot:replay/godot"
 import game "../shared/cave"
+import transportgd "godot:replay/godot/transport"
 
 Cave_Online :: struct {
     using party: rgd.Party,
@@ -31,7 +32,7 @@ online_ready :: proc(self: ^ReplayCave) {
     endpoint, valid := auth.endpoint(cave_param("REPLAY_CAVE_ROOM_ADDRESS", "127.0.0.1"), u16(port))
     if !valid || port < 1 || port > 65535 {online_fail(self, "The gameplay address is invalid."); return}
     storage, ok := online_native_init(self, local)
-    ice, ice_error := rgd.rtc_ice_settings("REPLAY_CAVE_ICE_JSON")
+    ice, ice_error := transportgd.rtc_ice_settings("REPLAY_CAVE_ICE_JSON")
     if ice_error != .None {online_fail(self, "The relay configuration is invalid."); return}
     cfg := rgd.Party_Config{service = service, namespace = "replay-cavecrawl-rooms", content = game.CONTENT, endpoint = endpoint,
                             invite_role = .Trusted_Peer, invite_uses = game.SEATS - 1, local_development = local, tls = self.online.tls, storage = storage, ice_json = ice,

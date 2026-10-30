@@ -15,6 +15,10 @@ import game "../shared/pitch"
 import co "godot:replay/comms"
 import dg "godot:replay/telemetry"
 import lb "godot:replay/lobby"
+import debuggd "godot:replay/godot/debug"
+import inputgd "godot:replay/godot/input"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 ReplayClaimball :: struct {
 	owner: gd.Node2d,
@@ -25,9 +29,9 @@ ReplayClaimball :: struct {
 	display_name:lb.Name,
 	name_sequence:u64,
 	identity:net.Token,
-	name_profile:rgd.Name_Profile,
+	name_profile:storagegd.Name_Profile,
 	online:Claimball_Online,
-	browser_identity:rgd.Browser_Identity,
+	browser_identity:storagegd.Browser_Identity,
 	profile_identity_ready,profile_name_loaded:bool,
 	browser_launch:string,
 	browser_save:[1]Claimball_Browser_Save,
@@ -37,7 +41,7 @@ ReplayClaimball :: struct {
 	room: rgd.Room(game.World,game.Controls,game.Action,game.Event,game.SEATS),
 	recovery_probe:[1]Pitch_Recovery,
 	view_epoch:u64,
-	players, ball: rgd.Nodes2,
+	players, ball: scenegd.Nodes2,
 	smoothing: [game.SEATS + 1]v.Smoother2,
 	ready, spiked, spike_visible, done: bool,
 	spike_node_start, own_spike_seen: bool,
@@ -71,9 +75,9 @@ ReplayClaimball :: struct {
 replay_claimball_ready :: proc(self:^ReplayClaimball) {
  self.session=&self.standalone
  install_controls()
- self.views_ready=rgd.nodes_load(&self.players,self.owner,"res://views/kicker.tscn",game.SEATS) && rgd.nodes_load(&self.ball,self.owner,"res://views/ball.tscn",1)
+ self.views_ready=scenegd.nodes_load(&self.players,self.owner,"res://views/kicker.tscn",game.SEATS) && scenegd.nodes_load(&self.ball,self.owner,"res://views/ball.tscn",1)
  if !self.views_ready || !co.init(&self.comms) || !dg.init(&self.diagnostics) {gd.print_str("REPLAY_CLAIMBALL_FAIL views/social");return}
- self.bot=strings.clone(claimball_param("RCB_BOT",""));self.identity=rgd.session_token(claimball_param("RCB_TOKEN",""))
+ self.bot=strings.clone(claimball_param("RCB_BOT",""));self.identity=storagegd.session_token(claimball_param("RCB_TOKEN",""))
  if claimball_int("RCB_CONTEST",0)==1 {self.contest_stop_tick=1800}
  ui_ready(self);online_ready(self)
  role:=claimball_param("RCB_ROLE","");if role!="" {when gd.IS_WEB {self.browser_launch=strings.clone(role)} else {connect_pitch(self,role,false,claimball_int("RCB_RESUME",0)==1)}}
@@ -96,7 +100,7 @@ connect_pitch :: proc(self:^ReplayClaimball,role:string,manual:bool,resume:bool=
  opts.latency_ms=u32(claimball_int("RCB_LATENCY",0));opts.jitter_ms=u32(claimball_int("RCB_JITTER",0));opts.loss_permyriad=u32(claimball_int("RCB_LOSS",0));opts.duplicate_permyriad=u32(claimball_int("RCB_DUPLICATE",0))
  opts.network.content=game.CONTENT;opts.remote_observed=true;opts.discover_epoch=claimball_int("RCB_COORD_PORT",0)==0 && !self.online.launch
  opts.network.hz,opts.network.lead,opts.network.snapshot_every=60,4,3
- if !rgd.session_comms_enable(&opts) || !rgd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
+ if !rgd.session_comms_enable(&opts) || !debuggd.session_diagnostics_enable(&opts) {ui_notice(self,"Could not configure social channels.");return}
  minimum:=u8(clamp(claimball_int("RCB_PLAYERS",manual || opts.role==.Solo ? 1 : 2),1,game.SEATS));goals:=u8(clamp(claimball_int("RCB_GOALS",3),1,255))
  err:=resume ? resume_pitch(self,opts) : open_session(self,game.initial(opts.role==.Server,minimum,goals,manual && opts.role!=.Server),opts)
  if err!=.None {if !resume {ui_notice(self,fmt.tprintf("Connection failed: %v",err))};return}
@@ -112,8 +116,8 @@ effect_policy :: proc(e: net.Net_Event(game.Event)) -> v.Policy {
 
 install_controls :: proc() {
 	if gd.has_action("rcb_left") {return}
-	rgd.bind_key("rcb_left", .A); rgd.bind_key("rcb_right", .D); rgd.bind_key("rcb_up", .W); rgd.bind_key("rcb_down", .S)
-	rgd.bind_key("rcb_kick", .Space); rgd.bind_key("rcb_spike", .E)
+	inputgd.bind_key("rcb_left", .A); inputgd.bind_key("rcb_right", .D); inputgd.bind_key("rcb_up", .W); inputgd.bind_key("rcb_down", .S)
+	inputgd.bind_key("rcb_kick", .Space); inputgd.bind_key("rcb_spike", .E)
 }
 
 sample :: proc(self: ^ReplayClaimball, w: game.World, seat: u16) -> game.Controls {
@@ -168,7 +172,7 @@ replay_claimball_process :: proc(self: ^ReplayClaimball, dt: f64) {
 			if err == .None && !self.spiked {
 				self.spiked, self.spike_at_ms, self.spike_at_tick, self.spike_first_sequence = true, now, f.tick, seq
 				self.spike_from = f.state.ball.motion.position
-				if node, found := rgd.nodes_get(&self.ball, 1); found {self.spike_from = gd.node2d_get_position(node); self.spike_node_start = true}
+				if node, found := scenegd.nodes_get(&self.ball, 1); found {self.spike_from = gd.node2d_get_position(node); self.spike_node_start = true}
 				_, second := issue(self, game.Action{spike = true})
 				gd.print_str(fmt.tprintf("RCB_SPIKE_SENT tick=%d sequence=%d second=%v", f.tick, seq, second))
 			}
@@ -236,7 +240,7 @@ replay_claimball_process :: proc(self: ^ReplayClaimball, dt: f64) {
 	if available {
 		paint(self, f, dt)
 		if self.spiked && self.spike_node_start && self.own_spike_seen && !self.spike_visible {
-			if node, found := rgd.nodes_get(&self.ball, 1); found && p.length_sq2(gd.node2d_get_position(node) - self.spike_from) > 12 * 12 {
+			if node, found := scenegd.nodes_get(&self.ball, 1); found && p.length_sq2(gd.node2d_get_position(node) - self.spike_from) > 12 * 12 {
 				self.spike_visible = true
 				gd.print_str(fmt.tprintf("RCB_SPIKE_LOCAL ticks=%d ms=%d acknowledged=%v", f.tick - self.spike_at_tick, gd.time_get_ticks_msec(gd.singleton_time()) - self.spike_at_ms, self.last_verdict >= self.spike_first_sequence))
 			}
@@ -297,7 +301,7 @@ paint :: proc(self: ^ReplayClaimball, frame: r.Frame(game.World), dt: f64) {
 	if self.session.authority {drawn = w.players} else if seat != 0 {drawn[seat - 1] = w.players[seat - 1]}
 	self.predicted_members = 0
 	if self.session.authority || seat != 0 {for player in w.players {if player.connected {self.predicted_members += 1}}}
-	instances: [game.SEATS]rgd.Instance2
+	instances: [game.SEATS]scenegd.Instance2
 	colors := [2]gd.Color{{0.35, 0.65, 1, 1}, {1, 0.62, 0.2, 1}}
 	n := 0
 	for player, i in drawn {if player.connected {
@@ -305,7 +309,7 @@ paint :: proc(self: ^ReplayClaimball, frame: r.Frame(game.World), dt: f64) {
 		if self.session.authority || int(seat) == i + 1 {pose = v.smooth_present(&self.smoothing[i], pose, dt)}
 		instances[n] = {key = u64(i + 1), pose = pose, scale = {1, 1}, color = colors[player.team - 1]}; n += 1
 	}}
-	rgd.nodes_present(&self.players, instances[:n])
+	scenegd.nodes_present(&self.players, instances[:n])
 	if self.ball_reset != w.ball.reset {self.ball_reset = w.ball.reset; self.smoothing[game.SEATS] = {}}
 	predicted := v.smooth_present(&self.smoothing[game.SEATS], {position = w.ball.motion.position}, dt)
 	pose := predicted
@@ -324,16 +328,16 @@ paint :: proc(self: ^ReplayClaimball, frame: r.Frame(game.World), dt: f64) {
 		if seat != 0 && !influencing && distance_sq >= 38 * 38 && speed_sq > 0.6 * 0.6 && self.claim.weight == 1 {self.fast_far_samples += 1}
 		pose = observed.round==w.round ? v.claim_pose(self.claim, {position = observed.ball.motion.position}, predicted) : predicted
 	}
-	ball := [1]rgd.Instance2{{key = 1, pose = pose, scale = {1, 1}, color = self.flash_left > 0 ? gd.Color{1, 0.75, 0.2, 1} : gd.Color{1, 1, 1, 1}}}
-	rgd.nodes_present(&self.ball, ball[:])
+	ball := [1]scenegd.Instance2{{key = 1, pose = pose, scale = {1, 1}, color = self.flash_left > 0 ? gd.Color{1, 0.75, 0.2, 1} : gd.Color{1, 1, 1, 1}}}
+	scenegd.nodes_present(&self.ball, ball[:])
 	if !self.session.authority && self.claim.weight == 1 {
-		if node, found := rgd.nodes_get(&self.ball, 1); found {
+		if node, found := scenegd.nodes_get(&self.ball, 1); found {
 			self.predicted_samples += 1
 			self.predicted_error_max = max(self.predicted_error_max, math.sqrt(p.length_sq2(gd.node2d_get_position(node) - predicted.position)))
 		}
 	}
 	if !self.session.authority && self.claim.weight == 0 && observed.round==w.round {
-		if node, found := rgd.nodes_get(&self.ball, 1); found {
+		if node, found := scenegd.nodes_get(&self.ball, 1); found {
 			self.watched_samples += 1
 			self.watched_error_max = max(self.watched_error_max, math.sqrt(p.length_sq2(gd.node2d_get_position(node) - observed.ball.motion.position)))
 		}
@@ -343,8 +347,8 @@ paint :: proc(self: ^ReplayClaimball, frame: r.Frame(game.World), dt: f64) {
 }
 
 replay_claimball_exit_tree :: proc(self: ^ReplayClaimball) {
-	online_close(self);browser_save_close(self);rgd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
-	co.destroy(&self.comms);dg.destroy(&self.diagnostics);rgd.name_profile_close(&self.name_profile)
-	rgd.nodes_destroy(&self.players); rgd.nodes_destroy(&self.ball)
+	online_close(self);browser_save_close(self);storagegd.browser_identity_close(&self.browser_identity);delete(self.browser_launch)
+	co.destroy(&self.comms);dg.destroy(&self.diagnostics);storagegd.name_profile_close(&self.name_profile)
+	scenegd.nodes_destroy(&self.players); scenegd.nodes_destroy(&self.ball)
 	close_session(self); delete(self.bot)
 }

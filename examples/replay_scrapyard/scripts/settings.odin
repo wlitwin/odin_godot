@@ -3,8 +3,8 @@ package replay_scrapyard
 import "core:fmt"
 import "core:strings"
 import gd "godot:godot"
-import rgd "godot:replay/godot"
 import prefs "../shared/settings"
+import storagegd "godot:replay/godot/storage"
 
 Settings_Phase :: enum {
 	Ready,
@@ -16,7 +16,7 @@ Settings :: struct {
 	value: prefs.Value,
 	enabled, error, dirty, headless: bool,
 	phase: Settings_Phase,
-	op: rgd.Browser_Store_Op,
+	op: storagegd.Browser_Store_Op,
 	namespace: string,
 	revision: u64,
 }
@@ -40,7 +40,7 @@ settings_ready :: proc(self: ^ReplayScrapyard) {
 	if s.enabled {
 		when gd.IS_WEB {
 			s.namespace = strings.clone(scrap_param("RSY_PROFILE_NAMESPACE", "scrapyard"))
-			if rgd.browser_store_read(&s.op, s.namespace, "settings", 4096) {
+			if storagegd.browser_store_read(&s.op, s.namespace, "settings", 4096) {
 				s.phase = .Reading
 			} else {
 				s.error = true
@@ -51,7 +51,7 @@ settings_ready :: proc(self: ^ReplayScrapyard) {
 			exists := gd.file_access_file_exists(text)
 			gd.free_string(text)
 			if exists {
-				bytes, err := rgd.storage_read(path, 4096)
+				bytes, err := storagegd.storage_read(path, 4096)
 				defer delete(bytes)
 				value, ok := prefs.decode(bytes)
 				if err == .None && ok {
@@ -135,14 +135,14 @@ settings_save :: proc(self: ^ReplayScrapyard) {
 		return
 	}
 	when gd.IS_WEB {
-		if rgd.browser_store_write(&s.op, s.namespace, "settings", bytes, s.revision, 4096) {
+		if storagegd.browser_store_write(&s.op, s.namespace, "settings", bytes, s.revision, 4096) {
 			s.phase = .Writing
 			s.dirty = false
 		} else {
 			s.error = true
 		}
 	} else {
-		if rgd.storage_write(scrap_param("RSY_SETTINGS_PATH", "user://replay_settings"), bytes, 4096) != .None {
+		if storagegd.storage_write(scrap_param("RSY_SETTINGS_PATH", "user://replay_settings"), bytes, 4096) != .None {
 			s.error = true
 		} else {
 			s.dirty = false
@@ -153,13 +153,13 @@ settings_save :: proc(self: ^ReplayScrapyard) {
 settings_poll :: proc(self: ^ReplayScrapyard) {
 	s := &self.settings[0]
 	when gd.IS_WEB {
-		if s.phase != .Ready && rgd.browser_store_poll(&s.op) == .Complete {
+		if s.phase != .Ready && storagegd.browser_store_poll(&s.op) == .Complete {
 			if s.phase == .Reading && s.op.error == .Missing {
 				s.revision = 0
 			} else if s.op.error != .None {
 				s.error = true
 			} else if s.phase == .Reading {
-				bytes, err := rgd.browser_store_bytes(&s.op)
+				bytes, err := storagegd.browser_store_bytes(&s.op)
 				defer delete(bytes)
 				value, ok := prefs.decode(bytes)
 				if err != .None || !ok {
@@ -172,7 +172,7 @@ settings_poll :: proc(self: ^ReplayScrapyard) {
 			} else {
 				s.revision = s.op.revision
 			}
-			rgd.browser_store_close(&s.op)
+			storagegd.browser_store_close(&s.op)
 			s.phase = .Ready
 		}
 	}
@@ -240,7 +240,7 @@ replay_scrapyard_on_fullscreen :: proc(self: ^ReplayScrapyard) {
 
 settings_close :: proc(self: ^ReplayScrapyard) {
 	s := &self.settings[0]
-	rgd.browser_store_close(&s.op)
+	storagegd.browser_store_close(&s.op)
 	delete(s.namespace)
 	s^ = {}
 }

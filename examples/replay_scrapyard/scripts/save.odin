@@ -7,6 +7,8 @@ import net "godot:replay/net"
 import rgd "godot:replay/godot"
 import game "../shared/game"
 import a "godot:replay/assets"
+import scenegd "godot:replay/godot/scene"
+import storagegd "godot:replay/godot/storage"
 
 Saved_Run :: struct {
 	saved_tick, restored_tick: u64,
@@ -14,7 +16,7 @@ Saved_Run :: struct {
 	notice_until: u64,
 	ok: bool,
 	phase: Browser_Run_Phase,
-	op: rgd.Browser_Store_Op,
+	op: storagegd.Browser_Store_Op,
 	revision: u64,
 	revision_known: bool,
 	bytes: []u8,
@@ -39,7 +41,7 @@ resume_run :: proc(self: ^ReplayScrapyard, options: rgd.Session_Options) -> net.
 	defer net.checkpoint_destroy(&cp)
 	bytes: []u8
 	bundle: a.Bundle_View
-	result: rgd.Storage_Result
+	result: storagegd.Storage_Result
 	when gd.IS_WEB {
 		if self.saved_run[0].phase != .Loaded {
 			return .Wrong_Phase
@@ -47,9 +49,9 @@ resume_run :: proc(self: ^ReplayScrapyard, options: rgd.Session_Options) -> net.
 		bytes = self.saved_run[0].bytes
 		self.saved_run[0].bytes = nil
 		self.saved_run[0].phase = .Idle
-		bundle, result = rgd.checkpoint_bundle_decode(&cp, game.model(), bytes, game.CONTENT)
+		bundle, result = storagegd.checkpoint_bundle_decode(&cp, game.model(), bytes, game.CONTENT)
 	} else {
-		bytes, bundle, result = rgd.checkpoint_bundle_read(
+		bytes, bundle, result = storagegd.checkpoint_bundle_read(
 			&cp,
 			game.model(),
 			scrap_param("RSY_SAVE", "user://run.replay"),
@@ -78,7 +80,7 @@ resume_run :: proc(self: ^ReplayScrapyard, options: rgd.Session_Options) -> net.
 			return .Invalid_Checkpoint
 		}
 	}
-	if installed := a.bundle_install(&bundle, &self.assets[0].cache, rgd.asset_png_valid); installed != .None {
+	if installed := a.bundle_install(&bundle, &self.assets[0].cache, scenegd.asset_png_valid); installed != .None {
 		gd.print_str(fmt.tprintf("RSY_SAVE_ERROR load=Codec assets=%v", installed))
 		return .Invalid_Checkpoint
 	}
@@ -150,7 +152,7 @@ replay_scrapyard_save_run :: proc(self: ^ReplayScrapyard) -> bool {
 	}
 	codec := self.session.link.publish_codec.ready ? &self.session.link.publish_codec : nil
 	when gd.IS_WEB {
-		bytes, encoded_result := rgd.checkpoint_bundle_encode(&cp, game.model(), &self.assets[0].cache, refs[:], codec)
+		bytes, encoded_result := storagegd.checkpoint_bundle_encode(&cp, game.model(), &self.assets[0].cache, refs[:], codec)
 		if encoded_result.error != .None {
 			gd.print_str(
 				fmt.tprintf("RSY_SAVE_ERROR encode=%v network=%v", encoded_result.error, encoded_result.network),
@@ -161,7 +163,7 @@ replay_scrapyard_save_run :: proc(self: ^ReplayScrapyard) -> bool {
 			bytes, frame.tick, replay_scrapyard_probe_hash(self, gd.Int(frame.tick))
 		return browser_run_submit(self)
 	}
-	result := rgd.checkpoint_bundle_write(
+	result := storagegd.checkpoint_bundle_write(
 		&cp,
 		game.model(),
 		&self.assets[0].cache,

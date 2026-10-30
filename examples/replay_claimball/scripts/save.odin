@@ -9,6 +9,7 @@ import net "godot:replay/net"
 import sc "godot:replay/schema"
 import rgd "godot:replay/godot"
 import game "../shared/pitch"
+import storagegd "godot:replay/godot/storage"
 
 save_path :: proc(self:^ReplayClaimball)->string {
  value:=gd.line_edit_get_text(self.ui[0].save_path);defer gd.free_string(value)
@@ -40,7 +41,7 @@ resume_pitch :: proc(self:^ReplayClaimball,opts:rgd.Session_Options)->net.Error 
   return restore_pitch(self,&slot.checkpoint,opts)
  } else {
  cp:net.Checkpoint(game.World,game.Controls,game.Action,game.SEATS);defer net.checkpoint_destroy(&cp)
- result:=rgd.checkpoint_read(&cp,game.model(),save_path(self),game.CONTENT)
+ result:=storagegd.checkpoint_read(&cp,game.model(),save_path(self),game.CONTENT)
  if result.error!=.None {
   ui_notice(self,result.error==.Open ? "Could not open the saved match. Check the file path." : "The saved match is damaged or from a different version.")
   return result.network!=.None ? result.network : net.Error.Invalid_Checkpoint

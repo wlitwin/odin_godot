@@ -7,6 +7,7 @@ import "godot:gdext"
 import rgd "godot:replay/godot"
 import content "../shared/content"
 import mods "../shared/mods"
+import storagegd "godot:replay/godot/storage"
 
 // Only a fresh authority loads local overlays. Followers and resumed worlds use
 // the catalog already carried by the authoritative frame/checkpoint.
@@ -63,7 +64,7 @@ mods_load :: proc(catalog: ^content.Catalog) {
 			gd.print_str("RSY_MODS_SKIP file limit")
 			break
 		}
-		bytes, err := rgd.storage_read(fmt.tprintf("%s/%s", directory, name), mods.MAX_FILE_BYTES)
+		bytes, err := storagegd.storage_read(fmt.tprintf("%s/%s", directory, name), mods.MAX_FILE_BYTES)
 		defer delete(bytes)
 		if err != .None {
 			gd.print_str(fmt.tprintf("RSY_MODS_SKIP file=%s read=%v", name, err))

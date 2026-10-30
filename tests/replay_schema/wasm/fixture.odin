@@ -3,8 +3,8 @@ package replay_schema_wasm
 import sc "godot:replay/schema"
 import r "godot:replay"
 import tr "godot:replay/transport"
-import gd "godot:replay/godot"
 import game "../../../examples/replay_hello/shared/hello"
+import transportgd "godot:replay/godot/transport"
 
 @(require)
 instantiate :: proc() {
@@ -35,10 +35,10 @@ instantiate :: proc() {
 	tr.close(&ta)
 	tr.close(&tb)
 	tr.memory_destroy(&m)
-	e: gd.Enet
-	gd.enet_host(&e, 0)
-	gd.enet_join(&e, "127.0.0.1", 1)
-	transport := gd.enet_transport(&e)
+	e: transportgd.Enet
+	transportgd.enet_host(&e, 0)
+	transportgd.enet_join(&e, "127.0.0.1", 1)
+	transport := transportgd.enet_transport(&e)
 	tr.poll(&transport)
 	tr.receive(&transport, bytes[:])
 	tr.close(&transport)

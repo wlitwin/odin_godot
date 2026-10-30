@@ -4,10 +4,10 @@ import gd "godot:godot"
 import r "godot:replay"
 import content "../shared/content"
 import v "godot:replay/view"
-import rgd "godot:replay/godot"
 import game "../shared/game"
 import display "../shared/presentation"
 import views "views"
+import scenegd "godot:replay/godot/scene"
 
 Combat_View_Key :: struct {
 	run: u32,
@@ -15,20 +15,20 @@ Combat_View_Key :: struct {
 }
 
 Combat_Bridge :: struct {
-	mobs: rgd.Script_Archetypes(game.Mob, display.Mob_View, views.ScrapEnemyView, views.ScrapEnemyStyle),
-	drops: rgd.View_Pool2(game.Drop, u8, gd.Node2d),
+	mobs: scenegd.Script_Archetypes(game.Mob, display.Mob_View, views.ScrapEnemyView, views.ScrapEnemyStyle),
+	drops: scenegd.View_Pool2(game.Drop, u8, gd.Node2d),
 	scope: v.Scope_Tracker(Combat_View_Key),
 }
 
 combat_bridge_init :: proc(self: ^ReplayScrapyard) -> bool {
 	bridge := &self.combat_bridge[0]
 	// Candidate registry is local: the view owner retains its own assets/config.
-	assets: rgd.Archetype_Assets(content.Mob)
-	defer rgd.archetype_assets_destroy(&assets)
+	assets: scenegd.Archetype_Assets(content.Mob)
+	defer scenegd.archetype_assets_destroy(&assets)
 	if !enemy_archetypes_load(&assets) {
 		return false
 	}
-	report := rgd.script_archetypes_init(
+	report := scenegd.script_archetypes_init(
 		&bridge.mobs,
 		&assets,
 		self.world_node,
@@ -42,12 +42,12 @@ combat_bridge_init :: proc(self: ^ReplayScrapyard) -> bool {
 		combat_bridge_close(self)
 		return content_report(&report)
 	}
-	if !rgd.view_pool_load(
+	if !scenegd.view_pool_load(
 		&bridge.drops,
 		self.world_node,
 		"res://entities/scrap.tscn",
 		game.MAX_DROPS,
-		rgd.View_Binding(u8, gd.Node2d) {
+		scenegd.View_Binding(u8, gd.Node2d) {
 			attach = proc(_: rawptr, node: gd.Node2d) -> (gd.Node2d, bool) {
 				gd.canvas_item_set_visible(node, true)
 				return node, true
@@ -64,8 +64,8 @@ combat_bridge_init :: proc(self: ^ReplayScrapyard) -> bool {
 
 combat_bridge_close :: proc(self: ^ReplayScrapyard) {
 	bridge := &self.combat_bridge[0]
-	rgd.script_archetypes_destroy(&bridge.mobs)
-	rgd.view_pool_destroy(&bridge.drops)
+	scenegd.script_archetypes_destroy(&bridge.mobs)
+	scenegd.view_pool_destroy(&bridge.drops)
 	bridge^ = {}
 }
 
@@ -85,19 +85,19 @@ combat_bridge_paint :: proc(self: ^ReplayScrapyard, observed: game.World, dt: f6
 	}
 	mobs := display.mobs(observed, epoch)
 	drops := display.drops(observed)
-	report := rgd.script_archetypes_present(&bridge.mobs, scope, mobs.items[:mobs.count])
+	report := scenegd.script_archetypes_present(&bridge.mobs, scope, mobs.items[:mobs.count])
 	if report.error != .None {
 		content_report(&report)
 		fail(self, "combat view binding")
 		return
 	}
-	if rgd.view_pool_present(&bridge.drops, scope, drops.items[:drops.count]) != .None {
-		report = rgd.view_pool_problem(&bridge.drops)
+	if scenegd.view_pool_present(&bridge.drops, scope, drops.items[:drops.count]) != .None {
+		report = scenegd.view_pool_problem(&bridge.drops)
 		content_report(&report)
 		fail(self, "drop view binding")
 		return
 	}
-	rgd.script_archetypes_visit(&bridge.mobs, self, combat_enemy_notice)
+	scenegd.script_archetypes_visit(&bridge.mobs, self, combat_enemy_notice)
 }
 
 // Game-specific notice policy stays here. Iteration and ownership are shared.
@@ -122,9 +122,9 @@ replay_scrapyard_bridge_probe :: proc(self: ^ReplayScrapyard, key: string) -> gd
 		return gd.Int(bridge.scope.revision)
 	}
 	if key == "drops" {
-		return gd.Int(rgd.view_pool_stats(&bridge.drops).count)
+		return gd.Int(scenegd.view_pool_stats(&bridge.drops).count)
 	}
-	stats := rgd.script_archetypes_stats(&bridge.mobs)
+	stats := scenegd.script_archetypes_stats(&bridge.mobs)
 	switch key {
 	case "mobs":
 		return gd.Int(stats.count)

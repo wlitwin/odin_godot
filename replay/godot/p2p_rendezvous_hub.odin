@@ -5,16 +5,18 @@ import gd "godot:godot"
 import "godot:gdext"
 import p "godot:replay/p2p/provision"
 import tr "godot:replay/transport"
+import wiregd "godot:replay/godot/internal/wire"
+import transportgd "godot:replay/godot/transport"
 
 P2P_Rendezvous_Hub :: struct {
 	ready: bool,
 	allocator: mem.Allocator,
 	hub: ^p.Hub,
-	socket: ^Websocket,
+	socket: ^transportgd.Websocket,
 	rooms: []Rendezvous,
 	bindings: [128]Rendezvous_Binding,
 }
-p2p_rendezvous_hub_init :: proc(r: ^P2P_Rendezvous_Hub, hub: ^p.Hub, socket: ^Websocket, allocator := context.allocator) -> bool {
+p2p_rendezvous_hub_init :: proc(r: ^P2P_Rendezvous_Hub, hub: ^p.Hub, socket: ^transportgd.Websocket, allocator := context.allocator) -> bool {
 	if r.ready || hub == nil || !hub.ready || socket == nil || !socket.ready || !socket.server {return false}
 	r.allocator, r.hub, r.socket = allocator, hub, socket
 	r.rooms = make([]Rendezvous, len(hub.rooms), allocator); r.ready = true
@@ -35,7 +37,7 @@ p2p_rendezvous_hub_pump :: proc(r: ^P2P_Rendezvous_Hub) {
         }
 		rendezvous_pump(&signal)
 	}
-	for &binding in r.bindings {if binding.peer != 0 && !websocket_connected(r.socket, binding.peer) {binding = {}}}
+	for &binding in r.bindings {if binding.peer != 0 && !rendezvous_connection_live(r.socket, binding.peer) {binding = {}}}
 }
 
 // The first bounded JSON message selects an opaque current rendezvous code.
@@ -45,18 +47,18 @@ p2p_rendezvous_hub_receive :: proc(r: ^P2P_Rendezvous_Hub, from: tr.Peer_Id, byt
 	if !r.ready || from == 0 {return false}
 	p2p_rendezvous_hub_pump(r)
 	for binding in r.bindings {if binding.peer == from {return rendezvous_receive(&r.rooms[binding.room], from, bytes)}}
-	if len(bytes) > 32768 || !rtc_json_depth(bytes) {websocket_disconnect(r.socket, from); return false}
+	if len(bytes) > 32768 || !wiregd.json_depth(bytes) {transportgd.websocket_disconnect(r.socket, from); return false}
 	text := gd.new_string_odin(string(bytes)); defer gd.free_string(text)
 	value := gd.json_parse_string(text); defer gd.variant_destroy(&value)
-	if gdext.variant_get_type(&value) != .Dictionary {websocket_disconnect(r.socket, from); return false}
+	if gdext.variant_get_type(&value) != .Dictionary {transportgd.websocket_disconnect(r.socket, from); return false}
 	data := gd.variant_to_dictionary(&value); defer gd.free_dictionary(data)
-	code := rtc_get_string(&data, "room", 64); defer delete(code)
-	if len(code) != 64 {websocket_disconnect(r.socket, from); return false}
+	code := wiregd.get_string(&data, "room", 64); defer delete(code)
+	if len(code) != 64 {transportgd.websocket_disconnect(r.socket, from); return false}
 	slot := -1
 	for &room, i in r.rooms {if room.ready && string(room.code[:]) == code {slot = i; break}}
-	if slot < 0 {websocket_disconnect(r.socket, from); return false}
+	if slot < 0 {transportgd.websocket_disconnect(r.socket, from); return false}
 	for &binding in r.bindings {
 		if binding.peer == 0 {binding = {from, slot}; return rendezvous_receive(&r.rooms[slot], from, bytes)}
 	}
-	websocket_disconnect(r.socket, from); return false
+	transportgd.websocket_disconnect(r.socket, from); return false
 }

@@ -1,10 +1,10 @@
 package replay_scrapyard
 
-import rgd "godot:replay/godot"
 
 import "core:math"
 import gd "godot:godot"
 import flow "../shared/flow"
+import scenegd "godot:replay/godot/scene"
 
 Glob_Rig :: struct {
 	node: gd.Mesh_Instance2d,
@@ -20,7 +20,7 @@ glob_make :: proc(self: ^ReplayScrapyard, rig: ^Glob_Rig, name: string, radius: 
 		angle := f32(i) / 10 * math.TAU
 		gd.packed_vector2_array_append(&points, {math.cos(angle) * radius, math.sin(angle) * radius})
 	}
-	rgd.mesh2_polygon(rig.node, points)
+	scenegd.mesh2_polygon(rig.node, points)
 	gd.free_packed_vector2_array(points)
 	gd.canvas_item_set_z_index(rig.node, 6)
 	gd.canvas_item_set_visible(rig.node, false)

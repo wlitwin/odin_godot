@@ -43,7 +43,7 @@ acceptance work. See [TURN datagram evidence](../docs/replay/results/browser-tur
 Steam's packet/Room lifecycle integration has native ABI and local API-contract
 tests. Live multi-account Valve networking, lobby UX and SteamGameServer are not
 validated by those fixtures. They remain experimental integrations, not supported
-live-network claims. See [Steam](godot/steam.md) and [Steam Room](godot/steam_room.md).
+live-network claims. See [Steam](godot/transport/steam.md) and [Steam Room](godot/steam_room.md).
 
 ## Recovery and failure policy
 

@@ -75,12 +75,17 @@ for native/browser builds.
 
 ## Godot authoring bridge
 
+The lifecycle package is `godot:replay/godot`. Optional scene, input, storage,
+transport and debug APIs live in its corresponding child packages; see the
+[import map](../replay/godot/README.md#choose-an-import). Feature APIs keep their
+names and use their feature's import rather than root forwarding aliases.
+
 The packaged library also includes typed entity/view pools and detached projections,
 immutable Resource/scene baking, InputMap and signal-action bindings, declarative
 visual/audio routes, and explicit simulation/cooperative body adapters. Start with
-[view pools](../replay/godot/view-pools.md), [definitions](../replay/definitions/README.md),
-[controls](../replay/godot/controls.md), [effects](../replay/godot/effect-routes.md)
-and [body contracts](../replay/godot/body-bindings.md). These owners stay outside
+[view pools](../replay/godot/scene/view-pools.md), [definitions](../replay/definitions/README.md),
+[controls](../replay/godot/input/controls.md), [effects](../replay/godot/scene/effect-routes.md)
+and [body contracts](../replay/godot/scene/body-bindings.md). These owners stay outside
 World and reuse existing replay, intent, journal and ownership protocols.
 
 The editor-first layer adds `Script_View(Value, Script)` for ordinary authored Odin
