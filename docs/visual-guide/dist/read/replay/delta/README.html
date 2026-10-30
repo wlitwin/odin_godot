@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Canonical snapshot deltas · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Canonical snapshot deltas</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/delta/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>replay/delta</code> provides a sparse XOR codec and a bounded snapshot cache over
+canonical bytes from <code>replay/schema</code>. It never compares compiler-layout padding.</p>
+<p>The little-endian delta format contains a u16 run count, then sorted,
+non-overlapping <code>(offset:u16, size:u16, XOR bytes)</code> runs. Values are at most 65,535
+bytes. Encode/decode preflight the complete operation before modifying output and
+allocate nothing. Dense changes can produce larger deltas; the sender then uses
+a full snapshot.</p>
+<p><code>Cache</code> owns fixed-size values keyed by nonzero stream-local snapshot IDs.
+<code>cache_find</code> returns borrowed bytes. Copy a promoted baseline if it must survive
+cache eviction. Clear history when the connection/checkpoint serial changes.</p>
+<p><code>cache_note_prehashed</code> avoids repeating a digest calculation. It is a trusted
+local optimization: its digest must have been computed over the exact supplied
+bytes. It does not validate a wire-provided hash. The networking receiver still
+computes and compares the reconstructed target digest before using this path.
+The cache owns its byte copy; duplicate IDs require the same digest and bytes.</p>
+<p>The network runner promotes only ACKs matching a snapshot actually sent on the
+current connection generation and checkpoint serial. Receivers reconstruct into
+scratch, validate checksum/schema/game state, then cache and acknowledge. Missing
+baselines request a full snapshot without inventing state or resetting the game
+when normal simulation history remains available.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_delta/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_net/run.sh</code></pre></div><p>Checksums detect compatibility/corruption issues; they do not authenticate peers
+or prove that a client simulated honestly. The session retains that responsibility.</p>
+<p>Encoding keeps very short equal prefixes on the byte path, then skips equal
+eight-byte regions with explicitly unaligned, bounded loads. A differing word
+locates its first changed byte from the appropriate endian-dependent end.
+Differing runs keep their original byte boundaries and ordered XOR format. Complete
+preflight and failure-without-output-mutation remain in place. Native and executed
+WASM corpora compare the resulting bytes with the bytewise reference.</p>
+<p><code>encode_bounded(base, target, dst, budget)</code> emits the identical sparse format only
+if it fits both the budget and destination. It can stop scanning once the candidate
+is too large. Unlike <code>encode</code>, failure does not report the required size; output
+remains untouched. Output must not overlap either input.</p>
+<p><code>encode_smallest(base, target, dst, workspace)</code> chooses the smallest existing sparse
+or LZ4 encoding that fits, preferring sparse on a tie. A bounded tiny-sparse trial
+can rule out LZ4; otherwise LZ4 stays in its existing scratch stage while bounded
+sparse encoding attempts to beat it. A nil workspace selects sparse-only behavior.
+Failure leaves output unchanged, and success changes only the returned extent.
+Workspace/input/output aliasing is rejected. Selection adds no allocation or
+workspace bytes, changes no decoder or wire format, and retains exact chosen bytes.
+The network runner bounds the result so that a delta must beat the full snapshot.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/delta/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/delta/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

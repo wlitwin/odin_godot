@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Self-contained save bundles · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Self-contained save bundles</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/assets/bundles.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>A bundle combines an opaque checkpoint/root document with the exact asset payloads
+it requires. The root remains independently encoded; assets are sorted by reference
+and deduplicated. Capturing gameplay state does not silently capture an entire cache.</p>
+<p><code>bundle_encode(root, refs, cache, meta)</code> validates references, availability and total
+size before allocating the output. Missing content fails before any file write.
+The format permits a 1 MiB root, 32 assets and a 16 MiB total file. A small canonical
+header stores version, lengths, asset count and the body&#39;s SHA-256; the appended
+body contains the root followed by canonical references and payloads. This supports
+files larger than the network envelope limit without weakening that limit.</p>
+<p><code>bundle_decode</code> checks the header, exact lengths, body digest, sorted/unique
+references and each asset&#39;s content ID. It returns read-only views into the supplied
+file bytes and changes no cache. Keep those bytes alive until the views are no
+longer used. <code>bundle_install</code> checks every asset, optional format validators and
+aggregate cache capacity before installing anything. Invalid data, validation
+failure or capacity exhaustion preserves existing entries and pins.</p>
+<p>The Godot helpers <code>checkpoint_bundle_write</code> and <code>checkpoint_bundle_read</code> connect
+the format to the existing checkpoint codec and staged file writer. Read returns
+owned file bytes plus a borrowed view; the caller must check identity/authority
+policy and dependency completeness before installing assets and resuming. Outer
+and inner content/epoch/tick metadata must agree. Callbacks, reconnect credentials
+and live transport objects remain outside the archive.</p>
+<p><code>checkpoint_bundle_encode</code> returns owned bundle bytes without performing I/O.
+<code>checkpoint_bundle_decode</code> validates supplied bytes and returns a borrowed view.
+Both share the same checkpoint/metadata validation with the file helpers. This
+lets an asynchronous backend store one complete bundle and report its own commit
+receipt. Scrapyard uses these helpers with IndexedDB for browser solo saves.</p>
+<p>Plain checkpoint files are also readable, with an empty asset set. A game that
+requires external assets must reject such a file unless those dependencies are
+actually included by an explicitly supported alternate mechanism. Scrapyard checks
+every player&#39;s image reference and requires it to be in the bundle, even if an
+unrelated local cache happens to contain the same image.</p>
+<p>The writer encodes everything before opening the staging file and then uses the
+existing flush/close/rename path. This is a process-crash boundary, not a portable
+power-loss guarantee. One writer owns a save path. The format does not grant a
+coordinator lease or authorize loading another player&#39;s local seat.</p>
+<p><code>bundle_replace_root(original, new_root, content)</code> supports explicit application
+upgrades. It validates the entire original bundle, preserves its metadata and
+asset records/payloads, and returns owned bytes with new lengths and a new body
+digest. The source is unchanged. The replacement root must be 1 byte–1 MiB and
+the complete output must remain within 16 MiB. This generic operation does not
+validate the replacement root&#39;s semantics, metadata or dependency completeness;
+the application must do that before publication. See the
+<a href="../net/checkpoint_upgrade.html">protocol-6 checkpoint bridge</a>.</p>
+<p>The optional <code>target_content</code> argument explicitly updates the outer content ID for
+an application-schema conversion. Zero (the default) preserves the source content.
+The source is always validated against the required <code>content</code> argument first.
+Epoch and tick remain unchanged. The caller must validate that the converted root
+actually declares the new content before writing or restoring the bundle.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../net/checkpoint_upgrade.html"><span>Explicit checkpoint conversion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/assets/bundles.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/assets/bundles.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

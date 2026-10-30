@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Build a game with Replay · odin_godot</title><link rel="icon" href="../favicon.svg"><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../reader.css"><link rel="stylesheet" href="../sdk.css"><script src="../reader.js" defer></script><script src="../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../docs.html" aria-current="page">Docs</a><a href="../guide.html">Field guide</a><a href="../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../docs.html">Overview</a><a href="install.html">Installation</a><a href="first-script.html">Your first script</a><a href="existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../read/docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../read/docs/authoring-guide.html">Script API</a><a href="../read/docs/events.html">Signals and events</a><a href="../read/docs/workflow.html">Editor workflow</a><a href="../read/docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="multiplayer.html">Choose a model</a><a href="kit.html">Build with Kit</a><a href="replay.html" aria-current="page">Build with Replay</a><a href="../read/docs/kit/timelines.html">Prediction and timelines</a><a href="../read/docs/kit/profiles.html">Authority profiles</a><a href="../read/replay/getting-started.html">Replay sessions and rooms</a><a href="../read/replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="exporting.html">Build and export</a><a href="../read/docs/exporting.html">Export reference</a><a href="../read/docs/debugging.html">Debugging</a><a href="../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../read/examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../read/examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../read/examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../guide.html">Illustrated field guide <span>↗</span></a><a href="../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../docs.html">Docs</a><span>/</span><a href="../reading.html">Multiplayer</a><span>/</span><span>Guide</span></div><p class="eyebrow">Multiplayer</p><h1>Build a game with Replay</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../reference/docs/visual-guide/content/replay-game.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#run-the-engine-free-model">Run the engine-free model</a><a href="#choose-the-runtime-owner">Choose the runtime owner</a><a href="#put-gameplay-dependencies-in-world">Put gameplay dependencies in World</a><a href="#connect-godot">Connect Godot</a><a href="#author-a-larger-game">Author a larger game</a></nav></details>
+<article class="reading-body "><p>Replay organizes gameplay around a complete typed World. The runner retains
+frames and input, restores a prior frame when necessary, and steps the changed
+suffix again. Godot owns input devices, scenes, animation, and effects outside
+that world. Replay is experimental; consult the support and runner contracts
+for the configuration you intend to ship.</p>
+<h2 id="run-the-engine-free-model">Run the engine-free model<a class="heading-anchor" href="#run-the-engine-free-model" aria-label="Link to this section">#</a></h2>
+<p>Start with Loot, a small Odin executable that changes the winner of a pickup:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_loot/run.sh</code></pre></div><p>The model predicts one inventory transfer, revises the input at tick 1, rebuilds
+eight ticks, and compares the result with an independent run. The same operation
+restores the chest, both inventories, entity lifetime, pool metadata, and RNG.</p>
+<p>Read <a href="../read/examples/replay_loot/game/game.odin.html">the complete model</a> and
+<a href="../read/examples/replay_loot/main.odin.html">its timeline lifecycle</a>. A local input
+revision demonstrates restoration; network authority is established by the
+network runner and session policy.</p>
+<h2 id="choose-the-runtime-owner">Choose the runtime owner<a class="heading-anchor" href="#choose-the-runtime-owner" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Owner</th>
+<th>Small reference</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Local replayable simulation</td>
+<td><code>Timeline</code></td>
+<td>Loot</td>
+</tr>
+<tr>
+<td>Godot game with direct offline, host, server, client, or observer roles</td>
+<td><code>Session</code></td>
+<td><a href="../read/build/template/replay/README.html">Session starter</a></td>
+</tr>
+<tr>
+<td>Invitations, enrollment, rejoin, and elected authority recovery</td>
+<td><code>Party</code> and <code>Room</code></td>
+<td><a href="../read/examples/replay_cavecrawl/README.html">Replay Cavecrawl</a></td>
+</tr>
+<tr>
+<td>Deterministic fixed-roster peer rollback</td>
+<td>Admitted P2P setup and <code>p2p.Runner</code></td>
+<td><a href="../read/examples/replay_duel/README.html">Duel</a></td>
+</tr>
+</tbody></table>
+</div><p>Pump the owner you chose. Room drives its Session; a direct Session drives its
+clock, transport, and runner. Keep live runtime owners at stable addresses and
+close dependent objects before their borrowed resources.</p>
+<h2 id="put-gameplay-dependencies-in-world">Put gameplay dependencies in World<a class="heading-anchor" href="#put-gameplay-dependencies-in-world" aria-label="Link to this section">#</a></h2>
+<p>Include every mutable value needed for the next tick: positions, health,
+inventories, cooldowns, scheduled work, RNG, entity membership, and allocation
+metadata. Use supported value types and handles. Keep node references, sockets,
+audio playback, and persistent storage outside the frame.</p>
+<p>A step reads the world, typed input, simulation tick, and fixed versioned
+definitions. Read devices before stepping. Record semantic occurrences during
+the step and reconcile their Begin, Update, Confirm, and Cancel changes in
+presentation. The <a href="../read/docs/replay/architecture.html">frame contract</a> describes
+transaction boundaries and history limits.</p>
+<h2 id="connect-godot">Connect Godot<a class="heading-anchor" href="#connect-godot" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../read/build/template/replay/README.html">Session starter</a> contains an offline
+and native host/client game. Edit <code>shared/game/game.odin</code> for rules and
+<code>scripts/starter.odin</code> for input and presentation. Use its documented role
+environment variables to start separate local host and client processes.</p>
+<p>The <a href="../read/examples/replay_recipes/README.html">checked lifecycle recipes</a>
+instantiate Session, Party → Room, and P2P setup against the public API. Hello&#39;s
+network scene shows the lower-level runner integration when you need custom
+orchestration. Follow <a href="../read/replay/getting-started.html">starting a Replay game</a>
+for the full choice of owners and imports.</p>
+<h2 id="author-a-larger-game">Author a larger game<a class="heading-anchor" href="#author-a-larger-game" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../read/examples/replay_scrapyard/contributor-guide.html">Scrapyard contributor guide</a>
+follows a shared turret from authored Resources through World, actions, and
+scene views. Use its workbench to change one feature in isolation. The
+<a href="../read/examples/replay_scrapyard/code-guide.html">code guide</a> maps responsibilities
+to files; the <a href="../read/replay/support.html">support envelope</a> records the limits
+of tested configurations.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../read/build/template/replay/README.html"><span>Replay starter</span><span aria-hidden="true">→</span></a><a href="../read/examples/replay_cavecrawl/README.html"><span>Replay Cavecrawl</span><span aria-hidden="true">→</span></a><a href="../read/examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/visual-guide/content/replay-game.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#run-the-engine-free-model" class="">Run the engine-free model</a><a href="#choose-the-runtime-owner" class="">Choose the runtime owner</a><a href="#put-gameplay-dependencies-in-world" class="">Put gameplay dependencies in World</a><a href="#connect-godot" class="">Connect Godot</a><a href="#author-a-larger-game" class="">Author a larger game</a></nav><div class="outline-actions"><a href="../reference/docs/visual-guide/content/replay-game.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

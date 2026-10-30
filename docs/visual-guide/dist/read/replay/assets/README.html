@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Asset references, caches and exchange · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Asset references, caches and exchange</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/assets/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>An <code>assets.Ref</code> is a SHA-256 ID and byte count. It is a value suitable for a frame,
+canonical schema or checkpoint. Payload bytes live in an independently owned
+<code>Cache</code>. A new payload gets a new ID; receiving an asset never changes simulation
+state.</p>
+<p><code>cache_put</code> owns a copy and validates an expected reference when supplied.
+<code>cache_read</code> / <code>cache_copy</code> return copies so ordinary reads cannot mutate content
+under an existing hash. Cache capacity and invalid data leave previous entries
+intact. Pins protect current dependencies; release pins and explicitly discard
+entries that are no longer needed. Destroy the owner when its lifetime ends.</p>
+<p><code>Mesh</code> exchanges missing watched references with explicitly bound peers. Its name
+does not require a full network mesh: bind only the authority on clients, and the
+admitted client connections on the authority. Simultaneous requests travel in both
+directions. Once the authority caches a player&#39;s asset, it can supply later joiners;
+a surviving cached copy can serve after a new authority/binding is installed.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">assets.mesh_init(&amp;mesh, &amp;cache, application_wire)
+assets.mesh_bind(&amp;mesh, admitted_peer, scope)
+assets.mesh_watch(&amp;mesh, needed_references[:])
+assets.mesh_frame(&amp;mesh, monotonic_ms)</code></pre></div><p>The watched working set is requested and public to bound peers. <code>mesh_publish</code>
+keeps earlier cached revisions available without pinning or requesting them. An optional per-peer authorizer further restricts serving
+and is rechecked during a transfer; revocation cancels remaining output. An optional
+content validator runs before installation. The frame reference is the expected
+content identity, not a file path supplied by a sender.</p>
+<p>The default profile has 32 cached entries, 128 KiB per asset, a 4 MiB cache and 32
+watched references. Up to 16 bound peers share 64 KiB/s output, 16 KiB per update,
+a 32 KiB burst, at most four requests per update and one new payload encoding per
+update. Ingress is limited to 64 packets/128 KiB per update. Each bound receiver
+allocates only the configured asset limit plus framing. Cache exhaustion is explicit;
+there is no implicit eviction of assets used by another subsystem.</p>
+<p><code>mesh_watch</code> pins cached dependencies without duplicating pins on repeated calls.
+Supply retained-history/checkpoint references as well as the current visible set
+when those lifetimes require them. <code>mesh_complete</code> reports byte availability for
+the working set. A missing asset remains missing rather than becoming guessed
+content. Applications can display a placeholder while requests retry.</p>
+<p>The Godot <code>Session_Assets</code> facade sets up the optional application lane, binds the
+admitted roster and rebuilds peer workers on transport/authority changes while
+keeping the cache. Call <code>session_assets_enable</code> on options before opening Session
+or Room, and <code>session_assets_frame</code> after its frame pump, including fenced frames.
+It does not infer dependencies from arbitrary game types. Use a <a href="bundles.html">save bundle</a>
+with the complete dependency set when persisting a world and its payloads.</p>
+<p><code>png_info</code> preflights PNG signature, IHDR CRC, dimensions and encoding fields before
+pixel allocation. It does not replace a full decoder. Godot&#39;s <code>asset_png_image</code>
+then validates/decodes the complete image. Defaults cap compressed bytes at 128 KiB,
+dimensions at 2048 and pixels at 1,048,576; bounds are configurable. The header and
+CRC rules follow the <a href="https://www.w3.org/TR/png-3/#11IHDR" rel="noreferrer">W3C PNG specification</a>.</p>
+<p>Native fault tests cover bidirectional transfer, late caches, source loss/new epoch,
+stale requests, private unadvertised cache entries, per-peer policy and content
+rejection. <code>mesh_announce</code> offers locally cached content before its ID enters
+gameplay. Offer acceptance is opt-in per admitted peer, with one pending offer
+per peer, bounded requests and a timeout. The Godot facade accepts offers from
+admitted players, not observers; its cache is specifically for public room assets.
+Earlier cached revisions remain available through the facade after a working-set
+change. Use a separate cache or a per-peer authorizer for private content.</p>
+<p>The network model&#39;s authority-only <code>action_admit</code> hook can require the validated
+bytes before accepting a reference-setting action. Its decision enters the action
+ledger; prediction/replay do not consult mutable caches. Scrapyard uses that hook,
+then gates coordinator preparation on the checkpoint&#39;s image dependencies.</p>
+<p>These are transport/cache guarantees; each game must supply complete save dependencies and prove its recovery/browser
+behavior with integration gates.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/assets/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/assets/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

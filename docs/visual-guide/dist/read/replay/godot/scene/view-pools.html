@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>View pool foundations · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>View pool foundations</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/view-pools.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#optional-property-caching">Optional property caching</a><a href="#identity-and-ownership">Identity and ownership</a><a href="#typed-entity-bindings">Typed entity bindings</a><a href="#detached-projection-and-sampling">Detached projection and sampling</a><a href="#animation-without-repainting-data">Animation without repainting data</a></nav></details>
+<article class="reading-body "><p>The <a href="../../../docs/replay/godot-bridge-plan.html">Godot bridge goal</a> adds typed
+entity bindings and detached projections above the existing <code>Nodes2</code> owner.</p>
+<p><code>Nodes2</code> now uses bounded indexed identity lookup, with a separate preflight index
+for each presentation batch. Zero and duplicate keys are rejected before changing
+scene instances. Retained keys retain their node; absent identities retire before
+new ones allocate, so a full pool can replace every identity in one call. The map
+preserves lowest-vacant-slot allocation and performs no per-frame Odin allocation.
+A fully retained membership batch skips capacity scans and index/free-slot rebuilds
+after complete preflight. Sparse indexes clear only recorded occupied buckets; each
+index adds four bytes per configured entry for those bucket locations.
+Scene creation/free still occurs when identities enter/leave.</p>
+<p>Capacity is 1–65536. Each index uses a power-of-two table with at most half its
+buckets occupied. Lookup is expected constant time, with a bounded full-table
+probe limit; it is not a worst-case constant-time hash guarantee. The extra index,
+free-slot and cached-value arrays increase presentation-owner memory in exchange
+for fewer repeated scans. They do not enter World, history or network packets.</p>
+<h2 id="optional-property-caching">Optional property caching<a class="heading-anchor" href="#optional-property-caching" aria-label="Link to this section">#</a></h2>
+<p>Existing callers keep <code>cache_properties=false</code>, so every call reapplies position,
+rotation, scale and modulation as before. An adapter that exclusively owns those
+four root properties can opt in:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">views.cache_properties = <span class="hljs-literal">true</span>
+ok := scenegd.nodes_present(&amp;views, instances)</code></pre></div><p>The first presentation applies all properties. Later calls apply only changed
+values. The cache compares desired values, not Godot state, so it does not need
+four engine reads per node. If animation/editor/game code changes an owned property,
+invalidate before the next presentation:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">scenegd.nodes_invalidate(&amp;views, entity_key) <span class="hljs-comment">// one view</span>
+scenegd.nodes_invalidate(&amp;views)             <span class="hljs-comment">// all views</span></code></pre></div><p>Invalidation does not respawn the view or restart effects. Turning caching off
+reapplies all values. Keep independently animated children separate from root
+properties controlled by this binding, or explicitly invalidate after an external
+write. Callers still own any game-specific child state and cleanup policy.</p>
+<p><code>Nodes2.stats</code> counts scene creations/retirements and property writes/skips. The
+two indexes count probes. These are local diagnostics, not simulation state.</p>
+<h2 id="identity-and-ownership">Identity and ownership<a class="heading-anchor" href="#identity-and-ownership" aria-label="Link to this section">#</a></h2>
+<p><code>view.handle_key(handle)</code> encodes the complete nonzero pool generation and index.
+Use a separate view pool for each source pool/timeline scope; the key does not
+globally identify a pool. An invalid handle returns zero. A replacement generation
+gets a new view. Clear views at an explicit session/epoch boundary when identities
+can otherwise repeat. The typed owner below handles scope changes automatically.</p>
+<p>The parent must outlive <code>Nodes2</code>. It owns the scene reference and its child views;
+external code may borrow a node from <code>nodes_get</code> but must not free it behind the
+owner. <code>nodes_destroy</code> releases references and queues node retirement. Engine
+retirement completes asynchronously. Failure to instantiate a scene is explicit;
+the existing API does not promise rollback of earlier scene lifecycle operations
+in that call.</p>
+<p>Pure index tests cover duplicates, collisions, capacity, reset and handle lifetime.
+<code>tests/replay_nodes/run.sh</code> exercises actual Godot properties, retained/replaced
+instances, opt-in behavior, external-write invalidation and resource retirement.
+The benchmark compares the preserved old owner, indexed owner and cached owner
+with the same scene/input workload. Timings isolate presentation calls, not GPU
+rendering or total game performance.</p>
+<h2 id="typed-entity-bindings">Typed entity bindings<a class="heading-anchor" href="#typed-entity-bindings" aria-label="Link to this section">#</a></h2>
+<p><code>View_Pool2(Entity, Value, Rig)</code> owns one source entity pool&#39;s views. <code>Value</code> is a
+pointer-free presentation value; <code>Rig</code> caches child nodes and may own local resources.
+The parent and callback <code>user</code> must outlive the owner. <code>attach</code> returns a rig once
+per new view; <code>paint</code> runs initially and when Value changes; <code>detach</code> releases rig
+resources before the node retires. A failed attach also receives detach, so cleanup
+must accept a partially initialized rig. Callbacks must not reenter this owner.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Actor_UI :: <span class="hljs-keyword">struct</span> { health: <span class="hljs-type">i32</span> }
+Actor_Rig :: <span class="hljs-keyword">struct</span> { label: gd.Label }
+views: scenegd.View_Pool2(Actor, Actor_UI, Actor_Rig)
+binding := scenegd.View_Binding(Actor_UI, Actor_Rig){
+    attach = <span class="hljs-keyword">proc</span>(_: <span class="hljs-type">rawptr</span>, node: gd.Node2d) -&gt; (Actor_Rig, <span class="hljs-type">bool</span>) {
+        label := <span class="hljs-keyword">cast</span>(gd.Label)gd.get_node(node, <span class="hljs-string">&quot;Health&quot;</span>)
+        <span class="hljs-keyword">return</span> {label}, label != <span class="hljs-literal">nil</span>
+    },
+    paint = <span class="hljs-keyword">proc</span>(_: <span class="hljs-type">rawptr</span>, rig: ^Actor_Rig, ui: Actor_UI) {
+        gd.set_text(rig.label, fmt.ctprintf(<span class="hljs-string">&quot;%d&quot;</span>, ui.health))
+    },
+}
+ok := scenegd.view_pool_load(&amp;views, parent, <span class="hljs-string">&quot;res://actor.tscn&quot;</span>, <span class="hljs-number">128</span>, binding)
+<span class="hljs-comment">// items contain typed handles and detached Entity_View(Actor_UI) values.</span>
+error := scenegd.view_pool_present(&amp;views, {epoch, view_revision}, items)
+<span class="hljs-comment">// When leaving: scenegd.view_pool_destroy(&amp;views).</span></code></pre></div><p>The typed owner caches root position/rotation/scale/color automatically. Reserve
+those properties for this owner. <code>view_pool_invalidate(&amp;views, handle)</code> invalidates
+both root properties and typed paint; omitting the handle invalidates all views.
+Do not mutate or free borrowed nodes outside these ownership rules. A changed
+scope recreates every rig, even when numeric handles repeat. Older epochs are
+rejected; revision is a caller-supplied reset token, not an authority credential.
+Generations distinguish reused entity slots within one scope.</p>
+<p>Invalid values, duplicates and capacity are preflighted before scene changes.
+Instantiation/attachment can fail after lifecycle work starts; that failure clears
+the typed owner and is explicit. It does not restore old scene nodes. Payload
+comparison uses value equality, not padding bytes. Floating values that differ
+continually will repaint; choose a quantized UI value when appropriate.</p>
+<h2 id="detached-projection-and-sampling">Detached projection and sampling<a class="heading-anchor" href="#detached-projection-and-sampling" aria-label="Link to this section">#</a></h2>
+<p><code>replay.project(&amp;timeline, tick, proc(World)-&gt;Display)</code> selects a retained frame and
+returns a pointer-free value. The callback receives World by value and cannot
+mutate history through a borrowed pointer; timeline mutation reentry is refused.
+It does not promise zero copying or automatically shrink the result. Keep Display
+small when reducing copy costs matters. Hello demonstrates a full view batch for
+clarity; its small World is actually smaller than that batch.</p>
+<p><code>view.project_pool</code> fills a reusable bounded <code>Projection(Entity, Value)</code> from a
+detached pool. Its typed entity callback returns <code>(Entity_View(Value), include)</code>;
+false filters a member. Invalid/capacity failures preserve the previous output.
+Projection owners allocate at initialization and allocate nothing per call.</p>
+<p><code>projection_select</code> requires explicit predicted, observed or authoritative input.
+<code>Local_Predicted_Remote_Observed</code> takes local-owner entities from prediction and
+others from observation, preserving each item&#39;s source and tick. Missing sources,
+mismatched scopes, and conflicting lifetimes/ownership in one slot are errors.
+Selection never grants simulation authority. Feed sources from the corresponding
+runner APIs; labeling a value does not establish its provenance.</p>
+<p><code>projection_blend</code> interpolates poses only for matching handles and teleport <code>cut</code>
+values. Before alpha reaches one, membership and discrete UI come from the older
+sample. Changed cuts snap the pose; changed scopes choose the newer batch directly.
+It refuses mixed-source interpolation and backward tick pairs. For mixed displays,
+interpolate observation first, then select local prediction. Keep destination and
+source owners distinct. Projection storage is presentation-owned and must not be
+mutated while another operation consumes it.</p>
+<p>See the compile-checked Hello and <code>tests/replay_nodes</code> examples, and
+<span class="local-reference" title="docs/replay/results/typed-views-2026-09-20/README.md · available in the repository">typed bridge evidence</span>.</p>
+<h2 id="animation-without-repainting-data">Animation without repainting data<a class="heading-anchor" href="#animation-without-repainting-data" aria-label="Link to this section">#</a></h2>
+<p>An optional <code>View_Binding.frame(user, rig, value, dt)</code> hook advances presentation
+animation even when the detached Value is unchanged and <code>paint</code> is skipped.
+Call <code>view_pool_frame(&amp;views, dt)</code> once after presenting a successful batch.
+It visits live entries only and rejects negative/nonfinite delta without callbacks.
+The callback receives the retained detached value and may animate rig-owned children;
+root pose/scale/modulation remain owned by the pool. Callbacks must not reenter or
+change pool membership. Simulation time and presentation time remain separate.</p>
+<p>Scrapyard&#39;s enemy bridge uses paint for texture/telegraph/health changes and frame
+for idle/attack/death animation, status flicker and hit wobble. A cached unchanged
+value therefore does not freeze an idle animation. This hook is optional for
+existing bindings; no frame callback is invoked by <code>view_pool_present</code> itself.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../docs/replay/godot-bridge-plan.html"><span>Godot bridge and measured optimization goal</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/view-pools.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#optional-property-caching" class="">Optional property caching</a><a href="#identity-and-ownership" class="">Identity and ownership</a><a href="#typed-entity-bindings" class="">Typed entity bindings</a><a href="#detached-projection-and-sampling" class="">Detached projection and sampling</a><a href="#animation-without-repainting-data" class="">Animation without repainting data</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/view-pools.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

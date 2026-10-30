@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Resuming a saved party · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Resuming a saved party</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/room_restore.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#lifecycle">Lifecycle</a><a href="#recovery-semantics">Recovery semantics</a><a href="#acceptance-and-remaining-work">Acceptance and remaining work</a></nav></details>
+<article class="reading-body "><p><code>Room_Options.restore_published</code> lets a fresh Room recover a durable checkpoint
+when its previous authority is gone. <code>Party</code> enables this for trusted hosting
+members (excluding observers). A live authority always takes precedence: Room
+joins that host normally. Existing live migration and frozen-owner recovery keep
+their own paths.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">options.restore_published = <span class="hljs-literal">true</span>
+<span class="hljs-comment">// WSS by default; explicit loopback WS is available for local development.</span>
+options.checkpoint_local_development = local_development
+error := replaygd.room_open(&amp;room, initial_frame, game_model, options)
+<span class="hljs-comment">// Continue the usual frame loop. No separate download or restore pump is needed.</span>
+error = replaygd.room_frame(&amp;room, delta_seconds, controls)</code></pre></div><p>The initial frame is used only for a genuinely new bootstrap room. It is never
+substituted for missing, corrupt, disallowed or too-old saved progress.</p>
+<h2 id="lifecycle">Lifecycle<a class="heading-anchor" href="#lifecycle" aria-label="Link to this section">#</a></h2>
+<p>After fresh process registration and an authenticated view with no live authority,
+Room computes its schema/config contract without creating a simulation timeline.
+It reads publication status, downloads the selected revision, decodes the complete
+typed checkpoint and verifies the stable token&#39;s playable reservation. Dedicated
+authority uses local seat zero.</p>
+<p>Room validates and installs packaged dependencies into <code>checkpoint_cache</code> before
+requesting authority. Room owns the prepared checkpoint independently of transfer
+buffers. The existing
+<code>preparation_ready</code> callback must approve referenced assets before Room requests
+authority. While waiting, ordinary authority queries continue and the completed
+download&#39;s ACK can retry, releasing the service transfer slot. If another host
+becomes live, Room releases its pending recovery state and joins it instead.</p>
+<p>The explicit Restore request shares the authority Lease&#39;s request sequence; Room
+does not start another RPC while it is pending. A successful correlated grant is
+required, followed by a fresh successful renewal before <code>session_resume</code> starts a
+runtime. This prevents validation/transfer latency from consuming most of the
+lease before expensive runtime setup. The runtime uses the saved
+configuration/state, correct local seat and freshly registered incarnation under
+the newer epoch. There is no uncoordinated authority fallback.</p>
+<p>A Restore reply may arrive after its conservative local deadline: that deadline
+is anchored to request start, while the coordinator granted ownership later.
+Room retains the exact prepared point and requests renewal when the authenticated
+view still reports this actor&#39;s reservation. It does not request another Restore
+or install a runtime using the expired permit. A successful correlated renewal
+can make the same epoch usable. If the coordinator has also expired or replaced
+the reservation, renewal is refused and normal recovery/join rules apply.</p>
+<p>Current request retries cannot change the service&#39;s policy result. <code>Busy</code> during
+status/download means another bounded transfer is in progress; Room retries a new
+status request after backoff instead of showing a terminal recovery error. <code>Busy</code>
+on an authority request retains the prepared bytes for a later new attempt. Stale
+publication/transport timeout returns to status lookup.
+Connection/generation changes preserve owned bytes while the control context is
+refreshed. An exact already-granted Point with a live authenticated lease can still
+be installed after a lost reply. A stale local permit needs fresh authorization;
+an expired coordinator reservation needs a new recovery grant.</p>
+<p><code>Room.restore.phase</code> exposes Checking, Downloading, Preparing, Requesting, Granted,
+Complete or Failed. <code>error</code> and <code>authority_error</code> preserve storage/protocol and
+authority-policy detail. Missing saves, unsupported contracts, denied reservations
+and excessive rollback remain visible failures. <code>room_restore_retry</code> permits an
+explicit retry for a fresh Room without an initialized Session. Cavecrawl displays
+progress and a retry button through its existing party menu.</p>
+<h2 id="recovery-semantics">Recovery semantics<a class="heading-anchor" href="#recovery-semantics" aria-label="Link to this section">#</a></h2>
+<p>The normal checkpoint resume policy retires pending accepted actions explicitly
+and disconnects nonlocal saved peers until they reconnect. Stable tokens, reserved
+seats and action frontiers survive. A game&#39;s normal leave/join rules apply to those
+peers; Room does not invent an alternate inventory policy. The restoring local
+player keeps its saved state. Personal profile persistence remains separate.</p>
+<p><code>Room.recovery.from_publication</code> identifies this path. <code>checkpoint_tick</code> is the
+restored boundary and <code>service_known_tick</code> is the latest authenticated pre-attempt
+authority tick observed by this Room. <code>known_lost_ticks</code> uses that known tick;
+<code>previous_confirmed</code> stays zero because a fresh process had no local timeline.
+This is a known rollback distance from that view, not proof about unreported work or every earlier
+grant lost across service restarts. Installation/interruption timing remains
+available through the existing recovery metrics.</p>
+<h2 id="acceptance-and-remaining-work">Acceptance and remaining work<a class="heading-anchor" href="#acceptance-and-remaining-work" aria-label="Link to this section">#</a></h2>
+<p>Cavecrawl&#39;s <strong>Rejoin recent party</strong> now resumes stored progress after the original
+game process exits and the service is killed/restarted. Native verified-TLS and
+fresh-browser/RTC tests restore the exact saved tick with three gems in epoch 2,
+accept a new guest and its loot action, then publish the continued game again.
+The browser gate uses explicit loopback development WS. Separate database readers
+validate the final saved inventories. The original live handoff/rejoin gate still
+passes with publication enabled.</p>
+<p>Competing-return fixtures retain the same published checkpoint in two fresh
+registered processes before releasing their recovery attempts. One becomes the
+new authority; the other observes that live host and joins it. Native release-order
+tests cover both possible owner seats and verify one epoch advance plus conserved
+loot in the next durable publication. A browser RTC race exercises the same
+transition. Temporary Busy responses must not strand a participant before it can
+reach that transition.</p>
+<p>This completes that Cavecrawl recovery path. Bounded atomic asset packages now also
+support Scrapyard sprays and its native/browser cold-cache restoration. Broader
+asset profiles, other game UI/state acceptance, public
+deployment and broader recovery/failure policy cases remain roadmap work. See the
+<a href="../provision/checkpoint/restore.html">guarded service decision</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room_restore.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#lifecycle" class="">Lifecycle</a><a href="#recovery-semantics" class="">Recovery semantics</a><a href="#acceptance-and-remaining-work" class="">Acceptance and remaining work</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/room_restore.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

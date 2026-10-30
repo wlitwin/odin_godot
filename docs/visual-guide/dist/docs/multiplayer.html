@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Choose a multiplayer model · odin_godot</title><link rel="icon" href="../favicon.svg"><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../reader.css"><link rel="stylesheet" href="../sdk.css"><script src="../reader.js" defer></script><script src="../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../docs.html" aria-current="page">Docs</a><a href="../guide.html">Field guide</a><a href="../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../docs.html">Overview</a><a href="install.html">Installation</a><a href="first-script.html">Your first script</a><a href="existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../read/docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../read/docs/authoring-guide.html">Script API</a><a href="../read/docs/events.html">Signals and events</a><a href="../read/docs/workflow.html">Editor workflow</a><a href="../read/docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="multiplayer.html" aria-current="page">Choose a model</a><a href="kit.html">Build with Kit</a><a href="replay.html">Build with Replay</a><a href="../read/docs/kit/timelines.html">Prediction and timelines</a><a href="../read/docs/kit/profiles.html">Authority profiles</a><a href="../read/replay/getting-started.html">Replay sessions and rooms</a><a href="../read/replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="exporting.html">Build and export</a><a href="../read/docs/exporting.html">Export reference</a><a href="../read/docs/debugging.html">Debugging</a><a href="../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../read/examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../read/examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../read/examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../guide.html">Illustrated field guide <span>↗</span></a><a href="../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../docs.html">Docs</a><span>/</span><a href="../reading.html">Multiplayer</a><span>/</span><span>Guide</span></div><p class="eyebrow">Multiplayer</p><h1>Choose a multiplayer model</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../reference/docs/visual-guide/content/multiplayer.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-the-unit-of-state">Choose the unit of state</a><a href="#choose-who-decides">Choose who decides</a><a href="#keep-presentation-separate">Keep presentation separate</a><a href="#test-one-contested-interaction">Test one contested interaction</a></nav></details>
+<article class="reading-body "><p>Three decisions shape a multiplayer game: where gameplay state lives, whose
+result settles a conflict, and which moment each screen displays. Choose them
+before adding a transport. A host/client role alone does not define all three.</p>
+<h2 id="choose-the-unit-of-state">Choose the unit of state<a class="heading-anchor" href="#choose-the-unit-of-state" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Where you write gameplay</th>
+<th>How correction is organized</th>
+<th>Start here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kit</td>
+<td>Script structs, tagged entity fields, generated commands, and optional fixed ticks</td>
+<td>Target-local command prediction and the simulation lane&#39;s historical state</td>
+<td><a href="kit.html">Build a Kit game</a></td>
+</tr>
+<tr>
+<td>Replay</td>
+<td>A typed World stepped from inputs, with Godot views outside the simulation</td>
+<td>Complete-frame restoration and replay for the authored simulation group</td>
+<td><a href="replay.html">Build a Replay game</a></td>
+</tr>
+</tbody></table>
+</div><p>Kit supports both cooperative owner movement and server-authoritative prediction.
+Replay supports server authority, cooperative owner streams, and deterministic
+peer rollback. Choose by the game&#39;s state dependencies and trust model rather
+than treating the frameworks as a co-op/competitive switch.</p>
+<h2 id="choose-who-decides">Choose who decides<a class="heading-anchor" href="#choose-who-decides" aria-label="Link to this section">#</a></h2>
+<p><strong>Invited co-op.</strong> Players can author their own motion while the host validates
+shared interactions. Kit&#39;s owner fields are a small starting point. Replay&#39;s
+owner streams can record accepted Godot body observations when the game uses
+live engine physics.</p>
+<p><strong>Listen-server action.</strong> The hosting player runs the authority. Clients submit
+intent, predict locally, and accept corrections. This is convenient for
+player-hosted sessions; the host still controls the authoritative process.</p>
+<p><strong>Dedicated authority.</strong> A process on trusted infrastructure judges the game.
+Validate game-specific input, choose admission and transport policy, and plan
+deployment and recovery. In Kit, the dedicated profile also requires constrained
+or validated simulation inputs. In Replay, Session exposes an avatarless Server
+role, with Room policies available for trusted infrastructure recovery.</p>
+<p><strong>Deterministic peers.</strong> Admitted players exchange inputs and reproduce the same
+steps. Replay&#39;s P2P runner requires fixed roster identities and a simulation that
+reproduces math, RNG, allocation, and input order across its target platforms.
+Use the <a href="../read/examples/replay_duel/README.html">Duel example</a> for that contract.</p>
+<h2 id="keep-presentation-separate">Keep presentation separate<a class="heading-anchor" href="#keep-presentation-separate" aria-label="Link to this section">#</a></h2>
+<p>Local prediction responds to current input. Remote interpolation usually presents
+a buffered past. Effects need to follow the frame being displayed; applying a
+remote pickup effect as soon as a packet arrives can make the item vanish before
+the visible player reaches it.</p>
+<p>Godot rigid-body solving needs an explicit policy. Saving node poses does not
+restore contact solving. Use a replayable query-based model or cooperative body
+observations according to the game you are building.</p>
+<h2 id="test-one-contested-interaction">Test one contested interaction<a class="heading-anchor" href="#test-one-contested-interaction" aria-label="Link to this section">#</a></h2>
+<p>Give two players one item. Let both predict taking it, delay the connection, and
+make one request lose. Check the inventories, entity lifetime, and effect journal.
+This exposes the state and presentation boundaries before a large game makes
+the failure difficult to isolate.</p>
+<p>Continue with <a href="../read/docs/kit/profiles.html">Kit profiles</a>,
+<a href="../read/replay/getting-started.html">Replay&#39;s runner guide</a>, and
+<a href="../read/docs/kit/timelines.html">timeline choices</a>. The illustrated field guide follows
+this pickup through both frameworks with diagrams and a correction lab.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="kit.html"><span>Build a game with Kit</span><span aria-hidden="true">→</span></a><a href="replay.html"><span>Build a game with Replay</span><span aria-hidden="true">→</span></a><a href="../read/examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/visual-guide/content/multiplayer.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-the-unit-of-state" class="">Choose the unit of state</a><a href="#choose-who-decides" class="">Choose who decides</a><a href="#keep-presentation-separate" class="">Keep presentation separate</a><a href="#test-one-contested-interaction" class="">Test one contested interaction</a></nav><div class="outline-actions"><a href="../reference/docs/visual-guide/content/multiplayer.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

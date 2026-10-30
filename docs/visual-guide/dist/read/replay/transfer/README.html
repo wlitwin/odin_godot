@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Bounded blob transfer · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Bounded blob transfer</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/transfer/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>replay/transfer</code> moves a canonical envelope over a borrowed packet transport.
+It is independent of gameplay models and checkpoint codecs. Recovery, P2P archives
+and public asset exchange can reuse its pacing, retries and integrity checks.</p>
+<p>A <code>Sender</code> owns one active encoded value. A <code>Blob_Receiver</code> allocates its configured
+byte cap and calls a validator only after source/scope, chunk assembly, SHA-256 and
+envelope checks pass. The callback must validate and install atomically, borrow the
+bytes only during that call, and leave the previous value intact on rejection.
+Receipts make lost acknowledgments and repeated chunks idempotent. Application
+values themselves remain caller-owned.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">transfer.sender_init(&amp;sender, scope, peer, wire,
+    archive_kind = MY_CONTENT_KIND, max_bytes = <span class="hljs-number">128</span> * <span class="hljs-number">1024</span>)
+transfer.blob_init(&amp;receiver, scope, peer, wire, MY_CONTENT_KIND,
+    install_candidate, user, max_bytes = <span class="hljs-number">128</span> * <span class="hljs-number">1024</span>)
+transfer.sender_begin(&amp;sender, encoded_envelope, now_ms)</code></pre></div><p>Service each endpoint with <code>sender_update</code> / <code>blob_update</code>, dispatching received
+packets to <code>sender_receive</code> / <code>blob_receive</code>. <code>destination</code> is an untrusted routing
+hint; each consumer performs validation again. Keep owners/callback data at stable
+addresses and destroy them explicitly. Borrowed transports are never closed by
+these owners.</p>
+<p><code>Scope{room, epoch, binding, content}</code> is supplied after admission. Change the
+binding when a connection incarnation changes. Scope identifiers reject stale or
+misrouted packets; they are not authentication or authority election. Envelope tick
+is a monotonic application stamp within this transfer stream; checkpoint adapters
+use simulation ticks, while assets use transfer sequence stamps.</p>
+<p>The default packet-kind base is <code>0x5200</code>, reserving seven following kinds. Callers may
+choose a disjoint base. The archive kind is independently checked inside the
+reassembled envelope. <code>replay/recovery</code> keeps its public facade, <code>0x5100</code> base,
+checkpoint default and existing wire representation. A golden packet test compares
+its complete offer digest against bytes captured before the extraction.</p>
+<p>Limits: at most 1 MiB per envelope, 1 KiB chunks, a configured sliding window,
+per-update/per-second output budgets, retry and timeout bounds. A smaller
+<code>max_bytes</code> bounds receiver allocation and rejects large offers before assembly.
+Use a shared transport budget when several senders/receivers operate together;
+per-worker budgets alone do not bound their sum. <code>replay/assets</code> does this for its
+peer workers, and the Session router also shares bandwidth with gameplay/recovery.</p>
+<p>Optional compression uses a distinct sixth offer kind. Set <code>sender.compress</code> only
+when the recipient has advertised support; its default is false. Recovery Link
+selects it from the admitted connection&#39;s Features bit 128, which resets on
+reconnection. Existing offer/chunk/reply schemas and canonical checkpoint formats
+are unchanged. Incompressible archives use the original offer.</p>
+<p>Compression splits archives into at most 17 independent LZ4 blocks of 65,535 bytes.
+The offer still names the raw archive size and SHA-256; its additional wire size
+must be smaller and remains subject to the raw byte cap. Receivers validate the
+complete block stream, raw hash, canonical envelope and typed callback before
+publishing a receipt. Compression never changes the authority recovery Point or
+its rollback policy.</p>
+<p>The sender retains the raw archive and, when smaller, a compressed copy. Encoding
+uses one raw-size temporary buffer and a block workspace. The receiver keeps its
+original <code>max_bytes</code> wire buffer and lazily allocates two additional <code>max_bytes</code>
+buffers for atomic decompression. The block decoder also uses 65,535 bytes of
+stack scratch. No allocation occurs per block; destroy releases all owned buffers.</p>
+<p><code>sender_update(sender, now_ms, max_output_bytes)</code> can further restrict one call&#39;s
+output allowance. The default keeps the configured allowance; zero suppresses
+output while still checking timeouts. A caller splitting one update across
+scheduling phases must subtract earlier transmitted bytes from its later
+allowance. This parameter does not reserve transport capacity or change packet
+priority.</p>
+<p>Schema-aware compression additionally uses the seventh offer kind. Set
+<code>sender.shuffle</code> only after the recipient advertises support, and supply
+<code>Layout{schema, offset}</code> for one fixed canonical section. Both endpoints borrow
+an immutable ready schema at a stable address. The receiver needs the same layout;
+it does not accept array offsets or programs supplied by a peer. Its fingerprint
+binds the schema&#39;s shuffle version, canonical fingerprint, ordered array regions,
+section offset and size. Unsupported or mismatched plans reject before assembly.</p>
+<p>The sender compares ordinary block compression with a schema-grouped candidate
+and selects the grouped form only when it is smaller, including an allowance for
+the extra offer metadata. Original canonical bytes and archive hashes remain the
+identity. Receiver decompression reuses its existing two scratch buffers, undoes
+the grouping, then validates raw SHA-256, canonical envelope and typed acceptance.
+Failed candidates cannot publish receipts. The sender temporarily adds one raw-size
+buffer for grouping. <code>shuffled_archives</code> counts sender selections or receiver
+validations; <code>shuffle_bytes_saved</code> is a sender-only comparison of encoded payloads,
+not total network traffic including retries.</p>
+<p>Recovery obtains the Frame section layout from its owned checkpoint codec and
+uses Features bit 256, which requires bit 128. Reconnect clears both capabilities.
+<code>net.checkpoint_frame_layout</code> provides the immutable schema/offset borrow;
+<code>sender_publish</code> uses it when a caller-owned codec is supplied. Recovery Link owns
+that codec automatically. Peers advertising only bit 128 retain ordinary block
+compression, and peers advertising neither retain original offers. None of these
+options changes checkpoint formats, the recovery Point, queue ordering or rollback
+policy.</p>
+<p><code>sender_begin</code> also accepts an explicit delivery channel (default <code>Unreliable</code>).
+A reliable sender relies on the transport for chunk delivery and does not enqueue
+application-level retransmissions of chunks already accepted by that transport.
+It retries its offer until the receiver acknowledges admission. Pass the actual
+received channel to <code>blob_receive</code>; accepted reliable traffic upgrades replies to
+reliable for the lifetime of that admitted scope. Delayed older datagrams cannot
+downgrade replies. Timeouts, byte budgets, hashes, typed installation and retention
+still apply. Transport disconnection or a broken delivery promise cannot be cured
+by this option.</p>
+<p>The caller must know the peer/router supports this delivery mode. Recovery Link
+negotiates Features bit 512 and chooses reliable checkpoint delivery only for a
+peer advertising it. Older peers retain the original unreliable path. This uses
+the existing transport channels; no new archive format or RTC channel is created.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/transfer/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/transfer/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

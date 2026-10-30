@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Portable local gameplay recordings · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Portable local gameplay recordings</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/diagnostic/recording.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#decode-and-verify">Decode and verify</a><a href="#contract-and-limits">Contract and limits</a><a href="#godot-export-and-hello-verifier">Godot export and Hello verifier</a><a href="#network-models">Network models</a></nav></details>
+<article class="reading-body "><p>A <code>Recording(State, Input, Event)</code> owns a replayable history window independently
+of its source timeline. It stores a complete starting frame, every subsequent
+recorded input and expected frame, and each ordered event batch. Capturing does
+not run the simulation or mutate its history. Replaying uses an isolated timeline
+and returns the first state/event mismatch with an owned <code>Audit_Capture</code>.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> d <span class="hljs-string">&quot;godot:replay/diagnostic&quot;</span>
+
+identity := d.Recording_Context{content = GAME_CONTENT, build = MODEL_REVISION, tick_hz = <span class="hljs-number">60</span>}
+recording: d.Recording(World, Input, Event)
+<span class="hljs-keyword">defer</span> d.recording_destroy(&amp;recording)
+result := d.recording_capture(&amp;recording, &amp;timeline, identity)
+<span class="hljs-keyword">if</span> result.error == .None {
+    bytes, error := d.recording_encode(&amp;recording)
+    <span class="hljs-keyword">defer</span> delete(bytes)
+    <span class="hljs-comment">// Persist bytes only when error == .None.</span>
+}</code></pre></div><p>Capture defaults to the newest 120 replayable ticks. Choose 1..4095 explicitly.
+It stops at a correction/checkpoint boundary or retained-history edge and keeps
+the preceding full frame. A checkpoint without any generating input produces a
+valid zero-step recording. Its earlier committed events are outside the recorded
+suffix; it does not invent inputs for authority corrections. Tick zero, nonzero
+checkpoints, wrapped retention and the maximum u64 tick are supported.</p>
+<p>Destroy owners before reuse; copying the owner aliases its owned arrays. Captured
+state/input/event values themselves follow Replay&#39;s no-reference value contract.
+Capture is a synchronous operation requiring exclusive access to the timeline.
+Do not mutate its source concurrently. Busy/reentrant timelines are rejected.</p>
+<h2 id="decode-and-verify">Decode and verify<a class="heading-anchor" href="#decode-and-verify" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">loaded: d.Recording(World, Input, Event)
+<span class="hljs-keyword">defer</span> d.recording_destroy(&amp;loaded)
+error := d.recording_decode(&amp;loaded, bytes, identity)
+<span class="hljs-keyword">if</span> error == .None {
+    model := d.Recording_Model(World, Input, Event){
+        step = game_step, state_valid = state_valid, input_valid = input_valid,
+        user = immutable_assets,
+    }
+    capture: r.Audit_Capture(World, Input, Event)
+    <span class="hljs-keyword">defer</span> r.audit_capture_destroy(&amp;capture)
+    result := d.recording_verify(&amp;loaded, identity, model, &amp;capture)
+    text := d.audit_text(result.replay, &amp;capture)
+    <span class="hljs-keyword">defer</span> delete(text)
+}</code></pre></div><p>Decode validates exact length, schema fingerprints, context, canonical values,
+chronological stamps, contiguous event ranges, event IDs and duplicate IDs before
+publishing an owner. Any failure leaves the destination empty. It executes no
+model code. Verify preflights all supplied state/input validators before the first
+step, then compares every complete state and ordered event batch using the core&#39;s
+logical equality. Validators may be nil where schema checks suffice. A rejected
+model value or aborted step reports its tick without claiming an audit mismatch.
+A successful zero-step verification checks the starting value but executes no step.</p>
+<p>The first divergent tick retains its preceding frame, input, expected/actual frame
+and both event batches. <code>audit_text</code> reports field differences, including private
+fields. A successful verification neither populates a failure capture nor changes
+the recording. Verification does not publish presentation effects, open networking,
+restore a game session or advance its confirmation frontier.</p>
+<h2 id="contract-and-limits">Contract and limits<a class="heading-anchor" href="#contract-and-limits" aria-label="Link to this section">#</a></h2>
+<p>The caller supplies nonzero content and build/model revision identifiers, plus
+1..10000 ticks per second. The frequency is checked metadata; simulation code
+still implements the actual timestep. Bump the revision for relevant changes in
+code, configuration and immutable assets. The format cannot discover undeclared
+external state or reconstruct assets from a pointer. Hello uses explicit manual
+revision 1 and its existing network content identifier; source/binary hashes in
+acceptance receipts identify the tested build more precisely.</p>
+<p>Version 1 uses a checksummed header envelope, a base-frame envelope, then a
+checksummed envelope per tick. The header fingerprint includes all state, input,
+event and header schemas, including zero-step files. The header declares exact
+counts and total byte length; every chunk carries its epoch, content and tick.
+All fields use canonical little-endian schemas. No native padding, pointers or
+platform-width integers enter a recording.</p>
+<p>Files are capped at 16 MiB; an individual envelope payload at 1 MiB; the owned
+record values at 64 MiB; a tick at 4096 events. Codec/simulation scratch and schema
+metadata add temporary memory. An export that exceeds a limit fails explicitly,
+without silently shrinking the selected window. Complete expected frames make
+field-level diagnostics straightforward but cost more space than input/hash-only
+recordings. Duplicate-event validation is bounded by each event batch. This is an
+explicit developer operation, unsuitable for every render frame.</p>
+<p>Checksums detect corruption, not malicious edits or origin. The archive includes
+complete authority/private state. It is not a network recovery format, durable
+transaction log, full-session stream or proof that arbitrary future inputs are
+deterministic. Continuous recording and multi-window assembly remain separate work.
+The <a href="playback.html">loaded-recording viewer</a> now inspects these files in Godot.</p>
+<h2 id="godot-export-and-hello-verifier">Godot export and Hello verifier<a class="heading-anchor" href="#godot-export-and-hello-verifier" aria-label="Link to this section">#</a></h2>
+<p><code>recording_export</code> captures/encodes then writes via staged native storage, or
+requests a browser download. Native storage retains its existing process-crash
+boundary, without promising power-loss durability. Browser download requests are
+not receipts that the user retained the file. <code>Debug_Recording</code> adds an opt-in
+button with latched input, status and a tooltip containing the captured range.
+Keep it at a stable address until teardown disconnects the callable.</p>
+<p>Hello exposes this beside its history controls with <code>REPLAY_DEBUG=1</code>. Export
+records the original timeline while inspecting; preview edits enter a recording
+only after an explicit Branch. Native output defaults to <code>user://hello.rplrec</code>;
+<code>REPLAY_RECORDING_PATH</code> overrides it. Chrome requests <code>hello.rplrec</code> as a download.
+Ordinary launches create no recording widget or recording allocations.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin run examples/replay_hello/tools/verify_recording \
+  -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -- /absolute/path/hello.rplrec</code></pre></div><p>The verifier bounds the file before allocating and rejects incomplete/growing
+reads. Exit 0 means the complete recorded suffix agrees; 1 reports replay/model
+failure, with field details for divergence; 2 reports usage/read/decode failure.
+It runs without Godot. Application rules and immutable geometry come from Hello&#39;s
+shared model, not the file.</p>
+<h2 id="network-models">Network models<a class="heading-anchor" href="#network-models" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../net/recording.html">network recording adapter</a> preserves <code>Batch</code> inputs and
+<code>Net_Event</code> outputs, including admission decisions and historical aim data. It is
+used by Scrapyard&#39;s developer-menu exporter and standalone verifier. Models needing
+context-aware input validation can supply <code>input_check(input, tick, user)</code>; it runs
+with the existing validators before any simulation step.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="playback.html"><span>Inspecting a saved gameplay recording</span><span aria-hidden="true">→</span></a><a href="../net/recording.html"><span>Replaying recorded network simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/diagnostic/recording.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#decode-and-verify" class="">Decode and verify</a><a href="#contract-and-limits" class="">Contract and limits</a><a href="#godot-export-and-hello-verifier" class="">Godot export and Hello verifier</a><a href="#network-models" class="">Network models</a></nav><div class="outline-actions"><a href="../../../reference/replay/diagnostic/recording.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

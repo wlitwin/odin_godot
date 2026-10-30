@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay server/client runner · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay server/client runner</h1><div class="reader-meta"><span>21 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#gameplay-model">Gameplay model</a><a href="#runtime-ownership-and-loop">Runtime ownership and loop</a><a href="#admission-delivery-and-recovery">Admission, delivery, and recovery</a><a href="#durable-authority-checkpoints">Durable authority checkpoints</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#authority-side-infrastructure-checks">Authority-side infrastructure checks</a><a href="#presentation-failures-and-catch-up">Presentation failures and catch-up</a><a href="#delivery-under-transport-loss">Delivery under transport loss</a><a href="#opt-in-direct-host-epoch-discovery">Opt-in direct-host epoch discovery</a><a href="#prediction-limits-and-cooperative-action-timing">Prediction limits and cooperative action timing</a><a href="#small-action-copies-under-loss">Small action copies under loss</a><a href="#receive-budget-deferral">Receive-budget deferral</a></nav></details>
+<article class="reading-body "><p><code>replay/net</code> connects a complete-world simulation to canonical codecs,
+transport-owned peer identities, prediction, authoritative correction, and the
+presentation journal. It is an experimental M3 implementation with acknowledged
+snapshot deltas and compact facts. Broader admission/recovery review and the later
+roadmap capabilities remain open work.</p>
+<p><code>Model.control_timing</code> defaults to <code>Scheduled</code>. The explicit <code>Latest_Observation</code>
+profile sends one current control sample, coalesces newer producer ticks into the
+next authority tick, and preserves the accepted value in replay history. It has a
+distinct negotiated contract; the default scheduled wire/archive contract remains
+unchanged. Use it for external outputs such as <a href="../../docs/replay/owner-streams.html">owner-streamed physics</a>,
+with game-level object/owner/sample validation. One-shot actions retain their
+sequenced command/outcome path.</p>
+<p><code>Model.event_policy(event) -&gt; view.Policy</code> configures gameplay-effect timing and
+survives Welcome, resync and recovery journal reconstruction. Spectators remain
+watched; mixed presentation can delay otherwise speculative remote events. A policy
+set directly on a transient journal must otherwise be reinstalled after reset.</p>
+<h2 id="gameplay-model">Gameplay model<a class="heading-anchor" href="#gameplay-model" aria-label="Link to this section">#</a></h2>
+<p>Instantiate <code>Model(State, Control, Action, Event, Seats)</code> and supply:</p>
+<ul>
+<li><code>step(state, controls, joins, leaves, ctx)</code>: fixed-tick gameplay. Joins/leaves are
+bitmasks delivered exactly at their simulation tick. They are not reads of a
+mutable current roster during replay.</li>
+<li><code>action(state, seat, action, ctx) -&gt; bool</code>: a discrete mutation over the complete
+world. Returning false restores all state and gameplay events produced by that
+action, while the rest of the tick continues.</li>
+<li><code>control_valid</code>, <code>action_valid</code>, and <code>state_valid</code>: the authored input/state
+language and invariants. The schema adds structural, finite, enum, and bit-mask
+validation before these callbacks.</li>
+<li><code>hold</code>: derive a legal held control from the previous sample. Clear transient
+fields here; continuous movement may remain held. Discrete commands belong in
+<code>Action</code>, not a repeated control bit.</li>
+<li><code>neutral</code>: a valid neutral control. <code>user</code> optionally points to immutable
+assets/configuration; it must not expose mutable external simulation state.</li>
+</ul>
+<p>Simulation uses the same code on authority and predicting clients. Events still
+carry game-defined payloads. Source zero is reserved by the network runner for
+action verdicts; gameplay emits from nonzero semantic sources.</p>
+<p>The runner supports one complete public or <a href="groups.html">authored partial prediction group</a>, one control
+and action type, one to eight player seats, and up to sixteen connections including
+observers. It refuses unscoped player prediction when the public projection omits authority-only
+state. <a href="replication.html">Recipient views</a> can filter snapshots, controls and events
+for players with validated prediction groups, or for observers.
+Authored group projection, footprint validation and timestamped boundary values
+now have initial native and Claimball gates. Broader group policies remain M6 work.</p>
+<p>On authority correction, the current full-world runner replaces older remote
+held-input guesses in the replayed suffix using the snapshot&#39;s held-input boundary.
+It applies <code>hold</code> once per prediction tick, including bootstrap and continuation,
+while preserving this client&#39;s recorded controls, aiming stamps and action IDs.
+For a scoped group, remote control slots are neutral and outside simulation members
+are removed by the authored projection. Boundary coupling is explicit.</p>
+<p><code>client.correction</code> reports the latest successful correction with before/after
+frames at the same prediction tick, a serial, authority tick and replayed-tick count.
+Read it after each pump (after <code>session_frame</code> in the Godot facade); copies are
+detached values. It resets on Welcome. A view can pass matching positions to
+<code>view.smooth_correct</code> without treating ordinary forward motion as correction.
+Storing the report costs two additional world values per client; large runtime
+owners should use stable heap addresses. Further storage/copy optimization remains
+subject to the roadmap&#39;s workload measurements.</p>
+<p>An optional <a href="profiling.html">profiling clock</a> records replay wall time/depth and
+histogram bounds without entering simulation or the network contract. Godot
+Sessions install it automatically.</p>
+<p>A complete snapshot ahead of a briefly stalled client can now be adopted directly
+when all intervening authoritative facts remain available. The runner preserves
+the journal and action queues, reprojects the group and rebuilds bounded prediction
+lead. <code>Stats.snapshot_catchups</code> records this path; it does not require a full
+Welcome/resync round trip. Godot drops the already-accounted-for frame backlog.
+Actual history/fact exhaustion still resyncs. <code>client.resync_notice</code> records the
+reason and relevant tick frontiers for diagnosis; <code>view_reset</code> also changes on a
+snapshot catch-up so consumers can cut obsolete smoothing.</p>
+<h2 id="runtime-ownership-and-loop">Runtime ownership and loop<a class="heading-anchor" href="#runtime-ownership-and-loop" aria-label="Link to this section">#</a></h2>
+<p><code>Server(...)</code> and <code>Client(...)</code> own timelines, schemas, queues, and histories.
+Keep them at stable addresses and destroy them once. Their transports are borrowed:
+destroy the runner before closing the transport adapter. The immutable model is
+passed into core stepping via <code>Step.user</code>; it is not part of frame state.</p>
+<p>On the authority:</p>
+<ol>
+<li><code>server_init</code> supplies the initial frame and model. A nonzero <code>local_seat</code>
+creates a listen-host player; zero is a dedicated authority.</li>
+<li>Call <code>server_pump(now_ms)</code> each render/service frame.</li>
+<li>For fixed simulation ticks, set local controls if applicable, then call
+<code>server_step</code>. <code>server_issue</code> queues the host player&#39;s discrete action.</li>
+<li>Read the current frame and emitted events for local presentation.</li>
+</ol>
+<p>On a client:</p>
+<ol>
+<li><code>client_init</code> supplies the same model/content contract, authority connection,
+and a stable opaque token. <code>spectator = true</code> allocates no player seat.</li>
+<li>Call <code>client_pump(now_ms)</code> to admit, receive facts/snapshots, reconcile, and
+maintain connection liveness.</li>
+<li>Once running, <code>client_step(control)</code> predicts one fixed tick. The exposed
+<code>clock_scale</code> nudges the local clock to maintain input lead. Initial lead uses
+the measured welcome round trip with a configured floor and bounded ceiling.</li>
+<li><code>client_issue(action)</code> returns a sequence ID for an action predicted at an
+upcoming tick and delivered reliably. Drain authoritative results through
+<code>client_outcomes</code> and presentation changes through the client&#39;s <code>journal</code>.</li>
+<li>Use <code>client_observed</code> for authoritative sparse frame pairs on the watch clock;
+predicted old frames are not remote observed truth.</li>
+</ol>
+<h2 id="admission-delivery-and-recovery">Admission, delivery, and recovery<a class="heading-anchor" href="#admission-delivery-and-recovery" aria-label="Link to this section">#</a></h2>
+<p>Snapshot acknowledgments are unreliable latest-state reports regardless of the
+logical snapshot size or its delivery channel. New snapshot receipts and the
+existing periodic heartbeat path resend the latest validated ID/hash. A lost ACK
+can postpone baseline advancement, but cannot hold later actions behind its
+retransmission in an ordered reliable stream. The authority ignores older IDs and
+requires a retained matching snapshot hash and current binding before advancing.
+Large bootstrap snapshots still wait for a valid ACK; periodic resend releases
+that gate after loss. Baseline-miss requests and gameplay action delivery retain
+their existing reliability policy.</p>
+<ul>
+<li>The handshake checks schema/protocol and content contracts. A connection cannot
+occupy multiple seats, and an already active token cannot be taken over by a
+different connection. Tokens are stored as SHA-256 digests on the server.</li>
+<li>Tokens are bearer reconnect credentials, not account authentication or transport
+encryption. Supply unpredictable tokens and the appropriate transport/deployment
+policy. The Godot sample uses random tokens normally and deterministic labels
+only for tests. <code>replay/godot.session_profile</code> now persists a local credential
+separately from the checkpoint&#39;s roster of token hashes.</li>
+<li>A stable seat is reserved across disconnect/reconnect. This initial version
+reserves seats until explicit release. <code>server_set_locked</code>, custom admission,
+kick, ban/unban, and <code>server_release_seat</code> now supply basic room controls. Release
+requires a disconnected seat with settled actions and a model <code>reset_player</code>
+callback; initialization for the next occupant occurs inside its joining tick.
+Bans survive reservation release and durable checkpoint recovery. Custom
+admission policy bytes and a policy ID can be archived; the application must
+reinstall the corresponding callback when restoring.</li>
+<li>Input windows contain eight tick-stamped controls. The entire window validates
+before buffer mutation. Sender connection plus connection generation chooses
+the seat; packet data cannot select another player. The first valid value for a
+tick wins, and old/far-future inputs cannot rewrite authority history.</li>
+<li>Actions are reliable, ordered by sequence, and deduplicated. They execute in
+stable seat order. Stale/far-future/invalid actions receive explicit verdicts;
+ordinary game rejection reports <code>Predicate</code>. Recent results and both received
+and settled frontiers survive reconnection so new actions cannot reuse an
+unresolved sequence.</li>
+<li>Complete occurrence batches use the reliable channel. State snapshots use the
+unreliable channel and supersede older pending snapshots. Correction waits for
+matching occurrence history, settles the authoritative prefix, and reconciles
+the speculative suffix.</li>
+<li>Prediction stops at a bounded horizon. Missing history or a long blackout enters
+explicit resync and requests a fresh checkpoint. Connection generations and
+checkpoint serials fence delayed input/snapshot traffic. Outstanding action IDs
+are preserved or settled explicitly.</li>
+<li>Per-pump byte/packet caps and per-seated-peer token buckets bound ingress work.
+Fixed queue/history limits return backpressure or recovery states. Consumers
+must drain presentation and action results regularly.</li>
+</ul>
+<h2 id="durable-authority-checkpoints">Durable authority checkpoints<a class="heading-anchor" href="#durable-authority-checkpoints" aria-label="Link to this section">#</a></h2>
+<p><code>checkpoint_capture</code>, <code>checkpoint_encode</code>, and <code>checkpoint_decode</code> produce a
+versioned complete authority archive. <code>server_restore</code> starts a fresh runtime at
+its exact frame under an explicitly newer epoch. It preserves roster reservations,
+token hashes, room locks/bans, action received/settled frontiers and recent results,
+and pending simulation decisions. The caller chooses whether queued actions are
+preserved or explicitly retired. The archive uses authority projection and is
+limited to 1 MiB; it must not be sent as an ordinary public snapshot.</p>
+<p>Low-level listen hosts must call <code>server_set_local_token</code> before capture. The
+Godot <code>Session</code> does this during opening. <code>Checkpoint</code> owns its arrays; keep it by
+pointer, destroy it once, and never copy a live owner. Decode requires an empty
+destination and expected content ID, and validates before installing any data.
+Runtime callbacks, connections, snapshot caches, presentation journals, and live
+allocators are rebuilt. <a href="../../docs/replay/recovery.html">Recovery contract</a> specifies
+the format, policies, verified guarantees, and remaining migration work.</p>
+<p>For repeated archives, initialize a <code>Checkpoint_Codec</code> with the state/control/
+action/event types and seat count, then pass it as <code>codec</code> to encode/decode.
+Destroy it once with <code>checkpoint_codec_destroy</code>. It retains schema programs, not
+game state. Every call still validates content, policy, values, and runtime contract;
+using a cache for a different type set is rejected. The uncached convenience path
+remains available and emits identical bytes. Recovery receivers and <code>Link</code> now
+keep these programs warm automatically.</p>
+<p><code>client_authority</code> transitions a surviving client to an approved newer epoch.
+Its Welcome resolves pending old IDs against the recovered frontiers, restarts
+sequence allocation from the ledger, and resets prediction/presentation. Consume
+<code>client_recovery</code> for Applied/Rejected/Retained/Retired/Settled_Unknown decisions.
+Unknown or lost work is explicit, and already accepted IDs are not awarded twice.
+See the <a href="../godot/room.html">Room driver</a> for the integrated lifecycle and limits.</p>
+<h2 id="verification-and-current-limits">Verification and current limits<a class="heading-anchor" href="#verification-and-current-limits" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_net/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/network_run.sh</code></pre></div><p>The engine-free suite covers join/movement/observer convergence, contested action
+prediction, rollback of failed mutations, loss/jitter/duplication, blackout resync,
+stable-seat reconnect, contract/token rejection, action deduplication, and forged
+sender or malformed input-window rejection. Checkpoint tests cover complete private
+state, promotion, pending-action policies, malformed archives, policy restoration,
+new-epoch fencing, and fresh-process-style stable-seat reconstruction. It also type-checks the instantiated
+runner for WASM.</p>
+<p>The Godot gate uses four real processes: a dedicated authority, two predicting
+players, and an observer. Every process has 120 ms injected receive delay by
+default (about 240 ms round trip). Players move immediately, reliable firing
+actions settle once, and every participant observes the authoritative shots.</p>
+<p>Snapshots now use acknowledged canonical baselines and sparse XOR deltas, with
+full fallback for dense changes or missing baselines. <code>snapshot_history</code> bounds
+the cache; <code>delta_snapshots=false</code> selects a full-snapshot reference mode. ACKs must
+match actual sent IDs/hashes within the current connection/checkpoint context.
+Facts encode only active occurrences, so empty ticks have a small header.</p>
+<p><code>egress_bytes_per_second</code> and <code>egress_bytes_per_pump</code> bound outbound traffic. Peer
+iteration rotates; checkpoints/facts precede optional snapshots. The per-peer
+burst permits two seconds of traffic or at least one complete message. Deferral
+retains reliable work and lets newer state supersede unsent snapshots. Stats expose
+full/delta counts, saved bytes, baseline misses, rejected ACKs, and egress deferral.
+The protocol contract is now version 7, including compact scheduled-input windows,
+removal, fresh-seat semantics,
+required permits, process incarnation in Hello, and <a href="view_time.html">input-bound aiming context</a>.
+Archive format 4 preserves validated held/future view contexts, incarnation metadata
+and the permit requirement. Room&#39;s identity check binds the
+incarnation to the coordinator-provisioned game-token hash before admitting traffic.
+Protocol-6 peers and archives require explicit conversion/update; this experimental
+version does not silently reinterpret them. <a href="input_codec.html">Compact input framing</a>
+changes bandwidth, not input timing or the eight-sample recovery window.
+Snapshots larger than <code>unreliable_packet_limit</code> (1,200 bytes by default) use reliable
+delivery so large full snapshots do not depend on lossy UDP fragmentation. Small
+deltas continue to use the superseding unreliable path. Each peer has at most one
+unacknowledged large snapshot; new large snapshots wait for its acknowledgement.
+Facts and small deltas may continue. Large snapshots receive reliable ACKs, with
+the usual heartbeat ACK as a fallback. A validated baseline miss releases the
+gate so an undecodable in-flight delta cannot prevent a replacement full state.
+This bounds ordered state backlog during bootstrap and on slow connections;
+large-state update frequency is consequently limited by acknowledgement latency.</p>
+<p>Failure-corpus expansion and admission/recovery review remain required. These tests
+do not establish host migration, owner-streamed co-op, deterministic P2P, browser
+runtime behavior, arbitrary scale, or parity with the full comparison games.</p>
+<h2 id="authority-side-infrastructure-checks">Authority-side infrastructure checks<a class="heading-anchor" href="#authority-side-infrastructure-checks" aria-label="Link to this section">#</a></h2>
+<p><code>Model.action_admit(user, seat, action)</code> is optional and runs only at authority
+admission, after static action/time checks and sequence deduplication. Its separate
+<code>action_admission_user</code> may query local infrastructure, such as validated asset
+availability. Keep the query local and nonblocking; a permit is checked again
+before queue mutation. Rejection is recorded as <code>Invalid</code> in the normal action
+verdict ledger. Prediction, simulation replay and audit use that recorded decision
+and never call the infrastructure hook. <code>Model.user</code> remains immutable simulation
+configuration. Reinstall the correct model when resuming a runtime; callbacks and
+pointers are not checkpoint data.</p>
+<p><a href="profiling.html">Runner timing diagnostics</a> separate ordinary advances, snapshot
+processing and correction/replay, with optional bounded raw-sample consumers.</p>
+<p>Correction selection retains the tick associated with each canonical snapshot
+cache entry. When the newest snapshot is ahead of contiguous reliable facts,
+the client can apply the newest older cached snapshot whose facts are complete.
+This prevents a continuously advancing unreliable snapshot stream from starving
+correction until the prediction horizon is exhausted. Cache/history bounds still
+apply. The first snapshot awaiting facts also remains in the pending slot even
+if newer snapshots wrap the delta cache. This does not approximate missing facts
+or reconstruct evicted state.</p>
+<p><code>client_outcomes</code> optionally reports which queued verdicts were recovered through
+a Welcome/journal reset. The Godot Session facade presents those as confirmed
+action-result changes, so a stale/future action verdict survives a full resync.
+Ordinary fact-delivered results retain their existing presentation route.</p>
+<p>A same-epoch Welcome now rebases the existing presentation journal. Queued changes
+survive, already confirmed watched effects mature at the new checkpoint, and
+abandoned speculative effects receive cancellations. The runner checks output
+capacity before installing the checkpoint; a full queue defers installation until
+the consumer drains and the normal Resync request retries. Only newly recovered
+Welcome verdicts use Session&#39;s synthetic route, avoiding duplicate confirmed
+verdicts. First admission and authorized epoch changes retain their distinct
+initialization/reset behavior. Unknown effects in missing history are not invented;
+this preserves known obligations, not a complete effect log across arbitrary gaps.</p>
+<p>Scheduled clients now refine their welcome-time prediction lead from
+<a href="input_timing.html">acknowledged-input turnaround and arrival margin</a>. Local send
+history is bounded, stale samples are rejected, and large excess lead can drain
+without retiming queued controls/actions. The existing <code>clock_scale</code> contract
+remains the integration point; Godot Session applies it automatically.</p>
+<h2 id="presentation-failures-and-catch-up">Presentation failures and catch-up<a class="heading-anchor" href="#presentation-failures-and-catch-up" aria-label="Link to this section">#</a></h2>
+<p>On <code>Error.Presentation</code>, <code>Client.presentation_failure</code> records the last failed
+journal operation: predicted or authority batch, confirmation, or watched-clock
+advance. It includes the journal&#39;s specific error, requested tick, confirmed/watch
+frontiers, prediction head, queue count and occupied ring slot, with a serial that
+increments on failure. It contains no gameplay payloads, is local to the client,
+and is cleared on client destruction. A zero serial means no runner journal
+failure was recorded; an adapter can also report undrained presentation output.</p>
+<p>After an ahead snapshot, the pump confirms its retained facts and advances the
+watched clock before rebuilding prediction lead. This permits old watched effects
+to finish before the prediction ring reuses their storage. No history, output
+capacity, event identity or timing policy is relaxed. Consumers must still drain
+the journal after pumping/stepping; the diagnostic record is not error recovery.</p>
+<p>A receive batch may itself span more than the fact ring, even when the transport
+retained complete snapshots and every needed event. Before an incoming valid fact
+would overflow that ring, the receiver now tries to apply a usable retained
+snapshot, mature its watched effects and rebuild prediction lead. This can release
+an older complete prefix even when a later fact is still delayed. Mid-batch work
+uses zero elapsed presentation time; the pump advances that clock once at its end.
+If no usable snapshot can release space, the existing Facts_Overflow resync still
+applies. Journal output capacity and packet/byte budgets are unchanged. See the
+<span class="local-reference" title="docs/replay/results/receive-backlog-2026-09-13/README.md · available in the repository">receive-backlog regression</span>.</p>
+<p>Large snapshots can use <a href="snapshot_parts.html">negotiated unreliable parts</a>, with
+bounded send/reassembly storage and existing canonical validation. Bootstrap,
+facts and the fallback for pre-extension protocol-7 peers retain their delivery
+rules. More frequent received worlds can increase bandwidth and correction cost;
+measure freshness and cost together.</p>
+<h2 id="delivery-under-transport-loss">Delivery under transport loss<a class="heading-anchor" href="#delivery-under-transport-loss" aria-label="Link to this section">#</a></h2>
+<p>Capable peers can use <a href="snapshot_parts.html#negotiated-two-erasure-parity">two-erasure snapshot parity</a>
+to complete a fragmented snapshot despite two missing shards per group. The
+receiver still verifies the complete digest and canonical state. Extra parity
+shares the existing egress budget; it can improve delivery under loss while
+reducing send cadence. The extension is negotiated, bounded and locally optional.</p>
+<p>Per-peer burst credit is bounded to one quarter-second at the configured rate,
+or one complete protocol packet when larger. This permits bootstrap without
+banking seconds of traffic for a catch-up burst. Existing steady byte budgets
+remain in force.</p>
+<p>Peers can negotiate <a href="recent_facts.html">compact recent facts</a>, sharing packet headers
+while retaining every occurrence and the same delivery cadence. Older peers retain
+the original bundle format.</p>
+<p>Up to four recent facts may also be bundled onto the unreliable channel every
+other authority tick after capability negotiation. The bundle fits the smaller
+of the configured unreliable limit and 1,024 bytes. The original reliable stream
+remains the guarantee; copies use normal budgets and exact-tick deduplication.
+Facts that do not fit are excluded. Bundling avoids consuming one RTC credit per
+copied fact. The complete bundle is validated before any contained fact commits. <code>Stats.redundant_facts</code> and
+<code>redundant_fact_bytes</code> expose that extra traffic. It can shorten a retransmission
+gap but is not a congestion-control or loss-free-delivery guarantee.</p>
+<p>Peers that also negotiate fact repair (feature bit 8) request up to four missing
+facts in a 32-tick window, at most once per 100 ms. The server confirms support
+before requests begin. Each reply is an ordinary, independently validated Facts
+packet on the unreliable channel; filtering uses the requested historical frame
+and recipient. The reliable stream remains active. Missing requests/replies are
+retried while a validated authority tick proves the gap exists. Duplicate requests
+share the server&#39;s per-peer 100 ms limit and normal receive/egress budgets.</p>
+<p>Replies must fit the negotiated unreliable packet limit (at most 1,024 bytes).
+Oversized facts wait for the reliable stream; this extension does not fragment
+facts, guarantee a maximum stall, or recover history that has expired. Binding,
+Welcome serial, epoch and content checks fence old requests/replies. Negotiation
+and retry state reset at each Welcome; base contract and checkpoint formats stay
+unchanged. Set <code>client.fact_repair_enabled=false</code> before its first pump to disable
+this extension. <code>Stats.fact_repair_requests</code>, <code>fact_repairs</code>, <code>fact_repair_bytes</code>
+and <code>fact_repair_oversize</code> expose requests, accepted reply traffic and size fallback.</p>
+<p>Before any scheduled input has been acknowledged, clock feedback gently increases
+prediction lead within the configured bounds. Otherwise a client whose initial
+inputs all arrive stale has no echo from which to calibrate and can remain stuck.
+Once an echo arrives, normal arrival-margin discipline resumes. No queued action
+or input is retimed.</p>
+<p>Per-peer rate admission reserves 32 additional bytes per logical packet as modest
+framing/retry headroom. Counters remain actual accepted application bytes; the
+per-pump buffer budget also remains in application bytes so one maximum packet
+can fit. This allowance is not a measurement of every backend&#39;s wire overhead.</p>
+<h2 id="opt-in-direct-host-epoch-discovery">Opt-in direct-host epoch discovery<a class="heading-anchor" href="#opt-in-direct-host-epoch-discovery" aria-label="Link to this section">#</a></h2>
+<p>A fresh direct client may call <code>client_discover_epoch(client, nonce)</code> before its
+first Hello. The nonce must be a fresh, nonzero 16-byte challenge, distinct from
+its reconnect token. An unleased host opts in with <code>server.epoch_discovery=true</code>.
+The query contains that challenge and the existing game contract; the reply echoes
+both under the host&#39;s current epoch. The client requires the selected transport
+peer, matching content/contract/challenge, a valid envelope and no installed world.
+Only then does it send the ordinary epoch-scoped Hello with its reconnect token.
+The query itself carries no credential and reserves no peer/seat.</p>
+<p>This is an optional protocol-7 extension (kinds 20/21), outside the base contract
+and checkpoint format. Existing explicit-epoch peers retain their handshake.
+Discovery requires both endpoints to support/enable it. Unsupported or disabled
+endpoints time out; the client does not fall back to a guessed epoch or older protocol. Retry uses the existing 500 ms joining cadence
+and timeout; server ingress/egress budgets still apply. After discovery, subsequent
+replies cannot change the client&#39;s epoch. Running/resyncing clients must use the
+explicit recovery APIs for authority replacement.</p>
+<p>This query trusts the endpoint already selected by the application/transport. It
+is not endpoint authentication, election or a substitute for a coordinator grant.
+Permit-controlled clients cannot enable it, and leased servers never answer it.
+The Godot <code>Session_Options.discover_epoch</code> convenience option applies those rules
+and generates a fresh challenge; it defaults off. Speedball enables it for direct
+sessions so Join/Watch works after a manual save/resume without exposing epochs in
+the game UI. See the <span class="local-reference" title="docs/replay/results/speedball-save-2026-09-08/README.md · available in the repository">save/discovery result</span>.</p>
+<h2 id="prediction-limits-and-cooperative-action-timing">Prediction limits and cooperative action timing<a class="heading-anchor" href="#prediction-limits-and-cooperative-action-timing" aria-label="Link to this section">#</a></h2>
+<p>Reaching <code>max_prediction</code> now returns <code>Capacity</code> from <code>client_step</code> and increments
+<code>Stats.stalls</code> while preserving the readable world, journal and queued actions.
+Continue pumping. An ordinary correction or complete ahead snapshot can resume
+prediction using retained facts; actual fact/history exhaustion still requests a
+resync. A stalled prediction is not a fresh authority observation. Monitor both
+stall attempts and received-frame progress when assessing responsiveness.</p>
+<p><code>Model.action_timing</code> defaults to <code>Scheduled</code>: requests target their proposed
+simulation tick and stale/future requests are rejected. <code>Receipt</code> is an explicit
+cooperative policy that queues a valid request for the next available authority
+tick, preserving per-seat FIFO order. The client&#39;s proposed tick does not choose
+the authority&#39;s execution time in that policy. Payload validation, admission,
+sequence deduplication, capacity limits, gameplay predicates and atomic failure
+remain unchanged. A request arriving during a cooldown may still be rejected by
+the game predicate; receipt scheduling is not an automatic gameplay retry.</p>
+<p>Clients continue predicting actions locally. Their predicted execution time/state
+may differ from the authority&#39;s actual receipt-time result, so normal corrections
+and event cancellation/confirmation still apply. Use confirmed presentation for
+effects that must not occur speculatively. <code>client_outcomes</code> reports the actual
+settled result once per sequence; receipt policy does not change control timing or
+historical-query validation.</p>
+<p>For a game with both delivery requirements, set a versioned per-action classifier:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">model.action_schedule = {
+    id = <span class="hljs-number">0x4d5947414d450001</span>,
+    timing = <span class="hljs-keyword">proc</span>(a: Action) -&gt; net.Action_Timing {
+        <span class="hljs-keyword">return</span> a.kind == .Dash || a.kind == .Interact ? .Receipt : .Scheduled
+    },
+}</code></pre></div><p>The callback overrides <code>action_timing</code> for validated payloads. It must be pure and
+depend only on the action and immutable rules. A nonzero ID and callback must be
+provided together; change the ID when the classification changes. The ID joins
+the negotiated/checkpoint contract, so a peer with a different policy cannot
+silently connect or restore. An unset classifier preserves existing contracts
+and wire/archive layouts. Invalid timing values are rejected before admission.</p>
+<p>Both kinds share the bounded per-seat FIFO and sequence/outcome stream. A future
+scheduled action can therefore delay a later receipt-time action; the classifier
+does not create a second priority queue. Only receipt-time payloads may be newly
+queued during same-epoch resync. The authority records admission ticks and reasons;
+correction, checkpoint restore and explicit checkpoint conversion preserve those
+decisions without calling the classifier again. Host-local actions are already
+at the authority and use its next available tick.</p>
+<p>Short button presses that require a delivery verdict belong in actions. Capturing
+a scheduled control only establishes local sampling: retransmission can still
+arrive after that tick. Receipt scheduling avoids that deadline, while gameplay
+predicates can still reject an intent, such as a dash during cooldown. Consume a
+latched intent after successful queue admission and handle its settled outcome.</p>
+<p>The action policy is part of the negotiated contract and checkpoint contract.
+Scheduled mode preserves its existing contract bytes. Mismatched action policies
+cannot join or restore a checkpoint silently. Checkpoint conversions compute the
+target model&#39;s contract explicitly; already-admitted pending actions retain their
+recorded authority schedule. The isolated endurance comparison opts into Receipt;
+existing game projects keep their configured policy.</p>
+<p>Scheduled input sampling also waits when its next tick is at or behind validated
+authority progress. <code>client.authority_tick_seen</code> tracks accepted snapshot, scoped snapshot-part and fact
+progress even while missing facts prevent installing that snapshot. A small old
+correction must not free one obsolete input step and consume a new press just
+before a complete newer snapshot catches the client up. This retains pending
+input at the caller; it does not retime an already-captured sample or make an
+unreliable input stream infallible. Latest-observation controls retain their
+separate receipt-time semantics. Welcome resets the frontier to its new scope.</p>
+<p>Receipt-time clients may enqueue validated actions during a same-epoch Resyncing
+phase when their player identity and prior binding are already established. The
+existing bounded action queue owns them; no packet is sent and no prediction runs
+until a new Welcome installs the binding. Original sequence IDs remain, prior
+outcomes settle normally, and queued requests are then sent through the ordinary
+receipt/admission path. This is queue admission, not an authority verdict.
+Scheduled-action clients, joining/migrating clients, spectators, terminal phases,
+invalid payloads and fenced permits keep their existing rejection rules. Capacity
+and timestamp-overflow checks still apply. A later disconnect can leave an
+unsubmitted intent unresolved; this is not durable input logging or guaranteed
+execution after an arbitrary process crash.</p>
+<h2 id="small-action-copies-under-loss">Small action copies under loss<a class="heading-anchor" href="#small-action-copies-under-loss" aria-label="Link to this section">#</a></h2>
+<p>Periodic heartbeats use unreliable delivery. They refresh liveness for the current
+binding and are repeated every 500 ms; they have no ordering dependency with later
+actions. The existing timeout and other validated-traffic liveness rules remain.</p>
+<p>Capable peers negotiate recent action bundles (feature value 64, kind 25). The
+server confirms that capability before the client sends a bundle. The reliable
+submission and 500 ms retry path stay active. A client additionally copies up to
+four oldest contiguous, already-sent requests at most once per 100 ms. The bundle
+fits the configured unreliable limit capped at 1,024 bytes. Large actions retain
+reliable-only delivery; the framework does not fragment these copies.</p>
+<p>Every enclosed request retains its original generation, Welcome serial, sequence,
+prediction tick and value. Copies neither retime nor predict an action again.
+The receiver validates the entire bundle before processing its prefix, then uses
+the ordinary admission, timing, ordering, deduplication and verdict path. Each
+inner action consumes a packet credit; all actual bytes consume the existing
+receive byte budget. This does not bypass authority admission or make stale
+scheduled commands valid. Missing/reordered copies are retried while requests
+remain pending; the reliable stream remains the delivery guarantee.</p>
+<p>The bundle uses the generation/serial/count header already used by recent facts,
+with a distinct message kind and independently enveloped canonical Action packets.
+No base contract or checkpoint format changes. Welcome resets negotiation and
+copy timing. Set <code>Client.action_copies_enabled=false</code> before first pump, or
+<code>Session_Options.disable_action_copies=true</code>, to opt out. Scrapyard exposes
+<code>RSY_ACTION_COPIES=0</code> (browser query <code>action_copies=0</code>). Counters are
+<code>action_copy_batches</code>, <code>action_copies</code>, <code>action_copy_bytes</code> and
+<code>action_copy_oversize</code>. Extra copies cost bandwidth and do not guarantee a fixed
+latency bound during arbitrary loss or congestion.</p>
+<h2 id="receive-budget-deferral">Receive-budget deferral<a class="heading-anchor" href="#receive-budget-deferral" aria-label="Link to this section">#</a></h2>
+<p><a href="receive_budget.html">Receive budgets preserve packets</a>: pumps supply the remaining
+byte allowance to the transport and stop on <code>Buffer_Too_Small</code>, leaving the packet
+queued for the next pump. Crossing the budget no longer discards reliable facts or
+actions. Existing packet/byte limits and transport storage bounds remain intact.</p>
+<p>Latest-observation clients now negotiate <a href="observations.html">packet-local sparse observations</a>
+when both peers support them. Canonical values, cadence, admission and checkpoint
+contracts stay unchanged; old peers and dense values use the full packet.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/replay/owner-streams.html"><span>Cooperative body ownership</span><span aria-hidden="true">→</span></a><a href="groups.html"><span>Authored prediction groups</span><span aria-hidden="true">→</span></a><a href="replication.html"><span>Recipient views and interest management</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#gameplay-model" class="">Gameplay model</a><a href="#runtime-ownership-and-loop" class="">Runtime ownership and loop</a><a href="#admission-delivery-and-recovery" class="">Admission, delivery, and recovery</a><a href="#durable-authority-checkpoints" class="">Durable authority checkpoints</a><a href="#verification-and-current-limits" class="">Verification and current limits</a><a href="#authority-side-infrastructure-checks" class="">Authority-side infrastructure checks</a><a href="#presentation-failures-and-catch-up" class="">Presentation failures and catch-up</a><a href="#delivery-under-transport-loss" class="">Delivery under transport loss</a><a href="#opt-in-direct-host-epoch-discovery" class="">Opt-in direct-host epoch discovery</a><a href="#prediction-limits-and-cooperative-action-timing" class="">Prediction limits and cooperative action timing</a><a href="#small-action-copies-under-loss" class="">Small action copies under loss</a><a href="#receive-budget-deferral" class="">Receive-budget deferral</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay transports · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay transports</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/transport/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#closing-transport-wrappers">Closing transport wrappers</a><a href="#deterministic-memory-adapter">Deterministic memory adapter</a><a href="#shared-packet-routing">Shared packet routing</a><a href="#godot-enet-adapter">Godot ENet adapter</a><a href="#fragmentation-and-browser-webrtc">Fragmentation and browser WebRTC</a><a href="#connection-generations">Connection generations</a><a href="#recording-a-real-interface">Recording a real interface</a></nav></details>
+<article class="reading-body "><p><code>Transport</code> is a borrowed interface over a concrete adapter. It provides <code>send</code>,
+<code>receive</code>, <code>poll</code>, <code>status</code>, <code>peer_connected</code>, and <code>close</code>. Accepted sends copy payloads; receive
+copies into caller storage. <code>Buffer_Too_Small</code> retains the pending packet and
+reports the required size. A peer ID identifies a transport connection, not a
+stable player seat. Session admission and reconnect identity are separate work.</p>
+<p>Packets are bounded to 64 KiB at this interface. A transport may have a smaller
+configured limit. There is no implicit broadcast: callers explicitly enumerate
+recipients. <code>Reliable</code> is ordered per direction/channel; <code>Unreliable</code> may lose,
+duplicate, or reorder messages. Check <code>Backpressure</code> and retry according to the
+session&#39;s delivery policy.</p>
+<h2 id="closing-transport-wrappers">Closing transport wrappers<a class="heading-anchor" href="#closing-transport-wrappers" aria-label="Link to this section">#</a></h2>
+<p>A <code>Transport</code> value is a borrowed handle, so copying it never creates another
+connection owner. Closing a handle invokes its adapter&#39;s close callback. Wrapper
+callbacks have these specific effects:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Wrapper interface</th>
+<th>Effect of <code>close</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>delay_transport</code></td>
+<td>Closes its base and frees the delay queue.</td>
+</tr>
+<tr>
+<td><code>remap_transport</code></td>
+<td>Closes its base and clears the mapping.</td>
+</tr>
+<tr>
+<td><code>fragments_transport</code></td>
+<td>Frees fragmentation storage; leaves its base open.</td>
+</tr>
+<tr>
+<td><code>router_transport</code></td>
+<td>Closes that lane; leaves the router and base open.</td>
+</tr>
+</tbody></table>
+</div><p>Close a forwarding wrapper as one stack; do not separately close stale copies of
+its base handle. For a borrowing wrapper, destroy its dependent runners first,
+close/destroy the wrapper, then close the base adapter. After closing all router
+lanes, call <code>router_destroy</code> to free the router&#39;s buffers, then close its base.
+These rules also apply when wrappers are composed: closing Fragments over Delay
+leaves Delay open until its own handle is closed.</p>
+<h2 id="deterministic-memory-adapter">Deterministic memory adapter<a class="heading-anchor" href="#deterministic-memory-adapter" aria-label="Link to this section">#</a></h2>
+<p><code>Memory</code> owns preallocated packet storage, endpoint registration, RNG, and bounded
+trace storage. Open distinct <code>Memory_Endpoint</code>s, obtain their interfaces with
+<code>memory_transport</code>, and advance the network with <code>memory_advance</code>. Nothing uses a
+wall clock. Close endpoints before destroying their network owner.</p>
+<p><code>Faults</code> controls latency/jitter in ticks, loss and duplication per 10,000 packets,
+and reliable retry delay. Reliable packets remain queued through a 100% loss
+blackout; unreliable packets drop. Reliable order is preserved even when later
+packets become ready first. Full queues return backpressure without partial sends.</p>
+<p>This models the service contract of reliable/unreliable channels, not ENet&#39;s
+congestion/retransmission algorithm. It does not establish a real-network result.
+Reproduction requires the initial config/seed, timed fault changes, input/send
+schedule, and time-advance schedule. The bounded trace and its logical hash help
+compare runs; <code>trace_dropped</code> explicitly reports incomplete trace retention.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_transport/run.sh</code></pre></div><h2 id="shared-packet-routing">Shared packet routing<a class="heading-anchor" href="#shared-packet-routing" aria-label="Link to this section">#</a></h2>
+<p><code>Router</code> supplies two borrowed transport views over one connection. Call
+<code>router_pump</code> once before pumping either consumer. Their <code>Transport.poll</code> callbacks
+do not poll again, so adding consumers cannot multiply the ingress budget.
+Bounded packet and byte rings preserve metadata and retain too-small reads.
+Unreliable overflow drops only that lane&#39;s datagram. Reliable overflow retains one
+pending packet until its lane drains, so reliable delivery is not silently weakened;
+this can temporarily hold up the underlying queue. The recovery link only routes
+unreliable checkpoint messages to its background lane.</p>
+<p>Both views share a token bucket and per-pump output limit. Background sends also
+leave <code>primary_reserve</code> bytes available for gameplay. Callers receive backpressure
+instead of an implicit send queue. <code>router_destroy</code> frees buffers but does not close
+the underlying owner. Three native tests cover queue isolation, reliable retention,
+wrapped byte storage, small receives, aggregate output bounds, and reserved capacity.</p>
+<h2 id="godot-enet-adapter">Godot ENet adapter<a class="heading-anchor" href="#godot-enet-adapter" aria-label="Link to this section">#</a></h2>
+<p><code>replay/godot.Enet</code> owns a directly polled <code>ENetMultiplayerPeer</code>. It does not
+install SceneMultiplayer or use Kit. Construct it with <code>enet_host</code>/<code>enet_join</code>,
+then use <code>enet_transport</code>. <code>enet_id</code> returns the current connection&#39;s ID after it
+connects. Host bind defaults to all interfaces; tests explicitly bind loopback.</p>
+<p>The adapter uses channel 0&#39;s independent reliable/unreliable transfer modes, as
+defined by <a href="https://docs.godotengine.org/en/stable/classes/class_multiplayerpeer.html#class-multiplayerpeer-property-transfer-channel" rel="noreferrer">Godot&#39;s MultiplayerPeer contract</a>.
+It owns/releases its peer reference, connection-tracking callables, and pending
+receive buffer. Connection signals maintain a live peer set without game-script
+callbacks, so disconnected recipients are rejected before sending. Polling a
+disconnected peer is a no-op. ENet constructors return false on Godot web targets;
+a WebRTC adapter is still required.</p>
+<p><code>Delay</code> is a bounded receive-delay decorator for real transports. It preserves
+delivery order, packet ownership, connection visibility, and backpressure. The
+Hello network gate uses it to inject 120 ms receive delay on each process.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_enet/run.sh</code></pre></div><p>That gate starts a server and two client processes, transfers canonical world
+envelopes in both delivery modes, verifies sender metadata and decoded data, and
+requires clean shutdown. It is a transport/codec acceptance test, <strong>not</strong> the
+roadmap&#39;s server-prediction/client/observer gameplay acceptance gate.</p>
+<p>Fresh project preparation uses a normal headless editor startup for 120 frames,
+allowing queued editor work to finish. The immediate <code>--import</code> shutdown path
+exhibited a first-scan crash in the existing editor integration; this remains an
+explicit tooling follow-up, rather than an ignored test failure.</p>
+<h2 id="fragmentation-and-browser-webrtc">Fragmentation and browser WebRTC<a class="heading-anchor" href="#fragmentation-and-browser-webrtc" aria-label="Link to this section">#</a></h2>
+<p><code>fragments_init</code> wraps a borrowed transport whose reliable channel preserves
+packet order. Both ends must use the same MTU. It copies accepted logical messages
+into bounded queues, fragments up to 64 KiB, expires partial unreliable assemblies,
+and retains reliable data through receiver backpressure. The live peer count must
+fit <code>Fragment_Config.messages</code>, which also bounds delivery-frontier tracking.
+Closing this wrapper does not close its borrowed base.</p>
+<p>The <a href="../godot/transport/rtc.html">Godot RTC adapter</a> composes fragmentation with raw negotiated
+data channels and receiver credit. This additional credit prevents Godot&#39;s finite
+JS ring from dropping already SCTP-delivered reliable data. <code>rtc_transport</code> is a
+normal Replay interface; <code>Session_Options.backend = .Rtc</code> uses it through the same
+server/client gameplay runner. Browser migration and deployed relay/TURN acceptance
+remain separate work.</p>
+<p>Fragment transmission selects queued messages by acceptance order and skips a
+blocked peer/channel for the current poll. Reused array slots do not determine
+send order or prevent the sender from using its remaining packet budget. The
+sustained-small-message regression covers queue wrap; reliable ordering and
+receiver backpressure tests remain separate checks.</p>
+<h2 id="connection-generations">Connection generations<a class="heading-anchor" href="#connection-generations" aria-label="Link to this section">#</a></h2>
+<p><code>Transport.generation</code> is an optional callback exposed through <code>peer_generation</code>.
+A versioned adapter supplies a nonzero generation for each connection and changes
+it when a numeric peer ID is rebound within the same open transport lifetime.
+<code>Received.generation</code> carries that local metadata for received/retained packets;
+it is not read from a gameplay payload and does not authenticate a member. Closing
+an owner ends its borrowed handles. Generations are not persisted across a closed
+transport owner or serialized in packets/checkpoints.</p>
+<p>Memory increments the generation when an endpoint ID reopens. WebRTC uses its
+peer-connection serial, including explicit replacement of creator ID 1. Healthy
+signaling continuation preserves the serial. <code>Delay</code>, <code>Router</code>, <code>Fragments</code> and
+<code>Remap</code> propagate the callback and packet metadata. Delayed and routed packets from
+a retired generation are discarded; fragment assemblies, pending input, queued
+output and delivery frontiers are retired separately for that connection. The
+wrappers expose <code>retired</code> counters in their existing diagnostics.</p>
+<p>Custom wrappers must forward the callback to retain these guarantees. An adapter
+without it remains unversioned (<code>generation == 0</code>); <code>receive</code> normalizes its
+metadata accordingly, preserving the old interface behavior. Such an adapter must
+still fence old traffic when reusing IDs, or construct a new wrapper/transport
+owner. This feature does not add reliable delivery across a disconnected session;
+the enclosing protocol decides what may be retransmitted or recovered.</p>
+<p>The transport suite checks ID reuse with delayed/queued/pending reliable packets,
+partial and completed fragments, reused message IDs, outbound queues, delivery
+frontiers, independent peers and unversioned-wrapper compatibility. The
+<span class="local-reference" title="docs/replay/results/p2p-creator-recovery-2026-09-08/README.md · available in the repository">creator-recovery browser gate</span>
+keeps a live P2P runner while the authenticated creator returns at ID 1 with a new
+connection generation.</p>
+<p><code>fragments_limit_unreliable</code> optionally bounds staged unreliable datagrams per
+recipient. Set it while the transmit queue is empty; zero leaves the ordinary
+message/byte limits alone. One large logical packet remains admissible when that
+recipient&#39;s unreliable queue is empty, even if it exceeds the pacing bound by
+itself. Further messages wait for capacity. Reliable messages retain their existing
+ordering and admission, and global memory/message limits remain in force.</p>
+<p>RTC uses a bound of eight staged unreliable datagrams in addition to its existing
+16-packet credit window. This applies backpressure before several stale snapshots
+accumulate inside the adapter. It does not drop accepted packets, change wire
+framing, enlarge receive buffers or prioritize away checkpoint traffic.
+<code>Fragment_Stats.queue_limited</code> records those admission deferrals.</p>
+<h2 id="recording-a-real-interface">Recording a real interface<a class="heading-anchor" href="#recording-a-real-interface" aria-label="Link to this section">#</a></h2>
+<p>The optional <a href="trace/README.html">trace package</a> captures exact transport callback
+observations with bounded owned storage and preserves nil-callback semantics.
+Strict playback checks caller operations and outbound bytes without opening a
+real endpoint. Caller marks can record pump times/configuration; the Claimball
+observer fixture also compares per-frame state and effect hashes.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/transport/rtc.html"><span>Replay WebRTC adapter</span><span aria-hidden="true">→</span></a><a href="trace/README.html"><span>Bounded transport recording and strict replay</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/transport/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#closing-transport-wrappers" class="">Closing transport wrappers</a><a href="#deterministic-memory-adapter" class="">Deterministic memory adapter</a><a href="#shared-packet-routing" class="">Shared packet routing</a><a href="#godot-enet-adapter" class="">Godot ENet adapter</a><a href="#fragmentation-and-browser-webrtc" class="">Fragmentation and browser WebRTC</a><a href="#connection-generations" class="">Connection generations</a><a href="#recording-a-real-interface" class="">Recording a real interface</a></nav><div class="outline-actions"><a href="../../../reference/replay/transport/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Editor-first authoring delivery · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Editor-first authoring delivery</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/editor-first-progress.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#validation-and-findings">Validation and findings</a><a href="#measured-cost">Measured cost</a></nav></details>
+<article class="reading-body "><p>E1–E6 of the <a href="editor-first-plan.html">editor-first goal</a> are complete.
+<span class="local-reference" title="docs/replay/results/editor-first-2026-09-20/README.md · available in the repository">Final source/test receipts</span> record the
+implementation, validation, measured tradeoffs and preserved original sources.
+The canonical entry point is <a href="../../examples/replay_scrapyard/editor-first.html">Scrapyard&#39;s authoring guide</a>.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Delivered</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>E1</td>
+<td><code>Script_View(Value, Script)</code> adapts an ordinary typed Odin Node script to a view pool; ready/component validation and retirement preserve ownership</td>
+</tr>
+<tr>
+<td>E2</td>
+<td>Enemy scene-local script, six authored appearance Resources and a reusable authored telegraph child; independent F6 preview</td>
+</tr>
+<tr>
+<td>E3</td>
+<td>Authored permanent-seat runner scene with weapon/reload/beacon children; detached runner/HUD values; ordinary Godot process callbacks; independent runner/HUD previews</td>
+</tr>
+<tr>
+<td>E4</td>
+<td>Scrapyard catalog admission uses atomic typed baking, resource/field diagnostics and duplicate-ID rejection; a compile-checked composed gameplay recipe</td>
+</tr>
+<tr>
+<td>E5</td>
+<td>Canonical editor/gameplay ownership guide, scene map, extension workflow and explicit procedural-renderer exceptions</td>
+</tr>
+<tr>
+<td>E6</td>
+<td>Native/WASM scene tests, actual browser previews, host/client/observer combat and revive, crash recovery, measured presentation cost; final receipts below</td>
+</tr>
+</tbody></table>
+</div><h2 id="validation-and-findings">Validation and findings<a class="heading-anchor" href="#validation-and-findings" aria-label="Link to this section">#</a></h2>
+<p>Independent enemy, runner and HUD previews pass natively. Authored child offsets,
+appearance changes, normal animation and scene round-trip checks pass without a
+Session or World. A real Chrome export executes the composed scenes and checks
+their rendered-node properties. The full game scripts also compile for WASM.</p>
+<p>Typed scene tests accept the expected script after ready, reject a wrong script or
+missing required appearance, and verify retirement on epoch replacement. Resource
+checks bake an edited catalog, reject invalid health and duplicate IDs, restore its
+original content hash and verify that the running authority World is unchanged.
+Actor, feedback, audio and combat HUD checks pass. The final combat peers agree
+at tick 861/hash 1245892162797171220. Native revive/camera agreement
+passes at tick 1140/hash 4842865242039378665; crash recovery with a downed player
+following the lost host passes at tick 468/hash 3315288502199572453.</p>
+<p>A failed revive run exposed an existing presentation bug: public client authority
+frames omit hit_history, but wound presentation was reading that server-private
+cache. The adapter now uses exact retained public event-tick frames on clients,
+with generation checks and explicit missing-history refusal. Authority hit judgment
+is unchanged. Client frames may be corrected or predicted; this is cosmetic data.
+The passing revive run saw the wound and returned the camera home; one unavailable
+history lookup remained explicitly counted. No new private data crosses the wire.</p>
+<p>A stale migration test read <code>.polygon</code> on a MeshInstance2D. It now uses the existing
+representation-independent ViewProbe.vertices helper and keeps the same shape/count
+assertion. The failed receipt is preserved. Another initial harness entry referenced
+a nonexistent camera_test.gd; the actual revive and crash-camera fixtures are now
+used. An early runner compile failed after removing a local catalog alias still
+used by the status display; that alias was retained.</p>
+<h2 id="measured-cost">Measured cost<a class="heading-anchor" href="#measured-cost" aria-label="Link to this section">#</a></h2>
+<p>Three alternating process pairs per size, five 120-call samples after warmup, use
+the same detached frames and debug-build settings. The previous bridge advanced
+animation inside paint; the new harness explicitly advances the scene-local enemy,
+runner, weapon/equipment and HUD callbacks too. It therefore compares paint plus
+animation work rather than claiming a speedup by omitting the new callbacks.
+Both paths verify the live authority World remains unchanged.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Enemies and drops, each</th>
+<th align="right">Previous typed bridge</th>
+<th align="right">Composed scenes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td align="right">65.44 µs</td>
+<td align="right">79.69 µs</td>
+</tr>
+<tr>
+<td>8</td>
+<td align="right">82.43 µs</td>
+<td align="right">83.00 µs</td>
+</tr>
+<tr>
+<td>32</td>
+<td align="right">100.03 µs</td>
+<td align="right">87.19 µs</td>
+</tr>
+</tbody></table>
+</div><p>These are isolated CPU calls, not rendered FPS, confidence intervals or universal
+speedups. Direct callback calls exclude Godot&#39;s callback-dispatch cost; scene
+construction/churn, GPU work and network/simulation cost are also excluded. The
+empty case regressed, the medium case is similar and the larger case improved in
+this fixture. Different builds/workloads can differ. Composition is justified by
+authoring and ownership, not a blanket performance promise.</p>
+<p>The original game, Kit and existing gameplay/content schemas remain unchanged.
+Generated arenas, high-churn projectile/beam batches and specialized feedback remain
+procedural by explicit design. The current guide documents that boundary rather
+than presenting partial conversion as an invisible limitation.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="editor-first-plan.html"><span>Editor-first Replay authoring and canonical Scrapyard</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/editor-first.html"><span>Canonical editor-first Replay example</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/editor-first-progress.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#validation-and-findings" class="">Validation and findings</a><a href="#measured-cost" class="">Measured cost</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/editor-first-progress.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay: an experimental simulation-first library · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay: an experimental simulation-first library</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../reference/replay/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-contract">The contract</a><a href="#present-limits">Present limits</a><a href="#optional-exact-correction-reuse">Optional exact correction reuse</a></nav></details>
+<article class="reading-body "><p>Replay explores a multiplayer authoring model built around a complete, replayable
+Odin world. It lives beside Kit and uses none of Kit&#39;s replication, simulation,
+or session runtime. <strong>Both implementations and both versions of each ported game
+must remain available.</strong></p>
+<p>Replay implements local simulation, server-authoritative prediction/reconciliation,
+cooperative owner streams, and deterministic P2P rollback. Its shared foundations
+include bounded typed history, entity pools/RNG, canonical codecs, presentation
+journals, recipient views, checkpoints, durable enrollment and host migration.
+Godot owns scenes/input/output; the simulation packages run without Godot.</p>
+<p>Start with <a href="getting-started.html">getting started</a>, the
+<a href="../build/template/replay/README.html">Session starter project</a>, and the
+<a href="../examples/replay_recipes/README.html">checked lifecycle recipes</a>. Most games
+need one Timeline, Session or Room owner; the package reference below includes
+advanced mechanisms and tools, not a checklist of required imports. Kit (v1)
+and Replay (v2) share <a href="../docs/authoring-guide.html#api-conventions-shared-by-kit-and-replay">Odin/API conventions</a>
+while retaining their different gameplay models.</p>
+<p>The library remains experimental. Use the <a href="../docs/replay/framework-audit.html">framework completion audit</a>
+to distinguish implemented contracts, tested combinations and remaining framework
+work. Full parity across every ported game is not its completion gate.</p>
+<ul>
+<li><a href="../docs/replay/roadmap.html">Roadmap and implementation plan</a></li>
+<li><a href="getting-started.html">Getting started and choosing a runner</a></li>
+<li><a href="compatibility.html">Compatibility and upgrade policy</a></li>
+<li><a href="support.html">Experimental support and release assessment</a></li>
+<li><a href="../docs/replay/architecture.html">Architecture and current API</a></li>
+<li><a href="../docs/replay/comparison.html">Game ports and comparison protocol</a></li>
+<li><a href="../examples/replay_loot/README.html">Runnable loot example</a></li>
+<li><a href="../examples/replay_hello/README.html">Godot Hello and Loot scenes</a></li>
+<li><a href="view/README.html">Presentation contract</a></li>
+<li><a href="event_folding.html">Explicit event folding</a></li>
+<li><a href="../docs/replay/progress.html">Implementation progress</a></li>
+<li><a href="editor/README.html">Editor authoring workflow and tools</a></li>
+<li><a href="godot/scene/adapter-bindings.html">Typed scene adapters and view declarations</a></li>
+<li><a href="godot/scene/archetypes.html">Authored archetypes and scene ownership</a></li>
+<li><a href="evolution/README.html">Revision freezing and explicit conversion</a></li>
+<li><a href="testing/README.html">Reusable feature scenarios</a></li>
+<li><a href="schema/README.html">Canonical schema/codecs</a></li>
+<li><a href="schema/unions.html">Typed action/event/state unions</a></li>
+<li><a href="diagnostics.html">Owned audit captures and field diagnostics</a></li>
+<li><a href="diagnostic/recording.html">Portable local gameplay recordings</a></li>
+<li><a href="net/recording.html">Network simulation recordings</a></li>
+<li><a href="telemetry/README.html">Session round-trip telemetry</a></li>
+<li><a href="transport/README.html">Transports and ENet gate</a></li>
+<li><a href="net/README.html">Server/client runner</a></li>
+<li><a href="delta/README.html">Canonical delta codec</a></li>
+<li><a href="../examples/replay_cavecrawl/README.html">Replay Cavecrawl port</a></li>
+<li><a href="../examples/replay_quickdraw/README.html">Replay Quickdraw competitive slice</a></li>
+<li><a href="../examples/replay_speedball/README.html">Replay Speedball contested-pitch slice</a></li>
+<li><a href="../examples/replay_claimball/README.html">Replay Claimball scoped-prediction slice</a></li>
+<li><a href="net/groups.html">Prediction groups and boundary values</a></li>
+<li><a href="p2p/README.html">Initial deterministic P2P runner</a></li>
+<li><a href="p2p/provision/README.html">Durable fixed-roster P2P provisioning</a></li>
+<li><a href="godot/p2p_party.html">P2P party client and signaling integration</a></li>
+<li><a href="godot/p2p_direct.html">Authenticated native two-player P2P</a></li>
+<li><a href="deterministic/README.html">Deterministic arithmetic and duel</a></li>
+<li><a href="play/README.html">Gameplay motion/query helpers</a></li>
+<li><a href="net/view_time.html">Aim context and historical collision queries</a></li>
+<li><a href="godot/README.html">Godot session facade</a></li>
+<li><a href="../docs/replay/recovery.html">Durable checkpoints and recovery contract</a></li>
+<li><a href="net/checkpoint_upgrade.html">Explicit checkpoint conversion</a></li>
+<li><a href="recovery/README.html">Trusted checkpoint replication</a></li>
+<li><a href="authority/README.html">Authority decisions and lease enforcement</a></li>
+</ul>
+<p>From the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_view/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_loot/run.sh</code></pre></div><p>The test gate runs native tests, type-checks the instantiated example for WASM,
+and executes the example. It is also registered in <code>tests/run_all.sh</code>.</p>
+<h2 id="the-contract">The contract<a class="heading-anchor" href="#the-contract" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> replay <span class="hljs-string">&quot;godot:replay&quot;</span>
+
+World :: <span class="hljs-keyword">struct</span> {position: <span class="hljs-type">i32</span>, rng: replay.Rng}
+Input :: <span class="hljs-keyword">struct</span> {move: <span class="hljs-type">i8</span>}
+Event :: <span class="hljs-keyword">struct</span> {position: <span class="hljs-type">i32</span>}
+
+step :: <span class="hljs-keyword">proc</span>(world: ^World, input: Input, ctx: ^replay.Step(Event)) {
+    world.position += <span class="hljs-type">i32</span>(input.move)
+}
+
+<span class="hljs-comment">// Application initialization:</span>
+timeline: replay.Timeline(World, Input, Event)
+err := replay.init(&amp;timeline, replay.Frame(World){}, step)
+<span class="hljs-comment">// Check err, advance with typed inputs, copy frames for presentation, and destroy.</span></code></pre></div><p>Store <strong>all mutable gameplay state</strong> in <code>World</code>, including RNG, cooldowns,
+scheduled work, entity lifetime, and entity allocation. A step can modify several
+entities directly. Read device input before calling <code>advance</code>. Draw from copies
+returned by <code>current</code> or <code>read</code>; presentation never writes into simulation.</p>
+<p>The value-storage implementation supports scalars, enums, bit sets, fixed
+arrays, ordinary structs and supported tagged unions containing those values. Initialization recursively
+rejects pointers, slices, strings, maps, procedures, and other unsupported types.
+Struct padding is allowed: these are typed, same-process snapshots, <strong>not wire
+packets</strong>. Canonical wire codecs live in <code>replay/schema</code>; dynamic collections
+remain future storage work.</p>
+<p>Treat a live <code>Timeline</code> as a single owner of allocations: keep it in one place,
+pass it by pointer, and call <code>destroy</code> once. Frame and event reads return/copy
+owned values. Pool pointers and step contexts are borrowed for the current step.</p>
+<h2 id="present-limits">Present limits<a class="heading-anchor" href="#present-limits" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Room has native/browser planned/crash migration, returned-host, repeated-handoff,
+control-partition and successor-loss evidence. Owner-driven co-op and native/
+browser P2P have separate contracts. These tests establish bounded scenarios,
+not arbitrary public reachability or platform coverage. Steam has contract tests;
+live-account acceptance remains separate.</li>
+<li>Server snapshots use acknowledged deltas, negotiated compression and full-state
+recovery. Prediction groups and recipient views are authored policies: the
+framework validates their declared invariants, not arbitrary gameplay dependencies.</li>
+<li><code>revise_input</code> supplies an explicitly corrected input batch; it is not a network
+protocol and does not decide whose input or state is authoritative.</li>
+<li>Initializing another timeline from a saved <code>Frame</code> proves in-process resume.
+Its epoch only scopes event IDs; it does not elect a host or reject packets.</li>
+<li>Events have speculative/confirmed/watched presentation and cancellation/update
+delivery. Committed external effects/outboxes remain future work. Do not play
+effects directly from a step.</li>
+<li><code>audit</code> reports the first differing tick. <code>audit_capture</code> retains the exact
+mismatch; canonical schema diagnostics identify differing fields. Local audit
+does not prove arbitrary game code deterministic across platforms. P2P has
+separate recorded-corpus cross-target checks.</li>
+<li>Whole frames and replay scratch are copied. This deliberately prioritizes
+correctness while the API is explored; scale claims require measurements.</li>
+</ul>
+<p>The API is experimental. The framework audit and each package&#39;s tested envelope
+determine what can be described as supported; historical game parity ledgers do
+not imply missing framework features.</p>
+<h2 id="optional-exact-correction-reuse">Optional exact correction reuse<a class="heading-anchor" href="#optional-exact-correction-reuse" aria-label="Link to this section">#</a></h2>
+<p><code>correct_reusing(timeline, truth, events[, rewrite])</code> returns the ordinary Result
+and a separate reused-record count. It validates the same checkpoint/event/history
+conditions as <code>correct</code>, calls the rewriter for every visited suffix input, and
+publishes atomically. When the complete predecessor state and rewritten input are
+byte-identical to their recorded counterparts, the existing record is retained;
+its state/events need no simulation or copying. Changed inputs and state continue
+through normal simulation, and reuse may resume after exact convergence.</p>
+<p>This requires a deterministic step with all mutable dependencies in State/Input
+and unchanged external configuration/callbacks. It is explicit and opt-in. Padding
+may conservatively prevent reuse; byte comparison also distinguishes signed zero.
+The ordinary <code>correct</code> and audit paths still execute the whole suffix. Audit never
+trusts reused records as proof of determinism. Result.steps remains the processed
+suffix span; subtract the separately returned count for simulated correction steps.
+A failed call returns zero reuse and leaves published state/input/events unchanged.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>Starting a Replay game</span><span aria-hidden="true">→</span></a><a href="../build/template/replay/README.html"><span>Replay starter</span><span aria-hidden="true">→</span></a><a href="../examples/replay_recipes/README.html"><span>Checked API recipes</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-contract" class="">The contract</a><a href="#present-limits" class="">Present limits</a><a href="#optional-exact-correction-reuse" class="">Optional exact correction reuse</a></nav><div class="outline-actions"><a href="../../reference/replay/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

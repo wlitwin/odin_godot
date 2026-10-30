@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Server authority and prediction · odin_godot</title><meta name="description" content="Move the cooperative square to a fixed tick, then predict its movement on the client."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Server authority and prediction</h1><p class="reader-dek">Move the cooperative square to a fixed tick, then predict its movement on the client.</p><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/quickstart-sim.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#what-changes">What changes</a><a href="#1-change-the-fields-replication-lane">1. Change the field's replication lane</a><a href="#2-move-movement-to-a-fixed-tick">2. Move movement to a fixed tick</a><a href="#3-sample-input">3. Sample input</a><a href="#4-attach-the-simulation-lane">4. Attach the simulation lane</a><a href="#5-remove-frame-rate-movement">5. Remove frame-rate movement</a><a href="#run-the-example">Run the example</a><a href="#run-a-dedicated-authority">Run a dedicated authority</a><a href="#what-the-simulation-lane-does-not-solve">What the simulation lane does not solve</a></nav></details>
+<article class="reading-body "><p>The <a href="quickstart.html">session-replication quickstart</a> lets each client write its
+own position. This guide moves that position to Kit&#39;s simulation lane: the
+authority derives movement from validated inputs, while the owning client runs
+the same fixed-tick code locally for immediate response.</p>
+<p>The completed example is <code>examples/hello_sim</code>. Its session, lobby, entity
+factory, spawn flow, chat, and reconnect behavior are the same concepts used by
+<code>examples/hello_net</code>. The differences are limited to the state that needs server
+authority.</p>
+<h2 id="what-changes">What changes<a class="heading-anchor" href="#what-changes" aria-label="Link to this section">#</a></h2>
+<p>The conversion has five parts:</p>
+<ol>
+<li>mark contested fields as predicted;</li>
+<li>move their mutation to a fixed-tick proc;</li>
+<li>sample and validate player input;</li>
+<li>attach a <code>ksim.Lane</code>; and</li>
+<li>remove the old frame-rate mutation.</li>
+</ol>
+<h2 id="1-change-the-fields-replication-lane">1. Change the field&#39;s replication lane<a class="heading-anchor" href="#1-change-the-fields-replication-lane" aria-label="Link to this section">#</a></h2>
+<p>In <code>Player</code>, replace the owner-stream tags on position:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Session replication: the entity owner writes position.</span>
+x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner,wire=f16&quot;`</span> <span class="hljs-comment">// owner float fields interpolate by default</span>
+
+<span class="hljs-comment">// Simulation lane: the authority writes position and the owner predicts it.</span>
+x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;predict,interp&quot;`</span></code></pre></div><p><code>interp</code> still controls presentation. For the local player, it smooths
+reconciliation error after authoritative snapshots arrive. For remote players,
+it interpolates between authoritative snapshots on the watched timeline.</p>
+<p>Fields that do not need rollback can remain on the reliable delta lane. The
+example&#39;s <code>pid</code> field is unchanged:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">pid: <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span></code></pre></div><h2 id="2-move-movement-to-a-fixed-tick">2. Move movement to a fixed tick<a class="heading-anchor" href="#2-move-movement-to-a-fixed-tick" aria-label="Link to this section">#</a></h2>
+<p>Declare the input that drives a player and the deterministic step that updates
+predicted state:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_input)</span>
+Player_Input :: <span class="hljs-keyword">struct</span> {
+	move: [<span class="hljs-number">2</span>]<span class="hljs-type">i8</span> <span class="hljs-string">`gd:&quot;range=-1:1&quot;`</span>,
+}
+
+STEP :: <span class="hljs-type">f32</span>(<span class="hljs-number">160.0</span> / <span class="hljs-number">60.0</span>)
+
+<span class="hljs-meta">@(gd_tick)</span>
+player_tick :: <span class="hljs-keyword">proc</span>(self: ^Player, input: Player_Input) {
+	self.x = clamp(self.x + <span class="hljs-type">f32</span>(input.move[<span class="hljs-number">0</span>]) * STEP, <span class="hljs-number">8</span>, <span class="hljs-number">632</span>)
+	self.y = clamp(self.y + <span class="hljs-type">f32</span>(input.move[<span class="hljs-number">1</span>]) * STEP, <span class="hljs-number">8</span>, <span class="hljs-number">352</span>)
+}</code></pre></div><p>The authority runs this proc to produce truth. The owning client runs it for
+prediction and may run it again during reconciliation. A tick proc therefore
+must use predicted fields, its input, and values derived from the tick. Do not
+read wall-clock time, input devices, scene-node transforms, or untracked random
+state from it.</p>
+<p>This example assumes the default 60 Hz simulation rate. If the lane&#39;s <code>hz</code>
+changes, derive movement constants from the same configured rate.</p>
+<h2 id="3-sample-input">3. Sample input<a class="heading-anchor" href="#3-sample-input" aria-label="Link to this section">#</a></h2>
+<p>Device access belongs in one <code>@(gd_sample)</code> proc on the game script:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_sample)</span>
+hello_sample :: <span class="hljs-keyword">proc</span>(self: ^HelloSim, tick: <span class="hljs-type">u64</span>, input: ^Player_Input) {
+	_ = tick
+	input^ = {}
+	<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_right&quot;</span>) {input.move[<span class="hljs-number">0</span>] += <span class="hljs-number">1</span>}
+	<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_left&quot;</span>)  {input.move[<span class="hljs-number">0</span>] -= <span class="hljs-number">1</span>}
+	<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_down&quot;</span>)  {input.move[<span class="hljs-number">1</span>] += <span class="hljs-number">1</span>}
+	<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_up&quot;</span>)    {input.move[<span class="hljs-number">1</span>] -= <span class="hljs-number">1</span>}
+}</code></pre></div><p><code>@(gd_input)</code> turns the struct&#39;s field tags into the validator. Kit clamps the
+axis after local sampling and applies the same sanitizer to every received input
+before changing the authority&#39;s de-jitter buffer. The tick therefore sees the
+same legal values on both sides.</p>
+<p>Available rules are <code>range=min:max</code>, <code>finite</code>, <code>unit</code> (a <code>[2]..[4]f32/f64</code>
+vector whose magnitude is clamped to one), <code>enum</code>, and <code>mask=bits</code>. Rules are
+part of the generated network fingerprint, so peers with different input
+languages refuse the join instead of disagreeing during play.</p>
+<p>For a predicate involving several fields or game state, keep the generated
+rules and add <code>@(gd_sample = &quot;validate&quot;)</code> plus
+<code>&lt;sample&gt;_validate(self, input) -&gt; bool</code>. The generated sanitizer runs first;
+returning <code>false</code> then rejects the complete multi-class packet. Use
+<code>validate=my_validator</code> to name the hook explicitly.</p>
+<h2 id="4-attach-the-simulation-lane">4. Attach the simulation lane<a class="heading-anchor" href="#4-attach-the-simulation-lane" aria-label="Link to this section">#</a></h2>
+<p>Add a lane beside the existing session components:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">HelloSim :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node2d,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	boot:  kboot.Boot,
+	lane:  ksim.Lane,
+
+	player_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Player:1&quot;`</span>,
+	me: ^Player,
+}</code></pre></div><p>That conventional field layout makes the generated facade lane-aware. One call
+from <code>_ready</code> attaches Boot, installs the entity factory, initializes the lane,
+and gives it to Boot:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_sim_net_attach(self, kboot.Options{
+	title = <span class="hljs-string">&quot;HELLO, SERVER AUTHORITY&quot;</span>,
+	env = <span class="hljs-string">&quot;HELLO&quot;</span>,
+}, kboot.network_profile(.Listen_Server_Action))</code></pre></div><p>Under that call, <code>hello_sim_lane_init</code> is generated from the <code>@(gd_tick)</code> and
+<code>@(gd_sample)</code> declarations. It registers the input type, validator, tick
+thunks, descriptors, and optional world passes. <code>boot_lane</code> makes the network
+pump drive simulation and presentation each frame.</p>
+<p>The third argument configures the session and lane together. Override fields on
+the materialized profile when the game&#39;s measured needs differ:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_sim_net_attach(
+	self,
+	kboot.Options{<span class="hljs-comment">/* ... */</span>},
+	config,
+)</code></pre></div><p>where <code>config</code> was prepared as ordinary data:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">config := kboot.network_profile(.Listen_Server_Action)
+config.lane.smooth_cut = <span class="hljs-number">48</span>
+config.lane.rewind_max = <span class="hljs-number">30</span></code></pre></div><p>The generated attach validates the full pair before starting. Start with a
+named profile and tune from measurements; see <a href="profiles.html">Network profiles</a>
+and <a href="sim.html#tuning">Simulation tuning</a>.</p>
+<h2 id="5-remove-frame-rate-movement">5. Remove frame-rate movement<a class="heading-anchor" href="#5-remove-frame-rate-movement" aria-label="Link to this section">#</a></h2>
+<p>Delete the code that wrote the local player&#39;s position from <code>_process</code>.
+The generated network pump now samples inputs, advances fixed ticks, reconciles
+snapshots, writes presentation values, and forwards declared events before the
+entity&#39;s <code>_process</code> displays them:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_sim_process :: <span class="hljs-keyword">proc</span>(self: ^HelloSim, delta: <span class="hljs-type">f64</span>) {
+	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) == .Menu {<span class="hljs-keyword">return</span>}
+	_ = hello_sim_net_frame(self, delta, knet.now_s())
+}</code></pre></div><p>Spawning and reliable state do not require a second code path. The generated
+factory tracks <code>Player</code> entities on the lane because their descriptor contains
+<code>predict</code> fields.</p>
+<h2 id="run-the-example">Run the example<a class="heading-anchor" href="#run-the-example" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh examples/hello_sim
+<span class="hljs-variable">$GODOT</span> --path examples/hello_sim &amp;
+HELLO_LATENCY=120 <span class="hljs-variable">$GODOT</span> --path examples/hello_sim</code></pre></div><p>Host in the first window and join in the second. In the joined window:</p>
+<ul>
+<li>the local square should respond immediately because it is predicted; and</li>
+<li>the host&#39;s square should move smoothly on the delayed watched timeline.</li>
+</ul>
+<p>The automated two-process test checks both behaviors under injected latency:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash examples/hello_sim/run.sh</code></pre></div><p>The simulation example pairs setup with <code>hello_sim_net_detach(self)</code> followed
+by <code>ksess.session_destroy(&amp;self.ses)</code> in <code>hello_sim_exit_tree</code>. The generated
+detach destroys the lane before its Session. Follow the same
+<a href="quickstart.html#8-release-the-stack-on-scene-exit">scene-exit rule</a> when replacing
+the game scene.</p>
+<h2 id="run-a-dedicated-authority">Run a dedicated authority<a class="heading-anchor" href="#run-a-dedicated-authority" aria-label="Link to this section">#</a></h2>
+<p>The example also exposes a headless server role:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">HELLO_ROLE=serve <span class="hljs-variable">$GODOT</span> --headless --path examples/hello_sim</code></pre></div><p><code>boot_serve</code> creates a dedicated infrastructure seat. The seat does not receive
+a player entity and does not participate in host succession. <code>hello_sim_ready</code>
+selects <code>.Dedicated_Competitive</code> for this role, while ordinary Host uses
+<code>.Listen_Server_Action</code>; the dedicated profile also verifies that every input
+class has a semantic validator. A production
+server still needs deployment, discovery, monitoring, restart, and abuse-control
+infrastructure; Kit does not provide a server fleet or matchmaking service.</p>
+<p>A listen server uses the same simulation code, but the hosting player controls
+the authority process. That is convenient for invited sessions, not a fair
+security boundary against the host.</p>
+<h2 id="what-the-simulation-lane-does-not-solve">What the simulation lane does not solve<a class="heading-anchor" href="#what-the-simulation-lane-does-not-solve" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Native ENet join codes provide discovery and limited UDP hole punching, not a
+general relay. Symmetric NAT still requires WebRTC with TURN or Steam.</li>
+<li>Prediction hides input latency; it does not make the authority&#39;s verdict
+instantaneous. Rejected or divergent actions still reconcile.</li>
+<li>Godot rigid-body physics cannot be replayed by Kit. Predicted physics must use
+query-based, tick-driven integration over data stored in the simulation.</li>
+<li>Public servers need an encrypted transport, semantic input validation,
+application-specific rate policy, and operational controls. See
+<a href="session.html#trust-and-admission">Session trust and admission</a>.</li>
+</ul>
+<p>Continue with <a href="sim.html">kit/sim</a> for discrete commands, predicted spawns,
+contested objects, world passes, presentation events, lag compensation, and reconciliation
+tuning.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/quickstart-sim.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#what-changes" class="">What changes</a><a href="#1-change-the-fields-replication-lane" class="">1. Change the field's replication lane</a><a href="#2-move-movement-to-a-fixed-tick" class="">2. Move movement to a fixed tick</a><a href="#3-sample-input" class="">3. Sample input</a><a href="#4-attach-the-simulation-lane" class="">4. Attach the simulation lane</a><a href="#5-remove-frame-rate-movement" class="">5. Remove frame-rate movement</a><a href="#run-the-example" class="">Run the example</a><a href="#run-a-dedicated-authority" class="">Run a dedicated authority</a><a href="#what-the-simulation-lane-does-not-solve" class="">What the simulation lane does not solve</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/quickstart-sim.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

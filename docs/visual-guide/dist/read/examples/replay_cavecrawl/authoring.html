@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Authoring captured floors · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authoring captured floors</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_cavecrawl/authoring.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#existing-replay-saves">Existing Replay saves</a><a href="#acceptance-gates">Acceptance gates</a></nav></details>
+<article class="reading-body "><p>Open <code>cave.tscn</code> and edit its <code>floor1_def</code> / <code>floor2_def</code> resources. The defaults
+live in <code>levels/level_1.tres</code> and <code>level_2.tres</code>; the original Cavecrawl project is
+separate. Each definition selects a floor PackedScene, chest stock, a wave plan and
+the rectangular rift used by the pure navigation model.</p>
+<p>The loader validates both definitions before opening a Session. It instantiates
+each floor outside the SceneTree, reads its four direct Marker2D children
+<code>ChestSpawn</code>, <code>DoorSpawn</code>, <code>Den1</code>, <code>Den2</code>, and destroys the temporary instance. The
+scene must have a Node2D root with an identity transform. Marker positions are in
+simulation coordinates: x 0–640, y 0–370. The rift must be a nonempty rectangle
+inside those bounds. Its explicit <code>rift_min</code> / <code>rift_max</code> fields must describe the
+same obstacle as the art; this loader does not convert Godot navigation meshes.</p>
+<p><code>gems</code> and <code>torches</code> accept 0–99. A zero stock leaves an empty chest slot; player
+inventory retains its normal per-item limits. <code>wave_counts</code> and <code>wave_rests</code> must
+have equal lengths between one and eight. Counts accept 0–255; rests accept
+0–65535 simulation ticks at 20 Hz. The 16-dweller pool bounds simultaneous live
+mobs; larger waves spawn as slots become available. A zero-count wave is legal.</p>
+<p>The resulting two <code>Floor</code> values are copied into <code>World</code>. The host&#39;s values travel
+with snapshots, replay history, save files and approved migration checkpoints.
+Clients may have different local definition values: gameplay and entity positions
+use the received world. Changes to the original Resource after initialization do
+not alter an active game. Start a new game to use a changed definition, or implement
+an explicit recorded rule change if live editing is required.</p>
+<p>PackedScenes remain local presentation assets, retained independently of the
+resource slots. Their contents are not serialized. Changing local art or navigation
+assets can therefore change appearance without changing a saved world&#39;s gameplay
+values; distribute matching assets when visual agreement matters. Mutating the
+retained PackedScene itself is not supported as a live authoring operation.</p>
+<p>Decoration is generated from the saved world seed and floor depth using the
+original splitmix32 recipe. Each nonzero seed produces ten alternating rocks and
+mushrooms at integer positions. Seed zero disables scatter. The default seed 1337
+has checksums 976669602 and 4288723372 for the two floors. Decorations are views;
+they do not consume gameplay RNG or enter collision state.</p>
+<h2 id="existing-replay-saves">Existing Replay saves<a class="heading-anchor" href="#existing-replay-saves" aria-label="Link to this section">#</a></h2>
+<p>Cavecrawl content is now <code>0x4341564552504c39</code>. C4 corrected wave pacing and den
+selection; C5 preserves avatar state on descent and separates run reset rules.
+C6 retains the relic across descent and releases it in place on restart.
+C7 retains relic ownership through death, respawn and ordinary disconnect.
+C8 records the observed authority and adopts the previous host’s relic on takeover.
+The ordinary loader rejects prior C1–C8 content, even where the value layout is unchanged.
+Gameplay protocol 7 and checkpoint format 4 are unchanged. This is an explicit
+conversion of earlier Replay saves, not an importer for original Kit saves.</p>
+<p>Build the converter and give it an existing source and a <strong>new</strong> destination:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin build examples/replay_cavecrawl/tools/upgrade_save \
+  -collection:godot=. -out:/tmp/replay-cave-upgrade
+/tmp/replay-cave-upgrade /path/to/old.replay /path/to/converted.replay</code></pre></div><p>The converter validates the old archive, copies its complete world and session
+ledgers, maps pending actions into the new command shape, and adds an already-playing
+lobby with default seat names. Content 1 receives the original default floors;
+content 2 retains its captured floors. The first connected seat becomes party leader.
+It then computes the new schema contract and hashes. It preserves the source and refuses to replace an existing
+file or symlink. Publication requires same-directory hard-link support. Conversion
+alone grants no authority and does not increment the epoch; normal resume or Room
+recovery still applies its authority rules. Use the owning profile/token when
+resuming and retain the original archive. Protocol-7/content-1 through content-8 saves are
+supported by this converter. C3 conversion preserves the complete checkpoint and
+its scheduled spawn/rest deadlines; later spawns use corrected pacing. C4/C5/C6/C7 conversion
+also preserves all saved values; future transitions use current rules. Lobby metadata/commands motivated content 3; gameplay
+protocol 7 and checkpoint layout 4 remain unchanged.</p>
+<h2 id="acceptance-gates">Acceptance gates<a class="heading-anchor" href="#acceptance-gates" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/definitions_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/definitions_network_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave/upgrade/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave/scatter_run.sh</code></pre></div><p>These check captured Resource/marker edits and fresh-process resume, host settings
+received by default-resource clients/observers under simulated network faults,
+invalid definitions, a genuine old-binary save converted and resumed, and original
+versus native/WASM scatter coordinates. The broader campaign and migration gates
+exercise the same expanded world schema.</p>
+<p>C8 adds <code>authority_known</code> and <code>authority_seat</code> to World. Old-world descriptors keep
+the frozen C3–C7 layout. Conversion preserves prior fields and seeds the new
+observation from the validated checkpoint header’s <code>local_seat</code>, independently of
+lobby leadership. Adoption occurs on the first resumed simulation tick.</p>
+<p>C9 adds generation-bound dweller Hit occurrences without changing saved world
+layout. C8 conversion preserves its authority observation exactly. Both native
+converters refuse coordinated archives; see <a href="impacts.html">impact compatibility</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="impacts.html"><span>Dweller impacts: C9 and O3</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/authoring.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#existing-replay-saves" class="">Existing Replay saves</a><a href="#acceptance-gates" class="">Acceptance gates</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/authoring.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>RTC continuation during a gameplay reconnect · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>RTC continuation during a gameplay reconnect</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/rtc-recovery.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#relay-outage-evidence">Relay outage evidence</a><a href="#replacing-a-peer-connection-under-the-same-id">Replacing a peer connection under the same ID</a></nav></details>
+<article class="reading-body "><p>An authenticated RTC adapter can now carry its short-lived signaling reservation
+across a full same-term gameplay transport reconnect. <code>Rtc_Continuation</code> contains
+the existing logical peer ID, opaque room code, resume token and host/client role.
+It is in-memory transport state, not a membership credential, checkpoint or save.</p>
+<p><code>rtc_continuation</code> exports it only from a registered context without a terminal error,
+with authenticated resumption enabled. <code>Rtc_Config.continuation</code> accepts it only
+for the exact room and role, with a nonzero token and a valid peer ID. Opening
+still performs the provider&#39;s fresh challenge and authorization proof. The provider
+checks the current registered member identity and reservation token before accepting
+the old logical ID. Knowledge of a peer ID or room name alone grants nothing.</p>
+<p><code>session_redirect</code> uses this path only when the authority epoch, member incarnation,
+signaling URL and room code match the previous RTC context. New authority terms
+and different destinations use normal fresh connections. The new adapter asks to
+replace the old channels; it does not treat incomplete fragment/channel state as
+delivered. The client runtime remains in place, preserving action IDs and old
+presentation history for normal Welcome reconciliation.</p>
+<p>An expired or rejected continuation does not confer a lease or revive an old
+identity. Ordinary coordinator, registration, packet-generation and authority
+checks remain in force. A subsequent retry may establish a fresh signaling
+reservation under those rules. This is distinct from the existing signaling-only
+reconnect, which can preserve healthy data channels without replacing them.</p>
+<h2 id="relay-outage-evidence">Relay outage evidence<a class="heading-anchor" href="#relay-outage-evidence" aria-label="Link to this section">#</a></h2>
+<p>The real relay-outage fixture keeps the coordinator and both game processes alive,
+stops Coturn, restarts it with the same configuration and requires a newly selected
+relay connection with traffic in both directions. It then verifies a new guest
+action from the authority, unchanged incarnations/epoch and retained inventory.
+Logical RTC peer identity and signaling continuation are checked separately from
+the browser&#39;s newly constructed peer-connection index.</p>
+<p>The initial implementation already recovered correctly, but full reconnect dropped
+the signaling token and could wait through the provider&#39;s reservation window. The
+continuation path avoids that unnecessary re-admission. Individual measured runs
+are recorded, not treated as a latency benchmark or an Internet guarantee. The
+existing 10-second gameplay timeout and platform ICE failure detection still
+contribute to interruption.</p>
+<p>See <span class="local-reference" title="docs/replay/results/relay-outage-2026-09-07/README.md · available in the repository">recorded outage results</span>
+and <a href="../../../tests/replay_turn/README.html">TURN fixture commands</a>. Credential refresh,
+ICE restart, combined coordinator/relay outages, public deployment and other
+platform/browser envelopes remain separate work.</p>
+<h2 id="replacing-a-peer-connection-under-the-same-id">Replacing a peer connection under the same ID<a class="heading-anchor" href="#replacing-a-peer-connection-under-the-same-id" aria-label="Link to this section">#</a></h2>
+<p>The public and raw RTC transports now expose the peer-connection serial as local
+connection-generation metadata. Fragment assembly/delivery state and outer Replay
+Delay/Router queues retire work from the old generation. A provider&#39;s replacement
+introduction can therefore create fresh channels under the same numeric ID without
+splicing old fragments or treating old delivery frontiers as belonging to the new
+connection. Signaling-only continuation of healthy channels retains its generation.</p>
+<p>The authenticated Duel now tests creator recovery: the creator saves and pauses,
+its browser is killed, and a fresh authenticated browser restores its file. The
+joining browser retains its runner through timeout and reconnects when creator
+ID 1 changes generation. Both reach the reference world with correct occurrences.
+The admission service and fixed match remain alive; this does not elect another
+player to supply the missing creator&#39;s inputs or recover an incompatible archive.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_turn/README.html"><span>Actual TURN relay gates</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/rtc-recovery.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#relay-outage-evidence" class="">Relay outage evidence</a><a href="#replacing-a-peer-connection-under-the-same-id" class="">Replacing a peer connection under the same ID</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/rtc-recovery.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

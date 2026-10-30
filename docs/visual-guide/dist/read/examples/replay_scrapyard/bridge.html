@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Using the new Replay bridge in Scrapyard · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Using the new Replay bridge in Scrapyard</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/bridge.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#data-and-lifetime-boundary">Data and lifetime boundary</a><a href="#improvements-driven-by-actual-use">Improvements driven by actual use</a><a href="#measured-tradeoffs">Measured tradeoffs</a><a href="#verification-and-remaining-scope">Verification and remaining scope</a></nav></details>
+<article class="reading-body "><p>Scrapyard already used the original Replay runner, journals and audio pool. It now
+also uses the new authoring bridge for <strong>enemies, loot and gameplay audio</strong>. The
+original sibling game remains untouched. This is a substantial integration slice,
+not a second full-game rewrite or a claim that every adapter is migrated.</p>
+<h2 id="data-and-lifetime-boundary">Data and lifetime boundary<a class="heading-anchor" href="#data-and-lifetime-boundary" aria-label="Link to this section">#</a></h2>
+<p><code>shared/presentation/mobs.odin</code> projects the selected observed World into detached
+mob display values: appearance, health, telegraph, status tint and nearby-prey
+information. No World or mutable catalog pointer enters a Godot rig. Existing
+observed interpolation remains the sampling policy for enemies and loot; local
+players and projectiles retain their current prediction policy.</p>
+<p><code>scripts/mob_bridge.odin</code> binds those values through <code>View_Pool2</code>. A PackedScene
+supplies Body and Telegraph children; attach caches them once. Paint handles data
+changes; frame handles animation. Generation, epoch, floor/run, observation reset
+and backward-time boundaries retire stale rigs. Initial/late observations seed
+health silently rather than inventing damage feedback. Loot uses the same typed
+lifetime owner with its existing authored scrap scene.</p>
+<p>Before, the game precreated 64 enemy sprites plus 64 telegraph rings and 128 scrap
+scenes (three nodes each), then manually hid unused slots and reset their state.
+The bridge removes those <strong>512 eagerly reserved nodes</strong>. Live entities instantiate
+views on demand, and recycled simulation slots get new scene lifetimes. Existing
+actor tests now check retirement and absence of stale state on the replacement,
+rather than requiring the same engine object to survive unrelated entities.</p>
+<p>This changes the pooling tradeoff: lifecycle safety and lower idle node count
+come with scene creation/free on membership churn. The timing below measures
+steady presentation, not that creation cost. High-churn projectiles should be
+evaluated separately before migration.</p>
+<h2 id="improvements-driven-by-actual-use">Improvements driven by actual use<a class="heading-anchor" href="#improvements-driven-by-actual-use" aria-label="Link to this section">#</a></h2>
+<p>Two missing shared primitives became apparent:</p>
+<ol>
+<li><strong>Animation separate from changed-data painting.</strong> A stationary enemy still
+animates. <code>View_Binding.frame</code> and <code>view_pool_frame</code> advance presentation time
+without putting a render delta/frame counter in the display payload or forcing
+every binding to repaint. It visits only live entries and animates children.</li>
+<li><strong>Audio projection with occurrence context.</strong> Scrapyard derives pitch from a
+stable event ID and reconstructs hurt positions at the event tick. The new
+<code>audio_route_init_change</code> callback receives the complete Change, removing the
+need for an implicit current-event side channel. It uses the existing route&#39;s
+policy, one-shot ledger, cancellation and epoch handling.</li>
+</ol>
+<p><code>scripts/audio.odin</code> now routes gameplay changes through Audio_Route. Music fades
+and sounds inferred from state remain game-specific, sharing the route&#39;s voice
+pool where appropriate. No audio or view state is added to World/checkpoints.</p>
+<h2 id="measured-tradeoffs">Measured tradeoffs<a class="heading-anchor" href="#measured-tradeoffs" aria-label="Link to this section">#</a></h2>
+<p>An isolated headless benchmark compares the frozen previous game adapter with the
+new adapter. Both paint the same detached frames through the real game paint
+function, with identical catalogs, mixed enemy kinds and one drop per enemy.
+Three alternating process pairs per size use warmup plus five 120-call batches.
+Simulation state is checked unchanged after every benchmark. Builds do not overlap
+measurement. These are native CPU presentation timings, not rendered FPS or GPU
+measurements. Both builds use the same framework version and the build helper&#39;s default
+<code>-debug</code> flags, with no <code>SCRIPT_BUILD_FLAGS</code> optimization override. Release-build
+timings can differ.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Enemies and drops, each</th>
+<th align="right">Previous paint</th>
+<th align="right">New paint</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td align="right">76.05 µs</td>
+<td align="right">75.71 µs</td>
+</tr>
+<tr>
+<td>8</td>
+<td align="right">81.05 µs</td>
+<td align="right">84.32 µs</td>
+</tr>
+<tr>
+<td>32</td>
+<td align="right">85.04 µs</td>
+<td align="right">96.84 µs</td>
+</tr>
+</tbody></table>
+</div><p>The 32-entity case adds about 11.8 µs, or 14% of this isolated paint call. Typed
+projection, comparison and ownership work is measurable. This integration is
+<strong>not a general performance win</strong>. Its value here is explicit lifetimes and a
+smaller, testable Godot boundary, plus fewer unused nodes. It also adds setup and
+projection code; animation rules remain game code. There is no line-count or human
+productivity superiority claim.</p>
+<p>The complete observed World is still used elsewhere in Scrapyard&#39;s paint function.
+Detached mob values reduce what rigs receive; they do not remove all World copies
+from the game or change history memory. Pure callbacks and shared ownership make
+the seam easier to reason about, while future conversions should justify their
+own costs.</p>
+<h2 id="verification-and-remaining-scope">Verification and remaining scope<a class="heading-anchor" href="#verification-and-remaining-scope" aria-label="Link to this section">#</a></h2>
+<p>Focused checks pass for enemy attack/hit/death, fresh lifetime replacement, player
+animation compatibility, damage/pickup effects and floor cleanup; contextual wound
+audio position/pitch/once-only behavior; and host/client/observer combat with 120 ms
+latency and equal whole-world hashes. The game scripts compile for WASM. Shared
+Godot tests verify unchanged-value animation and contextual route cancellation.
+The projection test verifies detached values and generation handles.</p>
+<p>No existing gameplay/shared-model or Kit source changed. Native/WASM compilation
+is not a new browser execution or hardware-audio listening claim. This increment
+does not repeat the full migration/parity matrix.</p>
+<p>Player rigs, predicted projectile selection, bespoke particles, input/UI bindings
+and Resource catalog loading remain on their current adapters. Convert these only
+where another concrete integration yields a useful simplification. In particular,
+projectile selection may need multiple identity domains when predicted and observed
+pools diverge; do not force that into one ambiguous view pool.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_SCRAP_BRIDGE_OUT=/absolute/fresh/output \
+  nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard_bridge/run.sh</code></pre></div><p><span class="local-reference" title="docs/replay/results/scrapyard-bridge-2026-09-20/README.md · available in the repository">Source and test receipts</span>
+record the exact workload, initial fixture failures and preserved original sources.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/bridge.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#data-and-lifetime-boundary" class="">Data and lifetime boundary</a><a href="#improvements-driven-by-actual-use" class="">Improvements driven by actual use</a><a href="#measured-tradeoffs" class="">Measured tradeoffs</a><a href="#verification-and-remaining-scope" class="">Verification and remaining scope</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/bridge.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

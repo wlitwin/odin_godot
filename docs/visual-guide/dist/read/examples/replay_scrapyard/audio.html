@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Audio and local settings · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Audio and local settings</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/audio.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Scrapyard now uses the original 23 synthesized sound effects and five music tracks.
+Their source hashes are recorded in <code>shared/audio/asset-provenance.json</code>; original
+assets and projects remain separate. Playback uses Replay&#39;s bounded audio adapter,
+with 12 positional voices, three screen voices and two music decks.</p>
+<p>Shot events now carry their firing family&#39;s value. The audio mapper can choose the
+correct clip after a weapon switch or entity removal, without reading a later world
+or dereferencing a live entity. Gameplay journal events drive shots, dash, hit,
+kill, hurt, pickup and blasts. Confirmation does not replay an already heard clip,
+and cancellation retains its consumed ID while stopping any still-owned voice.
+Positional effects use the original gain table and ±8% pitch variation.</p>
+<p>Other cues follow forward authoritative observations: gun jam/reload/clear states,
+down/revive, purchases, ability counters, floor clear/descent/wipe and selected enemy
+attack transitions. Initial observation, restore, new run and new epoch establish a
+silent baseline. Repeated or older observations do not replay those transitions.
+Departure second changes now use the original tick sound and small camera jolt;
+canceling is silent, and joining/restoring mid-countdown does not replay its start.
+These sampled transitions can coalesce or omit short intermediate states under a
+large snapshot gap; they are not an event-complete log of every original SFX site.
+The distinction remains part of the full audio/parity audit.</p>
+<p>Music selection uses the original seed/floor/run hash for the three combat tracks.
+Staging/wipe use the menu track and a cleared floor uses the intermission track.
+Two looping decks crossfade and the silent outgoing deck stops. Music is selected
+from current authority state, independently of effect history and replay.</p>
+<p>The Esc menu now offers sound volume (0–100% in ten steps), camera shake and
+fullscreen controls, plus a preview of the selected spray when its texture is
+available. Volume controls all Replay Scrapyard voices/music without changing a
+global audio bus. Shake affects only the camera&#39;s presentation offset. Fullscreen
+is disabled by the headless display; browser fullscreen remains subject to the
+browser&#39;s user-gesture behavior and has not been accepted by the settings gate.</p>
+<p>Native preferences use the separate bounded <code>user://replay_settings</code> record.
+<code>RSY_SETTINGS_PATH</code> overrides it. Native writes stage a complete file before rename.
+Browser preferences use the <code>settings</code> key in this game&#39;s IndexedDB namespace and
+revision-checked writes. Rapid edits while a write is pending are coalesced into a
+subsequent committed value. Conflicts/corruption preserve the existing record and
+keep further changes session-local. The menu reports settings that could not be
+saved. Pending browser operations have the existing browser-store commit contract.</p>
+<p><code>RSY_PERSIST=0</code> disables settings persistence as well as profiles, which keeps the
+editor workbench and automated sessions from changing normal preferences. Normal
+loadout choices remain in the existing profile record. <code>RSY_AUDIO=0</code> disables audio;
+the dedicated server role skips audio initialization by default.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_audio/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/settings_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/web_settings_run.sh</code></pre></div><p>The native and browser gates verify defaults, committed edits, fresh-process
+reload and corrupt-record preservation. The browser gate additionally kills Chrome
+after commit and verifies revision-conflict handling. Mixer capture confirms actual
+nonzero audio output; it is not a subjective listening review or an exhaustive
+sound-parity test.</p>
+<p>The extra event data introduced game content <code>...3044</code>; <a href="cast_paths.html">cast paths</a> used <code>...3046</code>, followed by current <a href="controls.html">dash actions</a> at <code>...3047</code>. Protocol 7 and checkpoint
+layout 4 remain unchanged. Explicit import supports content 42, 43 and 44 archives,
+including their original event contract. Event histories are not archived, so
+conversion rebinds the event schema without inventing past events. World/control
+state and action frontiers remain preserved. Full listening/visual parity, browser
+audio gesture coverage and broader playtesting remain roadmap requirements.</p>
+<p>AudioServer playback retirement is asynchronous. Automated scene tests close the
+game and allow its processing loop to retire audio references before quitting.
+The native CoreAudio backend produced no mixer frames in this environment, even
+with a Godot-only playback probe, and left pending playback references at exit.
+Hardware listening/driver acceptance remains open. The rendered settings/fullscreen
+check uses the Dummy driver; a separate capture verifies nonzero mixed PCM there.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/audio.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/audio.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

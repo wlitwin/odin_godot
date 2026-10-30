@@ -98,6 +98,10 @@ Choose its trust and timing baseline from the **[network profiles](docs/kit/prof
 
 ## Documentation
 
+The **[SDK documentation site](docs/visual-guide/README.md)** has guides for setup,
+Odin scripting, Kit, Replay, and export, plus an illustrated multiplayer guide and
+searchable reference. For a playable example, **[try Scrapyard in your browser](https://itchyitches.itch.io/scrapyard)**.
+
 | Doc | What it covers |
 |---|---|
 | **[docs/index.md](docs/index.md)** | The documentation map: start here to navigate |
@@ -111,6 +115,11 @@ Choose its trust and timing baseline from the **[network profiles](docs/kit/prof
 | [docs/design/](docs/design) | Internal notes: the `ScriptLanguageExtension` surface, export/web internals, the WASM spike |
 
 ## Examples
+
+**[Play Scrapyard on itch.io](https://itchyitches.itch.io/scrapyard)** to try an Odin +
+Godot arena shooter in the browser. The repository also includes the
+[Replay Scrapyard port](examples/replay_scrapyard/contributor-guide.md), with a visual
+guide to its authored scenes, replayable world, input, and presentation.
 
 **Building multiplayer? Start with the [Kit overview](docs/kit/index.md).** These
 three are its references:

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The run loop · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>The run loop</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/run.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>RSY_WAVE_BASE=0</code> supports an empty wave for parity with the original arena modes.
+An empty single-wave floor clears once without inventing a death or rest interval;
+both connected players receive the normal clear award. The experimental content
+ID is <code>0x5253435241503048</code>; older run archives require explicit conversion.</p>
+<p>Interactive play enables the run loop by default. Existing combat fixtures set
+<code>RSY_RUN=0</code> to keep their isolated encounters. The full run uses the original
+three-wave formulas, depth-based roster, every-third-floor horde and every-fourth-
+floor Titan. The boss takes precedence on a floor divisible by both. Five attempted
+barrel placements use the original floor-based scatter/cover exclusion rules.</p>
+<p>The director announces before spawning, admits one enemy per tick, and waits for
+directed deaths and the authored rest. Capacity refusal creates no phantom live
+enemy. The final wave&#39;s rest precedes completion, as in the original director.
+Floor clear requires both director completion and no living non-prop enemies.
+It awards one in-world core to each connected runner exactly once.</p>
+<p>On Clear, the <a href="shop.html">counter</a> offers nine clickable cards. Keys 1–4 buy damage,
+fire rate, speed or healing. Keys 5–8 buy belt, plate, catalyst or magnet with cores,
+matching the original game; 9 swaps to the next iron for free. The price and all predicates
+execute in the reducer. Active iron is separate from the claimed starting loadout.
+Plate raises maximum HP to 14, belt shaves three cadence ticks, catalyst extends
+mob status durations by half, and magnet adds 28 pixels of pickup reach. Temporary
+boosts and part modifiers use the same rules in prediction and authority.</p>
+<p>Every connected runner must be alive on the east gate to start its three-second
+departure. Stepping off cancels it. Departure clears floor-owned mobs, projectiles,
+zones, drops, flashes and query history; pool generations remain monotonic. Runners
+warp to the next-floor entry, retaining health, boosts, parts, cores and active gun
+state. Their warp counters prevent interpolation/smoothing across the teleport.
+Disconnected bodies are reaped on the turn; reconnect before a turn retains the
+body, while entry after reaping creates a fresh standing body from its claim.</p>
+<p>A wipe means every connected runner is down. After 150 saved ticks, the run counter
+advances and the crew returns to floor one. Scrap, temporary boosts, statuses and
+ability cooldowns reset; parts, cores and the current iron remain. Guns refill and
+the fresh wave observes the post-reset rest. These are in-world values. <a href="profiles.html">Local co-op profiles</a> now persist confirmed
+cores, parts and staging choices separately; they are not a secure competitive bank.</p>
+<p>Hold F near a downed friend to revive. The authority checks living reviver, connected
+target, range and 120 ticks of held input; release or retarget resets progress.
+Completion restores four HP once. This deliberately differs from the original&#39;s
+owner-authored progress/claim, where the host rechecked geometry but trusted the
+claimed duration. Held controls follow the runner&#39;s normal missing-input policy.</p>
+<p>Comparison limits remain explicit: spawn angle uses saved tick time instead of
+host wall time, target/iteration order is stable, departure/wipe/revive run on ticks,
+and all moves are server-authoritative. Numeric overflow is rejected rather than
+wrapping. Catalyst duration arithmetic uses a wider intermediate. Purchases are
+predicted transactions instead of the original host-only consequence. Full original
+UI/audio/feel parity remain evaluation work; the <a href="workbench.html">editor workbench</a>
+and <a href="shop.html">shop cards</a> have dedicated acceptance gates.</p>
+<p><code>run_loop.sh</code> uses short declared waves/rest to exercise two clears, shopping,
+departure cancellation, a horde-floor wipe and reset. <code>revive_run.sh</code> lets an actual
+enemy down a teammate, interrupts one hold, completes a second and compares the
+whole world across host/client/observer. Native tests additionally cover horde/boss
+precedence, ghost reaping, all parts and an authority checkpoint during departure.</p>
+<p>The <span class="local-reference" title="docs/replay/results/gauntlet-finale-2026-09-06/README.md · available in the repository">gauntlet gate</span>
+uses base four and all three five-second rests. It checks saved deadlines, thirteen
+spawns and one clear award per player, then compares a world at or after every
+participant&#39;s completion receipt. Its controlled team/support setup differs from
+the original solo act. It now continues into the original two-barrel chain finale
+through <a href="development.html">admitted development actions</a>, requiring two blasts from
+one shot and no extra clear awards. Original solo/difficulty/feel parity and a
+matched performance comparison remain separate requirements.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="shop.html"><span>The counter</span><span aria-hidden="true">→</span></a><a href="profiles.html"><span>Local co-op profiles</span><span aria-hidden="true">→</span></a><a href="workbench.html"><span>Editor workbench</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/run.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/run.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

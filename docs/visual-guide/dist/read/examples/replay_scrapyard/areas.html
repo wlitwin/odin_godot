@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Area effects and buff bursts · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Area effects and buff bursts</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/areas.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Novas, reaction/lob-impact flashes and grenade blasts now use filled 24-point
+discs at depth 8, with their existing radius and payload RGB. Nova base alpha is
+0.5; reaction/blast base alpha is 0.45. Over the displayed flash lifetime they
+expand from 0.92 to 1.06 times the radius while fading to zero. Late observations
+start partway through that curve, and expiration/correction removes the view.</p>
+<p>The original uses a 0.28-second local announcement clock. Replay retains its
+existing 17-tick flash lifetime (about 0.283 seconds at 60 Hz), deriving progress
+from displayed state. Nova and reaction discs use observed state; grenade blasts
+retain predicted local / observed remote selection. Separate bounded banks keep
+those worlds&#39; lifetimes independent. This is presentation metadata only: the
+simulation&#39;s flash, action/event, content and checkpoint formats are unchanged.</p>
+<p>Standing zones are filled 24-point discs, radius from their catalog row and alpha
+0.22. Payload RGB is used when its tint is visible; otherwise the original ember
+fallback applies. They keep their scale, position and alpha until the simulated
+zone expires. The effective depth is 2, matching the original zone parent&#39;s depth
+1 plus its disc child&#39;s depth 1. Late join and migration display an existing zone
+without a separate launch event.</p>
+<p>Buffs emit the original warm 12-particle, 0.4-second burst at the wearer recorded
+in the cast flash. A forward-observation tracker produces it once per new cast;
+initial observations, epoch/run/floor replacement and rewind/replay stay silent.
+It retains its highest observed tick so rewinding cannot replay an old burst.
+Existing view-reset/floor/epoch cleanup retires the particles. A flash entirely
+missed between displayed observations produces no invented historical burst.
+The existing bounded feedback pool owns and retires the emitter.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/area_view_run.sh
+REPLAY_PREBUILT=1 RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
+  RSY_AREA_CAPTURE=/absolute/existing/output/directory \
+  GODOT=/path/to/Godot bash examples/replay_scrapyard/area_view_run.sh</code></pre></div><p>The native fixture checks nova radius/color/expansion/fade, a zone&#39;s constant fill
+through its last ticks and removal, and buff wearer/particle configuration,
+single emission and cleanup, plus the disc from a slime landing. Browser acceptance records the corresponding nodes
+on all three peers. Migration checks the restored filled zone on the promoted
+host, alongside the existing restored-lob and continued-combat requirements.</p>
+<p><a href="cast_paths.html">Cast paths</a> now cover cone tongues and recorded spread bolts.
+Remaining impact details, broader devices,
+audio listening and paired timing/feel evaluation remain work. See <span class="local-reference" title="docs/replay/results/scrapyard-areas-2026-09-08/README.md · available in the repository">evidence</span>
+and the <a href="roadmap.html">port ledger</a>.</p>
+<p>The renderer now uses immutable ArrayMesh instances for procedural polygons.
+Color/alpha use instance self modulation; arcs reuse one unit polygon and an affine
+basis that preserves the existing kink, width and recorded endpoints. Node pools,
+visibility, lifetimes and simulation formats remain unchanged. This avoids the
+stock web renderer&#39;s Polygon2D index-update path, including during viewport resize.
+See the <span class="local-reference" title="docs/replay/results/immutable-polygons-2026-09-13/README.md · available in the repository">rendering audit</span>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="roadmap.html"><span>Scrapyard port ledger</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/areas.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/areas.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

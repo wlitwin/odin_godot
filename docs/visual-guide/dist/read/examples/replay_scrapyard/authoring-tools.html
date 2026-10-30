@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Adding and evolving a Replay feature · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Adding and evolving a Replay feature</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/authoring-tools.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#register-an-enemy">Register an enemy</a><a href="#bake-content-once">Bake content once</a><a href="#freeze-before-changing-a-contract">Freeze before changing a contract</a><a href="#exercise-the-feature">Exercise the feature</a><a href="#costs-and-scope">Costs and scope</a><a href="#current-adapter-declarations">Current adapter declarations</a></nav></details>
+<article class="reading-body "><p>Scrapyard is the canonical example for these optional Replay helpers. The Godot
+editor owns composition and local appearance; Odin value types own gameplay state,
+decisions and configuration. Stormcaller exercises all four parts of the workflow. The
+<a href="../../replay/godot/scene/adapter-bindings.html">typed adapter layer</a> now owns binding
+configuration, asset lifetimes, view traversal and contextual diagnostics.</p>
+<h2 id="register-an-enemy">Register an enemy<a class="heading-anchor" href="#register-an-enemy" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Create a <code>MobDef</code> under <code>data/mobs</code>, with a stable ID within <code>MAX_MOBS</code>. Add
+nested gameplay Resources such as <code>PulseDef</code> there; the shared extractor checks
+ranges and copies their values. Implement new behavior in the pure reducer.</li>
+<li>Create a style under <code>visuals/enemies</code> and compose a scene implementing
+<code>ScrapEnemyView</code>. Edit child geometry, animation and effects normally in Godot.</li>
+<li>Add a <code>ScrapEnemyArchetype</code> Resource under <code>archetypes/enemies</code>, referencing that
+definition, scene and style. The definition supplies its gameplay ID.</li>
+<li>Preview the scene with its single exported <code>appearance</code>, then exercise real
+gameplay in the workbench. No new enemy-view field or skin-array mapping is needed.</li>
+</ol>
+<p>The loader checks every catalog ID has a registration, rejects duplicates and
+invalid scene/style references, and retains the assets for the view owner&#39;s
+lifetime. The adapter selects by copied display ID; the view remains concerned
+with one enemy. New IDs still require deliberate gameplay/version decisions.
+<a href="../../replay/godot/scene/archetypes.html">Framework API and bounds</a>.</p>
+<h2 id="bake-content-once">Bake content once<a class="heading-anchor" href="#bake-content-once" aria-label="Link to this section">#</a></h2>
+<p>Interactive <code>content_load</code> and <code>dev/export_content.tscn</code> call the same
+<code>scripts/content.odin</code> extractor. After building/importing the current project:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">GODOT=/path/to/godot python3 examples/replay_scrapyard/tools/stock.py \
+  --project /absolute/path/to/built/project
+python3 examples/replay_scrapyard/tools/stock.py --check</code></pre></div><p>Check in <code>shared/content/stock.rpldef</code> and <code>stock.manifest.json</code> together. Headless
+servers/tests decode this artifact; there is no second gameplay-value parser.
+Godot remains required to rebake authored Resources, while <code>--check</code> only needs
+Python. The manifest covers nested data Resources, definition scripts, the
+extractor/exporter and catalog declarations. Cosmetic scenes/styles do not change
+this gameplay artifact.</p>
+<p>The command compares project sources, checks generated binding guards, and requires
+the running compiled exporter/catalog hashes to match. Resource-only edits can be
+rebaked directly; extractor/type edits need a rebuilt library. Export goes to a
+temporary file and must pass before replacing either committed file. An interruption
+between the two replacements leaves a pair that <code>--check</code> rejects. Invalid content
+never replaces the last valid pair. Source hashes/checksums are build consistency
+checks, not a trust or authentication mechanism.</p>
+<p>World receives a copied catalog. Editing a Resource after admission cannot alter
+live gameplay. The host&#39;s catalog still travels in snapshots/checkpoints. Reopening
+a run admits a new value; changing schemas or rules still needs version policy.</p>
+<h2 id="freeze-before-changing-a-contract">Freeze before changing a contract<a class="heading-anchor" href="#freeze-before-changing-a-contract" aria-label="Link to this section">#</a></h2>
+<p><code>replay/evolution.freeze</code> creates self-contained old value declarations;
+<code>contract</code> creates a reviewable canonical manifest. <code>scaffold</code> lists additive
+fields and refuses to convert until their defaults are explicitly reviewed.
+Changed/removed fields require authored mapping code. The tools do not infer
+historical reducer compatibility.</p>
+<p>Scrapyard&#39;s actual old codec uses <code>shared/revisions/content49/catalog.odin</code>, with
+no live type dependencies. The content49→50 converter explicitly supplies zero
+pulse defaults and copies all prior canonical leaf bytes. Tests verify each prior
+leaf, assert the zero defaults and decode a real old checkpoint. Use
+<code>tools/revision</code> to produce a separate review directory; keep old reducers and
+fixtures with their declared contracts. <a href="../../replay/evolution/README.html">API and limits</a>.</p>
+<h2 id="exercise-the-feature">Exercise the feature<a class="heading-anchor" href="#exercise-the-feature" aria-label="Link to this section">#</a></h2>
+<p>Use <code>replay/testing.correction</code> to compare predicted input followed by late
+correction against an uninterrupted reference, including events. Use <code>takeover</code>
+to roundtrip a checkpoint, change authority epoch, continue, audit and compare.
+Assert feature-specific state in the returned before/after frames.</p>
+<p>Stormcaller tests remaining charge time, one hit, a late escape, death interruption
+and old-save conversion. Its native/WASM corpus uses the same takeover helper.
+The peer runner supplies bounded process/log ownership while the game&#39;s real-peer
+script checks warnings, damage/dodge and convergence under configured latency.
+<a href="../../replay/testing/README.html">Harness contracts</a>.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_AUTHORING_OUT=/absolute/fresh/results \
+  nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authoring/run.sh</code></pre></div><p>This runs focused definition/schema/evolution/scenario checks, native/WASM feature
+comparison, authored scenes/negative registrations, canonical export rejection and
+real peers. It is not a full parity campaign across every game.</p>
+<h2 id="costs-and-scope">Costs and scope<a class="heading-anchor" href="#costs-and-scope" aria-label="Link to this section">#</a></h2>
+<p>Measured native optimized stock loading is about 1.7 ms per call on the development
+machine, versus roughly 0.25 µs for the old literal table. It compiles a schema and
+validates/decodes on each cold load: about 449 KiB peak tracked allocation and
+1.04 MiB cumulative allocation, with zero retained allocations. Avoid <code>stock()</code> in
+tick/frame loops. Long-lived content users can keep their own compiled Store/schema.</p>
+<p>The scene pool uses 257,152 bytes of Odin buffer payload versus 24,576 for the
+previous single-scene pool at capacity 64, ID limit 8 and seven registrations:
+232,576 bytes extra (about 227 KiB), excluding allocator overhead and Godot assets.
+It also partitions display items by kind each presentation. We have not established
+a frame-time improvement. Its purpose is authored variation and reliable ownership;
+the single-scene and specialized rendering APIs remain available.</p>
+<p>The takeover corpus still hashes to <code>8825198089392801664</code> on native and executed
+WASM. Its peak is 88,527,978 tracked bytes and cumulative allocation 197,797,441,
+with zero live allocations at completion. Allocation totals include testing and
+cold loading; they are not steady-state simulation costs.</p>
+<p><span class="local-reference" title="docs/replay/results/authoring-tools-2026-09-20/README.md · available in the repository">Exact receipts and limits</span>.
+Kit, the sibling original game, gameplay rules and network/content versions are
+unchanged by these tools.</p>
+<h2 id="current-adapter-declarations">Current adapter declarations<a class="heading-anchor" href="#current-adapter-declarations" aria-label="Link to this section">#</a></h2>
+<p>The enemy script declares its display field and typed hooks once:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:replay_view value=value,present=enemy_view_present,validate=enemy_view_validate,retired=enemy_view_retire,appearance=skin,configure=enemy_view_configure</span></code></pre></div><p>Scriptgen produces <code>scrap_enemy_view_replay_binding()</code>. The game initializes
+<code>Script_Archetypes</code> with that descriptor, a catalog and an explicit kind selector.
+The owner retains the required assets and callback configuration; the candidate
+registry can close immediately. Presentation and notice traversal need no raw
+callback casts or access to pool/index internals.</p>
+<p>Runner uses the simpler declaration without appearance/configure:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:replay_view value=value,present=runner_view_present,validate=runner_view_validate</span></code></pre></div><p>Its generated <code>Script_View</code> descriptor binds the four permanent runner scenes.
+Body generations, warps and epochs still reset cues inside each runner script;
+they do not respawn its node. Enemy view scope explicitly includes run/floor and
+observed rewind policy through <code>Scope_Tracker</code>. Sampling and feedback policies
+remain visible game code.</p>
+<p>Both views use typed <code>onready</code> component fields. Enemy F6 scenes supply a
+<code>ScrapEnemyPreview</code> Resource that references a definition and sample attack state;
+there is no preview-kind switch. The sample is baked at scene startup using the
+same <code>defs.bake_mob</code> function as gameplay/export. Use the isolated preview
+refresh controls to admit saved gameplay data; see <a href="editor-workflow.html">the editor workflow</a>. Generic Resource batches and checked access/narrowing
+helpers simplify that explicit mapping; codegen does not infer it from Inspector
+hints or generate a second extractor.</p>
+<p><span class="local-reference" title="docs/replay/results/adapter-2026-09-21/README.md · available in the repository">Adapter acceptance</span> records
+codegen regression, component/ownership checks, independent ID-7 preview,
+native/WASM equality, real revive peers and host-crash takeover.</p>
+<p>The <a href="editor-workflow.html">Replay editor dock and ability workbench</a> now expose
+validation, baking, current/stale status, Resource references, draft scaffolding,
+reproduction verification and scenario jobs through Godot.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/godot/scene/adapter-bindings.html"><span>Typed scene adapters</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/scene/archetypes.html"><span>Typed authored archetypes</span><span aria-hidden="true">→</span></a><a href="../../replay/evolution/README.html"><span>Revision contracts and explicit conversion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/authoring-tools.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#register-an-enemy" class="">Register an enemy</a><a href="#bake-content-once" class="">Bake content once</a><a href="#freeze-before-changing-a-contract" class="">Freeze before changing a contract</a><a href="#exercise-the-feature" class="">Exercise the feature</a><a href="#costs-and-scope" class="">Costs and scope</a><a href="#current-adapter-declarations" class="">Current adapter declarations</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/authoring-tools.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

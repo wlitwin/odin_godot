@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay authority decisions and leases · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay authority decisions and leases</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#decision-model">Decision model</a><a href="#durable-store-and-coordinator-restart">Durable store and coordinator restart</a><a href="#clock-and-reply-contract">Clock and reply contract</a><a href="#runner-enforcement">Runner enforcement</a><a href="#validation-and-remaining-integration">Validation and remaining integration</a></nav></details>
+<article class="reading-body "><p>This package supplies the coordinator state machine, correlated leases, and owned
+takeover preparation for M5. The network runner now enforces the resulting permit
+at gameplay boundaries. An authenticated coordinator service and SQLite durable
+store now have native and real-process gates. The <a href="../godot/room.html">Room driver</a>
+now passes initial planned/crash migration gates with surviving Cavecrawl clients;
+the full M5 failure matrix and provisioning flow remain open.
+See <a href="service.html">service and storage</a> for the new API and deployment contract.
+The <a href="../provision/README.html">admission backend</a> now provides durable invite/join
+transactions and live service credential installation; public provisioning remains open.</p>
+<h2 id="decision-model">Decision model<a class="heading-anchor" href="#decision-model" aria-label="Link to this section">#</a></h2>
+<p>The coordinator governs one room/content contract. A trusted admission service
+provisions <code>Member</code> records: stable member ID, process incarnation, endpoint, and
+permission to receive authority data/host. Cooperative rooms may nominate trusted
+players; dedicated rooms require the infrastructure flag as well. A peer cannot
+register or promote itself through an unauthenticated call.</p>
+<p><code>coordinator_start</code> grants the configured bootstrap member epoch 1.
+<code>coordinator_renew</code> requires the same owner/incarnation and epoch, a still-live
+lease, a newer request sequence, and a nondecreasing known authority tick.
+Replaying a renewal request does not extend its expiry. An expired owner must use
+the recovery protocol; it cannot revive the expired epoch with another renewal.</p>
+<p>The current owner nominates a successor and the gameplay connection binding used
+for its checkpoint. The successor makes an owned <code>Prepared</code> copy of an exact
+validated archive, then reports that point with <code>coordinator_prepare</code>. Claiming
+requires that exact point and identity, continued eligibility, and the configured
+limit on rollback from the coordinator&#39;s <strong>last known</strong> authority tick. This is not
+an upper bound on unobserved work after the last heartbeat.</p>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-51868fe8a50f98.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-51868fe8a50f98.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-51868fe8a50f98.svg" alt="System diagram: Replay authority decisions and leases" loading="lazy"></figure><p>Planned release is permitted before the old deadline only after the old process
+irreversibly retires its local <code>Lease</code>. The resulting <code>Retirement</code> identifies the
+owner, room, epoch, and observed revision. It is authenticated caller data, not a
+cryptographic certificate. <code>coordinator_release</code> also requires the exact prepared
+final checkpoint, at least as recent as the last recorded authority tick. Once
+released, the old lease cannot be reactivated by a delayed reply. Abrupt claims
+wait for expiry. Each successful claim increments the epoch and records the
+recovery point and kind. Competing/old-owner claims and stale incarnations fail.</p>
+<h2 id="durable-store-and-coordinator-restart">Durable store and coordinator restart<a class="heading-anchor" href="#durable-store-and-coordinator-restart" aria-label="Link to this section">#</a></h2>
+<p>Every mutation calls <code>Commit(user, expected_revision, next_record)</code> before changing
+the active record or exposing a grant. The backend must atomically compare the
+revision and durably store the complete next record. A failure poisons that
+coordinator instance and suppresses further grants/views. Model tests use an
+in-memory CAS ledger; the separate SQLite adapter has transaction/restart gates.</p>
+<p>Initialization also commits a new coordinator generation/revision, invalidating
+an earlier instance&#39;s subsequent CAS writes. When reopening a record that has
+issued an epoch, the new coordinator does not reuse its predecessor&#39;s absolute
+clock deadline. It quarantines for:</p>
+<p><code>ceil(lease_ms × (1 + drift) / (1 - drift)) + margin_ms</code></p>
+<p>before permitting a claim. This outlasts the previous possible lease even with
+opposite clock-rate errors. The persisted epoch floor is preserved. This requires
+one authoritative, linearizable durable store; independent writable copies of a
+room&#39;s store are not a supported coordination topology. Do not reset the record
+or reuse a room ID to bypass unavailable storage or the quarantine.</p>
+<p>Coordinator loss therefore stops authority after existing leases expire. A
+partition cannot independently elect a host through this profile. The coordinator
+reachable side may recover after the old lease expires; isolated participants
+freeze and later replace their state from the approved authority. Divergent
+inventories are never merged. A quorum-based decentralized profile remains separate
+work for deployments that cannot use a decision service.</p>
+<h2 id="clock-and-reply-contract">Clock and reply contract<a class="heading-anchor" href="#clock-and-reply-contract" aria-label="Link to this section">#</a></h2>
+<p><code>Lease</code> records the local time and sequence <strong>before</strong> sending a request. Only one
+request is outstanding; retransmission uses that original sequence/time. A valid,
+authenticated reply contains relative remaining duration, rather than a foreign
+machine&#39;s absolute deadline. With maximum clock-rate error <code>d</code>, the local deadline is:</p>
+<p><code>request_start + floor(remaining_ms × (1 - d) / (1 + d)) - margin_ms</code></p>
+<p>The larger of the local and coordinator drift bounds is used. Because the request
+starts before the coordinator processes it, this expires conservatively even
+without synchronized clock origins and with delayed replies. Expired replies,
+old revisions/epochs, clock reversal, and unavailable clocks cannot revive a lease.
+The default bound is 1,000 ppm with a 20 ms margin; it is a deployment assumption,
+not a measured guarantee for arbitrary clocks or virtual machines.</p>
+<p>Read current clock time for every permit check. It must advance during sleep and
+process suspension. Native adapters use
+<a href="https://developer.apple.com/documentation/kernel/1646199-mach_continuous_time" rel="noreferrer">Apple&#39;s mach_continuous_time</a>,
+<a href="https://man7.org/linux/man-pages/man3/clock_gettime.3.html" rel="noreferrer">Linux CLOCK_BOOTTIME</a>, and
+<a href="https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps" rel="noreferrer">Windows QueryPerformanceCounter</a>.
+Godot&#39;s normal tick clock being monotonic alone is insufficient evidence that it
+includes system sleep. Unsupported targets return an unavailable native clock;
+browser lease support requires a verified embedding clock. Mac native execution
+and Linux/Windows/WASM type-checks pass; actual Linux/Windows suspend behavior has
+not been exercised by this repository&#39;s gate.</p>
+<h2 id="runner-enforcement">Runner enforcement<a class="heading-anchor" href="#runner-enforcement" aria-label="Link to this section">#</a></h2>
+<p>Set <code>Config.require_permit=true</code> and provide <code>Permit</code> at server/client initialization.
+<code>lease_permit</code> supplies it from a live <code>Lease</code>; an authority lease additionally
+requires that the view&#39;s owner match this process&#39;s identity. An observer/client
+lease tracks the currently approved epoch without granting itself authority.</p>
+<p>The runner checks before accepting local gameplay, pumping gameplay packets,
+predicting/advancing ticks, and issuing gameplay sends. <code>Timeline.advance</code> also
+checks an optional <code>Commit_Gate</code> after simulation but <strong>before</strong> publishing the
+candidate. Rejection preserves the entire history ring, including its oldest slot,
+and the action frontier. Client prediction also restores its action&#39;s pending flag.
+This is deliberately not an advance-then-rewind workaround, which would already
+have overwritten the oldest frame when the ring is full.</p>
+<p><code>net.Error.Fenced</code> is an expected pause. Godot <code>Session</code> exposes <code>session.fenced</code>,
+stops ticking and clears clock backlog, and allows the application to keep its
+coordinator/recovery UI running. Permit checks must read a fresh clock, not a value
+cached at frame start. Packets accepted by a transport before expiry may arrive
+later; the approved new epoch fences them at the new authority/client context.
+External persistent effects still need resource-side epoch/idempotency enforcement;
+the future outbox is not implemented here. This profile assumes cooperative
+participants and authenticated coordinator calls, not Byzantine host resistance.</p>
+<p><code>Prepared</code> owns canonical archive bytes independently of the receiver&#39;s recyclable
+slots. <code>prepared_restore</code> requires a live owner lease whose recovery point exactly
+matches them, verifies the bytes, and restores a fresh server with the permit and
+new epoch. The caller provides the selected game seat/policy adapter; a future
+session driver will map the authenticated member to its stable game token/seat.</p>
+<p>Requiring permits is part of the handshake contract and survives checkpoints.
+The current experimental network protocol is <strong>5</strong>, archive format <strong>3</strong>, control
+RPC <strong>2</strong>, and decision record <strong>3</strong>. Earlier Replay archives are rejected; no automatic converter is
+claimed. Original Kit saves/projects are unaffected.</p>
+<h2 id="validation-and-remaining-integration">Validation and remaining integration<a class="heading-anchor" href="#validation-and-remaining-integration" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_godot/run.sh</code></pre></div><p>Twenty-four native tests cover partition timing, planned retirement, storage failure,
+restart quarantine/CAS fencing, late replies, renewal replay, adverse clock drift,
+eligibility/incarnations, known rollback limits, consecutive migrations, old-host
+return, durable-record codecs, native time, expiry during server/client simulation,
+history retention, and owned-checkpoint restoration under the exact grant. The
+prepared restore test transfers a real archive over the memory transport before
+destroying the receiver and changing authority. It is not a real-process takeover.</p>
+<p>The Godot gate uses the native clock to run and then fence the actual cave model;
+it verifies the head stays fixed and renewal after expiry is denied. It uses an
+in-process coordinator and test ledger. Separate Room gates now route approved
+endpoints/epochs into live Cavecrawl sessions and reconcile surviving clients during
+planned/crash takeover. Those initial gates do not complete the full M5 matrix.</p>
+<p><a href="moderation.html">Durable member removal</a> is an optional authenticated operation
+for the current live authority. It atomically disables the member and invalidates
+its prepared succession right without changing existing RPC schemas.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="service.html"><span>Authenticated authority service and durable storage</span><span aria-hidden="true">→</span></a><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#decision-model" class="">Decision model</a><a href="#durable-store-and-coordinator-restart" class="">Durable store and coordinator restart</a><a href="#clock-and-reply-contract" class="">Clock and reply contract</a><a href="#runner-enforcement" class="">Runner enforcement</a><a href="#validation-and-remaining-integration" class="">Validation and remaining integration</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

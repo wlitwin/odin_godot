@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Compact scheduled-input windows · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Compact scheduled-input windows</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/input_codec.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Protocol 7 adds envelope kind 15, <code>Inputs_Compact</code>. It carries the same generation,
+checkpoint serial, ordered ticks, controls and view stamps as the full kind-4
+packet. The sender keeps the same eight-sample redundancy window and sends at the
+same cadence. Every packet contains its own first sample, so dropping or reordering
+other packets cannot remove a decoding baseline. Latest-observation timing remains a separate mode. Its optional
+<a href="observations.html">packet-local sparse encoding</a> retains the full kind-14 fallback.</p>
+<p>The body begins with <code>generation:u64</code>, <code>serial:u64</code>, <code>count:u8</code>, all little-endian.
+Count is 1–8. Each record begins with a flags byte:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Bit</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>Tick equals the previous record&#39;s tick plus one; omit its eight bytes</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Canonical control bytes equal the previous record&#39;s; omit them</td>
+</tr>
+<tr>
+<td>2</td>
+<td>View stamp equals the previous record&#39;s; omit it</td>
+</tr>
+<tr>
+<td>3</td>
+<td>View stamp uses the byte-difference form below</td>
+</tr>
+</tbody></table>
+</div><p>The first flags byte must be zero. Bits 2 and 3 are mutually exclusive; higher
+bits are reserved. Fields not omitted follow in tick, control, view order. Controls
+use their ordinary canonical schema. The view is the existing 35-byte canonical
+stamp, including both IDs, ticks, fraction and validity flag.</p>
+<p>A view difference starts with five bitmap bytes, low bit first. Each set bit
+selects one of the 35 view bytes, followed in index order by its nonzero XOR byte.
+The five unused high bits must be zero. A difference must change at least one byte.
+The sender chooses it only when the bitmap and changes are smaller than a full
+view. Control equality uses canonical bytes, preserving distinctions such as the
+bit patterns of signed zero. If compact framing would not save space, the sender
+uses the full input packet; both forms are accepted by protocol-7 receivers.</p>
+<p>Decode is bounded and transactional. Truncation, trailing bytes, reserved flags,
+invalid reuse, tick overflow, bitmap overflow and invalid canonical values reject
+the packet. The server then performs the same connection/seat, generation/serial,
+control-language, order, future-window and view-provenance checks as for full input.
+It validates the entire window before admitting any tick. First accepted input
+for a tick still wins, and actions retain their separate reliable/deduplicated path.</p>
+<p>The extra sender scratch buffer holds one canonical input packet; it is allocated
+at client initialization and freed at destruction. Per-packet encoding and decoding
+allocate no memory. The full packet&#39;s schema fingerprint remains the envelope&#39;s
+logical schema identity; the protocol version specifies the compact framing.</p>
+<p>Tests compare compact/full admission, decode a packet without earlier input
+deliveries, check duplicate delivery, preserve view provenance, and reject malformed
+headers/records and a late invalid control without partial admission. The broader
+network fault suite exercises loss, reordering, duplication and resync.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="observations.html"><span>Compact latest observations</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/input_codec.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/input_codec.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Room admission and private coordinator storage · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Room admission and private coordinator storage</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/provision/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#api-and-ownership">API and ownership</a><a href="#invite-and-retry-rules">Invite and retry rules</a><a href="#client-handoff">Client handoff</a><a href="#storage-and-compatibility">Storage and compatibility</a><a href="#verification">Verification</a></nav></details>
+<article class="reading-body "><p><code>replay/provision</code> supplies the server-side create/invite/join state machine for
+an authority-controlled room. <code>Room</code> owns an existing <code>authority.Service</code>; its
+durable <code>Bundle</code> contains the authority record, member credentials, enrollment
+retry records and invite consumption. Every change uses the same revision CAS.
+This closes the previous gap between durable membership and separately configured
+service keys. The game simulation and host-migration protocol are unchanged.</p>
+<p>The SQLite store also provides <a href="checkpoints.html">durable room checkpoint publication</a>
+with separate revision CAS, typed validation and atomic metadata/bytes. The
+<a href="checkpoint/README.html">authenticated transfer endpoints</a> have native TLS restart
+acceptance. The standalone service now registers the three compiled game models;
+Room/Party owns publication and authenticated cold restore with native/browser
+acceptance. Game models/dependencies must still opt into the typed service contract;
+see <a href="../godot/room_restore.html">published restore</a>.</p>
+<p>The <a href="protocol.html">create/join protocol and Godot connection</a> now expose this
+backend through a bounded room hub and verified TLS. Native create/join/restart
+acceptance passes on loopback. The <a href="enrollment.html">client journal</a> adds durable
+native/browser enrollment. Shared Party menus and Room recovery are integrated into
+multiple example games. Public deployment, human accounts, global room discovery
+and room retirement remain separate product/deployment work. Tests use isolated
+provisioning and profile data; these local gates are not public reachability claims.</p>
+<h2 id="api-and-ownership">API and ownership<a class="heading-anchor" href="#api-and-ownership" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> provision <span class="hljs-string">&quot;godot:replay/provision&quot;</span>
+<span class="hljs-keyword">import</span> storage <span class="hljs-string">&quot;godot:replay/provision/sqlite&quot;</span>
+
+<span class="hljs-comment">// Server setup: private path, stable room ID and deployment-selected content/policy.</span>
+<span class="hljs-comment">// Keep these owners at stable addresses; call provision.close before storage.close.</span>
+store: storage.Store
+room: provision.Room
+
+<span class="hljs-comment">// For creation only, the creator has generated and retained a fresh Secret.</span>
+<span class="hljs-comment">// Check errors at every boundary. An existing room must be loaded, not recreated.</span>
+bundle, make_error := provision.make_room(room_id, content_id, creator_claim, endpoint)
+open_error := provision.open(&amp;room, bundle, storage.commit, &amp;store, authority_clock, control_wire)
+
+<span class="hljs-comment">// Only return credentials after successful durable creation/admission.</span>
+creator, creator_error := provision.creator_grant(&amp;room, creator_claim)
+ticket, invite_error := provision.invite(&amp;room, creator_claim, invite_secret, .Player)
+guest, join_error := provision.join(&amp;room, ticket, guest_claim, guest_endpoint)
+
+<span class="hljs-comment">// Existing authority RPC and rendezvous code use this same live service.</span>
+authority.service_pump(&amp;room.service)</code></pre></div><p>The abbreviated example assumes <code>storage.open</code> has succeeded and that room lookup
+has established absence. On restart, call <code>storage.load</code> and pass its complete
+bundle to <code>provision.open</code>; do not rebuild a bundle from gameplay archives. The
+authority service advances its persisted coordinator generation and applies the
+existing lease quarantine. A second owner fences the first owner&#39;s subsequent CAS
+writes. Calls on one owner are serialized, including packet delivery.</p>
+<p>Room IDs and allowed content/policies are the hosting application&#39;s responsibility.
+A create client must retain the same requested room ID and creator claim across
+retries. The hub atomically resolves competing creates and returns existing grants
+only after verifying the creator claim and original endpoint/content. Corrupt
+records are never interpreted as absent rooms. The backend does not allocate
+global room IDs or keep an unbounded map of rooms.</p>
+<p><code>provision.secret()</code> obtains 32 cryptographic random bytes on supported native
+targets. An explicit <code>Entropy</code> callback supports other runtimes and deterministic
+tests; it must provide cryptographic entropy in deployment. Unsupported runtime
+entropy, zero values and generated credential collisions fail. No pseudo-random
+fallback is provided. Generate the creator claim, invite secret and each enrollment
+claim independently, before submitting their corresponding request.</p>
+<h2 id="invite-and-retry-rules">Invite and retry rules<a class="heading-anchor" href="#invite-and-retry-rules" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><code>.Player</code> grants membership and its control/gameplay credentials. It grants no
+authority-backup or hosting permission. This role does not choose a gameplay
+seat or restrict the game&#39;s own spectator admission policy.</li>
+<li><code>.Trusted_Peer</code> explicitly grants co-op hosting and permission to receive complete
+authority backups. It is refused for dedicated rooms; infrastructure enrollment
+needs trusted deployment administration.</li>
+<li>The creator claim authorizes invite issue/revocation. Creator administration is
+separate from the current gameplay host and does not move on host migration.
+Disabling the creator member also disables its invite administration.</li>
+<li>An invite has a fixed role and finite use limit. Repeating its issuance with
+the same secret and parameters returns the same ticket. Changed parameters or
+a revoked ticket are refused. Exhaustion never refills the invite.</li>
+<li>Join retries must present the same ticket, enrollment claim and original
+endpoint. A committed retry returns the same control key and stable game token,
+plus the member&#39;s current incarnation. It consumes no further use and performs
+no write. Changed payloads and disabled members are refused.</li>
+<li>Revoking a ticket prevents new enrollment. It does not ban previously enrolled
+members or prevent them from recovering a lost successful response. Trusted
+membership administration still uses <code>authority.coordinator_member</code> through
+<code>room.service.coordinator</code>; its commit is routed into the same private bundle.</li>
+<li>Process Challenge/Rebind can update an enrolled member&#39;s incarnation/endpoint.
+The original enrollment endpoint remains stored solely to identify exact join
+retries. Ordinary RPCs still require the current bound nonce/incarnation.</li>
+</ul>
+<p>Membership, control key, game token, retry record and invite decrement enter one
+durable transaction. An error publishes no grant and no in-memory partial join.
+A storage failure poisons the running authority: the backend does not guess whether
+the commit reached storage. Reloading in a fresh owner resolves that uncertainty.</p>
+<p>Capacity is currently <strong>16 lifetime member slots and 16 lifetime invite slots per
+room</strong>, with at most 15 uses per invite. Disabled members and revoked/spent invites
+remain tombstones. IDs, credentials and old retry proofs are never recycled into
+new members. Long-lived public rooms will need an explicit bounded retirement and
+credential lifecycle before these limits can be expanded safely.</p>
+<h2 id="client-handoff">Client handoff<a class="heading-anchor" href="#client-handoff" aria-label="Link to this section">#</a></h2>
+<p>An authenticated, confidential provisioning frontend returns only the caller&#39;s
+<code>Grant</code>. Populate the Godot <code>Room_Options.identity</code>, <code>.key</code>, <code>.room</code>, and
+<code>.session.token</code> from that grant; require <code>.session.network.content</code> to match its
+content. The creator is the room&#39;s bootstrap member (stable member ID 1). Keep
+<code>provisioned_incarnation=false</code> so a newly opened game process goes through the
+existing challenged registration flow. The grant is a membership credential, not
+a live authority lease. Do not use its host permission as a substitute for the
+coordinator&#39;s current grant.</p>
+<p>Control/gameplay endpoints and ENet/WebSocket/RTC connection settings remain
+deployment inputs. Client credentials need private durable storage before users
+can rely on fresh-process reconnect. Enrollment secrets must not appear in URLs,
+logs or public rosters. Providing the backend over a plain public socket does not
+provide the confidentiality that credential issuance requires.</p>
+<h2 id="storage-and-compatibility">Storage and compatibility<a class="heading-anchor" href="#storage-and-compatibility" aria-label="Link to this section">#</a></h2>
+<p><code>replay/provision/sqlite</code> is native macOS/Linux storage. It reuses the authority
+store&#39;s checked WAL/FULL/fullfsync connection settings and writes a distinct
+<code>replay_provision</code> table. Compare/read/write happens within <code>BEGIN IMMEDIATE</code>.
+New files are exclusively created with mode 0600. Existing files with group/other
+permissions, symlinks and non-regular files are refused without changing them.
+The caller must supply a private directory and protect SQLite sidecars/backups;
+the bundle is plaintext at rest. Missing-file creation is explicit. Existing
+corrupt records are retained and produce a read error, even when creation is enabled.</p>
+<p>The bundle format is version <strong>1</strong>, canonical kind <code>0x5052</code>, with its authority
+revision in the envelope tick and game content ID in the content field. It contains
+decision record version 3. The gameplay protocol (7), checkpoint (4) and authority
+RPC (2) are unchanged. Older authority-only database rows cannot be upgraded
+without a trusted source for their missing keys and game tokens; no automatic
+import or fallback is attempted.</p>
+<p>The private bundle is never a migration checkpoint. A trusted gameplay successor
+may receive full simulation state but does not receive room administration claims,
+control keys, unused invite capabilities or other members&#39; game tokens.</p>
+<h2 id="verification">Verification<a class="heading-anchor" href="#verification" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_provision/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_provision_sqlite/run.sh</code></pre></div><p>Core tests exercise exact retries, revoked/exhausted invites, disabled/rebound
+members, dedicated policy, entropy failure, capacity, uncertain commits and a
+complete authenticated authority handoff using newly enrolled credentials. The
+package also checks for freestanding WASM; this does not claim browser provisioning.
+SQLite tests cover reopen, another owner&#39;s CAS, read-only storage, corrupt blobs
+and private file modes. Separate process-kill fixtures interrupt a real join before
+and after SQLite commit and verify the corresponding retry behavior in fresh
+processes. See <span class="local-reference" title="docs/replay/results/room-provisioning-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-and-ownership" class="">API and ownership</a><a href="#invite-and-retry-rules" class="">Invite and retry rules</a><a href="#client-handoff" class="">Client handoff</a><a href="#storage-and-compatibility" class="">Storage and compatibility</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

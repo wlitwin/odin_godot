@@ -199,12 +199,12 @@ sequenceDiagram
     Input->>Replay: Mount action with turret handle
     Replay->>Game: Apply action at its assigned tick
     Game->>Game: Check target generation, range and occupancy
-    Game-->>Replay: Accepted or refused; resulting state
+    Game-->>Replay: Accepted or refused, with resulting state
     Replay-->>View: Present predicted/observed turret values
     Player->>Input: Hold fire
     Input->>Replay: Sample fire control
     Replay->>Game: Advance subsequent simulation ticks
-    Game->>Game: Insert shot; spend ammo; remove turret at zero
+    Game->>Game: Insert shot, spend ammo, remove turret at zero
     Replay-->>View: Update or retire the turret view
 ```
 

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Complete run saves · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Complete run saves</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/saves.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#converting-older-replay-runs">Converting older Replay runs</a><a href="#content-50--stormcaller">Content 50 / Stormcaller</a><a href="#content-51--shared-turret">Content 51 / shared turret</a></nav></details>
+<article class="reading-body "><p>Current content 51 adds shared turrets; content 50 added authored pulse attacks and
+content 49 records takeover timer resets in the simulation. Content 48 made rewind history authority-only in ordinary replication; complete saves retain it. Content 47 added receipt-time dash actions. The explicit offline converter
+accepts content 42–50 and retains their pending action IDs/ticks, recorded controls
+and assets. Frozen old action enums prevent the new Dash member from changing the
+source schema. The <a href="controls.html">control contract</a> explains why the legacy dash
+control bit remains available for imported history.</p>
+<p>Browser solo play saves the complete checkpoint-and-image bundle in IndexedDB.
+F5 starts an asynchronous write; <strong>Saving run…</strong> changes to <strong>Run saved.</strong> only
+after the database completion receipt. Resume solo waits for the blob and validates
+identity, content and every image dependency before opening the runner. The
+<code>save_run()</code> browser return value means submission accepted; observe completion
+before treating <code>saved_tick</code>/<code>saved_hash</code> as the new saved point.</p>
+<p>Browser records use the profile namespace and reconnect identity. <code>save_slot</code>
+defaults to <code>run</code>; other slots stay under a separate <code>run/</code> key prefix so they
+cannot collide with profile or spray records. Slots are separate from native
+<code>RSY_SAVE</code> paths. Replacement compares the last observed storage revision. A
+conflict preserves the stored record and previous success receipt. Reload or use
+another slot before deciding to replace competing work; no automatic rebase occurs.</p>
+<p>Resume uses the bundled image even if the user&#39;s separately stored spray
+preference changed afterward. That preference applies to fresh runs; an explicit
+selection can still change a resumed run. This rule also applies on native.</p>
+<p><code>web_save_run.sh</code> uploads image A, saves active zone/lob combat, stores preference B,
+and kills Chrome. It deletes both uploads, checks that a fresh run uses B, then
+checks exact restore with A and new gunfire after the saved lob lands. It repeats
+resume after deleting the separate spray record. Stale-save conflicts, missing
+images, wrong identities and corruption preserve the source save. A slot named
+<code>profile</code> must preserve the profile and default run. The verified browser path is
+solo on local Chrome; Room worlds recover through leases/migration. Browser
+eviction/deletion and the <a href="../../replay/godot/storage/browser_store.html">storage contract</a> apply.</p>
+<p>On native, F5 writes the current uncoordinated solo/host authority checkpoint to
+<code>user://run.replay</code>. The menu&#39;s <strong>Resume solo</strong> opens it with the same local
+identity. A host can explicitly resume a saved co-op run with:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">RSY_ROLE=host RSY_RESUME=1 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh
+<span class="hljs-comment"># For a save created in epoch one, other processes join the resumed epoch two:</span>
+RSY_ROLE=client RSY_EPOCH=2 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh</code></pre></div><p><code>RSY_SAVE</code> overrides the file location. Start a fresh process to resume; this
+does not replace a live Session. Clients reconnect using their original tokens,
+which resolve the saved seats. Uncoordinated clients/observers must be given the
+resumed epoch with <code>RSY_EPOCH</code>; their default is one. Room handles this discovery
+and redirect automatically. This manual co-op resume path still needs integrated
+connection UX. Without a matching local token a player-hosted
+resume fails. A dedicated server may use seat zero. The archive must match current
+content and schema; this experiment does not silently convert old versions.</p>
+<p>The save bundle contains the checkpoint and all PNG payloads referenced by its
+players. The checkpoint contains the entire simulation frame, roster, ownership, admitted
+action frontiers and configured runner state. Zones, airborne deliveries, cooldowns,
+effect credit, pools, history, run timers and progression resume together. The
+installed frame is checked against the decoded frame before simulation advances.
+The new process uses a newer epoch; pending old work follows the standard explicit
+retirement policy. No fresh gameplay event is synthesized merely by loading a frame.</p>
+<p>The file uses the shared bounded codec and staged storage writer. A malformed,
+wrong-identity or wrong-content save fails without replacing the source. Successful
+close/rename is a process-crash boundary; portable power-loss durability is not
+claimed. Saves restore the older world, including its economy, and subsequent local
+profile writes reflect that restored authority. Profiles are local co-op progress,
+not an independently authoritative bank.</p>
+<p>Room sessions use coordinator-approved prepared checkpoints and migration. This
+manual entry point rejects Room archives requiring a permit: a local file does
+not authorize a new leader. Manually restarting an uncoordinated host also requires
+the previous authority to have stopped; use Room for live handoff/partition fencing.</p>
+<p><code>save_run.sh</code> creates active combat, saves, kills the source process, and starts a
+fresh one. It checks the actual installed world hash/tick, epoch and seat, lets the
+saved lob land once, then exercises new gunfire. It also rejects an unrelated token
+and a corrupted archive while preserving the corrupted file. The scenario uses
+the same long-lived combat fixture as the Room test.</p>
+<p><code>save_coop_run.sh</code> saves after both players have used abilities, kills all three
+game processes, restores the host and rejoins fresh client/observer processes.
+It preserves seats/loadouts and the client&#39;s previous cast, permits its next cast,
+continues saved effects and compares the complete world across all peers. The
+fixture supplies the explicit resumed epoch. Faulted/repeated manual save-rejoin,
+connection UX and conversion of older game schemas remain additional acceptance work.</p>
+<p><code>save_assets_run.sh</code> saves a spray supplied by a client, kills all game processes,
+deletes the original PNG and restarts only the host. The host must restore the
+image and placement from the bundle before any peer connects. A fresh observer
+then receives that image, the saved lob lands, new gunfire succeeds and both
+processes compare their complete world. A correctly framed bundle whose checkpoint
+still references a removed image is rejected without modifying the good file.</p>
+<p>The reader also accepts current-compatible plain checkpoint files when no external
+assets are required. Older gameplay/schema versions still need explicit conversion.
+Only current-frame dependencies are bundled: the default resume policy retires
+pending old actions. A different pending-action policy must include their asset
+dependencies too. See the <a href="../../replay/assets/bundles.html">bundle contract</a>.</p>
+<p><span id="converting-a-protocol-6-run"></span></p>
+<h2 id="converting-older-replay-runs">Converting older Replay runs<a class="heading-anchor" href="#converting-older-replay-runs" aria-label="Link to this section">#</a></h2>
+<p>The standalone Odin tool converts protocol-6 or protocol-7 / checkpoint-4 saves
+from Scrapyard content <code>0x5253435241503042</code>, plus protocol-7 contents <code>...3043</code> through <code>...304a</code>,
+into current content <code>...304b</code>. It uses frozen original world/Flash and action/event contracts
+and preserves existing world values and the control schema while updating the
+world, action and timing contracts for Arc paths and receipt-time dash. Content-42 actions receive a
+zeroed development payload. Archived event histories do not exist, so the new
+event detail, wall-contact kind and arc kind change the contract without inventing
+past occurrences or spread hops.
+The converter seeds <code>authority_epoch</code> from the validated checkpoint epoch while preserving the original timer values. Restore installs that exact converted frame; the first committed tick of the new epoch rearms the original takeover timers. See <a href="recovery.html#takeover-timers">succession behavior</a>.</p>
+<p>The normal game loader remains strict. Build and invoke from the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin build examples/replay_scrapyard/tools/upgrade_run \
+  -collection:godot=. -out:/tmp/replay-upgrade-run
+/tmp/replay-upgrade-run /path/to/old-run.replay /path/to/new-run.replay \
+  --identity-file /path/to/replay_identity</code></pre></div><p>Use the filesystem path of this Replay project&#39;s 16-byte <code>replay_identity</code>, not a
+<code>user://</code> URI. For a test save created with <code>RSY_TOKEN</code>, supply <code>--token SAME_LABEL</code>
+instead. The identity must resolve to a playable reservation in the archive.
+Identity verification here prevents accidental selection of another local save;
+local archives are not a secure competitive progression ledger.</p>
+<p>The tool validates the old contract, the full archive and bundle, matching
+container metadata, complete current-frame image dependencies and bounded PNG
+header information. It updates schema/content/protocol/contract stamps, maps any
+pending original actions into the new shape, and rebuilds container checksums.
+Godot performs the full PNG decode during normal resume. The world, roster, action
+sequences/refusal reasons, image bytes, tick and old epoch remain intact. Raw
+checkpoints are supported only when their worlds have no external image dependencies.</p>
+<p>The output path must be new. The tool stages and syncs a complete file in the same
+directory, then publishes it using a hard link that cannot replace an existing
+file or symlink. A failed conversion leaves the source and any existing destination
+untouched. Concurrent writers cannot replace the winner. Filesystems without hard
+links fail explicitly; portable power-loss durability of directory changes is not
+claimed. No interactive confirmation or in-place overwrite mode is needed.</p>
+<p>Resume the output with the same identity and <code>RSY_SAVE=/path/to/new-run.replay</code>.
+Normal resume advances the epoch and applies its existing pending-action retirement
+policy. Stop the old uncoordinated authority before resuming its world.</p>
+<p>The CLI rejects coordinator-permit archives and custom admission policies; use an
+application-owned coordinated upgrade/recovery path for those. It does not convert
+Scrapyard content <code>...3040</code>/<code>...3041</code>, older layouts or other game schemas. It also
+does not edit browser IndexedDB records; browser import/export UX remains separate
+work. See the <a href="../../replay/net/checkpoint_upgrade.html">library conversion contract</a>.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard/upgrade_run.sh</code></pre></div><p>This gate converts genuine older plain/spray saves from retained protocol-6 and
+protocol-7 game binaries, resumes them in fresh Godot processes, checks exact frame
+hashes/ticks and continued combat, and exercises
+corruption, wrong identity/content, missing dependencies, existing destinations,
+symlinks and concurrent publication. The original game and original saves remain
+separate and unchanged.</p>
+<p>See <a href="authority-history.html">authority history</a> for projection, prediction and full-checkpoint guarantees.</p>
+<h2 id="content-50--stormcaller">Content 50 / Stormcaller<a class="heading-anchor" href="#content-50--stormcaller" aria-label="Link to this section">#</a></h2>
+<p>The Stormcaller revision introduced content 50/J. The offline converter also accepts
+content 49/I, freezing its catalog shape and adding disabled zero-valued pulse
+components. Converted runs preserve their catalog; new runs load the current
+Resources. Network protocol 7 is unchanged, but old peers cannot join the new
+content/schema contract. See <a href="stormcaller.html">Stormcaller</a> for the feature and tests.</p>
+<h2 id="content-51--shared-turret">Content 51 / shared turret<a class="heading-anchor" href="#content-51--shared-turret" aria-label="Link to this section">#</a></h2>
+<p>Content 51/K adds the turret pool, authored turret definitions, and targeted
+mount/release actions. Content-50 imports start with no turrets; new configuration
+and action-target fields are zero. Existing catalogs and pending action identities
+remain intact, so this conversion does not inject the new ability into an old run.
+See <a href="shared-turret.html">shared turret</a> for behavior and recovery tests.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../replay/assets/bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/saves.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#converting-older-replay-runs" class="">Converting older Replay runs</a><a href="#content-50--stormcaller" class="">Content 50 / Stormcaller</a><a href="#content-51--shared-turret" class="">Content 51 / shared turret</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/saves.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

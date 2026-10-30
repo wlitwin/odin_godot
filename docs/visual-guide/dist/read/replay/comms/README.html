@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Session communications · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Session communications</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/comms/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#bounds-and-transport">Bounds and transport</a><a href="#recovery-semantics">Recovery semantics</a><a href="#observer-display-names">Observer display names</a></nav></details>
+<article class="reading-body "><p><code>replay/comms</code> supplies bounded host-ordered chat and positional markers outside
+simulation. <code>World</code>, action/event schemas and gameplay checkpoints stay unchanged.
+The Godot adapter uses the existing gameplay connection and recovery router.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> co <span class="hljs-string">&quot;godot:replay/comms&quot;</span>
+<span class="hljs-keyword">import</span> rgd <span class="hljs-string">&quot;godot:replay/godot&quot;</span>
+
+chat: co.Comms <span class="hljs-comment">// keep at a stable address beside Session/Room</span>
+assert(co.init(&amp;chat))
+options := rgd.SESSION_OPTIONS
+assert(rgd.session_comms_enable(&amp;options))
+<span class="hljs-comment">// Open Session/Room using options.</span>
+
+<span class="hljs-comment">// After each Session/Room.frame, including reconnect/fenced frames:</span>
+rgd.session_comms_frame(&amp;chat, &amp;session)
+co.say(&amp;chat, <span class="hljs-string">&quot;found a torch&quot;</span>)
+co.mark(&amp;chat, <span class="hljs-number">1</span>, {<span class="hljs-number">330</span>, <span class="hljs-number">210</span>, <span class="hljs-number">0</span>}) <span class="hljs-comment">// application-defined nonzero tag</span>
+<span class="hljs-keyword">for</span> {
+    marker, found := co.poll_marker(&amp;chat)
+    <span class="hljs-keyword">if</span> !found {<span class="hljs-keyword">break</span>}
+    <span class="hljs-comment">// Present once; expire using the presentation clock.</span>
+}
+<span class="hljs-keyword">for</span> {
+    receipt, found := co.poll_result(&amp;chat)
+    <span class="hljs-keyword">if</span> !found {<span class="hljs-keyword">break</span>}
+    <span class="hljs-comment">// receipt.submission identifies the local submission; value is owned by value.</span>
+    <span class="hljs-comment">// Present failures, and retain/repopulate the original text if desired.</span>
+}
+<span class="hljs-comment">// Render chat.lines[:chat.line_count] when chat.history_serial changes.</span>
+<span class="hljs-comment">// co.destroy(&amp;chat) before releasing its containing owner.</span></code></pre></div><p>The caller&#39;s text and marker positions are copied into value payloads. Text is
+clipped at a UTF-8 rune boundary to 240 bytes. Empty/malformed text and control or
+line-separator characters fail validation. The UI should render plain text; the
+Cavecrawl view explicitly disables BBCode. Each line stores the admitted seat, token hash and optional approved display name
+separately from text. There is no client-supplied speaker field. Display names, permissions and game-specific position checks remain application policy.
+Pass authority-observed <code>[]lobby.Name</code> values to <code>session_comms_frame</code> to stamp
+names at delivery creation. Existing lines keep their original name after a rename;
+changing display metadata does not reset connection retry/acknowledgement state.</p>
+<p>A client sends one numbered request at a time and waits for its result. Retries
+repeat the same request identity. The host stamps the speaker from the current
+admission roster, orders accepted messages, and echoes them to the sender through
+the same delivery path. Duplicate acknowledgements cannot consume a later request.
+Observers can chat but cannot create positional markers. Only the authority can
+call <code>system</code> to publish an unattributed system line.</p>
+<p><code>None</code> from <code>say</code>/<code>mark</code> means queued locally. Drain <code>poll_result</code> for each
+submission and its copied payload; the authority may reject with <code>Rate_Limited</code> or
+<code>Capacity</code>. Unread results retain their reserved submission slots, so they cannot
+be overwritten. <code>last_result</code> / <code>result_serial</code> also summarize the latest outcome. A
+rejected submission is not silently promoted to a delivery. The default limit is
+four messages of burst capacity, refilling at two per second for each sender.
+System lines bypass that per-sender bucket, but still obey queue capacity.</p>
+<h2 id="bounds-and-transport">Bounds and transport<a class="heading-anchor" href="#bounds-and-transport" aria-label="Link to this section">#</a></h2>
+<p>The component retains 64 chat/system lines, eight local submissions, 32 pending
+marker notifications and 128 outgoing deliveries per connection, for at most
+32 connections. Its peer storage is allocated once at initialization. Rendering a
+smaller window of history is a UI choice. Marker overflow is counted explicitly.
+A broadcast reserves capacity at every current recipient before committing to the
+host&#39;s history. A slow recipient can therefore cause new submissions to receive
+<code>Capacity</code>; it cannot silently lose an accepted broadcast from that queue.</p>
+<p>Traffic uses a canonical version-2 communications schema envelope, kind <code>0x434d</code>, current content,
+room, authority epoch and per-recipient connection generation. Source transport
+identity comes from the adapter. The receiver validates all of these, the request
+direction, payload and speaker rules. Checksums detect corruption; they are not
+cryptographic authentication. The authority is trusted to order and stamp messages.</p>
+<p>Comms gets an independent application lane through <code>recovery.link_add_application</code>.
+It can coexist with the original application lane used by Session assets. The
+router&#39;s total budget and gameplay reserve still apply. Version 2 adds stamped names and does not accept version-1 communications packets.
+Enable the same service on participating builds; optional service protocols are not negotiated with older
+builds. Do not attach two consumers to the same route.</p>
+<p>The pure <code>configure</code>/<code>frame</code> API accepts an explicitly authenticated roster. The
+Godot facade derives that roster from live Session connections and checks the
+current permit before pumping. Applications using the pure API must provide the
+same admission, authority and clock discipline. No received message grants state
+ownership, a gameplay action or authority to migrate.</p>
+<h2 id="recovery-semantics">Recovery semantics<a class="heading-anchor" href="#recovery-semantics" aria-label="Link to this section">#</a></h2>
+<p>Local scrollback survives a same-room authority change. A successor starts its new
+epoch&#39;s ordering and catches new connections up from the chat lines it actually
+received. Late joiners receive chat history, not expired marker events. Local
+history deduplicates using increasing <code>(epoch, sequence)</code> identities; reconnect
+never appends older catchup lines after newer lines already displayed. Changing
+room/content clears the local history. Authority epoch regression is rejected.</p>
+<p>A same-connection gameplay resync keeps communications active: it replaces the
+gameplay baseline, not the admitted communications binding. Queued requests,
+reliable deliveries and their sequence frontier survive that resync. A client
+still needs a previously accepted world/generation and any required valid permit.</p>
+<p>Pending local submissions are retired on fencing or scope/connection replacement,
+with <code>Scope_Changed</code> and <code>scope_drops</code> explaining the loss. Already received lines
+remain visible. This is <strong>ephemeral session history</strong>, not a durable messaging
+service: a killed host can lose lines that never reached its successor. Fresh
+process save/resume does not reconstruct chat. Persisting or moderating chat,
+private/team channels, identity display names and account services need their own
+explicit policies. Durable gameplay consequences belong in the simulation or a
+committed service, not in chat callbacks.</p>
+<p>Tests cover ordered echo, marker delivery, malformed UTF-8, clipping, spoofed
+speakers, stale connections, duplicate acknowledgements, rate/capacity limits,
+bounded late-join history and fencing. Cavecrawl adds real native and browser
+integration gates alongside its normal gameplay/migration tests.</p>
+<h2 id="observer-display-names">Observer display names<a class="heading-anchor" href="#observer-display-names" aria-label="Link to this section">#</a></h2>
+<p>An observer can attach a validated display label to a chat submission when its
+admitted <code>Binding.observer_name_allowed</code> capability is enabled. The sender captures
+the name with the queued payload, so renaming does not alter retries or historical
+entries. Empty labels retain the ordinary fallback. Names are bounded UTF-8 single
+lines under the existing lobby-name validation rules; they are not unique or
+verified account identities.</p>
+<p>The authority always supplies the speaker identity and seat from the admitted
+binding. A player cannot override its authoritative name through this observer
+path, and observer markers/system-message claims remain forbidden. A configured
+authority name still supplies the fallback when a request has no label.</p>
+<p>Godot&#39;s Session adapter negotiates Features bit 1024 in both directions before
+allowing these labels. <code>session_comms_frame</code> accepts an optional <code>observer_name</code>
+separately from the player-seat name array. Old clients keep empty name claims;
+new clients keep that behavior when an old server does not confirm support. Packet
+version 2 and its schema are unchanged: this uses the existing Entry.name field.
+Reconnect and authority replacement clear negotiation until the new handshake.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/comms/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#bounds-and-transport" class="">Bounds and transport</a><a href="#recovery-semantics" class="">Recovery semantics</a><a href="#observer-display-names" class="">Observer display names</a></nav><div class="outline-actions"><a href="../../../reference/replay/comms/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

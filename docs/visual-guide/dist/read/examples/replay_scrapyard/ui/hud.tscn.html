@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>hud.tscn · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../contributor-guide.html">Contributor guide</a><a href="../code-guide.html">Code guide</a><a href="../shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>hud.tscn</h1><div class="reader-meta"><span>284 lines · Configuration</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_scrapyard/ui/hud.tscn" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Configuration</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-ini"><span class="hljs-section">[gd_scene format=3]</span>
+<span class="hljs-section">[ext_resource type=&quot;Script&quot; path=&quot;res://scripts/hud.odin&quot; id=&quot;1_hud&quot;]</span>
+<span class="hljs-section">[ext_resource type=&quot;Texture2D&quot; path=&quot;res://assets/ui/metal_btn_dark.png&quot; id=&quot;2_steel&quot;]</span>
+<span class="hljs-section">[ext_resource type=&quot;Theme&quot; path=&quot;res://assets/ui/metal_theme.tres&quot; id=&quot;3_theme&quot;]</span>
+
+<span class="hljs-section">[node name=&quot;CombatHUD&quot; type=&quot;Control&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">3</span>
+<span class="hljs-attr">anchors_preset</span> = <span class="hljs-number">15</span>
+<span class="hljs-attr">anchor_right</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">anchor_bottom</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">grow_horizontal</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">grow_vertical</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">theme</span> = ExtResource(<span class="hljs-string">&quot;3_theme&quot;</span>)
+<span class="hljs-attr">script</span> = ExtResource(<span class="hljs-string">&quot;1_hud&quot;</span>)
+
+<span class="hljs-section">[node name=&quot;Prompt&quot; type=&quot;Label&quot; parent=&quot;.&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">1</span>, <span class="hljs-number">0.85</span>, <span class="hljs-number">0.3</span>, <span class="hljs-number">1</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">1</span>
+<span class="hljs-attr">anchors_preset</span> = -<span class="hljs-number">1</span>
+<span class="hljs-attr">anchor_left</span> = <span class="hljs-number">0.5</span>
+<span class="hljs-attr">anchor_top</span> = <span class="hljs-number">0.76</span>
+<span class="hljs-attr">anchor_right</span> = <span class="hljs-number">0.5</span>
+<span class="hljs-attr">anchor_bottom</span> = <span class="hljs-number">0.76</span>
+<span class="hljs-attr">offset_left</span> = -<span class="hljs-number">140.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">140.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">26.0</span>
+<span class="hljs-attr">horizontal_alignment</span> = <span class="hljs-number">1</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;◆ hold F — revive your friend&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Vitals&quot; type=&quot;NinePatchRect&quot; parent=&quot;.&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">12.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">30.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">182.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">54.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">texture</span> = ExtResource(<span class="hljs-string">&quot;2_steel&quot;</span>)
+<span class="hljs-attr">region_rect</span> = Rect2(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">64</span>, <span class="hljs-number">32</span>)
+<span class="hljs-attr">patch_margin_left</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_top</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_right</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_bottom</span> = <span class="hljs-number">9</span>
+
+<span class="hljs-section">[node name=&quot;Fill&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">7.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">7.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">163.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">17.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.4</span>, <span class="hljs-number">0.8</span>, <span class="hljs-number">0.4</span>, <span class="hljs-number">1</span>)
+
+<span class="hljs-section">[node name=&quot;Text&quot; type=&quot;Label&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">66.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">106.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">18.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">12</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;10/10&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Pip0&quot; type=&quot;Control&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">184.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">232.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;Name&quot; type=&quot;Label&quot; parent=&quot;Vitals/Pip0&quot;]</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">0.8</span>, <span class="hljs-number">0.85</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.8</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = -<span class="hljs-number">2.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">40.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">14.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">10</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;Q&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Bg&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip0&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">48.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.1</span>, <span class="hljs-number">0.11</span>, <span class="hljs-number">0.14</span>, <span class="hljs-number">0.9</span>)
+
+<span class="hljs-section">[node name=&quot;Fill&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip0&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">36.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.55</span>, <span class="hljs-number">0.95</span>, <span class="hljs-number">0.4</span>, <span class="hljs-number">1</span>)
+
+<span class="hljs-section">[node name=&quot;Pip1&quot; type=&quot;Control&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">246.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">294.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;Name&quot; type=&quot;Label&quot; parent=&quot;Vitals/Pip1&quot;]</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">0.8</span>, <span class="hljs-number">0.85</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.8</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = -<span class="hljs-number">2.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">40.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">14.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">10</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;E&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Bg&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip1&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">48.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.1</span>, <span class="hljs-number">0.11</span>, <span class="hljs-number">0.14</span>, <span class="hljs-number">0.9</span>)
+
+<span class="hljs-section">[node name=&quot;Fill&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip1&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">36.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">1</span>, <span class="hljs-number">0.6</span>, <span class="hljs-number">0.25</span>, <span class="hljs-number">1</span>)
+
+<span class="hljs-section">[node name=&quot;Pip2&quot; type=&quot;Control&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">308.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">356.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;Name&quot; type=&quot;Label&quot; parent=&quot;Vitals/Pip2&quot;]</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">0.8</span>, <span class="hljs-number">0.85</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.8</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = -<span class="hljs-number">2.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">40.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">14.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">10</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;SHIFT&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Bg&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip2&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">48.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.1</span>, <span class="hljs-number">0.11</span>, <span class="hljs-number">0.14</span>, <span class="hljs-number">0.9</span>)
+
+<span class="hljs-section">[node name=&quot;Fill&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals/Pip2&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">14.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">36.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">22.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.5</span>, <span class="hljs-number">0.85</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)
+
+<span class="hljs-section">[node name=&quot;St0&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">376.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">8.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">388.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">20.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;St1&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">394.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">8.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">406.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">20.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;St2&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">412.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">8.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">424.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">20.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;St3&quot; type=&quot;ColorRect&quot; parent=&quot;Vitals&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">430.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">8.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">442.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">20.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+
+<span class="hljs-section">[node name=&quot;Ammo&quot; type=&quot;NinePatchRect&quot; parent=&quot;.&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">self_modulate</span> = Color(<span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0.38</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">1</span>
+<span class="hljs-attr">anchors_preset</span> = -<span class="hljs-number">1</span>
+<span class="hljs-attr">anchor_left</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">anchor_top</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">anchor_right</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">anchor_bottom</span> = <span class="hljs-number">1.0</span>
+<span class="hljs-attr">offset_left</span> = -<span class="hljs-number">160.0</span>
+<span class="hljs-attr">offset_top</span> = -<span class="hljs-number">96.0</span>
+<span class="hljs-attr">offset_right</span> = -<span class="hljs-number">12.0</span>
+<span class="hljs-attr">offset_bottom</span> = -<span class="hljs-number">12.0</span>
+<span class="hljs-attr">grow_horizontal</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">grow_vertical</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">texture</span> = ExtResource(<span class="hljs-string">&quot;2_steel&quot;</span>)
+<span class="hljs-attr">region_rect</span> = Rect2(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">64</span>, <span class="hljs-number">32</span>)
+<span class="hljs-attr">patch_margin_left</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_top</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_right</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_bottom</span> = <span class="hljs-number">9</span>
+
+<span class="hljs-section">[node name=&quot;Gun&quot; type=&quot;Label&quot; parent=&quot;Ammo&quot;]</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">0.75</span>, <span class="hljs-number">0.8</span>, <span class="hljs-number">0.88</span>, <span class="hljs-number">0.9</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">12.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">4.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">130.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">27.0</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;scrapper&quot;</span>
+
+<span class="hljs-section">[node name=&quot;Count&quot; type=&quot;Label&quot; parent=&quot;Ammo&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">12.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">18.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">140.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">62.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">32</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;8 / 8&quot;</span>
+
+<span class="hljs-section">[node name=&quot;State&quot; type=&quot;Label&quot; parent=&quot;Ammo&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">12.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">58.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">140.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">82.0</span>
+theme_override_font_sizes/<span class="hljs-attr">font_size</span> = <span class="hljs-number">18</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;&quot;</span>
+
+<span class="hljs-section">[node name=&quot;BossPlate&quot; type=&quot;NinePatchRect&quot; parent=&quot;.&quot;]</span>
+<span class="hljs-attr">visible</span> = <span class="hljs-literal">false</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">1</span>
+<span class="hljs-attr">anchors_preset</span> = -<span class="hljs-number">1</span>
+<span class="hljs-attr">anchor_left</span> = <span class="hljs-number">0.5</span>
+<span class="hljs-attr">anchor_right</span> = <span class="hljs-number">0.5</span>
+<span class="hljs-attr">offset_left</span> = -<span class="hljs-number">200.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">96.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">200.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">126.0</span>
+<span class="hljs-attr">grow_horizontal</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">texture</span> = ExtResource(<span class="hljs-string">&quot;2_steel&quot;</span>)
+<span class="hljs-attr">region_rect</span> = Rect2(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">64</span>, <span class="hljs-number">32</span>)
+<span class="hljs-attr">patch_margin_left</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_top</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_right</span> = <span class="hljs-number">9</span>
+<span class="hljs-attr">patch_margin_bottom</span> = <span class="hljs-number">9</span>
+
+<span class="hljs-section">[node name=&quot;Fill&quot; type=&quot;ColorRect&quot; parent=&quot;BossPlate&quot;]</span>
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">7.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">7.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">393.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">23.0</span>
+<span class="hljs-attr">mouse_filter</span> = <span class="hljs-number">2</span>
+<span class="hljs-attr">color</span> = Color(<span class="hljs-number">0.78</span>, <span class="hljs-number">0.2</span>, <span class="hljs-number">0.3</span>, <span class="hljs-number">1</span>)
+
+<span class="hljs-section">[node name=&quot;Name&quot; type=&quot;Label&quot; parent=&quot;BossPlate&quot;]</span>
+<span class="hljs-attr">modulate</span> = Color(<span class="hljs-number">1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">1</span>)
+<span class="hljs-attr">layout_mode</span> = <span class="hljs-number">0</span>
+<span class="hljs-attr">offset_left</span> = <span class="hljs-number">120.0</span>
+<span class="hljs-attr">offset_top</span> = <span class="hljs-number">3.0</span>
+<span class="hljs-attr">offset_right</span> = <span class="hljs-number">320.0</span>
+<span class="hljs-attr">offset_bottom</span> = <span class="hljs-number">26.0</span>
+<span class="hljs-attr">text</span> = <span class="hljs-string">&quot;SCRAP TITAN  600/600&quot;</span>
+
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/ui/hud.tscn · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_scrapyard/ui/hud.tscn" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

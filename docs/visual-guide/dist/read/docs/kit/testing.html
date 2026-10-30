@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Integration-test your game · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Integration-test your game</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/testing.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-test-shape">The test shape</a><a href="#harness-reference">Harness reference</a><a href="#generated-probes">Generated probes</a><a href="#writing-assertions">Writing assertions</a></nav></details>
+<article class="reading-body "><p>The addon ships an integration-test harness in the template:
+<code>addons/odin_godot/template/test/</code> holds a sourceable <code>harness.sh</code> and a
+<code>driver.gd</code> skeleton. (A repo clone has the same files at
+<code>build/template/test/</code>, and every example&#39;s <code>run.sh</code> sources
+<code>build/template/test/harness.sh</code>.) scriptgen generates the probes the
+driver reads the world through. Reach for the harness whenever you need to
+prove a multiplayer behavior holds across real processes on a real network.
+The reference consumer is <code>examples/cavecrawl/run.sh</code>, a four-act test
+covering the story, save/resume, match flow plus moderation, and host
+migration under <code>kill -9</code>. All of its plumbing is the harness.</p>
+<p>For framework contributors, <code>tests/wireabi/run.sh</code> is the protocol-layout
+fixture. It generates one nested schema, executes its exact raw byte vector
+natively, and compiles the same fingerprint/layout assertions for web, Linux,
+and Windows targets. The native pass queries the generated <code>NET_SCHEMA</code> field,
+action, argument, type, and message tables; a profile-only package pins that
+projection too, while <code>tests/repgen</code> covers inputs, constraints, entity ids,
+scheduled actions, and presentation events. The fixture also proves a schema drift is denied by the real JOIN
+handshake and pins recursive diagnostics across replicated fields, input
+records, profiles, and typed messages, including platform-width integers,
+implicit enums, pointers, hidden padding, and unsupported containers.</p>
+<p><code>tests/author_surface/run.sh</code> guards the authoring language itself. It compiles
+negative fixtures for removed event attributes, quoted command policies, and
+redundant owner interpolation, then scans production source for retired action
+aliases and ID-only census generation. A compatibility spelling cannot return
+without making the complete suite fail.</p>
+<p><code>tests/kitdocs/run.sh</code> guards the prose around that language. It verifies every
+relative link in <code>docs/kit</code>, rejects retired symbols, and prevents tutorial
+pages from teaching raw session lifecycle or <code>_net_pump</code> as the ordinary path.</p>
+<p><code>tests/kitstress/run.sh</code> is the optimized scale/operations gate. It prints
+three receipts:</p>
+<ul>
+<li><code>STRESS</code>: delta CPU at 0/10/100% dirty, join/world/snapshot bytes, apply and
+resume CPU, and session resident/peak allocation for 100/500/2,000 entities.</li>
+<li><code>FANOUT</code>: per-recipient AOI composition CPU and authority egress at
+2/100, 4/500, and 8/2,000 player/entity shapes.</li>
+<li><code>RESIM</code>: forced eight-tick replay CPU and prediction-history bytes for
+32/128/512 predicted entities.</li>
+</ul>
+<p>The generous timing assertions detect complexity regressions, not machine
+speed. The supported starting values derived from these fixtures live in
+<code>network_profile_envelope</code>; <a href="profiles.html">profiles</a> explains what they do and
+do not guarantee.</p>
+<h2 id="the-test-shape">The test shape<a class="heading-anchor" href="#the-test-shape" aria-label="Link to this section">#</a></h2>
+<p>Launch N <em>real</em> headless processes of your <em>real</em> main scene under an
+injected bad link (<code>netgd</code>&#39;s shim, driven by your <code>*_LATENCY</code> / <code>*_JITTER</code>
+/ <code>*_LOSS</code> env vars: a slow wire, a wobbly one, a lossy one). A GDScript
+<code>SceneTree</code> driver presses the same <code>@(gd_method)</code>s your buttons fire (no
+mocks anywhere) and prints an UPPERCASE tag for every observable worth
+asserting. Your <code>run.sh</code> sources the harness, wraps each scenario in an
+<strong>act</strong>, and asserts over the <strong>logs</strong>:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">source</span> addons/odin_godot/template/test/harness.sh
+fslp_build
+
+<span class="hljs-function"><span class="hljs-title">duel</span></span>() {                                  <span class="hljs-comment"># one act: a self-contained scenario</span>
+    <span class="hljs-built_in">local</span> port=<span class="hljs-string">&quot;<span class="hljs-variable">$1</span>&quot;</span>
+    <span class="hljs-built_in">local</span> hlog=<span class="hljs-string">&quot;<span class="hljs-variable">$FSLP_LOGS</span>/h.log&quot;</span> glog=<span class="hljs-string">&quot;<span class="hljs-variable">$FSLP_LOGS</span>/g.log&quot;</span>
+    <span class="hljs-built_in">local</span> hp gp
+    hp=$(fslp_launch host <span class="hljs-string">&quot;<span class="hljs-variable">$hlog</span>&quot;</span> MYGAME_PORT=<span class="hljs-string">&quot;<span class="hljs-variable">$port</span>&quot;</span>)
+    fslp_ready <span class="hljs-string">&quot;<span class="hljs-variable">$hlog</span>&quot;</span> <span class="hljs-string">&quot;HOSTING&quot;</span> 10 <span class="hljs-string">&quot;<span class="hljs-variable">$hp</span>&quot;</span> || <span class="hljs-built_in">return</span> 1     <span class="hljs-comment"># bind receipt or retry</span>
+    gp=$(fslp_launch guest <span class="hljs-string">&quot;<span class="hljs-variable">$glog</span>&quot;</span> MYGAME_PORT=<span class="hljs-string">&quot;<span class="hljs-variable">$port</span>&quot;</span> MYGAME_LATENCY=120)
+    fslp_wait_all 90 <span class="hljs-string">&quot;<span class="hljs-variable">$hp</span>&quot;</span> <span class="hljs-string">&quot;<span class="hljs-variable">$gp</span>&quot;</span>
+    expect       <span class="hljs-string">&quot;<span class="hljs-variable">$hlog</span>&quot;</span> <span class="hljs-string">&quot;GAME_STARTED&quot;</span>                <span class="hljs-string">&quot;the round never started&quot;</span>
+    expect_same  <span class="hljs-string">&quot;<span class="hljs-variable">$hlog</span>&quot;</span> <span class="hljs-string">&quot;<span class="hljs-variable">$glog</span>&quot;</span> <span class="hljs-string">&quot;SCATTER sum=[0-9]+&quot;</span>  <span class="hljs-string">&quot;the worlds diverged&quot;</span>
+    expect_count <span class="hljs-string">&quot;<span class="hljs-variable">$glog</span>&quot;</span> <span class="hljs-string">&quot;WAVE_CLEARED&quot;</span> 2              <span class="hljs-string">&quot;the guest cleared both waves&quot;</span>
+    expect_absent <span class="hljs-string">&quot;<span class="hljs-variable">$hlog</span>&quot;</span> <span class="hljs-string">&quot;_FAIL&quot;</span>                      <span class="hljs-string">&quot;the host driver failed&quot;</span>
+}
+
+fslp_act <span class="hljs-string">&quot;the duel&quot;</span> 3 duel     <span class="hljs-comment"># 3 tries, fresh port each — bind races retry</span>
+fslp_verdict MYGAME            <span class="hljs-comment"># MYGAME_OK / MYGAME_FAIL</span></code></pre></div><h2 id="harness-reference">Harness reference<a class="heading-anchor" href="#harness-reference" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><code>fslp_act NAME TRIES FN</code> gives per-act retries on fresh ports. A bind
+conflict costs a try, not the run; a spent act fails the run, but later
+acts still execute, so one run reports every finding.</li>
+<li><code>fslp_ready LOG PATTERN SECS PID</code> waits for a receipt before launching
+the next peer, failing fast if the process died (the port-in-use race).</li>
+<li><code>fslp_wait_all SECS PIDS...</code> waits for drivers to exit themselves after
+<code>ROLE_DONE</code>/<code>ROLE_FAIL</code>, and reaps stragglers only past the deadline.</li>
+<li><code>fslp_reap [PIDS...]</code> sends TERM, allows a grace period for stdout to
+flush, then sends <code>-9</code>. A raw <code>kill -9</code> truncates the log buffer. Call
+<code>kill -9</code> yourself when the crash IS the test: cavecrawl&#39;s migration act
+kills its host mid-sentence, because the crash is what it asserts on.</li>
+<li><code>expect</code> / <code>expect_same</code> / <code>expect_absent</code> / <code>expect_count</code> form the
+assert vocabulary. All of them flip <code>FSLP_OK</code>, so a hand-rolled <code>grep</code>
+for an act&#39;s odd shape (asserting across two logs at once, exact counts)
+composes freely with them.</li>
+</ul>
+<h2 id="generated-probes">Generated probes<a class="heading-anchor" href="#generated-probes" aria-label="Link to this section">#</a></h2>
+<p>scriptgen generates the mechanical reads. For every <code>entity=</code> kind, the
+game class gets registered <code>@(gd_method)</code> probes:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">probe_&lt;kind&gt;_count()           # live entities of the kind, as this peer sees it
+probe_my_&lt;kind&gt;()              # my entity's net id (0 = none)
+probe_&lt;kind&gt;_&lt;field&gt;(id)       # any replicated SCALAR field; id 0 = mine</code></pre></div><p>So <code>game.probe_kicker_hp(0)</code> in <code>driver.gd</code> reads what this peer&#39;s screen
+believes, with zero game code. Probes read the same replicated state your
+HUD renders (on a sim-lane game: presentation truth, after <code>lane_present</code>).
+Hand-write only the genuinely game-shaped reads: a derived view (a
+predicted-hp overlay), a nearest-scan, a formatted compound. A hand-written
+proc that takes a probe&#39;s name suppresses the generated probe of that name.</p>
+<h2 id="writing-assertions">Writing assertions<a class="heading-anchor" href="#writing-assertions" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Verdicts come from logs, not exit codes.</strong> The launch subshell owns
+the pids; drivers print <code>ROLE_DONE</code> / <code>ROLE_FAIL</code> instead.</li>
+<li><strong>Assert each event on every peer that should observe it</strong>, and assert
+byte-identical (<code>expect_same</code>) where determinism matters: seeds,
+checksums, blob contents.</li>
+<li><strong>Branch on what the process BECAME, not what you launched.</strong> Under
+simultaneous joins, which peer seats as player 2 is a race; role-agnostic
+drivers plus asserts over concatenated logs survive it.</li>
+<li><strong>Edges need dwells.</strong> A flag flipped and cleared within one poll
+interval is invisible, so hold state long enough for the slowest poller
+(and the slowest <em>screen</em>; see &quot;The two timelines&quot; in <a href="net.html">net.md</a>).</li>
+<li><strong>Exact-value asserts on another peer&#39;s fluctuating fields are traps</strong>
+(hp mid-regen); assert ranges or your own printed truth.</li>
+<li><strong>Test above 100ms.</strong> Prediction bugs, edge-order bugs, and feel bugs are
+invisible on localhost; every reference test injects 120ms+ (and the shim
+does jitter and loss too; a flaky wire is a different test than a slow
+one).</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/testing.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-test-shape" class="">The test shape</a><a href="#harness-reference" class="">Harness reference</a><a href="#generated-probes" class="">Generated probes</a><a href="#writing-assertions" class="">Writing assertions</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/testing.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

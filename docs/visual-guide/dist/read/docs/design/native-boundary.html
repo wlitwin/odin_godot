@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Native core ↔ scripts boundary · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Native core ↔ scripts boundary</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/design/native-boundary.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#compatibility-rule">Compatibility rule</a><a href="#boundary-inventory-and-ownership">Boundary inventory and ownership</a><a href="#performance">Performance</a><a href="#changing-the-contract">Changing the contract</a></nav></details>
+<article class="reading-body "><p>Native builds use two libraries: the prebuilt odin_godot core and the project&#39;s compiled
+scripts library. This page records exactly what crosses that boundary, how compatibility is
+decided, and which side owns each allocation.</p>
+<h2 id="compatibility-rule">Compatibility rule<a class="heading-anchor" href="#compatibility-rule" aria-label="Link to this section">#</a></h2>
+<p>The loader validates a candidate before booting it or reading its manifest:</p>
+<ol>
+<li>Required C-callable entry points must exist.</li>
+<li><code>ABI_VERSION</code> must match. This is the manually bumped semantic generation for function
+signatures and contract meaning.</li>
+<li>The 64-bit ABI layout fingerprint must match. It covers every boundary struct&#39;s size,
+alignment, and named field offsets, plus the primitive, Godot enum, and procedure-pointer
+representations those structs use.</li>
+</ol>
+<p><code>odin version</code> is retained as build provenance, but exact string equality is not a load
+requirement. If two Odin releases compile the boundary identically, the scripts library loads
+and the native log records <code>ODIN_COMPILER_SKEW_ABI_COMPATIBLE</code>. If either the semantic
+generation or any layout fact differs, the library is rejected before <code>odin_scripts_boot</code> and
+the old hot-reload generation remains active.</p>
+<p>This does not promise that every Odin release can compile every odin_godot checkout. Source
+and compiler API changes are ordinary build-time compatibility constraints. The Nix-pinned
+compiler remains the tested recommendation, especially before Odin 1.0, but it is no longer an
+artificial binary lock when the produced ABI is demonstrably identical.</p>
+<h2 id="boundary-inventory-and-ownership">Boundary inventory and ownership<a class="heading-anchor" href="#boundary-inventory-and-ownership" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Representation</th>
+<th>Ownership and lifetime</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compatibility/provenance</td>
+<td><code>proc &quot;c&quot;</code> returning integers or a static <code>cstring</code></td>
+<td>No allocation; safe before boot</td>
+</tr>
+<tr>
+<td>Boot</td>
+<td><code>proc &quot;c&quot;</code> with Godot&#39;s C function pointer and opaque library handle</td>
+<td>Borrowed engine values</td>
+</tr>
+<tr>
+<td>Class manifest</td>
+<td>DLL-owned pointer + <code>i32</code> count of descriptors</td>
+<td>Immutable for that scripts generation; core never frees it</td>
+</tr>
+<tr>
+<td>Registration errors</td>
+<td>DLL-owned pointer + <code>i32</code> count of static cstrings</td>
+<td>Core clones messages before a generation can unload</td>
+</tr>
+<tr>
+<td>Lifecycle, method, getter/setter callbacks</td>
+<td>Contextless <code>proc &quot;c&quot;</code> pointers</td>
+<td>Core calls them only while the owning generation is leased</td>
+</tr>
+<tr>
+<td>Typed script resolver</td>
+<td><code>proc &quot;c&quot;</code>, opaque object/byte pointers, <code>uintptr</code> length</td>
+<td>Returned script memory is borrowed while the live-instance/execution gate permits access</td>
+</tr>
+<tr>
+<td>Panic reporter</td>
+<td><code>proc &quot;c&quot;</code> with a <code>cstring</code></td>
+<td>Borrowed for the duration of the call</td>
+</tr>
+<tr>
+<td>Script struct storage</td>
+<td>Raw block described by <code>uintptr</code> size/alignment and field offsets</td>
+<td>Allocated and freed by the core; scripts operate on the borrowed block</td>
+</tr>
+</tbody></table>
+</div><p>No Odin slice, dynamic array, map, string, <code>any</code>, allocator, closure context, or by-value
+Godot <code>Variant</code> crosses the library boundary. Tables are pointer+count pairs, text is cstring
+or pointer+length, flags are <code>b8</code>, counts and type tokens are fixed-width, and sizes are <code>uintptr</code>.
+Script <code>typeid</code> remains available to authored code and the runtime registry, but its descriptor
+slot is only an opaque <code>u64</code> token and is never interpreted by the core.</p>
+<p>Each side frees only its own allocations. The scripts DLL owns registry storage and static
+descriptor tables. The core clones path identities, cache metadata, and error text that must
+survive a reload; it also owns the outer script-struct allocation. Any heap-backed value a
+game stores inside its struct remains the game&#39;s responsibility, as it was before this ABI
+handshake.</p>
+<h2 id="performance">Performance<a class="heading-anchor" href="#performance" aria-label="Link to this section">#</a></h2>
+<p>Compatibility work happens once per initial load or hot-reload candidate. Normal execution
+still uses direct typed script pointers, direct field offsets, and native C-convention
+callbacks. There is no adapter object, descriptor translation, Variant marshaling, allocator
+bridge, or new lock on method/property/frame dispatch.</p>
+<p>The boundary intentionally is not packed: natural alignment keeps callback and pointer loads
+efficient. The fingerprint verifies the compiler&#39;s actual natural layout instead.</p>
+<h2 id="changing-the-contract">Changing the contract<a class="heading-anchor" href="#changing-the-contract" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Adding, removing, or reordering a descriptor field automatically changes the layout
+fingerprint.</li>
+<li>Changing an exported function signature, callback meaning, or another semantic fact that
+layout cannot express requires bumping <code>ABI_GENERATION</code> in <code>runtime/runtime.odin</code>.</li>
+<li>Keep all cross-library procedures <code>&quot;c&quot;</code> and contextless; never add an Odin-owned container
+or allocator to a boundary type.</li>
+<li>Extend the fingerprint when adding a new boundary struct.</li>
+</ul>
+<p><code>tests/reload_exports</code> proves both sides of the gate: a doctored compiler identity with an
+identical fingerprint loads, while a doctored descriptor layout is refused and the running
+generation remains intact.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/native-boundary.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#compatibility-rule" class="">Compatibility rule</a><a href="#boundary-inventory-and-ownership" class="">Boundary inventory and ownership</a><a href="#performance" class="">Performance</a><a href="#changing-the-contract" class="">Changing the contract</a></nav><div class="outline-actions"><a href="../../../reference/docs/design/native-boundary.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

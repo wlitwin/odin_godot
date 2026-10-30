@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Framework-first completion and experimental release assessment · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Framework-first completion and experimental release assessment</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/release-assessment.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#final-requirement-audit">Final requirement audit</a><a href="#final-failure-policy-check">Final failure-policy check</a><a href="#adoption-rationale">Adoption rationale</a><a href="#follow-up-boundaries">Follow-up boundaries</a></nav></details>
+<article class="reading-body "><p>Assessment date: 2026-09-20. This evaluates the user&#39;s revised priority: finish
+the framework and use games as representative validation, while deferring
+exhaustive game parity. It does not retroactively declare every historical
+M0–M9 port/deployment checkbox complete.</p>
+<p><strong>Decision: retain and deliver Replay as an experimental library alongside Kit.</strong>
+The requested multiplayer styles have implemented primitives and representative
+acceptance. The current framework closure queue is satisfied within the explicit
+<a href="../../replay/support.html">support envelope</a>. Neither human productivity superiority
+nor universal production/platform readiness is claimed. No release was published.</p>
+<h2 id="final-requirement-audit">Final requirement audit<a class="heading-anchor" href="#final-requirement-audit" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>User-facing requirement</th>
+<th>Authoritative evidence inspected</th>
+<th>Conclusion</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A separate Odin/Godot library with a coherent gameplay foundation</td>
+<td><code>replay</code> value timeline/pool/RNG/correction APIs; engine-free Loot; Hello models and Session adapter</td>
+<td>Implemented. Mutable gameplay dependencies are explicit; rendering and I/O remain outside simulation.</td>
+</tr>
+<tr>
+<td>Offline, co-op, competitive authority and deterministic peer rollback</td>
+<td>Current net/group/interest/owned/P2P tests; representative Hello, Cavecrawl/Slopball, Quickdraw/Claimball and Duel integrations</td>
+<td>Implemented under separate explicit policies. No false claim of deterministic Godot contact physics or unrestricted concurrent writers.</td>
+</tr>
+<tr>
+<td>Framework-owned difficult networking work</td>
+<td>Scheduling/action ledgers, prediction/correction, snapshots/deltas, recipient views, journals, bounded transport/routing, Party/Room/P2P setup</td>
+<td>Implemented and documented. Applications still choose game rules, trust and prediction scope.</td>
+</tr>
+<tr>
+<td>Host migration and recovery</td>
+<td>Complete checkpoint/identity/action state; coordinator fencing; planned/crash/repeat/partition/successor-loss/return/cold-restore evidence</td>
+<td>Implemented for the tested contracts. Crash recovery may lose work after the accepted checkpoint; external exactly-once side effects are not promised.</td>
+</tr>
+<tr>
+<td>Native/browser integration and reconnect identity</td>
+<td>Current authenticated native two-player ENet, browser RTC, durable enrollment and process-generation tests; forwarded-port creator return</td>
+<td>Implemented. Native and browser backends must match for cross-platform gameplay; validated combinations are listed in support.md.</td>
+</tr>
+<tr>
+<td>Practical authoring/debugging</td>
+<td>Input capture and detached presentation; diagnostics/recordings/playback; checked API recipes; paid-revive/weapon authoring comparisons</td>
+<td>Implemented with structural and runtime evidence. Human authoring speed/play-feel superiority remains unproven.</td>
+</tr>
+<tr>
+<td>Preserve both implementations and separately runnable games, including sibling Scrapyard</td>
+<td>Kit baseline hashes, clean original game paths, clean sibling revision; distinct Replay projects and isolated test profiles</td>
+<td>Preserved. Remaining full-game parity is deferred by user direction, not claimed complete.</td>
+</tr>
+<tr>
+<td>Comparison and stabilization</td>
+<td>Current 13-gate framework smoke (400 unit tests plus recipe/target/archive checks), observer trace, protocol/fixture fixes and prior representative cost measurements</td>
+<td>Verified selection passes. The historical C2 failure&#39;s cause remains unestablished; no failing current trace or invented fix is claimed.</td>
+</tr>
+<tr>
+<td>Deliver usable library entry points</td>
+<td>Getting-started guide, compatibility policy, checked lifecycle recipes, supported-envelope assessment and existing addon packaging</td>
+<td>Delivered in the workspace. Actual package installs/builds/runs outside the source checkout; no deployment or publication performed.</td>
+</tr>
+</tbody></table>
+</div><p>The <a href="framework-audit.html">implementation audit</a> provides source/test mappings.
+<span class="local-reference" title="docs/replay/results/framework-delivery-2026-09-20/README.md · available in the repository">Framework delivery receipts</span>
+cover the smoke, recipes and forwarded endpoint case. The final assessment&#39;s
+<span class="local-reference" title="docs/replay/results/framework-release-2026-09-20/README.md · available in the repository">receipts</span> cover actual control
+service loss and a freshly built isolated consumer addon.</p>
+<h2 id="final-failure-policy-check">Final failure-policy check<a class="heading-anchor" href="#final-failure-policy-check" aria-label="Link to this section">#</a></h2>
+<p>The native P2P service is killed after both encrypted links are admitted. Party
+readiness fails after about 10.46 seconds, and neither party claims readiness for
+new admissions. Existing authenticated links remain at generation 1 and both
+games continue to the full-reference tick-1200 hash <strong>9004447930841423017</strong>.</p>
+<p>Thus current behavior is explicit: existing P2P gameplay can survive background
+control loss, but new admission cannot. Automatic control reconnection is not
+implemented by the current Party owner. The application may close/reopen and
+restore/rejoin after service recovery. Signed denial/invalidity has a different
+policy and clears native link keys. This boundary is documented, not hidden behind
+an unbounded retry or a claim of seamless recovery from every outage.</p>
+<h2 id="adoption-rationale">Adoption rationale<a class="heading-anchor" href="#adoption-rationale" aria-label="Link to this section">#</a></h2>
+<p>Replay makes cross-entity operations ordinary value-world code, with shared replay
+and authority execution. The paid-revive comparison demonstrates that property
+for one real feature. It does not prove every feature is easier. Runtime costs in
+representative comparisons are often higher than Kit&#39;s; measured compression
+improvements do not remove the CPU/copying tradeoff. The result supports keeping
+Replay available for experiments and game-specific evaluation, rather than
+replacing Kit automatically. Both game versions remain useful for that evaluation.</p>
+<h2 id="follow-up-boundaries">Follow-up boundaries<a class="heading-anchor" href="#follow-up-boundaries" aria-label="Link to this section">#</a></h2>
+<p>These remain visible follow-ups, outside the completed framework-first closure
+queue: exhaustive game content/visual/audio parity; human comparative playtests;
+broader independent OS/hardware/browser validation; live Steam/GameServer and public
+account/deployment operations; arbitrary NAT and outage combinations; independent
+cryptographic review; automatic failed-control reconnection; and storage/prediction
+extensions beyond the documented bounded model.</p>
+<p>They are not being represented as finished. Advertising any of them as validated
+requires new evidence. The original detailed roadmap and historical results remain
+available for future work. The delivered experimental framework should be pinned
+to a source/toolchain revision and used according to its compatibility policy.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/support.html"><span>Experimental support envelope</span><span aria-hidden="true">→</span></a><a href="framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/release-assessment.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#final-requirement-audit" class="">Final requirement audit</a><a href="#final-failure-policy-check" class="">Final failure-policy check</a><a href="#adoption-rationale" class="">Adoption rationale</a><a href="#follow-up-boundaries" class="">Follow-up boundaries</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/release-assessment.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

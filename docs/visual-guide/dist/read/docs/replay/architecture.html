@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The Replay frame contract · odin_godot</title><meta name="description" content="What a frame contains, how a tick changes it, and what correction can safely restore."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>The Replay frame contract</h1><p class="reader-dek">What a frame contains, how a tick changes it, and what correction can safely restore.</p><div class="reader-meta"><span>10 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/architecture.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#objective">Objective</a><a href="#decisions-for-the-experiment">Decisions for the experiment</a><a href="#layer-boundaries">Layer boundaries</a><a href="#current-local-api">Current local API</a><a href="#simulation-rules-and-transaction-boundary">Simulation rules and transaction boundary</a><a href="#entity-identity-and-lifetime">Entity identity and lifetime</a><a href="#occurrences">Occurrences</a><a href="#snapshots-wire-state-and-determinism">Snapshots, wire state, and determinism</a><a href="#physics-sessions-and-migration">Physics, sessions, and migration</a><a href="#diagnostic-and-performance-direction">Diagnostic and performance direction</a></nav></details>
+<article class="reading-body "><p>Status: experimental. See the <a href="framework-audit.html">framework audit</a> for implemented
+contracts and remaining work. The original <a href="../kit/index.html">Kit</a>
+remains a separate supported implementation.</p>
+<h2 id="objective">Objective<a class="heading-anchor" href="#objective" aria-label="Link to this section">#</a></h2>
+<p>An author writes gameplay as ordinary operations over one coherent world:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">step(frame at T, input batch for T+1) -&gt; frame at T+1 + occurrences</code></pre></div><p>The runtime controls input delivery, stepping, history, correction, and
+presentation scheduling. Single-player uses the same simulation contract. The
+author still chooses game rules, authority, prediction scope, and which effects
+may be shown speculatively.</p>
+<p>Input sampling and intent delivery have separate contracts. Scheduled controls
+belong to a simulation tick and can arrive too late to use. Discrete actions carry
+sequence IDs and settled authority results. A game can classify actions as
+scheduled or receipt-time through a versioned <a href="../../replay/net/README.html">action schedule</a>:
+for example, preserve a shot&#39;s deadline while delivering an interaction without
+that deadline. Prediction still reconciles against the authority&#39;s recorded
+decision. Receipt-time delivery does not override game predicates or FIFO order.</p>
+<h2 id="decisions-for-the-experiment">Decisions for the experiment<a class="heading-anchor" href="#decisions-for-the-experiment" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong>Simulation state is independently restorable.</strong> Entity membership, allocation
+counters, timers, and RNG are state. Rendering resources and connections are
+outside the frame. Immutable definitions are content-versioned inputs to a
+session; mutable configuration changes must be tick-stamped.</li>
+<li><strong>History follows gameplay dependencies.</strong> Health that gates movement belongs
+in simulation history even when its network updates are infrequent. Being
+historical, being authoritative, and being replicated are separate policies.</li>
+<li><strong>Complete state per simulation group.</strong> Cross-entity mutation is ordinary
+code. The default group is the public world; an authored client projection can
+now remove nonmembers and retain explicit timestamped boundary values. Replay
+restores that complete group. Multiple independent groups remain later work;
+see the <a href="../../replay/net/groups.html">implemented group contract</a>.</li>
+<li><strong>Typed state before code generation.</strong> The first API is usable without
+scriptgen. Future generated authoring must lower onto a documented public API.</li>
+<li><strong>Presentation receives copies or explicitly read-only views.</strong> It never
+temporarily overwrites simulation fields. The initial API uses copies because
+Odin does not provide a general deeply immutable borrowed view.</li>
+<li><strong>Independent library and game ports.</strong> No aliasing the new API onto Kit&#39;s
+session/lane internals, no replacing old games, and no hidden fallback between
+implementations. Engine bindings and suitable pure utility algorithms may be
+shared through explicit dependencies.</li>
+</ol>
+<p>These principles are informed by the complete-state and independent-step
+contracts in <a href="https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md" rel="noreferrer">GGPO</a>
+and <a href="https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/systems" rel="noreferrer">Quantum</a>.
+They do not require adopting either product or requiring an ECS authoring model.</p>
+<h2 id="layer-boundaries">Layer boundaries<a class="heading-anchor" href="#layer-boundaries" aria-label="Link to this section">#</a></h2>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-f3734d716f72f3.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-f3734d716f72f3.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-f3734d716f72f3.svg" alt="System diagram: The Replay frame contract" loading="lazy"></figure><p>The core, canonical codecs, presentation, authoritative and deterministic P2P
+runners, owner streams, diagnostics and coordinated recovery are implemented.
+Their supported envelopes differ; engine physics remains an explicit cooperative
+policy rather than a deterministic rollback solver.</p>
+<p>Implemented package boundaries:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Responsibility</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>replay</code></td>
+<td>Typed frames, local timeline, bounded history, pools, RNG, events</td>
+<td>Value storage, transactional replay/correction, audit captures</td>
+</tr>
+<tr>
+<td><code>replay/schema</code></td>
+<td>Logical fields, canonical codecs, hashes, field diagnostics</td>
+<td>Runtime field programs, tagged unions and transactional codecs; static codec generation is optional future work</td>
+</tr>
+<tr>
+<td><code>replay/telemetry</code></td>
+<td>Bounded admitted-session round-trip probes and reports outside rollback state</td>
+<td>Core, Godot adapter, native/browser tally and native migration gates tested</td>
+</tr>
+<tr>
+<td><code>replay/view</code></td>
+<td>Interpolation and predicted/confirmed/canceled event presentation</td>
+<td>Journals, rebase, one-shot/cue retention, pose/phase sampling</td>
+</tr>
+<tr>
+<td><code>replay/authority</code>, <code>replay/provision</code>, <code>replay/recovery</code></td>
+<td>Authority terms, enrollment, checkpoint transfer and migration</td>
+<td>Authenticated registration, durable CAS, leases and recovery protocols</td>
+</tr>
+<tr>
+<td><code>replay/net</code></td>
+<td>Seats, controls/actions, facts/snapshots, correction/reconnect</td>
+<td>Scheduling policies, prediction/recipient groups, deltas/compression and recovery ledgers</td>
+</tr>
+<tr>
+<td><code>replay/p2p</code></td>
+<td>Deterministic input exchange, rollback and participant recovery</td>
+<td>Fixed-roster runner, archives, spectator recovery and authenticated provisioning</td>
+</tr>
+<tr>
+<td><code>replay/owned</code></td>
+<td>Cooperative owner-driven observations and transfer</td>
+<td>Explicit ownership/version/producer lineage and action context</td>
+</tr>
+<tr>
+<td><code>replay/transport</code></td>
+<td>Packet interface and deterministic fault model</td>
+<td>Implemented and tested</td>
+</tr>
+<tr>
+<td><code>replay/godot</code></td>
+<td>Godot transport/view/scene integration</td>
+<td>Session, Party/Room, P2P setup, scene/body/audio adapters and tools</td>
+</tr>
+<tr>
+<td><code>replay/play</code></td>
+<td>Replayable movement, collision, abilities, inventory helpers</td>
+<td>Value-based motion/query, timers, gun/effect/director helpers</td>
+</tr>
+</tbody></table>
+</div><p>Create subpackages only when implemented responsibility warrants them. The table
+does not reserve a permanent layout or require empty scaffolding packages.</p>
+<h2 id="current-local-api">Current local API<a class="heading-anchor" href="#current-local-api" aria-label="Link to this section">#</a></h2>
+<p><code>Timeline(State, Input, Event)</code> is a runtime owner. <code>State</code>, <code>Input</code>, and <code>Event</code>
+must recursively satisfy <code>value_supported</code>. The runner allocates bounded history
+and equally sized replay scratch during <code>init</code>; normal stepping and correction
+use those allocations. User callbacks must also avoid hidden allocations/state
+if the game needs that property.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>init(&amp;timeline, Frame(State){...}, step, cfg, epoch)</code></td>
+<td>Establish a checkpoint at any tick, including zero; reject unsupported types and invalid config before allocation</td>
+</tr>
+<tr>
+<td><code>advance(&amp;timeline, input)</code></td>
+<td>Execute tick <code>head+1</code> in scratch and commit on success</td>
+</tr>
+<tr>
+<td><code>current(&amp;timeline)</code> / <code>read(&amp;timeline, tick)</code></td>
+<td>Return a frame by value plus an existence flag</td>
+</tr>
+<tr>
+<td><code>revise_input(&amp;timeline, tick, input)</code></td>
+<td>Replace the complete input batch at that tick and replay through the current head; commit the entire suffix only on success</td>
+</tr>
+<tr>
+<td><code>confirm_through(&amp;timeline, tick)</code></td>
+<td>Monotonically settle state through that tick; subsequent input revision cannot alter it</td>
+</tr>
+<tr>
+<td><code>correct(&amp;timeline, truth, events)</code></td>
+<td>Atomically ingest complete authority state/events and replay the speculative suffix</td>
+</tr>
+<tr>
+<td><code>reset_checkpoint(&amp;timeline, frame, epoch)</code></td>
+<td>Explicit resync/recovery; discard old speculative history within an authorized epoch contract</td>
+</tr>
+<tr>
+<td><code>rewind(&amp;timeline, tick)</code></td>
+<td>Keep that frame and discard later speculative history; committed playback requires a fresh timeline/epoch</td>
+</tr>
+<tr>
+<td><code>audit(&amp;timeline, from_tick)</code></td>
+<td>Replay recorded inputs without committing; report first differing tick and state/event category</td>
+</tr>
+<tr>
+<td><code>copy_events(&amp;timeline, tick, dst)</code></td>
+<td>Copy the complete occurrence batch or report required capacity without a partial copy</td>
+</tr>
+<tr>
+<td><code>destroy(&amp;timeline)</code></td>
+<td>Release runtime storage; safe on a zero/destroyed timeline, invalid inside a step</td>
+</tr>
+</tbody></table>
+</div><p>Tick semantics: input for T transforms state at T-1 into state at T. A starting
+checkpoint has no recorded generating input. Revising that checkpoint is an
+<code>Initial_Frame</code> error; revising a tick whose predecessor fell out of history is
+<code>History_Missing</code>. Neither case silently replays from current state. Near the
+u64 tick limit, <code>advance</code> reports <code>Tick_Overflow</code>.</p>
+<p><code>Config.history_frames</code> counts stored frames, including a checkpoint. A history
+of N frames can replay at most N-1 transitions without another checkpoint.
+Values must be 2..4096. <code>events_per_tick</code> is 0..4096; zero intentionally disables
+event capacity. <code>DEFAULT_CONFIG</code> is 128 frames and 32 events per tick. These are
+prototype resource limits, not supported multiplayer scale envelopes.</p>
+<p><code>Result.steps</code> counts successfully staged steps, even if a later step failed.
+<code>Result.tick</code> is the failing tick or final processed tick. Only a successful
+revision commits staged results. Audit never commits.</p>
+<p>The starting checkpoint is confirmed. A runner explicitly advances the simulation
+confirmation frontier when authority settles state. <code>revise_input</code> rejects
+committed ticks and <code>rewind</code> rejects movement before the frontier. Copying an old
+frame into a new timeline remains valid for playback inspection or an authorized
+recovery protocol; neither operation is an authority election.</p>
+<h2 id="simulation-rules-and-transaction-boundary">Simulation rules and transaction boundary<a class="heading-anchor" href="#simulation-rules-and-transaction-boundary" aria-label="Link to this section">#</a></h2>
+<p>A step may read its state, input, tick, and fixed definitions, and mutate state
+through ordinary Odin functions. It must not access wall clocks, device state,
+Godot node transforms, ambient random generators, persistent storage, sockets,
+or mutable globals. Pool pointers and <code>Step</code> pointers must not escape the call.</p>
+<p>The candidate tick is a value copy. If <code>abort</code> is called, the event journal
+overflows, or an event ID duplicates another in the tick, the runner discards
+that candidate. A revision stages its <strong>complete suffix</strong> before committing:
+failure at tick 9 cannot leave ticks 5..8 changed in a supposedly rejected replay.</p>
+<p>This protects managed state. It cannot reverse audio, I/O, mutations through
+global pointers, or other side effects in a callback that violates the contract.
+The type gate excludes pointer-bearing frame values but does not prove callback
+purity. Audit is a diagnostic supplement, not a static effect system.</p>
+<p>Ordinary unsuccessful gameplay actions should validate before mutating. <code>abort</code>
+rejects the complete tick, including other players&#39; actions in that batch. Use it
+for inability to simulate the tick safely, not as the default response to a
+player trying an unavailable item. The loot example simply ignores an invalid
+take and continues with the other player&#39;s input.</p>
+<h2 id="entity-identity-and-lifetime">Entity identity and lifetime<a class="heading-anchor" href="#entity-identity-and-lifetime" aria-label="Link to this section">#</a></h2>
+<p><code>Pool(T, N)</code> stores entities and allocation metadata inside the frame. Insertion
+chooses the lowest reusable index and returns <code>Handle(T){index, generation}</code>.
+Removal clears the payload. Reusing a slot increments its generation; a slot
+whose generation is exhausted is retired. Restoring the frame restores entity
+existence and allocation order as well as payloads.</p>
+<p>Handles are typed and local to their pool/world. Two pools of the same type still
+require the caller to choose the right pool. They are not yet global network IDs.
+A rewound alternate branch can recreate an ID; a presentation object must resolve
+against the current view and must not treat a stale handle as a global lifetime
+guarantee. Wire IDs, provisional spawn identity, and branch-aware presentation
+reconciliation are explicit later milestones.</p>
+<h2 id="occurrences">Occurrences<a class="heading-anchor" href="#occurrences" aria-label="Link to this section">#</a></h2>
+<p><code>emit(ctx, source, key, payload)</code> records an <code>Occurrence(Event)</code> with identity
+<code>(epoch, tick, source, key)</code>. The author supplies a semantic source and key; the
+loot example combines the action sequence and an effect slot. Reordering two
+unrelated emits does not change identity. Duplicate keys fail the tick instead
+of ambiguously correlating two occurrences.</p>
+<p>Replaying replaces the tick&#39;s occurrence batch. It does not invoke effect
+callbacks. The <a href="../../replay/view/README.html">presentation journal</a> compares previous
+and replacement batches by ID and payload and produces begin/update/cancel/confirm
+notifications. Confirmation follows an explicit authority/commit frontier and
+watched effects also wait for their display tick. Effects that require durable
+external delivery still need a separate committed outbox and idempotent consumer.</p>
+<p>The epoch scopes IDs. Starting a timeline with epoch 2 does not
+prove that it is the legitimate authority. Leader selection, stale-packet
+fencing, input sequencing, and reconnect credentials belong to the session layer.</p>
+<h2 id="snapshots-wire-state-and-determinism">Snapshots, wire state, and determinism<a class="heading-anchor" href="#snapshots-wire-state-and-determinism" aria-label="Link to this section">#</a></h2>
+<p>The frame is a typed in-process value. Copying it makes a detached checkpoint,
+and another timeline can resume from it. Canonical value/envelope codecs, durable
+saves and the native coordinated recovery profile now exist. Padded structs
+are safe to copy; audit uses logical
+reflection equality rather than a raw memory comparison. NaNs compare unequal
+and will surface in audit; the network schema enforces finite values and the model
+validates gameplay-specific input and state policies.</p>
+<p>The canonical schema describes logical fields independently of compiler layout
+and applies bounds. Its envelope carries schema/content/version/epoch metadata.
+Authority/public codecs and explicit <a href="../../replay/net/replication.html">recipient views</a>
+are implemented, including state/control/event filtering and separate prediction
+groups. Alternative replica carriers and broader migration/deployment profiles
+remain additional work.
+A client&#39;s visibility-filtered snapshot is not a complete migration backup.</p>
+<p>Strict P2P mode will additionally require cross-target reproducibility: math,
+collision algorithms, iteration order, allocation, RNG, and input ordering. The
+initial integer duel now has native arm64/WASM execution equality and a separate
+peer-input runner. That evidence is scoped to its tested corpus, not arbitrary
+models or every target; see <a href="../../replay/p2p/README.html">P2P</a>.
+Server-authoritative mode can tolerate numerical discrepancies but still needs
+replayable state and useful correction limits.</p>
+<h2 id="physics-sessions-and-migration">Physics, sessions, and migration<a class="heading-anchor" href="#physics-sessions-and-migration" aria-label="Link to this section">#</a></h2>
+<p>Simulation collision must use frame-owned dynamic state. Static level assets can
+be immutable query inputs; moving doors/platforms must have historical state.
+An ordinary Godot physics world is not made replayable by saving node poses.
+Initial movement primitives will use explicit 2D kinematics and collision math.
+The <a href="owner-streams.html">owner-streamed profile</a> now has latest-observation admission,
+saved owner/handoff state, and Godot 2D/3D adapters. It records accepted engine outputs;
+it does not replay Godot contact solving. A separate Slopball port exercises the
+initial profile, including planned/crash physics migration; broader scenarios remain pending.</p>
+<p>A complete migration checkpoint combines a full authority frame,
+content/protocol versions, session membership/ownership, command deduplication
+frontiers, and an authority term. Host selection and transport rendezvous remain
+separate services. They must establish a unique accepted term before simulation
+resumes. Read <a href="roadmap.html#m5--session-recovery-and-host-migration">the migration milestone</a>
+for failure cases and acceptance gates.</p>
+<h2 id="diagnostic-and-performance-direction">Diagnostic and performance direction<a class="heading-anchor" href="#diagnostic-and-performance-direction" aria-label="Link to this section">#</a></h2>
+<p>Start with value copies and explicit step order. Measure snapshot bytes, copy
+cost, replay cost, event backlog, and allocation pressure before implementing
+page sharing or incremental snapshots. A typed arena or component store can
+replace fixed pools without changing the frame contract, but requires restore,
+allocation-order, and codec tests first.</p>
+<p>Extend audit to emit a path such as <code>players[1].inventory[3].count</code>, both values,
+the triggering input, and a reusable reproduction file. Allow deliberate replay
+every frame during offline play. Keep multiplayer fault schedules recorded so a
+failure is reproducible independently of real packet arrival timing.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../kit/index.html"><span>Kit multiplayer toolkit</span><span aria-hidden="true">→</span></a><a href="../../replay/net/README.html"><span>Replay server/client runner</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/architecture.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#objective" class="">Objective</a><a href="#decisions-for-the-experiment" class="">Decisions for the experiment</a><a href="#layer-boundaries" class="">Layer boundaries</a><a href="#current-local-api" class="">Current local API</a><a href="#simulation-rules-and-transaction-boundary" class="">Simulation rules and transaction boundary</a><a href="#entity-identity-and-lifetime" class="">Entity identity and lifetime</a><a href="#occurrences" class="">Occurrences</a><a href="#snapshots-wire-state-and-determinism" class="">Snapshots, wire state, and determinism</a><a href="#physics-sessions-and-migration" class="">Physics, sessions, and migration</a><a href="#diagnostic-and-performance-direction" class="">Diagnostic and performance direction</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/architecture.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

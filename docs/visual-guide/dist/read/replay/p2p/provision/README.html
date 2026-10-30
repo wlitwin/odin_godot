@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Fixed-roster P2P provisioning · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Fixed-roster P2P provisioning</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/p2p/provision/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#service-ownership">Service ownership</a><a href="#durability-and-reconnect">Durability and reconnect</a><a href="#scope-and-acceptance">Scope and acceptance</a></nav></details>
+<article class="reading-body "><p>This package creates durable, invite-only membership for a deterministic P2P
+match. It composes <code>replay/provision</code> enrollment and authenticated registration
+with <code>replay/p2p/admission</code>. It never starts a simulation authority lease.</p>
+<p>A room has a content ID, unique session ID and <strong>durable player count (2–8)</strong>.
+The first enrollee administers invitations and creates the signaling room; every
+participant has the same simulation role. All grants have <code>can_host</code>,
+<code>trusted_authority</code> and <code>infrastructure</code> false. Those flags describe authority
+permissions, not the ability to listen for P2P transport connections.</p>
+<h2 id="service-ownership">Service ownership<a class="heading-anchor" href="#service-ownership" aria-label="Link to this section">#</a></h2>
+<p>Use one stable, serialized <code>Hub</code> per bounded deployment. <code>hub_open</code> loads the
+entire existing room inventory before accepting requests; it refuses a player
+count/content mismatch. <code>hub_receive</code> accepts the existing provisioning protocol
+(Create, Invite, Join, Revoke). Existing <code>provision.Client</code>, <code>Enrollment_Journal</code>
+and Godot <code>Provision_Connection</code> can carry these operations unchanged. The
+deployment chooses content and player count; public callers cannot choose policy.</p>
+<p>Use verified TLS for enrollment because requests contain bearer claims/invites
+and replies contain private credentials. Transport connection/packet limits are
+also required. The hub bounds room allocation and uses the same global and
+per-connection enrollment token buckets as the authority provisioning hub.</p>
+<p><code>hub_control_receive</code> routes only authenticated Query, Challenge and Rebind.
+It filters Start, Renew, nomination, takeover and the optional removal extension
+before the existing MAC, nonce and sequence verifier. Each record stays at
+authority epoch zero. Do not expose the embedded enrollment service through the
+generic authority driver: use the P2P entry points.</p>
+<p>Invites reserve their remaining uses against vacant fixed seats. Revoke releases
+only unused reservations. Existing members never lose/recycle their seat through
+invite revocation. Exact invite/enrollment retries still work after exhaustion;
+changing the claim, original endpoint or ticket is a different request. Keys and
+game tokens are independently generated by the existing enrollment service.</p>
+<h2 id="durability-and-reconnect">Durability and reconnect<a class="heading-anchor" href="#durability-and-reconnect" aria-label="Link to this section">#</a></h2>
+<p><code>Bundle</code> wraps the complete private enrollment record plus the fixed player count.
+The commit callback must atomically compare the previous revision, persist the
+whole bundle, and reject a changed player count for an existing room. Do not store
+only <code>bundle.enrollment</code>: that would lose the fixed-roster contract.</p>
+<p>The native <code>sqlite</code> package implements that contract with FULL/WAL transactions,
+private files, canonical codecs, a separate <code>replay_p2p_provision</code> table, bounded
+startup inventory and revision checks across service owners. Existing authority
+room databases are not converted into P2P rooms. Uncertain creation fences the
+hub; uncertain room mutations fence that room until authoritative storage is
+reloaded. A committed join whose reply was lost returns the same credential on
+retry after restart.</p>
+<p>After receiving/reloading its grant, a new client process performs authenticated
+Challenge/Rebind using a fresh RPC nonce. The member ID and key remain stable;
+the service allocates a newer incarnation. It then queries the current roster.
+<code>match_from_reply</code> must receive a reply already accepted by <code>auth.Rpc_Client</code>;
+the helper itself is not a signature verifier. It checks the expected room,
+content, player count, current local identity, complete enabled membership, and
+absence of simulation authority.</p>
+<p><code>registry</code> returns Not_Ready until every seat is enrolled. Once complete, it
+derives an ordered admission roster with session = room ID and P2P admission
+epoch = 1 for the room&#39;s lifetime. A new match requires a new room ID. Rebinds
+change credentials&#39; incarnations without changing that roster or its code.
+The public match descriptor contains no peer keys.</p>
+<p>For Godot signaling, <code>rendezvous_p2p_room_provider</code> borrows the room and re-reads
+committed membership on every callback. It stays inactive while enrollment is
+incomplete, invalidates old incarnations immediately, and refuses a poisoned
+room. Initialize <code>Rendezvous</code> with <code>mesh=true</code>. Destroy it before its room/hub.
+Clients can pass the accepted descriptor and their current identity/key to
+<code>rtc_p2p_config</code>. Multi-room signaling routing remains the deployment&#39;s job.</p>
+<h2 id="scope-and-acceptance">Scope and acceptance<a class="heading-anchor" href="#scope-and-acceptance" aria-label="Link to this section">#</a></h2>
+<p>This supplies bearer room enrollment, not a human account system or matchmaking.
+It does not change the P2P runner&#39;s fixed-roster disconnect/history policy, elect
+a simulation host, or let late joiners replace departed players.</p>
+<p>Run <code>tests/replay_p2p_provision/run.sh</code> for core/wire/client/provider tests and
+WASM checking, <code>tests/replay_p2p_provision_sqlite/run.sh</code> for storage plus process
+kills before/after commit, and <code>tests/replay_p2p_provision_service/run.sh</code> for the
+native Godot TLS service/client fixture. The fixture provisions three members
+through one client process; it is not a three-player gameplay or browser test.</p>
+<p>The reusable <a href="../../godot/p2p_party.html">P2P party owner</a> now connects these APIs
+to Duel&#39;s browser and native create/join/rejoin flows. Local tests cover RTC and
+encrypted ENet gameplay, plus fresh-process archive return. Public deployment,
+broader recovery and human account integration remain open.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../godot/p2p_party.html"><span>P2P party setup</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/provision/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#service-ownership" class="">Service ownership</a><a href="#durability-and-reconnect" class="">Durability and reconnect</a><a href="#scope-and-acceptance" class="">Scope and acceptance</a></nav><div class="outline-actions"><a href="../../../../reference/replay/p2p/provision/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

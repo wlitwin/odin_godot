@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The first Odin script · odin_godot</title><meta name="description" content="Install the toolchain, connect the extension, and attach a compiled script to a Godot node."><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>The first Odin script</h1><p class="reader-dek">Install the toolchain, connect the extension, and attach a compiled script to a Godot node.</p><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../reference/docs/getting-started.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#1-install-the-toolchain-nix">1. Install the toolchain (Nix)</a><a href="#2-how-a-project-is-wired">2. How a project is wired</a><a href="#3-write-your-first-script">3. Write your first script</a><a href="#4-build">4. Build</a><a href="#5-attach-and-run">5. Attach and run</a><a href="#next-steps">Next steps</a></nav></details>
+<article class="reading-body "><p>This walks you from nothing to a running Odin script: install the toolchain, build the
+extension, wire it into a Godot project, then write, attach, and run your first <code>.odin</code>
+script. By the end you&#39;ll have a Node that prints on <code>_ready</code> and moves every frame.</p>
+<blockquote>
+<p><strong>Want to skip ahead?</strong> <code>examples/survivors/</code> and <code>tests/showcase/</code> are complete, working
+projects. The fastest way to a running Odin script is to copy one and edit it:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop
+bash build/build_scripts.sh tests/showcase
+<span class="hljs-variable">$GODOT</span> --path tests/showcase</code></pre></div><p>This page explains how those projects are wired so you can build your own.</p>
+</blockquote>
+<h2 id="1-install-the-toolchain-nix">1. Install the toolchain (Nix)<a class="heading-anchor" href="#1-install-the-toolchain-nix" aria-label="Link to this section">#</a></h2>
+<p>Everything is pinned in a Nix flake: Odin, the <code>ols</code> language server, LLVM/lld, Emscripten,
+Node, and a <code>$GODOT</code> pointing at Godot 4.7.1. You need <a href="https://nixos.org/" rel="noreferrer">Nix with flakes enabled</a>
+and Godot 4.7.x installed.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">cd</span> /path/to/odin_godot
+nix develop                    <span class="hljs-comment"># drops you in the toolchain shell</span></code></pre></div><div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">odin_godot dev shell  (target: Godot 4.7.1 stable)
+  odin:  /nix/store/.../odin  dev-2025-...
+  emcc:  /nix/store/.../emcc
+  godot: /Applications/Godot.app/Contents/MacOS/Godot</code></pre></div><p><code>$GODOT</code> defaults to the installed macOS Godot; override it with <code>GODOT=/path/to/godot nix develop</code>. Confirm it works headless:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/run_all.sh    <span class="hljs-comment"># the full suite — should end &quot;ALL GREEN&quot;</span></code></pre></div><h2 id="2-how-a-project-is-wired">2. How a project is wired<a class="heading-anchor" href="#2-how-a-project-is-wired" aria-label="Link to this section">#</a></h2>
+<p>An odin_godot project needs three things beyond your normal Godot project:</p>
+<ol>
+<li><strong>A <code>.gdextension</code> manifest</strong> that loads the compiled <strong>core</strong> dll.</li>
+<li><strong>A <code>scripts/</code> package</strong> containing your <code>.odin</code> scripts (the required boot shim is
+generated for you; see 2b).</li>
+<li><strong>A build</strong> (<code>build/build_scripts.sh</code>) that compiles your scripts (and the core) into the
+project&#39;s <code>bin/</code>.</li>
+</ol>
+<p>We&#39;ll use the showcase as the working reference and build the same structure.</p>
+<h3 id="2a-the-gdextension-manifest">2a. The <code>.gdextension</code> manifest<a class="heading-anchor" href="#2a-the-gdextension-manifest" aria-label="Link to this section">#</a></h3>
+<p>Drop this at the project root as <code>odin_godot.gdextension</code> (this is <code>examples/survivors/odin_godot.gdextension</code>,
+verbatim):</p>
+<div class="code-block"><div class="code-title"><span>Configuration</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-ini"><span class="hljs-section">[configuration]</span>
+<span class="hljs-attr">entry_symbol</span> = <span class="hljs-string">&quot;odin_godot_init&quot;</span>
+<span class="hljs-attr">compatibility_minimum</span> = <span class="hljs-string">&quot;4.6&quot;</span>
+
+<span class="hljs-section">[libraries]</span>
+<span class="hljs-attr">macos.debug</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.dylib&quot;</span>
+<span class="hljs-attr">macos.release</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.dylib&quot;</span>
+<span class="hljs-attr">macos.debug.arm64</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.dylib&quot;</span>
+<span class="hljs-attr">macos.release.arm64</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.dylib&quot;</span>
+
+<span class="hljs-comment">; Web target (built by build/build_web.sh — see docs/exporting.md):</span>
+<span class="hljs-attr">web.debug.wasm32</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.wasm&quot;</span>
+<span class="hljs-attr">web.release.wasm32</span> = <span class="hljs-string">&quot;res://bin/libodin_godot.wasm&quot;</span></code></pre></div><p><code>entry_symbol = &quot;odin_godot_init&quot;</code> is the core&#39;s GDExtension entry point. It registers the
+&quot;Odin&quot; scripting language so the editor recognizes <code>.odin</code> files. The <strong>core</strong> dll is what the
+manifest loads; the <strong>scripts</strong> dll (<code>libodinscripts.dylib</code>) is loaded <em>by</em> the core at runtime,
+so it is not listed here.</p>
+<h3 id="2b-the-scripts-package-and-its-boot-shim">2b. The <code>scripts/</code> package and its boot shim<a class="heading-anchor" href="#2b-the-scripts-package-and-its-boot-shim" aria-label="Link to this section">#</a></h3>
+<p>The <code>.odin</code> files in <code>scripts/</code> are <strong>one Odin package</strong> compiled into one shared dll. Pick a
+package name and use the <em>same</em> <code>package</code> line at the top of every <code>.odin</code> file in the
+directory. (Subfolders are separate packages that compile into the same dll; you don&#39;t need
+them to start, and <a href="modules.html">Script Modules</a> covers them when you do.)</p>
+<p>That package needs one init shim: an <code>@(export) odin_scripts_boot</code> the core calls right after
+it loads the dll, so the dll initializes its own <code>gdext</code>/<code>godot</code> package globals. <strong><code>scriptgen</code>
+generates this for you</strong> as <code>scripts/odin_godot_boot.gen.odin</code> on every build, so you normally
+write nothing. For reference, the generated file is:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> my_game_scripts
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;godot:gdext&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+<span class="hljs-meta">@(export)</span>
+odin_scripts_boot :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (
+	get_proc_address: gdext.ExtensionInterfaceGetProcAddress,
+	library: gdext.ExtensionClassLibraryPtr,
+) {
+	gdext.init(library, get_proc_address)
+	godot.init()
+}</code></pre></div><p>To customize it (rare), add a hand-written file defining <code>odin_scripts_boot</code>; scriptgen
+detects it and skips generating its own. The in-repo <code>tests/</code>/<code>examples/</code> projects take this
+opt-out, carrying a hand-written <code>boot.odin</code>.</p>
+<h3 id="2c-tell-the-editor-where-odin_godot-lives">2c. Tell the editor where odin_godot lives<a class="heading-anchor" href="#2c-tell-the-editor-where-odin_godot-lives" aria-label="Link to this section">#</a></h3>
+<p>The build and the editor&#39;s tooling resolve the Odin <code>godot</code> collection (the binding) from the
+odin_godot checkout. Point one of these at it:</p>
+<ul>
+<li>the <code>ODIN_GODOT_ROOT</code> environment variable (used by the build scripts), or</li>
+<li>the <strong><code>odin_godot/root</code></strong> project setting (used by the editor&#39;s validation), set to the
+absolute path of your odin_godot checkout.</li>
+</ul>
+<p>If you launch the editor from outside the Nix shell, it usually can&#39;t find <code>odin</code> on its
+<code>PATH</code>; point it at the compiler with the <strong><code>odin_godot/odin_bin</code></strong> project setting (absolute
+path to the <code>odin</code> binary) so reload-on-save works. (For autocomplete, <code>odin_godot/ols_bin</code>
+similarly points at <code>ols</code>.) These settings are summarized in
+<a href="workflow.html#editor-settings-reference">Workflow → editor settings</a>.</p>
+<h2 id="3-write-your-first-script">3. Write your first script<a class="heading-anchor" href="#3-write-your-first-script" aria-label="Link to this section">#</a></h2>
+<p>Create <code>scripts/mover.odin</code>. This is a <code>Node2D</code> that prints once on <code>_ready</code> and walks right
+every frame, built only from constructs verified in the showcase and survivors examples:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node2D       // the Godot base class this script extends</span>
+<span class="hljs-comment">//gd:class Mover          // optional global class alias; path identity works without it</span>
+<span class="hljs-keyword">package</span> my_game_scripts
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+<span class="hljs-comment">// The script struct. The FIRST field MUST be the owner node handle — the core writes the</span>
+<span class="hljs-comment">// node pointer there. Its type is just the handle you want to use (Node2d here).</span>
+Mover :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node2d,
+	speed: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;export,default=120&quot;`</span>,   <span class="hljs-comment">// @export var, tunable in the Inspector</span>
+}
+
+<span class="hljs-comment">// Lifecycle: a proc named `&lt;struct&gt;_ready` (the `mover_` prefix is stripped) runs on READY.</span>
+mover_ready :: <span class="hljs-keyword">proc</span>(self: ^Mover) {
+	gd.print(<span class="hljs-string">&quot;Mover ready!&quot;</span>)                <span class="hljs-comment">// -&gt; stdout + the editor Output panel</span>
+}
+
+<span class="hljs-comment">// `&lt;struct&gt;_process` runs every frame; the second param is the frame delta (seconds).</span>
+mover_process :: <span class="hljs-keyword">proc</span>(self: ^Mover, delta: <span class="hljs-type">f64</span>) {
+	pos := gd.node2d_get_position(self.owner)
+	pos.x += self.speed * <span class="hljs-type">f32</span>(delta)        <span class="hljs-comment">// walk right at `speed` px/s</span>
+	gd.node2d_set_position(self.owner, pos)
+}</code></pre></div><p>A few rules this demonstrates (full details in the <a href="authoring-guide.html">Authoring Guide</a>):</p>
+<ul>
+<li><strong>One script struct per file</strong>, identified by its first field being named <code>owner</code>.</li>
+<li><strong>Prefix proc names with the struct name</strong> (<code>mover_ready</code>, <code>mover_process</code>). All scripts
+share one package, so the prefix avoids collisions, and the prefix is stripped to derive the
+GDScript-facing name.</li>
+<li>The <code>//gd:</code> comment markers declare the class. <code>//gd:extends</code> names the base class and the
+<code>owner</code> field is the handle you use in code. The two are cross-checked (the handle must be
+the base or an ancestor of it), and <code>//gd:extends</code> may be omitted entirely, in which case the
+base is derived from the handle.</li>
+</ul>
+<p>You do <strong>not</strong> write the registration boilerplate: <code>build/build_scripts.sh</code> runs <code>scriptgen</code>,
+which emits it into <code>scripts/odin_godot_scripts.gen.odin</code>, one generated file for the whole
+directory (a build artifact you never edit, hidden in the FileSystem dock).</p>
+<h2 id="4-build">4. Build<a class="heading-anchor" href="#4-build" aria-label="Link to this section">#</a></h2>
+<p>From the Nix shell, point the build script at your project directory:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_scripts.sh /path/to/your/project&#x27;</span></code></pre></div><p>This (1) builds <code>scriptgen</code>, (2) generates the <code>*.gen.odin</code> build artifacts, (3) compiles your
+<code>scripts/</code> package into <code>bin/libodinscripts.dylib</code>, and (4) compiles the core into
+<code>bin/libodin_godot.dylib</code>. (<code>build_scripts.sh</code> takes the project dir as its first argument and
+defaults the scripts dir to <code>&lt;project&gt;/scripts</code>.)</p>
+<h2 id="5-attach-and-run">5. Attach and run<a class="heading-anchor" href="#5-attach-and-run" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Open the project in Godot (<code>$GODOT --path /path/to/your/project</code>, or via the Project
+Manager). The editor loads <code>odin_godot.gdextension</code> and recognizes <code>.odin</code> files.</li>
+<li>Add a <strong><code>Node2D</code></strong> to your scene (the base must match <code>//gd:extends</code>).</li>
+<li>In the Inspector&#39;s <strong>Script</strong> slot, attach <code>res://scripts/mover.odin</code>, the same file you
+wrote (there is no separate resource stub; the <code>.odin</code> <em>is</em> the attachable script).</li>
+<li>The Inspector now shows the <strong>Speed</strong> <code>@export</code> (default 120).</li>
+<li><strong>Run the scene.</strong> You&#39;ll see <code>Mover ready!</code> in the Output panel and the node walking
+right.</li>
+</ol>
+<p>To verify headless without the GUI, mirror what the example <code>run.sh</code> scripts do:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-variable">$GODOT</span> --path /path/to/your/project          <span class="hljs-comment"># windowed</span>
+<span class="hljs-variable">$GODOT</span> --headless --path /path/to/your/project --quit-after 30   <span class="hljs-comment"># smoke test</span></code></pre></div><h2 id="next-steps">Next steps<a class="heading-anchor" href="#next-steps" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Building multiplayer?</strong> → the <a href="kit/quickstart.html">co-op quickstart</a>: it takes you from
+zero to two windows moving a player, in two small files.</li>
+<li><strong><a href="authoring-guide.html">Authoring Guide</a></strong> covers exports of every type, signals, methods,
+resources, cross-script calls, autoloads, and the full <code>gd.*</code> helper catalog.</li>
+<li><strong><a href="workflow.html">Workflow</a></strong> covers the edit→reload loop, editor squiggles/autocomplete, and
+debugging.</li>
+<li>Read <code>examples/survivors/scripts/*.odin</code>. Each is heavily commented to teach one feature.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/getting-started.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#1-install-the-toolchain-nix" class="">1. Install the toolchain (Nix)</a><a href="#2-how-a-project-is-wired" class="">2. How a project is wired</a><a href="#2a-the-gdextension-manifest" class="subsection">2a. The .gdextension manifest</a><a href="#2b-the-scripts-package-and-its-boot-shim" class="subsection">2b. The scripts/ package and its boot shim</a><a href="#2c-tell-the-editor-where-odin_godot-lives" class="subsection">2c. Tell the editor where odin_godot lives</a><a href="#3-write-your-first-script" class="">3. Write your first script</a><a href="#4-build" class="">4. Build</a><a href="#5-attach-and-run" class="">5. Attach and run</a><a href="#next-steps" class="">Next steps</a></nav><div class="outline-actions"><a href="../../reference/docs/getting-started.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

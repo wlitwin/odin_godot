@@ -1,0 +1,120 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/transitions.odin" id="1_flow"]
+[ext_resource type="Texture2D" path="res://assets/ui/metal_btn_dark.png" id="2_steel"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="3_theme"]
+
+[node name="Transitions" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("3_theme")
+script = ExtResource("1_flow")
+
+[node name="Recovery" type="NinePatchRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -240.0
+offset_top = 136.0
+offset_right = 240.0
+offset_bottom = 194.0
+grow_horizontal = 2
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Text" type="Label" parent="Recovery"]
+modulate = Color(1, 0.86, 0.6, 1)
+layout_mode = 0
+offset_left = 26.0
+offset_top = 17.0
+offset_right = 460.0
+offset_bottom = 41.0
+text = "the keeper is gone dark — chasing the successor..."
+
+[node name="Depart" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.26
+anchor_right = 0.5
+anchor_bottom = 0.26
+offset_left = -450.0
+offset_right = 450.0
+offset_bottom = 110.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 88
+horizontal_alignment = 1
+text = "DESCENDING  3"
+
+[node name="Over" type="NinePatchRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -111.0
+offset_right = 250.0
+offset_bottom = 111.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Text" type="Label" parent="Over"]
+modulate = Color(1, 0.82, 0.75, 1)
+layout_mode = 0
+offset_left = 36.0
+offset_top = 24.0
+offset_right = 464.0
+offset_bottom = 198.0
+text = "T H E   Y A R D   T A K E S   Y O U
+
+floor reached  3
+kills  24      scrap lost  61
+cores banked  2  (they keep)
+
+...dragged back to the surface"
+
+[node name="Wave" type="NinePatchRect" parent="."]
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -310.0
+offset_right = 310.0
+offset_top = 136.0
+offset_bottom = 180.0
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Text" type="Label" parent="Wave"]
+offset_left = 12.0
+offset_top = 10.0
+offset_right = 608.0
+offset_bottom = 34.0
+horizontal_alignment = 1
+text = ""

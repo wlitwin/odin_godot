@@ -1,0 +1,4 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="hud"]
+[node name="HudPreview" instance=ExtResource("hud")]
+preview = true

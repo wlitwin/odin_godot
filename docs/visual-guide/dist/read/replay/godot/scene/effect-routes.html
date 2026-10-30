@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Declarative visual and audio routes · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Declarative visual and audio routes</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/effect-routes.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#routes-that-need-event-identity-or-history">Routes that need event identity or history</a></nav></details>
+<article class="reading-body "><p><code>Effect_Route2(Event, Value, Rig)</code> connects a typed event projection, bounded visual
+cue pool and typed scene binding. <code>Audio_Route(Event)</code> connects an event-to-sound
+projection, bounded voices and a consumption ledger. Both consume ordinary journal
+changes, preserving occurrence IDs through update, confirmation and cancellation.
+They remain outside World and never rerun gameplay to create presentation.</p>
+<p>A visual binding supplies:</p>
+<ul>
+<li><code>project(Event) -&gt; (Entity_View(Value), include)</code> for detached initial geometry
+and paint data. Prefer stable event-kind selection.</li>
+<li>Optional <code>animate(view, age, seconds) -&gt; view</code> for root fade/motion over time.</li>
+<li><code>View_Binding(Effect_State(Value), Rig)</code> to cache children at attachment and paint
+value, age, duration and confirmation. Detach releases any rig-owned resources.</li>
+</ul>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">route: scenegd.Effect_Route2(Event, Flash_Value, Flash_Rig)
+ok := scenegd.effect_route_load(&amp;route, parent, <span class="hljs-string">&quot;res://flash.tscn&quot;</span>, epoch,
+    <span class="hljs-number">0.3</span>, binding, capacity=<span class="hljs-number">32</span>)
+<span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes { scenegd.effect_route_change(&amp;route, change) }
+error := scenegd.effect_route_frame(&amp;route, render_delta)</code></pre></div><p>Journal policy already determines speculative or watched delivery. Default route
+policy Journal follows it. Confirmed delays this route until a confirmed Begin or
+Confirm, useful for effects that should not be shown speculatively. The first
+accepted start creates a lifetime; Update changes its value, Confirm marks it, and
+Cancel retires it. Neither Update nor Confirm restarts its age or scene. Reused
+slots get fresh generations and child bindings. Expired, canceled and capacity-
+dropped IDs remain consumed so replay cannot restart them.</p>
+<p>Changing the filter to exclude an active event cancels it. A later Update does
+not invent a speculative Begin; use a stable event category for routing, and
+ordinary value changes for animation. When a confirmed-only effect has not begun,
+its Confirm may start it, subject to its consumption ledger.</p>
+<p><code>effect_route_clear</code> removes live visuals without forgetting consumed IDs.
+<code>effect_route_epoch</code> requires a strictly newer epoch, clears visuals and resets the
+ledger/bindings. <code>effect_route_retire</code> advances the floor only when the caller knows
+no new Begin at or below it can arrive, including delayed watched/confirmed events.
+Do not use the render clock as that frontier. Full cue pools drop new effects;
+check <code>route.route.cues.stats</code>. Ledger history/per-tick capacity is explicit.
+Root properties and Rig lifetimes follow the <a href="view-pools.html">view ownership contract</a>.
+Scene instances are created on entry; bounded capacity does not mean prewarming.</p>
+<p>For audio, the callback returns <code>(Audio_Cue, include)</code> and may borrow streams from
+a presentation asset owner through <code>user</code>. Godot players retain their own stream
+reference while assigned. Destroy the route before the parent or borrowed callback
+owner. Each route owns its own bounded voices and ID ledger:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">audio: scenegd.Audio_Route(Event)
+ok := scenegd.audio_route_init(&amp;audio, parent, epoch, sound_for_event,
+    &amp;sound_bank, .Confirmed, world_voices=<span class="hljs-number">8</span>, screen_voices=<span class="hljs-number">2</span>)
+<span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes { scenegd.audio_route_change(&amp;audio, change) }</code></pre></div><p>Update moves an active spatial voice; it does not change the clip or restart
+playback. Confirmed-only routes play once upon confirmation. Cancel stops only a
+voice still owned by that occurrence, so canceling a stolen old voice cannot stop
+its replacement. Full voice pools steal in bounded round-robin order; consumed
+IDs remain tombstoned. <code>audio_route_epoch</code> clears voices under a newer epoch and
+<code>audio_route_retire</code> has the same safe-frontier requirement as visual routes.
+Use <code>audio_pool_volume(&amp;audio.pool, volume)</code> for a local volume setting.</p>
+<p>The pure <code>view.Cue_Route(Event, Value)</code> is also usable without Godot. Native and
+executed WASM corpus checks cover lifetime/overflow/epoch behavior. Actual Godot
+checks cover scene reuse, transform update, confirmation without restart, audio
+voice identity, cancellation, epoch rejection and resource cleanup. The scene
+fixture is compile-checked for WASM; it is not a browser audio-device claim.</p>
+<h2 id="routes-that-need-event-identity-or-history">Routes that need event identity or history<a class="heading-anchor" href="#routes-that-need-event-identity-or-history" aria-label="Link to this section">#</a></h2>
+<p><code>audio_route_init_change</code> accepts a callback with <code>(user, Change(Event))</code>, exposing
+the original occurrence ID/tick, change kind and confirmation state. It shares the
+same bounded voices, policy and consumption ledger as <code>audio_route_init</code>; choose
+one initializer. Cancel retires matching voices without calling either projector.
+A contextual projector sees the original Confirm even when the route delays its
+start until confirmation, so it can choose the correct historical placement.</p>
+<p>Scrapyard uses this callback for pitch derived from the occurrence ID and wound
+positions reconstructed at the event tick. Event-only routing remains available
+when a sound depends only on its gameplay payload.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="view-pools.html"><span>View pool foundations</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/effect-routes.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#routes-that-need-event-identity-or-history" class="">Routes that need event identity or history</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/effect-routes.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

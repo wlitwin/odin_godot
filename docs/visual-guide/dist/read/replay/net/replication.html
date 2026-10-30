@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Recipient views and interest management · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Recipient views and interest management</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/replication.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#prediction-and-presentation">Prediction and presentation</a><a href="#contracts-and-recovery">Contracts and recovery</a><a href="#current-scope-and-evidence">Current scope and evidence</a></nav></details>
+<article class="reading-body "><p><code>Model.replication</code> is an optional server-side transmission policy. It changes what
+a recipient receives, independently of the client&#39;s <code>Prediction_Group</code>. The
+server still simulates and archives the complete World.</p>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-ca9a717831a78c.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-ca9a717831a78c.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-ca9a717831a78c.svg" alt="System diagram: Recipient views and interest management" loading="lazy"></figure><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">model.replication = net.Replication(World, Control, Event, SEATS){
+    id = GAME_VIEW_V1,
+    project = project_recipient,
+    valid = validate_received_replica,
+    event = project_recipient_event,
+}</code></pre></div><p><code>project(frame, held, Recipient{seat, spectator})</code> returns <code>(Replica{state, held}, ok)</code>. Remove absent members from active storage and clear their payload, presence
+and lifetime fields according to the game&#39;s representation. The callback controls
+which held inputs are public too; filtering only entity state can still reveal
+hidden controls. A recipient has a validated seat or spectator status, never a
+client-supplied visibility mask. Store team/visibility permissions in replayable
+state if they affect historical decisions.</p>
+<p><code>valid(replica, recipient)</code> checks the received representation. It replaces the
+complete-world state validator for incoming Welcome/snapshot values. The authority
+continues using <code>Model.state_valid</code> for its initial world and archives. All controls
+still pass <code>control_valid</code>. Authority-only schema fields in both state and held controls are zeroed through
+the public replica codec before the server calls this validator, matching the client decoder.
+A rejected projection sends no fallback full state and increments
+<code>Stats.rejected_replica_views</code>; fix the authored policy rather than hiding the
+failure. The affected client may stall/resync while no valid view is available.</p>
+<p><code>event(frame, recipient, occurrence)</code> returns <code>(redacted_event, include)</code>. It sees
+the exact complete authority frame at the event&#39;s tick, including when facts are
+sent later. Omitted events never enter that recipient&#39;s fact packet. Included
+occurrences retain their epoch/tick/source/key identities; account for those IDs
+when deciding disclosure, and do not encode secrets in event IDs. Event owner
+metadata is recomputed from the redacted payload. Other players&#39; action verdicts
+are omitted automatically; a player retains its own results and spectators receive
+none. Empty fact ticks remain present so confirmation can advance normally.</p>
+<p>Callbacks must be pure functions of their supplied values and fixed model policy.
+They do not query current scene nodes or mutable side services. Decisions describe
+the supplied frame/event tick; they do not retroactively revoke already transmitted
+knowledge, hide traffic timing, or prevent inference from intentionally public data.
+The framework validates the authored invariant, not arbitrary Odin information flow.</p>
+<h2 id="prediction-and-presentation">Prediction and presentation<a class="heading-anchor" href="#prediction-and-presentation" aria-label="Link to this section">#</a></h2>
+<p>A player using a nonzero replication policy must also supply a nonzero prediction
+group. The group&#39;s <code>project</code> now receives the filtered replica. Include every
+mutable dependency required by the predicted step/action or use explicit timestamped
+boundary values. A received view alone does not establish a closed simulation group.
+Existing full-world clients keep their default behavior when replication is disabled.</p>
+<p>Authority-only fields can be omitted from a predicting player&#39;s wire view when this
+explicit policy/group pair is present. The former blanket rejection remains for
+unscoped full-world prediction. Observers validate and present their received view
+without running player prediction.</p>
+<p><code>client.authority_frame</code>, <code>client_observed</code> and Godot&#39;s authority-state convenience
+query mean the <strong>received replica</strong> on a filtered client. They are complete public
+worlds only under the default policy. Their historical ticks remain meaningful,
+but they cannot be used as complete migration/save archives. Client prediction is
+a further projection of that received value.</p>
+<p>Membership changes are ordinary value changes in the recipient&#39;s snapshot stream.
+The existing per-peer acknowledged baselines encode additions/removals and zeroed
+payloads. One peer&#39;s baseline is never reused for another peer. Dropped deltas,
+reconnect serials and authority epochs retain their existing validation boundaries.</p>
+<h2 id="contracts-and-recovery">Contracts and recovery<a class="heading-anchor" href="#contracts-and-recovery" aria-label="Link to this section">#</a></h2>
+<p>A nonzero policy ID is included in live and archived contract hashes. It names the
+authored representation/semantics; code addresses are not hashed. Change it when
+changing the policy contract. Peers must use matching IDs. Zero plus nil callbacks
+preserves the original contract and behavior, including earlier saves. A partial
+policy configuration is invalid.</p>
+<p>Authority archives retain complete state, held controls and action ledgers, and
+validate with the complete model. Restored authorities project fresh recipient
+views; a departing host is sanitized before seeding its client prediction. For
+Room, supply a model with the client prediction group even on the original host,
+because that same model can be used after a role change. Existing conversion APIs
+compute the target policy&#39;s contract and do not grant authority to the new bytes.</p>
+<p>Gameplay protocol 7 and checkpoint layout 4 are unchanged. The opt-in policy stamp
+distinguishes the new capability without changing existing zero-policy contracts.
+Normal private-state backup recipient authorization remains required; interest
+filtering does not make a full checkpoint safe for untrusted recipients.</p>
+<h2 id="current-scope-and-evidence">Current scope and evidence<a class="heading-anchor" href="#current-scope-and-evidence" aria-label="Link to this section">#</a></h2>
+<p>This implementation reuses the authority&#39;s fixed State carrier. It reduces repeated
+wire changes for omitted objects and filters event traffic, but does not reduce the
+carrier&#39;s in-memory size or infer sparse storage/dependency domains. Initial full
+snapshots retain their fixed schema size. Automatic spatial indexing, alternative
+replica types and multiple simulation groups remain separate work.</p>
+<p>The fixture uses 32 changing objects, an 80-unit visibility radius, two predicting
+players and a fixed-center observer. Player roster/positions are intentionally
+public; object payloads outside the view and remote held controls are suppressed.
+The wire tap checks current hidden nonce sentinels in Welcome/full/delta/fact
+packets, while decoded views and historical facts are also validated. Six core
+checks cover movement across regions, reconnect, complete archive recovery,
+contract mismatch, invalid projection refusal and departing-host sanitization.</p>
+<p>In its fixed 180-tick observer workload, the filtered stream uses 33,282 bytes versus
+69,360 for the full public observer (about 52% less). This includes fixture protocol
+traffic; it is not a general game bandwidth or CPU claim. Real Godot/ENet peers pass
+under configured latency, jitter, unreliable loss and duplication. See the
+<span class="local-reference" title="docs/replay/results/recipient-views-2026-09-07/README.md · available in the repository">retained evidence</span>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/replication.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#prediction-and-presentation" class="">Prediction and presentation</a><a href="#contracts-and-recovery" class="">Contracts and recovery</a><a href="#current-scope-and-evidence" class="">Current scope and evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/replication.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

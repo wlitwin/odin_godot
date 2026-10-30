@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Combat HUD · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Combat HUD</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/hud.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>The editable <a href="ui/hud.tscn.html">HUD scene</a> restores the original health plate, three
+cooldown pips, draining status squares, large magazine display, Titan health bar
+and nearby-teammate revive prompt. It shares the copied steel theme with the
+counter. The scene owns layout and node lifetime; <code>scripts/hud.odin</code> supplies values.</p>
+<p>The game&#39;s adapter passes the predicted local player and tick plus the confirmed
+world into the HUD each frame. Health, ammunition, ability cooldowns and dash
+readiness therefore follow the same local state as the runner. Boss health and
+downed-teammate eligibility use confirmed state; the local revive hold displays
+its progress. A spectator sees the boss bar without personal health/ammo panels.
+The HUD retains neither a world nor a Session and makes no gameplay decisions.</p>
+<p>Health drains and changes color, including the plate&#39;s increased maximum. Q/E
+and Shift pips consume/refill through ordinary casts and dashes; status squares
+use catalog colors and remaining duration. The magazine distinguishes ready,
+low, jammed and reloading states, rises above the counter during a floor clear,
+and returns to its authored offsets on descent. The boss bar hides on death.</p>
+<p>Original dimensions/colors/texture regions come from the original <code>ui/hud.tscn</code>
+and <code>scripts/hud.odin</code>. This port labels its selected ability slots Q/E and its
+revive key F. The boss plate sits below the existing selected-ability name line;
+the prompt adds hold progress. These are authored adaptations rather than a
+pixel-identical HUD claim. Fill extents and magazine offsets are cached from the
+scene at ready, so editing those dimensions does not require renderer constants.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/hud_run.sh
+RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
+  RSY_HUD_CAPTURE=/absolute/existing/output/directory \
+  nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/hud_run.sh</code></pre></div><p>The gate drives the actual game in the workbench: preparation uses admitted
+development actions, then normal firing, casts, dash, purchases and boss combat
+exercise the displays. <code>revive_run.sh</code> checks the prompt across a multiplayer
+hold/cancel/completion, and <code>run_loop.sh</code> checks magazine placement across clears
+and descent. Existing workbench and shop gates remain runnable.</p>
+<p>See <span class="local-reference" title="docs/replay/results/scrapyard-hud-2026-09-07/README.md · available in the repository">evidence</span>.
+Native captures use Dummy audio because the local CoreAudio issue remains open.
+<a href="transitions.html">Run transitions</a> are now implemented. Browser interaction,
+additional platforms, listening/feel comparisons and
+broader UI parity remain work. The <a href="camera.html">downed-player camera</a> is now
+implemented and tested separately. The full roadmap is not completed by this HUD
+slice.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="transitions.html"><span>Run transitions</span><span aria-hidden="true">→</span></a><a href="camera.html"><span>Borrowed eyes</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/hud.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/hud.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

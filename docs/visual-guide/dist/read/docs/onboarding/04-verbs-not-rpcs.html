@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Writing a Kit command · odin_godot</title><meta name="description" content="Predict the target mutation. Let authority settle the request and commit its consequences."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>Writing a Kit command</h1><p class="reader-dek">Predict the target mutation. Let authority settle the request and commit its consequences.</p><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/04-verbs-not-rpcs.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#writing-a-command">Writing a command</a><a href="#command-rules">Command rules</a><a href="#prediction-in-practice">Prediction in practice</a><a href="#commands-that-transfer-control">Commands that transfer control</a></nav></details>
+<article class="reading-body "><p>A <strong>command</strong> is how a player runs a mutation and lets the host decide whether it&#39;s true. You reach for one whenever a player acts on shared state: taking an item, opening a door, striking a ball. This post shows what a command replaces and how to write one.</p>
+<p>Here is &quot;take an item from a chest&quot; the way every RPC tutorial teaches it:</p>
+<div class="code-block"><div class="code-title"><span>GDScript</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-gdscript"># The version you'd write with rpc() — abridged, and already going wrong
+func try_take(slot: int):
+    if multiplayer.is_server():
+        _do_take(slot)                      # host takes directly
+    else:
+        _request_take.rpc_id(1, slot)       # client asks the host
+
+@rpc(&quot;any_peer&quot;)
+func _request_take(slot: int):
+    if not multiplayer.is_server(): return  # trust nothing
+    var sender := multiplayer.get_remote_sender_id()
+    if not _can_take(sender, slot): return  # validate
+    _do_take_for(sender, slot)
+    _sync_chest.rpc(slots)                  # tell everyone
+    _grant_item.rpc_id(sender, slot)        # tell the taker</code></pre></div><p>There are two code paths for the same action (host vs client), so they <em>will</em>
+drift. The client&#39;s screen does nothing until the round trip finishes, so the
+game feels like the network. Two players taking the last item both pass their
+local checks, and the resolution is whatever race the RPCs happen to run. Every
+new verb repeats all of it.</p>
+<p>A command replaces that whole shape: a player wants to run a mutation, and the
+host decides if it&#39;s true. The pipeline around that idea is generated.</p>
+<h2 id="writing-a-command">Writing a command<a class="heading-anchor" href="#writing-a-command" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span> <span class="hljs-comment">// this chest is a world interaction</span>
+chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span class="hljs-type">u8</span>, count: <span class="hljs-type">u16</span>, px, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	taken := kitems.take(self.slots[:], <span class="hljs-type">int</span>(slot), count)
+	<span class="hljs-keyword">if</span> taken.count == <span class="hljs-number">0</span> {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	self.last_take = taken   <span class="hljs-comment">// scratch for the hook, below</span>
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}</code></pre></div><p>There is no networking in it: no <code>is_server()</code>, no sender ID, no sync call. It&#39;s
+single-player code that validates and mutates its entity, returning whether it
+happened. The attribute generates <code>chest_take_cmd</code>, and calling that does the
+right thing wherever it&#39;s called:</p>
+<ul>
+<li><strong>On the host:</strong> it runs directly. If it returns <code>true</code>, the mutation stands
+and the changed fields ride the ordinary delta walk to everyone (see post 3;
+there is no separate sync step, since the state machinery is the sync step).</li>
+<li><strong>On a client:</strong> it runs <strong>immediately</strong>, so the item appears in the
+prediction the same frame the player clicked, and the intent is sent to the
+host, which runs <em>the same proc</em> as the authority. If the host also says
+<code>true</code>, the client&#39;s prediction was right and nothing more happens.</li>
+<li><strong>If the host says no</strong> (out of range according to the host&#39;s truth, or the
+item is already gone), the client&#39;s predicted mutation <strong>reverts
+automatically</strong>, and the rejection carries the authoritative state back with
+it. A generated <code>&lt;game&gt;_command_rejected</code> half receives a typed reason such
+as <code>.Predicate</code>, <code>.Stale</code>, or <code>.Timeout</code>; gameplay never decodes a reply or
+guesses why silence happened.</li>
+</ul>
+<p>Run the race that broke the RPC version: two players grab the last item in the
+same instant. Both predict success, so both screens show the grab instantly. The
+host runs the two commands in arrival order: the first wins, the second returns
+<code>false</code>, and the loser&#39;s screen puts the item back a beat later. You wrote a
+range check and an inventory op; the pipeline handles conflict resolution.</p>
+<p>This is what lets gameplay code carry <strong>zero role branches</strong>. The roles differ
+only in <em>when the proc runs and what its return is allowed to mean</em>, and that is
+the generated part.</p>
+<h2 id="command-rules">Command rules<a class="heading-anchor" href="#command-rules" aria-label="Link to this section">#</a></h2>
+<p>Command procs must accept three constraints.</p>
+<p><strong>A command mutates only its target.</strong> <code>chest_take</code> touches the chest, period.
+It runs speculatively on clients and authoritatively on the host. If it also
+credited your bag, sent chat, and played a sound, all of that would run twice,
+or on the wrong machine, or before it was true.</p>
+<p><strong>Cross-entity consequences go in the hook.</strong> &quot;The loot lands in MY bag&quot; is the
+host&#39;s job, once, after the verdict:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">game_command_hook :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, player: knet.Player_Id,
+                          entity: knet.Net_Id, cmd: <span class="hljs-type">u16</span>, ok: <span class="hljs-type">bool</span>) {
+	<span class="hljs-keyword">if</span> !ok {<span class="hljs-keyword">return</span>}
+	<span class="hljs-keyword">switch</span> cmd {
+	<span class="hljs-keyword">case</span> CHEST_CMD_TAKE: <span class="hljs-comment">/* credit player&#x27;s bag from chest.last_take */</span>
+	}
+}</code></pre></div><p>The hook fires on the authority for every executed command (a client&#39;s or the
+host&#39;s own), so there&#39;s exactly one place where consequences happen.</p>
+<p><strong>Gate before you issue.</strong> A predicted command that will obviously fail (no
+stamina, dead, on cooldown) should be checked before calling <code>chest_take_cmd</code> at
+all: a refused prediction still crosses the wire, and the proc&#39;s own <code>false</code> is
+your safety net, not your UX.</p>
+<p>Everything inside the proc must also be <strong>deterministic and revertible</strong>. The
+kit&#39;s item/inventory ops (<code>kitems.take</code>, grid packing, stacking) are plain
+functions over plain data for this reason.</p>
+<h2 id="prediction-in-practice">Prediction in practice<a class="heading-anchor" href="#prediction-in-practice" aria-label="Link to this section">#</a></h2>
+<p>Wire it up and play with the built-in latency shim (every kit game exposes it as
+an env knob that injects 120ms of lag):</p>
+<ul>
+<li>Your clicks land <strong>now</strong>. Chests open, items move, doors unlock on your screen
+the frame you act.</li>
+<li>Truth arrives a tenth of a second later and, almost always, agrees.</li>
+<li>When it disagrees, the revert is small and honest: the item you &quot;took&quot; fades
+back because someone else was faster. Players read that instantly.</li>
+</ul>
+<p>The RPC version makes every interaction wait the round trip. Trusting the client
+instead lets a modified client rewrite your economy. Prediction with host
+verdicts is both responsive and honest, and it costs one attribute.</p>
+<h2 id="commands-that-transfer-control">Commands that transfer control<a class="heading-anchor" href="#commands-that-transfer-control" aria-label="Link to this section">#</a></h2>
+<p>Some verbs transfer <em>control</em> rather than items. Puttputt&#39;s golf mechanic is a
+strike command whose hook hands the ball&#39;s ownership to the striker: the ball
+becomes theirs to simulate (post 3&#39;s owner-streamed fields) until someone else
+putts. Grabbing, carrying, mounting, possession are all the same three lines.
+Ownership is just state.</p>
+<p>One question is left open. The loser&#39;s item &quot;fades back a beat later,&quot; and a
+remote player&#39;s pickup effect has to play on your screen at some point, but
+<em>when</em>? It is not simply &quot;when the state changes&quot;; the timing is the
+mental-model shift the next post covers.</p>
+<p><em>Next: <a href="05-the-two-timelines.html">The two timelines →</a></em></p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="05-the-two-timelines.html"><span>5 · The two timelines</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/04-verbs-not-rpcs.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#writing-a-command" class="">Writing a command</a><a href="#command-rules" class="">Command rules</a><a href="#prediction-in-practice" class="">Prediction in practice</a><a href="#commands-that-transfer-control" class="">Commands that transfer control</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/04-verbs-not-rpcs.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Browser identities and local checkpoints · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Browser identities and local checkpoints</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/browser_checkpoint.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>Browser_Identity</code> reads or creates a persistent 16-byte Session token through
+IndexedDB. Keep it at a stable address, poll it before opening a runner, and obtain
+the token through <code>browser_identity_token</code>. A token is published only in Ready.
+Missing records are created with CAS(0); a competing creator reads the winning
+record. Malformed data and storage failures never produce a volatile replacement.
+Explicit test tokens can bypass this helper; they are not account authentication.</p>
+<p><code>Browser_Checkpoint(S,C,A,E,N)</code> owns a local self-contained authority archive and
+its observed storage revision. It uses the same canonical checkpoint codec as
+native save/resume. Open it before a new run or explicit resume:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">storagegd.browser_identity_open(&amp;identity, <span class="hljs-string">&quot;my-game&quot;</span>)
+<span class="hljs-comment">// On subsequent frames:</span>
+storagegd.browser_identity_frame(&amp;identity)
+token, ready := storagegd.browser_identity_token(&amp;identity)
+<span class="hljs-comment">// Once ready, open one token-scoped slot with your model/content.</span>
+rgd.browser_checkpoint_open(&amp;slot, <span class="hljs-string">&quot;my-game&quot;</span>, slot_key, model, content, token)
+rgd.browser_checkpoint_frame(&amp;slot)</code></pre></div><p>Ready means the initial read completed. <code>has_checkpoint</code> distinguishes a missing
+slot from a validated archive. The loader checks the complete model/content
+contract and owning seat credential. This helper refuses permit-protected and
+custom-admission-policy archives: a local save is not a shortcut around Room
+approval. External asset dependencies need an application bundle, as Scrapyard
+already uses; they are not inferred from World.</p>
+<p>During play, call <code>browser_checkpoint_save(&amp;slot, &amp;session)</code> on a local authority.
+The function captures the complete frame and session ledgers once and submits an
+asynchronous write. A true return means submitted, not saved. Keep pumping the game
+and <code>browser_checkpoint_frame</code>. <code>receipt_serial</code> advances after a completed write
+attempt; <code>last_success</code>, <code>saved_tick</code>, <code>saved_hash</code> and <code>revision</code> report the result.
+The saved hash includes the frame tick. Storage and codec failures are reported
+separately. At most one write is outstanding in a slot.</p>
+<p>Writes use the slot&#39;s previously observed revision. They do not fetch a newer
+revision merely to enable replacement. A stale tab receives Conflict and retains
+the prior loaded archive; the stored winning archive is unchanged. Failed slots
+cannot write or resume until an explicit reopen/reload decision. An application
+can still permit a new unsaved run while clearly reporting that storage failed.</p>
+<p>The <code>checkpoint</code> is owned by the slot. Borrow it only while Ready for a synchronous
+<code>session_resume</code>, which copies the required state into the new runtime. Resume
+still requires the owning token and a newer authority epoch. Do not destroy the
+borrowed checkpoint. Keep the supplied model and any immutable model.user data
+alive for the slot&#39;s lifetime.</p>
+<p>Close with <code>browser_checkpoint_close</code> and <code>browser_identity_close</code> when their
+owner is released. Closing a pending write may discard a receipt after a commit
+has happened; it is not proof of rollback. Cavecrawl disables Leave while saving
+and reports success only after transaction completion. Browser termination can
+still interrupt a write, so reopening reads whichever revision actually committed.</p>
+<p>These helpers inherit the <a href="storage/browser_store.html">browser store</a> limits and durability
+boundary. Identity and save slots are separate transactions; a confirmed identity
+precedes session creation, so a completed save does not refer to an uncommitted
+new credential. Browser deletion/eviction and same-origin access still apply.
+There is no claim of portable power-loss durability or public identity provisioning.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/browser_checkpoint.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/browser_checkpoint.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

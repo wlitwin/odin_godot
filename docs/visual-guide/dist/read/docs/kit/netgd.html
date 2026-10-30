@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/netgd — the Godot transport binding · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/netgd — the Godot transport binding</h1><div class="reader-meta"><span>12 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/netgd.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-channel-plan">The channel plan</a><a href="#session_wire-and-the-four-forwarding-methods">Session_Wire and the four forwarding methods</a><a href="#hosting-and-joining">Hosting and joining</a><a href="#the-disconnect-signals-are-required">The disconnect signals are required</a><a href="#host-migration">Host migration</a><a href="#wire_receive-and-the-kind-byte">wire_receive and the kind byte</a><a href="#link-simulation">Link simulation</a><a href="#traffic-and-link-stats">Traffic and link stats</a><a href="#kicks-wire_drop">Kicks: wire_drop</a><a href="#pba_view">pba_view</a><a href="#swapping-transports">Swapping transports</a></nav></details>
+<article class="reading-body "><p><a href="net.html">kit/net</a> is the pure wire core and <a href="session.html">kit/session</a> is the pure session
+model. <strong>kit/netgd is the only place either touches Godot.</strong> It rides the engine&#39;s
+SceneMultiplayer raw-bytes path (<code>send_bytes</code> out, the <code>peer_packet</code> signal in) on top of
+whatever <code>MultiplayerPeer</code> the game installed. The ergonomic wrappers handle peer creation:
+<code>gd.host</code> / <code>gd.join</code> for ENet, <code>gd.webrtc_host</code> / <code>gd.webrtc_join</code> for browser room codes.
+This lets the toolkit work over every transport those support, and <a href="steamgd.html">Steam</a> slots
+in the same way. Riding SceneMultiplayer, rather than owning the peer and polling it, keeps
+<code>@(gd_rpc)</code> and the engine&#39;s spawner/synchronizer interop working alongside the toolkit.</p>
+<p>State ownership rule (same as the events package): <strong>no package globals</strong>. A session&#39;s
+transport state lives in the owning script&#39;s struct. The procs here are stateless sugar.</p>
+<h2 id="the-channel-plan">The channel plan<a class="heading-anchor" href="#the-channel-plan" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>channel 0</strong> is untouched: the engine&#39;s own RPC/replication traffic.</li>
+<li><strong><code>CHANNEL_RELIABLE</code> (1)</strong> carries commands, results, transitions, chat, and join
+snapshots. It is sent <code>RELIABLE</code> because this traffic is discrete and rare, so no loss
+handling is needed.</li>
+<li><strong><code>CHANNEL_STREAM</code> (2)</strong> carries owner-authoritative state snapshots. It is sent
+<code>UNRELIABLE_ORDERED</code> with last-value semantics: a drop is superseded by the next tick&#39;s
+snapshot.</li>
+</ul>
+<p>The transfer-mode aliases (<code>RELIABLE</code>, <code>UNRELIABLE_ORDERED</code>) and the raw send procs
+(<code>send_to</code>, <code>send_reliable</code>, <code>send_stream</code>) let call sites read as intent, but with a
+<code>Session_Wire</code> attached you rarely call them yourself: the session&#39;s <code>Send_Proc</code> does.</p>
+<p>If you hand-roll a <code>Send_Proc</code> (the raw-layer path), translate the peer through
+<code>wire_engine_peer(to_peer) -&gt; (engine_peer, ok)</code>. Never cast a <code>ksess.Peer_Id</code> to an engine
+int directly. The sentinels don&#39;t line up: kit&#39;s <code>BROADCAST_PEER</code> is <code>Peer_Id(-1)</code>, but the
+engine reads a raw -1 as &quot;all except peer 1&quot;, so a raw cast makes the server silently miss
+every broadcast. <code>wire_engine_peer</code> maps broadcast to the engine&#39;s 0 and returns <code>ok = false</code>
+for <code>NO_PEER</code>: a disconnected seat&#39;s peer reached the transport, so drop the send.</p>
+<h2 id="session_wire-and-the-four-forwarding-methods">Session_Wire and the four forwarding methods<a class="heading-anchor" href="#session_wire-and-the-four-forwarding-methods" aria-label="Link to this section">#</a></h2>
+<p><code>Session_Wire</code> is the session&#39;s transport binding: the <code>Send_Proc</code> adapter (kind byte +
+reliable/stream channel pick), the packet route, the engine&#39;s connection signals, and the
+client&#39;s join handshake, roughly 50 lines a game would otherwise write by hand. In a stock
+game it lives inside <a href="boot.html">kit/boot</a>&#39;s <code>Boot</code> (<code>boot.wire</code>; <code>boot_attach</code> runs the
+<code>wire_attach</code>/<code>wire_listen</code> calls below for you). Games that skip boot keep it as a field on
+the script struct and wire it directly.</p>
+<p>Godot signals <strong>must land on <code>@(gd_method)</code>s of a script</strong>. Scriptgen only processes game
+scripts, so the kit cannot own the receiving methods. The contract: the game keeps four
+one-line methods, and the wire owns everything behind them. From cavecrawl&#39;s
+<code>examples/cavecrawl/scripts/net.odin</code>, verbatim:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method)</span>
+cave_lobby_on_packet :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byte_Array) {
+	netgd.wire_receive(&amp;self.wire, id, packet)
+}
+
+<span class="hljs-meta">@(gd_method)</span>
+cave_lobby_on_peer_left :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, id: gd.Int) {
+	ksess.session_peer_disconnected(&amp;self.ses, ksess.Peer_Id(id))
+}
+
+<span class="hljs-meta">@(gd_method)</span>
+cave_lobby_on_net_up :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby) {
+	ksess.session_client_join(&amp;self.ses)
+}
+
+<span class="hljs-meta">@(gd_method)</span>
+cave_lobby_on_net_down :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby) {
+	ksess.session_peer_disconnected(&amp;self.ses, ksess.HOST_PEER)
+}</code></pre></div><p>Wiring, in <code>ready()</code> (from cavecrawl&#39;s <code>cavecrawl.odin</code>) and <code>process()</code>:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">netgd.wire_attach(&amp;self.wire, self.owner, &amp;self.ses, MSG_SESSION)
+netgd.wire_listen(&amp;self.wire, <span class="hljs-string">&quot;on_packet&quot;</span>, <span class="hljs-string">&quot;on_peer_left&quot;</span>, <span class="hljs-string">&quot;on_net_up&quot;</span>, <span class="hljs-string">&quot;on_net_down&quot;</span>)
+
+<span class="hljs-comment">// process():</span>
+netgd.wire_pump(&amp;self.wire, now_s())</code></pre></div><p><code>wire_attach</code> installs the session&#39;s <code>Send_Proc</code> (kind byte + reliable/stream channel pick);
+it survives <code>session_host_start</code> / <code>session_client_start</code> / <code>session_host_resume</code>, so call it
+once. <code>wire_listen</code> connects <code>peer_packet</code> → <code>on_packet</code>, <code>peer_disconnected</code> →
+<code>on_peer_left</code>, <code>connected_to_server</code> → <code>on_net_up</code>, and <strong>both</strong> <code>connection_failed</code> and
+<code>server_disconnected</code> → <code>on_net_down</code>. Call it after the node is in the tree (<code>ready()</code>
+qualifies). Empty method names skip that signal, but see <a href="#the-disconnect-signals-are-required">the disconnect
+signals</a> before you skip any.</p>
+<h2 id="hosting-and-joining">Hosting and joining<a class="heading-anchor" href="#hosting-and-joining" aria-label="Link to this section">#</a></h2>
+<p>Every game&#39;s Host/Join handlers repeat the same two-step: bring the transport up, then start
+the session over it. The wire owns both flavors:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// native (ENet) — the address is known before dialing</span>
+netgd.begin_host(&amp;wire, port, name, max_peers = <span class="hljs-number">32</span>, token = <span class="hljs-number">0</span>) -&gt; <span class="hljs-type">bool</span>  <span class="hljs-comment">// false = port taken</span>
+netgd.begin_join(&amp;wire, addr, port, token, name) -&gt; <span class="hljs-type">bool</span>
+
+<span class="hljs-comment">// browser (WebRTC room codes) — the relay ASSIGNS the code after the host connects</span>
+netgd.begin_host_web(&amp;wire, url, name, token = <span class="hljs-number">0</span>, room = <span class="hljs-string">&quot;&quot;</span>) -&gt; <span class="hljs-type">bool</span>  <span class="hljs-comment">// false = relay socket refused</span>
+netgd.begin_join_web(&amp;wire, url, room, token, name) -&gt; <span class="hljs-type">bool</span>
+netgd.web_poll(&amp;wire)   <span class="hljs-comment">// every frame: pumps the signaling handshake</span>
+netgd.web_close(&amp;wire)  <span class="hljs-comment">// full teardown — retry a failed join, or an heir raising a new room</span></code></pre></div><p><code>token</code> is the host&#39;s own reconnect token (see <a href="session.html">session</a>); it makes a dead host
+reclaimable after a host-migration handoff. <code>room</code> asks the relay to honor a RESERVED code
+instead of minting a fresh one. Host migration uses it: the current host reserves the next
+room code in advance, and the heir hosts under that reserved code while clients reconnect on
+exactly that code (empty = mint a fresh code, the ordinary host case). The web pair differs
+from ENet in one structural way: the room code <strong>does not exist yet</strong> when <code>begin_host_web</code>
+returns. The relay assigns it async. Pump <code>web_poll</code> each frame and read it back with
+<code>gd.webrtc_room_code(node)</code> when it lands; <code>gd.webrtc_session_state</code> /
+<code>gd.webrtc_error_reason</code> narrate the handshake for your lobby. Everything above these calls
+(session, muster, commands, replication) is the same code path on both transports; the branch
+ends the moment the multiplayer peer installs.</p>
+<p><a href="boot.html">kit/boot</a> wraps both flavors with the stock lobby ceremony: <code>boot_host</code> /
+<code>boot_join</code> and their <code>boot_host_web</code> / <code>boot_join_web</code> twins.</p>
+<p>All four <code>begin_*</code> calls are <strong>sugar</strong> over one mechanism: <code>transport_host</code> /
+<code>transport_join</code> with the flavor picked for you. They are the shortest way to spell the common
+case and the names games already say; reach for the generic pair when the transport is a
+<em>variable</em> (a settings menu, a fallback chain, kit/boot&#39;s doors). See <a href="#swapping-transports">Swapping
+transports</a>.</p>
+<h3 id="native-enet-join-codes">Native ENet join codes<a class="heading-anchor" href="#native-enet-join-codes" aria-label="Link to this section">#</a></h3>
+<p>&quot;Send your friend a four-letter code&quot; without Steam and without reading out an IP: the same
+relay the browser build already talks to (native room mode: <code>tests/webrtc/signal_server.mjs</code>
+is the reference; the production relay speaks it at <code>/rtc</code>) becomes a phonebook for plain
+ENet. The host registers its bound port under a minted code; a joiner trades the code for the
+host&#39;s observed endpoint; the join proceeds exactly as <code>begin_join</code> does.</p>
+<p><strong>A kit game uses the boot doors</strong>, the same shape as every other door, and its
+generated <code>&lt;game&gt;_net_frame</code> drives the whole rendezvous through Boot (the
+host&#39;s minted code lands in the lobby status and <code>boot_room_code</code>; a
+joiner&#39;s resolved endpoint walks through <code>boot_join</code> on its own; a bad code
+restores the menu with the reason):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host — instead of boot_host (also: kui.lobby_show_code reveals the stock</span>
+<span class="hljs-comment">// lobby&#x27;s code field, and kui.lobby_code reads what the human typed):</span>
+kboot.boot_host_coded(&amp;self.boot, RELAY_URL, port, name)
+<span class="hljs-comment">// joiner — a CODE instead of an address; no port, no IP:</span>
+kboot.boot_join_code(&amp;self.boot, RELAY_URL, <span class="hljs-string">&quot;KWXP&quot;</span>, token, name)</code></pre></div><p>Games below the boot (or with their own lobby flow) drive <code>code.odin</code> raw:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, AFTER begin_host(port) succeeded:</span>
+netgd.code_host_open(&amp;rdv, RELAY_URL, port)
+<span class="hljs-comment">// joiner, INSTEAD of an address:</span>
+netgd.code_join_open(&amp;rdv, RELAY_URL, <span class="hljs-string">&quot;KWXP&quot;</span>)
+
+<span class="hljs-comment">// both, every frame, until it resolves:</span>
+<span class="hljs-keyword">switch</span> netgd.code_poll(&amp;rdv, &amp;wire) {
+<span class="hljs-keyword">case</span> .Ready:
+    <span class="hljs-keyword">if</span> rdv.is_host {show(netgd.code_room(&amp;rdv))} <span class="hljs-comment">// the code to share</span>
+    <span class="hljs-keyword">else</span> {ip, port := netgd.code_endpoint(&amp;rdv); begin_join(&amp;wire, ip, port, token, name)}
+<span class="hljs-keyword">case</span> .Failed: <span class="hljs-comment">// rdv.err: .No_Room (typo / host gone), .Full, .Closed — say WHY,</span>
+              <span class="hljs-comment">// then point at the doors that always work (browser, Steam)</span>
+}</code></pre></div><p><code>examples/hello_net</code> is the worked consumer of the boot doors (its <code>run.sh</code> join-by-code act
+proves the full loop against a local relay; with <code>HELLO_RELAY</code> set, its lobby grows the code
+field). <strong>NAT coverage:</strong> this covers the same-LAN pair, the port-forwarded or public host,
+and the common port-preserving home NAT (the relay hands the host each joiner&#39;s observed
+endpoint and <code>wire_punch</code> warms the mapping with a few UDP packets). Symmetric NATs it does
+NOT cover: there is no TURN for raw ENet. When the connect times out, say so and offer the
+browser build (WebRTC + TURN) and Steam, which always work. A copyable code serves most
+players; the two spare doors serve the rest.</p>
+<h2 id="the-disconnect-signals-are-required">The disconnect signals are required<a class="heading-anchor" href="#the-disconnect-signals-are-required" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Unwired <code>peer_disconnected</code>: an alt-F4&#39;d client haunts the roster forever, and the host
+keeps sending to a ghost.</li>
+<li>Unwired <code>connection_failed</code>: a failed join hangs on &quot;Joining...&quot; with no way out. The same
+forward handles <code>server_disconnected</code>, treating a vanished server as host loss.</li>
+</ul>
+<p>A misspelled forward compiles clean but fails at runtime, so scriptgen validates every literal
+method name passed to <code>wire_listen</code> / <code>listen_packets</code> (and <code>boot_attach</code>&#39;s <code>methods</code>) against
+the script&#39;s registered <code>@(gd_method)</code>s: a typo is a build error; an empty string is a skip.</p>
+<h2 id="host-migration">Host migration<a class="heading-anchor" href="#host-migration" aria-label="Link to this section">#</a></h2>
+<p>The session decides which peer becomes the new host, the heir
+(<a href="session.html#backup-hosting-and-resume">session</a>). <code>netgd.Succession</code> owns HOW the survivors
+find that heir. <code>kboot</code>&#39;s state machine owns WHEN: the window, the retry policy, and the
+deferred mechanics (<code>boot_migration</code> wires the whole flow, and most games never touch this
+layer directly). The handoff record is typed as <code>[kind u8][payload]</code>, encoded and decoded
+only here (<code>succession_decode</code>), so a new transport adds a <code>Rendezvous_Kind</code> and two switch
+arms, never a string-format negotiation:</p>
+<ul>
+<li><strong><code>.Native_Addr</code></strong> is <code>[addr][port]</code>: the heir&#39;s address as the host saw it, plus the
+seat-derived port the heir will bind. ENet-only: a transport with no peer-address story
+cannot provide this handoff, and warns once rather than silently shipping no migration.</li>
+<li><strong><code>.Web_Room</code></strong> is <code>[code]</code>: the relay honors reservations on create, so the host reserves
+the next room code in advance; the heir hosts under it and survivors reconnect on boot&#39;s
+timer (a browser cannot block, and the heir needs a moment to open the room). A Steam lobby
+id is the reserved next kind.</li>
+</ul>
+<p>Configure once (<code>Succession{kind, signal_url, base_port, token, name}</code>; <code>boot_succ_config</code>
+does it for door games), then the verbs are stateless: <code>succession_torch</code> on
+<code>Ev_Backup_Target</code> (host) publishes the handoff, <code>succession_raise</code> (heir), <code>succession_dial</code>
+(one attempt at a decoded rendezvous: <code>kboot</code>&#39;s machine owns tries, gaps, and give-up;
+<code>succession_named</code> peeks so a handoff with no named successor leaves the world standing). The
+game keeps its campaign blob, its census wipe, and its words, as <code>boot_migration</code> halves.</p>
+<h2 id="wire_receive-and-the-kind-byte">wire_receive and the kind byte<a class="heading-anchor" href="#wire_receive-and-the-kind-byte" aria-label="Link to this section">#</a></h2>
+<p>Every wire packet leads with the game&#39;s one message byte (the <code>kind</code> passed to <code>wire_attach</code>).
+<code>wire_receive</code> checks <code>view[0] != wire.kind</code> and returns early: other kinds are not the
+wire&#39;s, and the game routes those itself <em>before</em> calling <code>wire_receive</code>. This is how session
+traffic shares <code>peer_packet</code> with any other raw-bytes protocol the game runs.</p>
+<h2 id="link-simulation">Link simulation<a class="heading-anchor" href="#link-simulation" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">wire_set_latency :: <span class="hljs-keyword">proc</span>(wire: ^Session_Wire, ms: <span class="hljs-type">int</span>, jitter_ms := <span class="hljs-number">0</span>, loss_pct := <span class="hljs-number">0</span>, burst := <span class="hljs-number">1</span>, bandwidth_bps := <span class="hljs-number">0</span>)</code></pre></div><p>Injects one-way <strong>receive</strong> latency (0 disables): every packet this peer receives is held
+that long before the session sees it, buffered in the wire and delivered by <code>wire_pump</code>. The
+delay is app-side, above the transport, so ENet&#39;s acks and retransmits still flow at protocol
+level; what you are testing is your <em>game&#39;s</em> feel under real round trips, not the socket&#39;s.
+The toolkit&#39;s integration tests run at 120 ms to verify that prediction responds immediately
+while confirms measurably ride the slow wire.</p>
+<p><code>jitter_ms</code> adds a uniform extra <code>[0, jitter)</code> per packet, with one constraint: delivery stays
+FIFO per sender (the shim sits above ENet&#39;s already-ordered channels, and reordering here
+would break the ordered-reliable contract). <code>loss_pct</code> is channel-honest the same way: a
+<strong>stream</strong> batch rolls the dice and vanishes (last-value semantics: the next batch supersedes
+it, which is the real behavior of the unreliable channel), while <strong>reliable</strong> traffic must
+arrive, so its &quot;loss&quot; costs what loss really costs a reliable channel: a retransmit&#39;s worth of
+extra delay.</p>
+<p>Two more knobs model links that are cruel, not just bad. <code>burst</code> is the mean lost-run length
+in packets: at 1 (the default) losses are independent coin flips; past it they arrive
+Gilbert-Elliott style, with long clean stretches, then a burst that eats <code>~burst</code> consecutive
+packets, at the <em>same average rate</em>. Bursts matter because a redundant input window shrugs off
+scattered drops but can be wiped out whole inside one burst, and reliable-channel losses in a
+burst stack their retransmit delays, which is the pattern real WiFi and cellular produce.
+<code>bandwidth_bps</code> caps the modeled downlink (bytes/s, one pipe shared by every sender):
+sustained overflow doesn&#39;t drop, it QUEUES, and the delay grows. This is bufferbloat, the
+failure narrow links have long before loss shows up. Up/down asymmetry needs no knob: each end
+shims its own <em>receive</em>, so a bad uplink is the OTHER window&#39;s numbers (the integration tests
+run each process with its own env). Not modeled: per-peer mixing on one receiver. One flaky
+friend among good ones shares your whole shimmed downlink.</p>
+<p>kit/boot wires all five off env for you:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">QD_LATENCY=120 QD_JITTER=30 QD_LOSS=3 ./run_two_windows.sh        <span class="hljs-comment"># the classic trio</span>
+QD_LOSS=3 QD_BURST=4 QD_BANDWIDTH=16000 ./run_two_windows.sh      <span class="hljs-comment"># cruel: bursty loss on a 16KB/s pipe</span></code></pre></div><h2 id="traffic-and-link-stats">Traffic and link stats<a class="heading-anchor" href="#traffic-and-link-stats" aria-label="Link to this section">#</a></h2>
+<p>Every framed byte the wire sends or receives is tallied by session message kind (state,
+stream, cmd, spawn, app; app is split by its tag byte, so the sim lane&#39;s traffic is named,
+not lumped), windowed per second. Two reads:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">netgd.wire_traffic(&amp;wire) -&gt; <span class="hljs-type">string</span>
+<span class="hljs-comment">// &quot;rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3&quot;</span>
+netgd.wire_rates(&amp;wire) -&gt; Wire_Rates <span class="hljs-comment">// packets/s and bytes/s, in/out</span>
+netgd.wire_link_quality(&amp;wire, peer) -&gt; (rtt_ms, jitter_ms, loss_pct, ok)</code></pre></div><p><code>wire_traffic</code> is the <a href="ui.html">netgraph</a>&#39;s traffic row; <code>wire_rates</code> is the same
+completed one-second gauge as numeric aggregate packet/byte rates. Boot fills
+both automatically. You can watch a chatty field&#39;s bytes move as you tune
+<code>wire=f16</code>, stream rates, or interest.
+<code>wire_link_quality</code> reads ENet&#39;s own per-peer statistics (smoothed rtt, rtt variance, packet
+loss ×<code>PACKET_LOSS_SCALE</code>), the transport&#39;s view, meaningful on clients about the host
+(<code>ksess.HOST_PEER</code>); a host asks per client peer. quickdraw&#39;s netgraph fill is the worked
+example.</p>
+<h2 id="kicks-wire_drop">Kicks: wire_drop<a class="heading-anchor" href="#kicks-wire_drop" aria-label="Link to this section">#</a></h2>
+<p>A kick is two calls: <code>ksess.session_kick</code> unseats the player (and tells them why); the wire
+severs their socket. An <strong>immediate</strong> ENet disconnect races its own outgoing queue: the
+<code>SES_KICKED</code> the session just sent would be discarded, and the kicked player would see a
+host-crash instead of the reason. So:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">wire_drop :: <span class="hljs-keyword">proc</span>(wire: ^Session_Wire, peer: ksess.Peer_Id, after := <span class="hljs-number">0.75</span>)</code></pre></div><p>schedules the close; <code>wire_pump</code> performs it after the reliable queue has flushed and acked.
+The session already ignores the unseated peer, so nothing it sends in the gap matters. From
+cavecrawl:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">was, ok := ksess.session_kick(&amp;self.ses, target, ban = <span class="hljs-literal">true</span>)
+<span class="hljs-keyword">if</span> !ok {<span class="hljs-keyword">return</span>}
+netgd.wire_drop(&amp;self.wire, was) <span class="hljs-comment">// deferred: the KICKED message flushes first</span></code></pre></div><p>The actual close is <code>drop_peer(node, peer)</code>, usable directly when you don&#39;t need the delay.
+It calls <code>multiplayer_peer_disconnect_peer</code> with <code>force=false</code>, graceful for the same flush
+reason.</p>
+<h2 id="pba_view">pba_view<a class="heading-anchor" href="#pba_view" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">pba_view :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (pba: ^gd.Packed_Byte_Array) -&gt; []<span class="hljs-type">u8</span></code></pre></div><p><code>pba_view</code> returns a zero-copy view of a <code>Packed_Byte_Array</code>&#39;s contents. It is valid only
+while the array is alive, i.e. inside the receiving method call. Feed it to
+<code>knet.reader_make</code>; clone anything you keep. For raw-bytes listening without a
+<code>Session_Wire</code>, <code>listen_packets(node, method)</code> connects <code>peer_packet</code> to a single
+<code>@(gd_method)</code> on the same node&#39;s script.</p>
+<p><code>gd.packed_byte_array_view</code> is the underlying helper (engine-type ergonomics, not
+networking). <code>netgd.pba_view</code> is an alias for it; every packet handler in the tree opens with
+it, so the short spelling stays.</p>
+<h2 id="swapping-transports">Swapping transports<a class="heading-anchor" href="#swapping-transports" aria-label="Link to this section">#</a></h2>
+<p>The data plane is transport-agnostic: SceneMultiplayer&#39;s signals fire identically over any
+<code>MultiplayerPeer</code>, which is why nothing on this page mentions ENet specifics: the wire never
+sees the transport. The control plane (open, pump, close, who-is-that-peer) is captured in
+one record (<code>transport.odin</code>):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Transport :: <span class="hljs-keyword">struct</span> {
+    name:       <span class="hljs-type">string</span>,           <span class="hljs-comment">// &quot;enet&quot; / &quot;webrtc&quot; / &quot;steam&quot;</span>
+    rendezvous: Rendezvous_Kind,  <span class="hljs-comment">// the handoff flavor `address` feeds (.None = cannot migrate)</span>
+    open_host:  <span class="hljs-keyword">proc</span>(wire, at: Endpoint, name: <span class="hljs-type">string</span>, token: <span class="hljs-type">u64</span>, dedicated: <span class="hljs-type">bool</span>) -&gt; <span class="hljs-type">bool</span>,
+    open_join:  <span class="hljs-keyword">proc</span>(wire, at: Endpoint, name: <span class="hljs-type">string</span>, token: <span class="hljs-type">u64</span>, spectate: <span class="hljs-type">bool</span>) -&gt; <span class="hljs-type">bool</span>,
+    pump:       <span class="hljs-keyword">proc</span>(wire),       <span class="hljs-comment">// nil = the engine polls it</span>
+    close:      <span class="hljs-keyword">proc</span>(wire),       <span class="hljs-comment">// nil = nothing outlives the peer</span>
+    link:       <span class="hljs-keyword">proc</span>(wire, peer) -&gt; (rtt_ms, jitter_ms, loss_pct: <span class="hljs-type">f64</span>, ok: <span class="hljs-type">bool</span>),
+    address:    <span class="hljs-keyword">proc</span>(wire, peer, allocator) -&gt; (<span class="hljs-type">string</span>, <span class="hljs-type">bool</span>),
+}
+
+Endpoint :: <span class="hljs-keyword">struct</span> {   <span class="hljs-comment">// WHERE a run lives, in the flavor its transport understands</span>
+    addr: <span class="hljs-type">cstring</span>,     <span class="hljs-comment">// native: the host&#x27;s address (join) · web: the relay url</span>
+    port: <span class="hljs-type">int</span>,         <span class="hljs-comment">// native: the port to bind or dial</span>
+    room: <span class="hljs-type">cstring</span>,     <span class="hljs-comment">// web: the room code — reserved on host, knocked on join</span>
+    peer_id: <span class="hljs-type">u64</span>,      <span class="hljs-comment">// steam: the host&#x27;s steam id (join)</span>
+    max_peers: <span class="hljs-type">int</span>,    <span class="hljs-comment">// host: seat cap (0 = the transport&#x27;s default)</span>
+}</code></pre></div><p><code>open_host</code> / <code>open_join</code> are <strong>required</strong>; the rest are optional. A nil slot is a documented
+degradation with a stated consequence:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>slot</th>
+<th>nil means</th>
+<th>what the user sees</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pump</code></td>
+<td>the engine polls it (ENet, Steam)</td>
+<td>nothing, one nil check per frame</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td>nothing outlives the peer</td>
+<td>a re-host binds clean anyway</td>
+</tr>
+<tr>
+<td><code>link</code></td>
+<td>no per-peer statistics story</td>
+<td>the netgraph blanks its link row instead of showing a confident zero</td>
+</tr>
+<tr>
+<td><code>address</code></td>
+<td>no rendezvous handle for a peer</td>
+<td><strong>host migration is off</strong>, and <code>succession_torch</code> says so once, naming the transport</td>
+</tr>
+</tbody></table>
+</div><p><code>transport_host</code> / <code>transport_join</code> open a wire and the wire remembers its transport;
+<code>transport_service</code> (the per-frame pump, driven for you by generated
+<code>&lt;game&gt;_net_frame</code> through Boot), <code>transport_close</code>,
+<code>wire_link_quality</code>, and the succession handoff all dispatch through that remembered
+transport. A wire opened the RAW way (<code>gd.host</code> by hand, then <code>wire_attach</code>) never named one
+and reads as ENet. This is safe because every ENet verb class-checks the installed peer and
+answers <code>ok = false</code> when it is something else.</p>
+<p>Shipped records: <code>netgd.ENET</code>, <code>netgd.WEBRTC</code>, and <code>ksteam.TRANSPORT</code>
+(<a href="steamgd.html">steamgd.md</a>). A fourth transport fills one record and inherits every door,
+the lobby ceremony, the control-plane pump, and the succession config: <code>Session_Wire</code> and
+the four forwards are byte-for-byte the same in every case.</p>
+<p><strong>Cross-play.</strong> A session never MIXES transports: every peer of one session rides the
+same <code>MultiplayerPeer</code> flavor (ENet, WebRTC, or Steam), because there is one multiplayer
+peer under the SceneMultiplayer and every seat is a peer on it. &quot;Swappable&quot; means the
+host picks the door for the whole run, not that peers pick doors per seat: a Steam owner
+hosting for a non-Steam friend hosts on ENet or WebRTC, and the Steam friends walk
+through that door like everyone else. The neighboring features and their status:</p>
+<ul>
+<li><strong>LAN discovery</strong> is not shipped. A broadcast ping is easy to hand-roll (UDP broadcast
+the port, <code>begin_join</code> what answers); the join-code door already covers the same-LAN
+pair without it.</li>
+<li><strong>Server browser</strong> is not shipped, and it is not a weekend project: a browser needs a
+directory service, the join-code relay grown up into registration, listing, and
+liveness. The join-code helper covers only the rendezvous step.</li>
+<li><strong>Splitscreen</strong> means one process, one seat. The session has one identity per process;
+two players on one couch sharing a screen is a game-side input/camera problem the
+toolkit doesn&#39;t model.</li>
+<li><strong>Consoles</strong> are untested, and no platform transports exist here. The engine-free core
+would port; the door glue (a platform&#39;s session/invite API as a <code>MultiplayerPeer</code>)
+is the real work, and nobody has done it.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/netgd.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-channel-plan" class="">The channel plan</a><a href="#session_wire-and-the-four-forwarding-methods" class="">Session_Wire and the four forwarding methods</a><a href="#hosting-and-joining" class="">Hosting and joining</a><a href="#native-enet-join-codes" class="subsection">Native ENet join codes</a><a href="#the-disconnect-signals-are-required" class="">The disconnect signals are required</a><a href="#host-migration" class="">Host migration</a><a href="#wire_receive-and-the-kind-byte" class="">wire_receive and the kind byte</a><a href="#link-simulation" class="">Link simulation</a><a href="#traffic-and-link-stats" class="">Traffic and link stats</a><a href="#kicks-wire_drop" class="">Kicks: wire_drop</a><a href="#pba_view" class="">pba_view</a><a href="#swapping-transports" class="">Swapping transports</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/netgd.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

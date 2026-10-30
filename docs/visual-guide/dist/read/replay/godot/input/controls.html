@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Device controls and signal actions · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Device controls and signal actions</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/input/controls.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>Input_Binding(Control)</code> interns InputMap names once and maps buffered button
+values to your ordinary game Control type. It stays outside World. A mapper can
+also read presentation-owned aim/device data through its borrowed user pointer;
+it must return a detached value and must not mutate the simulation.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">bindings := [<span class="hljs-number">2</span>]inputgd.Input_Action{{<span class="hljs-string">&quot;ui_left&quot;</span>, <span class="hljs-number">0</span>}, {<span class="hljs-string">&quot;ui_right&quot;</span>, <span class="hljs-number">1</span>}}
+controls: inputgd.Input_Binding(Control)
+ok := inputgd.input_binding_init(&amp;controls, bindings[:], Control{},
+    <span class="hljs-keyword">proc</span>(_: <span class="hljs-type">rawptr</span>, buttons: replay.Buttons) -&gt; Control {
+        <span class="hljs-keyword">return</span> {move=<span class="hljs-type">i8</span>(buttons.held &amp; <span class="hljs-number">2</span> != <span class="hljs-number">0</span>)-<span class="hljs-type">i8</span>(buttons.held &amp; <span class="hljs-number">1</span> != <span class="hljs-number">0</span>)}
+    })
+
+<span class="hljs-comment">// Once per engine frame; combine all applicable gates.</span>
+inputgd.input_binding_sample(&amp;controls, {.Menu})
+value := inputgd.input_binding_read(&amp;controls)
+<span class="hljs-comment">// After a tick/control submission commits:</span>
+inputgd.input_binding_consume(&amp;controls)</code></pre></div><p>Up to 64 unique actions map to unique bits. Capture coalesces repeated presses of
+the same button within one simulation tick, while preserving simultaneous press
+and release. Reading does not consume; failed simulation steps keep their edges.
+Held state remains after consuming edges. For a Session that accepts controls once
+per render frame, consume only after successful submission according to that
+runner&#39;s input contract; this helper does not change its scheduling.</p>
+<p><code>Paused</code>, <code>Unfocused</code>, <code>Menu</code> and <code>Inspecting</code> gates return the supplied neutral
+Control and discard buffered edges. A button held across a gate transition must
+be released before reuse. Supply gates before sampling each frame; application
+code decides focus/menu eligibility rather than the library guessing from an
+arbitrary Control node. Analog axes can be sampled in the mapper; applications
+with analog hold/rearm requirements must apply their own dead-zone policy.
+The engine-free <code>replay.Control_Capture</code> exposes the same bit/edge/gate behavior.</p>
+<h1 id="signal-actions">Signal actions<a class="heading-anchor" href="#signal-actions" aria-label="Link to this section">#</a></h1>
+<p><code>Signal_Action(Action)</code> connects a no-argument signal such as Button.pressed to a
+typed payload constructor and the existing <code>Action_Intent</code>. Keep it at a stable
+address. Emitter and user must outlive it; destroy/disconnect before freeing them.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">buy: inputgd.Signal_Action(Action)
+ok := inputgd.signal_action_init(&amp;buy, button, <span class="hljs-string">&quot;pressed&quot;</span>,
+    <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>) -&gt; (Action, <span class="hljs-type">bool</span>) {
+        ui := <span class="hljs-keyword">cast</span>(^Shop_UI)user
+        <span class="hljs-keyword">return</span> Action{item=ui.selected_item}, ui.selection_valid
+    }, &amp;shop_ui)
+
+inputgd.signal_action_gate(&amp;buy, gates) <span class="hljs-comment">// cancel only unsubmitted input by default</span>
+sequence, error := inputgd.session_bound_action(&amp;session, &amp;buy)
+<span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes {
+    inputgd.bound_action_observe(&amp;buy, &amp;session, change)
+}</code></pre></div><p>The payload is copied on the click. Another click while a payload awaits
+submission returns Capacity and preserves the first click. There is no hidden
+unbounded click queue. Call the submit helper every frame: backpressure/fencing
+retains the payload; accepted submission transfers delivery to the action ledger.
+<code>room_bound_action</code> provides the Room equivalent. Confirmed epoch-scoped results,
+including recovered tickets, remain in <code>buy.intent</code>; ordinary prediction cannot
+settle an action. Recovery reports are processed even while UI submission is gated.</p>
+<p>Gates reject new captures. Default Cancel drops only unsubmitted work; Keep holds
+it until the gate clears. Neither can cancel work already accepted by the ledger.
+Update gate state before signals can arrive (including inside menu/focus handlers),
+then sample/submit in your frame loop. The library cannot infer when your UI became
+ineligible. Programmatic <code>signal_action_capture</code> uses the same typed latch.
+Signals with arguments should use a normal typed script handler to construct the
+action, or a separate adapter; this initial binding accepts no-argument signals.</p>
+<p>Destroying a binding disconnects its callable and discards local tracking. It does
+not cancel an action already in a running Session. Consume results/recovery in
+order, and use explicit session lifecycle boundaries before reusing an owner.
+See <a href="intents.html">intent contracts</a> for counters and result semantics, and
+<code>tests/replay_nodes/scripts/input.odin</code> for the compile-checked engine example.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="intents.html"><span>Copied action intents</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/input/controls.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/input/controls.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

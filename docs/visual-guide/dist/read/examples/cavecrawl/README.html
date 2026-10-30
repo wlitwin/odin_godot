@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>cavecrawl — the co-op reference · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>cavecrawl — the co-op reference</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/cavecrawl/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>This is the broadest co-op Kit example: a drop-in cave crawler that exercises
+sessions with reconnect
+identity, declarative replication, predicted commands with <code>_then</code>
+consequences, the generated entity factory, items and chests, host-validated
+combat, hostile AI, positional pings, quit-and-resume saves, host migration,
+and the ENet↔Steam transport swap. It was grown one phase at a time (lobby →
+chat → lootable world → predicted combat → dwellers → saves), and
+<a href="../../docs/kit/build-a-game-in-a-day.html">build-a-game-in-a-day</a> retraces
+that arc brick by brick — when a step there feels terse, the corresponding
+file here is the long answer.</p>
+<p>The example contains about 4,500 hand-written lines and is deliberately the largest
+example — the place to see every pattern coexisting in one game. For the
+smallest complete kit game read <span class="local-reference" title="examples/slopball/ · available in the repository">slopball</span> first; for the
+server-authority model read <span class="local-reference" title="examples/quickdraw/ · available in the repository">quickdraw</span> and
+<span class="local-reference" title="examples/speedball/ · available in the repository">speedball</span> (<a href="../../docs/kit/timelines.html">choosing a model</a>).</p>
+<p>The multiplayer author surface is the entity files — a struct with
+<code>gd:&quot;replicate&quot;</code> tags, verbs as <code>@(gd_command)</code> procs, a <code>_process</code> that
+dresses from fields:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_OWNER_PREDICTED)</span>
+door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	self.open = !self.open
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}</code></pre></div><p>One class, many files, split the way a real game is:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>file</th>
+<th>owns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cavecrawl.odin</code></td>
+<td>the vocabulary, the CaveLobby state, ready/process</td>
+</tr>
+<tr>
+<td><code>net.odin</code></td>
+<td>identity + the Host/Join/Steam doors (the transport forwards are generated)</td>
+</tr>
+<tr>
+<td><code>world.odin</code></td>
+<td>census hooks, spawns, the interact prompt</td>
+</tr>
+<tr>
+<td><code>input.odin</code></td>
+<td>keys/mouse and the player verbs they drive</td>
+</tr>
+<tr>
+<td><code>rocks.odin</code></td>
+<td>peer-owned projectile visuals — the zero-felt-lag story</td>
+</tr>
+<tr>
+<td><code>host.odin</code></td>
+<td>the authority: game tick, dweller brains</td>
+</tr>
+<tr>
+<td><code>save.odin</code></td>
+<td>the run on disk (session snapshot + game blob)</td>
+</tr>
+<tr>
+<td><code>queries.odin</code></td>
+<td>read-only windows for HUDs and test drivers</td>
+</tr>
+<tr>
+<td><code>spelunker/chest/door/pickup/dweller/relic.odin</code></td>
+<td>the entities, a file each</td>
+</tr>
+</tbody></table>
+</div><div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh examples/cavecrawl
+<span class="hljs-variable">$GODOT</span> --path examples/cavecrawl          <span class="hljs-comment"># host, join from a second window</span>
+
+bash examples/cavecrawl/run.sh            <span class="hljs-comment"># integration test: multiple real ENet processes,</span>
+                                          <span class="hljs-comment"># 120ms injected latency (CAVECRAWL_OK)</span></code></pre></div><p>The integration test (<code>run.sh</code> + <code>cave_test.gd</code>) is a reusable pattern for
+testing a game: real processes over real sockets drive the <code>@(gd_method)</code>
+surface and assert against log lines. Loot
+races, predicted combat under latency, a kill mid-flight, quit-and-resume,
+and a host handover all run headless from <code>tests/run_all.sh</code>.</p>
+<p>WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores
+· Enter chat. Env: <code>CAVE_PORT</code> · <code>CAVE_NAME</code> · <code>CAVE_TOKEN</code> (distinct
+same-machine identities) · <code>CAVE_STEAM=0</code> (force ENet when Steam is
+running; Steam lobbies use the Spacewar app id, see
+<a href="../../docs/kit/steamgd.html">steamgd</a>).</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/cavecrawl/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/cavecrawl/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

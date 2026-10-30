@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>godot:play: reusable gameplay blocks · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>godot:play: reusable gameplay blocks</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/play.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#networked-blocks">Networked blocks</a><a href="#simulation-lane-blocks">Simulation-lane blocks</a><a href="#local-helpers">Local helpers</a><a href="#owner-simulated-physics-with-playpuppet">Owner-simulated physics with play.Puppet</a><a href="#playpuppet3">play.Puppet3</a></nav></details>
+<article class="reading-body "><p><code>godot:play</code> contains small gameplay components and presentation helpers used by
+the Kit examples. Networked blocks are embedded in an entity struct. Script
+generation flattens their tagged fields into the entity descriptor and hoists
+their commands onto the entity&#39;s generated command table.</p>
+<p>The package provides policy and reusable state, not complete game features. A
+weapon block can decide whether a trigger pull fires; the game still decides
+what projectile to spawn, what it may hit, and how the result affects the world.</p>
+<h2 id="networked-blocks">Networked blocks<a class="heading-anchor" href="#networked-blocks" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Replication model</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>play.Gun</code></td>
+<td>Reliable host state with an optimistic command</td>
+<td>Magazine, reload, jam, and clear state. <code>Gun_Def</code> supplies configuration.</td>
+</tr>
+<tr>
+<td><code>play.Ability</code></td>
+<td>Reliable host state with an optimistic command</td>
+<td>Cooldown-gated casts. The game supplies resource cost and effect policy.</td>
+</tr>
+<tr>
+<td><code>play.Channel</code></td>
+<td>Owner stream plus a host command</td>
+<td>Hold progress and target for revive, capture, hack, or cast-bar interactions. The host must validate the final claim.</td>
+</tr>
+<tr>
+<td><code>play.Health</code></td>
+<td>Reliable host state</td>
+<td>Hit points, maximum hit points, damage, heal, and death-transition helpers. It declares no player command.</td>
+</tr>
+<tr>
+<td><code>play.Telegraph</code></td>
+<td>Reliable host state</td>
+<td>A tick-based wind-up and landing test for warnings, traps, and enemy attacks.</td>
+</tr>
+<tr>
+<td><code>play.Puppet</code></td>
+<td>Owner stream</td>
+<td>A <code>RigidBody2D</code> simulated by one peer and displayed by all others.</td>
+</tr>
+<tr>
+<td><code>play.Puppet3</code></td>
+<td>Owner stream</td>
+<td>The corresponding <code>RigidBody3D</code> block, including quaternion rotation and angular velocity.</td>
+</tr>
+</tbody></table>
+</div><p>Example composition:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Runner :: <span class="hljs-keyword">struct</span> {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	health: play.Health,
+	weapon: play.Gun,
+	lob:    play.Ability,
+}</code></pre></div><p>This contributes the blocks&#39; replicated fields to <code>Runner</code> and generates
+commands such as <code>runner_weapon_fire_cmd</code> and <code>runner_lob_cast_cmd</code>. See
+<a href="net.html#composing-verbs-from-embedded-blocks">Composing commands from embedded blocks</a>
+for naming and override rules.</p>
+<p>Use generated replicated-field edge halves for presentation:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
+runner_health_hp_edge :: <span class="hljs-keyword">proc</span>(
+	game: ^Game,
+	self: ^Runner,
+	old_hp, new_hp: <span class="hljs-type">i32</span>,
+) {
+	<span class="hljs-keyword">if</span> new_hp &lt; old_hp {show_damage(game, self, old_hp - new_hp)}
+	<span class="hljs-keyword">if</span> old_hp &gt; <span class="hljs-number">0</span> &amp;&amp; new_hp == <span class="hljs-number">0</span> {show_death(game, self)}
+}</code></pre></div><p>Initial state and full resynchronization establish a baseline without replaying
+historical edges.</p>
+<p>Cross-entity consequences remain in game code. For example,
+<code>runner_weapon_fire_then</code> checks <code>self.weapon.fired</code>, validates or leashes the
+client-provided origin, and spawns the authoritative projectile. The block does
+not know the entity&#39;s position or the rules of the target world.</p>
+<h2 id="simulation-lane-blocks">Simulation-lane blocks<a class="heading-anchor" href="#simulation-lane-blocks" aria-label="Link to this section">#</a></h2>
+<p>Predicted blocks live in <code>godot:play/sim</code>, conventionally imported as <code>psim</code>:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>psim.Cool</code></td>
+<td>Replayable tick cooldown with <code>due</code>, <code>arm</code>, and <code>ready</code> helpers.</td>
+</tr>
+<tr>
+<td><code>psim.Mover</code></td>
+<td>Tick-driven 2D movement with acceleration and bounds.</td>
+</tr>
+<tr>
+<td><code>psim.Roller</code></td>
+<td>Self-integrating rolling body with friction, speed cap, and wall bounce.</td>
+</tr>
+</tbody></table>
+</div><p>Their fields use <code>gd:&quot;predict&quot;</code> and their ticks compose with the embedding
+entity&#39;s tick. Do not mix a root <code>play</code> network block and a <code>play/sim</code> block
+without checking which replication lane its fields select. The complete
+contract is in <a href="sim.html#simulation-blocks-in-godotplaysim">Simulation blocks</a>.</p>
+<h2 id="local-helpers">Local helpers<a class="heading-anchor" href="#local-helpers" aria-label="Link to this section">#</a></h2>
+<p>The package also includes state and procedures that do not cross the wire:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>actions_install</code></td>
+<td>Idempotently install keyboard and mouse actions from <code>Key_Row</code> and <code>Mouse_Row</code> tables.</td>
+</tr>
+<tr>
+<td><code>decay</code>, <code>ramp</code>, <code>advance</code>, <code>hold</code>, <code>pulse</code>, <code>pulse01</code></td>
+<td>Small frame-animation helpers over <code>f32</code> values.</td>
+</tr>
+<tr>
+<td><code>show</code>, <code>follow</code>, <code>fill</code>, <code>depth</code></td>
+<td>Update simple 2D world markers.</td>
+</tr>
+<tr>
+<td><code>every</code>, <code>latch</code></td>
+<td>Frame cadence and rising-edge helpers.</td>
+</tr>
+<tr>
+<td><code>Pace(T)</code>, <code>Deadlines(K, T)</code> with <code>due</code>, <code>arm</code>, <code>ready</code></td>
+<td>Re-armable deadlines over a caller-selected clock.</td>
+</tr>
+<tr>
+<td><code>Edge(T)</code> with <code>see</code>, <code>sync</code></td>
+<td>Detect changes in derived or local state that has no generated replicated-field edge.</td>
+</tr>
+<tr>
+<td><code>Trail</code>, <code>trail_note</code>, <code>trail_read</code></td>
+<td>Authority-side position history for game-owned state. For streamed session entities, prefer <code>session_rewound</code>.</td>
+</tr>
+</tbody></table>
+</div><p><code>Edge(T)</code> is not needed for a directly replicated field. Use it for a value
+derived from several fields or for local persistence state, and call <code>sync</code>
+after a full resynchronization when that jump should become the new baseline.</p>
+<p><code>Pace</code> stores a deadline. It is suitable for authority scratch or local
+presentation cadence; simulation-lane cooldowns should use <code>psim.Cool</code> so their
+state participates in replay.</p>
+<h2 id="owner-simulated-physics-with-playpuppet">Owner-simulated physics with <code>play.Puppet</code><a class="heading-anchor" href="#owner-simulated-physics-with-playpuppet" aria-label="Link to this section">#</a></h2>
+<p>Godot&#39;s rigid-body solver cannot be rewound by Kit. A <code>Puppet</code> instead assigns
+one peer to simulate a shared <code>RigidBody2D</code>. That peer publishes pose and
+velocity through owner-streamed fields. Every other peer freezes the body in
+kinematic mode and moves it along the interpolated stream.</p>
+<p>This model is useful for a co-op ball, crate, vehicle, or physics prop when one
+simulator at a time is acceptable. It is not server-authoritative rollback
+physics: contacts are decided on the current owner&#39;s machine, and remote views
+are delayed by interpolation.</p>
+<h3 id="declare-and-attach-the-block">Declare and attach the block<a class="heading-anchor" href="#declare-and-attach-the-block" aria-label="Link to this section">#</a></h3>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Ball :: <span class="hljs-keyword">struct</span> {
+	owner:  gd.Rigid_Body2d,
+	net_id: knet.Net_Id,
+	puppet: play.Puppet,
+}
+
+ball_ready :: <span class="hljs-keyword">proc</span>(self: ^Ball) {
+	play.puppet_attach(&amp;self.puppet, self.owner, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+}
+
+ball_process :: <span class="hljs-keyword">proc</span>(self: ^Ball, delta: <span class="hljs-type">f64</span>) {
+	play.puppet_frame(&amp;self.puppet, <span class="hljs-type">f32</span>(delta))
+}</code></pre></div><p>Pass an optional visual child to <code>puppet_attach</code> when you want render-error
+smoothing. The rigid body moves immediately to authoritative state, while the
+visual child decays a small correction over time.</p>
+<h3 id="initialize-received-state">Initialize received state<a class="heading-anchor" href="#initialize-received-state" aria-label="Link to this section">#</a></h3>
+<p>Call <code>puppet_born</code> from the typed born hook after spawn fields have arrived, then
+select whether this peer currently owns the body:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
+ball_born :: <span class="hljs-keyword">proc</span>(
+	game: ^Game,
+	self: ^Ball,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) {
+	_ = id
+	play.puppet_born(&amp;self.puppet)
+	play.puppet_seat(&amp;self.puppet, owner == game.ses.me)
+}</code></pre></div><p><code>puppet_born</code> places the physics body from its replicated fields during the
+spawn frame. This avoids displaying the scene&#39;s default transform before its
+first <code>_process</code> callback.</p>
+<p>When <code>Ev_Owner_Changed</code> names this entity, call <code>puppet_seat</code> with whether the
+new owner is the local player. The new simulator is seeded from streamed pose
+and velocity so momentum crosses the handoff. Remote peers cut to the new
+ownership baseline before continuing interpolation.</p>
+<h3 id="transfer-and-predict-ownership">Transfer and predict ownership<a class="heading-anchor" href="#transfer-and-predict-ownership" aria-label="Link to this section">#</a></h3>
+<p>The authority changes ownership with <code>session_set_owner</code>. The game decides the
+policy: last toucher, current carrier, current driver, or a permanent host
+owner.</p>
+<p><code>puppet_claim</code> allows a client to begin simulating provisionally while it waits
+for an ownership command. If the authority grants ownership, the provisional
+flight continues. If the claim is denied or times out, the body freezes and the
+visual correction returns it to the actual owner&#39;s stream. Treat the claim as
+presentation prediction, not authority.</p>
+<p><code>puppet_place</code> performs a reset or teleport. Pair it with the entity kind&#39;s
+generated teleport door—such as <code>ball_teleport(&amp;game.boot, ball)</code>—so remote
+interpolation cuts instead of blending through the discontinuity.
+<code>puppet_shove</code> applies an impulse on the current simulator.</p>
+<h2 id="playpuppet3"><code>play.Puppet3</code><a class="heading-anchor" href="#playpuppet3" aria-label="Link to this section">#</a></h2>
+<p><code>Puppet3</code> applies the same ownership model to <code>RigidBody3D</code>. It streams position,
+quaternion rotation, linear velocity, and angular velocity. Its procedures use
+the <code>puppet3_*</code> prefix.</p>
+<p>See <code>examples/slopball</code> for the 2D integration and <code>examples/slopball3d</code> for the
+3D version. For state that must be simulated by a trusted authority and replayed
+on clients, use query-based integration with <a href="sim.html">kit/sim</a> instead of a
+Godot rigid body.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/play.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#networked-blocks" class="">Networked blocks</a><a href="#simulation-lane-blocks" class="">Simulation-lane blocks</a><a href="#local-helpers" class="">Local helpers</a><a href="#owner-simulated-physics-with-playpuppet" class="">Owner-simulated physics with play.Puppet</a><a href="#declare-and-attach-the-block" class="subsection">Declare and attach the block</a><a href="#initialize-received-state" class="subsection">Initialize received state</a><a href="#transfer-and-predict-ownership" class="subsection">Transfer and predict ownership</a><a href="#playpuppet3" class="">play.Puppet3</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/play.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

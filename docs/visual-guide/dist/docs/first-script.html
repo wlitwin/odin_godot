@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Write your first script · odin_godot</title><link rel="icon" href="../favicon.svg"><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../reader.css"><link rel="stylesheet" href="../sdk.css"><script src="../reader.js" defer></script><script src="../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../docs.html" aria-current="page">Docs</a><a href="../guide.html">Field guide</a><a href="../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../docs.html">Overview</a><a href="install.html">Installation</a><a href="first-script.html" aria-current="page">Your first script</a><a href="existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../read/docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../read/docs/authoring-guide.html">Script API</a><a href="../read/docs/events.html">Signals and events</a><a href="../read/docs/workflow.html">Editor workflow</a><a href="../read/docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="multiplayer.html">Choose a model</a><a href="kit.html">Build with Kit</a><a href="replay.html">Build with Replay</a><a href="../read/docs/kit/timelines.html">Prediction and timelines</a><a href="../read/docs/kit/profiles.html">Authority profiles</a><a href="../read/replay/getting-started.html">Replay sessions and rooms</a><a href="../read/replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="exporting.html">Build and export</a><a href="../read/docs/exporting.html">Export reference</a><a href="../read/docs/debugging.html">Debugging</a><a href="../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../read/examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../read/examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../read/examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../guide.html">Illustrated field guide <span>↗</span></a><a href="../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../docs.html">Docs</a><span>/</span><a href="../reading.html">Get started</a><span>/</span><span>Guide</span></div><p class="eyebrow">Get started</p><h1>Write your first script</h1><div class="reader-meta"><span>1 min read</span><span>Odin × Godot</span><a href="../reference/docs/visual-guide/content/first-script.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#define-the-script-state">Define the script state</a><a href="#build-the-project">Build the project</a><a href="#attach-the-script-and-run">Attach the script and run</a><a href="#add-the-next-piece">Add the next piece</a></nav></details>
+<article class="reading-body "><p>This example attaches a compiled Odin script to a <code>Node2D</code> and moves it every
+frame. Start with the <a href="install.html">SDK installed</a> and a project whose extension
+and build helpers are wired as described in the <a href="existing-project.html">project setup</a>.</p>
+<h2 id="define-the-script-state">Define the script state<a class="heading-anchor" href="#define-the-script-state" aria-label="Link to this section">#</a></h2>
+<p>Create <code>scripts/mover.odin</code>. Use the same package name as the project&#39;s other
+scripts; the example below uses <code>my_game_scripts</code>.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node2D</span>
+<span class="hljs-comment">//gd:class Mover</span>
+<span class="hljs-keyword">package</span> my_game_scripts
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+Mover :: <span class="hljs-keyword">struct</span> {
+    owner: gd.Node2d,
+    speed: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;export,default=120&quot;`</span>,
+}
+
+mover_ready :: <span class="hljs-keyword">proc</span>(self: ^Mover) {
+    gd.print(<span class="hljs-string">&quot;Mover ready!&quot;</span>)
+}
+
+mover_process :: <span class="hljs-keyword">proc</span>(self: ^Mover, delta: <span class="hljs-type">f64</span>) {
+    position := gd.node2d_get_position(self.owner)
+    position.x += self.speed * <span class="hljs-type">f32</span>(delta)
+    gd.node2d_set_position(self.owner, position)
+}</code></pre></div><p><code>owner</code> is the engine node. <code>self</code> points to the Odin struct. Pass <code>self.owner</code>
+when an engine function asks for a node; pass <code>self</code> to your own procedures that
+operate on the script state.</p>
+<p>The <code>gd:&quot;export&quot;</code> tag makes Speed editable in the Inspector. The <code>mover_</code> prefix
+associates the procedures with <code>Mover</code>; Godot sees the usual <code>_ready</code> and <code>_process</code>
+callbacks through generated registration.</p>
+<h2 id="build-the-project">Build the project<a class="heading-anchor" href="#build-the-project" aria-label="Link to this section">#</a></h2>
+<p>From an SDK development shell, pass the project directory to the build helper:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh /absolute/path/to/your_game</code></pre></div><p>For an installed addon, use its helper and prebuilt core as shown in
+<a href="existing-project.html#compile-the-scripts">existing project setup</a>.</p>
+<p>The build runs <code>scriptgen</code> and compiles authored and generated source together.
+Generated <code>*.gen.odin</code> files are build outputs; edit the authored script instead.</p>
+<h2 id="attach-the-script-and-run">Attach the script and run<a class="heading-anchor" href="#attach-the-script-and-run" aria-label="Link to this section">#</a></h2>
+<p>Open the project, add a <code>Node2D</code>, and attach <code>res://scripts/mover.odin</code> in its
+Script slot. Speed should appear in the Inspector with a default of 120.
+Run the scene: the Output panel prints the ready message and the node moves right.</p>
+<p>Change Speed in the Inspector, then change the procedure and rebuild. This
+separates authored scene values from compiled behavior and gives you a small
+scene for checking the edit/build/run loop.</p>
+<h2 id="add-the-next-piece">Add the next piece<a class="heading-anchor" href="#add-the-next-piece" aria-label="Link to this section">#</a></h2>
+<p>Use the <a href="../read/docs/authoring-guide.html">authoring reference</a> for typed signals,
+Godot-callable methods, Resource fields, and on-ready node lookup. The
+<a href="../read/docs/onboarding/02-thinking-in-structs.html">script model</a> explains shared data,
+cross-script access, and composition. For input, movement, combat, or networking,
+choose a <a href="../examples.html">runnable example</a> close to your game.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="install.html"><span>Install the SDK</span><span aria-hidden="true">→</span></a><a href="existing-project.html"><span>Add Odin to an existing project</span><span aria-hidden="true">→</span></a><a href="../read/docs/authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/visual-guide/content/first-script.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#define-the-script-state" class="">Define the script state</a><a href="#build-the-project" class="">Build the project</a><a href="#attach-the-script-and-run" class="">Attach the script and run</a><a href="#add-the-next-piece" class="">Add the next piece</a></nav><div class="outline-actions"><a href="../reference/docs/visual-guide/content/first-script.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

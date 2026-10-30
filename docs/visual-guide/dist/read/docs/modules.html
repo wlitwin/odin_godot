@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Script modules — splitting a project into per-module dlls · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html" aria-current="page">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Script modules — splitting a project into per-module dlls</h1><div class="reader-meta"><span>21 min read</span><span>Odin × Godot</span><a href="../../reference/docs/modules.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#when-to-use-modules">When to use modules</a><a href="#layout-and-naming-rules">Layout and naming rules</a><a href="#script-subpackages">Script subpackages</a><a href="#no-imports-between-script-modules">No imports between script modules</a><a href="#cross-module-communication">Cross-module communication</a><a href="#resshared--vocabulary-every-module-can-import">res://shared/ — vocabulary every module can import</a><a href="#reload-per-module-rebuild-and-swap">Reload: per-module rebuild and swap</a><a href="#global-class-alias-collisions">Global-class alias collisions</a><a href="#exporting-with-modules">Exporting with modules</a><a href="#platform-support">Platform support</a><a href="#troubleshooting">Troubleshooting</a></nav></details>
+<article class="reading-body "><p>By default all of a project&#39;s Odin scripts belong to <strong>one script module</strong>, <code>res://scripts/</code>,
+compiled into <strong>one scripts dll</strong>, and for most projects that is the right shape. <strong>Script
+modules</strong> are the opt-in scaling tool for when it stops being right: split scripts into
+<code>res://modules/&lt;name&gt;/</code> directories, each its own Odin package compiled into its <strong>own dll</strong>
+(<code>libodinscripts_&lt;name&gt;.dylib</code> / <code>.so</code> / <code>.dll</code>), loaded beside the main dll and
+<strong>hot-swapped independently</strong>: a save recompiles only the module you edited, so
+rebuild-on-save latency stays flat as the project grows.</p>
+<p>Modules buy that flat save latency with slower full builds and a hard isolation rule. Read
+the cost model first. <strong>Most projects should not start with modules.</strong></p>
+<p>Two things on this page are not about splitting into dlls and apply to every project,
+including one that never creates a module: <a href="#script-subpackages">script subpackages</a>
+(organizing one module&#39;s scripts into subfolders, still one dll) and
+<a href="#shared"><code>res://shared/</code></a> (read-only packages every module may import).</p>
+<h2 id="when-to-use-modules">When to use modules<a class="heading-anchor" href="#when-to-use-modules" aria-label="Link to this section">#</a></h2>
+<p>Every scripts dll pays a fixed compile floor of roughly <strong>0.85 s</strong>, because the Odin front-end
+type-checks the full <code>godot</code> binding once <em>per dll</em>, no matter how few scripts the
+dll holds. That floor shapes the trade:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Project size</th>
+<th>Modules?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&lt; ~50–100 scripts</td>
+<td><strong>No</strong>: pure overhead</td>
+<td>A single-dll save is already near the floor; each module you add puts another ~0.85 s floor on every <em>full</em> build (≈2× slower at 10 modules) and buys nothing on save.</td>
+</tr>
+<tr>
+<td>~50–100+ scripts, save latency starting to hurt</td>
+<td>Maybe</td>
+<td>Split along real seams (enemies, UI, world-gen…) only when the single-dll save time actually bothers you.</td>
+</tr>
+<tr>
+<td>Hundreds of scripts</td>
+<td><strong>Yes</strong>: this is what modules are for</td>
+<td>Measured at 300 method-heavy scripts: a save went <strong>4.5 s → 0.79 s (5.7×)</strong> after splitting, and the per-save cost stays flat as the project keeps growing (you only ever rebuild the module you touched).</td>
+</tr>
+</tbody></table>
+</div><p>(Numbers measured on the Apple-silicon macOS dev machine with the editor&#39;s <code>-o:none</code> dev
+builds; your absolute times will differ, the shape won&#39;t.)</p>
+<p>A project without a <code>modules/</code> dir loads, builds, and exports exactly as a single-dll
+project. Nothing about modules is loaded, built, or exported until you create one.</p>
+<h2 id="layout-and-naming-rules">Layout and naming rules<a class="heading-anchor" href="#layout-and-naming-rules" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">your_project/
+  scripts/                 -&gt; bin/libodinscripts.dylib            (the MAIN module — always)
+    ui/                    -&gt; (a subpackage of the main module: same dll)
+  modules/
+    enemies/               -&gt; bin/libodinscripts_enemies.dylib    (one dll per module)
+    worldgen/              -&gt; bin/libodinscripts_worldgen.dylib
+  shared/                  -&gt; (read-only packages every module may import; no dll of its own)</code></pre></div><ul>
+<li><strong><code>res://scripts/</code> is the main module and always exists.</strong> Modules are additions, not a
+replacement: a good default is gameplay glue + autoloads in <code>scripts/</code>, big subsystems in
+modules.</li>
+<li><strong>Each module is its own Odin package</strong> with its <strong>own package name</strong> (<code>package game_enemies</code>, not a copy of the main package&#39;s name). Package names must be unique across
+the project: the web export links every module into one wasm, where two packages with the
+same name won&#39;t compile.</li>
+<li><strong>Module directory names must be dot-free.</strong> The runtime discovers module dlls as
+<code>libodinscripts_&lt;name&gt;.&lt;ext&gt;</code> siblings of the main scripts dll and skips any <code>&lt;name&gt;</code>
+containing a dot (dots mark hot-reload copies). A dotted <code>res://modules/&lt;name&gt;</code> is an
+export error telling you to rename it.</li>
+<li><strong>Authored source paths are runtime identity.</strong> Only explicit <code>//gd:class</code> global aliases
+must be unique across modules (see <a href="#global-class-alias-collisions">Collisions</a>).</li>
+<li><strong>A module is a tree of packages, not one flat directory.</strong> Every subdirectory holding
+authored <code>.odin</code> sources is its own Odin package, and an engine-native script class may
+live there and be attached from there (<code>res://scripts/ui/hud.odin</code>). Kit-coupled
+declarations stay in the module root. See <a href="#script-subpackages">Script subpackages</a> for
+the full rules. An edit anywhere under <code>res://modules/&lt;name&gt;/</code> counts as an edit to that
+module for rebuild-on-save.</li>
+<li>A module dir with no <code>.odin</code> sources is skipped at build time, loudly:
+<code>build_scripts: skipping module &#39;&lt;name&gt;&#39; (no .odin sources)</code>.</li>
+</ul>
+<h3 id="generated-files">Generated files<a class="heading-anchor" href="#generated-files" aria-label="Link to this section">#</a></h3>
+<p><code>scriptgen</code> writes, per module:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Where</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>odin_godot_scripts.gen.odin</code></td>
+<td>in <strong>each package directory that has annotated scripts</strong> (the module root, and each script subpackage)</td>
+<td>the registration boilerplate for every script in that directory, one banner-marked section per source</td>
+</tr>
+<tr>
+<td><code>odin_godot_guard.gen.odin</code></td>
+<td>the module root only</td>
+<td>the staleness guard (one compile-time <code>#load_hash</code> per authored source in the whole tree) plus the import manifest that links the script subpackages</td>
+</tr>
+<tr>
+<td><code>odin_godot_boot.gen.odin</code></td>
+<td>the module root only</td>
+<td>the <code>odin_scripts_boot</code> export the core calls after it loads the dll</td>
+</tr>
+</tbody></table>
+</div><p>You never write or edit these, and the loader ignores <code>*.gen.odin</code> as attachable scripts.
+Anything else matching <code>*.gen.odin</code> under a module is swept on the next build, which is also
+how a project built before the consolidated layout migrates: its old per-source
+<code>&lt;name&gt;.gen.odin</code> files are simply deleted the first time the new <code>scriptgen</code> runs.</p>
+<h3 id="creating-a-module">Creating a module<a class="heading-anchor" href="#creating-a-module" aria-label="Link to this section">#</a></h3>
+<p>There is no template machinery for modules. <strong>Project → Tools → Set Up Odin Scripts</strong>
+creates only the main <code>res://scripts/</code>. A module is a directory with a script in it, about
+five lines of boilerplate, so a starter dir would be overkill. Make the directory and drop
+in a script:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -p modules/enemies</code></pre></div><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// modules/enemies/enemy.odin</span>
+<span class="hljs-comment">//gd:extends Node</span>
+<span class="hljs-comment">//gd:class Enemy</span>
+<span class="hljs-keyword">package</span> game_enemies      <span class="hljs-comment">// the module&#x27;s OWN package name — unique in the project</span>
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+Enemy :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node,
+	hp:    gd.Int <span class="hljs-string">`gd:&quot;export&quot;`</span>,
+}
+
+enemy_ready :: <span class="hljs-keyword">proc</span>(self: ^Enemy) {
+	<span class="hljs-keyword">if</span> self.hp == <span class="hljs-number">0</span> { self.hp = <span class="hljs-number">10</span> }
+}</code></pre></div><p>Then build (<code>build/build_scripts.sh &lt;project&gt;</code> builds the main module <em>and</em> every module,
+or just save in the editor). <code>scriptgen</code> generates the module&#39;s own boot shim and staleness
+guard, like the main module&#39;s; there is no extra boilerplate. Attach
+<code>res://modules/enemies/enemy.odin</code> to a node exactly like any other Odin script.</p>
+<h2 id="script-subpackages">Script subpackages<a class="heading-anchor" href="#script-subpackages" aria-label="Link to this section">#</a></h2>
+<p>A module&#39;s scripts do not have to sit in one flat directory. <strong>Every subdirectory of a module
+that holds authored <code>.odin</code> sources is its own Odin package</strong>, at any depth, and an
+engine-native script class may live there:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scripts/                    package game_main       (the module root)
+  game.odin
+  ui/                       package game_ui         (a script subpackage)
+    hud.odin                -&gt; attach res://scripts/ui/hud.odin
+  util/                     package game_util       (a plain helper subpackage)
+    util.odin</code></pre></div><p>This is organization, not splitting: <strong>one dll per module, unchanged.</strong> The root&#39;s generated
+guard file carries an <code>import _ &quot;ui&quot;</code> manifest line per script subpackage, which is what
+links each subpackage&#39;s generated registration into the module&#39;s dll. Build commands, the
+<code>.gdextension</code>, and export are all untouched. It does not move the wire contract either:
+<code>NET_FINGERPRINT</code> folds in the class names of the whole tree, root and subpackages alike, so
+moving a class between the root and a subfolder leaves the hash — and therefore the join
+door — exactly where it was.</p>
+<p><strong>What a subpackage class gets.</strong> The whole engine-native surface: <code>//gd:extends</code> /
+<code>//gd:class</code> / <code>//gd:tool</code> / <code>//gd:icon</code>, lifecycle procs, <code>@(gd_method)</code>, <code>@(gd_connect)</code>,
+<code>@(gd_rpc)</code>, typed signal fields with their generated emitters, <code>gd:&quot;export&quot;</code> fields and
+their hints, and <code>gd:&quot;onready=…&quot;</code> references. A subdirectory with no annotated scripts is
+just a helper package as before, and gets no generated file at all.</p>
+<p><strong>What must stay in the module root.</strong> Every <strong>kit</strong> declaration: <code>gd:&quot;replicate&quot;</code>,
+<code>gd:&quot;owner&quot;</code>, <code>gd:&quot;predict&quot;</code>, <code>gd:&quot;backup&quot;</code> and <code>gd:&quot;profile=&quot;</code> field tags, <code>entity=</code> scene
+fields, a <code>net_id</code> field, <code>@(gd_command)</code>, <code>@(gd_tick)</code>, <code>@(gd_input)</code>, <code>@(gd_sample)</code>, <code>@(gd_step)</code>,
+<code>@(gd_message)</code>, <code>@(gd_event)</code>, session and succession halves, the sim lane&#39;s input class, and
+a <code>kboot.Boot</code> field. The reason is the wire contract: a module&#39;s kit surface (replicated
+field order, verb ids, entity type ids, the one tick input struct, the fact tuples) folds
+into <code>NET_FINGERPRINT</code>, which two peers compare at the join door, and it is resolved
+package-wide in the module root. A lane or a verb hiding in a subfolder would leave the
+fingerprint silently short of it, so <code>scriptgen</code> refuses it by name:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scriptgen: error: scripts/ui/hud.odin: Hud declares a gd:&quot;replicate&quot; field tag in the script
+subpackage &quot;ui&quot; — kit wiring is part of the MODULE's wire contract (fingerprint, lanes, input
+struct) and is game-coupled; move this file to the module root (…). Subfolders like ui/ hold
+engine-native script classes: extends/class, methods, signals, exports, onready, rpc</code></pre></div><p><strong>A subpackage may not import the module root.</strong> The root already imports every script
+subpackage through its manifest, so an import back up is always a cycle. Rather than let Odin
+report the cycle from inside generated code, <code>scriptgen</code> names it and the ways out:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scriptgen: error: scripts/ui/hud.odin:6: a subfolder script package cannot import the module
+root (&quot;..&quot; resolves to …/scripts) — the root's generated import manifest already imports every
+script subpackage, so this is an import CYCLE
+  Subfolders hold engine-native script classes and helpers; they are LEAVES of the
+  module. Anything that needs the module root's types or state is game-coupled and
+  belongs in the module root itself. To share the other way, move the shared code
+  DOWN into a subpackage both the root and the subfolder import (sibling subpackage
+  imports are legal), or pass what it needs in as an argument.</code></pre></div><p><strong>Uniqueness.</strong> Every package in a module tree needs its own <code>package</code> name (on web export
+they all link into one wasm side module, where the package name is the symbol prefix), and
+explicit <code>//gd:class</code> aliases must be unique across the whole tree because they opt into
+Godot&#39;s project-wide global type namespace. Marker-less scripts are keyed by their
+<code>res://</code> paths and need no name uniqueness. Both package-name and explicit-alias conflicts
+are build-time errors naming both declaring locations:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scriptgen: error: duplicate package name &quot;game_main&quot; — declared in both &quot;.../scripts&quot; and
+&quot;.../scripts/ui&quot;; every package in a module tree needs its OWN name (on web export they all
+link into one wasm side module, where the package name is the symbol prefix)
+
+scriptgen: error: .../scripts/ui/hud.odin: duplicate explicit //gd:class &quot;Game&quot; in
+&quot;.../scripts/game.odin&quot; and &quot;.../scripts/ui/hud.odin&quot;</code></pre></div><p><strong>Typed access still works inside the module.</strong> All the packages of one module share a dll,
+so the root can <code>import &quot;ui&quot;</code> and read a subpackage&#39;s script struct directly:
+<code>rt.script_of(node, ui.Hud)</code> returns a typed <code>^ui.Hud</code>. The boundary that returns <code>nil</code> is
+the <em>module</em> boundary, not the package boundary (see
+<a href="#rtscript_of-across-modules"><code>rt.script_of</code> across modules</a>).</p>
+<p>Note what the import binds. Odin names a relative import after the <strong>last element of its
+path</strong>, not after the package&#39;s declared name: <code>import &quot;ui&quot;</code> binds <code>ui</code> even though the
+package above declares itself <code>package game_ui</code>, and <code>import &quot;defs&quot;</code> binds <code>defs</code>. Give it
+whatever name you want with an alias — <code>import d &quot;defs&quot;</code>.</p>
+<p><strong>When to reach for a subpackage.</strong> Use one when a group of classes is self-contained and the
+module root does not need to name their types: HUD widgets, menus, editor tools, effects.
+Keep everything else flat. A subpackage is not a scaling tool (the save still rebuilds the
+whole module dll); the scaling tool is a module.</p>
+<p><code>tests/subpkg_spike/</code> is the worked example, including the four refusals above.</p>
+<h2 id="no-imports-between-script-modules">No imports between script modules<a class="heading-anchor" href="#no-imports-between-script-modules" aria-label="Link to this section">#</a></h2>
+<p>A script module must not import another script module (or <code>scripts/</code>). A package linked into
+two dlls gets <strong>its package globals duplicated per dll</strong>: each dll carries its own copy, so
+writes from one module never reach the other and &quot;shared&quot; state forks silently. The build
+rejects cross-module imports two ways: <code>scriptgen</code> checks every file&#39;s import declarations
+structurally (an absolute-path import, or any relative import that resolves outside the
+module&#39;s directory, is a hard error), and a fast grep for <code>..</code>-relative imports backstops it
+(<code>check_module_isolation</code> in <code>build/common.sh</code>, shared by <code>build_scripts.sh</code> and
+<code>build_export_scripts.sh</code>, ported in <code>build_scripts.ps1</code>):</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">build_scripts: ILLEGAL cross-module import in '&lt;dir&gt;':
+  ...
+  Script modules are ISOLATED packages: a package imported by two script dlls
+  duplicates its globals per dll (shared state would silently fork). Talk to
+  other modules through the engine (signals / methods / autoloads) instead,
+  or move the shared state into exactly one module.
+  For types, constants and pure procs — a vocabulary with no state to fork —
+  put the package under '&lt;project&gt;/shared' instead: any module may import it, and
+  scriptgen verifies that tree stays state-free.</code></pre></div><p>Odin itself would compile a cross-module <code>import &quot;../enemies&quot;</code> without objection. The
+isolation is a build-tooling rule (scriptgen plus <code>build_scripts</code>), not a language one, so
+the check is explicit and loud rather than a compiler error.</p>
+<p>The consequences, stated plainly:</p>
+<ul>
+<li>Modules cannot share Odin types, procs, or package globals with each other, except through
+the <a href="#shared"><code>res://shared/</code></a> tree, which is verified to hold no state.</li>
+<li>Cross-module communication is <strong>engine-mediated and name-based</strong>: signals, method calls
+by name (<code>gd.object_call</code>), autoloads.</li>
+<li><code>rt.script_of</code>&#39;s typed access <strong>stops at the module boundary</strong> (see below).</li>
+<li>Shared mutable state lives in <strong>exactly one module</strong> (its package globals), or in an
+<strong>autoload</strong>, never in a package two modules both import.</li>
+</ul>
+<h2 id="cross-module-communication">Cross-module communication<a class="heading-anchor" href="#cross-module-communication" aria-label="Link to this section">#</a></h2>
+<p>Modules communicate through the engine. The following pair mirrors <code>tests/modules_spike/</code>
+(which verifies it headless): <code>Player</code> in the main module attacks an <code>Enemy</code> from the
+enemies module.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// scripts/player.odin — the MAIN module</span>
+<span class="hljs-comment">//gd:extends Node</span>
+<span class="hljs-comment">//gd:class Player</span>
+<span class="hljs-keyword">package</span> game_main
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+Player :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node,
+}
+
+<span class="hljs-comment">// Enemy&#x27;s type lives in res://modules/enemies — this module CANNOT import it.</span>
+<span class="hljs-comment">// Call it by NAME through the engine instead (dynamic, no shared types):</span>
+<span class="hljs-meta">@(gd_method)</span>
+player_attack :: <span class="hljs-keyword">proc</span>(self: ^Player, target: gd.Node, amount: gd.Int) {
+	amt := amount
+	v := gd.variant_from_int(&amp;amt)
+	_ = gd.object_call(<span class="hljs-keyword">cast</span>(gd.Object)target, gd.sname(<span class="hljs-string">&quot;take_hit&quot;</span>), v)
+}</code></pre></div><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// modules/enemies/enemy.odin — the `enemies` module</span>
+<span class="hljs-comment">//gd:extends Node</span>
+<span class="hljs-comment">//gd:class Enemy</span>
+<span class="hljs-keyword">package</span> game_enemies
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+Enemy :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node,
+	hp:    gd.Int <span class="hljs-string">`gd:&quot;export&quot;`</span>,
+}
+
+<span class="hljs-comment">// The cross-module entry point: any module (or GDScript) reaches it by name.</span>
+<span class="hljs-meta">@(gd_method)</span>
+enemy_take_hit :: <span class="hljs-keyword">proc</span>(self: ^Enemy, amount: gd.Int) {
+	self.hp -= amount
+}</code></pre></div><p>Pick the tool by what you need:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Notify whoever cares, decoupled</td>
+<td><strong>Signals</strong>: declare in one module, <code>gd.connect_to(emitter, &quot;sig&quot;, target, &quot;method&quot;)</code> from anywhere; connections are engine-side and cross modules freely</td>
+</tr>
+<tr>
+<td>Call a specific node&#39;s method</td>
+<td><strong>Name-based call</strong>: <code>gd.object_call(obj, gd.sname(&quot;take_hit&quot;), args…)</code> (the <code>Object::call</code> path GDScript uses)</td>
+</tr>
+<tr>
+<td>Shared game state / services</td>
+<td><strong>An autoload</strong> (see the <a href="authoring-guide.html#autoload-singletons">Authoring Guide</a>): one real node at <code>/root/Name</code> every module reaches by path, or package globals in exactly ONE module fronted by its <code>@(gd_method)</code>s</td>
+</tr>
+<tr>
+<td>Shared types, constants, pure procs</td>
+<td><strong>A <a href="#shared"><code>res://shared/</code></a> package</strong>: imported directly by every module, verified state-free</td>
+</tr>
+<tr>
+<td>Typed struct access</td>
+<td><strong><code>rt.script_of</code>: module-local only</strong> (below)</td>
+</tr>
+</tbody></table>
+</div><h3 id="rtscript_of-across-modules"><code>rt.script_of</code> across modules<a class="heading-anchor" href="#rtscript_of-across-modules" aria-label="Link to this section">#</a></h3>
+<p>Within a module, <code>rt.script_of(obj, T)</code> is a zero-overhead typed path, and that includes the
+module&#39;s <a href="#script-subpackages">subpackages</a>, which share its dll: the root can
+<code>import &quot;ui&quot;</code> and call <code>rt.script_of(node, ui.Hud)</code>. Across modules it returns <code>nil</code>: with no
+cross-module imports you cannot name another module&#39;s struct type, and the core&#39;s class check
+returns nil for a same-name type from another module (a node carrying the enemies module&#39;s
+<code>Enemy</code> is never a non-nil <code>^YourEnemy</code>). Treat <code>script_of</code> as &quot;typed access to <em>my</em> module&#39;s
+scripts&quot;; everything else goes through the engine. (Verified from both sides in
+<code>tests/modules_spike/</code>.)</p>
+<p><span id="shared"></span></p>
+<h2 id="resshared--vocabulary-every-module-can-import"><code>res://shared/</code> — vocabulary every module can import<a class="heading-anchor" href="#resshared--vocabulary-every-module-can-import" aria-label="Link to this section">#</a></h2>
+<p>The isolation rule exists for one hazard: a package linked into two dlls gets its own copy of
+every <strong>mutable package global</strong>, so a write through one module&#39;s copy is invisible to the
+other. Duplicated types, constants and pure procs carry no such hazard. Two copies of an enum,
+a payload struct or a <code>clamp01</code> proc are indistinguishable.</p>
+<p>So one tree is exempt. <strong>Any package under <code>&lt;project&gt;/shared/</code> may be imported by any script
+module</strong>, the main one or a <code>modules/&lt;name&gt;</code> one, from the module root or from a subpackage,
+at any depth. It is an ordinary relative import; what matters is where it resolves, not how
+many <code>..</code> segments it takes:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">your_project/
+  shared/
+    ids/ids.odin            package shared_ids
+  scripts/
+    game.odin               import ids &quot;../shared/ids&quot;
+    ui/hud.odin             import ids &quot;../../shared/ids&quot;
+  modules/
+    enemies/enemy.odin      import ids &quot;../../shared/ids&quot;</code></pre></div><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// shared/ids/ids.odin — read-only vocabulary: types, constants, pure procs.</span>
+<span class="hljs-keyword">package</span> shared_ids
+
+Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {None = <span class="hljs-number">0</span>, Player = <span class="hljs-number">1</span>, Enemy = <span class="hljs-number">2</span>}
+
+STEP :: <span class="hljs-number">7</span>
+
+Payload :: <span class="hljs-keyword">struct</span> {
+	kind:   Kind,
+	amount: <span class="hljs-type">i32</span>,
+}
+
+brand :: <span class="hljs-keyword">proc</span>(k: Kind) -&gt; <span class="hljs-type">int</span> {<span class="hljs-keyword">return</span> <span class="hljs-type">int</span>(k) * <span class="hljs-number">100</span> + STEP}</code></pre></div><p>There is no dll for <code>shared/</code>. Each module that imports a shared package compiles its own copy
+into its own dll, which is exactly why the tree must stay state-free.</p>
+<h3 id="the-rules-and-what-refuses-them">The rules, and what refuses them<a class="heading-anchor" href="#the-rules-and-what-refuses-them" aria-label="Link to this section">#</a></h3>
+<p><code>scriptgen</code> parses every shared package a module actually imports (following shared-to-shared
+imports transitively, so a package nothing imports is nobody&#39;s business) and refuses these,
+naming the file, the line, and the reason:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Not allowed in <code>shared/</code></th>
+<th>Why</th>
+<th>The refusal (abridged)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>a file-scope mutable variable (<code>x := …</code>, <code>x: T</code>, including <code>@(thread_local)</code>)</td>
+<td>it is the per-dll copy the isolation rule exists for</td>
+<td><code>declares the file-scope variable &quot;counter&quot; — every module that links this package gets its OWN copy of it, so writes from one module never reach the other and the state silently forks. Constants (counter :: …), types and pure procs are fine here</code></td>
+</tr>
+<tr>
+<td>an <code>@(static)</code> local</td>
+<td>package state with a proc-local spelling</td>
+<td><code>declares an @(static) local — that is package STATE with a proc-local spelling, and every module that links this package gets its own copy</code></td>
+</tr>
+<tr>
+<td><code>@(init)</code> / <code>@(fini)</code></td>
+<td>it would run once <strong>per dll</strong></td>
+<td><code>declares the @(init) proc &quot;setup&quot; — it would run ONCE PER DLL (every module that links this package runs it again, over that dll&#39;s own copy of the package)</code></td>
+</tr>
+<tr>
+<td>a <code>//gd:</code> marker or an <code>@(gd_*)</code> proc</td>
+<td>an attachable class belongs to a module; <code>shared/</code> is engine-agnostic</td>
+<td><code>carries the script marker &quot;//gd:class Sneaky&quot; — an attachable script class belongs to a MODULE (res://scripts or res://modules/&lt;name&gt;), never to res://shared/</code></td>
+</tr>
+<tr>
+<td>importing anything but a collection (<code>godot:</code> / <code>core:</code> / <code>base:</code> / <code>vendor:</code>) or another <code>shared/</code> package</td>
+<td>importing a module from here IS the forked-globals hazard: that module&#39;s package would link into every dll</td>
+<td><code>imports &quot;../../modules/other&quot;, which resolves to &quot;…/modules/other&quot; OUTSIDE the shared tree (…)</code></td>
+</tr>
+</tbody></table>
+</div><p>Every one of them ends with the same explanation:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">  res://shared/ is READ-ONLY VOCABULARY: types, constants (X :: …) and pure procs.
+  It is linked into EVERY module that imports it, and each dll gets its own copy of
+  any package state — so mutable globals there would silently fork per module. Keep
+  state in exactly one module (or behind an autoload the modules reach through the
+  engine); keep the vocabulary they agree on here.</code></pre></div><p>One more limitation, refused loudly rather than silently: a struct carrying <code>gd:&quot;…&quot;</code> tags
+cannot be embedded from <code>shared/</code>. <code>scriptgen</code> resolves tagged bundles inside the module&#39;s own
+package tree and in <code>godot:</code> collection packages only, so tags on a shared struct&#39;s fields
+would never register. An untagged plain-data struct from <code>shared/</code> is fine.</p>
+<p>Plain shared types may also be aliases, including generic runtime owners such as
+<code>Timeline :: replay.Timeline(World, Input, Event)</code>. Scriptgen now follows the named
+shape and its inline fields before deciding that no Godot metadata would be lost.
+Generic arguments retain the package/import context where they were supplied;
+aliases cannot hide tagged fields, typed signals or composed methods/ticks. Cyclic,
+unresolved or over-budget shapes keep the existing refusal. An engine-import
+normalization context that collides with a user package named <code>gd</code> is also refused
+conservatively; use an unambiguous import alias. The proof is bounded
+to 64 nested resolutions and 4,096 visited type expressions per candidate.
+Pointer/container/callback boundaries retain the existing opaque composition
+policy; this does not add automatic hoisting through arrays or pointers.</p>
+<p>Accepting a runtime-owner alias does not make that owner copyable or serializable.
+For example, Replay Timeline allocations still have one owner and must be used by
+pointer. The pure shared package remains subject to the same no-globals/no-script
+rules. See <a href="../tests/replay_shared_alias/README.html">focused and application acceptance</a>.</p>
+<h3 id="reload-one-shared-edit-rebuilds-every-module">Reload: one shared edit rebuilds every module<a class="heading-anchor" href="#reload-one-shared-edit-rebuilds-every-module" aria-label="Link to this section">#</a></h3>
+<p>The shared tree belongs to no module, so its content hash is folded into <strong>every</strong> module&#39;s:
+saving a file under <code>res://shared/</code> rebuilds and hot-swaps <strong>every</strong> module dll, each firing
+its own <code>reload</code> hooks and resetting its own package globals. That is correct (any module may
+be compiled against what you changed) and it is the cost of putting something there: the flat
+per-save latency modules buy you does not apply to a shared edit. A project with no <code>shared/</code>
+directory behaves exactly as before.</p>
+<h3 id="choosing-between-shared-an-autoload-and-one-modules-globals">Choosing between <code>shared/</code>, an autoload, and one module&#39;s globals<a class="heading-anchor" href="#choosing-between-shared-an-autoload-and-one-modules-globals" aria-label="Link to this section">#</a></h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>You need</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>types, enums, constants, pure functions that several modules must agree on</td>
+<td><strong>a <code>shared/</code> package</strong>: a direct import, no engine round trip, no runtime cost</td>
+</tr>
+<tr>
+<td>mutable state several modules read and write</td>
+<td><strong>an autoload</strong> (a real node at <code>/root/Name</code>, reached by name through the engine), or <strong>package globals in exactly one module</strong> fronted by its <code>@(gd_method)</code>s</td>
+</tr>
+<tr>
+<td>state, types and helpers only one module uses</td>
+<td><strong>that module&#39;s own package</strong>, or a plain helper subpackage inside it</td>
+</tr>
+</tbody></table>
+</div><p>The dividing line is state. If it can be written at runtime, it does not belong in <code>shared/</code>,
+and <code>scriptgen</code> will say so at build time rather than let two dlls disagree at play time.
+<code>tests/shared_spike/</code> is the worked example: two dlls, one vocabulary, plus each refusal above.</p>
+<h2 id="reload-per-module-rebuild-and-swap">Reload: per-module rebuild and swap<a class="heading-anchor" href="#reload-per-module-rebuild-and-swap" aria-label="Link to this section">#</a></h2>
+<p>Saving a script in the editor rebuilds <strong>only the module containing the saved file</strong>: the
+reload coordinator maps the resource path directly to its module root, hashes that root (not
+every module), and kicks one scoped build per <em>changed</em> module before hot-swapping just that
+dll. A first background probe establishes all hash baselines, and a slower full reconciliation
+catches out-of-editor content edits/deletions. The other dlls are not rebuilt, not reloaded,
+or touched during an ordinary save. The ~0.85 s floor is paid once per save, for one module,
+no matter how big the rest of the project is.</p>
+<p>Semantics of a module swap (all asserted by <code>tests/modules_spike/</code>):</p>
+<ul>
+<li><strong>The swapped module:</strong> live instances keep their state (same-layout fast path, or exported
+values preserved by name otherwise, per the normal <a href="workflow.html#live-editing-show-on-save">reload rules</a>),
+and its <code>reload</code> hook fires on each instance with the new code. But the module&#39;s
+<strong>package globals RESET</strong>: it is a fresh dll, so its globals reinitialize.</li>
+<li><strong>Every other module:</strong> instances keep state <em>and</em> package globals, keep running, and
+never see a reload hook. The main module&#39;s blackboard survives an enemies-module swap
+untouched.</li>
+</ul>
+<p>If a module keeps meaningful state in package globals, expect it to reset when <em>that</em> module
+reloads. State that must survive its owner&#39;s edit-save loop belongs on instances (exported
+fields) or in an autoload in a module you aren&#39;t editing.</p>
+<p>The one edit that is not scoped to a single module is an edit under
+<a href="#shared"><code>res://shared/</code></a>: it rebuilds and swaps every module, because any of them may be
+compiled against it.</p>
+<p>A compile error in a module&#39;s rebuild-on-save surfaces in the editor <strong>Output</strong> panel
+exactly like a main-module error (the actual <code>path(line:col) Error: …</code> lines), and the old
+dll stays live until a build succeeds. Editor validation squiggles and autocomplete work with
+no configuration for every file in the tree: a module root, a subpackage, and a <code>shared/</code>
+package all diagnose against the packages they really import.</p>
+<p>In a running game, <code>load(&quot;res://modules/enemies/enemy.odin&quot;).reload(true)</code> swaps only the
+module owning that script (the path decides: <code>res://modules/&lt;name&gt;/…</code> → that module,
+anything else → the main module).</p>
+<h2 id="global-class-alias-collisions">Global-class alias collisions<a class="heading-anchor" href="#global-class-alias-collisions" aria-label="Link to this section">#</a></h2>
+<p>Script attachment, typed access, and reload key on canonical <code>res://</code> paths, so ordinary
+scripts do not need globally unique names. An explicit <code>//gd:class</code> opts into Godot&#39;s
+project-wide global type namespace and therefore must be unique. Collisions are never silent:</p>
+<ul>
+<li><p><strong>Within one module (build time):</strong> <code>scriptgen</code> refuses two identical <code>//gd:class</code> names
+anywhere in a module&#39;s tree, root and subpackages together, naming both files:
+<code>scriptgen: error: …/ui/hud.odin: duplicate explicit //gd:class &quot;Game&quot; in &quot;.../scripts/game.odin&quot; and &quot;.../scripts/ui/hud.odin&quot;</code>.</p>
+</li>
+<li><p><strong>Native, module vs. module:</strong> the colliding module is <strong>rejected at load</strong> with an error
+naming both sides, and the first module&#39;s class keeps working:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">odin_godot: duplicate explicit //gd:class 'Player' in 'res://scripts/player.odin' and
+'res://modules/rogue/rogue.odin' (script modules 'main (res://scripts)' and 'rogue');
+module 'rogue' was NOT loaded.</code></pre></div><p>A reload that would <em>introduce</em> a collision is refused the same way, keeping the old code:
+<code>odin_godot: reload rejected — explicit //gd:class &#39;X&#39; in &#39;res://modules/a/x.odin&#39; collides with &#39;res://modules/b/x.odin&#39; from script module &#39;b&#39; (old code kept).</code></p>
+</li>
+<li><p><strong>Web composed manifest:</strong> all modules share one manifest. Both descriptors remain
+independently path-addressable, but the duplicate global alias is refused with both
+canonical paths:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">odin_godot: duplicate explicit //gd:class 'Contested' in
+'res://modules/enemies/contested.odin' and 'res://scripts/contested.odin'; both scripts
+remain path-addressable, but the global alias is ambiguous.</code></pre></div></li>
+</ul>
+<h2 id="exporting-with-modules">Exporting with modules<a class="heading-anchor" href="#exporting-with-modules" aria-label="Link to this section">#</a></h2>
+<p>Nothing extra to do: at export the plugin builds <strong>one optimized dll per module</strong> (same
+<code>odin_godot/export_optimization</code> level as the main dll) and bundles each beside the main
+scripts dll (<code>add_shared_object</code>: macOS <code>Contents/Frameworks</code>, sibling of the executable
+elsewhere), which is exactly where the exported game&#39;s runtime scans for
+<code>libodinscripts_&lt;name&gt;.&lt;ext&gt;</code> siblings. The export log shows one line per module:
+<code>odin export: bundled module &#39;enemies&#39; (…)</code>.</p>
+<p>Failures are loud, never silent:</p>
+<ul>
+<li>A module whose dll didn&#39;t get built <strong>fails the export with an error naming it</strong>, since an
+exported game must never silently ship without a module&#39;s classes:
+<code>odin export: script module &#39;enemies&#39; dll missing (…) — the exported game would ship WITHOUT this module&#39;s classes</code></li>
+<li>A dotted module dir name is an export error (rename it; the runtime would never discover
+its dll).</li>
+</ul>
+<p><strong>Web</strong> export composes the main module <em>and</em> every script module into the single
+Emscripten SIDE_MODULE wasm, subpackages and imported <code>shared/</code> packages included (this is
+why package names must be unique across the whole project, not just per module). Cross-module
+behavior is the same (engine-mediated calls, keep-first collisions), verified in a real
+browser by <code>tests/modules_web/</code>.</p>
+<h3 id="build_modules0--building-without-modules"><code>BUILD_MODULES=0</code> — building without modules<a class="heading-anchor" href="#build_modules0--building-without-modules" aria-label="Link to this section">#</a></h3>
+<p>Setting the <code>BUILD_MODULES=0</code> environment variable skips modules in <code>build_scripts.sh</code> /
+<code>build_export_scripts.sh</code> <strong>and</strong> in the export plugin&#39;s bundling, loudly, since the result
+lacks the module classes:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">odin export: BUILD_MODULES=0 — script modules NOT built or bundled; the exported game will
+only have the main res://scripts classes</code></pre></div><p>It exists for scoped builds (the per-module reload rebuild uses it to build exactly one
+dir), CI subsets, and bisecting, not as a shipping configuration.</p>
+<h2 id="platform-support">Platform support<a class="heading-anchor" href="#platform-support" aria-label="Link to this section">#</a></h2>
+<p>Verified means the code path has actually been run on that platform:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>macOS</td>
+<td>✅ <strong>Runtime-verified</strong>: native run, cross-module calls, per-module reload, and export all asserted headless (<code>tests/modules_spike/</code>); script subpackages (<code>tests/subpkg_spike/</code>) and the shared tree, including the rebuild-every-module edit (<code>tests/shared_spike/</code>), likewise</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>✅ <strong>Browser-verified</strong>: multi-module wasm composition, cross-module call, and the keep-first collision error asserted in headless Chrome (<code>tests/modules_web/</code>)</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>Expected working (the same POSIX build/runtime code path as macOS) but <strong>not runtime-verified</strong> on a Linux host</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Build + per-module reload support is present. <code>tests/build_helpers/</code> executes the real PowerShell pipeline and verifies parity with Bash for modules, cache invalidation, cleanup, failure recovery, flags, and concurrent publication; native MSVC/runtime execution still needs a Windows host</td>
+</tr>
+</tbody></table>
+</div><h2 id="troubleshooting">Troubleshooting<a class="heading-anchor" href="#troubleshooting" aria-label="Link to this section">#</a></h2>
+<p>The messages you&#39;ll actually see, and what they mean:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Message (abridged)</th>
+<th>Meaning / fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>build_scripts: ILLEGAL cross-module import in &#39;&lt;dir&gt;&#39;: …</code> (or <code>scriptgen: error: … ILLEGAL cross-module import …</code>)</td>
+<td>A module imports another module (any import that resolves outside the module&#39;s own directory and outside <code>shared/</code>, <code>..</code>-relative or absolute). Remove it; communicate through the engine, move the shared state into one module, or, if it is only types/constants/pure procs, move the package under <a href="#shared"><code>res://shared/</code></a>.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: &lt;Class&gt; declares &lt;what&gt; in the script subpackage &quot;&lt;dir&gt;&quot; — kit wiring is part of the MODULE&#39;s wire contract …</code></td>
+<td>A kit declaration (a lane tag, <code>@(gd_command)</code>, <code>@(gd_tick)</code>, an <code>entity=</code> field, a half, …) sits in a subfolder. Move that file to the module root; subfolders hold engine-native classes only.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: a subfolder script package cannot import the module root (…) — … this is an import CYCLE</code></td>
+<td>A script subpackage imports <code>..</code>. Move the shared code down into a subpackage both sides import (sibling imports are legal), or pass what it needs in as an argument.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: duplicate package name &quot;X&quot; — declared in both &quot;…&quot; and &quot;…&quot;</code></td>
+<td>Two directories in one module tree declare the same <code>package</code> name. Give each its own.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: duplicate explicit //gd:class &quot;X&quot; in &quot;…&quot; and &quot;…&quot;</code></td>
+<td>Two scripts in one module tree claim one optional global alias. Rename or remove one marker; both scripts otherwise bind by path.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: the shared package file &lt;f&gt; declares the file-scope variable &quot;x&quot; …</code> (also <code>@(static)</code>, <code>@(init)</code>/<code>@(fini)</code>, a <code>//gd:</code> marker, an <code>@(gd_*)</code> proc)</td>
+<td>A package under <code>res://shared/</code> carries state or a script. Keep state in exactly one module or an autoload; <code>shared/</code> is types, constants and pure procs. See <a href="#shared"><code>res://shared/</code></a>.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: the shared package file &lt;f&gt; imports &quot;…&quot;, which resolves to &quot;…&quot; OUTSIDE the shared tree (…)</code></td>
+<td>A shared package imports a module (or any other outside package). It may import collections and other <code>shared/</code> packages only.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: X.y: &quot;…&quot; comes from the SHARED package &quot;…&quot; — … scriptgen does not resolve gd:&quot;…&quot;-tagged BUNDLES across it</code></td>
+<td>A <code>gd:</code>-tagged struct was embedded from <code>shared/</code>. Move the tagged bundle into the module (or a <code>godot:</code> collection package); untagged plain data from <code>shared/</code> is fine.</td>
+</tr>
+<tr>
+<td><code>scriptgen: error: …: odin_scripts_boot is declared in the subpackage &quot;…&quot; — the boot export is ONE per dll …</code></td>
+<td>A hand-written boot shim ended up in a subfolder. Move it to the module root.</td>
+</tr>
+<tr>
+<td><code>odin_godot: duplicate explicit //gd:class &#39;X&#39; in &#39;res://…&#39; and &#39;res://…&#39; — … module &#39;…&#39; was NOT loaded.</code></td>
+<td>Global-alias collision at native module load; the later module was rejected whole. Rename or remove one marker.</td>
+</tr>
+<tr>
+<td><code>odin_godot: reload rejected — explicit //gd:class &#39;X&#39; in &#39;res://…&#39; collides with &#39;res://…&#39; …</code></td>
+<td>A rebuild introduced a global-alias collision; the swap was refused and old code stays live.</td>
+</tr>
+<tr>
+<td><code>… duplicate explicit //gd:class &#39;X&#39; in &#39;res://…&#39; and &#39;res://…&#39;; both scripts remain path-addressable …</code></td>
+<td>Web found an ambiguous global alias. Both path identities work; rename or remove one marker.</td>
+</tr>
+<tr>
+<td><code>odin export: script module &#39;X&#39; has a dot in its name — …</code></td>
+<td>Rename <code>res://modules/&lt;X&gt;</code> dot-free; the runtime only discovers dot-free module dlls.</td>
+</tr>
+<tr>
+<td><code>odin export: script module &#39;X&#39; dll missing (…) — the exported game would ship WITHOUT this module&#39;s classes</code></td>
+<td>The module&#39;s export build failed or was skipped. Check the export log above it for the compile error.</td>
+</tr>
+<tr>
+<td><code>odin export: BUILD_MODULES=0 — script modules NOT built or bundled; …</code></td>
+<td>You (or a script) set <code>BUILD_MODULES=0</code>; unset it to ship modules.</td>
+</tr>
+<tr>
+<td><code>build_scripts: skipping module &#39;X&#39; (no .odin sources)</code></td>
+<td>The <code>modules/X/</code> dir is empty: add a script or delete it.</td>
+</tr>
+<tr>
+<td>A save&#39;s compile error in the editor Output</td>
+<td>It surfaces the same way as a main-module error: fix it, and the module&#39;s old dll stays live meanwhile.</td>
+</tr>
+</tbody></table>
+</div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../tests/replay_shared_alias/README.html"><span>Shared plain-type and runtime-alias acceptance</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/modules.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#when-to-use-modules" class="">When to use modules</a><a href="#layout-and-naming-rules" class="">Layout and naming rules</a><a href="#generated-files" class="subsection">Generated files</a><a href="#creating-a-module" class="subsection">Creating a module</a><a href="#script-subpackages" class="">Script subpackages</a><a href="#no-imports-between-script-modules" class="">No imports between script modules</a><a href="#cross-module-communication" class="">Cross-module communication</a><a href="#rtscript_of-across-modules" class="subsection">rt.script_of across modules</a><a href="#resshared--vocabulary-every-module-can-import" class="">res://shared/ — vocabulary every module can import</a><a href="#the-rules-and-what-refuses-them" class="subsection">The rules, and what refuses them</a><a href="#reload-one-shared-edit-rebuilds-every-module" class="subsection">Reload: one shared edit rebuilds every module</a><a href="#choosing-between-shared-an-autoload-and-one-modules-globals" class="subsection">Choosing between shared/, an autoload, and one module's globals</a><a href="#reload-per-module-rebuild-and-swap" class="">Reload: per-module rebuild and swap</a><a href="#global-class-alias-collisions" class="">Global-class alias collisions</a><a href="#exporting-with-modules" class="">Exporting with modules</a><a href="#build_modules0--building-without-modules" class="subsection">BUILD_MODULES=0 — building without modules</a><a href="#platform-support" class="">Platform support</a><a href="#troubleshooting" class="">Troubleshooting</a></nav><div class="outline-actions"><a href="../../reference/docs/modules.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

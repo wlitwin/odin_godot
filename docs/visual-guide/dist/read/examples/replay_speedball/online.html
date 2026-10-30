@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Speedball party menus · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Speedball party menus</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_speedball/online.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#saved-party-recovery">Saved party recovery</a></nav></details>
+<article class="reading-body "><p>Set <code>RSB_ROOM_SERVICE</code> to use the shared Replay Party helper and
+<a href="../replay_room_service/README.html">room service</a>. The native/browser menu then offers Create
+Party, Join Party, a Watch only choice, Rejoin Recent and Copy Invite. The creator
+can also copy its invite during play. Without that setting, the existing direct
+address and native save/resume menus remain available. Solo remains available in
+party mode; file selection/resume controls use the direct menu configuration.</p>
+<p>The service URL is deployment configuration, not a hard-coded public service.
+A local development setup can use:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -p .replay-room-data
+REPLAY_ROOM_CONTENT=0x5253504545444234 \
+REPLAY_ROOM_DB=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/.replay-room-data/speedball.sqlite3&quot;</span> \
+REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_room_service/run.sh
+
+RSB_ROOM_SERVICE=ws://127.0.0.1:49740 RSB_ROOM_LOCAL=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_speedball/play.sh</code></pre></div><p>Omit database creation on subsequent service starts. Give each local player a
+separate <code>RSB_PROFILE</code>, <code>RSB_ROOMS_DB</code> and <code>RSB_PORT</code>. Native storage currently uses
+the optional Darwin/Linux SQLite adapter. The game test uses verified WSS with a
+private CA; plain WS requires the explicit loopback development setting.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RSB_ROOM_SERVICE</code></td>
+<td>Provisioning and Room control URL</td>
+</tr>
+<tr>
+<td><code>RSB_ROOM_LOCAL=1</code></td>
+<td>Explicit loopback WS development mode</td>
+</tr>
+<tr>
+<td><code>RSB_ROOM_CA</code></td>
+<td>Optional native CA certificate for private verified WSS</td>
+</tr>
+<tr>
+<td><code>RSB_ROOMS_DB</code></td>
+<td>Room credentials and recent selection; default <code>user://speedball_rooms.sqlite3</code></td>
+</tr>
+<tr>
+<td><code>RSB_ROOM_ADDRESS</code></td>
+<td>Advertised native gameplay address; default <code>127.0.0.1</code></td>
+</tr>
+<tr>
+<td><code>RSB_PORT</code></td>
+<td>This member&#39;s advertised gameplay port; default <code>49480</code></td>
+</tr>
+<tr>
+<td><code>RSB_PROFILE</code></td>
+<td>Separate personal identity/name profile</td>
+</tr>
+</tbody></table>
+</div><p>The service needs reachable gameplay endpoints for native ENet. Local tests do not
+prove Internet/NAT traversal. The shared helper also accepts ICE/relay configuration,
+and the browser gate now verifies local RTC gameplay. Public deployment and
+TURN-only routing remain separate Speedball acceptance work.</p>
+<p>Create Party durably enrolls a creator and produces a repeatable invite. Join Party
+validates the pasted invite, enrolls the member and durably stores its credential
+before opening Room. Rejoin Recent reads that stored credential; the returned
+process receives a newer incarnation and retains its game seat. The personal
+identity/name profile remains separate from the room&#39;s network token. A failed
+invitation does not create a local game; competing start actions are blocked while
+enrollment is active.</p>
+<p>Invites grant trusted co-op membership with <code>SEATS - 1</code> uses. The menu explicitly
+says invited friends can host and keep the match running. This grants access to
+complete authority checkpoints when selected as a successor. It is not a competitive
+untrusted-player preset. Ordinary player invitations remain a library capability;
+this game menu currently issues the trusted co-op variant.</p>
+<p>Watch only applies to Join Party and Rejoin Recent. Invited observers occupy seat
+0, create no player, and receive no checkpoints. They remain observers through
+migration and can leave/rejoin in that mode. Observer chat uses the existing
+<code>Observer</code> label. The choice is a gameplay role, not a reduction of the credential&#39;s
+underlying trusted membership; the driver selects successors from connected player
+seats. Create Party starts a player host regardless of the watch choice.</p>
+<p>Room&#39;s normal lease/roster checks, automatic successor selection, prepared
+checkpoints and migration UI apply. Native acceptance saves a moving scored pitch,
+performs planned handoff or abrupt owner loss, then returns the old host in a fresh
+process using Rejoin Recent. It requires a stable invite/seat, an increased
+incarnation, observer leave/rejoin, new spikes/chat and matching canonical worlds.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_speedball/online_run.sh
+RSB_PARTY_RENDER=1 RSB_PARTY_MODES=planned \
+  nix develop --<span class="hljs-built_in">command</span> bash examples/replay_speedball/online_run.sh</code></pre></div><p><code>RSB_PARTY_OUT</code> selects a fresh artifact directory. Private databases, identity
+files, TLS keys and invite text belong in local scratch storage, not published test
+results. See <span class="local-reference" title="docs/replay/results/speedball-party-2026-09-08/README.md · available in the repository">receipts, captures and limits</span>.</p>
+<p>Steam integration, invite rotation/revocation UI,
+public deployment and wider visual/playtest/comparison coverage remain. The original
+Speedball and sibling Scrapyard projects stay independently runnable.</p>
+<p>The <a href="online_web_run.sh.html">browser party gate</a> exports the same game and uses lower-case
+query parameters such as <code>room_service</code> / <code>room_local</code> instead of native environment
+variables. It persists personal identity/name and room credentials in separate
+IndexedDB namespaces, and verifies them after closing/reopening a browser process.
+Gameplay uses WebRTC while the configured service provides enrollment, control and
+signaling. The local gate exercises planned handoff, browser-host loss, true
+observers, rejoin, new actions/chat and matching worlds. See
+<span class="local-reference" title="docs/replay/results/speedball-browser-2026-09-08/README.md · available in the repository">browser evidence</span>
+for measured limits. Browser solo checkpoints now use the separate
+<a href="README.html#browser-solo-save-slots">save-slot flow</a>; public relay deployment remains open.</p>
+<h2 id="saved-party-recovery">Saved party recovery<a class="heading-anchor" href="#saved-party-recovery" aria-label="Link to this section">#</a></h2>
+<p>The online host can use <strong>Save</strong> or F5 to publish the match to the room service.
+Saving is asynchronous: the UI shows progress, a confirmed stored tick, or an
+uncertain result that can be retried. Followers and observers cannot publish.
+<code>RSB_ROOM_CHECKPOINT_MS</code> (browser <code>room_checkpoint_ms</code>) opts into automatic saving;
+zero keeps saves manual and supported intervals are 1–120 seconds.</p>
+<p><strong>Rejoin recent party</strong> joins a live host when one exists. If the party is abandoned,
+Room loads the stored match, obtains a newer authority epoch and resumes it with
+the returning player&#39;s stable seat/profile. Missing, incompatible or too-old saves
+show a recovery error and retry option. A stored save does not bypass the room&#39;s
+rollback policy or create a replacement match silently.</p>
+<p>The recovery fixture saves a scored first round, exits the game and kills/restarts
+the service, then uses the actual rejoin menu in a fresh process. It checks the
+saved score, winner, round and kick count plus personal profile identity, admits a
+new guest, plays round 2, verifies chat and publishes again. A separate reader
+validates the continued stored match and names.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_speedball/party_restore_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_speedball/party_restore_web_run.sh</code></pre></div><p>Native uses verified TLS; the browser fixture uses explicit loopback development
+WS and real RTC. These checkpoints remain distinct from direct file saves and
+browser solo slots. See <a href="../../replay/godot/room_restore.html">Room restoration</a>.</p>
+<p>The recovery notice uses the shared <a href="../../replay/godot/room_backup.html">backup-status observation</a>.
+It distinguishes an approved backup from preparation, stale progress or uncertain
+control; a prior host change does not imply the next backup is ready.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="README.html"><span>Replay Speedball</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/online.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#saved-party-recovery" class="">Saved party recovery</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_speedball/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

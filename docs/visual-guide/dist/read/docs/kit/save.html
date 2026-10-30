@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/save — quit and resume a run · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/save — quit and resume a run</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/save.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#declaring-the-game-blob">Declaring the game blob</a><a href="#versioning-what-crosses-time-what-crosses-the-wire">Versioning: what crosses time, what crosses the wire</a><a href="#api-by-task">API by task</a><a href="#worked-excerpt-cavecrawl">Worked excerpt (cavecrawl)</a><a href="#gotchas">Gotchas</a></nav></details>
+<article class="reading-body "><p>Save a run to disk, resume it later, and mint the persistent identity token that makes
+&quot;later&quot; work. The <a href="session.html">session</a> snapshot that ships to the backup host every few
+seconds is already a complete re-hostable world, and <code>session_host_resume</code> already rebuilds
+one. <strong>Saving a run and surviving a dead host are the same contract.</strong> kit/save points it at
+a file and wraps it in a versioned envelope.</p>
+<p><strong>Lane compatibility: lane-agnostic (session-level).</strong> The envelope wraps the session
+snapshot: delta-lane and <code>gd:&quot;backup&quot;</code> state. Sim-lane runtime state (ledgers, inputs in
+flight) is not saved: a resumed sim restarts its lane fresh from the saved authoritative
+fields, the correct semantics for a server-authority run. The sim lane refuses host
+<em>migration</em> (see <a href="sim.html">sim.md</a>); resuming from disk restarts the authority.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> ksave <span class="hljs-string">&quot;godot:kit/save&quot;</span></code></pre></div><h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
+<p>The file layout:</p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">[magic u32][format u16][game_version u16][saved_by u64][game blob][session snapshot]</code></pre></div><ul>
+<li><code>format</code> is the <strong>toolkit&#39;s</strong> layout version (<code>FORMAT :: u16(3)</code>, bumped with the
+session snapshot layout: version 2 added entity blobs and wire codecs, and version 3 added
+the door, <code>locked</code> and <code>denied</code>, which rides the roster). A mismatched save refuses to parse
+instead of reading garbage: a file from an older toolkit comes back <code>Bad_Envelope</code>, cleanly,
+by version.</li>
+<li><code>game_version</code> is the <strong>game&#39;s</strong> own stamp. You pass what you like and check what you get;
+content changes are the game&#39;s problem to detect.</li>
+<li><code>saved_by</code> fixes the who-am-I question on restore: the host that saved resumes under its
+own old <code>Player_Id</code>. Hosts have no reconnect token (they never JOINed), so the file
+remembers for them.</li>
+<li>The <strong>game blob</strong> carries host-side state the session cannot know about: wave directors,
+AI clocks, quest flags. The snapshot covers identity/stats/entities; anything else the game
+owns, the game saves.</li>
+</ul>
+<p>Restore is <strong>restore-into-lobby</strong>: the caller is seated as host of the live world with every
+other player disconnected-but-reclaimable. Friends rejoin with their persisted tokens and get
+their ids, stats, and owned entities back, exactly like any reconnect.</p>
+<p>The envelope is engine-free (bytes in, bytes out, unit-testable without Godot); the file
+helpers are thin FileAccess wrappers so <code>user://</code> paths work on every platform, web included.</p>
+<h2 id="declaring-the-game-blob">Declaring the game blob<a class="heading-anchor" href="#declaring-the-game-blob" aria-label="Link to this section">#</a></h2>
+<p>The game blob is the same host-local state host migration ships (see <a href="session.html">session</a>),
+and you don&#39;t hand-serialize it. Tag the fields on your game class <code>gd:&quot;backup&quot;</code> and scriptgen
+generates a version-hashed <code>&lt;class&gt;_backup_write</code> / <code>_read</code> pair over them, so a takeover or a
+resume restores the campaign with no second, hand-kept read list to drift out of order:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">CaveLobby :: <span class="hljs-keyword">struct</span> {
+	host_ticks: <span class="hljs-type">int</span>                           <span class="hljs-string">`gd:&quot;backup&quot;`</span>,
+	director:   kai.Director                  <span class="hljs-string">`gd:&quot;backup&quot;`</span>, <span class="hljs-comment">// a POD struct rides whole</span>
+	brains:     <span class="hljs-keyword">map</span>[knet.Net_Id]Dweller_Brain <span class="hljs-string">`gd:&quot;backup&quot;`</span>, <span class="hljs-comment">// map[POD]POD: length + loop</span>
+	respawn_at: <span class="hljs-keyword">map</span>[knet.Net_Id]<span class="hljs-type">int</span>           <span class="hljs-string">`gd:&quot;backup&quot;`</span>,
+	<span class="hljs-comment">// ...</span>
+}
+
+<span class="hljs-comment">// the migration half (kboot.boot_migration&#x27;s table calls it, host only):</span>
+<span class="hljs-meta">@(gd_half)</span>
+cave_lobby_backup :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, w: ^knet.Writer) {
+	<span class="hljs-keyword">if</span> self.started {cave_lobby_backup_write(self, w)}
+}
+<span class="hljs-comment">// resume from a FILE / the heir&#x27;s `&lt;game&gt;_took_over(r)` half:</span>
+<span class="hljs-keyword">if</span> !cave_lobby_backup_read(self, &amp;r) { <span class="hljs-comment">/* stale or truncated — bail */</span> }</code></pre></div><p>Supported: POD scalars, POD structs, POD fixed arrays, <code>map[POD]POD</code>, and <code>[dynamic]POD</code> (rides
+<code>using</code>/embeds like <code>replicate</code>). Anything else (a slice, a string, a non-POD element) is a
+build error, spelled out. The version const is a hash of the field set, so a blob from a
+mismatched build fails the read cleanly instead of misreading bytes. <code>knet.write_pod</code>/<code>read_pod</code>
+are that same primitive, exposed for any fixed-shape state you still serialize by hand.</p>
+<h2 id="versioning-what-crosses-time-what-crosses-the-wire">Versioning: what crosses time, what crosses the wire<a class="heading-anchor" href="#versioning-what-crosses-time-what-crosses-the-wire" aria-label="Link to this section">#</a></h2>
+<p>Three versioning conventions live in this repo. Which one you want is decided by what your
+bytes cross.</p>
+<ul>
+<li><strong>Bytes that cross TIME</strong> (a save file, a <code>gd:&quot;backup&quot;</code> blob, a succession payload
+authored by a build you may not be running anymore) take an <strong>FNV field hash</strong>, generated
+from the shape itself. There is no peer to negotiate with; the reader&#39;s only check is that
+the writer&#39;s shape matches its own. scriptgen&#39;s <code>&lt;class&gt;_backup_write</code>/<code>_read</code> pair is the
+worked example; <code>knet.write_pod</code>/<code>read_pod</code> is the same primitive for hand-serialized state.</li>
+<li><strong>Bytes that cross THE WIRE</strong> (every <code>SES_*</code> message, the lane wire, the netgd frame)
+take a <strong>rev constant at the join door</strong>: <code>ksess.PROTOCOL_REV</code>, <code>knet.WIRE_REV</code>, and each
+wire-bearing package&#39;s own, all folded into the <code>NET_FINGERPRINT</code> a <code>SES_JOIN</code> carries. A
+skewed peer is refused with <code>Ev_Join_Denied{.Version}</code> before it can misparse a single
+delta. Bump the rev in the package whose wire you changed, in the same commit, and log what
+moved beside the constant.</li>
+<li><strong><code>ksave.FORMAT</code></strong> is the third, and it is hand-maintained. It versions the <em>envelope</em>, not
+a field set: there is nothing to hash (magic, format, a game stamp, an id, two
+length-prefixed byte ranges), and it is the outermost gate, so it must be readable by a
+reader that has agreed to nothing yet. Its changelog comment beside the constant is the
+contract.</li>
+</ul>
+<p>Two points that follow from the split:</p>
+<p><strong>The backup wrapper is unversioned.</strong> The identical <code>session_snapshot</code> bytes get kit/save&#39;s
+versioned envelope on disk and a bare <code>[blob_len u32][game blob][snapshot]</code> on the
+<a href="session.html#backup-hosting-and-resume">migration wire</a>. The snapshot crossing the wire is
+already covered: <code>PROTOCOL_REV</code> gates the join, and a peer that never got a seat never gets
+a backup, so a second stamp on the wire would version bytes that cannot arrive from a build
+that disagrees. The file has no such join door, which is why it carries an envelope.</p>
+<p><strong>A <code>game_version</code> mismatch is not a <code>FORMAT</code> mismatch.</strong> <code>Bad_Envelope</code> is the toolkit&#39;s
+verdict; <code>Wrong_Version</code> is yours. Keep them separate: a content bump should never look like
+a corrupt file.</p>
+<h2 id="api-by-task">API by task<a class="heading-anchor" href="#api-by-task" aria-label="Link to this section">#</a></h2>
+<p><strong>Save</strong> (host only):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">save_write :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, w: ^knet.Writer, game_version: <span class="hljs-type">u16</span>, game_blob: []<span class="hljs-type">u8</span> = <span class="hljs-literal">nil</span>)</code></pre></div><p><strong>Resume, the whole button in one call</strong>: it reads the file, validates the envelope, checks
+the version stamp, and restores the run. It returns the game blob (temp-allocated; parse it
+immediately):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">resume :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, name: <span class="hljs-type">string</span>, path: <span class="hljs-type">cstring</span>, game_version: <span class="hljs-type">u16</span>) -&gt; (game_blob: []<span class="hljs-type">u8</span>, err: Resume_Error)
+
+Resume_Error :: <span class="hljs-keyword">enum</span> {
+	Ok,
+	No_File,       <span class="hljs-comment">// nothing saved at `path`</span>
+	Bad_Envelope,  <span class="hljs-comment">// wrong magic/format — not one of ours</span>
+	Wrong_Version, <span class="hljs-comment">// a different game (or older content) wrote it</span>
+	Corrupt,       <span class="hljs-comment">// the session snapshot didn&#x27;t parse</span>
+}</code></pre></div><p>Each case is a different sentence to the player; see the excerpt below.</p>
+<p><strong>The pieces</strong>, if you need them separately (custom slot UI, save browsers):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">save_read_header :: <span class="hljs-keyword">proc</span>(r: ^knet.Reader) -&gt; (h: Header, ok: <span class="hljs-type">bool</span>)
+save_restore :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, name: <span class="hljs-type">string</span>, r: ^knet.Reader, h: Header) -&gt; <span class="hljs-type">bool</span></code></pre></div><p><code>save_read_header</code> leaves the reader positioned on the session snapshot (hand it to
+<code>save_restore</code>) and returns ok=false only on wrong magic/format, never on a merely different
+<code>game_version</code>; that verdict belongs to the game. <code>save_restore</code> needs a <strong>fresh</strong> session
+with the entity factory installed.</p>
+<p><strong>Identity</strong> (the mint-once-keep-forever token that reconnects, resumed saves, and reclaimed
+entities all ride on):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">persistent_token :: <span class="hljs-keyword">proc</span>(path: <span class="hljs-type">cstring</span>) -&gt; <span class="hljs-type">u64</span></code></pre></div><p>Loads the 8-byte token from <code>path</code>, or mints one and persists it there. Keep the file, keep
+the identity: pass the result to <code>session_client_start</code> every run. Unguessable-by-friends is
+the bar, not cryptographic strength.</p>
+<p><strong>Files</strong> (<code>user://</code> on every platform):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">write_file :: <span class="hljs-keyword">proc</span>(path: <span class="hljs-type">cstring</span>, bytes: []<span class="hljs-type">u8</span>) -&gt; <span class="hljs-type">bool</span>
+file_exists :: <span class="hljs-keyword">proc</span>(path: <span class="hljs-type">cstring</span>) -&gt; <span class="hljs-type">bool</span>
+read_file :: <span class="hljs-keyword">proc</span>(path: <span class="hljs-type">cstring</span>, allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; (bytes: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>)</code></pre></div><h2 id="worked-excerpt-cavecrawl">Worked excerpt (cavecrawl)<a class="heading-anchor" href="#worked-excerpt-cavecrawl" aria-label="Link to this section">#</a></h2>
+<p>Saving writes the game blob first, then wraps the envelope around it.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">blob := knet.writer_make()
+<span class="hljs-keyword">defer</span> knet.writer_destroy(&amp;blob)
+write_game_blob(self, &amp;blob)
+w := knet.writer_make()
+<span class="hljs-keyword">defer</span> knet.writer_destroy(&amp;w)
+ksave.save_write(&amp;self.ses, &amp;w, GAME_VERSION, knet.writer_bytes(&amp;blob))
+ok := ksave.write_file(save_path(), knet.writer_bytes(&amp;w))</code></pre></div><p>Resuming handles the per-case UX first, then the game blob, then the transport:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">blob, err := ksave.resume(&amp;self.ses, my_name(self), save_path(), GAME_VERSION)
+<span class="hljs-keyword">switch</span> err {
+<span class="hljs-keyword">case</span> .No_File:
+    kui.lobby_set_status(&amp;self.ui, <span class="hljs-string">&quot;No saved run to resume&quot;</span>)
+    <span class="hljs-keyword">return</span>
+<span class="hljs-keyword">case</span> .Bad_Envelope, .Wrong_Version:
+    kui.lobby_set_status(&amp;self.ui, <span class="hljs-string">&quot;That save is from another cave&quot;</span>)
+    <span class="hljs-keyword">return</span>
+<span class="hljs-keyword">case</span> .Corrupt:
+    <span class="hljs-keyword">return</span>
+<span class="hljs-keyword">case</span> .Ok:
+}
+<span class="hljs-keyword">if</span> !read_game_blob(self, blob) {<span class="hljs-keyword">return</span>}
+<span class="hljs-keyword">if</span> !gd.host(self.owner, port()) {<span class="hljs-keyword">return</span>}   <span class="hljs-comment">// transport comes up AFTER — see gotchas</span></code></pre></div><p>Identity gets wired at join time (<code>net.odin</code>):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ksess.session_client_start(&amp;self.ses, my_token(), my_name(self))
+<span class="hljs-comment">// my_token() -&gt; ksave.persistent_token(&quot;user://cave_token&quot;)</span>
+<span class="hljs-comment">// (tests choose an identity via a CAVE_TOKEN env override instead)</span></code></pre></div><h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Transport order is flexible.</strong> <code>ksave.resume</code> can run before OR after the transport is
+up: nothing sends until the session ticks. A resume that succeeds before a transport that
+fails is safe to abandon: session re-init is re-entrant; the next <code>session_host_start</code> /
+<code>session_client_start</code> re-inits.</li>
+<li><strong>Forget the game blob and the session won&#39;t miss it; your game will.</strong> Cavecrawl without
+it restarts wave 1 on top of the saved dwellers. If the host owns state outside entities,
+it goes in the blob.</li>
+<li><strong>The blob from <code>resume</code> is temp-allocated</strong> (it views the temp-allocated file bytes).
+Parse it before the temp allocator resets.</li>
+<li><strong>Install the factory first.</strong> Restore recreates every entity through the session&#39;s factory
+(<code>session_set_factory</code>); a fresh session without one has nothing to build with.</li>
+<li><code>save_write</code> asserts <code>is_host</code>: the authority saves the run.</li>
+<li><code>Wrong_Version</code> vs <code>Bad_Envelope</code>: the envelope check is the toolkit&#39;s; the version check is
+yours. Bump your <code>game_version</code> when content shifts (cavecrawl: <code>GAME_VERSION :: u16(9)</code>).</li>
+</ul>
+<p>Siblings: <a href="session.html">session.md</a> (snapshot, <code>session_host_resume</code>, reconnect tokens) ·
+<a href="net.html">net.md</a> (Writer/Reader for the game blob) · <a href="comms.html">comms.md</a> (narrate the resume:
+<code>comms_system(&amp;comms, &quot;the cave remembers&quot;)</code>).</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/save.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#declaring-the-game-blob" class="">Declaring the game blob</a><a href="#versioning-what-crosses-time-what-crosses-the-wire" class="">Versioning: what crosses time, what crosses the wire</a><a href="#api-by-task" class="">API by task</a><a href="#worked-excerpt-cavecrawl" class="">Worked excerpt (cavecrawl)</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/save.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

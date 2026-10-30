@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Coordinator-backed RTC signaling · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Coordinator-backed RTC signaling</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/rendezvous.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#explicit-providers-and-p2p-rosters">Explicit providers and P2P rosters</a></nav></details>
+<article class="reading-body "><p><code>Rendezvous</code> is a bounded JSON frontend alongside the native authority Service.
+It borrows that Service and a raw Websocket listener. Poll the listener once,
+route binary messages to <code>auth.service_receive</code>, route text to
+<code>rendezvous_receive</code>, and call <code>rendezvous_pump</code> every frame. Close the frontend
+before closing its borrowed owners.</p>
+<p>A create/join request must name the exact room code derived from the current
+signed authority view. The frontend issues a fresh cryptographic challenge on
+that WebSocket connection. A response consumes the challenge once and must arrive
+before its deadline. <code>auth.rendezvous_verify</code> checks the member key, registered
+incarnation, live grant and requested role. Only the approved owner receives RTC
+peer ID 1. Other enabled members receive increasing IDs. A disconnected RTC instance may
+retain its ID through authenticated continuation; a fresh instance does not gain
+that reservation merely by presenting the member key. A second live connection
+for an already admitted identity is rejected.</p>
+<p>The relay introduces an authority star and overwrites the sender ID itself.
+Only admitted peers can relay SDP/ICE, and clients can signal only the authority.
+It never carries gameplay packets. New authority terms remove old signaling
+memberships. Expired grants, disabled/rebound members, disconnected sockets and
+expired challenges are pruned. Existing direct data channels remain subject to
+Room&#39;s gameplay lease and epoch checks, independently of signaling.</p>
+<p>Defaults allow 32 signaling connections, five-second challenges, a 15-second
+continuation grace period, a burst of 64
+messages and 32 messages/second per connection. JSON is limited to 32 KiB and
+nesting depth 16. Outgoing backpressure disconnects the affected signaling peer
+instead of silently dropping an introduction or SDP message. The shared listener
+and control service retain their own packet/connection budgets.</p>
+<p>Client setup uses a stable <code>Rtc_Grant_Auth</code> containing a verified View, identity
+and provisioned key:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := transportgd.rtc_grant_config(&amp;authorization, signaling_url, is_owner)
+transportgd.rtc_open(&amp;rtc, cfg)</code></pre></div><p>The generic <code>Rtc_Config.authorize</code> callback can answer other compatible challenged
+providers. Its returned text is borrowed for the immediate send. Authenticated
+registration requires strict equality with the requested room; unauthenticated
+legacy relays remain supported by ordinary <code>rtc_open</code> calls.</p>
+<p>Room owns this authorization state and copied provider configuration through
+host/client role changes. Its <code>Migration_Transport</code> names RTC explicitly, using
+the configured provider URL plus the room/content/epoch/owner-derived code. The
+coordinator&#39;s existing native endpoint record and wire formats are unchanged;
+RTC destinations are not interpreted as ENet addresses.</p>
+<p>Authenticated registrations receive a random continuation token. On signaling
+loss the frontend holds the identity/peer ID for the bounded grace period. A
+reconnection must answer a fresh challenge and present that token; comparisons
+use constant-time verification. Disabled/rebound members, obsolete terms and
+expired reservations cannot resume. Tokens are invalidated with the room term.
+They supplement member authentication and do not replace it.</p>
+<p><code>rtc_grant_config</code> enables automatic signaling recovery. It retries after 500 ms,
+retains healthy peer connections and fragment state, and checks that the resumed
+ID/token match. Incomplete connections are deliberately rebuilt, with replacement
+introductions to both endpoints. A rejected or expired continuation surfaces an
+error for the enclosing session to handle; it never silently adopts a new ID.
+Legacy relays remain opt-in and need not implement continuation.</p>
+<p>Real-browser gates cover host/client recovery with unchanged connection
+serials, packets received during the outage, wrong-token rejection and late join
+after recovery. Cavecrawl also continues in the same epoch with no migration.
+Its planned/crash and broader migration gates remain available. Public provisioning,
+TLS/TURN deployment and other browser engines still need acceptance. The local
+fixture contains test keys and is not a production account/admission service.</p>
+<h2 id="explicit-providers-and-p2p-rosters">Explicit providers and P2P rosters<a class="heading-anchor" href="#explicit-providers-and-p2p-rosters" aria-label="Link to this section">#</a></h2>
+<p><code>rendezvous_provider_init</code> accepts a borrowed <code>Rendezvous_Provider</code> with a clock,
+current scope, enabled-identity predicate and fixed-proof verifier. The provider
+owns credential persistence and policy. The common frontend still enforces the
+per-connection random challenge, one-time use, deadline, duplicate/reservation
+checks and packet budgets. Its verifier callback consumes the existing 116-byte
+proof slot and returns an exact identity and room code. <code>rendezvous_init</code> wraps the
+authority Service in this interface and preserves the existing lease policy.</p>
+<p><code>Rendezvous_Config.mesh</code> allows introductions and forwarding among all admitted
+peers. It defaults to false. Provider introductions include exact member/incarnation
+metadata; the RTC client can require it and expose it for logical roster binding.
+The <a href="../p2p/admission/README.html">P2P admission provider</a> authenticates a fixed match
+without creating a gameplay authority lease. Its current creator transport and
+credential-issuance boundaries remain explicit.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../p2p/admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/rendezvous.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#explicit-providers-and-p2p-rosters" class="">Explicit providers and P2P rosters</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/rendezvous.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

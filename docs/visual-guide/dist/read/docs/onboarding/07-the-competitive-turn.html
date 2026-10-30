@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>7 · The competitive turn · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>7 · The competitive turn</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/07-the-competitive-turn.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#predict-self-your-avatar-on-both-timelines">Predict-self: your avatar on both timelines</a><a href="#choosing-per-object-predict-self-and-contested">Choosing per object: predict-self and contested</a><a href="#the-claim">The claim</a><a href="#lag-compensation">Lag compensation</a><a href="#what-carries-over">What carries over</a></nav></details>
+<article class="reading-body "><p>The co-op model gives each player authority over their own avatar: you write
+your position, everyone else reads it. That works when you trust the other
+players. A client lying about where it stands is a social problem, not a
+netcode one.</p>
+<p>Competitive games invert that. In a duel, a ranked arena, or a fighting game the
+opponent is not a friend, and &quot;trust the client&#39;s own position&quot; is the first
+thing a cheater breaks. So the <strong>server</strong> simulates the truth, every client
+<strong>predicts</strong> it locally so the game still feels instant, and when a prediction
+turns out wrong the server&#39;s word wins: the screen <strong>rolls back and
+resimulates</strong> to match. This is rollback netcode, the model that fighting games
+and Rocket League are built on.</p>
+<p>The competitive lane is <code>kit/sim</code>, and it is the same declarative surface as the
+co-op lane. You do not learn a new engine; you tag a different handful of fields,
+and the two-timelines discipline carries over. The lane is chosen per <strong>field</strong>,
+so one game can be co-op in its chat and its scoreboard and server-authoritative
+in its hitboxes.</p>
+<h2 id="predict-self-your-avatar-on-both-timelines">Predict-self: your avatar on both timelines<a class="heading-anchor" href="#predict-self-your-avatar-on-both-timelines" aria-label="Link to this section">#</a></h2>
+<p>In the co-op lane your avatar&#39;s <code>x, y</code> are <code>gd:&quot;owner&quot;</code>: you own them and you
+stream them. In the sim lane they become predicted state, and the tick that
+moves them is a plain proc with a tag:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Fighter :: <span class="hljs-keyword">struct</span> {
+	body: psim.Mover,          <span class="hljs-comment">// x/y/vx/vy — predicted, resimmable</span>
+	hp:   <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// the delta lane, as before — the server&#x27;s ledger</span>
+}
+
+<span class="hljs-meta">@(gd_tick)</span>                     <span class="hljs-comment">// &quot;predict-self&quot;: I predict MY fighter; the server reconciles</span>
+fighter_tick :: <span class="hljs-keyword">proc</span>(self: ^Fighter, input: Fighter_Input) {
+	<span class="hljs-comment">// read the stick, write intent. That&#x27;s it. Runs live on my screen every</span>
+	<span class="hljs-comment">// frame, re-runs during a resim when the server corrects me, and runs on</span>
+	<span class="hljs-comment">// the server as the one truth. No is_host, no role branches.</span>
+}</code></pre></div><p><code>@(gd_tick)</code> is the entire opt-in. Your fighter runs on your predicted timeline
+(instant to your hand) and on the server (the truth), and the lane reconciles
+the two behind your back. The input you read is delivered by the lane. You
+never send a packet.</p>
+<h2 id="choosing-per-object-predict-self-and-contested">Choosing per object: predict-self and contested<a class="heading-anchor" href="#choosing-per-object-predict-self-and-contested" aria-label="Link to this section">#</a></h2>
+<p>A remote avatar renders in the past (see <a href="../kit/timelines.html">timelines</a>).
+Competitive games make you choose, per object, whether to keep it that way:</p>
+<ul>
+<li><strong>Predict-self</strong>: the default <code>@(gd_tick)</code>. Predict only <em>your</em> fighter;
+watch the opponent an interp-delay behind, but <em>accurately</em>. Use it wherever a
+correctly-placed opponent matters: a hitscan shot, a parry window. This is
+what quickdraw ships.</li>
+<li><strong>Contested</strong>: <code>@(gd_tick = &quot;contested&quot;)</code>. For a shared object both players
+hit: a ball, a flag, a bomb. Marking it <code>contested</code> makes <strong>every</strong> peer
+predict it, so your touch resolves on your screen the instant you make it. The
+server still owns the truth; a disagreement rolls back and glides.</li>
+</ul>
+<p>The soccer example ships three times, one game per model, so you can read the
+difference side by side:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>example</th>
+<th>model</th>
+<th>the ball is…</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>examples/slopball</code></td>
+<td>co-op</td>
+<td>owned by the last toucher; peer-authoritative</td>
+</tr>
+<tr>
+<td><code>examples/speedball</code></td>
+<td>predict-<strong>world</strong></td>
+<td><em>everyone</em> predicted (avatars too), one timeline, constant tiny glides</td>
+</tr>
+<tr>
+<td><code>examples/claimball</code></td>
+<td>predict-self + <strong>claim</strong></td>
+<td>only <em>your</em> avatar predicted; the ball predicted and <strong>claimed</strong></td>
+</tr>
+</tbody></table>
+</div><h2 id="the-claim">The claim<a class="heading-anchor" href="#the-claim" aria-label="Link to this section">#</a></h2>
+<p><code>claimball</code> combines predict-self with a contested ball, which raises a question
+the other two models avoid. The ball runs on <em>your</em> predicted timeline, but your
+<em>opponent</em> renders in the past. If you always draw the ball from your
+prediction, a shot your opponent takes appears a whole interp-delay <em>before</em>
+their avatar visibly kicks it. The result is a predicted ball, a past-rendered
+player, and one shared screen.</p>
+<p>The fix is one boolean, asked continuously: <strong>is my simulation the one driving
+this ball right now?</strong></p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// in the world pass, every tick MY fighter is influencing the ball:</span>
+<span class="hljs-keyword">if</span> ksim.lane_live(&amp;g.lane) {          <span class="hljs-comment">// presentation — live pass only, never a resim</span>
+	<span class="hljs-keyword">if</span> my_kicker_in_reach || ball_still_fast_from_my_kick {
+		ksim.lane_claim(&amp;g.lane, ball.net_id)   <span class="hljs-comment">// draw it from MY predicted pose</span>
+	}
+}</code></pre></div><p>Claimed, the ball draws from your prediction instantly and correctly, because
+<em>you</em> caused its motion. Unclaimed, it draws the watched view, so your
+opponent&#39;s touch moves it <em>beside their delayed avatar</em>, exactly where they will
+appear to hit it. The claim decays over a quarter second when you stop
+influencing the ball, so the handback is a glide, not a snap.</p>
+<p>One rule to get right: <strong>release the claim when the ball slows, never on mere
+distance.</strong> Your kick&#39;s whole flight is your consequence, so keep the claim
+while the ball is fast and far. If you drop it just because the ball got far from
+your feet, the fade target (the watched view, sitting a timeline-skew behind a
+fast ball) yanks your own kick <em>backwards</em> mid-flight. Release when the ball is
+slow: the two timelines have converged, and nobody sees the handoff.</p>
+<h2 id="lag-compensation">Lag compensation<a class="heading-anchor" href="#lag-compensation" aria-label="Link to this section">#</a></h2>
+<p>The hitscan problem (&quot;I shot where my screen showed the target, but the server
+says I missed because its copy already moved&quot;) is one call, because the lane
+keeps every entity&#39;s recent history:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">judged := ksim.lane_rewound_begin(&amp;g.lane, shooter) <span class="hljs-comment">// wind every OTHER entity</span>
+g.hit = trace_shot(g)                               <span class="hljs-comment">// back to the shooter&#x27;s view</span>
+ksim.lane_rewound_end(&amp;g.lane)</code></pre></div><h2 id="what-carries-over">What carries over<a class="heading-anchor" href="#what-carries-over" aria-label="Link to this section">#</a></h2>
+<p>Everything from the co-op lane still holds: reconnects, drop-in joins, saves,
+host migration, the wire-version door, Steam. The sim lane rides the same
+session: a game is co-op in its lobby and its chat and server-authoritative in
+its hitboxes, and the reconnect path treats them the same.</p>
+<p><strong>Run it:</strong></p>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">nix develop --command bash -c 'bash examples/claimball/native_run.sh'  # CLAIMBALL_NATIVE_OK</code></pre></div><p>Three headless processes at 240ms round-trip: a striker drives a ball it
+predicts to a goal, <em>claiming</em> it the whole way (so it presents from the
+striker&#39;s timeline, with <code>claim</code> riding near 1), while a watcher who never
+touches it sees it watched (<code>claim</code> 0). It all resolves to one ball, two
+timelines, and one screen each.</p>
+<p>Deeper reference: <a href="../kit/sim.html">kit/sim</a> for the full lane, and
+<a href="../kit/timelines.html">timelines</a> for the per-field guide to deciding what&#39;s
+co-op and what&#39;s contested in <em>your</em> game.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/07-the-competitive-turn.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#predict-self-your-avatar-on-both-timelines" class="">Predict-self: your avatar on both timelines</a><a href="#choosing-per-object-predict-self-and-contested" class="">Choosing per object: predict-self and contested</a><a href="#the-claim" class="">The claim</a><a href="#lag-compensation" class="">Lag compensation</a><a href="#what-carries-over" class="">What carries over</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/07-the-competitive-turn.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

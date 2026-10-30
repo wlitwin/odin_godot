@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Native Quickdraw saves · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Native Quickdraw saves</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_quickdraw/saves.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>The native session menu accepts a save-file path and offers Resume solo and Resume
+host. During a direct authority session, Save/F5 writes the complete authority
+checkpoint. A connected client or observer cannot save authority state. Explicit
+scripted launches can use <code>RQ_SAVE=/path/duel.replay RQ_RESUME=1 RQ_ROLE=host</code> or
+<code>RQ_ROLE=solo</code>; <code>RQ_PROFILE</code> selects the local reconnect identity separately.</p>
+<p>The checkpoint contains the complete world: player lives/HP, scores, gold/equipment,
+drone positions, cooldowns, respawn deadlines, active lobs, collision history, names
+and start policy. Session identities, input/action ledgers and their accepted pending
+work are part of the shared archive format. It does not save scene nodes, active
+cosmetic pulses, local chat scrollback or personal profile files.</p>
+<p>Resume validates the model/content contract and the saving host&#39;s identity before
+opening a new authority session. It starts a newer epoch from the exact saved frame.
+Direct file resume uses the default retirement policy for accepted but unexecuted
+commands and schedules absent peers to leave; matching identities can rejoin their
+retained seats. It does not resurrect old network connections or silently preserve
+pending purchases. Solo resume keeps the host and lets other saved players depart.
+Presentation is freshly seeded so historical shots/hurt flashes/rings do not replay.</p>
+<p>A local file is not a host-election credential. Quickdraw refuses file resume for
+configured Room sessions and for permit/custom-policy archives; those require their
+recovery service. File resume deliberately creates a new direct session. Stop the
+old direct game before replacing it. Configured online authorities now publish through <a href="online.html">Room</a>; public
+deployment remains separate work. <a href="online.html">Abandoned-party restoration</a> now has
+its own service-backed acceptance path.</p>
+<p>Writes use the existing bounded staged-file/rename helper. A failed write leaves the
+previous committed file intact. Missing, damaged, incompatible or wrong-owner files
+do not open a session and show a specific menu explanation. This is the existing
+process-crash save boundary, not a new portable power-loss durability guarantee.
+Native identity and display-name preferences remain separate; do not share an identity
+file as a game-save export.</p>
+<p>The game content/schema remains D2; this feature does not add gameplay fields. D1
+archives still have no implicit conversion. Browser IndexedDB slots and identity persistence now have their own
+<a href="browser-saves.html">browser-local flow</a>; they do not use native file paths.</p>
+<p>Run <code>tests/replay_quickdraw_save/run.sh</code> from the Nix development environment for a
+fresh-process combat save/resume fixture. It uses isolated paths and identities,
+kills only its owned writers after a durable receipt, checks negative loads and
+failed-write preservation, then continues respawn, equipment, purchases, lobs and
+named chat in a fresh host/client pair.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Quickdraw parties</span><span aria-hidden="true">→</span></a><a href="browser-saves.html"><span>Browser-local Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/saves.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_quickdraw/saves.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

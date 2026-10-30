@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Recorded authority observations · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Recorded authority observations</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/authority.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#recovery-and-compatibility">Recovery and compatibility</a></nav></details>
+<article class="reading-body "><p><code>Model.authority</code> opts a game into a pure simulation policy:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">authority = {id = <span class="hljs-number">1</span>, apply = observe_authority}</code></pre></div><p>The server records <code>Authority_Observation{known=true, seat=local_seat}</code> in each
+<code>Batch</code>. Seat zero identifies a dedicated authority with no local player. The
+policy runs after fresh-player resets and before the ordinary model step, under
+the same commit gate and rollback transaction. It may change state and emit game
+events, or abort the entire tick. The policy&#39;s nonzero identifier participates in
+the negotiated model/checkpoint contract; change it when its semantics change.</p>
+<p>The callback receives a recorded fact, not live process-role access. Keep the
+previous observed authority in the game state when you need a transition. That
+makes repeated observations idempotent and restores the previous identity with
+the rest of the world during correction. Cavecrawl uses this to adopt a departed
+host&#39;s carried relic while leaving avatars with their returning player identities.</p>
+<p>Clients record an unknown observation and do not predict authority-policy calls.
+They receive the resulting world/effects through normal authoritative snapshots
+and facts. Gameplay packets expose no client-supplied authority observation. An
+unknown observation must have seat zero; known observations require an enabled
+policy and an in-range seat. Recording preflight checks these rules before any
+simulation. Other simulation inputs continue predicting normally.</p>
+<h2 id="recovery-and-compatibility">Recovery and compatibility<a class="heading-anchor" href="#recovery-and-compatibility" aria-label="Link to this section">#</a></h2>
+<p><code>server_restore</code> retains the exact checkpoint frame. On the first subsequent
+committed tick, the server records its newly authorized local seat. No hidden
+checkpoint edit or unrecorded gameplay callback runs during restore. A checkpoint
+captured before that first tick still contains the old game-state observation and
+the current host seat in its existing header; another restore therefore does not
+lose a pending identity transition. The game decides how a dedicated successor or
+an initially unknown authority affects its entities.</p>
+<p>Existing gameplay packet and checkpoint envelope formats are unchanged. Models
+with the policy disabled retain their previous negotiated contract. An enabled
+policy has a distinct contract, and games adding observation fields to their
+worlds must explicitly convert their old state schemas.</p>
+<p><code>Batch</code> is also the diagnostic recording input type, so its schema fingerprint
+has changed for all network recordings. Normal recording decode rejects the old
+fingerprint. <code>recording_upgrade_without_authority</code> explicitly maps older inputs
+only for models whose authority policy remains disabled; it cannot fabricate
+missing host observations. It preserves the source context, frames, decisions
+and events. Verification remains separate from conversion. See
+<a href="recording.html#older-network-recordings">recording conversion</a>.</p>
+<p>This observation identifies the runner&#39;s local player seat. It does not represent
+all shared-authority object ownership, grant permission to host, or replace the
+lease/coordinator checks that authorize a runner to commit.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="recording.html"><span>Replaying recorded network simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/authority.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#recovery-and-compatibility" class="">Recovery and compatibility</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/authority.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

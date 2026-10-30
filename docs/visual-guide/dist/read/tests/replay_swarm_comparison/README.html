@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Sustained Scrapyard offensive comparison · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Sustained Scrapyard offensive comparison</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/tests/replay_swarm_comparison/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_SWARM_OUT=/private/tmp/replay-swarm-new \
+  nix develop --<span class="hljs-built_in">command</span> bash tests/replay_swarm_comparison/run.sh</code></pre></div><p>Requires the original sibling <code>../scrapyard</code>. The output directory must be fresh.
+The harness makes separately runnable Kit and Replay project copies with isolated
+save names, records the existing baseline ownership cleanup, and builds both with
+<code>-debug -o:speed</code>. It waits for editor build workers, explicitly rebuilds, and
+fingerprints the actual binaries. Original projects and user profiles are preserved.</p>
+<p>The <a href="contract.json.html">contract</a> specifies two stationary bolter users, seed 1337,
+60 Hz and a 60 FPS process cap, with 120 ms receive delay in each process. Shared
+resource fixtures disable scrapbot bite damage and set bolter magazine capacity
+to 255 and jam probability to zero. This avoids player wipes and reload pauses in
+this particular offensive workload. These fixture changes are recorded separately
+from the baseline cleanup and read-only measurement adapters.</p>
+<p>The host fills forty stock scrapbots, then replenishes toward forty every six
+ticks, with at most four spawn requests per batch. Spawn requests and nearest-enemy
+aim selection run through existing game development paths inside the timed game
+callback. Enemy AI, collisions, projectiles, damage, death/reaping and pickups run
+through ordinary gameplay. Both peers arm after a two-second warmup with settled receive progress and fire for
+twenty seconds. A shared stop barrier and two-second settle precede final receipts.</p>
+<p>Acceptance requires 32–44 living enemies in every captured frame, a time-weighted
+mean of at least 36, at least twenty kills, sixty observed enemy identities, twenty
+actors with measured travel, and 45–75 shots per player during each window. The
+read-only census records IDs, position, HP, kind, combat totals and population on
+each process frame. Authority health, kill and loot conservation must hold. Both
+peers must converge on the final damage, kills, scrap, loot, health, population,
+known spawn count and shots. Every issued host spawn must have been observed.</p>
+<p>The default gate requires three pairs in alternating Kit/Replay order, exact
+source/binary fingerprints, clean process shutdown and twenty report rejection/
+acceptance cases. Raw receipts, callback timings, census cost, measurement-window
+RSS, environment and per-run/aggregate statistics remain in the output directory.
+<code>REPLAY_SWARM_PILOT=1</code> runs one pair with an explicit partial-plan report and a
+separate pilot marker; it cannot satisfy the full comparison gate.</p>
+<p>Callback timings are inclusive elapsed time for the real game callback, including
+its different networking/simulation/presentation work and the spawn/aim adapter.
+Census and GDScript observation work are outside that timer but consume process
+time and memory. The reported census subtotal ends after enemy enumeration and
+authority conservation checks; subsequent counter reads and trace construction
+are outside both timers. It is not total instrumentation CPU cost. RSS includes instrumentation
+and is sampled only while the measurement marker is active. Application output
+counts accepted protocol bytes, including Replay&#39;s other router lanes and Kit&#39;s
+one-byte tag, excluding ENet framing/retransmission. Delay settings are not measured
+RTT. Nearest-rank percentiles and median/range across three pairs are descriptive,
+not confidence intervals or a framework-only ratio.</p>
+<p>The same intent and population envelope do not imply identical transient worlds.
+Authority models, spawn scheduling, targets, shots, attribution and presentation
+differ. Clients observe different prediction/authority scopes. This is a sustained
+offensive workload: movement, player damage, status/ability combinations, changing
+waves, network faults, human responsiveness and full-game parity remain separate
+requirements. The older peak-and-drain stress gates remain available.</p>
+<p>Version 2 makes receive freshness explicit: two warmup seconds and every measured
+client observation must keep contiguous facts no more than thirty ticks ahead of
+the received authority frame, and prediction depth no more than lead plus thirty.
+The host must advance 1,180–1,220 ticks; the Replay client&#39;s received authority
+frame may advance 1,140–1,260 across the window because its endpoints can fall on
+different snapshot delivery phases. Actual advance and lag percentiles/maxima
+are reported, and no resync may occur during measurement. Thirty ticks is a
+workload acceptance bound, not a responsiveness target for competitive games.
+The earlier four-tick warmup bound cannot hold continuously while large reliable
+snapshots await acknowledgments. That pacing limitation remains visible.</p>
+<p><code>REPLAY_SWARM_REUSE=/path/to/previous-run</code> first prepares new isolated sources,
+verifies every compiled source/content hash against the previous copies and checks
+shared framework/binary hashes, then copies exact binaries and imported asset
+caches. Only the external GDScript driver and isolated project namespace may
+differ. The reuse receipt records the source run; build logs belong to that build.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_swarm_comparison/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_swarm_comparison/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

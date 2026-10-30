@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Authenticated authority service and durable storage · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authenticated authority service and durable storage</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/service.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#trust-and-message-contract">Trust and message contract</a><a href="#atomic-replay-protection">Atomic replay protection</a><a href="#sqlite-adapter">SQLite adapter</a><a href="#evidence">Evidence</a></nav></details>
+<article class="reading-body "><p><code>Service</code> exposes the coordinator through the borrowed Replay transport interface.
+<code>Rpc_Client</code> correlates replies with a <code>Lease</code>; the SQLite adapter implements the
+durable compare-and-swap callback. The library and real-process fixture now exercise
+planned transfer of an actual replayed simulation and coordinator crash/restart.
+The Room driver additionally passes live-client planned/crash, repeated, returned-
+host, partition, and successor-loss gates. <a href="registration.html">Process registration</a>
+now supplies fresh incarnations for known members. General room/invite provisioning
+and broader combat/platform acceptance remain open.</p>
+<h2 id="trust-and-message-contract">Trust and message contract<a class="heading-anchor" href="#trust-and-message-contract" aria-label="Link to this section">#</a></h2>
+<p>Provision enabled <code>Member</code> records and distinct, unpredictable 32-byte keys for
+their member IDs. Keep keys in the admission/secret provider, not the public
+room record. A game process obtains a fresh incarnation through Challenge/Rebind
+or a trusted provisioner. Reconnecting its control transport retains its
+lease/request sequence. Fixture keys are deterministic test data and
+must not be used for deployment.</p>
+<p>Each <code>Rpc_Client</code> also requires a fresh 16-byte cryptographic nonce. <code>rpc_nonce</code>
+uses the native entropy source when available; other embeddings must supply one.
+Replies bind the member/incarnation, nonce, request sequence, and SHA-256 of the
+exact request. Request and reply MACs use separate protocol-domain prefixes and
+HMAC-SHA-256. Verification uses the standard crypto package&#39;s constant-time
+comparison. A key belonging to one identity cannot authenticate another identity.</p>
+<p>Control RPCs provide Query, Start, Renew, Nominate, Prepare, Release, Claim,
+Recover_Owner, Challenge, and Rebind. Requests/replies use canonical bounded envelopes and append a
+32-byte MAC. They authenticate metadata; they do <strong>not encrypt</strong> it. Use a suitable
+protected transport/deployment if room identities or endpoints are confidential.
+The control plane does not transmit the game&#39;s complete private checkpoint.</p>
+<p>Bad MACs, unknown/disabled identities, wrong lengths, and invalid schemas do not
+reach the store. Each pump consumes at most 32 packets and authenticated identities
+have request token buckets. The receive buffer can drain the transport&#39;s full
+64 KiB packet limit, then rejects oversize RPCs, so an oversized packet cannot
+remain at the queue head and block all later requests.</p>
+<h2 id="atomic-replay-protection">Atomic replay protection<a class="heading-anchor" href="#atomic-replay-protection" aria-label="Link to this section">#</a></h2>
+<p>Decision record version 3 includes a per-member request sequence, request hash,
+result, and bound client nonce. The service evaluates a command on a private coordinator copy, then
+commits its decision and replay frontier together through one real CAS operation.
+This includes reads and rejected commands: an older delayed mutation cannot run
+after a newer Query, including after service restart.</p>
+<p>An identical retry of the latest request returns its recorded result and a fresh
+view of current remaining lease time; it does not renew again or repeat the
+decision. Older sequences, or different payloads at the same sequence, are stale.
+The reply&#39;s sequence floor allows an RPC wrapper to continue an already running
+incarnation&#39;s sequence. It is not permission for a new game process to reuse that
+incarnation or reconstruct an absent world.</p>
+<p><code>rpc_begin</code> records the local request start before sending. <code>rpc_client_pump</code>
+retries those same bytes, without moving the lease&#39;s reference time. A timeout
+returns <code>Busy</code> and has an unknown remote outcome; it is not evidence that a command
+was never committed. <code>rpc_completed</code> reports a validated reply for the current
+request. After an uncertain operation, inspect the coordinator&#39;s durable view and
+use a new request rather than assume failure or success.</p>
+<p>Retired owners can continue receiving authenticated control metadata while their
+gameplay permit stays permanently disabled for that epoch. This lets an old owner
+learn that its final archive has been prepared and submit its release.</p>
+<h2 id="sqlite-adapter">SQLite adapter<a class="heading-anchor" href="#sqlite-adapter" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">store: authority_sqlite.Store
+error := authority_sqlite.open(&amp;store, database_path) <span class="hljs-comment">// existing file by default</span>
+record, found, load_error := authority_sqlite.load(&amp;store, room, content)
+<span class="hljs-comment">// Check every result. Create a new file/room only through explicit provisioning.</span>
+error2 := authority.service_init(&amp;service, record, authority_sqlite.commit,
+                                 &amp;store, clock, transport, credentials[:])</code></pre></div><p>Pass <code>create=true</code> only when explicitly creating a new database. A missing existing
+database does not silently become a room with a reset epoch floor. Existing rows
+are validated against the canonical record schema, room, content, and revision.</p>
+<p>The store uses <code>BEGIN IMMEDIATE</code> for read/compare/write, stores the decision and
+request frontiers in one canonical blob, and returns success only after COMMIT.
+It verifies WAL journal mode and FULL synchronization, enables <code>fullfsync</code> and
+checkpoint synchronization, and bounds busy waiting. SQLite documents the WAL/FULL
+durability boundary and synchronization behavior in its
+<a href="https://www.sqlite.org/wal.html" rel="noreferrer">WAL documentation</a> and
+<a href="https://www.sqlite.org/pragma.html#pragma_synchronous" rel="noreferrer">synchronous pragma documentation</a>.</p>
+<p>The current adapter supports native macOS and Linux and links SQLite. The Nix dev
+shell now includes it. The runtime tests here ran on macOS. This is a local-file
+backend, not a replicated coordinator database; use one authoritative database on
+a supported local filesystem. The implementation relies on SQLite and the storage
+stack honoring their synchronization contract. Tests kill processes and verify
+recovery; they do not physically interrupt machine power or certify storage hardware.</p>
+<p>A competing coordinator initialization commits a new generation/revision, so an
+older instance&#39;s next CAS fails. Restart quarantine still outlasts old possible
+leases. <code>Recover_Owner</code> permits the same surviving owner to prepare its frozen world
+and obtain a newer epoch after quarantine. If a grant committed immediately before
+its reply was lost, the exact checkpoint recorded by that grant can also be used;
+the claimant must actually possess it. Neither path revives the old epoch.</p>
+<h2 id="evidence">Evidence<a class="heading-anchor" href="#evidence" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_sqlite/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_authority_service/run.sh</code></pre></div><p>The authority suite now has 19 native tests plus a WASM type-check. New cases cover
+MAC forgery/cross-identity requests, nonce-bound replies, oversized ingress, durable
+replay frontiers across newer reads/restart, lost replies, storage failures, and
+recovery of an unconsumed committed grant. SQLite tests reopen the database, race
+stale CAS connections, and force a write failure. A subprocess dies with an
+uncommitted corrupt replacement; a fresh process recovers the prior epoch, tick,
+and request frontier.</p>
+<p>The Godot service gate runs coordinator, old owner, and successor processes. It
+transfers the actual cave model (including private fixture data, looted inventory,
+and a live projectile), retires the old owner, prepares/releases/claims through
+authenticated RPCs, and restores the successor&#39;s simulation at epoch 2. The gate
+then kills the coordinator, reopens its SQLite record as generation 2, keeps the
+successor alive, waits through quarantine, and resumes its retained world at epoch 3.</p>
+<p>This proves the decision service, durability, and simulation transfer components.
+The fixture uses explicit test provisioning and a separate checkpoint connection.
+It does not yet prove migration of live Cavecrawl clients, gameplay rendezvous,
+or every M5 crash/partition scenario. That driver and its acceptance cases remain
+the next work.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/service.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#trust-and-message-contract" class="">Trust and message contract</a><a href="#atomic-replay-protection" class="">Atomic replay protection</a><a href="#sqlite-adapter" class="">SQLite adapter</a><a href="#evidence" class="">Evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/service.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

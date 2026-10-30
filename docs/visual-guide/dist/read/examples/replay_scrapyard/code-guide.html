@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Reading and editing the Scrapyard code · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html" aria-current="page">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Reading and editing the Scrapyard code</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/code-guide.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-frame-loop">The frame loop</a><a href="#find-the-code-for-a-change">Find the code for a change</a><a href="#code-style">Code style</a><a href="#format-the-code">Format the code</a><a href="#check-a-change">Check a change</a></nav></details>
+<article class="reading-body "><p>New to the project? Start with the <a href="contributor-guide.html">visual contributor guide</a>
+for the architecture, a hands-on reading path and an end-to-end feature trace.</p>
+<h2 id="the-frame-loop">The frame loop<a class="heading-anchor" href="#the-frame-loop" aria-label="Link to this section">#</a></h2>
+<p>Start at <code>scripts/scrapyard.odin</code>. It declares the Godot script&#39;s state and its
+ready/process/exit callbacks. The process callback shows the frame&#39;s order:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">typing := poll_frame_ui(self)
+<span class="hljs-comment">// Return here until the script and a session/room are ready.</span>
+poll_frame_services(self, typing)
+control := sample_gameplay_input(self, typing)
+<span class="hljs-keyword">if</span> !advance_gameplay_session(self, dt, control) {
+    <span class="hljs-keyword">return</span>
+}
+update_prediction_smoothing(self)
+dispatch_session_changes(self)
+present_session_frame(self, dt)</code></pre></div><p>The deferred <code>finish_frame</code> runs audio, recording, diagnostics, social/recovery,
+screen and feedback hooks even when a frame returns early. Their order is
+intentional. Input edges are captured before session advancement; corrections
+and event changes are consumed before presentation.</p>
+<h2 id="find-the-code-for-a-change">Find the code for a change<a class="heading-anchor" href="#find-the-code-for-a-change" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Responsibility</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Input bindings and scene-component setup</td>
+<td><code>scripts/scene_setup.odin</code></td>
+</tr>
+<tr>
+<td>Network options, identity/resume, initial world and training encounters</td>
+<td><code>scripts/session_start.odin</code></td>
+</tr>
+<tr>
+<td>Profile declaration and lobby actions</td>
+<td><code>scripts/lobby_actions.odin</code></td>
+</tr>
+<tr>
+<td>Held controls, overlay guards, discrete actions and development-driver overrides</td>
+<td><code>scripts/input.odin</code></td>
+</tr>
+<tr>
+<td>Session advancement, correction smoothing and frame completion</td>
+<td><code>scripts/frame.odin</code></td>
+</tr>
+<tr>
+<td>Event fan-out, action outcomes and diagnostic traces</td>
+<td><code>scripts/session_events.odin</code></td>
+</tr>
+<tr>
+<td>Observation interpolation and scene presentation</td>
+<td><code>scripts/drawing.odin</code></td>
+</tr>
+<tr>
+<td>Gameplay status and local save/status messages</td>
+<td><code>scripts/status_view.odin</code></td>
+</tr>
+<tr>
+<td>Development control methods and test/diagnostic queries</td>
+<td><code>scripts/development_controls.odin</code>, <code>scripts/probes.odin</code></td>
+</tr>
+<tr>
+<td>Simulation tick, roster changes and player motion</td>
+<td><code>shared/game/game.odin</code></td>
+</tr>
+<tr>
+<td>Cast admission/cooldowns and individual ability effects</td>
+<td><code>shared/game/abilities.odin</code>, <code>shared/game/ability_casts.odin</code></td>
+</tr>
+<tr>
+<td>Enemy target selection and concrete AI routines</td>
+<td><code>shared/game/brains.odin</code></td>
+</tr>
+<tr>
+<td>Workbench admission, encounter setup, confirmation and updates</td>
+<td><code>scripts/workbench.odin</code></td>
+</tr>
+<tr>
+<td>Lobby sections, roster, button states and selected loadout</td>
+<td><code>scripts/muster.odin</code></td>
+</tr>
+<tr>
+<td>Flame reconciliation/collision and arc presentation</td>
+<td><code>scripts/cast_path_view.odin</code></td>
+</tr>
+</tbody></table>
+</div><p>Files under <code>scripts/</code> share one Odin package. Helpers receive the values or
+borrowed world references they need. The script owns the session and Godot handles;
+the simulation owns gameplay values. Simulation rules remain under <code>shared/game</code>, detached
+display values under <code>shared/presentation</code>, and authored node behavior under
+<code>scripts/views</code>. The <a href="editor-first.html">editor-first guide</a> explains that boundary.</p>
+<p><code>Ability_Cast</code> holds the resolved inputs for one cast; <code>Mob_Pursuit</code> holds one
+enemy&#39;s selected target, distance and speed. They are temporary inputs to ordinary
+functions. Persistent gameplay values belong in <code>World</code>. Ability handlers share
+the rule that a killing hit cannot also apply a status to that target.</p>
+<h2 id="code-style">Code style<a class="heading-anchor" href="#code-style" aria-label="Link to this section">#</a></h2>
+<p>Use multiline procedure bodies and control-flow blocks, one statement per line,
+and a blank line between meaningful phases. Keep short literals compact. Extract
+a helper when it names a responsibility, isolates a lifecycle concern, or removes
+nesting; a flat data table need not become many tiny functions.</p>
+<h2 id="format-the-code">Format the code<a class="heading-anchor" href="#format-the-code" aria-label="Link to this section">#</a></h2>
+<p>The project-local <code>odinfmt.json</code> uses tabs and a 120-column target. From the
+repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> python3 examples/replay_scrapyard/tools/format.py
+nix develop --<span class="hljs-built_in">command</span> python3 examples/replay_scrapyard/tools/format.py --check</code></pre></div><p>The command covers handwritten Odin in scripts, shared code and tools, excluding
+generated bindings and frozen revision definitions. Godot&#39;s format-on-save uses
+the same configuration. The formatter preserves inline blocks, so write new
+control flow across lines explicitly.</p>
+<p>Formatting a definition extractor or catalog source changes its provenance hash.
+Rebuild, then use <code>tools/stock.py --project /absolute/path/to/built/project</code> to
+refresh the artifact receipt. Formatting alone must preserve the canonical
+catalog digest, schema and semantic content version; it does not justify a new
+save revision.</p>
+<h2 id="check-a-change">Check a change<a class="heading-anchor" href="#check-a-change" aria-label="Link to this section">#</a></h2>
+<p>Run the model tests when changing gameplay rules:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin <span class="hljs-built_in">test</span> tests/replay_scrapyard \
+  -collection:godot=. -out:/tmp/replay-scrapyard-model-tests</code></pre></div><p>Use the feature&#39;s focused test or workbench when changing an input handler, view,
+or authored Resource. Changes to an action or saved state also need correction
+and checkpoint-continuation coverage. The contributor guide lists the
+<a href="contributor-guide.html#7-run-the-smallest-relevant-check-then-expand">model, Godot, and multiplayer checks</a>
+and explains when each applies.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="contributor-guide.html"><span>Start here: contributing to Replay Scrapyard</span><span aria-hidden="true">→</span></a><a href="editor-first.html"><span>Canonical editor-first Replay example</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/code-guide.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-frame-loop" class="">The frame loop</a><a href="#find-the-code-for-a-change" class="">Find the code for a change</a><a href="#code-style" class="">Code style</a><a href="#format-the-code" class="">Format the code</a><a href="#check-a-change" class="">Check a change</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/code-guide.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

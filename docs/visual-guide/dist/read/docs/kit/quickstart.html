@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The first two-peer game · odin_godot</title><meta name="description" content="Build a small cooperative game from field declarations, entities, and commands."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>The first two-peer game</h1><p class="reader-dek">Build a small cooperative game from field declarations, entities, and commands.</p><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/quickstart.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#prerequisite">Prerequisite</a><a href="#build-and-run-the-example">Build and run the example</a><a href="#1-declare-a-replicated-entity">1. Declare a replicated entity</a><a href="#2-register-the-entity-scene">2. Register the entity scene</a><a href="#3-attach-the-standard-stack">3. Attach the standard stack</a><a href="#4-host-join-and-start">4. Host, join, and start</a><a href="#5-spawn-one-player-entity-per-seat">5. Spawn one player entity per seat</a><a href="#6-track-the-locally-owned-entity">6. Track the locally owned entity</a><a href="#7-pump-the-session-and-move-the-local-player">7. Pump the session and move the local player</a><a href="#8-release-the-stack-on-scene-exit">8. Release the stack on scene exit</a><a href="#test-with-latency-and-packet-loss">Test with latency and packet loss</a><a href="#next-steps">Next steps</a></nav></details>
+<article class="reading-body "><p>This guide builds <code>examples/hello_net</code>: two Godot windows, one player-controlled
+square per window, with both squares visible to both players. It introduces the
+default Kit stack:</p>
+<ul>
+<li>a host-authoritative session and roster;</li>
+<li>generated entity spawning and lookup;</li>
+<li>owner-streamed movement with interpolation on remote peers;</li>
+<li>reliable replicated fields for shared state; and</li>
+<li>the stock lobby, chat, transport, and reconnect flow.</li>
+</ul>
+<p>The guide uses focused excerpts. The complete, buildable sources are
+<a href="../../examples/hello_net/scripts/hello.odin.html"><code>hello.odin</code></a> and
+<a href="../../examples/hello_net/scripts/player.odin.html"><code>player.odin</code></a>.</p>
+<h2 id="prerequisite">Prerequisite<a class="heading-anchor" href="#prerequisite" aria-label="Link to this section">#</a></h2>
+<p>Complete <a href="../getting-started.html">Getting Started</a> first. In this repository,
+enter <code>nix develop</code> so that <code>odin</code> and <code>$GODOT</code> refer to the pinned tools. In an
+installed addon, use <code>addons/odin_godot/build/build_scripts.sh</code> in place of the
+repository build script shown below.</p>
+<h2 id="build-and-run-the-example">Build and run the example<a class="heading-anchor" href="#build-and-run-the-example" aria-label="Link to this section">#</a></h2>
+<p>From the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_scripts.sh examples/hello_net
+<span class="hljs-variable">$GODOT</span> --path examples/hello_net &amp;
+<span class="hljs-variable">$GODOT</span> --path examples/hello_net</code></pre></div><p>Select <strong>Host</strong> in the first window and <strong>Join</strong> in the second. Arrow keys move
+the square owned by the active window. A remote square is deliberately rendered
+slightly behind its owner so that Kit can interpolate between received samples.</p>
+<p>If this checkpoint fails, check the build output first, then confirm that both
+processes use the same build and that port <code>4242</code> is available.</p>
+<h2 id="1-declare-a-replicated-entity">1. Declare a replicated entity<a class="heading-anchor" href="#1-declare-a-replicated-entity" aria-label="Link to this section">#</a></h2>
+<p><code>Player</code> is an ordinary Odin script struct. The field tags select how each value
+is replicated:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node2D</span>
+<span class="hljs-comment">//gd:class Player</span>
+<span class="hljs-keyword">package</span> hello_net
+
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+<span class="hljs-keyword">import</span> knet <span class="hljs-string">&quot;godot:kit/net&quot;</span>
+
+Player :: <span class="hljs-keyword">struct</span> {
+	owner:  gd.Node2d,
+	skin:   gd.Polygon2d <span class="hljs-string">`gd:&quot;onready=Skin&quot;`</span>,
+	net_id: knet.Net_Id,
+	x, y:   <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner,wire=f16&quot;`</span>, <span class="hljs-comment">// float owner streams interpolate by default</span>
+	pid:    <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
+	mine:   <span class="hljs-type">bool</span>,
+	tinted: <span class="hljs-type">bool</span>,
+}</code></pre></div><div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>net_id</code></td>
+<td>Stable entity identifier assigned by the session. Generated entity helpers require this field.</td>
+</tr>
+<tr>
+<td><code>x</code>, <code>y</code></td>
+<td>The entity owner writes these values. Other peers receive the stream and interpolate it. <code>wire=f16</code> reduces their encoded size.</td>
+</tr>
+<tr>
+<td><code>pid</code></td>
+<td>The host writes this value and sends changes reliably on the delta lane.</td>
+</tr>
+<tr>
+<td><code>mine</code>, <code>tinted</code></td>
+<td>Local implementation state. Untagged fields do not cross the network.</td>
+</tr>
+</tbody></table>
+</div><p>The script renders the current presentation values each frame. The same proc
+runs for local and remote entities:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">player_process :: <span class="hljs-keyword">proc</span>(self: ^Player, delta: <span class="hljs-type">f64</span>) {
+	_ = delta
+	<span class="hljs-keyword">if</span> !self.tinted &amp;&amp; self.pid != <span class="hljs-number">0</span> {
+		self.tinted = <span class="hljs-literal">true</span>
+		hues := [<span class="hljs-number">4</span>]gd.Color{
+			{<span class="hljs-number">0.9</span>, <span class="hljs-number">0.5</span>, <span class="hljs-number">0.2</span>, <span class="hljs-number">1</span>}, {<span class="hljs-number">0.3</span>, <span class="hljs-number">0.7</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">1</span>},
+			{<span class="hljs-number">0.5</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.4</span>, <span class="hljs-number">1</span>}, {<span class="hljs-number">0.9</span>, <span class="hljs-number">0.4</span>, <span class="hljs-number">0.7</span>, <span class="hljs-number">1</span>},
+		}
+		gd.polygon2d_set_color(self.skin, hues[<span class="hljs-type">int</span>(self.pid) % <span class="hljs-number">4</span>])
+	}
+	gd.node2d_set_position(<span class="hljs-keyword">cast</span>(gd.Node2d)self.owner, {self.x, self.y})
+}</code></pre></div><p>For the owning player, <code>x</code> and <code>y</code> are the values just written by local input.
+For every other player, Kit has already replaced them with interpolated
+presentation values before <code>_process</code> reads them.</p>
+<h2 id="2-register-the-entity-scene">2. Register the entity scene<a class="heading-anchor" href="#2-register-the-entity-scene" aria-label="Link to this section">#</a></h2>
+<p>The game script owns the session components and exports the scene used to create
+players:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">HelloNet :: <span class="hljs-keyword">struct</span> {
+	owner: gd.Node2d,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	boot:  kboot.Boot,
+
+	player_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Player:1&quot;`</span>,
+	me: ^Player,
+}</code></pre></div><p>The <code>entity=Player:1</code> tag associates wire type <code>1</code> with <code>Player</code> and generates:</p>
+<ul>
+<li><code>hello_net_entities</code>, which installs the entity factory;</li>
+<li><code>player_spawn</code>, <code>player_of</code>, <code>player_owned_by</code>, and <code>player_mine</code>;</li>
+<li>typed <code>player_ref</code> handles plus one-pass <code>player_all</code> iteration
+with <code>player_all</code> as the sole enumeration view;</li>
+<li>spawn/free bookkeeping hooks; and</li>
+<li>scalar probes used by the integration-test harness.</li>
+</ul>
+<p>Assign <code>player.tscn</code> to <code>player_scene</code> in the Inspector. Entity type numbers are
+part of the wire protocol, so keep them stable once compatible builds may meet.</p>
+<h2 id="3-attach-the-standard-stack">3. Attach the standard stack<a class="heading-anchor" href="#3-attach-the-standard-stack" aria-label="Link to this section">#</a></h2>
+<p>Set up Kit from the game&#39;s <code>_ready</code> proc:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_net_ready :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
+	hello_net_attach(
+		self,
+		kboot.Options{
+			title = <span class="hljs-string">&quot;HELLO, MULTIPLAYER&quot;</span>,
+			status = <span class="hljs-string">&quot;Host a room, or join one at localhost&quot;</span>,
+			legend = <span class="hljs-string">&quot;Arrows move · Enter chat&quot;</span>,
+			env = <span class="hljs-string">&quot;HELLO&quot;</span>,
+			min_players = <span class="hljs-number">1</span>,
+		},
+		kboot.network_profile(.Friends_Coop),
+	)
+}</code></pre></div><p>Because the struct has one direct <code>Boot</code>, <code>Session</code>, and <code>Comms</code>, scriptgen
+creates this game-network facade automatically. <code>hello_net_attach</code> creates
+the stock UI, initializes the Godot transport adapter, wires session and chat,
+installs <code>hello_net_entities</code>, and connects the standard signal methods.
+<code>Options.env = &quot;HELLO&quot;</code> also defines the prefix for settings such as
+<code>HELLO_PORT</code>, <code>HELLO_NAME</code>, <code>HELLO_TOKEN</code>, and the link simulator variables used
+later in this guide. <code>.Friends_Coop</code> states the trust model: players may author
+their owner-streamed movement, while the host owns reliable shared state and
+validates commands. Omitting the third argument selects the same profile, but
+naming it makes the game&#39;s intent visible.</p>
+<p>The individual <code>boot_attach</code> and <code>hello_net_entities</code> calls remain available
+for a custom shell, but the common path does not need to order them by hand.
+Read <a href="profiles.html">Network profiles</a> before promoting fast state to a
+server-authoritative simulation or deploying a dedicated authority.</p>
+<h2 id="4-host-join-and-start">4. Host, join, and start<a class="heading-anchor" href="#4-host-join-and-start" aria-label="Link to this section">#</a></h2>
+<p>The stock lobby calls these <code>@(gd_method)</code> procedures. Authority-specific
+lifecycle work remains explicit: only the host creates the initial entities and
+starts replication.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method)</span>
+hello_net_on_host :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
+	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {<span class="hljs-keyword">return</span>}
+	<span class="hljs-keyword">if</span> !kboot.boot_host(
+		&amp;self.boot,
+		kboot.boot_port(&amp;self.boot, <span class="hljs-number">4242</span>),
+		kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>),
+	) {<span class="hljs-keyword">return</span>}
+	hello_net_on_start(self)
+}
+
+<span class="hljs-meta">@(gd_method)</span>
+hello_net_on_join :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
+	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {<span class="hljs-keyword">return</span>}
+	kboot.boot_join(
+		&amp;self.boot,
+		<span class="hljs-string">&quot;127.0.0.1&quot;</span>,
+		kboot.boot_port(&amp;self.boot, <span class="hljs-number">4242</span>),
+		kboot.boot_token(&amp;self.boot),
+		kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>),
+	)
+}
+
+<span class="hljs-meta">@(gd_method)</span>
+hello_net_on_start :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
+	<span class="hljs-keyword">if</span> !self.ses.is_host || kboot.boot_phase(&amp;self.boot) == .Playing {<span class="hljs-keyword">return</span>}
+	<span class="hljs-keyword">for</span> _, player <span class="hljs-keyword">in</span> self.ses.players {
+		<span class="hljs-keyword">if</span> player.connected {spawn_player(self, player.id)}
+	}
+	ksess.session_start_replicating(&amp;self.ses)
+}</code></pre></div><p>The full example also supports relay-backed join codes. Address-based hosting is
+enough for the first run; see <a href="netgd.html#native-enet-join-codes">Native ENet join codes</a>
+when you need the relay flow.</p>
+<h2 id="5-spawn-one-player-entity-per-seat">5. Spawn one player entity per seat<a class="heading-anchor" href="#5-spawn-one-player-entity-per-seat" aria-label="Link to this section">#</a></h2>
+<p>Spawning has two stages: create and initialize the entity locally, then send its
+spawn record.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">spawn_player :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, pid: knet.Player_Id) {
+	<span class="hljs-keyword">if</span> _, exists := player_owned_by(&amp;self.boot, pid); exists {<span class="hljs-keyword">return</span>}
+	p, id := player_spawn(&amp;self.boot, owner = pid)
+	p.pid = <span class="hljs-type">u8</span>(pid)
+	p.x = <span class="hljs-number">120</span> + <span class="hljs-type">f32</span>(<span class="hljs-type">u64</span>(pid) % <span class="hljs-number">8</span>) * <span class="hljs-number">56</span>
+	p.y = <span class="hljs-number">180</span>
+	kboot.boot_spawn_send(&amp;self.boot, id)
+}</code></pre></div><p><code>player_spawn</code> uses the generated factory and returns a typed pointer.
+<code>boot_spawn_send</code> serializes the initialized fields. Call it only after all
+spawn-time values have been assigned.</p>
+<p>When a player joins after the game has started, an authority-only generated
+event half creates that player&#39;s entity:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
+hello_net_player_joined_then :: <span class="hljs-keyword">proc</span>(
+	self: ^HelloNet,
+	id: knet.Player_Id,
+	rejoin: <span class="hljs-type">bool</span>,
+) {
+	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) == .Playing &amp;&amp; !rejoin {
+		spawn_player(self, id)
+	}
+}</code></pre></div><p>The <code>_then</code> suffix is significant: script generation routes this consequence on
+the authority. The proc still contains the game-specific decision about whether
+this event needs a new entity.</p>
+<h2 id="6-track-the-locally-owned-entity">6. Track the locally owned entity<a class="heading-anchor" href="#6-track-the-locally-owned-entity" aria-label="Link to this section">#</a></h2>
+<p>Generated entity hooks maintain any small amount of game-specific bookkeeping:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
+player_spawned :: <span class="hljs-keyword">proc</span>(
+	game: ^HelloNet,
+	self: ^Player,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) {
+	_ = id
+	<span class="hljs-keyword">if</span> owner == game.ses.me {
+		self.mine = <span class="hljs-literal">true</span>
+		game.me = self
+	}
+}
+
+<span class="hljs-meta">@(gd_half)</span>
+player_freed :: <span class="hljs-keyword">proc</span>(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
+	_ = id
+	<span class="hljs-keyword">if</span> self == game.me {game.me = <span class="hljs-literal">nil</span>}
+}</code></pre></div><p>These hooks run when the generated entity census changes. Use the later
+<code>&lt;game&gt;_entity_spawned</code> session event for presentation that depends on replicated
+spawn fields. In particular, place a new node there so it does not render one
+frame at the scene&#39;s default origin:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
+hello_net_entity_spawned :: <span class="hljs-keyword">proc</span>(
+	self: ^HelloNet,
+	id: knet.Net_Id,
+	type: ksess.Entity_Type,
+	owner: knet.Player_Id,
+) {
+	_ = type
+	_ = owner
+	<span class="hljs-keyword">if</span> p, ok := player_of(&amp;self.boot, id); ok {
+		gd.node2d_set_position(<span class="hljs-keyword">cast</span>(gd.Node2d)p.owner, {p.x, p.y})
+	}
+	gd.set_bool(<span class="hljs-keyword">cast</span>(gd.Object)self.boot.ui.root, <span class="hljs-string">&quot;visible&quot;</span>, <span class="hljs-literal">false</span>)
+}</code></pre></div><p>At this point the spawn fields have been applied on every peer.</p>
+<h2 id="7-pump-the-session-and-move-the-local-player">7. Pump the session and move the local player<a class="heading-anchor" href="#7-pump-the-session-and-move-the-local-player" aria-label="Link to this section">#</a></h2>
+<p>The generated network pump must run once per active frame. It advances the
+transport, session, replication clocks, chat, and any attached simulation lane,
+then forwards declared session events to their typed halves.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_net_process :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, delta: <span class="hljs-type">f64</span>) {
+	was := kboot.boot_phase(&amp;self.boot)
+	<span class="hljs-keyword">if</span> was == .Menu {<span class="hljs-keyword">return</span>}
+
+	_ = hello_net_frame(self, delta, knet.now_s())
+	<span class="hljs-keyword">if</span> self.me != <span class="hljs-literal">nil</span> {
+		dx, dy: <span class="hljs-type">f32</span>
+		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_right&quot;</span>) {dx += <span class="hljs-number">1</span>}
+		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_left&quot;</span>)  {dx -= <span class="hljs-number">1</span>}
+		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_down&quot;</span>)  {dy += <span class="hljs-number">1</span>}
+		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_up&quot;</span>)    {dy -= <span class="hljs-number">1</span>}
+		self.me.x = clamp(self.me.x + dx * <span class="hljs-number">160</span> * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">632</span>)
+		self.me.y = clamp(self.me.y + dy * <span class="hljs-number">160</span> * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">352</span>)
+	}
+	<span class="hljs-keyword">if</span> was != .Playing &amp;&amp; kboot.boot_phase(&amp;self.boot) == .Playing {
+		gd.print_str(<span class="hljs-string">&quot;HELLO_STARTED&quot;</span>)
+	}
+}</code></pre></div><p><code>boot_phase</code> is derived from session state. Read it before and after the pump
+when you need the frame on which a phase changes; do not maintain a second
+<code>started</code> flag for the same state.</p>
+<p><code>hello_net_frame</code> returns a <code>kboot.Net_Frame</code> when you need comms markers or
+the co-op fixed-step count. Use the lower-level <code>boot_pump</code> plus
+<code>hello_net_events</code> only when event dispatch must occur at a custom point in the
+frame.</p>
+<p>This movement model is intentionally owner-authoritative: a client writes its
+own position directly. It is appropriate for cooperative play among invited
+peers, but the host cannot use these coordinates as cheat-resistant truth. Use
+the <a href="quickstart-sim.html">simulation quickstart</a> when the authority must derive
+movement from validated inputs.</p>
+<h2 id="8-release-the-stack-on-scene-exit">8. Release the stack on scene exit<a class="heading-anchor" href="#8-release-the-stack-on-scene-exit" aria-label="Link to this section">#</a></h2>
+<p>The scene owns the Godot nodes; your script owns the Kit allocations. Pair
+attachment with teardown when replacing or freeing the game scene:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hello_net_exit_tree :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
+	hello_net_detach(self)
+	ksess.session_destroy(&amp;self.ses)
+}</code></pre></div><p>The generated detach stops the network stack in dependency order and resets
+the Session&#39;s run. <code>session_destroy</code> also releases its retained wiring. Use
+detach alone when the same game owner will attach again; use both calls for
+final scene removal. Both operations are safe after an earlier detach.</p>
+<h2 id="test-with-latency-and-packet-loss">Test with latency and packet loss<a class="heading-anchor" href="#test-with-latency-and-packet-loss" aria-label="Link to this section">#</a></h2>
+<p><code>Options.env</code> enables the built-in link simulator:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">HELLO_LATENCY=120 HELLO_JITTER=20 HELLO_LOSS=5 \
+  <span class="hljs-variable">$GODOT</span> --path examples/hello_net</code></pre></div><p>The values are one-way latency in milliseconds, jitter in milliseconds, and
+loss as a percentage. Under latency, the local square should still respond
+immediately while the remote square follows on its interpolation timeline.</p>
+<p>The example&#39;s automated test launches real headless processes, verifies the
+replicated state, and exercises join codes:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash examples/hello_net/run.sh</code></pre></div><p>See <a href="testing.html">Integration-test your game</a> before adapting that harness.</p>
+<h2 id="next-steps">Next steps<a class="heading-anchor" href="#next-steps" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Read <a href="net.html">kit/net</a> to add a host-validated <code>@(gd_command)</code> action or a
+replicated-field edge handler.</li>
+<li>Read <a href="session.html">kit/session</a> for reconnect behavior, ownership transfer,
+late joins, moderation, backup hosts, and app messages.</li>
+<li>Use <a href="play.html#owner-simulated-physics-with-playpuppet"><code>play.Puppet</code></a>
+for a shared Godot <code>RigidBody2D</code> or <code>RigidBody3D</code> in the co-op model.</li>
+<li>Continue to <a href="quickstart-sim.html">Server authority and client prediction</a> for
+<code>gd:&quot;predict&quot;</code>, fixed ticks, input validation, and reconciliation.</li>
+<li>Use <a href="build-a-game-in-a-day.html">Build a multiplayer game</a> for a broader tour of
+chat, interaction, items, combat, AI, saves, and Steam.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/quickstart.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#prerequisite" class="">Prerequisite</a><a href="#build-and-run-the-example" class="">Build and run the example</a><a href="#1-declare-a-replicated-entity" class="">1. Declare a replicated entity</a><a href="#2-register-the-entity-scene" class="">2. Register the entity scene</a><a href="#3-attach-the-standard-stack" class="">3. Attach the standard stack</a><a href="#4-host-join-and-start" class="">4. Host, join, and start</a><a href="#5-spawn-one-player-entity-per-seat" class="">5. Spawn one player entity per seat</a><a href="#6-track-the-locally-owned-entity" class="">6. Track the locally owned entity</a><a href="#7-pump-the-session-and-move-the-local-player" class="">7. Pump the session and move the local player</a><a href="#8-release-the-stack-on-scene-exit" class="">8. Release the stack on scene exit</a><a href="#test-with-latency-and-packet-loss" class="">Test with latency and packet loss</a><a href="#next-steps" class="">Next steps</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/quickstart.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

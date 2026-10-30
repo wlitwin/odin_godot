@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Kit glossary · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Kit glossary</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/glossary.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#authority">Authority</a><a href="#boot">Boot</a><a href="#census">Census</a><a href="#command">Command</a><a href="#consequence-_then">Consequence (_then)</a><a href="#delta-lane">Delta lane</a><a href="#edge">Edge</a><a href="#entity">Entity</a><a href="#presentation-event">Presentation event</a><a href="#tick-payload-event">Tick payload event</a><a href="#factory">Factory</a><a href="#half">Half</a><a href="#owner-stream">Owner stream</a><a href="#network-profile">Network profile</a><a href="#player-peer-and-seat">Player, peer, and seat</a><a href="#prediction-reconciliation-and-resimulation">Prediction, reconciliation, and resimulation</a><a href="#session">Session</a><a href="#simulation-lane">Simulation lane</a><a href="#tick">Tick</a><a href="#transport">Transport</a><a href="#watched-entity">Watched entity</a><a href="#net-schema">Net schema</a><a href="#wire-fingerprint">Wire fingerprint</a></nav></details>
+<article class="reading-body "><p>This page defines terms used by Kit&#39;s generated APIs and reference
+documentation.</p>
+<h2 id="authority">Authority<a class="heading-anchor" href="#authority" aria-label="Link to this section">#</a></h2>
+<p>The process whose value is final for a piece of state. In session replication,
+the host is authoritative for <code>replicate</code> fields and commands, while an entity
+owner is authoritative for its <code>owner</code> stream. In <code>kit/sim</code>, the server is
+authoritative for <code>predict</code> fields.</p>
+<p>A listen server is both an authority and a player. A dedicated server is an
+authority without a player avatar.</p>
+<h2 id="boot">Boot<a class="heading-anchor" href="#boot" aria-label="Link to this section">#</a></h2>
+<p><code>kboot.Boot</code> connects the common Godot-facing parts of a Kit game: lobby and HUD
+widgets, <code>netgd</code> transport, session, comms, generated entity factory, frame pump,
+and an optional simulation lane. For the conventional direct-field shell,
+scriptgen emits <code>&lt;game&gt;_net_attach</code>, the normal <code>&lt;game&gt;_net_frame</code>, and
+<code>&lt;game&gt;_net_detach</code>. <code>&lt;game&gt;_net_pump</code> and component-level <code>boot_*</code> procedures
+are the custom-order primitives underneath.</p>
+<p><code>boot_phase</code> reports <code>.Menu</code>, <code>.Connecting</code>, <code>.Lobby</code>, or <code>.Playing</code> from the
+current session state.</p>
+<h2 id="census">Census<a class="heading-anchor" href="#census" aria-label="Link to this section">#</a></h2>
+<p>The generated index of live entities of each declared type. An
+<code>entity=Player:1</code> field generates typed queries such as <code>player_of</code>,
+<code>player_owned_by</code>, <code>player_ref</code>, and <code>player_all</code>. <code>Net_Ref(Player)</code> is the
+pointer-free value to retain;
+<code>Net_Entity(Player)</code> is a temporary iteration row carrying its live typed
+pointer, owner, and ID. The census avoids maintaining a second game map that can
+drift from the session registry.</p>
+<p>The generated <code>&lt;entity&gt;_spawned</code> and <code>&lt;entity&gt;_freed</code> hooks run when census
+bookkeeping changes. Spawn fields are not yet the presentation baseline in the
+<code>_spawned</code> hook; use the later typed <code>&lt;entity&gt;_born</code> hook or the session&#39;s
+<code>&lt;game&gt;_entity_spawned</code> event when initialization depends on received fields.</p>
+<h2 id="command">Command<a class="heading-anchor" href="#command" aria-label="Link to this section">#</a></h2>
+<p>A player-requested action declared with <code>@(gd_command)</code>. A generated
+<code>&lt;verb&gt;_cmd</code> proc uses the same call site on a client and on the authority.
+Its typed <code>Action_Policy</code> decides who may ask, whether the issuing client may
+predict, and the encoded argument limit. The command body validates current
+game state and applies a single-entity mutation.</p>
+<p>An optimistic command runs locally before the authority replies. Confirmation
+keeps the predicted result; rejection replaces it with authoritative state.
+Commands on simulation-lane entities are scheduled on ticks and replay with the
+simulation.</p>
+<p>The generated call returns <code>Action_Outcome</code>: its state is
+<code>Applied</code>/<code>Predicted</code>/<code>Rejected</code>, its optional rejection reason is typed, and
+its sequence correlates the later callback. Immediate and scheduled actions
+share <code>Action_Reject_Reason</code> (<code>Access</code>, <code>Rate</code>, <code>Malformed</code>, <code>Stale</code>,
+<code>Predicate</code>, <code>Timeout</code>) and the session&#39;s command-confirmed/rejected/executed
+halves.</p>
+<h2 id="consequence-_then">Consequence (<code>_then</code>)<a class="heading-anchor" href="#consequence-_then" aria-label="Link to this section">#</a></h2>
+<p>The authority-only half paired with a command, tick, or generated event. A
+command body should mutate its target entity. Its <code>&lt;verb&gt;_then</code> consequence
+performs game-level work such as spawning another entity, crediting a player, or
+transferring ownership after the command succeeds.</p>
+<h2 id="delta-lane">Delta lane<a class="heading-anchor" href="#delta-lane" aria-label="Link to this section">#</a></h2>
+<p>The reliable, host-authoritative replication path selected by
+<code>gd:&quot;replicate&quot;</code>. At each network tick, the registry compares fields with a
+shadow copy and encodes only changed values. A full entity record provides the
+baseline for spawning, late join, and resynchronization.</p>
+<h2 id="edge">Edge<a class="heading-anchor" href="#edge" aria-label="Link to this section">#</a></h2>
+<p>A transition in a replicated field. A generated
+<code>&lt;class&gt;_&lt;field&gt;_edge(game, entity, old, new)</code> half runs when an applied network
+change crosses that field. Initial state and full resynchronization establish a
+baseline without replaying historical edge effects.</p>
+<h2 id="entity">Entity<a class="heading-anchor" href="#entity" aria-label="Link to this section">#</a></h2>
+<p>A network-tracked struct with a <code>knet.Net_Id</code>, a stable wire type, an owner, and
+a generated descriptor. The session controls its network lifetime; the entity
+factory creates or frees the corresponding Odin script and Godot node on each
+peer.</p>
+<p><code>Net_Id</code> identifies an entity within a session. It is not a Godot instance ID or
+a persistent save identity.</p>
+<h2 id="presentation-event">Presentation event<a class="heading-anchor" href="#presentation-event" aria-label="Link to this section">#</a></h2>
+<p>A one-shot presentation occurrence declared with <code>@(gd_event)</code>. Scriptgen
+generates a suffix-free <code>^Boot</code> announce proc from its <code>_fx</code> declaration. Its
+entity anchor selects the existing session or simulation presentation timeline,
+supplies <code>mine</code>, and supports <code>everyone</code>, <code>owner</code>, or <code>observers</code> audiences.
+With one entity parameter the anchor is inferred; several require
+<code>anchor=PARAM</code>.</p>
+<p>Events do not mutate authoritative state and are not replayed to joiners. Kit
+suppresses sim events during resimulation, presents live/owning screens without
+another interpolation delay, and schedules observers on the anchor&#39;s clock.</p>
+<h2 id="tick-payload-event">Tick payload event<a class="heading-anchor" href="#tick-payload-event" aria-label="Link to this section">#</a></h2>
+<p>A one-shot simulation-lane presentation occurrence associated with a tick. A
+tick proc can return payload values to a name-paired <code>_fx</code> half. Cross-entity
+or world occurrences use <code>@(gd_event)</code> instead.</p>
+<p>Tick payloads do not mutate authoritative state. Kit suppresses them during
+resimulation, presents local payloads immediately, and schedules remote payloads on
+the watched timeline.</p>
+<h2 id="factory">Factory<a class="heading-anchor" href="#factory" aria-label="Link to this section">#</a></h2>
+<p>The mapping from a stable entity type number to the scene, descriptor, command
+set, simulation set, and create/free functions needed on every peer. A field tag
+such as <code>gd:&quot;entity=Player:1&quot;</code> lets script generation build this table and its
+typed spawn/query helpers.</p>
+<h2 id="half">Half<a class="heading-anchor" href="#half" aria-label="Link to this section">#</a></h2>
+<p>A user-written proc whose name and signature pair with a generated mechanism.
+Script generation supplies routing and calls the game-specific half. Common
+examples are:</p>
+<ul>
+<li><code>&lt;verb&gt;_then</code> for an authority consequence;</li>
+<li><code>&lt;tick&gt;_fx</code> for simulation presentation;</li>
+<li><code>&lt;class&gt;_&lt;field&gt;_edge</code> for a replicated change;</li>
+<li><code>&lt;entity&gt;_spawned</code>, <code>_born</code>, and <code>_freed</code> for entity lifetime; and</li>
+<li><code>&lt;game&gt;_&lt;event&gt;</code> for session events.</li>
+</ul>
+<p>The term describes one side of generated code plus game code; it does not imply
+that the proc runs on every role.</p>
+<h2 id="owner-stream">Owner stream<a class="heading-anchor" href="#owner-stream" aria-label="Link to this section">#</a></h2>
+<p>The unreliable, freshness-oriented replication path selected by <code>gd:&quot;owner&quot;</code>.
+The entity&#39;s current owner writes the fields. The host verifies the sender&#39;s
+ownership, relays accepted samples, and other peers interpolate them.</p>
+<p>An owner stream is suitable when occasional loss can be replaced by the next
+sample. It trusts the owner to supply the value and is therefore not a
+cheat-resistant position channel.</p>
+<h2 id="network-profile">Network profile<a class="heading-anchor" href="#network-profile" aria-label="Link to this section">#</a></h2>
+<p>A named, fully materialized <code>Session_Config</code> and <code>Lane_Config</code> pair selected
+with <code>kboot.network_profile</code>: <code>.Friends_Coop</code>, <code>.Listen_Server_Action</code>, or
+<code>.Dedicated_Competitive</code>. The generated <code>&lt;game&gt;_net_attach</code> validates the pair
+and installs both halves before the stack starts. A profile records timing and
+trust assumptions; only the actual authority deployment creates the trust
+boundary.</p>
+<h2 id="player-peer-and-seat">Player, peer, and seat<a class="heading-anchor" href="#player-peer-and-seat" aria-label="Link to this section">#</a></h2>
+<p><code>knet.Player_Id</code> is the stable identity used by gameplay. A reconnect token can
+reclaim the same player ID, stats, and owned entities after the transport
+connection changes.</p>
+<p><code>ksess.Peer_Id</code> identifies the current transport connection and can change on
+reconnect. A <em>seat</em> is a player&#39;s current place in the session roster. Spectator
+and dedicated-server seats have restricted behavior.</p>
+<p>Keep player IDs in game state; use peer IDs only at transport/session boundaries.</p>
+<h2 id="prediction-reconciliation-and-resimulation">Prediction, reconciliation, and resimulation<a class="heading-anchor" href="#prediction-reconciliation-and-resimulation" aria-label="Link to this section">#</a></h2>
+<p>Prediction runs an action locally before authoritative state arrives.</p>
+<p>Reconciliation compares an authoritative result with the corresponding local
+prediction and adopts authority when they differ.</p>
+<p>Resimulation restores authoritative state at an earlier tick and replays later
+ticks from stored inputs. A resimulated proc may run more than once, so it must
+not directly perform audio, particles, logging, node mutation, or other
+one-shot effects.</p>
+<h2 id="session">Session<a class="heading-anchor" href="#session" aria-label="Link to this section">#</a></h2>
+<p><code>ksess.Session</code> owns player identity, roster, entity lifetime, replication
+scheduling, commands, stats, moderation, application messages, and backup
+snapshots. It is transport-independent and does not import Godot.</p>
+<h2 id="simulation-lane">Simulation lane<a class="heading-anchor" href="#simulation-lane" aria-label="Link to this section">#</a></h2>
+<p>The <code>kit/sim</code> fixed-tick path selected by <code>gd:&quot;predict&quot;</code>. Clients send input
+windows to one authority. The authority simulates and sends tick-stamped
+snapshots; owning clients predict and reconcile, while watching clients
+interpolate remote truth.</p>
+<h2 id="tick">Tick<a class="heading-anchor" href="#tick" aria-label="Link to this section">#</a></h2>
+<p>A fixed simulation or network step. Session replication normally mutates
+gameplay at frame rate while the network tick schedules replication. Simulation
+lane gameplay mutates predicted fields inside fixed-rate <code>@(gd_tick)</code> procs.</p>
+<p>Use tick counts for replayable gameplay timers. Use frame <code>delta</code> only for
+presentation.</p>
+<h2 id="transport">Transport<a class="heading-anchor" href="#transport" aria-label="Link to this section">#</a></h2>
+<p>The mechanism that carries Kit&#39;s byte messages between peers. <code>kit/netgd</code>
+adapts Godot <code>MultiplayerPeer</code> transports such as ENet and WebRTC;
+<code>kit/steamgd</code> adapts Steam. Session and replication code do not depend on which
+transport is installed.</p>
+<p>Transport choice affects encryption, NAT traversal, peer addressing, and host
+succession support. It does not change the replicated entity schema.</p>
+<h2 id="watched-entity">Watched entity<a class="heading-anchor" href="#watched-entity" aria-label="Link to this section">#</a></h2>
+<p>A remote simulation-lane entity rendered from authoritative snapshots on a
+delayed clock. The delay normally provides two samples to interpolate between.
+The local predicted entity is often called <em>mine</em>; a remote interpolated entity
+is <em>watched</em>.</p>
+<p>Presentation events from watched entities should run when that entity reaches
+the event tick, not immediately when the packet arrives.</p>
+<h2 id="net-schema">Net schema<a class="heading-anchor" href="#net-schema" aria-label="Link to this section">#</a></h2>
+<p>The generated package-level <code>NET_SCHEMA</code> value: structured, allocation-free
+metadata for the same canonical wire contract hashed into the session
+fingerprint. It lists entity kinds and fields, recursive types, input classes
+and constraints, actions and policies, presentation events, profiles, and messages. Runtime
+callbacks remain in their execution descriptors; the net schema is the stable
+read-only view for diagnostics and tooling.</p>
+<h2 id="wire-fingerprint">Wire fingerprint<a class="heading-anchor" href="#wire-fingerprint" aria-label="Link to this section">#</a></h2>
+<p>A generated identifier for the game&#39;s network schema. Peers with incompatible
+fingerprints are refused during the session handshake instead of interpreting
+the same bytes as different entity fields, commands, inputs, or messages. The
+fingerprint is a compatibility check, not authentication.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/glossary.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authority" class="">Authority</a><a href="#boot" class="">Boot</a><a href="#census" class="">Census</a><a href="#command" class="">Command</a><a href="#consequence-_then" class="">Consequence (_then)</a><a href="#delta-lane" class="">Delta lane</a><a href="#edge" class="">Edge</a><a href="#entity" class="">Entity</a><a href="#presentation-event" class="">Presentation event</a><a href="#tick-payload-event" class="">Tick payload event</a><a href="#factory" class="">Factory</a><a href="#half" class="">Half</a><a href="#owner-stream" class="">Owner stream</a><a href="#network-profile" class="">Network profile</a><a href="#player-peer-and-seat" class="">Player, peer, and seat</a><a href="#prediction-reconciliation-and-resimulation" class="">Prediction, reconciliation, and resimulation</a><a href="#session" class="">Session</a><a href="#simulation-lane" class="">Simulation lane</a><a href="#tick" class="">Tick</a><a href="#transport" class="">Transport</a><a href="#watched-entity" class="">Watched entity</a><a href="#net-schema" class="">Net schema</a><a href="#wire-fingerprint" class="">Wire fingerprint</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/glossary.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

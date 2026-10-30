@@ -1,0 +1,9 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://entities/mob.tscn" id="enemy"]
+[ext_resource type="Resource" path="res://visuals/enemies/hulk.tres" id="appearance"]
+[ext_resource type="Resource" path="res://dev/enemy_view_state.tres" id="preview"]
+[node name="EnemyPreview" instance=ExtResource("enemy")]
+position = Vector2(320, 240)
+preview = true
+appearance = ExtResource("appearance")
+preview_state = ExtResource("preview")

@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Workflow — the dev loop, editor DX, and debugging · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html" aria-current="page">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Workflow — the dev loop, editor DX, and debugging</h1><div class="reader-meta"><span>13 min read</span><span>Odin × Godot</span><a href="../../reference/docs/workflow.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#odin-scripts-are-aot-compiled">Odin scripts are AOT-compiled</a><a href="#building">Building</a><a href="#live-editing-show-on-save">Live editing (show-on-save)</a><a href="#editor-dx-validation-autocomplete-highlighting">Editor DX (validation, autocomplete, highlighting)</a><a href="#debugging">Debugging</a></nav></details>
+<article class="reading-body "><p>This is the day-to-day guide: how you build, iterate, get editor help, and debug. Read the
+limitations first, since they shape everything else.</p>
+<h2 id="odin-scripts-are-aot-compiled">Odin scripts are AOT-compiled<a class="heading-anchor" href="#odin-scripts-are-aot-compiled" aria-label="Link to this section">#</a></h2>
+<p>Your <code>.odin</code> scripts compile to a native shared library (<code>.dylib</code> / <code>.so</code> / <code>.dll</code>) that the
+engine loads through the GDExtension boundary. <strong>There is no interpreter.</strong> GDScript is
+interpreted; Odin is not. That single fact decides what works and what doesn&#39;t:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Odin scripts</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>_ready</code> / <code>_process</code> / signals / <code>@export</code> / methods</td>
+<td>✅ Full GDScript parity</td>
+<td>dispatched through a typed registry</td>
+</tr>
+<tr>
+<td>Hot reload on save</td>
+<td>✅ <strong>Recompile</strong> + swap (a few seconds)</td>
+<td>not instant like interpreted reload, but live</td>
+</tr>
+<tr>
+<td><code>eval</code> / <code>expression</code> / a REPL</td>
+<td>❌ Impossible</td>
+<td>nothing to evaluate source at runtime</td>
+</tr>
+<tr>
+<td>In-editor breakpoints / step / pause / expression-eval in the debugger panel</td>
+<td>❌ No</td>
+<td>the GDScript VM never sees your compiled proc — use <code>lldb</code></td>
+</tr>
+<tr>
+<td>New <code>@export</code> appearing instantly on save</td>
+<td>⚠️ Needs a recompile</td>
+<td>the export lives in the compiled dll; the editor rebuilds for you (a moment&#39;s latency)</td>
+</tr>
+<tr>
+<td>Editor remote scene tree / live property edit</td>
+<td>✅ Yes</td>
+<td>engine-side, not script-line</td>
+</tr>
+<tr>
+<td><code>lldb</code> breakpoints, <code>bt</code>, memory inspection</td>
+<td>✅ Full power</td>
+<td>a script dll is a native C library — debug it as one</td>
+</tr>
+</tbody></table>
+</div><p>These are inherent to a compiled language. Everything below is built around them.</p>
+<h2 id="building">Building<a class="heading-anchor" href="#building" aria-label="Link to this section">#</a></h2>
+<p><strong>In the editor:</strong> <strong>Project → Tools → Build Odin Scripts</strong> compiles the current project&#39;s
+scripts dll (the same background build as save-on-reload), with progress in the Output panel,
+so no terminal is needed. Saving a script rebuilds automatically too. The command line below is
+for CI, headless builds, or working from the source repo.</p>
+<p><code>build/build_scripts.sh [PROJECT_DIR] [SCRIPTS_DIR]</code> runs the full pipeline:</p>
+<ol>
+<li>builds the <code>scriptgen</code> preprocessor,</li>
+<li>runs it over the scripts dir to emit the <code>*.gen.odin</code> build artifacts beside your sources
+(you never edit these; the loader ignores them as attachable scripts). There are three
+kinds: <code>odin_godot_scripts.gen.odin</code>, one per package directory, holding the registration
+code for every script in that directory; <code>odin_godot_boot.gen.odin</code>, the init shim; and
+<code>odin_godot_guard.gen.odin</code>, the staleness guard, a compile-time <code>#load_hash</code> assert per
+authored source. A build path that skips this step (a bare <code>odin build</code> against
+yesterday&#39;s <code>*.gen.odin</code>) fails at compile time, naming the drifted file instead of
+silently compiling stale descriptors,</li>
+<li>builds the scripts dll (<code>odin build &lt;scriptsdir&gt; -build-mode:dll</code> with
+<code>-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_half -custom-attribute:gd_message</code>, which let
+the Odin compiler accept the marker attributes), and</li>
+<li>builds the core dll.</li>
+</ol>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_scripts.sh examples/survivors&#x27;</span>
+<span class="hljs-comment"># -&gt; examples/survivors/bin/{libodinscripts.dylib, libodin_godot.dylib}</span></code></pre></div><p>Defaults target <code>tests/phase35</code>; pass your project dir as the first argument. The repo root
+(for the <code>godot</code> collection) is derived from the script&#39;s own location, overridable with
+<code>ODIN_GODOT_ROOT</code>. If <code>odin</code> is not on <code>PATH</code>, pass it explicitly as <code>ODIN=/abs/path/to/odin</code>.</p>
+<p>If the project has <a href="modules.html">script modules</a> (<code>res://modules/&lt;name&gt;/</code>), the same command
+also builds one <code>libodinscripts_&lt;name&gt;.&lt;ext&gt;</code> per module (<code>BUILD_MODULES=0</code> opts out).</p>
+<h2 id="live-editing-show-on-save">Live editing (show-on-save)<a class="heading-anchor" href="#live-editing-show-on-save" aria-label="Link to this section">#</a></h2>
+<p>GDScript is interpreted, so a new <code>@export</code> appears in the Inspector the instant you save. An
+Odin <code>@export</code> lives in the <strong>compiled</strong> scripts dll, so it doesn&#39;t exist until that dll is
+<strong>rebuilt</strong>. To give you the same &quot;save → it appears&quot; loop, the editor recompiles and reloads
+the scripts dll for you:</p>
+<ol>
+<li><strong>On save</strong>, the editor (and only the editor, since a running/exported game never
+recompiles) kicks a <strong>background</strong> rebuild of the scripts dll on a worker thread, so the UI
+never freezes while <code>odin build</code> runs (a few seconds). Rapid saves coalesce into one rebuild.</li>
+<li><strong>When the build finishes</strong>, on the next editor frame the dll is hot-swapped in place: live
+instances re-bind and <strong>keep their state</strong>, and the Inspector&#39;s property lists refresh, so
+a freshly-added <code>@export</code> appears <strong>without restarting the editor</strong>.</li>
+</ol>
+<p><strong>Format on save.</strong> When <code>odinfmt</code> is reachable (it ships with ols; also the
+<code>odin_godot/odinfmt_bin</code> setting), saving a script writes <strong>formatted</strong> code to disk and
+updates the open buffer in place. The change is a single undo step, the caret position is
+preserved, and no unsaved dot appears. A project-root <code>odinfmt.json</code> is honored. Sources that
+don&#39;t parse yet save unformatted (never blocked); disable with the <code>odin_godot/format_on_save</code>
+project setting.</p>
+<p><strong>You can always see where the build is.</strong> A status badge in the editor&#39;s <strong>top toolbar</strong>
+shows <em>Odin: building…</em> while a rebuild runs, flashes green <em>live ✓ (X.Xs)</em> when the swap
+lands, and turns a sticky red <em>build FAILED</em> after a broken save (the actual compiler
+errors are in the Output panel). It hides when idle.</p>
+<p><strong>Play waits for the build.</strong> Pressing Play while a rebuild is in flight blocks (briefly)
+until it finishes, and <strong>refuses to launch on a failed build</strong>, because otherwise
+save-then-Play would silently run your <em>previous</em> dll. This uses the editor&#39;s
+<code>EditorPlugin._build</code> hook, the same mechanism C# uses to compile before launch; a red error
+in the Output explains the refusal.</p>
+<p><strong>Per-module rebuilds.</strong> In a project using <a href="modules.html">script modules</a>, the rebuild is
+scoped: the saved resource path maps directly to its module root, so the worker neither walks
+nor hashes unrelated modules before rebuilding + swapping <strong>only the module(s) whose sources
+changed</strong>. Coalesced saves retain every affected root. A save in <code>res://modules/enemies/</code>
+recompiles that one dll, leaving the main module and every other module&#39;s dll (instances,
+package globals, all of it) untouched. A slower background reconciliation still catches
+external edits and deletions that did not produce a save callback. That&#39;s what keeps save
+latency flat in large projects; the swapped module&#39;s own package globals reset (fresh dll).
+The one exception is a save under
+<code>res://shared/</code>, the <a href="modules.html#shared">read-only vocabulary tree</a> every module may import:
+that rebuilds and swaps <strong>every</strong> module, because any of them may be compiled against it.
+See <a href="modules.html">Script Modules</a> for details.</p>
+<p><strong>Finding the compiler.</strong> The editor often has no <code>odin</code> on its <code>PATH</code> (e.g. launched from the
+macOS app, not a shell). Point it at the binary with the <strong><code>odin_godot/odin_bin</code></strong> project
+setting, or set the <code>ODIN</code> environment variable, or launch the editor from the Nix shell. If
+none resolves, reload-on-save warns once and is skipped (the editor keeps working). The scripts
+package defaults to <code>res://scripts</code>; override with <strong><code>odin_godot/scripts_dir</code></strong>.</p>
+<p><strong>Manual trigger.</strong> If save detection misses (or you changed something outside the saved
+file), force the rebuild+reload+refresh by reloading the script, for example with
+<code>load(&quot;res://scripts/your_script.odin&quot;).reload(true)</code> from a tool script or the editor&#39;s
+script-reload affordance. This runs the exact same path as save.</p>
+<p><strong>Caveats.</strong></p>
+<ul>
+<li>Adding/removing/reordering struct fields changes the layout: exported values are preserved
+<strong>by name</strong> across the swap, but non-exported private fields reset (the same reload caveat
+GDScript has).</li>
+<li>The live Inspector <em>panel</em> repaint after a swap is a visual editor behavior; the property
+list it reads is updated immediately in-process (verified headless), but eyeballing the panel
+repaint needs a display.</li>
+<li>Native DLL generations are ownership-bounded. Ordinary live instances transfer to the new
+generation, and the old image unloads at the closed execution gate. A live instance whose
+class was removed keeps only its exact old generation until that instance is freed.</li>
+<li>Procedure-bearing state (including nested <code>events.Event</code> and <code>flow.Action</code> containers) is
+detected recursively. Define <code>&lt;struct&gt;_reload</code> and rebuild that state there. Without the
+hook, the instance deliberately remains on its coherent old code and emits an actionable
+warning; intermediate generations still unload. Returned Inspector property lists hold a
+separate core-cache lease and never pin executable code.</li>
+</ul>
+<h2 id="editor-dx-validation-autocomplete-highlighting">Editor DX (validation, autocomplete, highlighting)<a class="heading-anchor" href="#editor-dx-validation-autocomplete-highlighting" aria-label="Link to this section">#</a></h2>
+<p>Three editor-only features make <code>.odin</code> feel like a real scripting language in Godot. All are
+native-only (the web build stubs them) and all degrade gracefully: if a tool binary is
+missing, they warn once and the editor keeps working.</p>
+<h3 id="live-error-squiggles-_validate">Live error squiggles (<code>_validate</code>)<a class="heading-anchor" href="#live-error-squiggles-_validate" aria-label="Link to this section">#</a></h3>
+<p>The editor surfaces real <strong>Odin compiler</strong> errors as inline squiggles + Errors-panel entries
+as you type, in <strong>two tiers</strong>. <strong>Syntax errors</strong> (the everyday while-typing state: the
+half-typed expression, the missing brace) come from the compiler&#39;s own parser running
+<strong>in-process</strong> (~0.1 ms), so the squiggle lands on the very first debounce and the slow check
+is never scheduled for a buffer it couldn&#39;t type-check anyway. <strong>Type errors</strong> need the real
+checker: because a single <code>.odin</code> file isn&#39;t a compile unit, it type-checks the file&#39;s
+<strong>package</strong>: it copies the package (and the neighboring packages it imports relatively, so a
+helper or subpackage import resolves) to a temp overlay, overwrites the one edited file with
+your unsaved buffer, runs <code>odin check</code>, and maps <code>‹file›(‹line›:‹col›) Error: ‹msg›</code> back to
+the editor. That check runs on a <strong>background worker</strong> with a result cache, so it never freezes the
+UI (first-call latency ~0.03 ms; the check itself, ~0.5 s warm on a game-sized package,
+completes a moment later and the squiggles update on the next debounce). The <code>godot</code> collection root resolves <code>odin_godot/root</code> setting →
+<code>ODIN_GODOT_ROOT</code> env → <strong>auto-derived from the installed addon&#39;s own location</strong>, so a normal
+<code>addons/odin_godot/</code> install needs no configuration; set <code>odin_godot/root</code> only if you keep the
+collection somewhere non-standard.</p>
+<blockquote>
+<p><strong>Scope:</strong> <code>_validate</code> shows squiggles for the <strong>file you&#39;re editing</strong>. An error your edit
+causes in a <em>sibling</em> file of the same package isn&#39;t shown as a live squiggle there (the
+engine only validates the open file), but it <strong>does</strong> surface in the Output when the
+rebuild-on-save build runs, so cross-file breakage isn&#39;t silent, just deferred to save.</p>
+</blockquote>
+<h3 id="autocomplete-_complete_code-backed-by-ols">Autocomplete (<code>_complete_code</code>, backed by <code>ols</code>)<a class="heading-anchor" href="#autocomplete-_complete_code-backed-by-ols" aria-label="Link to this section">#</a></h3>
+<p>Typing offers completions from the <code>ols</code> Odin language server (so <code>gd.node2d_set_p</code> →
+<code>node2d_set_position</code>, etc.). One <strong>long-lived</strong> <code>ols</code> subprocess is kept alive for the editor
+session over real stdio pipes, so completions are warm (<del>17–19 ms) instead of re-spawning and
+re-indexing the whole binding each keystroke (</del>0.5–1.25 s). If <code>ols</code> can&#39;t start or dies, the
+editor transparently falls back to a fresh spawn, then restarts the session. Each row shows the
+symbol&#39;s <strong>type/signature</strong> inline (from ols) next to its name. Point at the binary with
+<strong><code>odin_godot/ols_bin</code></strong> (or the <code>OLS</code> env var, or <code>PATH</code>); <code>ols</code> ships in the Nix shell.</p>
+<h3 id="syntax-highlighting">Syntax highlighting<a class="heading-anchor" href="#syntax-highlighting" aria-label="Link to this section">#</a></h3>
+<p><code>.odin</code> files are token-colored in the Script panel (keywords, comments, strings, numbers,
+PascalCase types, proc calls). It&#39;s registered on the first editor frame and touches only the
+Script editor. Limitation: block comments are highlighted per-line, so a <code>/* … */</code> spanning
+lines isn&#39;t tracked across them.</p>
+<h3 id="icons">Icons<a class="heading-anchor" href="#icons" aria-label="Link to this section">#</a></h3>
+<p>A script class gets a custom icon via the <strong><code>//gd:icon &lt;res-path&gt;</code></strong> marker (shown in the Scene
+/ FileSystem docks and Create-Node dialog, like a GDScript <code>@icon</code>). A script that sets <strong>no</strong>
+<code>//gd:icon</code> falls back to a bundled <strong>Odin mark</strong> (<code>res://addons/odin_godot/icon.svg</code>), so
+<code>.odin</code> scripts are recognizable rather than showing the generic script glyph. Override the
+default per project with the <strong><code>odin_godot/default_icon</code></strong> setting (point it at your own icon,
+or <code>&quot;&quot;</code> to use the engine generic). The default is existence-checked, so a non-standard install
+without the icon simply shows the generic one.</p>
+<h3 id="find-in-files">Find in Files<a class="heading-anchor" href="#find-in-files" aria-label="Link to this section">#</a></h3>
+<p>The script editor&#39;s <strong>Find in Files</strong> (Ctrl/Cmd+Shift+F) searches <code>.odin</code> files. Godot&#39;s
+search file-type list is a hardcoded set (<code>gd</code>, <code>cs</code>, <code>gdshader</code>) with no hook for a
+GDExtension scripting language, so on load the Odin editor plugin appends <code>odin</code> to the
+<code>editor/script/search_in_file_extensions</code> project setting. The value is applied in-memory each session (your <code>project.godot</code> is left untouched),
+and the search dialog re-reads it every time it opens, so the <code>*.odin</code> filter checkbox is
+there and checked by default.</p>
+<p>One known gap remains, functionality-irrelevant: documentation tooltips for <code>@export</code>s/methods
+in the Inspector aren&#39;t wired (autocomplete <em>does</em> show type signatures; see above).</p>
+<h3 id="generated-files-are-hidden-in-the-filesystem-dock">Generated files are hidden in the FileSystem dock<a class="heading-anchor" href="#generated-files-are-hidden-in-the-filesystem-dock" aria-label="Link to this section">#</a></h3>
+<p>The build writes one <code>odin_godot_scripts.gen.odin</code> registration file per scripts directory,
+plus the boot shim and staleness guard (they must live inside the package directory they
+belong to, since Odin packages are single-directory). They aren&#39;t
+attachable or openable in the editor, so the Odin plugin <strong>hides them from the FileSystem
+dock</strong>, re-hiding them after every dock rebuild. This is widget-level hiding: Godot&#39;s
+filesystem scan admits files by extension only (<code>.gen.odin</code> ends in <code>.odin</code>) and there is no
+per-file exclusion hook, so re-hiding after each rebuild is the available mechanism. They
+remain real files on disk: external editors, git, and the engine&#39;s Find in Files (which is
+also extension-based) still see them.</p>
+<p>To show them (e.g. when inspecting what scriptgen emits), set the
+<strong><code>odin_godot/show_generated_files</code></strong> project setting to <code>true</code>; it takes effect at the next
+dock rebuild (toggling a file save or reopening the project is enough).</p>
+<p>Any <code>*.gen.odin</code> a build does not produce is deleted by the next one, printing
+<code>scriptgen: removed stale &lt;path&gt; (not generated by this run)</code>. That covers a deleted script&#39;s
+leftovers and, on the first build after upgrading odin_godot, the older layout&#39;s per-source
+<code>&lt;name&gt;.gen.odin</code> files.</p>
+<p><span id="editor-settings"></span></p>
+<h3 id="editor-settings-reference">Editor settings reference<a class="heading-anchor" href="#editor-settings-reference" aria-label="Link to this section">#</a></h3>
+<p>Set these as <strong>project settings</strong> (they also have env fallbacks for shell-launched editors):</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Env fallback</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>odin_godot/odin_bin</code></td>
+<td><code>ODIN</code></td>
+<td>absolute path to the <code>odin</code> compiler (reload-on-save, validation)</td>
+</tr>
+<tr>
+<td><code>odin_godot/ols_bin</code></td>
+<td><code>OLS</code></td>
+<td>absolute path to the <code>ols</code> language server (autocomplete)</td>
+</tr>
+<tr>
+<td><code>odin_godot/emcc_bin</code></td>
+<td><code>EMCC</code></td>
+<td>absolute path to Emscripten&#39;s <code>emcc</code> (<strong>web export</strong> only)</td>
+</tr>
+<tr>
+<td><code>odin_godot/root</code></td>
+<td><code>ODIN_GODOT_ROOT</code></td>
+<td>the odin_godot checkout, for the <code>-collection:godot</code> root</td>
+</tr>
+<tr>
+<td><code>odin_godot/scripts_dir</code></td>
+<td>—</td>
+<td>the scripts package (default <code>res://scripts</code>)</td>
+</tr>
+<tr>
+<td><code>odin_godot/export_optimization</code></td>
+<td><code>ODIN_EXPORT_OPT</code></td>
+<td>Odin <code>-o:</code> level for <strong>exported</strong> builds: <code>none</code>/<code>minimal</code>/<code>size</code>/<code>speed</code>/<code>aggressive</code> (default <code>speed</code>)</td>
+</tr>
+<tr>
+<td><code>odin_godot/default_icon</code></td>
+<td>—</td>
+<td>editor icon for <code>.odin</code> scripts with no <code>//gd:icon</code> (default <code>res://addons/odin_godot/icon.svg</code>; <code>&quot;&quot;</code> = engine generic)</td>
+</tr>
+<tr>
+<td><code>odin_godot/show_generated_files</code></td>
+<td>—</td>
+<td><code>true</code> shows <code>*.gen.odin</code> build artifacts in the FileSystem dock (hidden by default)</td>
+</tr>
+</tbody></table>
+</div><blockquote>
+<p><strong>Dev builds vs. exports.</strong> The editor&#39;s rebuild-on-save loop compiles at <code>-o:none</code> so saves
+stay fast. <strong>Exports</strong> (desktop and web) compile at <code>odin_godot/export_optimization</code> (default
+<code>speed</code>) so shipped games are optimized. The two are independent. For a maximally lean
+release, append <code>-no-bounds-check -disable-assert</code> via the <code>SCRIPT_BUILD_FLAGS</code> env when
+running the export build script directly.</p>
+</blockquote>
+<h2 id="debugging">Debugging<a class="heading-anchor" href="#debugging" aria-label="Link to this section">#</a></h2>
+<p>Because a script dll is a native library, the workflow is <strong>logging + <code>lldb</code> + reading crash
+backtraces</strong>, exactly like debugging a C library. The full reference (with verified
+transcripts) is in <strong><a href="debugging.html">Debugging</a></strong>; the essentials:</p>
+<h3 id="logging-gdprint--gderror--gdwarn">Logging: <code>gd.print</code> / <code>gd.error</code> / <code>gd.warn</code><a class="heading-anchor" href="#logging-gdprint--gderror--gdwarn" aria-label="Link to this section">#</a></h3>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+gd.print(<span class="hljs-string">&quot;player ready&quot;</span>)        <span class="hljs-comment">// -&gt; stdout + the editor Output panel</span>
+gd.print_int(score)             <span class="hljs-comment">// i64 (also print_float / print_bool / print_value)</span>
+gd.warn(<span class="hljs-string">&quot;coin value was 0&quot;</span>)     <span class="hljs-comment">// yellow, non-fatal (push_warning)</span>
+gd.error(<span class="hljs-string">&quot;Hud node missing&quot;</span>)    <span class="hljs-comment">// RED in Output/Debugger, with context (push_error)</span></code></pre></div><p>The helpers are tiny and <code>contextless</code> (they don&#39;t pull in <code>core:fmt</code>, keeping the wasm
+footprint small). For formatted output, format with Odin&#39;s <code>fmt</code> first:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
+gd.print(fmt.ctprintf(<span class="hljs-string">&quot;score=%d&quot;</span>, score))   <span class="hljs-comment">// ctprintf -&gt; temp cstring, what gd.print wants</span>
+gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;hp=%d/%d&quot;</span>, hp, max_hp))</code></pre></div><h3 id="native-debugging-with-lldb">Native debugging with <code>lldb</code><a class="heading-anchor" href="#native-debugging-with-lldb" aria-label="Link to this section">#</a></h3>
+<p>Zero-setup from the editor: <strong>Project &gt; Tools &gt; Debug Game (LLDB)</strong> opens a terminal
+running the game under lldb, and <strong>Debug Game (Break at Cursor)</strong> halts it on the script
+line the caret is on; <strong>Generate VS Code Debug Config</strong> wires the same thing into VS
+Code/CodeLLDB (F5, clickable breakpoints in <code>.odin</code> files). From a shell, the same
+launcher (it handles the macOS gotchas: SIP re-sign, lldb&#39;s <code>::</code> mis-parse):</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">build/debug_game.sh --<span class="hljs-built_in">break</span> player.odin:51 tests/showcase</code></pre></div><p>The dlls carry full DWARF (<code>-debug -use-single-module</code>): file:line breakpoints, stepping,
+and <code>frame variable</code> with typed args. <code>frame variable *self</code> prints the live script
+struct, and the auto-loaded <code>godot_lldb.py</code> summaries render <code>godot.String</code>/<code>String_Name</code>/
+<code>Variant</code> values. A script <code>panic</code> freezes the session at the panic site. See
+<a href="debugging.html">debugging.md</a> for the full tour.</p>
+<h3 id="other-editors-and-ides">Other editors and IDEs<a class="heading-anchor" href="#other-editors-and-ides" aria-label="Link to this section">#</a></h3>
+<p><strong>Project &gt; Tools &gt; Generate ols.json (IDE Completion)</strong> writes an <code>ols.json</code> at the
+project root: ols-based editors (Neovim, Zed, Sublime, Helix) get completion for your
+scripts + the <code>godot</code> collection immediately, and JetBrains IDEs import it via the
+<a href="https://plugins.jetbrains.com/plugin/22933-odin-support" rel="noreferrer">Odin Support plugin</a>
+(right-click the file). Rider edits great but cannot debug native code (plugin
+limitation on Rider ≥ 2025.2). CLion/IDEA Ultimate can, pointed at the debuggable
+Godot copy. See <a href="debugging.html#jetbrains-ides-rider-clion-idea-ultimate-">debugging.md</a>
+for details.</p>
+<h3 id="crashes-and-panics-are-reported-automatically">Crashes and panics are reported automatically<a class="heading-anchor" href="#crashes-and-panics-are-reported-automatically" aria-label="Link to this section">#</a></h3>
+<p>A crash or panic in script code is reported: an Odin <code>panic</code>/<code>assert</code> pushes a red
+<code>ODIN_SCRIPT_PANIC &lt;message&gt; (file:line)</code> error to the <strong>editor Output</strong>, and a raw fatal
+signal (SIGSEGV etc., e.g. an engine call on a nil handle, on macOS/Linux) prints an
+<code>ODIN_GODOT_CRASH</code> report to stderr with the <strong>faulting Odin proc symbolized</strong>, pushes a
+one-line error toward the editor, and still chains to Godot&#39;s own crash handler. See the
+&quot;What you see when the game crashes&quot; section of <a href="debugging.html">Debugging</a>.</p>
+<p>For deeper digging: run the crashing scenario under <code>lldb</code> (it stops at the fault) and <code>bt</code>,
+or read the native backtrace printed to stderr (grep it for your package name). On macOS the
+same backtrace is in the <code>.ips</code> report under <code>~/Library/Logs/DiagnosticReports/</code>.</p>
+<blockquote>
+<p>A <code>_debug_get_current_stack_info</code> virtual is wired and produces a correct native Odin
+backtrace <strong>when invoked</strong>, but Godot only calls it during an active remote-debug session, so
+it does <strong>not</strong> automatically surface a script-line stack on a plain error. Use <code>lldb</code> for
+your day-to-day stack view. See <a href="debugging.html">Debugging</a> for the full account.</p>
+</blockquote>
+<h3 id="web--wasm">Web / wasm<a class="heading-anchor" href="#web--wasm" aria-label="Link to this section">#</a></h3>
+<p>In the browser there&#39;s no <code>dlopen</code>, no native stack, and no <code>lldb</code>. Debug with <strong>logging</strong>
+(<code>gd.print</code> → the JS console) and browser devtools. See <a href="exporting.html">Exporting</a>.
+&lt;/content&gt;</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="debugging.html"><span>Debugging Odin scripts</span><span aria-hidden="true">→</span></a><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/workflow.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#odin-scripts-are-aot-compiled" class="">Odin scripts are AOT-compiled</a><a href="#building" class="">Building</a><a href="#live-editing-show-on-save" class="">Live editing (show-on-save)</a><a href="#editor-dx-validation-autocomplete-highlighting" class="">Editor DX (validation, autocomplete, highlighting)</a><a href="#live-error-squiggles-_validate" class="subsection">Live error squiggles (_validate)</a><a href="#autocomplete-_complete_code-backed-by-ols" class="subsection">Autocomplete (_complete_code, backed by ols)</a><a href="#syntax-highlighting" class="subsection">Syntax highlighting</a><a href="#icons" class="subsection">Icons</a><a href="#find-in-files" class="subsection">Find in Files</a><a href="#generated-files-are-hidden-in-the-filesystem-dock" class="subsection">Generated files are hidden in the FileSystem dock</a><a href="#editor-settings-reference" class="subsection">Editor settings reference</a><a href="#debugging" class="">Debugging</a><a href="#logging-gdprint--gderror--gdwarn" class="subsection">Logging: gd.print / gd.error / gd.warn</a><a href="#native-debugging-with-lldb" class="subsection">Native debugging with lldb</a><a href="#other-editors-and-ides" class="subsection">Other editors and IDEs</a><a href="#crashes-and-panics-are-reported-automatically" class="subsection">Crashes and panics are reported automatically</a><a href="#web--wasm" class="subsection">Web / wasm</a></nav><div class="outline-actions"><a href="../../reference/docs/workflow.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

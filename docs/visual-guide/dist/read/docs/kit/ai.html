@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/ai — NPC verbs and the wave director · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/ai — NPC verbs and the wave director</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/ai.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#perception">Perception</a><a href="#steering-per-tick-returns-the-new-position">Steering (per tick; returns the new position)</a><a href="#the-wave-director">The wave director</a><a href="#worked-example-the-dwellers-brain">Worked example: the dweller's brain</a><a href="#gotchas">Gotchas</a></nav></details>
+<article class="reading-body "><p>Reach for <code>kit/ai</code> when the host needs NPCs that perceive, chase, flee, and patrol, as well
+as a director that paces enemy waves. It supplies the <em>verbs</em>; you write the brain.</p>
+<p><strong>Lane compatibility: COOP model, sim-safe math.</strong> The patterns here assume the coop
+NPC shape: host-brained, owner-streamed poses. On the <a href="sim.html">sim lane</a> an NPC is a
+server-ticked entity with <code>predict</code> fields, and its brain runs in the AUTHORITY pass. The
+perception/steering math is pure and safe in either; the wave director is
+authority-side logic and ports as-is. See <a href="nav.html">nav</a> for the one genuinely
+dangerous crossing.</p>
+<h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
+<p><strong>Patterns, not a framework</strong>: kit/ai has no Brain type, no behavior tree, no update loop.
+The game writes an ordinary <code>switch</code> over a replicated <code>state: u8</code> in its <strong>host</strong> tick,
+built from these verbs. Cavecrawl&#39;s dweller is the documented example.</p>
+<p>An NPC is an entity <strong>owned by the host player</strong>: the host&#39;s brain tick writes <code>x/y</code> like
+any owner writes streamed fields, and every client interpolates the motion for free. Its
+state byte and hp are plain replicated fields. The whole network presence of cavecrawl&#39;s
+dweller is this struct (<code>examples/cavecrawl/scripts/dweller.odin</code>):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Dweller :: <span class="hljs-keyword">struct</span> {
+	owner:  gd.Node2d,
+	glyph:  gd.Label <span class="hljs-string">`gd:&quot;onready=Glyph&quot;`</span>,
+	net_id: knet.Net_Id,
+	x, y:   <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span>
+	hp:     <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
+	state:  <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// its mood, on every screen</span>
+	...
+}</code></pre></div><p>Replicated mood byte + owner-streamed position = <strong>clients watch the hunt for free</strong>: every
+peer renders the same 🦇/😈/💨 from <code>state</code> and sees the chase as smooth interpolated
+motion, without one line of AI or wire code on the client.</p>
+<p>Everything here is deterministic, allocation-free, dimension-agnostic (<code>[3]f32</code>; 2D leaves
+z zero) and engine-free.</p>
+<h2 id="perception">Perception<a class="heading-anchor" href="#perception" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Target :: <span class="hljs-keyword">struct</span> {
+	id:  <span class="hljs-type">u32</span>,
+	pos: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>,
+}
+
+<span class="hljs-comment">// Is the straight line from `from` to `to` blocked (a wall between)? The</span>
+<span class="hljs-comment">// GAME owns geometry — kit/ai only asks. nil = open world, everything seen.</span>
+Blocker_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span>
+
+<span class="hljs-comment">// The nearest target within `max_range` that line-of-sight reaches.</span>
+nearest :: <span class="hljs-keyword">proc</span>(from: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, targets: []Target, max_range: <span class="hljs-type">f32</span>, blocker: Blocker_Proc = <span class="hljs-literal">nil</span>, user: <span class="hljs-type">rawptr</span> = <span class="hljs-literal">nil</span>) -&gt; (best: Target, ok: <span class="hljs-type">bool</span>)
+
+in_reach :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, reach: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span></code></pre></div><h2 id="steering-per-tick-returns-the-new-position">Steering (per tick; returns the new position)<a class="heading-anchor" href="#steering-per-tick-returns-the-new-position" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// One tick of walking toward `goal`. `arrived` = we are ON it now (never</span>
+<span class="hljs-comment">// overshoots — the last step lands exactly).</span>
+step_toward :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (pos, goal: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, speed: <span class="hljs-type">f32</span>) -&gt; (next: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, arrived: <span class="hljs-type">bool</span>)
+
+<span class="hljs-comment">// One tick of running AWAY from `threat` (flee). Standing exactly on the</span>
+<span class="hljs-comment">// threat picks +x arbitrarily — any direction beats none.</span>
+step_away :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (pos, threat: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, speed: <span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>
+
+<span class="hljs-comment">// Patrol bookkeeping: advance (and wrap) the waypoint index once the current</span>
+<span class="hljs-comment">// one is within `reach`. The game steps toward `points[current]` as usual.</span>
+patrol_next :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (points: [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, current: <span class="hljs-type">int</span>, pos: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, reach: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">int</span></code></pre></div><p>Speeds are per tick. To walk a navmesh instead of a straight line, feed <code>step_toward</code> the
+goal from <a href="nav.html">kit/nav</a>&#39;s <code>next_point</code>.</p>
+<h2 id="the-wave-director">The wave director<a class="heading-anchor" href="#the-wave-director" aria-label="Link to this section">#</a></h2>
+<p>The director decides <em>when</em> and <em>how many</em>; the game decides what and where (its spawn code
+runs per emitted spawn). Only one wave runs at a time, and the next one starts after the
+field is clear and a breather passes.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Wave :: <span class="hljs-keyword">struct</span> {
+	count: <span class="hljs-type">u16</span>, <span class="hljs-comment">// how many this wave</span>
+	rest:  <span class="hljs-type">u16</span>, <span class="hljs-comment">// ticks of calm AFTER this wave clears, before the next</span>
+}
+
+Director :: <span class="hljs-keyword">struct</span> {
+	wave:       <span class="hljs-type">int</span>, <span class="hljs-comment">// waves fully started so far (1-based once running)</span>
+	pending:    <span class="hljs-type">u16</span>, <span class="hljs-comment">// still to spawn in the current wave</span>
+	alive:      <span class="hljs-type">int</span>, <span class="hljs-comment">// living spawns (the game reports deaths)</span>
+	rest_until: <span class="hljs-type">u64</span>, <span class="hljs-comment">// calm gate before the next wave starts</span>
+	done:       <span class="hljs-type">bool</span>, <span class="hljs-comment">// all waves started and cleared</span>
+}
+
+<span class="hljs-comment">// Once per host tick. Returns how many to spawn NOW (the director paces one</span>
+<span class="hljs-comment">// per tick — spawn bursts read badly and spike the delta batch).</span>
+director_tick :: <span class="hljs-keyword">proc</span>(d: ^Director, tick: <span class="hljs-type">u64</span>, waves: []Wave) -&gt; (spawn: <span class="hljs-type">int</span>)
+
+<span class="hljs-comment">// The game reports each director-spawned NPC&#x27;s death. When the wave clears,</span>
+<span class="hljs-comment">// the calm before the next one starts counting.</span>
+director_note_death :: <span class="hljs-keyword">proc</span>(d: ^Director, tick: <span class="hljs-type">u64</span>, waves: []Wave)
+
+<span class="hljs-comment">// The current wave number for HUDs (&quot;wave 2/3&quot;); 0 before the first.</span>
+director_wave :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (d: ^Director) -&gt; <span class="hljs-type">int</span></code></pre></div><h2 id="worked-example-the-dwellers-brain">Worked example: the dweller&#39;s brain<a class="heading-anchor" href="#worked-example-the-dwellers-brain" aria-label="Link to this section">#</a></h2>
+<p>Each dweller gets one think-tick per host tick, running host-only: it perceives, then runs a
+plain switch. State and position are replicated fields; writing them <em>is</em> the AI&#39;s entire
+network presence (<code>examples/cavecrawl/scripts/host.odin</code>, <code>cave_dwellers_think</code>):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">pos := [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>{dw.x, dw.y, <span class="hljs-number">0</span>}
+seen, spotted := kai.nearest(pos, targets[:], DWELLER_AGGRO)
+
+state := DWELLER_IDLE
+<span class="hljs-keyword">switch</span> {
+<span class="hljs-keyword">case</span> spotted &amp;&amp; dw.hp &lt;= FLEE_BELOW:
+	state = DWELLER_FLEE
+	pos = kai.step_away(pos, seen.pos, DWELLER_SPEED / <span class="hljs-number">2</span>)
+<span class="hljs-keyword">case</span> spotted:
+	state = DWELLER_CHASE
+	<span class="hljs-keyword">if</span> kai.in_reach(pos, seen.pos, BITE_RANGE) {
+		<span class="hljs-keyword">if</span> brain.bite_cd == <span class="hljs-number">0</span> {
+			brain.bite_cd = BITE_CD
+			cave_hurt_spelunker(self, victim_id, self.spelunkers[victim_id], BITE_DMG, knet.PLAYER_ID_INVALID, <span class="hljs-literal">false</span>)
+		}
+	} <span class="hljs-keyword">else</span> {
+		pos, _ = kai.step_toward(pos, seen.pos, DWELLER_SPEED)
+	}
+<span class="hljs-keyword">case</span>:
+	pos, _ = kai.step_toward(pos, brain.home, DWELLER_SPEED)
+}
+dw.x = pos.x
+dw.y = pos.y
+dw.state = state</code></pre></div><p>The director drives spawning in the same tick, and deaths report back
+(<code>cave_slay_dweller</code> calls <code>kai.director_note_death</code>):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">to_spawn := kai.director_tick(&amp;self.director, <span class="hljs-type">u64</span>(self.host_ticks), self.waves[:self.waves_n])
+<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; to_spawn {
+	cave_spawn_dweller(self)
+}</code></pre></div><p>Damage on hit goes through <a href="combat.html">kit/combat</a>&#39;s <code>hit</code>/<code>credit_*</code>; entity
+lifetime uses the generated typed doors (<code>dweller_spawn</code>, <code>boot_spawn_send</code>,
+and <code>dweller_despawn</code>). See the <a href="boot.html#the-entity-factory">Boot entity factory</a>.</p>
+<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Hoist <code>director_tick</code> out of the range expression.</strong> An Odin range bound is
+re-evaluated per iteration, and <code>director_tick</code> has side effects, so inlining it in the
+range silently drains the wave.</li>
+<li>The director paces <strong>one spawn per tick</strong>. Don&#39;t loop it.</li>
+<li>Per-NPC state that no one else needs (bite cooldowns, home dens) lives in a host-side
+map (<code>self.brains[id]</code>), not in replicated fields; only the <em>consequences</em> (<code>x/y</code>,
+<code>state</code>, <code>hp</code>) ship.</li>
+<li>The host&#39;s own screen is only as smooth as the writer: the brain writes <code>x/y</code> in tick
+steps. <code>dweller_process</code> glides the node toward the sim with <code>kai.step_toward</code> at frame
+rate (+50% slack), on every role: clients shadow the already-smooth stream, and the host
+smooths the tick steps.</li>
+<li><code>step_away</code> at distance zero picks +x arbitrarily; <code>nearest</code> with a nil blocker sees
+everything (open world).</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="nav.html"><span>kit/nav — pathfinding adapters</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ai.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#perception" class="">Perception</a><a href="#steering-per-tick-returns-the-new-position" class="">Steering (per tick; returns the new position)</a><a href="#the-wave-director" class="">The wave director</a><a href="#worked-example-the-dwellers-brain" class="">Worked example: the dweller's brain</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/ai.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

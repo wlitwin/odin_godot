@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Process registration and gameplay identity · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Process registration and gameplay identity</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/registration.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#registration-contract">Registration contract</a><a href="#gameplay-binding">Gameplay binding</a><a href="#extended-recovery-policy-and-evidence">Extended recovery policy and evidence</a></nav></details>
+<article class="reading-body "><p>A control key identifies an authorized member. A process incarnation identifies
+one running instance of that member. The service now assigns fresh incarnations
+through authenticated Challenge/Rebind RPCs; callers do not need to guess the next
+counter or reuse an old process identity.</p>
+<p>The initial member, key, permissions, game-token hash, and endpoint are
+provisioned by a trusted room/admission provider. The new
+<a href="../provision/README.html">admission backend</a> persists those credentials together
+with invite consumption. Its bounded create/join protocol has native TLS acceptance;
+the client journal now adds durable native/browser enrollment. Public deployment
+and game UI remain pending.
+Registration preserves those
+permissions and the game-token binding. It can update the endpoint using an
+explicit request, but it cannot enable hosting or create an unknown member.</p>
+<h2 id="registration-contract">Registration contract<a class="heading-anchor" href="#registration-contract" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>A client with a fresh random RPC nonce requests a challenge for its member ID.</li>
+<li>The service issues a random, expiring challenge bound to that nonce, current
+coordinator generation, current incarnation, next incarnation, and endpoint.</li>
+<li>The client authenticates a Rebind containing that proof.</li>
+<li>One durable CAS replaces the incarnation and resets/binds its request frontier
+to the new RPC nonce. A replay of that exact committed Rebind is idempotent.</li>
+</ol>
+<p>Challenge alone changes no durable identity. Old confirmations do not match a new
+challenge, expired challenges fail, and outstanding challenges do not survive a
+coordinator restart. Incarnations only increase. A live authority cannot be replaced
+through registration. Normally an old host returns after another authority has
+been granted; the expired-owner recovery opt-in below provides a separate path.
+Recently active instances also prevent another nonce from preempting their member
+while the old control connection is still live.</p>
+<p>Keys are looked up by stable member ID. Ordinary RPCs must then match both the
+current durable incarnation and its bound nonce. Invalid bindings get no live lease.
+This prevents a replacement RPC wrapper from inheriting a lease merely because it
+knows the member&#39;s key. Registration does not claim Byzantine resistance against a
+member deliberately sharing its credentials or lying about game state.</p>
+<p><code>Room</code> performs this handshake by default. Its initial <code>identity.incarnation</code> is a
+nonzero hint; the accepted identity is returned in <code>room.options.identity</code>.
+<code>provisioned_incarnation=true</code> bypasses registration only when a trusted provider
+already assigned this particular process identity. A zero registration endpoint
+retains the provisioned endpoint.</p>
+<p>A checkpoint-enabled service may opt into expired-owner registration after lease
+expiry and restart quarantine. This replaces only the member incarnation/nonce;
+it never inherits the old owner&#39;s lease. The separate
+<a href="../provision/checkpoint/restore.html">published restore decision</a> must authorize an
+exact saved checkpoint and a newer epoch. A live owner remains protected, and
+services without this opt-in retain the owner-rebind refusal.</p>
+<h2 id="gameplay-binding">Gameplay binding<a class="heading-anchor" href="#gameplay-binding" aria-label="Link to this section">#</a></h2>
+<p>Member records include the SHA-256 hash of the stable game token. The gameplay
+Hello carries the process incarnation, and the authority&#39;s Room validates it
+against the authenticated coordinator roster. The network runner rejects stale
+incarnations, retires their connection binding, and allows a validated newer
+instance to reclaim the token&#39;s reserved seat and action frontier. Checkpoints
+preserve incarnation metadata. Backup selection resolves the member&#39;s latest
+incarnation and checks the selected gameplay connection&#39;s token hash before
+disclosing an authority archive.</p>
+<p>The stable player token preserves game identity; the increasing incarnation fences
+the old process. Cavecrawl&#39;s returned-host gate kills the original host, migrates
+to a successor, starts a fresh old-host process, verifies a newer incarnation and
+the original seat, and executes another gameplay action. The guest stays running
+throughout and retains its inventory.</p>
+<p>The current experimental formats are gameplay protocol <strong>7</strong>, checkpoint <strong>4</strong>,
+control RPC <strong>2</strong>, and decision record <strong>3</strong>. Earlier experimental records require
+an explicit converter; no silent fallback or permission downgrade is provided.
+Original Kit formats and games remain separate.</p>
+<h2 id="extended-recovery-policy-and-evidence">Extended recovery policy and evidence<a class="heading-anchor" href="#extended-recovery-policy-and-evidence" aria-label="Link to this section">#</a></h2>
+<p>A handoff request requires a live selected successor. Loss before freezing cancels
+the request. Loss after the source retires can recover the surviving source&#39;s
+frozen world under a new coordinator-approved epoch. If the final checkpoint was
+already released, its exact hash/tick/size must match; neither side can substitute
+a different world or revive the retired epoch. Competing valid claims are serialized
+by the durable store.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_migration/extended_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_migration/partition_run.sh</code></pre></div><p>These real-process gates passed:</p>
+<ul>
+<li>Returned killed host: newer incarnation 103, original seat 1, new accepted action.</li>
+<li>Two planned handoffs: the guest remains alive through epoch 3 and two migrations.</li>
+<li>Old-host control partition: gameplay stops at a fixed tick after lease expiry;
+the guest continues on the successor; the isolated owner later rejoins.</li>
+<li>Successor killed during handoff: the surviving source recovers under epoch 2,
+with conserved guest inventory and a fresh acknowledged action.</li>
+</ul>
+<p>The partition injection pauses the old host&#39;s control pumping; its gameplay
+connection remains present. This establishes the lease/room behavior under that
+specific partition, not every network topology or every crash instruction boundary.
+Broader combat coverage, competitive migration, lobby/invite provisioning, and
+other platform/reachability profiles remain roadmap work.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/registration.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#registration-contract" class="">Registration contract</a><a href="#gameplay-binding" class="">Gameplay binding</a><a href="#extended-recovery-policy-and-evidence" class="">Extended recovery policy and evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/registration.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

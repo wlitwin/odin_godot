@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Party menus and durable enrollment · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Party menus and durable enrollment</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_cavecrawl/online.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#invites-and-host-migration">Invites and host migration</a><a href="#configuration-and-profiles">Configuration and profiles</a><a href="#party-checkpoint-publication">Party checkpoint publication</a></nav></details>
+<article class="reading-body "><p>The separate Replay Cavecrawl can now create/join parties through the
+<a href="../replay_room_service/README.html">room service</a>. Players no longer need preassigned
+member IDs or control keys. With <code>REPLAY_CAVE_ROOM_SERVICE</code> configured, the menu
+shows <strong>Create party</strong>, <strong>Join party</strong>, <strong>Rejoin recent party</strong>, and <strong>Copy party
+invite</strong>. Without it, the existing solo/LAN menu and preconfigured fixtures remain.</p>
+<p>Creating or joining first persists the exact enrollment request. A successful
+credential becomes usable only after its storage receipt. Native macOS/Linux uses
+the optional private SQLite client store; browsers use IndexedDB. Records are
+scoped by the exact service URL and room ID. New parties get new records; existing
+credentials are not overwritten.</p>
+<p>A small recent-party reference is stored separately with its own compare-and-swap.
+It changes only after the enrollment request is durable, and before that request
+is sent. A failed/conflicting reference stops the attempt. <strong>Rejoin recent party</strong>
+loads the exact stored request or credential, then performs normal challenged
+process registration. A missing/corrupt record does not create a replacement
+identity. Joining again with an invite also finds that room&#39;s existing credential.</p>
+<h2 id="invites-and-host-migration">Invites and host migration<a class="heading-anchor" href="#invites-and-host-migration" aria-label="Link to this section">#</a></h2>
+<p>Cavecrawl issues one co-op invite with <code>SEATS - 1</code> uses. Its secret is derived with
+HMAC from the creator&#39;s persisted claim, exact service URL, room/content, role,
+use count and index zero. Retrying after restart reproduces the same capability
+and issuance parameters. It does not issue extra uses, revive a revoked invite,
+or disclose the creator&#39;s secret to recipients. New indices are explicit new
+invitations, not automatic retry behavior. This version does not expose invite
+rotation/revocation controls.</p>
+<p>The invite grants trusted co-op membership, including permission to host and receive
+complete authority backups. The menu states that invited friends can keep playing
+if the host disconnects. Competitive games must choose their own admission policy;
+dedicated public creation/trusted-player invites remain refused by the backend.</p>
+<p>Room&#39;s opt-in automatic successor mode selects a connected eligible member in
+stable seat order, checking the authenticated roster, token, current incarnation,
+hosting/trust permission and infrastructure requirement where applicable. Revoking
+an active target&#39;s eligibility stops further backup publication. Disconnected
+targets retain their last inspectable receipt until replacement. Existing explicit
+successor configuration remains available.</p>
+<p>The setup/storage loop now lives in the shared <a href="../../replay/godot/party.html">Party API</a>,
+also used by Scrapyard. Existing Cavecrawl enrollment and recent-room keys are
+preserved. An unavailable invite no longer prevents an already authorized creator
+from using its stored credential; the UI reports the invitation separately.</p>
+<p>The menu flow uses the normal checkpoint/lease machinery. Tests exercise planned
+handoff with zero lost ticks, preserved guest loot, and a departed host reopening
+its profile with a fresh incarnation and the same invite. The ordinary Leave
+button still closes the Room; a surviving prepared successor follows the abrupt
+recovery policy. This does not claim that a party whose every participant exits
+can resurrect gameplay from coordinator credentials alone. The service stores
+authority decisions, not game checkpoints.</p>
+<h2 id="configuration-and-profiles">Configuration and profiles<a class="heading-anchor" href="#configuration-and-profiles" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>REPLAY_CAVE_ROOM_SERVICE</code> / browser <code>room_service</code></td>
+<td>Provisioning/control/signaling service URL</td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ROOM_LOCAL=1</code> / <code>room_local=1</code></td>
+<td>Explicit loopback WS development mode</td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ROOM_CA</code></td>
+<td>Optional native certificate authority for a private verified TLS service</td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ROOMS_DB</code></td>
+<td>Native credential database, default isolated <code>user://rooms.sqlite3</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ROOM_ADDRESS</code> / <code>room_address</code></td>
+<td>Advertised gameplay endpoint host, default <code>127.0.0.1</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_PORT</code> / <code>port</code></td>
+<td>Native gameplay port, default 49422</td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ICE_JSON</code></td>
+<td>Native RTC deployment configuration, when using an RTC extension</td>
+</tr>
+<tr>
+<td><code>REPLAY_CAVE_ROOM_RELAY=1</code> / <code>room_relay=1</code></td>
+<td>Obtain and refresh credentials from the room service</td>
+</tr>
+</tbody></table>
+</div><p>Browser hosts can supply <code>globalThis.replayIceConfig</code> before Godot starts. It is
+not a query parameter. Actual relay-only UDP/TCP tests now cover this party flow;
+see <a href="../../replay/godot/transport/ice-deployment.html">ICE deployment settings</a> for scope and limits.</p>
+<p>Native clients on the same machine need different gameplay ports and different
+credential databases when representing different players. For different machines,
+advertise addresses reachable by the other peers; a loopback address is local only.
+This example does not provide automatic NAT traversal for ENet. Browser RTC uses
+the service&#39;s challenged signaling; public relay/ICE deployment remains work.</p>
+<p>The browser menu can be opened with <code>room_service</code> and explicit local-development
+parameters; the invite itself is pasted into the game, not placed in a URL. Browser
+profiles represent separate players. Same-origin tabs sharing storage reuse the
+same room credential, and process registration applies the existing live-instance
+rules. Display-name preferences and local solo saves remain separate.</p>
+<p>The party remains bound to its original service URL. Moving services, retiring
+profiles, forgotten recent-room records, invitation rotation and all-participants-
+gone gameplay recovery need explicit workflows; no identity or authority fallback
+is inferred. Original Cavecrawl, original Scrapyard and the Kit framework remain
+separately runnable.</p>
+<p>See <span class="local-reference" title="docs/replay/results/cave-online-menu-2026-09-07/README.md · available in the repository">native/browser evidence</span>
+and the <a href="../../replay/provision/enrollment.html">library enrollment contract</a>.</p>
+<h2 id="party-checkpoint-publication">Party checkpoint publication<a class="heading-anchor" href="#party-checkpoint-publication" aria-label="Link to this section">#</a></h2>
+<p>An online host can now request a durable service checkpoint through F5/the save
+action or <strong>Store party checkpoint</strong>. Set <code>REPLAY_CAVE_ROOM_CHECKPOINT_MS=10000</code>
+(browser parameter <code>room_checkpoint_ms=10000</code>) for automatic publication. The
+default is manual; valid automatic intervals are 1–120 seconds. The configured
+service must support Cavecrawl checkpoints. Solo/local saves stay separate.</p>
+<p>The Room driver handles status lookup, immutable capture, authenticated upload and
+lost-reply recovery while leases and live backups continue. The stored tick is a
+durable snapshot boundary; work after it is not claimed as saved. An interruption
+may leave the outcome uncertain until a fresh status check.</p>
+<p><strong>Rejoin recent party</strong> can now recover that stored progress after everyone leaves.
+It joins a live host when one exists; otherwise a trusted returning player downloads
+the saved world and obtains a newer authority epoch before play resumes. Missing,
+invalid or too-old saves show a recovery error and retry option instead of starting
+an empty replacement world. The service&#39;s configured rollback limit still applies.
+Native and browser tests resume the saved cave, admit a new guest, execute new loot
+actions and store the continued game. See <a href="../../replay/godot/room_restore.html">Room restoration</a>
+and the remaining <a href="../../replay/provision/checkpoints.html">M5 plan</a>.
+See the <a href="../../replay/godot/room_save.html">Room API</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/transport/ice-deployment.html"><span>ICE settings for party and Room connections</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/online.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#invites-and-host-migration" class="">Invites and host migration</a><a href="#configuration-and-profiles" class="">Configuration and profiles</a><a href="#party-checkpoint-publication" class="">Party checkpoint publication</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

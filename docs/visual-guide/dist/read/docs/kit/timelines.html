@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Choosing a timeline · odin_godot</title><meta name="description" content="Decide whose simulation drives each object and which moment each screen displays."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html" aria-current="page">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Choosing a timeline</h1><p class="reader-dek">Decide whose simulation drives each object and which moment each screen displays.</p><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/timelines.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#summary">Summary</a><a href="#start-with-what-players-can-contest">Start with what players can contest</a><a href="#hybrid-games-are-expected">Hybrid games are expected</a><a href="#presentation-rules">Presentation rules</a><a href="#authority-is-not-the-same-as-security">Authority is not the same as security</a><a href="#scale-and-validation-status">Scale and validation status</a><a href="#what-kit-does-not-implement">What Kit does not implement</a><a href="#package-compatibility">Package compatibility</a><a href="#recommended-reading-order">Recommended reading order</a></nav></details>
+<article class="reading-body "><p>Multiplayer code has to answer two separate questions:</p>
+<ol>
+<li>Which process decides the authoritative value?</li>
+<li>Which point in time should each player see?</li>
+</ol>
+<p>Kit offers several answers because no single choice is best for co-op movement,
+competitive hitscan, and shared physics. Select a model for each contested
+entity or field; the rest of the session can continue to use reliable
+replication.</p>
+<h2 id="summary">Summary<a class="heading-anchor" href="#summary" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Authoritative writer</th>
+<th>Local presentation</th>
+<th>Remote presentation</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Session replication</td>
+<td>Host for <code>replicate</code>; entity owner for <code>owner</code></td>
+<td>Owner-streamed state is immediate</td>
+<td>Owner streams are interpolated in the past</td>
+<td>Invited co-op, player movement that the host need not verify, owner-simulated Godot physics</td>
+</tr>
+<tr>
+<td>Predict self</td>
+<td>Server simulation</td>
+<td>The local player&#39;s state is predicted at the current tick</td>
+<td>Other players are interpolated on a delayed watched clock</td>
+<td>Competitive movement and aimed actions</td>
+</tr>
+<tr>
+<td>Contested object</td>
+<td>Server simulation, with a temporary local presentation claim</td>
+<td>The claimant predicts the object while its interaction is active</td>
+<td>Other peers watch authoritative snapshots</td>
+<td>A ball, vehicle, carried object, or other isolated shared object</td>
+</tr>
+<tr>
+<td>Predict world</td>
+<td>Server simulation</td>
+<td>The client predicts local and remote simulation from echoed inputs</td>
+<td>Corrections are reconciled and visually smoothed</td>
+<td>Games where current contact between several moving bodies must look coherent</td>
+</tr>
+</tbody></table>
+</div><p>The first model is provided by <code>kit/net</code> and <code>kit/session</code>. The other three use
+<code>kit/sim</code>. All four share the same player identities, entity factory, reliable
+delta fields, chat, saves, and transports.</p>
+<h2 id="start-with-what-players-can-contest">Start with what players can contest<a class="heading-anchor" href="#start-with-what-players-can-contest" aria-label="Link to this section">#</a></h2>
+<p>Use the least expensive model that gives the authority you need.</p>
+<h3 id="no-adversarial-fast-state">No adversarial fast state<a class="heading-anchor" href="#no-adversarial-fast-state" aria-label="Link to this section">#</a></h3>
+<p>For an invited co-op game, owner streams are usually the simplest option. Each
+player writes their own movement or aim; the host remains authoritative for
+shared state and commands. Remote peers interpolate streamed values, so normal
+packet loss does not require rollback or retransmission.</p>
+<p>This model does not make owner-streamed values cheat-resistant. Do not use a
+client&#39;s streamed position as trusted evidence in a public competitive game.</p>
+<p>Read <a href="net.html">kit/net</a>, <a href="session.html">kit/session</a>, and the
+<a href="quickstart.html">session-replication quickstart</a>. <code>examples/slopball</code> shows
+owner-simulated Godot physics through <code>play.Puppet</code>.</p>
+<h3 id="a-players-movement-or-aim">A player&#39;s movement or aim<a class="heading-anchor" href="#a-players-movement-or-aim" aria-label="Link to this section">#</a></h3>
+<p>Use predict-self when the authority must derive a player&#39;s state from inputs.
+The owning client predicts at the current tick, while other entities remain on
+the delayed watched clock. This keeps local controls responsive without making
+every client simulate every remote player.</p>
+<p>Aimed actions need lag compensation because the target was displayed in the
+past. <code>lane_rewound</code> reconstructs the authority&#39;s recorded state for the view
+associated with the shooter&#39;s input. The authority must bound that rewind and
+validate all client input used by the simulation.</p>
+<p><code>examples/quickdraw</code> is the reference. Its native integration test compares a
+rewound shot with the same shot judged against the live server state.</p>
+<h3 id="one-shared-object">One shared object<a class="heading-anchor" href="#one-shared-object" aria-label="Link to this section">#</a></h3>
+<p>A contested object can use a presentation claim. The server remains
+authoritative, but the client that initiated an interaction temporarily presents
+its predicted version of the object. Other peers continue to display delayed
+authoritative snapshots.</p>
+<p>Claims are useful when round-trip delay on a kick, grab, or steering handoff is
+noticeable but predicting the whole world would be excessive. A claim should be
+tied to the interaction that caused it and released when that interaction ends,
+not simply when the object crosses an arbitrary distance.</p>
+<p>This model can still show mixed-time artifacts: a predicted ball may move before
+a delayed remote player visibly reaches it. If contact itself is central to the
+game, use predict-world instead.</p>
+<h3 id="contact-among-several-moving-bodies">Contact among several moving bodies<a class="heading-anchor" href="#contact-among-several-moving-bodies" aria-label="Link to this section">#</a></h3>
+<p>Predict-world echoes players&#39; latest inputs so that each client can advance the
+contested simulation on one local timeline. This avoids the most obvious
+mixed-time contact artifacts, but it increases simulation and reconciliation
+work. Remote inputs are necessarily estimates until the next batch arrives, so
+small corrections are normal.</p>
+<p>Movement with inertia predicts better than movement that can change velocity
+instantaneously. Simulated objects should integrate their own state between
+snapshots, and contact resolution must be replay-safe.</p>
+<p><code>examples/speedball</code> demonstrates this model. Compare it with
+<a href="../../examples/slopball/README.html"><code>examples/slopball</code></a>, which implements a
+similar game using owner-simulated physics.</p>
+<h2 id="hybrid-games-are-expected">Hybrid games are expected<a class="heading-anchor" href="#hybrid-games-are-expected" aria-label="Link to this section">#</a></h2>
+<p>The choice is not global. A simulation-lane entity can still contain reliable
+delta fields:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Player :: <span class="hljs-keyword">struct</span> {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	x, y:   <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;predict,interp&quot;`</span>, <span class="hljs-comment">// fixed-tick simulated movement</span>
+	hp:     <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,      <span class="hljs-comment">// reliable host-written state</span>
+	team:   <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
+}</code></pre></div><p>Quickdraw uses predicted movement beside reliable health and score. Chests,
+inventories, chat, match state, and save data generally do not benefit from
+rollback and should remain on the session layer.</p>
+<p>The <a href="sim.html#promoting-a-coop-game">promotion checklist</a> moves one entity at a
+time from an owner stream to the simulation lane. A hybrid is a supported end
+state, not merely an intermediate step.</p>
+<h2 id="presentation-rules">Presentation rules<a class="heading-anchor" href="#presentation-rules" aria-label="Link to this section">#</a></h2>
+<p>These rules apply across the models:</p>
+<ol>
+<li><strong>Present an effect on the same timeline as its cause.</strong> A locally predicted
+shot should flash immediately. A remote shot should flash when the watched
+shooter reaches the corresponding tick.</li>
+<li><strong>Treat first sight as a baseline.</strong> A newly spawned entity should be placed
+from its received fields without replaying score flashes, damage reactions,
+or other historical edges.</li>
+<li><strong>Judge the state that was displayed.</strong> Lag-compensated queries should use
+validated snapshot evidence tied to the input being adjudicated. Bound its
+age with authority-observed RTT/jitter and the configured rewind window;
+treat a client-reported render offset only as a capped hint.</li>
+<li><strong>Keep replayed code free of presentation and engine state.</strong> A resimulated
+tick may run more than once. Audio, particles, node mutation, wall clocks,
+and non-ledgered randomness do not belong in it.</li>
+<li><strong>Adopt truth immediately and smooth only the display.</strong> Reconciliation must
+update simulation state before replay. Render-error smoothing can hide small
+corrections; intentional teleports should cross a configured cut threshold
+and display immediately.</li>
+<li><strong>Resolve simulated contact from replayable data.</strong> Query static level
+geometry if needed, but test moving entities against their simulated fields,
+not the physics server&#39;s current-frame transforms.</li>
+</ol>
+<p><code>kit/net</code> exposes edge halves for reliable replicated changes. <code>kit/sim</code> exposes
+tick payloads and declared events so presentation can run once on the appropriate
+clock without firing during resimulation.</p>
+<h2 id="authority-is-not-the-same-as-security">Authority is not the same as security<a class="heading-anchor" href="#authority-is-not-the-same-as-security" aria-label="Link to this section">#</a></h2>
+<p>A server-authoritative model means the authority computes the final state. It
+does not automatically make a game secure:</p>
+<ul>
+<li>A listen server is controlled by the hosting player. Use a dedicated authority
+when the host must not be able to alter outcomes.</li>
+<li>Input structures need semantic validators. Structural decoding alone cannot
+know that an axis is restricted to <code>-1</code>, <code>0</code>, or <code>1</code>.</li>
+<li>Commands need the correct generated access mode and game-specific predicate.</li>
+<li>Public sessions need an encrypted transport and application-specific traffic,
+moderation, logging, and deployment policies.</li>
+</ul>
+<p>See <a href="session.html#trust-and-admission">Session trust and admission</a> and
+<a href="profiles.html">Network profiles</a> for the concrete configuration and validation
+attached to each trust model.</p>
+<h2 id="scale-and-validation-status">Scale and validation status<a class="heading-anchor" href="#scale-and-validation-status" aria-label="Link to this section">#</a></h2>
+<p>The default co-op session cap is eight players. Unit tests cover lower-level
+session behavior at 32 seats, while the shipped real-process examples exercise
+smaller groups. Quickdraw and Speedball are duel-scale references. Treat those
+examples as correctness demonstrations, not published capacity targets for a
+production game.</p>
+<p>Measure CPU time, bandwidth, reconciliation frequency, and engine cost using
+your entity counts and network profile. <code>kit/ui</code> provides a netgraph, and the
+<a href="testing.html">testing harness</a> can inject latency, jitter, loss, and bandwidth
+limits into multi-process scenarios.</p>
+<h2 id="what-kit-does-not-implement">What Kit does not implement<a class="heading-anchor" href="#what-kit-does-not-implement" aria-label="Link to this section">#</a></h2>
+<p>Kit does not ship deterministic peer-to-peer lockstep. Lockstep can be a better
+fit for a small deterministic simulation in which every participant must run
+the same world and rollback the same inputs. It also requires cross-platform
+determinism, has a different late-join model, and does not provide a trusted
+referee by itself.</p>
+<p>Kit&#39;s simulation lane instead gives one authority the final state. Client
+prediction is allowed to be approximate because authoritative snapshots repair
+divergence.</p>
+<h2 id="package-compatibility">Package compatibility<a class="heading-anchor" href="#package-compatibility" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Use with the simulation lane</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>comms</code>, <code>xfer</code>, <code>save</code>, <code>ui</code></td>
+<td>Session-level; use unchanged.</td>
+</tr>
+<tr>
+<td><code>items</code></td>
+<td>Inventory state normally remains on reliable deltas. Pure slot and packing helpers are usable anywhere replay-safe.</td>
+</tr>
+<tr>
+<td><code>interact</code></td>
+<td>Geometry helpers are replay-safe. Prompt and command examples are written for session replication.</td>
+</tr>
+<tr>
+<td><code>combat</code></td>
+<td>Its networked projectile and predicted-health flow targets session replication. Reuse pure geometry and policy helpers; implement sim combat with predicted fields, commands, and events.</td>
+</tr>
+<tr>
+<td><code>ai</code></td>
+<td>Perception and steering math can be reused. Run navigation and non-replayable decisions only in the authority pass.</td>
+</tr>
+<tr>
+<td><code>nav</code></td>
+<td>Do not call Godot navigation queries from a resimulated tick. Call them from authority-only logic and feed replayable results into the simulation.</td>
+</tr>
+<tr>
+<td><code>fx</code></td>
+<td>Presentation helpers are reusable. The tracer pool is the co-op projectile presentation path; sim projectiles are usually predicted entities.</td>
+</tr>
+</tbody></table>
+</div><h2 id="recommended-reading-order">Recommended reading order<a class="heading-anchor" href="#recommended-reading-order" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><a href="quickstart.html">Session-replication quickstart</a></li>
+<li><a href="quickstart-sim.html">Simulation quickstart</a></li>
+<li><a href="sim.html">kit/sim reference</a></li>
+<li><code>examples/quickdraw</code> for predict-self and lag compensation</li>
+<li><code>examples/slopball</code> and <code>examples/speedball</code> as a side-by-side comparison</li>
+</ol>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/timelines.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#summary" class="">Summary</a><a href="#start-with-what-players-can-contest" class="">Start with what players can contest</a><a href="#no-adversarial-fast-state" class="subsection">No adversarial fast state</a><a href="#a-players-movement-or-aim" class="subsection">A player's movement or aim</a><a href="#one-shared-object" class="subsection">One shared object</a><a href="#contact-among-several-moving-bodies" class="subsection">Contact among several moving bodies</a><a href="#hybrid-games-are-expected" class="">Hybrid games are expected</a><a href="#presentation-rules" class="">Presentation rules</a><a href="#authority-is-not-the-same-as-security" class="">Authority is not the same as security</a><a href="#scale-and-validation-status" class="">Scale and validation status</a><a href="#what-kit-does-not-implement" class="">What Kit does not implement</a><a href="#package-compatibility" class="">Package compatibility</a><a href="#recommended-reading-order" class="">Recommended reading order</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/timelines.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

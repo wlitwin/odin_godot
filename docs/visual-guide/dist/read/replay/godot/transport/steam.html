@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Steam packet transport · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Steam packet transport</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/steam.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#ownership-and-bounds">Ownership and bounds</a><a href="#validation-and-outstanding-work">Validation and outstanding work</a></nav></details>
+<article class="reading-body "><p>Replay has an explicit Steam Session backend built over GodotSteam&#39;s
+<code>SteamMultiplayerPeer</code>. It uses the same typed handshake, seat admission, input/
+action protocol, snapshots and checkpoint machinery as the other transports.
+The adapter retains a peer directly; it does not install SceneMultiplayer or rely
+on Kit. ENet now shares its bounded packet/lifetime adapter.</p>
+<p>The interface was checked against GodotSteam 4.22.1, upstream commit
+<a href="https://codeberg.org/godotsteam/godotsteam/src/commit/5853a7741d174cfa37edee1ca44a11581a989d0b/godotsteam_multiplayer_peer.cpp" rel="noreferrer"><code>5853a7741d174cfa37edee1ca44a11581a989d0b</code></a>.
+The separately released GDExtension loaded under Godot 4.7.1 and exposed the
+expected native class/methods without initializing Steam. This is ABI/capability
+evidence, not successful Steam network delivery. The current verified envelope is
+listed below.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">runtime: transportgd.Steam_Runtime <span class="hljs-comment">// stable address; outlives every using Session</span>
+<span class="hljs-keyword">if</span> transportgd.steam_runtime_init(&amp;runtime, MY_APP_ID) != .None {<span class="hljs-keyword">return</span>}
+
+options := rgd.SESSION_OPTIONS
+options.role = .Host <span class="hljs-comment">// .Client on the other device</span>
+options.backend = .Steam
+options.steam = transportgd.STEAM_CONFIG
+options.steam.runtime = &amp;runtime
+options.steam.virtual_port = <span class="hljs-number">0</span>
+options.steam.host_steam_id = host_id <span class="hljs-comment">// required for clients; u64, not a seat</span>
+
+err := rgd.session_open(&amp;session, initial, model, options)
+<span class="hljs-comment">// Normal session_frame / session_changes / session_issue calls follow.</span></code></pre></div><p>Initialization is explicit and uses the client Steam API. It can launch an app
+session/presence and requires a suitable installed GodotSteam build, Steam client
+and app entitlement. <code>steam_available</code> only checks native capability and has none
+of those initialization effects. Missing runtime/capability or an unexpected API
+shape returns a typed error; it does not silently fall back to ENet.</p>
+<p>The runtime requests manual callbacks. <code>Steam</code> transport polling pumps
+<code>run_callbacks</code> before polling its peer. If the game is waiting for lobby/invite
+callbacks before opening a Session, call <code>steam_runtime_poll</code> in its own outer
+loop. Polling must remain on the Godot/Steam owning thread. This client-API adapter
+is not an implementation of the SteamGameServer SDK; <code>.Server</code> still means Replay&#39;s
+no-local-player authority role using the configured runtime.</p>
+<p>Godot peer IDs and Steam IDs are different types/identities. <code>steam_id</code> returns the
+local Godot transport ID. <code>steam_remote_id</code> maps a currently connected peer to the
+Steam ID reported by the provider. <code>steam_parse_id</code> accepts nonzero decimal 64-bit
+IDs and rejects malformed/overflowing endpoints. A transport address is not a
+Replay simulation seat or a grant of authority; admission policy remains separate.</p>
+<p><code>steam_open_peer</code> accepts a fresh caller-created peer implementing the same API.
+The adapter validates the base class and required methods, retains the peer,
+attaches connection callbacks and calls <code>create_host</code> / <code>create_client</code>. Session
+options can supply that peer through <code>steam.peer</code>; it is borrowed only during open,
+then removed from the retained options. Normal operation constructs the native
+class dynamically. The supplied runtime must remain alive.</p>
+<h2 id="ownership-and-bounds">Ownership and bounds<a class="heading-anchor" href="#ownership-and-bounds" aria-label="Link to this section">#</a></h2>
+<p>The shared MultiplayerPeer adapter keeps one owned 64 KiB receive buffer and a
+bounded connected-peer registry. A short destination preserves the pending packet
+until a later read can copy it. Reliable/unreliable modes are reported separately,
+channel zero is selected explicitly, and invalid targets/oversized outgoing
+messages are refused. The provider must support Replay&#39;s 64 KiB logical packet
+limit; GodotSteam&#39;s inspected Sockets implementation supports larger messages.</p>
+<p>The wrapper forwards the shared adapter&#39;s <a href="multiplayer-generations.html">connection generations</a>.
+Pending copies and backend packets preceding a replacement connection cannot
+acquire the new peer generation. This local metadata does not authenticate a Steam ID.</p>
+<p>Close all Sessions/peers before releasing their runtime. Callbacks are detached
+before peer shutdown, buffers and references are released, and repeated close is
+safe. <code>steam_runtime_release</code> clears the borrowed runtime binding; it intentionally
+does not shut down a Steam API shared with other peers or lobby services. Lobby
+membership, invitations and SDK shutdown remain application-owned lifecycle work.
+No invitation or message to another Steam account is sent by capability detection.</p>
+<h2 id="validation-and-outstanding-work">Validation and outstanding work<a class="heading-anchor" href="#validation-and-outstanding-work" aria-label="Link to this section">#</a></h2>
+<p><code>tests/replay_steam/run.sh</code> uses a named API-contract fixture: a Godot
+MultiplayerPeerExtension delegates packets to real ENet while exposing the inspected
+Steam constructor/mapping methods. Separate processes exchange 64 KiB payloads,
+exercise both transfer modes and pending-buffer copies, then run a complete Replay
+handshake, validated loot action and authority checkpoint. Constructor/initialization
+failure cases verify rejection and cleanup. The fixture uses no Valve service.</p>
+<p><code>tests/replay_steam/capability_run.sh</code> loads a supplied addon and inspects the real
+class/method surface with Steam auto-initialization disabled. The pinned release
+passed this on macOS ARM64. <code>tests/replay_steam/live_run.sh</code> is an opt-in live test
+for two logged-in Steam accounts/devices. Its output uses a separate live sentinel;
+contract or capability success cannot satisfy that gate.</p>
+<p>Live Valve relay/P2P behavior, invitations/lobby UX, entitlement/account boundaries,
+SteamGameServer support and broader platforms remain pending. <a href="../steam_room.html">Room endpoint/recovery integration</a> now supplies explicit Steam
+addresses and fresh peer construction through takeover/rejoin. Its local contract
+fixture remains distinct from live multi-account acceptance. Existing ENet/RTC Room
+profiles remain available. These gaps stay
+requirements of the full roadmap; this adapter is not a completed Steam deployment.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="multiplayer-generations.html"><span>MultiplayerPeer connection generations</span><span aria-hidden="true">→</span></a><a href="../steam_room.html"><span>Steam destinations for Room recovery</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/steam.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-bounds" class="">Ownership and bounds</a><a href="#validation-and-outstanding-work" class="">Validation and outstanding work</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/steam.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

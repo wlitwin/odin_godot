@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>types.odin · odin_godot</title><link rel="icon" href="../../../../../favicon.svg"><link rel="stylesheet" href="../../../../../style.css"><link rel="stylesheet" href="../../../../../reader.css"><link rel="stylesheet" href="../../../../../sdk.css"><script src="../../../../../reader.js" defer></script><script src="../../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../../docs.html" aria-current="page">Docs</a><a href="../../../../../guide.html">Field guide</a><a href="../../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../../docs.html">Overview</a><a href="../../../../../docs/install.html">Installation</a><a href="../../../../../docs/first-script.html">Your first script</a><a href="../../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../../docs/authoring-guide.html">Script API</a><a href="../../../../docs/events.html">Signals and events</a><a href="../../../../docs/workflow.html">Editor workflow</a><a href="../../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../../docs/kit.html">Build with Kit</a><a href="../../../../../docs/replay.html">Build with Replay</a><a href="../../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../../docs/exporting.html">Build and export</a><a href="../../../../docs/exporting.html">Export reference</a><a href="../../../../docs/debugging.html">Debugging</a><a href="../../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../../docs.html">Docs</a><span>/</span><a href="../../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>types.odin</h1><div class="reader-meta"><span>140 lines · Odin</span><span>Odin × Godot</span><a href="../../../../../reference/examples/replay_claimball/shared/pitch/types.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> claimball_pitch
+
+<span class="hljs-keyword">import</span> r <span class="hljs-string">&quot;godot:replay&quot;</span>
+<span class="hljs-keyword">import</span> p <span class="hljs-string">&quot;godot:replay/play&quot;</span>
+<span class="hljs-keyword">import</span> net <span class="hljs-string">&quot;godot:replay/net&quot;</span>
+<span class="hljs-keyword">import</span> h <span class="hljs-string">&quot;godot:replay/history&quot;</span>
+<span class="hljs-keyword">import</span> lb <span class="hljs-string">&quot;godot:replay/lobby&quot;</span>
+
+CONTENT :: <span class="hljs-type">u64</span>(<span class="hljs-number">0x52434c41494d4233</span>)
+SEATS :: <span class="hljs-number">4</span>
+HZ :: <span class="hljs-number">60</span>
+RUN_SPEED :: <span class="hljs-type">f32</span>(<span class="hljs-number">2.2</span>)
+RUN_ACCEL :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.35</span>)
+KICK_REACH :: <span class="hljs-type">f32</span>(<span class="hljs-number">30</span>)
+KICK_POWER :: <span class="hljs-type">f32</span>(<span class="hljs-number">6.5</span>)
+KICK_CD :: <span class="hljs-type">u16</span>(<span class="hljs-number">20</span>)
+SPIKE_REACH :: <span class="hljs-type">f32</span>(<span class="hljs-number">44</span>)
+SPIKE_POWER :: <span class="hljs-type">f32</span>(<span class="hljs-number">5.5</span>)
+KICKOFF_HOLD :: <span class="hljs-type">u16</span>(<span class="hljs-number">72</span>)
+CENTER :: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{<span class="hljs-number">320</span>, <span class="hljs-number">180</span>}
+PLAYER_BOUNDS :: p.Aabb2{{<span class="hljs-number">21</span>, <span class="hljs-number">21</span>}, {<span class="hljs-number">619</span>, <span class="hljs-number">339</span>}}
+BALL_LAW :: p.Roll_Law2{<span class="hljs-number">0.985</span>, <span class="hljs-number">9</span>, <span class="hljs-number">0.55</span>, {{<span class="hljs-number">20</span>, <span class="hljs-number">20</span>}, {<span class="hljs-number">620</span>, <span class="hljs-number">340</span>}}}
+SPAWNS :: [<span class="hljs-number">4</span>][<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{{<span class="hljs-number">200</span>, <span class="hljs-number">100</span>}, {<span class="hljs-number">440</span>, <span class="hljs-number">260</span>}, {<span class="hljs-number">200</span>, <span class="hljs-number">260</span>}, {<span class="hljs-number">440</span>, <span class="hljs-number">100</span>}}
+KICK :: <span class="hljs-type">u8</span>(<span class="hljs-number">1</span>)
+
+Player :: <span class="hljs-keyword">struct</span> {initialized, connected, named: <span class="hljs-type">bool</span>, motion: p.Motion2, kick_cd: <span class="hljs-type">u16</span>, team: <span class="hljs-type">u8</span>}
+Ball :: <span class="hljs-keyword">struct</span> {motion: p.Motion2, hold: <span class="hljs-type">u16</span>, reset: <span class="hljs-type">u32</span>}
+Score :: <span class="hljs-keyword">struct</span> {left, right, winner: <span class="hljs-type">u8</span>}
+World :: <span class="hljs-keyword">struct</span> {
+	group_seat: <span class="hljs-type">u16</span>,
+	outside: h.Boundary([SEATS]Player), <span class="hljs-comment">// read-only sampled outsiders; no predicted contacts in this profile</span>
+	players: [SEATS]Player,
+	names: [SEATS]lb.Name,
+	manual_start: <span class="hljs-type">bool</span>,
+	ball: Ball,
+	score: Score,
+	clock: <span class="hljs-type">u64</span>,
+	round: <span class="hljs-type">u32</span>,
+	kicks, spikes, contacts: <span class="hljs-type">u32</span>,
+	started: <span class="hljs-type">bool</span>,
+	min_players, goals_to, seat_offset: <span class="hljs-type">u8</span>,
+}
+Controls :: <span class="hljs-keyword">struct</span> {move: [<span class="hljs-number">2</span>]<span class="hljs-type">i8</span>, buttons: <span class="hljs-type">u8</span>}
+Action :: <span class="hljs-keyword">struct</span> {spike, start: <span class="hljs-type">bool</span>, name: lb.Name, restart_round: <span class="hljs-type">u32</span>}
+Event_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {Kick, Spike, Goal}
+Event :: <span class="hljs-keyword">struct</span> {round: <span class="hljs-type">u32</span>, kind: Event_Kind, seat, team: <span class="hljs-type">u8</span>, position, velocity: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>, score: Score}
+
+initial :: <span class="hljs-keyword">proc</span>(dedicated := <span class="hljs-literal">false</span>, min_players: <span class="hljs-type">u8</span> = <span class="hljs-number">1</span>, goals_to: <span class="hljs-type">u8</span> = <span class="hljs-number">3</span>, manual_start: <span class="hljs-type">bool</span> = <span class="hljs-literal">false</span>) -&gt; World {
+	w:=World{round=<span class="hljs-number">1</span>,manual_start=manual_start,ball = {motion = {position = CENTER}, hold = KICKOFF_HOLD}, min_players = min_players, goals_to = goals_to, seat_offset = dedicated ? <span class="hljs-number">1</span> : <span class="hljs-number">0</span>}
+	<span class="hljs-keyword">for</span> &amp;name,i <span class="hljs-keyword">in</span> w.names {name=lb.seat_name(<span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>))}
+	<span class="hljs-keyword">return</span> w
+}
+
+model :: <span class="hljs-keyword">proc</span>() -&gt; net.Model(World, Controls, Action, Event, SEATS) {
+	<span class="hljs-keyword">return</span> {group = {id = <span class="hljs-number">1</span>, project = project, valid = group_valid}, step = step, action = action, reset_player = reset_player, control_valid = control_valid, state_valid = state_valid,
+	        action_valid = action_valid, hold = <span class="hljs-keyword">proc</span>(c: Controls) -&gt; Controls {<span class="hljs-keyword">return</span> c},
+	        event_owner = <span class="hljs-keyword">proc</span>(e: Event) -&gt; <span class="hljs-type">u16</span> {<span class="hljs-keyword">return</span> <span class="hljs-type">u16</span>(e.seat)}}
+}
+
+control_valid :: <span class="hljs-keyword">proc</span>(c: Controls) -&gt; <span class="hljs-type">bool</span> {<span class="hljs-keyword">return</span> c.move[<span class="hljs-number">0</span>] &gt;= <span class="hljs-number">-1</span> &amp;&amp; c.move[<span class="hljs-number">0</span>] &lt;= <span class="hljs-number">1</span> &amp;&amp; c.move[<span class="hljs-number">1</span>] &gt;= <span class="hljs-number">-1</span> &amp;&amp; c.move[<span class="hljs-number">1</span>] &lt;= <span class="hljs-number">1</span> &amp;&amp; c.buttons &amp; ~KICK == <span class="hljs-number">0</span>}
+state_valid :: <span class="hljs-keyword">proc</span>(w: World) -&gt; <span class="hljs-type">bool</span> {<span class="hljs-keyword">return</span> w.group_seat == <span class="hljs-number">0</span> &amp;&amp; !w.outside.valid &amp;&amp; rules_valid(w)}
+rules_valid :: <span class="hljs-keyword">proc</span>(w: World) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">if</span> w.round==<span class="hljs-number">0</span> {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">for</span> name <span class="hljs-keyword">in</span> w.names {<span class="hljs-keyword">if</span> !lb.name_valid(name,<span class="hljs-literal">false</span>) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}}
+	<span class="hljs-keyword">if</span> w.manual_start &amp;&amp; w.seat_offset!=<span class="hljs-number">0</span> {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">if</span> w.min_players &lt; <span class="hljs-number">1</span> || w.min_players &gt; SEATS || w.goals_to &lt; <span class="hljs-number">1</span> || w.seat_offset &gt; <span class="hljs-number">1</span> || w.ball.hold &gt; KICKOFF_HOLD || w.score.winner &gt; <span class="hljs-number">2</span> {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">if</span> w.score.left &gt; w.goals_to || w.score.right &gt; w.goals_to {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">if</span> (w.score.winner == <span class="hljs-number">1</span>) != (w.score.left == w.goals_to) || (w.score.winner == <span class="hljs-number">2</span>) != (w.score.right == w.goals_to) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">if</span> w.ball.reset != <span class="hljs-type">u32</span>(w.score.left) + <span class="hljs-type">u32</span>(w.score.right) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">for</span> player, i <span class="hljs-keyword">in</span> w.players {
+		team := (i + <span class="hljs-number">1</span> + <span class="hljs-type">int</span>(w.seat_offset)) % <span class="hljs-number">2</span> == <span class="hljs-number">1</span> ? <span class="hljs-type">u8</span>(<span class="hljs-number">1</span>) : <span class="hljs-type">u8</span>(<span class="hljs-number">2</span>)
+		<span class="hljs-keyword">if</span> player.kick_cd &gt; KICK_CD || (player.connected &amp;&amp; !player.initialized) || (player.initialized &amp;&amp; player.team != team) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	}
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+project :: <span class="hljs-keyword">proc</span>(frame: r.Frame(World), seat: <span class="hljs-type">u16</span>) -&gt; World {
+	w := frame.state
+	w.group_seat = seat
+	w.outside = {tick = frame.tick, value = w.players, valid = <span class="hljs-literal">true</span>}
+	<span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> w.players {<span class="hljs-keyword">if</span> i + <span class="hljs-number">1</span> != <span class="hljs-type">int</span>(seat) {player = {}} <span class="hljs-keyword">else</span> {w.outside.value[i] = {}}}
+	<span class="hljs-keyword">return</span> w
+}
+
+group_valid :: <span class="hljs-keyword">proc</span>(w: World, seat: <span class="hljs-type">u16</span>) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">if</span> w.group_seat != seat || !w.outside.valid || w.outside.tick &gt; w.clock || !rules_valid(w) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	<span class="hljs-keyword">for</span> player, i <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> i + <span class="hljs-number">1</span> != <span class="hljs-type">int</span>(seat) &amp;&amp; player != (Player{}) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+		<span class="hljs-keyword">if</span> i + <span class="hljs-number">1</span> == <span class="hljs-type">int</span>(seat) &amp;&amp; w.outside.value[i] != (Player{}) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+	}
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+reset_player :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, ctx: ^r.Step(Event)) {
+	w.names[seat<span class="hljs-number">-1</span>]=lb.seat_name(seat)
+	pid := <span class="hljs-type">int</span>(seat) + <span class="hljs-type">int</span>(w.seat_offset)
+	spots := SPAWNS
+	w.players[seat - <span class="hljs-number">1</span>] = {initialized = <span class="hljs-literal">true</span>, connected = <span class="hljs-literal">true</span>, motion = {position = spots[pid % len(spots)]}, team = pid % <span class="hljs-number">2</span> == <span class="hljs-number">1</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">2</span>}
+}
+
+<span class="hljs-comment">// Roster decisions may read boundary metadata without adding outsiders to the</span>
+<span class="hljs-comment">// predicted simulation. Gameplay contacts still iterate only w.players.</span>
+member :: <span class="hljs-keyword">proc</span>(w:^World,index:<span class="hljs-type">int</span>)-&gt;Player {
+ <span class="hljs-keyword">if</span> w.group_seat!=<span class="hljs-number">0</span> &amp;&amp; index+<span class="hljs-number">1</span>!=<span class="hljs-type">int</span>(w.group_seat) {<span class="hljs-keyword">return</span> w.outside.value[index]}
+ <span class="hljs-keyword">return</span> w.players[index]
+}
+leader :: <span class="hljs-keyword">proc</span>(w:^World)-&gt;<span class="hljs-type">u16</span> {
+ <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;SEATS {<span class="hljs-keyword">if</span> member(w,i).connected {<span class="hljs-keyword">return</span> <span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>)}}
+ <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>
+}
+action_valid :: <span class="hljs-keyword">proc</span>(a:Action)-&gt;<span class="hljs-type">bool</span> {<span class="hljs-keyword">return</span> <span class="hljs-type">int</span>(a.spike)+<span class="hljs-type">int</span>(a.start)+<span class="hljs-type">int</span>(a.name.length&gt;<span class="hljs-number">0</span>)+<span class="hljs-type">int</span>(a.restart_round&gt;<span class="hljs-number">0</span>)==<span class="hljs-number">1</span> &amp;&amp; lb.name_valid(a.name)}
+action :: <span class="hljs-keyword">proc</span>(w:^World,seat:<span class="hljs-type">u16</span>,a:Action,ctx:^r.Step(Event))-&gt;<span class="hljs-type">bool</span> {
+ <span class="hljs-keyword">if</span> seat==<span class="hljs-number">0</span> || seat&gt;SEATS || !action_valid(a) || !w.players[seat<span class="hljs-number">-1</span>].connected {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+ <span class="hljs-keyword">if</span> a.restart_round&gt;<span class="hljs-number">0</span> {<span class="hljs-keyword">return</span> restart(w,seat,a.restart_round,ctx)}
+ <span class="hljs-keyword">if</span> a.spike {<span class="hljs-keyword">return</span> spike(w,seat,a,ctx)}
+ <span class="hljs-keyword">if</span> a.name.length&gt;<span class="hljs-number">0</span> {w.names[seat<span class="hljs-number">-1</span>]=a.name;w.players[seat<span class="hljs-number">-1</span>].named=<span class="hljs-literal">true</span>;<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>}
+ <span class="hljs-keyword">if</span> !w.manual_start || w.started || seat!=leader(w) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+ count:=<span class="hljs-number">0</span>;<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;SEATS {<span class="hljs-keyword">if</span> member(w,i).connected {count+=<span class="hljs-number">1</span>}}
+ <span class="hljs-keyword">if</span> count&lt;<span class="hljs-type">int</span>(w.min_players) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+ w.started=<span class="hljs-literal">true</span>;<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+<span class="hljs-comment">// Restart within the same session. The command names its completed round, so</span>
+<span class="hljs-comment">// delayed requests cannot reset a later match. Outside players remain immutable</span>
+<span class="hljs-comment">// boundary samples during local prediction; only the authority resets everybody.</span>
+restart :: <span class="hljs-keyword">proc</span>(w:^World,seat:<span class="hljs-type">u16</span>,round:<span class="hljs-type">u32</span>,ctx:^r.Step(Event))-&gt;<span class="hljs-type">bool</span> {
+ <span class="hljs-keyword">if</span> w.score.winner==<span class="hljs-number">0</span> || seat!=leader(w) || round!=w.round || round==max(<span class="hljs-type">u32</span>) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+ count:=<span class="hljs-number">0</span>;<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;SEATS {<span class="hljs-keyword">if</span> member(w,i).connected {count+=<span class="hljs-number">1</span>}}
+ <span class="hljs-keyword">if</span> count&lt;<span class="hljs-type">int</span>(w.min_players) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
+ before:=w^
+ next:=initial(w.seat_offset==<span class="hljs-number">1</span>,w.min_players,w.goals_to,w.manual_start)
+ next.clock,next.round,next.started=w.clock,w.round+<span class="hljs-number">1</span>,<span class="hljs-literal">true</span>
+ next.group_seat,next.outside=w.group_seat,w.outside
+ <span class="hljs-keyword">for</span> player,i <span class="hljs-keyword">in</span> before.players {<span class="hljs-keyword">if</span> player.initialized {
+  reset_player(&amp;next,<span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>),ctx)
+  next.players[i].connected,next.players[i].named=player.connected,player.named
+ }}
+ next.names=before.names;w^=next;<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/shared/pitch/types.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../../docs.html">Documentation</a><a href="../../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../../reference/examples/replay_claimball/shared/pitch/types.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

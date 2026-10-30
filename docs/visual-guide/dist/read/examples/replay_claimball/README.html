@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay Claimball · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay Claimball</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_claimball/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-group-and-the-claim">The group and the claim</a><a href="#what-is-preserved-and-what-is-pending">What is preserved and what is pending</a></nav></details>
+<article class="reading-body "><p>A separate <a href="../claimball/README.html">Claimball</a> port. Unlike Replay Speedball&#39;s
+complete-pitch prediction, each player predicts <strong>only their own avatar and the
+shared ball</strong>. Other active avatars are removed from the prediction group; the
+authority continues to simulate everyone. Original Claimball/Speedball/Slopball
+remain runnable in their original directories.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/play.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_claimball/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/network_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/compete_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/fault_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_claimball/stall_run.sh</code></pre></div><p>The default opens a <a href="session-ui.html">session menu</a> with Solo, Host, Join and Watch.
+For automatic separate windows, set <code>RCB_ROLE=host</code> and
+<code>RCB_ROLE=client</code>; <code>server</code> and <code>observer</code> also work. Port defaults to 49490.
+<code>RCB_PLAYERS</code> is the start threshold, <code>RCB_GOALS</code> the winning score, and
+<code>RCB_TOKEN</code> a deterministic test identity label. Normal native menu play persists
+its identity and name in a separate profile. Launchers use localhost. WASD moves, Space kicks, E spikes.
+<code>RCB_BOT=striker</code> drives a match; <code>idle</code> watches; <code>spiker</code> retains the optional
+two-command scenario. Fault controls are <code>RCB_LATENCY</code>/<code>RCB_JITTER</code> in milliseconds
+and <code>RCB_LOSS</code>/<code>RCB_DUPLICATE</code> in ten-thousandths. Native macOS is tested; the WASM
+fixture is a type-check, not browser multiplayer acceptance.</p>
+<h2 id="the-group-and-the-claim">The group and the claim<a class="heading-anchor" href="#the-group-and-the-claim" aria-label="Link to this section">#</a></h2>
+<p><a href="shared/pitch/types.odin.html"><code>shared/pitch</code></a> declares a <code>Prediction_Group</code>: projection
+retains the local player/ball and records timestamped outsiders separately. Its
+validator rejects reintroduced remote simulation members. The ordinary gameplay
+step iterates the group&#39;s connected players. Outside avatars do not produce
+predicted contacts, matching the original&#39;s predict-self policy; remote touches
+arrive through authoritative correction. See the <a href="../../replay/net/groups.html">group contract</a>.</p>
+<p>Presentation draws remote players from observed frames. A local influence inside
+38 pixels claims the ball. The claim stays active through fast flight, including
+when the ball leaves reach. Once untouched and below 0.6 units/tick, it fades back
+to observed presentation over 0.25 seconds. A fast ball that this player never
+influenced does not create a claim. Claim state is presentation-only.</p>
+<p>A claimed predicted goal reset stays on the predicted timeline until the observed
+reset catches up, then releases. This explicit reset latch prevents blending a
+new kickoff back toward the old goal position. It is an intentional clarification
+of the original&#39;s claim/reset behavior. Score/winner presentation remains
+authoritative, while the complete score and reset state participate in replay.</p>
+<h2 id="what-is-preserved-and-what-is-pending">What is preserved and what is pending<a class="heading-anchor" href="#what-is-preserved-and-what-is-pending" aria-label="Link to this section">#</a></h2>
+<p>Pitch geometry, movement/momentum, kick cadence/reach/power, dribble contact,
+rolling friction/cap/bounce, goals, kickoff hold, team/spawn correspondence, claim
+reach and release thresholds are ported. Geometry provenance is in <a href="assets.html">assets.md</a>.
+The common rules were copied from the new Speedball port into this separate
+project, so each game remains independently buildable.</p>
+<p>As in Replay Speedball, spikes carry intent and use the issuing seat&#39;s current
+world position rather than supplied coordinates; two queued commands run on
+successive ticks. The HUD/team tint are initial replacements. Native session menus, names, chat,
+scoreboard, leave/rejoin, Play again and native save/resume now have automated
+acceptance. Initial native Room handoff/crash migration is tested. Party menus and browser RTC handoff/crash paths are now tested locally. Steam,
+broader contested scenarios and human visual review remain pending. This is an
+initial M6 slice, not full parity or a paired performance comparison.</p>
+<p>The four-process gate runs authority, striker, idle player and true observer at
+240 ms gameplay RTT. It checks one predicted avatar per player, local speculative
+kicks, matching score/reset, five-authority-kick agreement in the recorded match,
+claim retention during fast distant flight, and actual Godot-node agreement with
+the selected predicted/observed pose. The idle player&#39;s underlying ball prediction
+can still receive large corrections; those are hidden by its observed presentation.
+<code>RCB_GROUP</code> and <code>RCB_METRICS</code> expose both facts. The original gate uses an idle
+opponent. <code>compete_run.sh</code> adds a second active striker, stops bot controls at tick
+1800, lets the ball settle, and checks agreement/effect reconciliation. It need not
+finish a match; winning three goals is not its time limit. <code>fault_run.sh</code> adds
+0–20 ms receive jitter, 10% unreliable-packet loss and 10% duplication, with seed
+42 per adapter. Reliable application traffic stays ordered and delivered; this
+does not model ENet&#39;s lower-level retransmission/congestion loop. The gate requires
+observed drops/duplicates and both players&#39; authoritative kicks, claims and views.</p>
+<p><code>RCB_CONTEST</code> counts remote kick effects presented while a local claim was active.
+This demonstrates overlapping interactions, not proof that a claim was obsolete:
+the local player may already have made a newer predicted touch. Claims still
+release under the authored proximity/speed/reset policy. The tests do not establish
+subjective quality during takeovers. <code>RCB_PROFILE</code> reports replay wall time and
+conservative histogram percentile bounds.</p>
+<p><code>stall_run.sh</code> pauses the idle client&#39;s main thread for 800 ms while the match
+continues. It requires an ahead-snapshot catch-up, no full resync, and preservation
+of all kick effects and final gameplay state. This covers a short local stall,
+not a blackout longer than the retained history. <code>RCB_RESYNC</code> prints reasons and
+tick frontiers if a full resync becomes necessary.</p>
+<p>The <span class="local-reference" title="docs/replay/results/claimball-ui-2026-09-13/README.md · available in the repository">native UI receipts</span>
+retain an intermittent fault failure: the observer resynchronized and missed four
+kick presentations, despite converged final state. Later instrumented runs do not
+establish its cause or resolve that failure.
+The <span class="local-reference" title="docs/replay/results/resync-effects-2026-09-19/README.md · available in the repository">same-epoch resync fix</span>
+separately proves and fixes loss of already confirmed effects when Welcome replaced
+the journal. A faulted checkpoint-refresh run preserves all eleven kicks, and
+old/current native plus WASM trace comparisons isolate the lost output. The cause
+of the older Facts_Overflow remains unestablished.</p>
+<p>Play again is a round-scoped command in the current session. It retains identities
+and chat while resetting match state. Content C3 includes the round and event
+scope; C1/C2 peers and archives remain explicitly incompatible. See the
+<a href="session-ui.html#play-again">session guide</a> for behavior and reproduction.</p>
+<p>Native authority saves and fresh-process solo/host resume are described in the
+<a href="session-ui.html#native-match-saves">session guide</a>. The default checkpoint path is
+<code>user://claimball.replay</code>, configurable with <code>RCB_SAVE</code>; the matching host profile
+is required to resume. <code>tests/replay_claimball_save/run.sh</code> verifies exact moving
+state, ownership/error handling, rejoin, continued commands and match restart.</p>
+<p>Native coordinator-driven handoff and crash recovery now have a separate
+<a href="migration.html">migration guide</a>. A successor restores the complete authority world
+while clients continue to predict one avatar. The shared package is named
+<code>claimball_pitch</code> to coexist with Speedball&#39;s <code>pitch</code> in service programs; its import
+path and verified C3 wire/save contracts remain unchanged.</p>
+<p><a href="online.html">Party menus and browser play</a> use the shared provisioned Room adapters.
+Configure <code>RCB_ROOM_SERVICE</code> (browser query <code>room_service</code>) to create or join an
+invited party. Native/browser profiles remain separate from Party credentials;
+observers keep seat zero and do not receive succession checkpoints. The service
+can persist complete C3 checkpoints, with publication before and after browser
+migration independently decoded. Local test success does not establish a deployed
+public service or resolve the retained first-run browser fencing failure.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../claimball/README.html"><span>claimball — predict-self + the claim</span><span aria-hidden="true">→</span></a><a href="session-ui.html"><span>Claimball session UI</span><span aria-hidden="true">→</span></a><a href="../../replay/net/groups.html"><span>Authored prediction groups</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-group-and-the-claim" class="">The group and the claim</a><a href="#what-is-preserved-and-what-is-pending" class="">What is preserved and what is pending</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_claimball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Owner-streamed Godot bodies · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Owner-streamed Godot bodies</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/body2.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>Body2</code> borrows a scene body and optional skin node. It supports RigidBody2D and
+CharacterBody2D. Its driver and visual smoothing live outside simulation state.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">body2_attach(&amp;adapter, physics_body, .Rigid, skin)
+body2_sync(&amp;adapter, authority_owned_state, my_owner_id, epoch,
+           authority_tick, may_publish, render_delta, optional_observer_state)
+sample, error := body2_sample(&amp;adapter, engine_physics_frame)</code></pre></div><p>The ownership argument must come from authority state, not client prediction.
+<code>session_authority_state</code> supplies the appropriate frame. Connection/fencing/game
+eligibility is a separate <code>may_publish</code> decision. Optional observed history may
+interpolate a remote pose only within the same object/revision/discontinuity scope.
+Observers freeze rigid bodies in kinematic mode; remote character bodies remain
+solid but their local controller must not call move_and_slide. <code>body2_simulating</code>
+answers whether a controller may operate the local solver.</p>
+<p>Transforms are written through PhysicsServer and the node&#39;s global transform;
+linear/angular velocity and sleeping state cross reseeds. Freeze is lifted before
+seeding a new solver, avoiding Godot restoring an obsolete pose when it wakes.
+Temporary Variants are destroyed. Samples read PhysicsServer state and reuse the
+last immutable observation between physics frames, so differing render/network
+rates do not erase the newest observation. Character samples use real velocity.</p>
+<p>Preparing an authority-issued offer can run a speculative solver while the old
+owner remains accepted. <code>body2_preview</code> can start a local-only possession preview
+earlier; it publishes nothing until an authority offer exists. Matching preparation
+can retain the preview, while denial, cuts, lost eligibility and timeout revert it.
+There may be overlapping speculative solvers. Exactly one revision is accepted by
+the owner-state reducer at a time.</p>
+<p>Node reseeds are immediate; a frozen kinematic PhysicsServer transform may settle
+on the next physics step. Skin rendering therefore reads the visible parent node,
+while publication reads the solver. Small position/angular corrections decay on
+the skin with a 63 ms half-life; explicit cuts reset both errors and do not glide.
+The visual-only skin is a direct child with a captured authored offset/rotation.
+Observer jumps of at least six position units or 0.12 radians trigger correction;
+90-unit or π/2-radian corrections cut. Scene
+geometry/scale is authored separately from the streamed pose. The adapter does not
+serialize solver contact caches, joints, or arbitrary engine state. Reconstructing
+pose and velocity is a cooperative recovery boundary, not deterministic solver replay.
+The current skin-offset correction assumes unit global body scale; scaled hierarchy
+visual correction needs separate validation. The physics pose uses global transforms.</p>
+<p><code>body2_destroy</code> only clears the adapter; the caller owns and frees the nodes.
+When a current authority frame is unavailable, call <code>body2_suspend</code> to stop solving
+and publication while retaining the previous observation clock. Do not tag a cached
+old-world pose with the new session epoch: a recovered checkpoint may have an earlier
+tick. Resume with the actual authority frame so the driver can rebase its scope and
+seed the complete recovered pose and velocities.
+For 3D, <a href="body3.html">Body3</a> applies the same owner protocol to quaternion poses and
+linear/angular velocity; a separate Replay Slopball3D port exercises it.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/body2.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/body2.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

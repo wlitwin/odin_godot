@@ -5,6 +5,9 @@ use → ship.**
 
 ## Start here
 
+- **[SDK documentation site](visual-guide/README.md)** provides task-based guides for
+  setup, scripting, Kit, Replay, and export, plus system diagrams, an interactive
+  correction lab, examples, and searchable reference.
 - **[Getting Started](getting-started.md)**: install the Nix toolchain, build the extension,
   add it to a Godot project, and write + attach your first `.odin` script (a Node that moves
   on `_process`). It's a real, copy-pasteable hello-world, and for multiplayer, the

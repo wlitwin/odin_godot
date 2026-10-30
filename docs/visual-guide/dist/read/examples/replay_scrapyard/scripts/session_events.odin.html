@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>session_events.odin · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../contributor-guide.html">Contributor guide</a><a href="../code-guide.html">Code guide</a><a href="../shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>session_events.odin</h1><div class="reader-meta"><span>127 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_scrapyard/scripts/session_events.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay_scrapyard
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+<span class="hljs-keyword">import</span> r <span class="hljs-string">&quot;godot:replay&quot;</span>
+<span class="hljs-keyword">import</span> net <span class="hljs-string">&quot;godot:replay/net&quot;</span>
+<span class="hljs-keyword">import</span> rgd <span class="hljs-string">&quot;godot:replay/godot&quot;</span>
+<span class="hljs-keyword">import</span> v <span class="hljs-string">&quot;godot:replay/view&quot;</span>
+<span class="hljs-keyword">import</span> game <span class="hljs-string">&quot;../shared/game&quot;</span>
+<span class="hljs-keyword">import</span> inputgd <span class="hljs-string">&quot;godot:replay/godot/input&quot;</span>
+
+dispatch_session_changes :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard) {
+	audio_prepare(self)
+	feedback_prepare(self)
+	changes: [<span class="hljs-number">320</span>]v.Change(net.Net_Event(game.Event))
+	<span class="hljs-keyword">for</span> {
+		n := rgd.session_changes(self.session, changes[:])
+		<span class="hljs-keyword">if</span> n == <span class="hljs-number">0</span> {
+			<span class="hljs-keyword">break</span>
+		}
+		<span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes[:n] {
+			audio_event(self, change)
+			runner_effect(self, change)
+			feedback_event(self, change)
+			observe_action_results(self, change)
+			count_gameplay_effects(self, change)
+		}
+	}
+}
+
+observe_action_results :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, change: v.Change(net.Net_Event(game.Event))) {
+	event := change.occurrence.value
+	<span class="hljs-keyword">if</span> event.kind == .Action_Result &amp;&amp;
+	   event.seat == rgd.session_seat(self.session) &amp;&amp;
+	   event.sequence == self.development_sequence &amp;&amp;
+	   change.confirmed &amp;&amp;
+	   change.kind != .Cancel {
+		self.development_result = event.applied ? <span class="hljs-number">1</span> : <span class="hljs-number">-1</span>
+		self.development_reason = gd.Int(event.reason)
+	}
+	inputgd.intent_observe(&amp;self.dash_intent[<span class="hljs-number">0</span>], self.session, change)
+	inputgd.intent_observe(&amp;self.turret_intent[<span class="hljs-number">0</span>], self.session, change)
+	<span class="hljs-keyword">if</span> event.kind == .Action_Result &amp;&amp;
+	   event.seat == rgd.session_seat(self.session) &amp;&amp;
+	   change.confirmed &amp;&amp;
+	   change.kind != .Cancel &amp;&amp;
+	   !event.applied &amp;&amp;
+	   (event.reason == .Stale || event.reason == .Future) {
+		<span class="hljs-keyword">if</span> event.sequence == self.declare_sequence {
+			self.declared = <span class="hljs-literal">false</span>
+		}
+		<span class="hljs-keyword">if</span> event.sequence == self.ready_sequence {
+			self.ready_retry = <span class="hljs-literal">true</span>
+		}
+	}
+	<span class="hljs-keyword">if</span> event.kind == .Action_Result &amp;&amp;
+	   (gd.env_int(<span class="hljs-string">&quot;REPLAY_MIGRATION_TRACE&quot;</span>, <span class="hljs-number">0</span>) == <span class="hljs-number">1</span> || scrap_int(<span class="hljs-string">&quot;RSY_TRACE&quot;</span>, <span class="hljs-number">0</span>) == <span class="hljs-number">1</span>) &amp;&amp;
+	   change.kind == .Begin {
+		gd.print_str(
+			fmt.tprintf(
+				<span class="hljs-string">&quot;RSY_ACTION seat=%d sequence=%d applied=%v reason=%v&quot;</span>,
+				event.seat,
+				event.sequence,
+				event.applied,
+				event.reason,
+			),
+		)
+	}
+}
+
+count_gameplay_effects :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, change: v.Change(net.Net_Event(game.Event))) {
+	event := change.occurrence.value
+	<span class="hljs-keyword">if</span> event.kind == .Gameplay &amp;&amp; event.value.kind == .Dash {
+		<span class="hljs-keyword">if</span> change.kind == .Begin {
+			self.dash_effects += <span class="hljs-number">1</span>
+		}
+		<span class="hljs-keyword">if</span> change.kind == .Cancel {
+			self.dash_cancels += <span class="hljs-number">1</span>
+		}
+	}
+	<span class="hljs-keyword">if</span> event.kind == .Gameplay &amp;&amp; event.value.kind == .Shot {
+		<span class="hljs-keyword">if</span> change.kind == .Begin {
+			self.shot_effects += <span class="hljs-number">1</span>
+		}
+		<span class="hljs-keyword">if</span> change.kind == .Cancel {
+			self.shot_cancels += <span class="hljs-number">1</span>
+		}
+		trace_shot_query(self, change)
+	}
+}
+
+trace_shot_query :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, change: v.Change(net.Net_Event(game.Event))) {
+	event := change.occurrence.value
+	<span class="hljs-keyword">if</span> self.session.authority &amp;&amp; scrap_int(<span class="hljs-string">&quot;RSY_TRACE_QUERY&quot;</span>, <span class="hljs-number">0</span>) == <span class="hljs-number">1</span> {
+		tick := change.occurrence.id.tick
+		record, recorded := r.read(&amp;self.session.server.timeline, tick)
+		input, sampled := r.read_input(&amp;self.session.server.timeline, tick)
+		at := <span class="hljs-type">int</span>(event.value.seat - <span class="hljs-number">1</span>)
+		<span class="hljs-keyword">if</span> recorded &amp;&amp; sampled &amp;&amp; record.state.catalog.guns[record.state.players[at].gun_id].family &gt;= <span class="hljs-number">3</span> {
+			v := input.views[at]
+			player := record.state.players[at]
+			floor := <span class="hljs-type">u64</span>(<span class="hljs-number">0</span>)
+			<span class="hljs-keyword">for</span> peer <span class="hljs-keyword">in</span> self.session.server.peers {
+				<span class="hljs-keyword">if</span> peer.seat == <span class="hljs-type">u16</span>(at + <span class="hljs-number">1</span>) {
+					floor = peer.rtt_floor_ms
+					<span class="hljs-keyword">break</span>
+				}
+			}
+			gd.print_str(
+				fmt.tprintf(
+					<span class="hljs-string">&quot;RSY_QUERY tick=%d seat=%d from=%d to=%d fraction=%d input=%v result=%v rtt_floor=%d rejected_views=%d expired_views=%d&quot;</span>,
+					tick,
+					at + <span class="hljs-number">1</span>,
+					v.from,
+					v.to,
+					v.fraction,
+					v.status,
+					player.last_query,
+					floor,
+					self.session.server.stats.rejected_views,
+					self.session.server.stats.expired_views,
+				),
+			)
+		}
+	}
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/scripts/session_events.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_scrapyard/scripts/session_events.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Start here: contributing to Replay Scrapyard · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html" aria-current="page">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Start here: contributing to Replay Scrapyard</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/contributor-guide.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#1-play-it-then-open-a-workbench">1. Play it, then open a workbench</a><a href="#2-the-architecture-at-a-glance">2. The architecture at a glance</a><a href="#3-know-who-owns-each-value">3. Know who owns each value</a><a href="#4-two-clocks-and-three-views-of-the-world">4. Two clocks, and three views of the world</a><a href="#5-follow-one-feature-end-to-end-the-turret">5. Follow one feature end to end: the turret</a><a href="#6-choose-a-first-contribution">6. Choose a first contribution</a><a href="#7-run-the-smallest-relevant-check-then-expand">7. Run the smallest relevant check, then expand</a><a href="#8-deeper-reading-when-a-task-needs-it">8. Deeper reading when a task needs it</a></nav></details>
+<article class="reading-body "><p>Scrapyard has three main pieces: <strong>authored Godot content</strong>, <strong>replayable gameplay
+state and rules</strong>, and <strong>a Godot adapter that turns input into requests and state
+into scenes</strong>. Learn one feature across those boundaries before trying to read
+every subsystem. The shared turret is a compact, complete example.</p>
+<p>This guide describes the current Replay game. The sibling original Scrapyard and
+Kit remain separate. For a file-by-file reference, use the <a href="code-guide.html">code guide</a>.</p>
+<h2 id="1-play-it-then-open-a-workbench">1. Play it, then open a workbench<a class="heading-anchor" href="#1-play-it-then-open-a-workbench" aria-label="Link to this section">#</a></h2>
+<p>Run commands from the repository root, <code>odin_godot</code>. The repository&#39;s
+<a href="../../README.html">setup instructions</a> cover the development environment.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># Build and launch the game.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh
+
+<span class="hljs-comment"># Or use the quiet turret encounter.</span>
+RSY_RUN=0 RSY_ENCOUNTER=turret \
+  nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh</code></pre></div><p>Choose Solo, select the shared turret in an ability slot, then Ready/Start.
+WASD moves, Q/E casts, T mounts/releases a nearby turret, and the mouse aims/fires.
+Run and turret rules are described in <a href="run.html">run.md</a> and
+<a href="shared-turret.html">shared-turret.md</a>.</p>
+<p>For the editor on macOS, enter the development shell and build first:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop
+bash build/build_scripts.sh examples/replay_scrapyard
+ODIN_SCRIPTS_DLL=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/examples/replay_scrapyard/bin/libodinscripts.dylib&quot;</span> \
+  <span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --editor --path examples/replay_scrapyard</code></pre></div><p>On Linux, use <code>libodinscripts.so</code> and set <code>GODOT</code> to your engine executable if the
+environment has not supplied it.</p>
+<p>Open <a href="dev/turret_workbench.tscn.html">dev/turret_workbench.tscn</a>, press F6, then choose
+<strong>Run isolated encounter</strong>. This equips and casts through the real game. For
+visual editing without a network session, use
+<a href="dev/enemy_view.tscn.html">dev/enemy_view.tscn</a>,
+<a href="dev/runner_view.tscn.html">dev/runner_view.tscn</a>, or
+<a href="dev/hud_view.tscn.html">dev/hud_view.tscn</a>.</p>
+<h2 id="2-the-architecture-at-a-glance">2. The architecture at a glance<a class="heading-anchor" href="#2-the-architecture-at-a-glance" aria-label="Link to this section">#</a></h2>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-94bb817ee9d7be.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-94bb817ee9d7be.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-94bb817ee9d7be.svg" alt="System diagram: Start here: contributing to Replay Scrapyard" loading="lazy"></figure><p>The simulation contains values and calls ordinary Odin procedures. With the same
+starting state, tick context and admitted inputs, it can reproduce the same result.
+Replay retains history and reruns the rules when correction requires it. Godot
+objects are reconstructed or updated from those results.</p>
+<p>Scrapyard currently chooses authority with client prediction and observed remote
+presentation. It is one use of Replay, not a claim that every multiplayer game
+must choose this networking policy. The policy wiring is in
+<a href="shared/game/game.odin.html"><code>game.model()</code></a>,
+<a href="shared/game/replication.odin.html">replication.odin</a>, and
+<a href="shared/game/succession.odin.html">succession.odin</a>.</p>
+<p>Common import aliases are <code>r</code> for Replay&#39;s core value/timeline tools, <code>net</code> for
+network simulation, <code>rgd</code> for the Godot integration, <code>game</code> for this game&#39;s rules,
+and <code>display</code> for detached presentation values. Files with the same Odin package
+share procedures; splitting a file does not introduce a new service or object.</p>
+<h2 id="3-know-who-owns-each-value">3. Know who owns each value<a class="heading-anchor" href="#3-know-who-owns-each-value" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Owner</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>How many bullets should a new turret have?</td>
+<td>Authored definition, copied into <code>World.catalog</code></td>
+<td><span class="local-reference" title="examples/replay_scrapyard/data/deployables/shared_turret.tres · available in the repository">shared_turret.tres</span></td>
+</tr>
+<tr>
+<td>How many bullets remain, and who is operating it?</td>
+<td>Replayable simulation state</td>
+<td><code>Turret.ammo</code> and <code>Turret.operator</code> in <a href="shared/game/turret.odin.html">turret.odin</a></td>
+</tr>
+<tr>
+<td>What should the ammo label display?</td>
+<td>A derived display value</td>
+<td><code>Turret_View</code> in <a href="shared/presentation/turrets.odin.html">presentation/turrets.odin</a></td>
+</tr>
+<tr>
+<td>Where is that label placed?</td>
+<td>An authored scene</td>
+<td><a href="entities/turret.tscn.html">entities/turret.tscn</a></td>
+</tr>
+<tr>
+<td>How does the barrel turn or the body change color?</td>
+<td>Local view behavior</td>
+<td><a href="scripts/views/turret.odin.html">scripts/views/turret.odin</a></td>
+</tr>
+<tr>
+<td>Which scene instance belongs to this turret?</td>
+<td>The view adapter, using a generation-checked handle</td>
+<td><a href="scripts/turret_bridge.odin.html">turret_bridge.odin</a></td>
+</tr>
+</tbody></table>
+</div><p>Use <code>World</code> for values needed to reproduce gameplay: health, occupancy, cooldowns,
+entity lifetimes, progression and similar rules. Scene references, textures,
+smoothing and animation state belong in the adapter or view. Local settings and
+profile persistence have their own services; every local preference need not be
+part of the multiplayer world.</p>
+<p>Godot composition still applies. A runner has authored Body, Gun, Reload, Beacon
+and Nameplate children; a view script can delegate to child components. Gameplay
+composition uses state fields and ordinary procedures. The two compositions meet
+at explicit display values. See the <a href="editor-first.html">editor-first guide</a>.</p>
+<p>In this game, movement collision and hit judgment run in Odin. Moving an enemy&#39;s
+Body child in the editor changes its visual offset; its gameplay position and
+collision radius still come from the simulation. Attaching another visual child
+does not automatically create a new replicated entity.</p>
+<p>The <code>//gd:class</code> declarations, <code>gd:&quot;export&quot;</code>/<code>gd:&quot;onready&quot;</code> field tags and
+<code>@(gd_method)</code> annotations connect authored Odin scripts to Godot. A
+<code>//gd:replay_view</code> declaration generates the typed binding for a view&#39;s explicit
+presentation/validation hooks. Read the authored scripts and their callbacks;
+the generated registration code is infrastructure.</p>
+<p>Definition Resources are copied into the admitted catalog. Changing a Resource
+does not retroactively change an existing run&#39;s catalog. Start a new encounter to
+admit the new settings. The editor&#39;s bake command also updates the stock artifact
+used by headless tests; it uses the same typed extractor.</p>
+<h2 id="4-two-clocks-and-three-views-of-the-world">4. Two clocks, and three views of the world<a class="heading-anchor" href="#4-two-clocks-and-three-views-of-the-world" aria-label="Link to this section">#</a></h2>
+<p>Godot&#39;s <code>_process</code> callback runs at display-frame cadence. Replay&#39;s simulation
+runs at 60 ticks per second in this game. Advancing one display frame can run
+multiple ticks, or none. Gameplay timers use ticks; visual interpolation and
+animation can use frame <code>dt</code>.</p>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-083117d5070c33.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-083117d5070c33.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-083117d5070c33.svg" alt="System diagram: Start here: contributing to Replay Scrapyard" loading="lazy"></figure><p>Read <a href="scripts/scrapyard.odin.html"><code>replay_scrapyard_process</code></a>, then follow its helpers
+in <a href="scripts/frame.odin.html">frame.odin</a>. <code>finish_frame</code> is deferred, so its services
+also run on early-return paths. Inside a simulation tick,
+<a href="shared/game/game.odin.html"><code>step_view</code></a> updates roster, upkeep, movement, combat and
+run progression. The network model applies admitted actions after that step;
+<code>action</code> validates the requested gameplay operation. The session owns ordering
+and scheduling, so avoid calling an extra simulation step from a view callback.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>State source</th>
+<th>Purpose in this game</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Authority state</td>
+<td>Confirmed game decisions and the received authoritative baseline; on a client this is the latest available observation, not knowledge of the server&#39;s instantaneous present</td>
+</tr>
+<tr>
+<td>Predicted state</td>
+<td>Responsive local movement and actions before their outcomes are fully known</td>
+</tr>
+<tr>
+<td>Observed/interpolated state</td>
+<td>Smooth remote actor and spectator presentation from received frames</td>
+</tr>
+</tbody></table>
+</div><p><a href="scripts/drawing.odin.html"><code>drawing.odin</code></a> selects these sources. Local runners use
+prediction; remote runners use observed poses. Turrets use the shared predicted
+world for seated clients and the observed world for spectators. Prediction does
+not grant authority: an occupied-turret claim can be refused and corrected.</p>
+<p>Events have a separate presentation lifecycle. A speculative effect may begin,
+be confirmed, or be cancelled. Follow <a href="scripts/session_events.odin.html">session_events.odin</a>
+for audio, feedback and action outcomes. Replaying rules must not directly repeat
+Godot audio calls or particle creation.</p>
+<h2 id="5-follow-one-feature-end-to-end-the-turret">5. Follow one feature end to end: the turret<a class="heading-anchor" href="#5-follow-one-feature-end-to-end-the-turret" aria-label="Link to this section">#</a></h2>
+<p>Read these files in order. Each answers a different question:</p>
+<ol>
+<li><span class="local-reference" title="examples/replay_scrapyard/data/abilities/turret.tres · available in the repository">data/abilities/turret.tres</span> and
+<span class="local-reference" title="examples/replay_scrapyard/data/deployables/shared_turret.tres · available in the repository">data/deployables/shared_turret.tres</span>:
+what is configurable?</li>
+<li><a href="shared/game/abilities.odin.html">abilities.odin</a> and
+<a href="shared/game/ability_casts.odin.html">ability_casts.odin</a>: how is the cast admitted,
+dispatched by family and charged a cooldown?</li>
+<li><a href="shared/game/turret.odin.html">turret.odin</a>: what state exists, and what makes deploy,
+mount, release, fire and cleanup valid?</li>
+<li><a href="scripts/input.odin.html">input.odin</a> and
+<a href="scripts/turret_bridge.odin.html">turret_bridge.odin</a>: how does T capture a target
+and submit a reliable mount/release intent?</li>
+<li><a href="shared/presentation/turrets.odin.html">presentation/turrets.odin</a>: how is gameplay
+state converted into the values needed for display?</li>
+<li><a href="entities/turret.tscn.html">entities/turret.tscn</a> and
+<a href="scripts/views/turret.odin.html">views/turret.odin</a>: how do composed nodes show those
+values?</li>
+<li><a href="../../tests/replay_turret/model/turret_test.odin.html">turret tests</a>: what behavior
+must survive contention, correction, stale handles and recovery?</li>
+</ol>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-946df83de70299.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-946df83de70299.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-946df83de70299.svg" alt="System diagram: Start here: contributing to Replay Scrapyard" loading="lazy"></figure><p>Occupancy lives in the turret. Removing the turret therefore releases its operator
+without a second mounted flag to synchronize. A pool handle includes an index
+and generation: an old request cannot target a new turret that reused the slot.
+The adapter follows that identity and the current view scope to manage nodes.</p>
+<p>The complete feature guide is <a href="shared-turret.html">shared-turret.md</a>. For a second
+example centered on enemy behavior and composed animation, read
+<a href="stormcaller.html">Stormcaller</a>.</p>
+<h2 id="6-choose-a-first-contribution">6. Choose a first contribution<a class="heading-anchor" href="#6-choose-a-first-contribution" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Start here</th>
+<th>Check it with</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Adjust HUD layout or an actor&#39;s visual offsets</td>
+<td><code>ui/</code>, <code>entities/</code>, <code>views/components/</code>, <code>visuals/</code></td>
+<td>The matching F6 view preview</td>
+</tr>
+<tr>
+<td>Tune turret ammunition or an ability&#39;s radius</td>
+<td><code>data/</code>, Inspector Resource fields</td>
+<td>Validate Content, then a fresh ability workbench encounter</td>
+</tr>
+<tr>
+<td>Change an ability effect</td>
+<td><code>shared/game/ability_casts.odin</code> and its admission in <code>abilities.odin</code></td>
+<td>Focused model tests, then an encounter</td>
+</tr>
+<tr>
+<td>Change enemy behavior</td>
+<td><code>shared/game/brains.odin</code> or <code>pulse.odin</code></td>
+<td>Brain/model tests and a live workbench enemy</td>
+</tr>
+<tr>
+<td>Change input or lobby interaction</td>
+<td><code>scripts/input.odin</code>, <code>muster.odin</code>, <code>lobby_actions.odin</code></td>
+<td>Godot input/lobby checks and real peers</td>
+</tr>
+<tr>
+<td>Add a new saved component or action</td>
+<td>State and validation in <code>shared/game/</code>; authoring/display as needed</td>
+<td>Correction, checkpoint continuation and explicit compatibility work</td>
+</tr>
+</tbody></table>
+</div><p>A useful first exercise is to move the turret&#39;s Ammo label in its scene, run the
+workbench, and observe that only presentation changed. Then tune its authored
+ammo, validate, start a fresh encounter, and inspect how the catalog supplies
+that value to a newly deployed turret. Restore exploratory edits when finished.</p>
+<p>For a new gameplay feature, follow the <a href="editor-workflow.html">editor workflow</a> and
+<a href="authoring-tools.html">authoring tools guide</a>. Changes to serialized shapes or rule
+contracts need deliberate version/conversion handling; <a href="saves.html">saves.md</a>
+explains the existing policy. Generated <code>*.gen.odin</code> bindings are build outputs.</p>
+<h2 id="7-run-the-smallest-relevant-check-then-expand">7. Run the smallest relevant check, then expand<a class="heading-anchor" href="#7-run-the-smallest-relevant-check-then-expand" aria-label="Link to this section">#</a></h2>
+<p>These commands run from the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># Pure game tests: no Godot window or network service.</span>
+nix develop --<span class="hljs-built_in">command</span> odin <span class="hljs-built_in">test</span> tests/replay_scrapyard \
+  -collection:godot=. -out:/tmp/replay-scrapyard-model-tests
+
+<span class="hljs-comment"># Focused turret model tests.</span>
+nix develop --<span class="hljs-built_in">command</span> odin <span class="hljs-built_in">test</span> tests/replay_turret/model \
+  -collection:godot=. -out:/tmp/replay-turret-model-tests
+
+<span class="hljs-comment"># Full turret exercise: native/WASM, workbench, real peers and host recovery.</span>
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turret/run.sh
+
+<span class="hljs-comment"># Formatting and authored stock consistency.</span>
+nix develop --<span class="hljs-built_in">command</span> python3 examples/replay_scrapyard/tools/format.py --check
+python3 examples/replay_scrapyard/tools/stock.py --check</code></pre></div><p>The existing <a href="../../tests/replay_turret/README.html">test guide</a> describes the turret
+fixtures. The <a href="code-guide.html">code guide</a> records recent refactor verification.
+For appearance changes, run the affected scene; for changed input paths, use real
+Godot input; for saved gameplay state, check correction and checkpoint recovery.</p>
+<h2 id="8-deeper-reading-when-a-task-needs-it">8. Deeper reading when a task needs it<a class="heading-anchor" href="#8-deeper-reading-when-a-task-needs-it" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Guide</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Everyday code navigation and formatting</td>
+<td><a href="code-guide.html">Code guide</a></td>
+</tr>
+<tr>
+<td>Godot scenes versus simulation composition</td>
+<td><a href="editor-first.html">Editor-first guide</a></td>
+</tr>
+<tr>
+<td>Inspector validation, baking and reproducible workbench tests</td>
+<td><a href="editor-workflow.html">Editor workflow</a></td>
+</tr>
+<tr>
+<td>Held controls, discrete actions and receipt timing</td>
+<td><a href="controls.html">Controls</a></td>
+</tr>
+<tr>
+<td>Combat and run progression</td>
+<td><a href="combat.html">Combat</a>, <a href="run.html">Run rules</a></td>
+</tr>
+<tr>
+<td>Coordinated rooms and host recovery</td>
+<td><a href="online.html">Online</a>, <a href="recovery.html">Recovery</a></td>
+</tr>
+<tr>
+<td>Save compatibility</td>
+<td><a href="saves.html">Saves</a></td>
+</tr>
+</tbody></table>
+</div><p>A <code>Session</code> runs a simulation with network input/history. A <code>Room</code> adds coordinated
+membership and authority recovery around a session. Those details matter when
+working on joining, persistence or migration; an initial gameplay or visual task
+can follow the feature path above without reading the transport implementation.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="code-guide.html"><span>Reading and editing the Scrapyard code</span><span aria-hidden="true">→</span></a><a href="../../README.html"><span>odin_godot</span><span aria-hidden="true">→</span></a><a href="run.html"><span>The run loop</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/contributor-guide.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#1-play-it-then-open-a-workbench" class="">1. Play it, then open a workbench</a><a href="#2-the-architecture-at-a-glance" class="">2. The architecture at a glance</a><a href="#3-know-who-owns-each-value" class="">3. Know who owns each value</a><a href="#4-two-clocks-and-three-views-of-the-world" class="">4. Two clocks, and three views of the world</a><a href="#5-follow-one-feature-end-to-end-the-turret" class="">5. Follow one feature end to end: the turret</a><a href="#6-choose-a-first-contribution" class="">6. Choose a first contribution</a><a href="#7-run-the-smallest-relevant-check-then-expand" class="">7. Run the smallest relevant check, then expand</a><a href="#8-deeper-reading-when-a-task-needs-it" class="">8. Deeper reading when a task needs it</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/contributor-guide.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

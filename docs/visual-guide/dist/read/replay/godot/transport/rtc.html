@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay WebRTC adapter · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay WebRTC adapter</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/rtc.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#connections-and-signaling">Connections and signaling</a><a href="#packet-limits-and-flow-control">Packet limits and flow control</a><a href="#acceptance-and-remaining-work">Acceptance and remaining work</a></nav></details>
+<article class="reading-body "><p><code>Rtc</code> owns raw Godot <code>WebRTCPeerConnection</code> and <code>WebRTCDataChannel</code> objects.
+It does not install <code>MultiplayerAPI</code>, use scene RPCs, or share a global session pool.
+Keep its address stable while open. <code>rtc_transport</code> exposes the same copied-packet
+interface used by ENet, server/client sessions and the P2P runner.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">rtc: transportgd.Rtc
+assert(transportgd.rtc_open(&amp;rtc, {url = <span class="hljs-string">&quot;wss://your-relay/rtc&quot;</span>, host = <span class="hljs-literal">true</span>}))
+wire := transportgd.rtc_transport(&amp;rtc)
+<span class="hljs-keyword">defer</span> tr.close(&amp;wire)
+<span class="hljs-comment">// Each frame: tr.poll(&amp;wire), then drain tr.receive. rtc.room becomes available</span>
+<span class="hljs-comment">// after registration. Join with {url = ..., room = shared_code}.</span></code></pre></div><p>For the gameplay facade, start from <code>SESSION_OPTIONS</code>, set <code>backend = .Rtc</code>,
+<code>rtc = {url = ..., room = ...}</code>, and choose <code>Host</code>, <code>Server</code>, <code>Client</code> or <code>Observer</code>.
+<code>session_frame</code> pumps the transport; read the assigned code from <code>session.rtc.room</code>.
+Role controls whether registration creates or joins a room. Options&#39; strings are
+copied by the adapter during opening and released on close. <code>session_close</code> owns
+transport teardown, including optional delay and recovery routing wrappers.</p>
+<h2 id="connections-and-signaling">Connections and signaling<a class="heading-anchor" href="#connections-and-signaling" aria-label="Link to this section">#</a></h2>
+<p>The JSON signaling protocol uses <code>create</code>, <code>join</code>, <code>signal</code> and <code>leave</code> requests;
+responses are <code>created</code>/<code>joined</code>, <code>peer</code>, <code>peer_left</code>, <code>signal</code> and <code>error</code>.
+Introductions carry numeric peer IDs, and the lower ID creates the offer. The
+relay must introduce both endpoints before forwarding SDP/ICE and assign <code>from</code>
+from the authenticated socket, never a client-supplied sender. IDs must not be
+reused within a live room. A star relay gives host/client connections; a mesh
+relay gives direct connections between all introduced peers. There is no automatic
+game-packet forwarding between unconnected peers.</p>
+<p>SDP uses <code>{kind:&quot;sdp&quot;, sdp_type:&quot;offer&quot;|&quot;answer&quot;, sdp:...}</code> under <code>data</code>.
+ICE uses <code>{kind:&quot;ice&quot;, media:..., index:..., name:...}</code>. Incoming ICE waits until
+the remote description has actually been installed, including Godot&#39;s async
+answer path. Callback contexts remain alive through the custom Callable&#39;s final
+reference, are marked inactive before disconnect, and cannot target a reused
+connection slot after teardown.</p>
+<p>The adapter has 16 remote slots, 32 KiB signaling messages, nesting depth 16,
+64 pending ICE candidates per peer, a 15-second registration deadline and a
+45-second handshake deadline. Signaling uses a bounded 128 KiB socket buffer and
+64-message poll budget. It preserves healthy direct channels when signaling is
+lost and reports <code>signaling_lost</code>. Authenticated grant configuration enables
+bounded-identity signaling continuation; plain relays retain explicit failure
+handling. It does not silently create another room.</p>
+<p><code>ice_json</code> supplies the WebRTC configuration, including deployment-specific
+STUN/TURN servers and credentials. The default is an empty ICE-server list for
+local testing. The local fixture in <code>tests/replay_rtc/signal_server.mjs</code> binds only
+to loopback; it is not a public authenticated room service. Browser-native WebRTC
+is the tested target. Native use explicitly requires <code>native_extension = true</code>
+and an installed Godot WebRTC extension; native ENet remains the default.</p>
+<p>Party and the Cavecrawl/Scrapyard menus now carry bounded, validated ICE settings
+through Room migration/rejoin. Actual Coturn UDP/TCP fixtures inspect selected
+relay candidates and transferred bytes; wrong credentials cannot fall back to
+direct gameplay in relay-only mode. See <a href="ice-deployment.html">ICE deployment settings</a>.</p>
+<h2 id="packet-limits-and-flow-control">Packet limits and flow control<a class="heading-anchor" href="#packet-limits-and-flow-control" aria-label="Link to this section">#</a></h2>
+<p>Reliable and unreliable traffic use separately negotiated channels (IDs 0 and 1).
+The unreliable channel is unordered with zero retransmissions. Each physical
+packet is at most 1,200 bytes: a 16-byte credit envelope plus at most 1,184 bytes
+from the fragmentation layer. Logical Replay packets retain their 65,536-byte
+limit. The fragment header is 20 bytes, with a message ID, total length and part
+index/count; all integers are little endian. Fragments validate bounds before
+allocation and deliver reliable logical messages in send order.</p>
+<p>New peers advertise <code>control_stream: 1</code> alongside their SDP and use negotiated
+channel 2 (<code>replay-control-v1</code>) for cumulative credit acknowledgments and fences.
+This channel is reliable and unordered: older cumulative acknowledgments can be
+ignored safely, and fences already use a monotonic receive frontier. Application
+data remains on IDs 0/1 and keeps its existing ordering and sequence validation.
+The separate stream avoids waiting for ordered checkpoint messages to be delivered
+before credit messages become available. It still shares SCTP congestion control;
+it does not guarantee latency or solve all snapshot-freshness stalls under loss.</p>
+<p>Absent the peer capability, controls retain their original reliable channel-0
+path. <code>Rtc_Config.legacy_control</code> explicitly omits the capability and third channel.
+Receiving application data on control stream 2, control on unreliable stream 1,
+or an acknowledgment beyond the sender&#39;s issued sequence remains a protocol error.
+Channel 2 is required to open only after both local support and remote capability
+are known. This capability does not change the packet header, gameplay protocol,
+checkpoint format, identity or authority checks. Real mixed-version loaded-game
+handoffs cover both offerer/answerer directions; native-extension deployment and
+broader platform validation remain additional coverage.</p>
+<p>The browser adapter requires Godot&#39;s <code>network/limits/webrtc/max_channel_in_buffer_kb</code>
+to be at least its default 64 KiB; smaller settings fail opening explicitly.
+The adapter limits each channel to 16 unacknowledged data packets and 32 KiB of
+local queued channel bytes. Acknowledgments follow application receipt, not merely
+SCTP delivery. This matters because Godot&#39;s JS data-channel ring can drop data even
+on a reliable channel when it fills. A reliable credit probe releases lost
+unreliable packets&#39; window; it does not retransmit their gameplay payloads. An
+unacknowledged window closes after 15 seconds without credit progress, exposing a
+disconnection instead of silently claiming reliable delivery. Applications should
+continue polling/draining during menus; prolonged suspension requires reconnect.</p>
+<p>Fragment queues default to 32 messages, 1 MiB outgoing and 2 MiB incoming logical
+bytes. Unfinished unreliable assemblies expire after two seconds. Reliable
+assemblies remain until consumed or disconnected; receive backpressure retains the
+next fragment. <code>Buffer_Too_Small</code> retains a complete logical packet for retry.
+Closing <code>Fragments</code> alone releases only its storage, borrowing its base transport;
+closing the public <code>Rtc</code> transport also closes its owned Godot objects.</p>
+<h2 id="acceptance-and-remaining-work">Acceptance and remaining work<a class="heading-anchor" href="#acceptance-and-remaining-work" aria-label="Link to this section">#</a></h2>
+<p>Run <code>nix develop --command bash tests/replay_rtc/run.sh</code> with the Godot web templates,
+Chrome and the existing <code>tests/web/node_modules</code> dependencies installed. Failures
+retain logs; missing browser dependencies fail rather than report a green gate.
+The fixture uses separate Chrome processes and real data channels, without public
+STUN/TURN. It exchanges 64 KiB reliable messages followed by smaller messages,
+unreliable data, direct client-to-client traffic, departure, replacement and
+closing/reopening the same adapter address.
+A second scenario uses the ordinary Hello simulation through <code>Session</code> and compares
+canonical world hashes after movement and a reliable firing action.</p>
+<p><code>Room</code> now supports challenged RTC destinations through <code>Migration_Transport</code>,
+using a trusted provider URL and a code derived from the signed authority view.
+Planned and killed-host Cavecrawl browser gates pass. Wider failure cases, public
+provisioning/TURN and additional browser engines remain open. See the
+<a href="../rendezvous.html">authenticated signaling frontend</a>. Replay Duel also provides
+P2P gameplay/spectator/archive gates; other ports still need browser acceptance.</p>
+<p>Same-term Room reconnection can now retain an authenticated RTC continuation
+across transport replacement, while requesting new channels and preserving the
+client&#39;s action ledger. Real Coturn outage tests exercise recovery without replacing
+the game processes or authority. See <a href="rtc-recovery.html">RTC recovery</a>.</p>
+<p>Engine contracts: <a href="https://docs.godotengine.org/en/stable/classes/class_webrtcpeerconnection.html" rel="noreferrer">WebRTCPeerConnection</a>,
+<a href="https://docs.godotengine.org/en/stable/classes/class_webrtcdatachannel.html" rel="noreferrer">WebRTCDataChannel</a>,
+and <a href="https://github.com/godotengine/godot/blob/master/modules/webrtc/webrtc_data_channel_js.cpp" rel="noreferrer">Godot&#39;s JS receive/send implementation</a>.</p>
+<p>Authenticated signaling recovery uses <code>resume_signaling</code> and the provider&#39;s
+continuation token. <code>signaling_resumes</code> counts completed resumptions;
+<code>rtc_connection_serial</code> reports local peer-connection generations for diagnostics.
+<code>rtc_drop_signaling</code> closes only the signaling socket and is useful for embedding
+lifecycle controls or fault tests. If every existing channel is healthy, a resume
+preserves those generations and all data/fragment state. See <a href="../rendezvous.html">rendezvous</a>
+for challenge, grace-period and provider compatibility requirements.</p>
+<p>An authenticated provider may attach exact 64-bit <code>member</code> and <code>incarnation</code>
+metadata to introductions. <code>Rtc_Config.require_identity</code> requires an authorization
+callback and refuses introductions missing valid identity metadata.
+<code>rtc_peer_identity</code> exposes that identity for a connected physical peer on an
+authenticated signaling connection. Applications still validate the member against
+their roster before creating a logical binding. See <a href="../../p2p/admission/README.html">P2P admission</a>
+for the fixed-match provider and rejoin integration.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="ice-deployment.html"><span>ICE settings for party and Room connections</span><span aria-hidden="true">→</span></a><a href="../rendezvous.html"><span>Coordinator-backed RTC signaling</span><span aria-hidden="true">→</span></a><a href="rtc-recovery.html"><span>RTC continuation during a gameplay reconnect</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/rtc.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#connections-and-signaling" class="">Connections and signaling</a><a href="#packet-limits-and-flow-control" class="">Packet limits and flow control</a><a href="#acceptance-and-remaining-work" class="">Acceptance and remaining work</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/rtc.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

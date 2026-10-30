@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Immutable authored definitions · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Immutable authored definitions</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/definitions/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>definitions.Store(Value)</code> publishes bounded canonical values under a <code>Ref</code> containing
+semantic version, schema fingerprint and content checksum. Resource handles, nodes,
+strings, slices and pointers cannot enter Value. Reads return copies. The store is
+an owner outside World; do not copy it or mutate its metadata/entries directly.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">store: defs.Store(Weapon_Definition)
+report := defs.init(&amp;store, <span class="hljs-number">16</span>)
+<span class="hljs-comment">// Destroy also cleans up a failed init.</span>
+ref, report := defs.publish(&amp;store, definition, GAME_CONTENT_VERSION)
+value, found := defs.get(&amp;store, ref)</code></pre></div><p>Publication validates schema values, then an optional typed validator returning a
+<code>Report</code>. Failure preserves existing entries. Reports own bounded 256-byte path
+and message buffers, including after schema destruction; longer diagnostics are
+truncated. <code>report_path</code>/<code>report_message</code> borrow text from the report you supply.
+Repeat publication of identical canonical values reuses a reference; changed
+values or semantic versions produce distinct references. Padding is excluded.
+The fingerprint/checksum uses Replay&#39;s existing FNV codec, not cryptographic
+identity. A matching reference with different canonical bytes is rejected as a
+collision within the store. Authenticate imported content through the existing
+transport/admission layer; this API alone is not a trust boundary.</p>
+<p>There is no automatic eviction. <code>pin(ref)</code> protects a version needed by live
+history, pending work or checkpoints; <code>remove</code> and <code>destroy</code> refuse pinned values.
+Call <code>unpin</code> after the last corresponding dependency ends. Multiple pins count
+independently. Pinning is explicit because the store cannot infer references
+hidden in arbitrary World layouts. Build/admit a complete dependency set before
+starting or restoring a simulation. Missing definitions must fail admission; do
+not silently substitute the latest revision.</p>
+<p>Two valid approaches:</p>
+<ul>
+<li>Embed baked values in World/checkpoints. Replay owns their lifetime naturally;
+no external lookup or store pin is needed after copying. Cavecrawl uses this.</li>
+<li>Store only portable definition references in World and keep a frozen catalog
+available to the reducer. Pin every version its retained history may read, and
+serialize/transfer those dependencies with checkpoints before allowing restore.
+Never hide mutable Resource data behind a reference to reduce history size.</li>
+</ul>
+<p>The store uses bounded linear lookup; it is intended for definition catalogs,
+not per-entity hot loops. It allocates at initialization, and publication/read/pin
+operations allocate nothing internally. Schema and diagnostics retain their
+usual compiled-module lifetime. Access and callbacks must be serialized; callbacks
+must not mutate/reenter the same store.</p>
+<h1 id="godot-baking">Godot baking<a class="heading-anchor" href="#godot-baking" aria-label="Link to this section">#</a></h1>
+<p><code>scenegd.bake</code> runs a typed extractor against an authored source and publishes
+only after complete success. Source can be a Resource pointer, typed script value,
+or a fixed batch. The source is borrowed synchronously; it must stay alive during
+extraction. The output has the store&#39;s pointer-free canonical value type.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ref, report := scenegd.bake(&amp;store, source, GAME_CONTENT_VERSION,
+    <span class="hljs-keyword">proc</span>(source: Source, ctx: ^scenegd.Bake_Context) -&gt; Definition {
+        root := scenegd.bake_scene2(ctx, source.scene, <span class="hljs-string">&quot;$.scene&quot;</span>)
+        spawn, ok := scenegd.bake_marker2(ctx, root, <span class="hljs-string">&quot;Markers/Spawn&quot;</span>)
+        count := scenegd.bake_int(ctx, source.count, <span class="hljs-number">0</span>, <span class="hljs-number">32</span>, <span class="hljs-string">&quot;$.count&quot;</span>)
+        <span class="hljs-keyword">return</span> Definition{spawn=spawn, count=<span class="hljs-type">u16</span>(count)}
+    })</code></pre></div><p>The first <code>bake_fail</code> wins. Numeric narrowing follows validation. Schema checks
+and an optional typed validator run before publication. Application rules such as
+collision geometry, wave limits and cross-field constraints remain explicit.</p>
+<p><code>bake_scene2</code> owns temporary detached scene instances, destroying them on success
+and every failure path. The context supports at most 16 simultaneous scenes.
+Roots must be Node2D with identity transform. <code>bake_marker2</code> accepts nested Node2D
+ancestry and composes local transforms into root-local coordinates; top-level
+ancestors and nonfinite positions are rejected. Detached extraction does not run
+<code>_ready</code>, but scripts/resources can still have constructors: use authored data
+scenes appropriate for loading. Do not free or retain a returned temporary node.</p>
+<p>Presentation PackedScenes remain separately owned by the application. Retain them
+only after a successful bake and release old references when their presentations
+retire. Cavecrawl demonstrates atomic replacement of a two-floor definition set
+and its retained scenes. Resource edits after baking cannot mutate the values.</p>
+<p>No reflection annotations or generator are required. The typed manual extraction
+keeps authored paths and game constraints visible and remains compile-checked on
+native and WASM targets. <code>tests/replay_definitions</code> covers store contracts;
+<code>tests/replay_nodes</code> exercises actual detached scene extraction and cleanup.</p>
+<h1 id="canonical-build-artifacts">Canonical build artifacts<a class="heading-anchor" href="#canonical-build-artifacts" aria-label="Link to this section">#</a></h1>
+<p><code>artifact_export(&amp;store, ref, source_digest)</code> returns owned envelope bytes from an
+already validated immutable definition. <code>artifact_import(&amp;store, bytes, semantic, source_digest)</code> validates exact schema, semantic contract, length, checksum and
+canonical values before publishing. An overload accepts a typed game validator.
+Passing source zero accepts any source digest; a nonzero value requires a match.
+Callers delete export bytes. This remains corruption detection, not authentication.</p>
+<p>Artifacts reuse the canonical schema envelope with definition kind <code>0x4446</code> and
+file-format epoch 1. The metadata tick holds the optional authoring-source digest;
+it grants no authority and schedules no simulation work.</p>
+<p>Scrapyard has one typed Godot extractor for interactive admission and explicit
+headless export. <code>tools/stock.py</code> invokes <code>dev/export_content.tscn</code>, records source
+hashes and verifies build provenance; it never interprets gameplay TRES fields.
+Its headless stock code decodes the committed artifact. Use <code>--check</code> in CI to
+reject changed nested resources or stale artifact/receipt pairs without Godot.
+See the <a href="../../examples/replay_scrapyard/authoring-tools.html">complete authoring workflow</a>.</p>
+<p>The <a href="../godot/scene/archetypes.html">typed archetype registry</a> associates these value
+contracts with separately owned local scenes. <a href="../evolution/README.html">Evolution tools</a>
+freeze revision dependencies and scaffold explicit conversions.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/authoring-tools.html"><span>Adding and evolving a Replay feature</span><span aria-hidden="true">→</span></a><a href="../godot/scene/archetypes.html"><span>Typed authored archetypes</span><span aria-hidden="true">→</span></a><a href="../evolution/README.html"><span>Revision contracts and explicit conversion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/definitions/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/definitions/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

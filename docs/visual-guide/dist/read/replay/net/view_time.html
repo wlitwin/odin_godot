@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Aim and historical queries · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Aim and historical queries</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/view_time.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#collision-storage">Collision storage</a><a href="#presentation-and-spawn-identity">Presentation and spawn identity</a></nav></details>
+<article class="reading-body "><p><code>Model.step_view</code> is the simulation callback for games that need the view associated
+with each control sample. It replaces <code>Model.step</code> for that model; existing models
+can keep <code>step</code>. Both execute the same complete-world prediction/correction loop.</p>
+<p>Draw remote players with <code>client_present(&amp;client)</code>. It returns two authoritative
+frames and a quantized interpolation fraction and remembers their snapshot IDs.
+Compute aim from those same drawn positions. Subsequent <code>client_step</code> calls bind
+that bracket to their controls; receiving a newer snapshot does not rewrite the
+earlier aiming context. Calling <code>client_observed</code> alone does not bind a context.</p>
+<p>Presentation drift is bounded by <code>watch_delay + view_slack</code> behind the latest
+installed authority frame. After a sparse delivery or local stall, the observed
+clock catches up to that bound. If the available interpolation endpoints exceed
+<code>max_view_span</code>, it advances to the newer received endpoint. <code>Stats.watch_catchups</code>
+counts these advances. Watched events advance with that same clock. This may skip
+an old visual interval; it prevents lingering on views whose proofs have expired.
+Previously captured aiming stamps stay unchanged, and the server still validates
+their identity and age. Catch-up does not turn rejected history into a live query.</p>
+<p>The server resolves the transmitted <code>View_Stamp</code> into a <code>View_Time</code>:</p>
+<ul>
+<li><code>Historical</code>: both snapshot IDs/ticks were sent to this connection in its
+current generation/checkpoint serial, the bracket is bounded, and its age at
+receipt is within policy.</li>
+<li><code>Live</code>: authority-local input, querying the current simulation step.</li>
+<li><code>Unavailable</code>: no observed view was supplied.</li>
+<li><code>Invalid</code>: malformed bracket or unknown/mismatched snapshot identity.</li>
+<li><code>Expired</code>: a known view exceeds the allowed age. A previously accepted view can
+also expire before its scheduled simulation tick executes.</li>
+</ul>
+<p>Only control ownership and ordinary input validity determine whether movement is
+accepted. An invalid view disables that input&#39;s historical query; it does not
+discard otherwise valid movement. Reliable actions remain a separate API.</p>
+<p>Defaults allow 30 ticks of rewind, a 12-tick interpolation span and four ticks of
+timing slack. At receipt, the age bound is the smaller of <code>max_rewind</code> and the
+measured snapshot-ack RTT floor in ticks plus <code>watch_delay + view_slack</code>. Until an
+RTT observation exists, the absolute bound applies. A two-second measurement
+window lets the floor adapt to route changes. Execution applies <code>max_rewind</code>
+again so queued or held inputs cannot keep a historical query alive indefinitely.
+These settings, including watch delay, participate in the connection contract.</p>
+<p>These are bounded, validated hints, not proof of what a physical display showed.
+A client can select another known bracket within policy or delay acknowledgements;
+the absolute cap still applies. Competitive deployments must choose suitable
+caps and trust only their authority&#39;s world/collision data.</p>
+<h2 id="collision-storage">Collision storage<a class="heading-anchor" href="#collision-storage" aria-label="Link to this section">#</a></h2>
+<p><code>replay/history.History(T, N)</code> is a value-owned ring. Put it in <code>World</code> when its
+contents influence simulation. It then participates in correction, canonical
+snapshots, saves and migration. <code>read</code>/<code>bracket</code> return copies and explicit misses;
+they never temporarily move live entities. This initial representation trades
+copying/bandwidth for a straightforward complete-world contract.</p>
+<p><code>query_view(&amp;history, view, live, tick, blend)</code> resolves the validated <code>View_Time</code>
+against that ring and returns <code>{value, status, tick, available}</code>. Live requests use
+the supplied current value. Historical requests require both retained endpoints;
+missing history becomes Unavailable, malformed ranges become Invalid, and rejected
+view statuses stay unavailable. There is no live fallback. Read <code>value</code> only when
+<code>available</code> is true. The helper does not authenticate raw client stamps; the runner
+does that before supplying <code>View_Time</code> to <code>step_view</code>.</p>
+<p>The game supplies a pure <code>blend(a, b, fraction)</code> for its collision snapshot and
+checks the resulting lifetime IDs against current entities before applying effects.
+Quickdraw and Scrapyard use this helper with different proxy representations.
+History values, including generation changes, remain part of rollback/checkpoints.</p>
+<p>Quickdraw records four <code>replay/play.Hurtbox2</code> proxies after movement each tick.
+Its ray starts at the live shooter&#39;s position, queries the validated historical
+target bracket, and clips against authored static walls/crates. A life identifier
+prevents an old body from hitting a respawned player. Missing history or rejected
+view context produces an explicit miss. The A/B control intentionally queries
+live targets instead. A game chooses its own policy; there is no hidden fallback
+to current collision poses.</p>
+<p>Validated held/future view contexts are archived alongside controls. Network
+snapshot proofs are connection-local and rebuilt on rejoin. As with existing
+control streams, reconnect retires archived remote inputs and samples a fresh
+stream; archived reliable action IDs follow the selected recovery policy.</p>
+<h2 id="presentation-and-spawn-identity">Presentation and spawn identity<a class="heading-anchor" href="#presentation-and-spawn-identity" aria-label="Link to this section">#</a></h2>
+<p>Supply <code>Model.event_owner</code> and call <code>client_remote_observed</code> to present local
+effects speculatively and remote effects on the observed clock. The journal still
+delivers Begin/Update/Cancel/Confirm. Clients that do not opt in retain their
+existing policy. Keep the client at a stable address: the policy carries
+a borrowed pointer to that client.</p>
+<p>Godot Session/Room callers can set <code>Session_Options.remote_observed=true</code> instead
+of reinstalling the policy after role changes. Quickdraw clears scene instances
+on epoch/Welcome reset and scopes active beam cancellation to the full event ID,
+so cancellation of an old shot cannot erase a newer shot&#39;s beam.</p>
+<p>Quickdraw predicts the complete world but draws remote bodies/projectiles from
+observed frames. This is mixed presentation, not a partial-world predictor or an
+owner-authoritative physics mode. <a href="../owned/README.html">Owner observations</a> and
+prediction groups have separate contracts.</p>
+<p><code>replay/play.spawn_key(tick, seat, ordinal)</code> supplies a bounded semantic ID for
+predicted view lifetime. Authority and prediction can allocate different pool
+slots and still identify the same projectile. Pool generations continue to govern
+simulation handles. An application must reset its view namespace on authority
+epoch changes; the spawn key alone is not an epoch-qualified global ID.</p>
+<p>Gameplay protocol is version 7; complete authority archives are version 4. Earlier
+experimental packets/archives are rejected. Authority control RPC and coordinator
+decision record versions are independent.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../owned/README.html"><span>Owner-streamed values</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/view_time.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#collision-storage" class="">Collision storage</a><a href="#presentation-and-spawn-identity" class="">Presentation and spawn identity</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/view_time.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

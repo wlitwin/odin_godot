@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Godot bridge goal progress · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Godot bridge goal progress</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/godot-bridge-progress.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#b1-foundation--2026-09-20">B1 foundation — 2026-09-20</a><a href="#b2-typed-views-and-projections--2026-09-20">B2 typed views and projections — 2026-09-20</a><a href="#b3-definition-baking--2026-09-20">B3 definition baking — 2026-09-20</a><a href="#b4-input-and-signals--2026-09-20">B4 input and signals — 2026-09-20</a><a href="#b5-visualaudio-routes--2026-09-20">B5 visual/audio routes — 2026-09-20</a><a href="#b6-body-contracts--2026-09-20">B6 body contracts — 2026-09-20</a><a href="#b7-measurement-and-delivery--2026-09-20">B7 measurement and delivery — 2026-09-20</a></nav></details>
+<article class="reading-body "><p>Completed scope: <a href="godot-bridge-plan.html">B1–B7 plan</a>. This is separate from the completed
+framework-first implementation. The typed authoring layers and final measured delivery gate are now complete.</p>
+<h2 id="b1-foundation--2026-09-20">B1 foundation — 2026-09-20<a class="heading-anchor" href="#b1-foundation--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented bounded <code>view.Key_Index</code>, lifetime-preserving handle keys, indexed
+<code>Nodes2</code> reconciliation/lookup, opt-in property caching and explicit invalidation.
+Default callers continue reapplying root properties. Duplicate/zero IDs are
+preflighted before scene changes, and full-capacity replacement remains supported.</p>
+<p>Twenty-six view tests/WASM checking, a real Godot lifecycle/property/resource test,
+and existing Hello/Loot presentation tests in an isolated copy pass. A dense
+presentation-call benchmark compares the preserved old owner, indexing alone and
+caching with identical moving-position input. At 1,024 views the median call is
+630.4 / 111.6 / 46.1 microseconds. Caching avoids about 75% of property calls in that
+workload. These are not rendered-frame/GPU or whole-game timings. Extra bounded
+index/cache memory is a tradeoff; sparse and very small pools need separate
+measurement before universal performance claims.</p>
+<p>See <a href="../../replay/godot/scene/view-pools.html">API/lifetime contract</a> and
+<span class="local-reference" title="docs/replay/results/view-index-2026-09-20/README.md · available in the repository">focused evidence</span>.</p>
+<h2 id="b2-typed-views-and-projections--2026-09-20">B2 typed views and projections — 2026-09-20<a class="heading-anchor" href="#b2-typed-views-and-projections--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented detached <code>replay.project</code>, bounded typed entity projections, explicit
+predicted/observed/authoritative selection, interpolation and teleport cuts, and
+<code>View_Pool2(Entity, Value, Rig)</code>. Child bindings attach once per lifetime, paint
+skips unchanged values, and epoch/reset changes recreate rigs. Hello now uses the
+bridge; gameplay code and World hashes remain unchanged.</p>
+<p>32 core tests and 29 view tests pass, with WASM compilation. Actual Godot checks
+cover lifecycle, cached child properties, invalidation and failure cleanup. Existing
+Hello/Loot, rewind, inspector/branching, recording verification, rendered inspector
+and network inspection checks pass. See <span class="local-reference" title="docs/replay/results/typed-views-2026-09-20/README.md · available in the repository">evidence</span>.
+No projection speedup is claimed yet; Hello&#39;s expanded view batch is larger than
+its tiny World, and by-value projection may still copy State.</p>
+<h2 id="b3-definition-baking--2026-09-20">B3 definition baking — 2026-09-20<a class="heading-anchor" href="#b3-definition-baking--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented typed immutable definition stores, semantic/schema/content identity,
+owned field diagnostics, explicit retained-version pins and transactional baking.
+The Godot scope owns temporary scenes and supports validated nested marker
+transforms. Cavecrawl uses one atomic bake for its authored two-floor set, retaining
+presentation scenes only after success. Definitions remain embedded in World,
+so its checkpoint format is unchanged.</p>
+<p>Pure store/WASM and real Godot extraction checks pass, including failure cleanup.
+Existing Cavecrawl authored-content, mutation isolation, save/reload and six invalid
+input cases pass; all scripts also compile for WASM. See
+<span class="local-reference" title="docs/replay/results/definitions-2026-09-20/README.md · available in the repository">evidence</span>.</p>
+<h2 id="b4-input-and-signals--2026-09-20">B4 input and signals — 2026-09-20<a class="heading-anchor" href="#b4-input-and-signals--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented engine-free buffered Control_Capture, typed InputMap bindings and a
+stable-address Signal_Action owner over existing Action_Intent. Gates suppress
+held inputs across pause/focus/menu boundaries; signal payloads are copied on click,
+with explicit one-slot overflow and cancel/keep policy. Recovery still rebinds
+accepted tickets while UI submission is paused.</p>
+<p>33 core tests/Loot/WASM and actual Godot input/signal/retry/epoch/recovery/disconnect
+checks pass. Complete native fixture scripts also compile for WASM. See
+<span class="local-reference" title="docs/replay/results/input-bindings-2026-09-20/README.md · available in the repository">evidence</span> and
+<a href="../../replay/godot/input/controls.html">API contracts</a>.</p>
+<h2 id="b5-visualaudio-routes--2026-09-20">B5 visual/audio routes — 2026-09-20<a class="heading-anchor" href="#b5-visualaudio-routes--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented declarative Cue_Route, Effect_Route2 and Audio_Route over existing
+journal IDs, bounded cue/voice pools and typed views. Routes follow journal policy
+or delay until confirmation. Updates/confirmation preserve scene and playback
+lifetimes; canceled/expired/dropped IDs remain consumed, and slot reuse gets new
+view generations.</p>
+<p>30 view tests/WASM, a shared native/executed WASM lifecycle corpus, and actual
+Godot scene/audio identity, cancellation and cleanup checks pass. Complete engine
+fixture scripts compile for WASM. See <span class="local-reference" title="docs/replay/results/effect-routes-2026-09-20/README.md · available in the repository">evidence</span>
+and <a href="../../replay/godot/scene/effect-routes.html">route contracts</a>.</p>
+<h2 id="b6-body-contracts--2026-09-20">B6 body contracts — 2026-09-20<a class="heading-anchor" href="#b6-body-contracts--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Implemented distinct Simulation_Body2/3 pose bindings and Session adapters selecting
+only authority state for cooperative Body2/3. The sample facade rechecks fencing,
+phase, pause and epoch; missing state suspends the producer. Existing transfer,
+reseed, correction and admission semantics remain in the owned-body protocol.</p>
+<p>11 owned-protocol tests/WASM and actual Godot checks in both dimensions pass for
+authored offsets, freeze, invalid input, preparing/accepted transfer, cuts,
+fencing, recovered epochs and pause. Complete fixture scripts compile for WASM.
+See <span class="local-reference" title="docs/replay/results/body-bindings-2026-09-20/README.md · available in the repository">evidence</span> and
+<a href="../../replay/godot/scene/body-bindings.html">body contracts</a>.</p>
+<h2 id="b7-measurement-and-delivery--2026-09-20">B7 measurement and delivery — 2026-09-20<a class="heading-anchor" href="#b7-measurement-and-delivery--2026-09-20" aria-label="Link to this section">#</a></h2>
+<p>Completed sparse/dense comparisons including the typed owner, and actual Hello/
+Scrapyard copy, public/authority encode/hash, advance and suffix-replay profiles.
+The sparse comparison exposed avoidable capacity work. Occupied-bucket clearing
+and a fully retained membership path remove it without changing lifecycle or
+preflight behavior; dense cases improved too. Typed 1/1024 calls measured
+4.208 → 0.050 µs; typed 1024/1024 measured 67.458 → 61.892 µs in paired runs.</p>
+<p>The selective read benchmark allows compiler copy elimination; detached projection
+has a small validation cost and is not claimed as a universal copy speedup.
+Materialized Scrapyard reads measured 0.926 µs and 16-tick replay 149.332 µs in the
+final profile. COW/chunked history is deferred; broader encoding caches need exact
+recipient/connection/content dependencies before safe implementation.</p>
+<p>Final validation passes 76 pure tests, native/WASM recipes, executed WASM route
+checks and the actual Godot bridge fixture. Rebuilt Hello/Loot and inspector/
+recording/network checks pass. All 65 baseline Kit hashes match, original game
+directories and sibling Scrapyard remain clean. No parity expansion was needed.</p>
+<p>The goal is complete. See <a href="godot-bridge-performance.html">performance and tradeoffs</a>,
+<span class="local-reference" title="docs/replay/results/godot-bridge-2026-09-20/README.md · available in the repository">delivery evidence</span> and public contracts
+linked from the <a href="../../replay/godot/README.html">Godot integration entry point</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="godot-bridge-plan.html"><span>Godot bridge and measured optimization goal</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/scene/view-pools.html"><span>View pool foundations</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/input/controls.html"><span>Device controls and signal actions</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/godot-bridge-progress.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#b1-foundation--2026-09-20" class="">B1 foundation — 2026-09-20</a><a href="#b2-typed-views-and-projections--2026-09-20" class="">B2 typed views and projections — 2026-09-20</a><a href="#b3-definition-baking--2026-09-20" class="">B3 definition baking — 2026-09-20</a><a href="#b4-input-and-signals--2026-09-20" class="">B4 input and signals — 2026-09-20</a><a href="#b5-visualaudio-routes--2026-09-20" class="">B5 visual/audio routes — 2026-09-20</a><a href="#b6-body-contracts--2026-09-20" class="">B6 body contracts — 2026-09-20</a><a href="#b7-measurement-and-delivery--2026-09-20" class="">B7 measurement and delivery — 2026-09-20</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/godot-bridge-progress.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

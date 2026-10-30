@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay checkpoint replication · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay checkpoint replication</h1><div class="reader-meta"><span>9 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/recovery/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#ownership-and-integration">Ownership and integration</a><a href="#shared-gameplay-connection">Shared gameplay connection</a><a href="#transfer-and-retention-protocol">Transfer and retention protocol</a><a href="#evidence-and-limits">Evidence and limits</a><a href="#independent-application-consumers">Independent application consumers</a><a href="#schema-aware-checkpoint-compression">Schema-aware checkpoint compression</a><a href="#checkpoint-delivery-channel">Checkpoint delivery channel</a></nav></details>
+<article class="reading-body "><p><code>replay/recovery</code> transfers complete authority checkpoints to an explicitly trusted
+successor. It builds on <code>replay/net</code> archives and the borrowed transport interface.
+It provides transfer/validation/retention; it does not select a legitimate leader,
+fence a partitioned authority, discover a new host, or reconnect game clients.</p>
+<p>The reusable <a href="../transfer/README.html">transfer package</a> also supports bounded canonical
+records. Recovery retains compatible <code>Sender</code> / <code>Blob_Receiver</code> facade names.
+Supply the expected envelope kind and an <code>accept(user, archive, bytes) -&gt; bool</code>
+callback to <code>blob_init</code>; opt the Sender into the same kind with <code>archive_kind</code>.
+The core verifies source/scope, chunks, SHA-256 and envelope integrity before the
+callback. The callback must validate and install atomically, borrow bytes only for
+its duration, and return false on failure. Receipts are retained for retry handling;
+the generic core does not retain decoded application values. The typed checkpoint
+Receiver wraps this core and still retains the two validated authority checkpoints
+required by the sender/coordinator contract. Both receiver owners must stay at
+stable addresses. Existing checkpoint callers keep their APIs and canonical archive
+format. Optional transfer representations require negotiated peer support.</p>
+<p>The <a href="../p2p/spectators.html">P2P spectator</a> uses the generic core for confirmed history;
+its separate envelope kind cannot be installed as an authority checkpoint.</p>
+<h2 id="ownership-and-integration">Ownership and integration<a class="heading-anchor" href="#ownership-and-integration" aria-label="Link to this section">#</a></h2>
+<p>The application installs <code>Scope{room, epoch, binding, content}</code> and a specific
+transport peer on each endpoint. A binding identifies a particular authorized
+source/successor connection. Replace the binding when reconnecting/replacing that
+peer, even if the transport reuses its numeric ID. These identifiers are context
+checks, not credentials or authentication. A successor receives the complete
+authority projection, including hidden fields; select it accordingly.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">sender: recovery.Sender
+receiver: recovery.Receiver(World, Control, Action, Event, SEATS)
+error := recovery.sender_init(&amp;sender, scope, successor_peer, wire)
+error = recovery.receiver_init(&amp;receiver, scope, authority_peer, wire, model)
+
+<span class="hljs-comment">// Authority side: capture at a simulation boundary, then publish an owned copy.</span>
+error = recovery.sender_publish(&amp;sender, &amp;checkpoint, model, now_ms)
+
+<span class="hljs-comment">// Each endpoint&#x27;s packet dispatcher, after transport.poll/receive:</span>
+result := recovery.receiver_receive(&amp;receiver, packet.from, packet_bytes, now_ms)
+<span class="hljs-comment">// Or sender_receive on the publishing endpoint.</span>
+error = recovery.receiver_update(&amp;receiver, now_ms)
+<span class="hljs-comment">// Or sender_update on the publishing endpoint.</span></code></pre></div><p>Check every error/result. Call <code>sender_destroy</code>/<code>receiver_destroy</code> once; neither
+closes the borrowed transport. Owners must remain at stable addresses and must not
+be shallow-copied. <code>sender_begin</code> accepts encoded archive bytes and copies them;
+<code>sender_publish</code> encodes a typed checkpoint first. Only one transfer is active per
+sender. <code>sender_cancel</code> permits explicit replacement while retaining the last
+validated receipt; sequences continue increasing within the binding.</p>
+<p>The low-level protocol does not independently drain the wire. <code>Link</code> now integrates
+it with the gameplay runner using <code>transport.Router</code>, separate queues, and a combined
+output budget. <code>handles</code> is only untrusted routing inspection. The standalone ENet
+acceptance fixture uses a dedicated wire; the cave replication gate uses the same
+connection for actual gameplay and checkpoints.</p>
+<h2 id="shared-gameplay-connection">Shared gameplay connection<a class="heading-anchor" href="#shared-gameplay-connection" aria-label="Link to this section">#</a></h2>
+<p><code>Link(State, Control, Action, Event, Seats)</code> owns the router, one outgoing transfer,
+an optional incoming receiver, and reusable archive schema metadata. Initialize it
+around the underlying transport, then give <code>link_game_transport</code> to <code>server_init</code>
+or <code>client_init</code>. Each outer frame calls <code>link_pump</code> once, pumps/steps gameplay, and
+finally calls <code>link_server</code> or <code>link_client</code>. Destroy the link before closing the
+underlying transport. The Godot <code>Session</code> facade performs this ordering.</p>
+<p>Receiver opt-in is explicit: set <code>Link_Config.accept_checkpoints=true</code>. The
+authority then calls <code>link_target</code> with a live admitted connection. Use
+<code>net.server_seat_connection</code> when selecting by playable seat. The binding comes
+from the admission ledger&#39;s connection generation; it cannot be supplied by an
+incoming archive. The target interval defaults to one simulation second. New
+archives wait for the active transfer to complete/fail, avoiding endless replacement
+of partial transfers. Retargeting and <code>link_untarget</code> discard that target&#39;s current
+receipt; sequence numbers keep increasing so selecting the same live peer again
+does not collide with old transfers.</p>
+<p>The link does not automatically reauthorize a replacement connection. A disconnected,
+kicked, or generation-mismatched target receives no further work. Its old receipt
+remains inspectable along with an unavailable status. Selecting a new live connection
+is an explicit application/coordinator decision. Incoming archives remain available
+after connection loss for the eventual takeover driver.</p>
+<p>Packet routing preserves sender identity and delivery mode. Only bounded checkpoint messages
+enter the background queue; every consumer still validates its
+own protocol. Queue overflow may drop unreliable background datagrams, which the transfer
+repairs. Reliable background messages use the router&#39;s bounded retention/backpressure path. Combined byte/rate budgets reserve capacity for gameplay; a saturated game
+may defer checkpoints until their timeout. The most recent backup failure remains
+in <code>Link.error</code>/<code>model_error</code>; it does not halt active gameplay. The migration driver
+must consider checkpoint age and successor availability rather than assume a fresh
+replica always exists. Custom policy validators must be installed before receiver
+initialization, with an immutable user descriptor valid for the receiver&#39;s lifetime.</p>
+<p><code>receiver_latest</code> returns the newest validated receipt. <code>receiver_checkpoint</code>
+looks up an <strong>exact</strong> archive descriptor and returns a read-only borrow, valid until
+the next receive/destroy. The takeover driver must use the receipt authorized by
+the coordinator; newest does not by itself mean authorized. The archive can be
+passed to <code>net.server_restore</code> or persisted by an application.</p>
+<p>By default, a saved custom admission policy is rejected. Install <code>policy_valid</code>
+and its immutable user descriptor to explicitly validate the policy ID/data before
+acknowledgement. The application must also provide the corresponding admission
+implementation during restore. Policy bytes never deserialize callbacks.</p>
+<h2 id="transfer-and-retention-protocol">Transfer and retention protocol<a class="heading-anchor" href="#transfer-and-retention-protocol" aria-label="Link to this section">#</a></h2>
+<p>Protocol v1 uses canonical <code>RPLY</code> envelopes with kinds <code>0x5101</code>–<code>0x5105</code>:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Offer</td>
+<td>Version/chunk size, room/binding, archive sequence/tick/size/SHA-256, and last acknowledged archive to retain</td>
+</tr>
+<tr>
+<td>Chunk</td>
+<td>Archive sequence and chunk index followed by exactly the expected bytes</td>
+</tr>
+<tr>
+<td>Progress</td>
+<td>Offer receipt, or a 64-chunk acknowledgement bitmap</td>
+</tr>
+<tr>
+<td>Ready</td>
+<td>Exact descriptor of a fully reconstructed and validated archive</td>
+</tr>
+<tr>
+<td>Failed</td>
+<td>Explicit integrity/archive/policy/retention/timeout failure</td>
+</tr>
+</tbody></table>
+</div><p>Transfers use 1,024-byte chunks. The largest packet is 1,102 bytes, within the
+configured test datagram envelope. A bounded selective-repeat window repairs lost
+chunks and progress messages over the unreliable transport channel. Repeated
+offers repair lost Ready packets. ACKs cannot claim chunks that were never sent.
+Packet checksums protect framing; the final SHA-256 identifies the complete
+archive. Neither provides peer authentication.</p>
+<p>The receiver preallocates one 1 MiB reassembly buffer, with fixed bitmaps. Offers
+cannot allocate arbitrary buffers. Bounds, version, scope, exact chunk length,
+duplicate consistency, final digest, checkpoint codec, game-state validity, and
+custom policy support are checked before a Ready receipt. Timeouts apply at receive
+as well as update, so a late final chunk cannot bypass the deadline.</p>
+<p>Two validated archives may be retained. Each new offer names the authority&#39;s last
+acknowledged archive as its retention anchor. A newer candidate whose Ready was
+lost may be superseded, while that older anchor remains available. Validation uses
+a temporary third checkpoint; only a successful decode changes stored owners.
+An incomplete, corrupt, rejected, or timed-out transfer cannot replace a usable
+archive. Unknown retention claims are rejected. A completed transfer is a receipt
+for <strong>validated process memory</strong>, not a disk/power-loss guarantee. The successor
+must remain available, or another eligible replica is required.</p>
+<p><code>Stats</code> records packets/bytes, retries, duplicate chunks, deferral, rejection,
+validation, and failures. Receipts include archive tick and receipt time; the game
+can calculate checkpoint age. The caller supplies monotonic milliseconds; time
+reversal is rejected. CPU measurements belong around the calls so the pure package
+does not depend on an operating-system clock or Godot.</p>
+<h2 id="evidence-and-limits">Evidence and limits<a class="heading-anchor" href="#evidence-and-limits" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_recovery/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_recovery_enet/run.sh</code></pre></div><p>Nine native tests cover receipt/restore/action identity, lost Ready and retention,
+invalid state, timeout and recovery, same-archive connection rebinding, wrong peers,
+corrupt packets, time reversal, custom policies, offer limits/version/retention,
+out-of-range chunks, and a large private cave archive under deterministic faults.
+The integration test runs gameplay plus repeated archives, checks that an unselected
+observer receives none, retargets the same connection, and revokes the target.
+The package and actual Godot probe also type-check for WASM. This is not a browser
+network runtime gate; ENet is still native-only.</p>
+<p>The real two-process ENet fixture transfers a cave simulation with looted inventory
+and an active rock, plus 72,000 bytes of authority-only fixture data. With 120 ms receive
+delay, up to 20 ms jitter, 10% unreliable loss, and 10% duplication, one debug-build
+run recorded:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">archive: 75,591 bytes, tick 49
+capture/encode: 39,591 us
+transfer through Ready: 2,043 ms, 173,838 sent bytes, 95 retries
+receiver packet processing/validation: 193,712 us accumulated
+restore and first continued simulation tick: 108,260 us</code></pre></div><p>The restored complete frame equals the transferred checkpoint, includes the
+private data and conserved loot, and continues simulation. These are single-run
+instrumentation receipts, not percentile benchmarks or old/new game comparisons.
+The fixture adds private data specifically to exceed the 64 KiB packet limit;
+ordinary Cavecrawl archives are smaller. Those measurements motivated reusable
+<code>net.Checkpoint_Codec</code> metadata. Receivers warm it at initialization; <code>Link</code> warms
+its publishing codec when a target is selected. The same fixture with warm metadata
+recorded 1,574 us capture/encode and 7,304 us accumulated receiver processing, with
+identical archive bytes. One-time fresh server restore still builds its runtime
+schemas (139,521 us in that run). These remain individual debug measurements.</p>
+<p>The first Godot debug build terminated inside the Odin compiler. Direct debug,
+non-debug, and the subsequent normal project build succeeded without a source
+workaround; the crash has not been reproduced or claimed fixed.</p>
+<p>The live Cavecrawl gate is <code>examples/replay_cavecrawl/replication_run.sh</code>. It keeps
+gameplay and periodic backups on the same ENet connection, with the same fault
+settings, and verifies a common checkpoint containing the guest&#39;s loot and open
+door. Save/resume and restarted-host/guest recovery gates remain separate.</p>
+<p>Next: install coordinator-approved successor/fencing decisions, then implement planned
+and abrupt takeover with surviving-client frontier reconciliation. See the
+<a href="../../docs/replay/recovery.html">recovery contract</a> and <a href="../../docs/replay/roadmap.html">roadmap</a>.</p>
+<h2 id="independent-application-consumers">Independent application consumers<a class="heading-anchor" href="#independent-application-consumers" aria-label="Link to this section">#</a></h2>
+<p><code>link_add_application(&amp;config, Application_Route{user, handles})</code> reserves another
+bounded receive lane before <code>link_init</code>. It returns <code>(lane, ok)</code>; adding an identical
+route is idempotent and a full registry returns false. Obtain that borrowed lane
+with <code>link_application_lane(&amp;link, lane)</code>. The original <code>application_handles</code> and
+<code>link_application_transport</code> retain lane 2, so existing asset consumers continue
+to work. Extra routes use lanes 3–7, with the same router budgets and primary reserve.</p>
+<p>Classification is ordered: checkpoint, original application, additional routes,
+then gameplay fallback. Handlers should match only their own protocol. Routing is
+not authentication; each consumer validates live admission and scope. All enabled
+consumers must drain their lanes after the shared pump. A full reliable receive
+lane preserves its packet and can exert transport backpressure. <a href="../comms/README.html">Comms</a>
+uses an additional route while Session assets keep their existing one.</p>
+<h2 id="schema-aware-checkpoint-compression">Schema-aware checkpoint compression<a class="heading-anchor" href="#schema-aware-checkpoint-compression" aria-label="Link to this section">#</a></h2>
+<p>Link now negotiates both ordinary block compression (Features bit 128) and Frame
+schema grouping (bit 256, requiring 128). It obtains the fixed Frame schema and
+canonical section offset from its checkpoint codec. Both endpoints validate the
+same plan fingerprint. Grouped candidates are selected only when smaller; ordinary
+compression and original offers remain available. Receiver reconstruction ends
+with the same raw archive SHA-256, canonical envelope and typed checkpoint checks.
+Archive identity, retention and coordinator authority decisions remain unchanged.</p>
+<p>The <a href="../transfer/README.html">transfer contract</a> describes layout lifetimes, bounded
+scratch and statistics. Low-level <code>sender_publish</code> can use a caller-owned codec
+for grouping; Link manages this automatically. The earlier experimental early-send
+schedules are not installed: gameplay and recovery retain their normal service
+order and the coordinator still enforces the configured rollback limit.</p>
+<h2 id="checkpoint-delivery-channel">Checkpoint delivery channel<a class="heading-anchor" href="#checkpoint-delivery-channel" aria-label="Link to this section">#</a></h2>
+<p>Features bit 512 advertises support for checkpoint messages on the existing
+reliable channel. Link uses it when available; absent capability retains the
+unreliable path. The receiver mirrors reliable delivery after validating traffic,
+and cannot be downgraded by delayed datagrams in the same scope. Capabilities are
+immutable for a connection and reset on reconnect. Raw/compressed/schema-grouped
+archives all retain the same descriptors and validation.</p>
+<p>For RTC this separates checkpoints from the unreliable snapshot credit window.
+It does not add credits, widen staging queues, change the shared byte budget, or
+prioritize checkpoints ahead of gameplay. Reliable chunk retries belong to the
+transport; the archive sender does not duplicate them. Reliable congestion can
+still delay gameplay on that channel, so callers must inspect actual backup age
+and failure state. A fresh replica is never an unconditional guarantee.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../transfer/README.html"><span>Bounded blob transfer</span><span aria-hidden="true">→</span></a><a href="../p2p/spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/recovery.html"><span>Replay checkpoint and recovery contract</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/recovery/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-integration" class="">Ownership and integration</a><a href="#shared-gameplay-connection" class="">Shared gameplay connection</a><a href="#transfer-and-retention-protocol" class="">Transfer and retention protocol</a><a href="#evidence-and-limits" class="">Evidence and limits</a><a href="#independent-application-consumers" class="">Independent application consumers</a><a href="#schema-aware-checkpoint-compression" class="">Schema-aware checkpoint compression</a><a href="#checkpoint-delivery-channel" class="">Checkpoint delivery channel</a></nav><div class="outline-actions"><a href="../../../reference/replay/recovery/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

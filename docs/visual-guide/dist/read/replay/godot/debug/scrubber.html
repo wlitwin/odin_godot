@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Inspecting and branching local history · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Inspecting and branching local history</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/debug/scrubber.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#ownership-and-limits">Ownership and limits</a><a href="#hello-integration">Hello integration</a><a href="#editing-a-preview">Editing a preview</a></nav></details>
+<article class="reading-body "><p><code>Debug_Scrubber</code> is an opt-in timeline dock for an offline developer workflow.
+Pause, inspect a retained frame, and either resume the original future or start
+an alternate branch. The widget reads frame copies and returns commands; the
+application owns the clock, presentation and decision to replace its timeline.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Init once at a stable address; destroy before its owner leaves the tree.</span>
+debuggd.debug_scrubber_init(&amp;scrubber, owner)
+
+<span class="hljs-comment">// Before advancing the local timeline:</span>
+<span class="hljs-keyword">switch</span> debuggd.debug_scrubber_frame(&amp;scrubber, &amp;timeline) {
+<span class="hljs-keyword">case</span> .Inspect: <span class="hljs-comment">// Save prior pause state, pause the clock, discard device edges.</span>
+<span class="hljs-keyword">case</span> .Resume: <span class="hljs-comment">// Restore prior pause state, clear accumulated time/device edges.</span>
+<span class="hljs-keyword">case</span> .Branch:
+    frame, ok := debuggd.debug_scrubber_read(&amp;scrubber, &amp;timeline)
+    <span class="hljs-keyword">if</span> ok {
+        <span class="hljs-comment">// Explicit application operation: initialize from this complete frame</span>
+        <span class="hljs-comment">// under a new epoch, reset presentation at this tick, then leave inspection.</span>
+    }
+<span class="hljs-keyword">case</span> .Invalidated: <span class="hljs-comment">// The source epoch/head changed; release the inspection pause.</span>
+<span class="hljs-keyword">case</span> .None:
+}
+
+<span class="hljs-comment">// While active, paint this value instead of the live head. Do not play its old</span>
+<span class="hljs-comment">// one-shot events or feed its poses back into simulation.</span>
+frame, inspecting := debuggd.debug_scrubber_read(&amp;scrubber, &amp;timeline)
+
+debuggd.debug_scrubber_end(&amp;scrubber)     <span class="hljs-comment">// Explicit reset/branch completion.</span>
+debuggd.debug_scrubber_destroy(&amp;scrubber) <span class="hljs-comment">// Teardown, including signal callables.</span></code></pre></div><p>F10 and the Pause/Resume button enter or leave inspection. Drag the slider or use
+its ordinary keyboard controls to select a frame. Branch is a separate button.
+Godot&#39;s <code>pressed</code> signal is latched, so a complete click between render frames
+still reaches the application. Repeated clicks on the same button before a pump
+coalesce. Keep the widget at a stable address until destroy disconnects callbacks.</p>
+<p>The slider stores relative offsets within at most 4096 retained slots. It does
+not convert absolute <code>u64</code> ticks to floating point. <code>replay.history_window</code> scans
+bounded record metadata and includes the initial/corrected checkpoint. This differs
+from an audit window, which requires known generating inputs and a preceding frame.
+Tick zero, wrapped retention, nonzero checkpoints and the <code>u64</code> boundary are valid.</p>
+<h2 id="ownership-and-limits">Ownership and limits<a class="heading-anchor" href="#ownership-and-limits" aria-label="Link to this section">#</a></h2>
+<p>The owner must exclusively pause its local timeline while inspecting. Epoch/head
+changes invalidate the selection; the widget does not detect arbitrary same-head,
+same-epoch replacement or concurrent mutation. Session, Room and P2P runners are
+not paused, corrected or migrated by these controls. No network or administrative
+authority is implied. Use the separate read-only diagnostic overlay on live peers.</p>
+<p>Resume retains the original timeline and confirmation frontier. Branching is an
+explicit local operation from a complete frame, including entity generations,
+cooldowns and RNG. The application must start a new presentation epoch and seed
+its journal at the branch tick; old effects must not be delivered again. This does
+not undo already committed external effects. It is not network recovery or a save
+format. The optional field editor below edits a copied local preview; the
+<a href="../../diagnostic/recording.html">recording exporter</a> saves the original replayable suffix.</p>
+<h2 id="hello-integration">Hello integration<a class="heading-anchor" href="#hello-integration" aria-label="Link to this section">#</a></h2>
+<p>Replay Hello enables the dock alongside <code>debug_enabled</code> / <code>REPLAY_DEBUG=1</code>.
+F8 controls the older audit panel; the history dock remains available when that
+panel is hidden. Ordinary launches allocate no debugging components.</p>
+<p>The example preserves an existing pause on Resume, paints historical entity views,
+and clears transient flashes when leaving inspection. Branching calls its existing
+complete-frame reset under a fresh epoch. Gameplay input held during inspection
+stays suppressed until released, preventing a slider/key gesture from leaking into
+the resumed or branched simulation. Inspection creates no catch-up backlog.</p>
+<p>Run <code>nix develop --command bash tests/replay_scrubber/run.sh</code> for the core-backed
+native scene workflow, existing Hello/Loot regressions, rendered capture and WASM
+check. The dedicated fixture preserves prepared inputs, binaries&#39; hashes and driver
+revisions. Broader editor workflows remain roadmap work.</p>
+<p>The <span class="local-reference" title="docs/replay/results/history-inspection-2026-09-13/README.md · available in the repository">recorded native/Chrome gate</span>
+also covers real browser keyboard, slider and button input with zero buffer-target
+conflicts. Focused slider arrow keys intentionally change the selected tick; they
+are not gameplay movement while inspecting. Browser acceptance checks held fire,
+and native acceptance checks both held movement and fire. Hello&#39;s muzzle flash now
+uses an immutable mesh to avoid the Polygon2D redraw issue exposed by this gate.</p>
+<h2 id="editing-a-preview">Editing a preview<a class="heading-anchor" href="#editing-a-preview" aria-label="Link to this section">#</a></h2>
+<p><code>Debug_Field_Editor(State)</code> adds a schema-derived field menu, value input, Apply
+and Reset. Hello enables it with the history dock. Fields include array leaves,
+entity IDs, counters, timers, enum names and authority-only values; the application
+provides its state validator to reject broken relationships such as a pool count
+that disagrees with its live slots.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">editor: debuggd.Debug_Field_Editor(game.World)
+debuggd.debug_field_editor_init(&amp;editor, owner, game.network_state_valid)
+
+<span class="hljs-comment">// Before handling the scrubber action, including Branch:</span>
+action := debuggd.debug_scrubber_frame(&amp;scrubber, &amp;timeline)
+debuggd.debug_field_editor_frame(&amp;editor, &amp;scrubber, &amp;timeline)
+frame, inspecting := debuggd.debug_field_editor_read(&amp;editor)
+<span class="hljs-comment">// Paint frame while inspecting. On Branch, accept this complete frame under a</span>
+<span class="hljs-comment">// new epoch. On Resume/Invalidated, restore the previous pause and input guard.</span>
+<span class="hljs-comment">// On explicit reset/branch completion:</span>
+debuggd.debug_field_editor_end(&amp;editor)
+<span class="hljs-comment">// At teardown, before freeing its owner:</span>
+debuggd.debug_field_editor_destroy(&amp;editor)</code></pre></div><p>Apply validates a candidate, then replaces only the preview. The original frame,
+retained timeline, confirmation frontier and journal stay unchanged. Reset restores
+the selected original frame; selecting another tick or leaving inspection discards
+edits. Branch uses the edited state with the selected original tick. Hello seeds a
+new presentation epoch without playing old effects and preserves the prior pause.
+The <code>dirty</code> flag means an edit was accepted since selection/reset, including an
+accepted value equal to its original value.</p>
+<p>Values accept exact booleans, decimal or <code>0x</code> integers, enum names or declared
+numeric values, numeric bit masks, and finite floats. The input is limited to 128
+characters. Overflow, malformed text, illegal flags, inactive union fields and
+model-invalid candidates are rejected without changing the preview. Union tags
+are inspectable but read-only: changing variants needs a complete valid value.
+Single-field validation cannot perform a coordinated multi-field transaction.</p>
+<p>The menu shows at most the first 2048 schema leaves and explicitly reports
+truncation. Its search is supplied by Godot&#39;s ordinary dropdown. Large models can
+build their own searchable editor on <code>schema.field_index</code>, <code>schema.scalar_text</code>
+and <code>schema.edit_scalar</code>. These helpers do not alter schema fingerprints or wire
+formats. The widget requires a complete authority schema and retains two frame
+copies; Apply also allocates one canonical payload and a typed candidate. It is
+intended for paused authoring, not a simulation tick or a live network peer.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../diagnostic/recording.html"><span>Portable local gameplay recordings</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/debug/scrubber.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-limits" class="">Ownership and limits</a><a href="#hello-integration" class="">Hello integration</a><a href="#editing-a-preview" class="">Editing a preview</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/debug/scrubber.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

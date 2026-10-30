@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Spray images and decals · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Spray images and decals</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/sprays.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Choose a PNG in staging, or place it at this project&#39;s <code>user://spray.png</code>. G stamps
+it at the runner&#39;s simulated position. One decal belongs to each runner: stamping
+again moves it, and selecting a replacement image repaints the standing decal.
+Floor transitions remove the placement but keep the signature. Missing image bytes
+show a diamond until delivery finishes. PNGs are limited to 128 KiB, 2048 pixels
+per dimension and 1,048,576 total pixels before Godot decodes them.</p>
+<p><code>RSY_SPRAY</code> selects an initial file; <code>RSY_SPRAY_STORE</code> overrides the picker save
+location on native. Browser picks use an IndexedDB record bound to the loaded
+profile identity. With persistence enabled, the PNG is validated and pinned in
+cache before submission, and replaces the active preference only after the commit
+receipt. The HUD shows <strong>Saving spray…</strong> while waiting. Revisions protect against
+competing writes. Fresh runs load this preference; resume uses the checkpoint&#39;s
+image. With <code>persist=0</code>, picks stay in memory. Explicit fixture tokens do not
+implicitly read a user&#39;s spray. The
+original game&#39;s files and user-data directory remain separate.</p>
+<p>The simulation holds only <code>assets.Ref</code> (SHA-256 and byte count), position, stamp
+counter and floor. Set-image/stamp are normal reliable actions. The application
+announces its local upload outside gameplay; the authority admits Set_Spray only
+once the bytes have passed content validation and entered its cache. That decision
+is recorded by the runner and is not re-evaluated during prediction/replay. The
+stamp origin is taken from the world, not claimed by a caller.</p>
+<p>The <a href="../../replay/assets/README.html">asset service</a> handles transfer, caching and
+late join through the Session&#39;s optional application lane. It shares the transport
+budget with gameplay and checkpoint replication. Peer bindings come from the
+admitted roster. Images are validated before cache installation, and failed local
+picks leave the prior accepted image and saved file intact.</p>
+<p>Room preparation checks the image references in each candidate checkpoint before
+advertising it to the coordinator. Current and prepared dependencies stay pinned;
+earlier cached public images can fill a retained checkpoint. Incomplete newer
+candidates can be refreshed from newer received checkpoints without discarding the
+previously approved point. Recovery can use that older point if necessary.</p>
+<p><code>spray_run.sh</code> exchanges two different images, joins observers before and after
+replacement, checks decoded texture sizes and exact content IDs, moves a standing
+decal and rejects a malformed replacement. <code>spray_migration_run.sh</code> pauses the
+successor&#39;s asset service until a candidate is demonstrably waiting on its image,
+then resumes delivery and tests planned/crash combat takeover with a visible spray.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/spray_run.sh
+RSY_JITTER=20 RSY_LOSS=1000 RSY_DUPLICATE=1000 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/spray_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/spray_migration_run.sh</code></pre></div><p>Manual saves now bundle the downloaded images referenced by the saved world.
+They can restore and serve an offline owner’s spray without its original file.
+A browser picker, persistent preference, WebRTC exchange and browser/native save
+bundles now have acceptance gates. A persistent general-purpose network cache,
+public web deployment, Steam, full presentation/audio parity and broader quota/
+recovery cases remain work.
+This port adds explicit pixel limits beyond the original compressed-byte limit.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/assets/README.html"><span>Asset references, caches and exchange</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/sprays.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/sprays.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

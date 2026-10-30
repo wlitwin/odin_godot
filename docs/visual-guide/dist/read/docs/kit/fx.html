@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/fx — bursts, flashes, tracers · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/fx — bursts, flashes, tracers</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/fx.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#api-by-task">API by task</a><a href="#the-zero-felt-lag-pattern">The zero-felt-lag pattern</a><a href="#gotchas">Gotchas</a><a href="#floating-text-floats--float_text--floats_frame">Floating text (Floats / float_text / floats_frame)</a><a href="#screen-shake-shake--shake_add--shake_frame">Screen shake (Shake / shake_add / shake_frame)</a></nav></details>
+<article class="reading-body "><p>kit/fx provides code-driven visual effects: one-shot particle bursts, hit-flash tweens, and
+the projectile tracer pool. It requires no scene assets to install, and any script can call
+these procedures. Reach for kit/fx when an effect has no authored home in a scene. An entity
+that keeps its own emitter (a flaming torch, a pyre) authors it in its own scene instead.</p>
+<p>Presentation is lane-agnostic; the triggers differ. Bursts, flashes, and tweens fire from
+wherever presentation runs, whether that is coop <code>_edge</code> halves and announces or sim <code>_fx</code>
+halves and <a href="sim.html">declared events</a>. The tracer pool and <code>fire_announce</code> are the coop answer
+for projectiles specifically; in a sim game, projectiles are predicted <em>entities</em> that carry
+their own visuals (see <a href="sim.html">sim.md</a>).</p>
+<p><strong>2D only.</strong> Bursts are <code>Cpu_Particles2d</code>, floats are Control-positioned Labels, and shake
+moves a <code>Node2d</code>. A 3D game gets nothing from this package (including screen shake) and
+authors its own effects. The <code>(x, y)</code> arguments reflect that; the toolkit&#39;s <code>[3]f32</code> position
+convention resumes in the dimension-agnostic packages (combat/interact/ai).</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> kfx <span class="hljs-string">&quot;godot:kit/fx&quot;</span></code></pre></div><h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
+<p>There are two lifetimes and two shapes:</p>
+<ul>
+<li><strong>flash</strong> is fire-and-forget: it paints the node a color now and lets a Tween walk it back
+to white. The tween is owned by the node, so if the node dies mid-flash the tween dies with
+it, and no bookkeeping is needed.</li>
+<li><strong>burst_at</strong> is a one-shot spark burst parented to the WORLD (not the victim), so it
+outlives despawns: a slain enemy&#39;s node is gone next frame, but its spark burst is not.
+Spent emitters carry a TTL (<code>BURST_TTL :: f32(0.8)</code> seconds) in a <code>Bursts</code> pool the game
+owns; call <code>bursts_frame()</code> once per frame to reap them.</li>
+</ul>
+<p><strong>Tracers</strong>: a <code>kcombat.Fire</code> describes the authoritative cast (px/<em>tick</em> velocity, tick
+ttl), and a tracer is that cast on THIS screen: a plain glyph Label flying on the FRAME clock
+(px/<em>s</em>), with no entity and nothing on the wire. The pool owns flight, node bookkeeping, and
+contact detection; the game owns what a hit means (the callbacks).</p>
+<h2 id="api-by-task">API by task<a class="heading-anchor" href="#api-by-task" aria-label="Link to this section">#</a></h2>
+<p><strong>Bursts and flashes:</strong></p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">burst_at :: <span class="hljs-keyword">proc</span>(fx: ^Bursts, parent: gd.Node, x, y: <span class="hljs-type">f32</span>, color: gd.Color)
+bursts_frame :: <span class="hljs-keyword">proc</span>(fx: ^Bursts, delta: <span class="hljs-type">f64</span>)   <span class="hljs-comment">// reap spent emitters, once per frame</span>
+bursts_destroy :: <span class="hljs-keyword">proc</span>(fx: ^Bursts)             <span class="hljs-comment">// frees the tracking list; nodes belong to the scene</span>
+flash :: <span class="hljs-keyword">proc</span>(node: gd.Node, color: gd.Color)   <span class="hljs-comment">// nil-safe — a victim&#x27;s node may already be gone</span>
+burst_node :: <span class="hljs-keyword">proc</span>(parent: gd.Node, x, y: <span class="hljs-type">f32</span>, color: gd.Color) -&gt; gd.Cpu_Particles2d</code></pre></div><p><code>burst_node</code> is the escape hatch: the configured emitter itself, unreaped, for effects with a
+home of their own. World-positioned bursts go through <code>burst_at</code> so they get reaped.</p>
+<p><strong>Tracers</strong>: the game supplies two procs, and the kit does the rest:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Who can this shooter&#x27;s tracer hit, right now. Slice from temp_allocator.</span>
+Targets_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, shooter: knet.Player_Id) -&gt; []kcombat.Target
+
+Tracer_Hit :: <span class="hljs-keyword">struct</span> {
+	shooter: knet.Player_Id,
+	target:  <span class="hljs-type">u32</span>,     <span class="hljs-comment">// the kcombat.Target id the game supplied (a Net_Id, usually)</span>
+	pos:     [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>,  <span class="hljs-comment">// the victim&#x27;s position (where the sparks go)</span>
+}
+On_Hit_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, hit: Tracer_Hit)
+
+tracer_add :: <span class="hljs-keyword">proc</span>(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: <span class="hljs-type">string</span>, tick_hz: <span class="hljs-type">int</span>)
+tracers_frame :: <span class="hljs-keyword">proc</span>(t: ^Tracers, delta: <span class="hljs-type">f64</span>, user: <span class="hljs-type">rawptr</span>, targets: Targets_Proc, on_hit: On_Hit_Proc)
+tracers_clear :: <span class="hljs-keyword">proc</span>(t: ^Tracers)              <span class="hljs-comment">// a level change: old rocks die with the old floor</span>
+tracers_destroy :: <span class="hljs-keyword">proc</span>(t: ^Tracers)</code></pre></div><p><code>tracer_add</code> converts the Fire&#39;s tick-clock numbers to the frame clock (<code>vel = f.vel * hz</code>,
+<code>left = f32(f.ttl) / hz</code>), so pass <code>ksess.session_tick_hz(&amp;ses)</code> and visuals stay smooth at
+any refresh rate. <code>tracers_frame</code> flies every tracer one frame, sweeps the frame&#39;s segment
+for contact (the same segments as the host&#39;s tick sim, just finer), calls <code>on_hit</code> on visual
+contact, and reaps; expired tracers reap silently.</p>
+<h2 id="the-zero-felt-lag-pattern">The zero-felt-lag pattern<a class="heading-anchor" href="#the-zero-felt-lag-pattern" aria-label="Link to this section">#</a></h2>
+<p>cavecrawl and the latency-injected integration tests demonstrate this pattern:</p>
+<ol>
+<li>The <strong>shooter</strong> draws its tracer at CAST time (a prediction, made this frame).</li>
+<li>The <strong>host</strong> launches the authoritative sim projectile AND announces the <code>Fire</code> over
+SES_APP so every other screen draws one.</li>
+<li>Everyone <strong>skips their own echo</strong> (<code>fire.shooter == me</code> at the handler).</li>
+<li>Per frame, <code>tracers_frame</code> flies each tracer; on visual contact the game plays the impact
+NOW (predicted hp dip, sparks, flash) while truth arrives a beat later as ordinary deltas
+and squares the number.</li>
+</ol>
+<p>From cavecrawl&#39;s <code>rocks.odin</code>:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// A rock on THIS screen: a ● tracer in the kit/fx pool (no entity, no wire).</span>
+add_visual_rock :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, f: kcombat.Fire) {
+    kfx.tracer_add(&amp;self.tracers, self.world, f, <span class="hljs-string">&quot;\xE2\x97\x8F&quot;</span>, ksess.session_tick_hz(&amp;self.ses))
+}
+
+<span class="hljs-comment">// Every peer, once per FRAME:</span>
+cave_visual_frame :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, delta: <span class="hljs-type">f64</span>) {
+    kfx.tracers_frame(&amp;self.tracers, delta, self, rock_targets, rock_impact)
+}
+
+<span class="hljs-comment">// Who a shooter&#x27;s rock may hit right now: everybody alive except the shooter&#x27;s own avatar.</span>
+rock_targets :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, shooter: knet.Player_Id) -&gt; []kcombat.Target {
+    self := <span class="hljs-keyword">cast</span>(^CaveLobby)user
+    targets := make([<span class="hljs-keyword">dynamic</span>]kcombat.Target, <span class="hljs-keyword">context</span>.temp_allocator)
+    <span class="hljs-keyword">for</span> id, sp <span class="hljs-keyword">in</span> self.spelunkers {
+        <span class="hljs-keyword">if</span> id == self.avatar_of[shooter] || sp.hp &lt;= <span class="hljs-number">0</span> {<span class="hljs-keyword">continue</span>}
+        append(&amp;targets, kcombat.Target{id = <span class="hljs-type">u32</span>(id), pos = {sp.x, sp.y, <span class="hljs-number">0</span>}, radius = BODY_RADIUS})
+    }
+    <span class="hljs-comment">// ... dwellers too ...</span>
+    <span class="hljs-keyword">return</span> targets[:]
+}</code></pre></div><p>An impact triggers a predicted hp dip through the <code>kcombat.Predicted_Hp</code> overlay, sparks at
+the victim, and a red flash, all in the same frame as visual contact, with no round trip.
+If the host saw a miss, the dip heals back when truth lands.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">rock_impact :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, hit: kfx.Tracer_Hit) {
+    self := <span class="hljs-keyword">cast</span>(^CaveLobby)user
+    <span class="hljs-comment">// ... kcombat.php_note_hit on the victim ...</span>
+    fx_burst_at(self, hit.pos.x, hit.pos.y, {<span class="hljs-number">1</span>, <span class="hljs-number">0.9</span>, <span class="hljs-number">0.4</span>, <span class="hljs-number">1</span>})
+    fx_flash(self.nodes[knet.Net_Id(hit.target)], {<span class="hljs-number">1</span>, <span class="hljs-number">0.35</span>, <span class="hljs-number">0.35</span>, <span class="hljs-number">1</span>})
+    refresh_hud(self)
+}</code></pre></div><h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>px/tick vs px/s.</strong> A <code>Fire</code> speaks the tick clock (the authoritative sim&#39;s units); a
+tracer flies on the frame clock. <code>tracer_add</code> does the conversion, but only if you hand
+it the real <code>session_tick_hz</code>. If you hardcode 20, a session running at another rate
+flies wrong.</li>
+<li><strong>Targets are rebuilt per tracer per frame, from <code>context.temp_allocator</code>.</strong> Eligibility
+depends on the shooter (never hit your own avatar), so there is no cached list. Your
+<code>Targets_Proc</code> must be cheap and must not return long-lived memory.</li>
+<li><strong>The library prints nothing.</strong> Games narrate their own log lines. cavecrawl keeps thin
+wrappers (<code>fx_burst_at</code>, <code>fx_flash</code> in its <code>fx.odin</code>) so its integration tests&#39; <code>CAVE_FX</code>
+lines survive. If your tests grep logs, wrap likewise.</li>
+<li><strong>Call the reapers.</strong> Call <code>kfx.bursts_frame(&amp;fx, delta)</code> and <code>kfx.tracers_frame(...)</code> once
+per frame, or bursts linger and rocks fly forever. Fly visuals FIRST in process, before the
+host&#39;s ticks, so a seen impact is noted before the authority deals damage in the same frame.</li>
+<li><strong>Level change ≠ destroy.</strong> <code>tracers_clear</code> frees the in-flight nodes and keeps the pool;
+<code>tracers_destroy</code> / <code>bursts_destroy</code> drop only tracking memory, since nodes belong to the
+scene.</li>
+<li><strong>The visual hit can differ from the authoritative one.</strong> Play juice from <code>on_hit</code>; never
+mutate replicated state there. Use the prediction overlay in <a href="combat.html">combat.md</a> instead.</li>
+</ul>
+<p>Siblings: <a href="combat.html">combat.md</a> (<code>Fire</code>, <code>Target</code>, <code>projectile_hit</code>, predicted hp) ·
+<a href="session.html">session.md</a> (<code>session_tick_hz</code>, SES_APP fire announcements) ·
+<a href="ui.html">ui.md</a> (the HUD the impact repaints).</p>
+<h2 id="floating-text-floats--float_text--floats_frame">Floating text (<code>Floats</code> / <code>float_text</code> / <code>floats_frame</code>)<a class="heading-anchor" href="#floating-text-floats--float_text--floats_frame" aria-label="Link to this section">#</a></h2>
+<p>The &quot;+2 wood&quot; / &quot;-14&quot; that pops off a spot, drifts up, and fades is the cheapest
+juice-per-line in the toolkit. It is pool-driven exactly like Bursts: the game owns a
+<code>Floats</code>, calls <code>floats_frame(&amp;fx, delta)</code> once per frame, and labels animate and reap
+themselves. Parent to the WORLD so they outlive whatever they announce; temp-allocated text
+(<code>fmt.ctprintf</code>) is fine, since the engine copies it.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">kfx.float_text(&amp;self.floats, self.boot.world, x - <span class="hljs-number">16</span>, y - <span class="hljs-number">34</span>, <span class="hljs-string">&quot;+1 wood&quot;</span>)</code></pre></div><h2 id="screen-shake-shake--shake_add--shake_frame">Screen shake (<code>Shake</code> / <code>shake_add</code> / <code>shake_frame</code>)<a class="heading-anchor" href="#screen-shake-shake--shake_add--shake_frame" aria-label="Link to this section">#</a></h2>
+<p>This is trauma-model shake: impacts ADD trauma (<code>shake_add(&amp;s, 0.3)</code>), trauma decays
+linearly, and the applied offset is trauma² jitter, so small hits whisper, big ones slam,
+and there is no lingering wobble. Apply per frame to the boot containers (they are Node2D
+so everything rides along):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">kfx.shake_frame(&amp;self.shake, delta, self.boot.stage, self.boot.world)</code></pre></div><p>The shake belongs to the CAUSER&#39;s screen: it should thump when MY chop lands (the <code>mine</code>
+path of a presentation proc; see homestead), not when I merely watch someone else&#39;s. It
+settles exactly home on its last frame.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/fx.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api-by-task" class="">API by task</a><a href="#the-zero-felt-lag-pattern" class="">The zero-felt-lag pattern</a><a href="#gotchas" class="">Gotchas</a><a href="#floating-text-floats--float_text--floats_frame" class="">Floating text (Floats / float_text / floats_frame)</a><a href="#screen-shake-shake--shake_add--shake_frame" class="">Screen shake (Shake / shake_add / shake_frame)</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/fx.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

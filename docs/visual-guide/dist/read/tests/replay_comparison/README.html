@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Paired Scrapyard comparisons · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Paired Scrapyard comparisons</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/tests/replay_comparison/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#combat-encounter">Combat encounter</a></nav></details>
+<article class="reading-body "><div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_comparison/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_comparison/firing_run.sh</code></pre></div><p>The harness prepares isolated original/Replay projects, applies the explicitly
+recorded baseline ownership overlay, and instruments each game&#39;s real process
+callback. It does not replace gameplay. Three paired repetitions alternate
+Kit→Replay / Replay→Kit ordering. <code>REPLAY_COMPARISON_DIR</code> chooses a fresh output
+directory; <code>REPLAY_COMPARISON_REPETITIONS</code> controls the number of pairs.
+The original sibling project is required. If it is absent, the ordinary repository
+suite reports this gate as skipped; that is not comparison acceptance evidence.</p>
+<p>Both games use seed 1337, two players, 60 Hz, a 60 FPS process cap and 120 ms receive
+delay per participant. The default idle controller waits for authoritative skin/weapon choices,
+enters an empty single-wave floor, and checks stage, population, health, loadouts
+and both positions throughout a three-second window after 500 ms warmup. Inputs
+contain no movement, gunfire or casts. It compares the settled empty arena, not
+enemy AI, combat, prediction feel or the games&#39; complete mutable schemas.</p>
+<p><code>firing_run.sh</code> uses the same arena and stationary players with bolter magazine
+size 3 and jam probability 0 in both isolated content copies. Cooldown, projectile
+speed/lifetime/damage and reload duration retain their shared stock settings. Both
+players complete warmup before arming, hold eastward fire until nine rounds have
+been locally observed as spent, then release. This drives each game&#39;s existing
+input/cadence, authority, projectile and reload paths. The total measurement window
+is six seconds, followed by an unmeasured drain/reload period.</p>
+<p>The active gate requires exactly nine accepted rounds from each player, at least
+two observed reload entries per player, the original stationary position/health,
+unchanged content knobs, no jams, and complete projectile/reload cleanup. It records
+input transitions and each process&#39;s observations of rounds, ammo and weapon mode;
+the host also samples its authoritative projectile population. <code>summary.json</code>
+reports sampled peak/time-weighted occupancy and the first/ninth shot observation
+offsets. Original client weapon observations can include owner prediction; Replay&#39;s
+probe reads received authority frames. Host measurements are the common authority
+observation scope. The timing offsets are not round-trip latency estimates.</p>
+<p>The workload matches intent, weapon settings and final shot totals. It does not
+assume identical transient projectile populations or firing times. The trigger
+ends at a fixed shot budget because equal trigger duration produced different
+shot counts in the original host/client reload paths. Those timing differences
+remain in the observations and in the measured game callback costs. This range
+has no AI, hits, damage, movement or contested outcomes; it does not replace the
+remaining full combat/stress comparisons or paired human playtests.</p>
+<p>A runtime failure writes its state, input trace and available observations to
+<code>failure-ROLE.json</code> before exiting. Failures are retained; there is no automatic
+retry. The output directory must be fresh so earlier projects/results cannot be
+mixed into a new comparison.</p>
+<p>Scripts use <code>-debug -o:speed</code>. Editor import can rebuild them, so the harness
+exports the flags, performs a final explicit build after the editor exits, records
+DLL hashes, and verifies those hashes again after measurement. <code>build-manifest.json</code>
+is required by the report; a claimed optimization flag alone is insufficient.</p>
+<p>An editor worker can outlive editor exit. <code>wait_builds.py</code> observes the actual
+project-specific compiler/linker processes before the final build; its wait log
+is retained. A stale staging directory alone is not treated as a running build.</p>
+<p>The baseline byte counter includes its one-byte wire tag. Both counters therefore
+cover their own application protocol output, excluding ENet framing/retransmission.
+The callback timer is inclusive elapsed wall time, not CPU-only time. It includes
+different UI/audio implementations and must not be interpreted as a framework-only
+ratio. RSS is an approximate peak over process lifetime, including startup. Input
+aim/presentation internals, authority models and protocol cadences differ. Actual
+RTT distributions are not yet sampled by this gate; it records the per-process
+delay configuration. No network loss or jitter is injected here.</p>
+<p><code>summary.json</code> retains per-run nearest-rank percentiles, median/range aggregates,
+the workload contract and build manifest. Raw samples, process logs and RSS records
+remain beside it. <code>REPLAY_COMPARISON_PHASES=1</code> enables Replay&#39;s existing phase
+profiler and writes timing CSVs; keep that diagnostic run separate from paired
+uninstrumented results. All failures remain failures; no automatic retry chooses
+a favorable run. The original game and its user-data directory remain untouched.</p>
+<p>The firing wrapper also runs <code>verify_report.py</code> against copied receipts. A valid
+result must pass, while an extra accepted round, missing reloads, an empty
+projectile trace, wrong input, reordered observations or a changed binary digest
+must fail without publishing a summary. The report verifier never mutates the
+original receipts or binaries.</p>
+<p>The current driver also records Replay&#39;s configured lead, prediction depth,
+replayed ticks, fact/snapshot progress, baseline misses and resync counters. Before
+measurement, the receive-side world must remain within four ticks of fact progress
+and within the configured lead plus four ticks for at least 500 ms. This strengthens
+the settled-workload warmup; the measurement tick, duration, shot and state limits
+remain unchanged. The additional counters are diagnostic observations outside the
+game callback timer, not a change to simulation or network policy.</p>
+<h2 id="combat-encounter">Combat encounter<a class="heading-anchor" href="#combat-encounter" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_comparison/combat_run.sh</code></pre></div><p>The combat scenario starts from the same empty floor and stationary player poses.
+The host requests four stock scrapbots at offsets (80,-20), (80,0), (80,20) and
+(100,0) from seat 2. Both games use their existing spawn paths, NPC brains, body
+collisions, damage, projectile/reload rules, death/reaping and pickup behavior.
+The adapters execute spawning and nearest-enemy targeting inside the timed game
+callback, so those costs are included in both implementations.</p>
+<p>Each process waits until it observes player damage, then holds nearest-living-enemy
+fire until its player has spent nine rounds. The eight-second measurement includes
+the encounter and ensuing weapon/cleanup work. Both peers must finish with four
+kills, 12 clamped damage, 12 collected scrap, nine rounds per player, no surviving
+enemies/drops/projectiles, and at least two reload entries per player. Neither
+player may die. No player movement, casts, statuses or additional waves are issued.</p>
+<p>A read-only census captures every observed enemy&#39;s identity, position, health and
+kind, plus living population, drop amount, health loss and combat counters. The
+report checks actual enemy motion, the four initial spawn regions and authoritative
+health/damage conservation. The game callback samples also carry timestamps, so the
+report can select samples whose latest preceding census contained a living enemy.
+Those are observed combat intervals, not exact simulation-phase boundaries. Census
+and observation overhead are separately measured outside the game callback.</p>
+<p>This matches requested encounter content and final offensive/pickup/shot totals.
+It does <strong>not</strong> assert identical transient gameplay: the original spawns immediately
+inside its callback while Replay queues actions, both target through their own
+observations, and authority, crowd ordering and presentation differ. Player damage,
+kill attribution, NPC occupancy and completion timing remain reported outcomes.
+This is a small encounter comparison, not a sustained-swarm benchmark or full-game
+parity/adoption verdict.</p>
+<p>The capture includes original/workspace revisions and dirty state, hashes of shared
+framework sources, isolated authored sources/assets, exact binaries, Godot/Odin,
+CPU/RAM, process configuration and requested pair ordering. Reporting refuses
+changed sources/binaries or missing repetitions. Mutation checks also reject missing
+damage/loot/motion/enemies, wrong spawn regions/health and invalid sample times.
+A one-pair run is useful as a pilot; the default comparison requires three alternating
+pairs. Earlier idle/firing receipts used less complete source/environment capture.</p>
+<p>The input-timing revision additionally records acknowledged-input turnaround,
+arrival margin, clock scale, sample counts and lead updates. Turnaround includes
+application/queue/snapshot work and is labeled separately from transport RTT.
+The controller/workload gates remain unchanged, allowing the three-pair combat
+contract to be repeated before and after this timing policy change.</p>
+<p>Replay application output now uses the session router&#39;s accepted-byte counter,
+including enabled telemetry and other application lanes. Historical results before
+the tally telemetry change used gameplay-runner bytes. Their archived contracts
+retain that older scope. The isolated original game still counts protocol payloads
+plus its one-byte transport tag; neither count includes ENet overhead/retransmission.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_comparison/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#combat-encounter" class="">Combat encounter</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_comparison/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

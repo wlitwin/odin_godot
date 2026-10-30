@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Restoring a published checkpoint · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Restoring a published checkpoint</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/provision/checkpoint/restore.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#client-sequence">Client sequence</a><a href="#authority-and-storage-contract">Authority and storage contract</a><a href="#validation-and-integration-status">Validation and integration status</a></nav></details>
+<article class="reading-body "><p>Checkpoint protocol <strong>3</strong> retains the explicit <code>Restore</code> decision introduced in
+version 2 and adds complete asset-package transfer. Upload/download do
+not grant authority. A restore selects one exact durable publication and obtains a
+new authority epoch only after current membership, policy, lease and storage checks.
+The private Bundle/Record and gameplay/checkpoint formats remain unchanged.</p>
+<h2 id="client-sequence">Client sequence<a class="heading-anchor" href="#client-sequence" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Recover the existing enrollment credentials, then register the fresh process
+through the authority RPC Challenge/Rebind handshake on the same connection.
+The checkpoint-enabled service permits replacement of an expired owner&#39;s
+incarnation only after lease expiry and coordinator restart quarantine. A live
+owner is still protected. Registration preserves the stable game token and
+grants no lease; the old owner identity remains in the record until a restore
+or another authorized migration decision wins.</li>
+<li>Read status and download the selected publication through the checkpoint client.
+<code>client_prepare</code> performs typed checkpoint validation and copies it into an owned
+<code>authority.Prepared</code>. Keep that owner at a stable address. Prepare every required
+external game asset before requesting authority.</li>
+<li>Call <code>client_restore</code> with the current authority Lease, exact Publication and
+owned Prepared. No ordinary authority RPC may be pending simultaneously. Restore
+uses that Lease&#39;s request sequence; normal upload/download operation sequences
+remain separate. Continue multiplexing checkpoint and authority replies.</li>
+<li>A successful correlated reply installs a lease for the new epoch and sets its
+<code>require_owner</code> flag. Check <code>lease_live</code> before restoring: a delayed successful
+decision can arrive with no usable lease time. Use <code>prepared_restore</code> or the
+equivalent Session path with that lease/permit and the correct local seat.
+Supply <code>Resume_Options.local_incarnation</code> for a fresh process; Session forwards
+a nonzero <code>Session_Options.incarnation</code>. Zero retains legacy saved incarnation
+behavior, and a supplied older incarnation is rejected before runtime creation.</li>
+</ol>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">publication := client.saved.publication
+error := checkpoint.client_prepare(&amp;client, &amp;prepared, game_model)
+<span class="hljs-comment">// Check error; prepare referenced assets before continuing.</span>
+error = checkpoint.client_restore(&amp;client, &amp;lease, publication, &amp;prepared)
+<span class="hljs-comment">// Pump the shared control connection. After a successful reply and live lease:</span>
+restore_error := authority.prepared_restore(
+    &amp;prepared, &amp;server, game_model, gameplay_wire, &amp;lease, local_seat,
+    options = {local_incarnation = lease.identity.incarnation},
+)</code></pre></div><p>This abbreviated example omits application error/UI handling. Client close or
+failure cancels its outstanding lease request, not a possibly committed authority
+decision. Keep Prepared until the chosen restore/retry outcome is resolved.</p>
+<h2 id="authority-and-storage-contract">Authority and storage contract<a class="heading-anchor" href="#authority-and-storage-contract" aria-label="Link to this section">#</a></h2>
+<p><code>service_recover_published</code> is a trusted integration entry point. The protocol
+server verifies HMAC, exact request context and current identity/nonce/peer/
+connection/coordinator-generation binding before calling the backend. The backend
+must atomically guard the authority commit against publication replacement; this
+entry point is not a public function that authenticates arbitrary raw arguments.</p>
+<p>The SQLite adapter loads and validates the deployment-selected model, then holds
+the exact publication as a scoped commit guard. The existing provisioning commit
+reloads the publication inside <code>BEGIN IMMEDIATE</code> and compares all its metadata,
+including revision and Point. The private Bundle, new authority epoch, recovered
+Point and restore request frontier commit together through the existing Room
+callback. No second in-memory Bundle can diverge from the service&#39;s Record.</p>
+<p>Restore requires:</p>
+<ul>
+<li>An enabled trusted host. Dedicated policy additionally requires infrastructure.</li>
+<li>A current playable reservation for the actor&#39;s stable token in a cooperative
+checkpoint, with no matching game ban. A merely enrolled peer cannot take another
+player&#39;s local seat. Dedicated infrastructure uses the dedicated local-seat path.</li>
+<li>An expired owner lease and elapsed restart quarantine. A concurrent live owner
+renewal or a different coordinator process is fenced by the durable Record CAS.</li>
+<li>The exact latest publication revision, model contract and Point. A checkpoint in
+the current epoch is allowed. A prior grant&#39;s exact recovered Point remains
+eligible after that grant/service was lost without a newer publication; arbitrary
+older points are refused.</li>
+<li>The existing <code>max_known_rollback</code> bound and final-release constraint. A save can
+be durable yet too old to authorize. Set save cadence and deployment recovery
+policy deliberately; publication alone does not override that policy.</li>
+</ul>
+<p>The primitive stages the grant with existing coordinator rules, then persists the
+request result. Admitted policy refusals such as <code>Busy</code> and <code>Too_Old</code> also persist
+their frontier, so replay after expiry cannot turn the same rejected request into
+a grant. Malformed/unauthorized requests and unavailable/mismatched publications
+are rejected before this decision admission. A later explicit request uses a new
+lease sequence and is evaluated against the then-current state.</p>
+<p>An exact lost grant reply returns the durable result without advancing epoch or
+renewing its lease. A higher RPC frontier makes an older request stale. If the
+coordinator restarts, its usual generation advance/quarantine still applies; a
+fresh registered process may need a newer grant using the same exact retained
+source Point. Old traffic cannot resurrect the earlier epoch.</p>
+<p>While the endpoint remains live, an exact request whose digest/result still matches
+the durable frontier uses a cached receipt plus a freshly calculated authority
+view. It does not repeat model/asset decoding or block a queued lease renewal.
+Stale frontiers are rejected before storage loading. Cache loss still uses the
+validated storage path; the cache itself never establishes authority.</p>
+<p><code>allow_expired_owner_rebind</code> is a trusted service opt-in installed while an attached
+checkpoint endpoint has a recovery backend. Closing that endpoint restores its
+previous setting. Services without recovery support retain the former blanket
+owner-rebind refusal. The opt-in does not itself check or grant a saved-world claim.</p>
+<h2 id="validation-and-integration-status">Validation and integration status<a class="heading-anchor" href="#validation-and-integration-status" aria-label="Link to this section">#</a></h2>
+<p>Low-level callers should refresh a successful Restore grant with a new correlated
+authority <code>Renew</code> before paying runtime setup costs. The Restore request may
+spend much of its lifetime in transfer/validation, and its local lease deadline
+is anchored to request start. Even an already expired local permit can request
+renewal; only the coordinator decides whether the reservation still exists.
+Installation and simulation still require a live permit. <code>Room</code> handles this
+exchange automatically. The <a href="../../../tests/replay_restore_renewal/README.html">delayed-grant gate</a>
+covers both a successful same-epoch renewal and an expired-reservation refusal.</p>
+<p>Native TLS fixtures restore the three actual Cavecrawl, Speedball and Scrapyard
+models after all original client processes and the service have exited: incarnation
+2 receives epoch 2 and advances a saved tick-1 simulation to tick 11. Unit tests
+cover stale traffic, lease/quarantine, excessive rollback, missing playable seats,
+lost grants, rejected-request replay, storage Point/publication substitution and
+dedicated infrastructure/final-release rules. Real processes killed before/after
+the restore commit recover respectively epoch 1/request 2 or epoch 2/request 3,
+while publication 1 remains intact; fresh coordinator startup is inactive.</p>
+<p>Godot Room/Party now drives the complete download/preparation/restore lifecycle and
+Cavecrawl exposes resume/retry UI. Separate native and browser gates resume actual
+saved cave play and accept new guests after all original processes have exited.
+Room distinguishes service-known rollback from local confirmation history.
+Atomic asset packages now cover declared dependencies including Scrapyard sprays.
+Broader asset profiles, other game acceptance and broader loss reporting remain
+integration work. See <a href="../../godot/room_restore.html">Room restoration</a> and the
+<a href="../checkpoints.html">M5 plan</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_restore_renewal/README.html"><span>Delayed restore grant renewal</span><span aria-hidden="true">→</span></a><a href="../../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/restore.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#client-sequence" class="">Client sequence</a><a href="#authority-and-storage-contract" class="">Authority and storage contract</a><a href="#validation-and-integration-status" class="">Validation and integration status</a></nav><div class="outline-actions"><a href="../../../../reference/replay/provision/checkpoint/restore.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

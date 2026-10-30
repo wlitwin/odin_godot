@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Paid-revive authoring comparison · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Paid-revive authoring comparison</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/tests/replay_authoring/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Run <code>REPLAY_AUTHORING_OUT=/absolute/fresh/directory nix develop --command bash tests/replay_authoring/run.sh</code>.</p>
+<p>This creates independently runnable Kit and Replay game copies, installs the same
+paid-revive feature, builds both, and runs three players through the shared
+contract. The originals and main Replay game remain untouched. The preserved
+feature patches are applied before test adapters; ownership cleanup of the Kit
+copy is recorded separately. To open a prepared game directly, build its <code>project</code>
+directory and run its normal <code>main.tscn</code>; its usual menu and revive controls work.
+Use the matching built extension through <code>ODIN_SCRIPTS_DLL</code> when needed.</p>
+<p>The feature costs the rescuer three scrap, pays those three to the revived player,
+and restores the existing four HP. It uses the existing two-second channel and
+56-pixel reach. Funds and recipient capacity gate the channel/consequence; the
+recipient&#39;s alive state prevents a second rescuer or continued input from charging
+again. Each variant has an explicit experiment compatibility identifier.</p>
+<p>The full matrix has three cases (funded, funding while held, contended), no-delay
+and 120-ms receive-delay conditions, and two repetitions with alternating
+implementation order. That is 24 three-process runs / 72 peer receipts. The delay
+is per process, not a measured 120-ms RTT; no loss/jitter/duplication is injected.
+<code>REPLAY_AUTHORING_SMOKE=1</code> runs one funded local pair and produces a distinct
+smoke marker; the report rejects incomplete plans unless explicitly invoked with
+<code>--allow-partial</code>.</p>
+<p>Test setup uses existing development methods to grant funds and down a teammate.
+Input uses each game&#39;s existing held-revive driver. The adapter only reads state
+or forwards those operations. The gameplay feature remains in the actual revive
+path, never in the driver. Authority conservation is checked every driver frame;
+all peers must converge, and another 2.5 seconds of held input must leave the result
+unchanged. A missing-funds case verifies three seconds of refusal before funding
+arrives while the input remains held. Either contending rescuer may win.</p>
+<p><code>feature/feature.patch</code>, before/after snapshots and <code>changes.json</code> identify the
+feature alone. Counts include added/removed physical and nonblank lines, split by
+file responsibility. Source formatting and pre-existing helpers influence these
+numbers. They are not human authoring time, productivity, debugging effort or a
+whole-framework verdict. Generated code, content, test adapters, copied assets
+and baseline ownership cleanup are excluded from feature counts but preserved in
+source/build manifests or separate evidence.</p>
+<p>Important boundaries: Kit uses owner-time channels, host consequences and a
+replicated stat registry; Replay uses scheduled controls and a value reducer for
+prediction and authority. Wallet/health updates can arrive separately on Kit
+clients; convergence is required, while conservation is enforced on the host.
+The u32 receiver-capacity checks are present in both patches; this process matrix
+uses small wallets. Save/migration acceptance for this experimental rule, broader
+faults, other authoring changes and human/timed studies remain work.</p>
+<p>After all successful receipts, peers stop application and engine networking at a
+shared barrier before freeing their scenes. An earlier simultaneous-close run
+hit an ENet send error after its results were written; that partial run is retained
+separately and does not count as a completed matrix. This teardown is test-only
+and is not a graceful-disconnect or migration acceptance claim.</p>
+<p>The report recomputes line counts and net added library API occurrences (subtracting retained calls on changed lines) from actual
+before/after files, verifies the displayed patch, checks source/binary hashes,
+and requires every planned receipt plus the teardown barrier. Run
+<code>python3 tests/replay_authoring/verify_report.py OUTPUT_DIRECTORY</code> to exercise
+its rejection cases. The original and primary Replay game files are never test
+mutation targets.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_authoring/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_authoring/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

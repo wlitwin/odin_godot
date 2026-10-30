@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Durable checkpoint assets · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Durable checkpoint assets</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/provision/checkpoint/assets.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#dependency-policy">Dependency policy</a><a href="#package-and-persistence">Package and persistence</a><a href="#room-integration">Room integration</a></nav></details>
+<article class="reading-body "><p>A room publication can now include its complete external asset set in the same
+transaction as its checkpoint. The authority Point continues to name the raw typed
+checkpoint. A separate signed payload descriptor names the transferred package;
+the package verifies its root against that Point and checks every asset&#39;s content
+hash. Restore grants still select the exact checkpoint publication.</p>
+<h2 id="dependency-policy">Dependency policy<a class="heading-anchor" href="#dependency-policy" aria-label="Link to this section">#</a></h2>
+<p>The deployment and game supply the same <code>Asset_Policy</code>:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">policy := checkpoint.Asset_Policy{
+    collect = game.checkpoint_assets,
+    validate = scenegd.asset_png_valid,
+}
+backend.assets = policy
+room_options.checkpoint_assets = policy
+room_options.checkpoint_cache = &amp;asset_cache</code></pre></div><p><code>collect</code> receives the raw checkpoint, a bounded reference buffer and an optional
+borrowed checkpoint codec. It must
+enumerate all required assets, including executable pending work. Return false on
+overflow or invalid input. Zero references and duplicates are normalized; malformed
+references fail. The callback may decode the checkpoint with its deployment-selected
+model but must not mutate it or call back into storage. <code>validate</code> checks actual
+asset content and is mandatory for a nonempty dependency set.</p>
+<p>Room builds reusable schema metadata before acquiring authority and shares it with
+checkpoint encoding, decoding and dependency collection. Collectors may use that
+codec for their declared model while it remains borrowed; they must not destroy or
+retain it. Packaging enumerates dependencies once and validates the encoded entries
+without decoding the root again solely to repeat the same enumeration.</p>
+<p>Scrapyard&#39;s collector includes current player sprays and accepted executable
+pending <code>Set_Spray</code> declarations. Its service and Room validate PNG data through
+the existing bounded Godot image decoder. Rejected/retired declarations do not
+require an asset that will never be installed.</p>
+<p>The service requires an exact asset set: missing, extra, corrupt and semantically
+invalid entries are refused before publication. A game without declared external
+dependencies continues to use raw checkpoints. Undeclared extra uploads are not
+accepted as a general-purpose storage bucket.</p>
+<h2 id="package-and-persistence">Package and persistence<a class="heading-anchor" href="#package-and-persistence" aria-label="Link to this section">#</a></h2>
+<p>The transfer package is a canonical envelope around the existing asset bundle.
+The full payload, including checkpoint and assets, is limited to <strong>1 MiB</strong> and <strong>32
+unique references</strong>, matching the room transfer profile. Each asset remains subject
+to its game/cache limits. The local-file bundle profile retains its separate 16 MiB
+limit. <code>bundle_encode</code> now accepts a lower caller-selected bound and checks it before
+allocating the output; room packaging uses that preflight.</p>
+<p>The SQLite store adds <code>replay_room_checkpoint_package</code>. Raw checkpoint, publication
+metadata and package are written/removed atomically. A single joined read obtains
+one coherent publication/package snapshot. Package framing, root identity, asset
+hashes and model dependency policy are checked before a typed load returns data.
+A zero-length or corrupt package row is not treated as an absent package.</p>
+<p>Restore&#39;s commit guard compares the package descriptor as well as the publication,
+so the package cannot disappear or change between validation and the authority
+decision. Existing raw checkpoint publications remain readable for models that
+require no assets. A legacy raw checkpoint that requires missing assets fails
+validation; it is not silently acknowledged as complete or repaired with guessed
+data. Back up the complete private database, including this table.</p>
+<p><code>Saved.bytes</code> owns the raw checkpoint and <code>Saved.payload</code> owns the optional package.
+Destroy them together with <code>saved_destroy</code>. The stored package duplicates its root,
+so on-disk root-plus-package data is bounded by twice the 1 MiB root limit per room;
+transfer bytes remain at most 1 MiB. Repeated publications replace the previous
+package; there is no unbounded asset history or cross-room asset sharing.</p>
+<h2 id="room-integration">Room integration<a class="heading-anchor" href="#room-integration" aria-label="Link to this section">#</a></h2>
+<p>Room packages assets from the borrowed cache after capturing its immutable root.
+Missing cache data prevents upload. The transfer owns its accepted bytes, so later
+cache changes cannot alter that in-flight package. A lost reply is resolved through
+the current validated publication, as with raw checkpoints.</p>
+<p>During recovery, Room validates dependency completeness and installs the package
+into its cache before the existing preparation callback and restore request.
+<code>bundle_install</code> preflights the complete set and cache capacity before mutation.
+The cache must outlive Room; the game still owns texture/material construction.
+Installing bytes does not grant authority.</p>
+<p>Checkpoint-transfer protocol <strong>3</strong> adds the payload descriptors and v3 HMAC domain.
+Clients and services must upgrade together. Publication metadata, authority Record,
+private Bundle, gameplay protocol and raw checkpoint formats remain unchanged.</p>
+<p>Bundled transfer deliberately starts with one complete durable snapshot. It does
+not implement cross-publication deduplication, independent asset uploads or saves
+beyond this transfer bound. Save age, transfer duration and the room&#39;s existing
+rollback policy remain separate: a durable checkpoint can still be too old for a
+restore grant. No recovery-policy limit is relaxed by asset publication.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/assets.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#dependency-policy" class="">Dependency policy</a><a href="#package-and-persistence" class="">Package and persistence</a><a href="#room-integration" class="">Room integration</a></nav><div class="outline-actions"><a href="../../../../reference/replay/provision/checkpoint/assets.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Speedball port ledger · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Speedball port ledger</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_speedball/parity.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Original: <code>examples/speedball/</code>. Replay: <code>examples/replay_speedball/</code>. Both retain
+separate projects, launchers and ports. Original sources are not rewritten by this
+port. The original&#39;s generated Kit boot/lane code and the Replay value model are
+different authoring/runtime designs; matching rules is not a framework-only timing
+comparison.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Original behavior</th>
+<th>Replay status / evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Contested whole-pitch prediction; local kick/spike response</td>
+<td>Separate complete-state pitch; core, solo and four-process network gates</td>
+</tr>
+<tr>
+<td>Pitch, ball/player movement, contact, goal/reset/hold rules</td>
+<td>Preserved with explicit seat-order contacts; pure model tests</td>
+</tr>
+<tr>
+<td>Dedicated first client&#39;s spawn/team mapping</td>
+<td>Preserved one-seat offset; network gate requires right-side winner</td>
+</tr>
+<tr>
+<td>Host/join/name/port/start front door</td>
+<td>Scene-authored menu; match-leader manual start, editable address/port and validated names</td>
+</tr>
+<tr>
+<td>Scripted auto-start and solo launch</td>
+<td>Existing role/bot environment paths retained</td>
+</tr>
+<tr>
+<td>Enter chat / Escape release / gameplay input capture</td>
+<td>Replay comms channel; three-process UI gate checks literal markup and captured movement/spike input</td>
+</tr>
+<tr>
+<td>Tab score overlay, named roster, ping, departed rows</td>
+<td>Authoritative names/team/score with optional telemetry; departed rows retained</td>
+</tr>
+<tr>
+<td>Late join and rejoin</td>
+<td>Authority state initializes views/score; UI gate leaves/rejoins a running pitch using the same token</td>
+</tr>
+<tr>
+<td>Score/winner text and arrival/start narration</td>
+<td>Authoritative HUD and comms messages</td>
+</tr>
+<tr>
+<td>Host departure</td>
+<td>Direct sessions show connection-ended; configured Room sessions recover through an authenticated coordinator</td>
+</tr>
+<tr>
+<td>Planned handoff / crash during play</td>
+<td>Native Room gate restores a moving scored checkpoint and verifies new actions, chat and common worlds; fixed local three-member fixture</td>
+</tr>
+<tr>
+<td>Original caller-supplied spike coordinates</td>
+<td>Deliberately replaced by seat-derived origin; trust-model difference retained</td>
+</tr>
+<tr>
+<td>Original mixed sim score / discrete scoreboard state</td>
+<td>Complete Replay score/winner participates in rollback; authoritative HUD reads remain</td>
+</tr>
+<tr>
+<td>Persistent reconnect identity from Kit boot</td>
+<td>Native profile and browser IndexedDB identity/name; fresh-process gates reclaim the seat and chosen display name</td>
+</tr>
+<tr>
+<td>Play again (Replay addition)</td>
+<td>Round-scoped leader command; two complete networked matches with guest rejection, roster retention and chat</td>
+</tr>
+<tr>
+<td>Match save/resume UI (Replay addition)</td>
+<td>Direct native authority saves; exact fresh-process solo/host restore, same-seat rejoin, continued actions/restart/chat and malformed/failed-write checks</td>
+</tr>
+<tr>
+<td>Party create/invite/join/rejoin (Replay integration)</td>
+<td>Shared Party helper; native WSS and local browser RTC, durable credentials, profile separation and fresh-process host return</td>
+</tr>
+<tr>
+<td>Invited watch-only mode</td>
+<td>True seat-0 observer across migration and leave/rejoin; no player or backup subscription</td>
+</tr>
+<tr>
+<td>Browser solo checkpoints (Replay addition)</td>
+<td>Named IndexedDB slots; exact restore after SIGKILL, continued play/restart, stale-tab and corruption preservation, alternate slots</td>
+</tr>
+<tr>
+<td>Room save publication and abandoned-party recovery</td>
+<td>Host save/F5, optional cadence, guarded fresh-process rejoin, retained scored round, new guest/round/chat and continued durable save; native/browser fixtures</td>
+</tr>
+<tr>
+<td>Public deployment</td>
+<td>Still pending; direct/native/browser solo saves stay distinct from coordinated party recovery</td>
+</tr>
+<tr>
+<td>Browser party gameplay</td>
+<td>Chrome RTC planned/host-loss migration, observer rejoin, fresh-browser identity/name/invite continuity, new spikes/chat and common worlds</td>
+</tr>
+<tr>
+<td>Public/Steam deployment, other browsers and broad play-feel review</td>
+<td>Still pending for this port</td>
+</tr>
+</tbody></table>
+</div><p>The current experimental content ID is <code>0x5253504545444234</code>. Names, named-profile
+state, manual-start policy and intent commands change the model&#39;s schema from the
+initial Speedball slice. Revision 3 changes start authorization to the first
+connected seat, preserving the match leader during a planned authority handoff and
+selecting a surviving leader after departure. Revision 4 adds the round counter and
+restart intent. The previous content ID is intentionally incompatible;
+old-schema archives have no implicit conversion path. Ball/score rule
+changes were not used to obtain the social/UI result.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/parity.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_speedball/parity.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

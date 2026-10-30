@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay Hello and Loot views · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay Hello and Loot views</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_hello/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#hello">Hello</a><a href="#loot">Loot</a><a href="#validation">Validation</a></nav></details>
+<article class="reading-body "><p>New Godot scenes built on Replay. The original <code>hello_net</code>, <code>hello_sim</code>,
+Cavecrawl, and Scrapyard projects remain in their original locations. These
+Hello and Loot scenes remain <strong>offline</strong>; the separate Network scene now uses
+the new server/client/observer runner.</p>
+<p>From the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># Interactive Hello: arrows move, Space/Enter fires, Escape restarts.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/play.sh
+
+<span class="hljs-comment"># Interactive loot: Space corrects the predicted winner, Escape restarts.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/play.sh loot
+
+<span class="hljs-comment"># Builds both scenes and exercises real Godot processes headlessly.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/run.sh
+
+<span class="hljs-comment"># Four-process networking gate, including injected 240 ms round-trip latency.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/network_run.sh
+
+<span class="hljs-comment"># Interactive network host, then join from another terminal.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/play.sh network
+REPLAY_ROLE=client nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/play.sh network</code></pre></div><p>The Network scene accepts <code>REPLAY_ROLE=host|server|client|observer</code>, <code>REPLAY_PORT</code>,
+<code>REPLAY_ADDRESS</code>, and receive-delay <code>REPLAY_LATENCY</code> (milliseconds). <code>server</code> is an
+avatarless authority; <code>host</code> has a local player. <code>REPLAY_TOKEN</code> provides a
+deterministic identity label for tests; normal clients generate random credentials.
+Persistence across app restarts and host migration remain future work.</p>
+<p>The fault decorator also accepts <code>REPLAY_JITTER</code> in milliseconds and
+<code>REPLAY_LOSS</code>/<code>REPLAY_DUPLICATE</code> in packets per 10,000. Loss/duplication affect
+unreliable traffic; reliable ordering/delivery is preserved. For example:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_JITTER=20 REPLAY_LOSS=1000 REPLAY_DUPLICATE=1000 \
+  nix develop --<span class="hljs-built_in">command</span> bash examples/replay_hello/network_run.sh</code></pre></div><p>The gameplay gate requires acknowledged delta traffic on every participant,
+alongside movement, action, state, and effect assertions.</p>
+<p>The scripts set the collection root and scripts DLL path for the engine; the
+project has its own name and build outputs. <code>REPLAY_PREBUILT=1</code> skips compilation
+only when running the acceptance gate against already current binaries.</p>
+<h2 id="hello">Hello<a class="heading-anchor" href="#hello" aria-label="Link to this section">#</a></h2>
+<p>The script uses the shared <code>game.Timeline</code> runtime alias directly; generated Godot
+registration stays separate from the pure model package.</p>
+<p><code>shared/hello/game.odin</code> contains the complete simulation, shared with native
+tests: frame-owned actors, static kinematic collision, fire cooldowns, and
+projectile creation/expiry. <code>scripts/hello.odin</code> samples devices, advances fixed
+ticks, commits local results, and presents copies through <code>replay/godot</code>.</p>
+<p>The offline Hello scene&#39;s second avatar is a stationary reference. Both avatars
+are player-controlled in the separate Network scene.
+Short button presses are buffered across render frames that produce no tick.
+Ordinary pause discards buffered gameplay edges and fixed-clock remainder. A
+control already held when pausing or resuming must be released before it can act
+again; presses made entirely while paused do not become deferred gameplay.
+Normal local state is immediately confirmed. Explicit playback rewind creates a
+fresh epoch from a retained frame; it does not rewrite already committed history
+inside the original epoch.</p>
+<p>The test walks and fires using Godot&#39;s Input API, waits for projectile expiry,
+rewinds to a retained live-projectile frame, and verifies that its scene instance
+returns without replaying the historical muzzle effect. It also audits the real
+gameplay state after presentation.</p>
+<h2 id="loot">Loot<a class="heading-anchor" href="#loot" aria-label="Link to this section">#</a></h2>
+<p><code>scripts/loot.odin</code> imports the unchanged M1 loot model from
+<code>godot:examples/replay_loot/game</code>. This example therefore requires a repository
+checkout rather than only a packaged addon. It shows the blue player&#39;s predicted
+inventory transfer, then lets you correct the action to the orange player.</p>
+<p>The complete world is revised; the presentation journal cancels the original
+take and begins the replacement while keeping the unchanged projectile effect.
+Repeated correction produces no duplicate effects. The fixture intentionally
+leaves that interaction unconfirmed and advances by commands for inspection.</p>
+<h2 id="validation">Validation<a class="heading-anchor" href="#validation" aria-label="Link to this section">#</a></h2>
+<p><code>run.sh</code> requires <code>REPLAY_HELLO_OK</code> and <code>REPLAY_LOOT_VIEW_OK</code> and rejects script
+errors, engine errors, and scenario failures. It builds on the engine-free
+<code>tests/replay</code> and <code>tests/replay_view</code> suites, including a WASM type-check of the
+instantiated view/clock/adapter/game surface. The broader <a href="../../tests/replay_hello_input/README.html">input/history/recording acceptance</a>
+now also runs real Chrome workflows. These are technical behavior checks, not a
+network comparison or a claim of human play-feel parity.</p>
+<p>Set the scene’s <code>debug_enabled</code> inspector property or launch with <code>REPLAY_DEBUG=1</code>
+for the <a href="../../replay/godot/debug/debug.html">local diagnostic overlay</a>. F8 toggles the panel
+and F9 explicitly audits recent replayable history. It is disabled by default.</p>
+<p>The same option enables the <a href="../../replay/godot/debug/scrubber.html">local history dock</a>.
+F10 pauses for inspection; its slider paints retained frames without changing the
+live world. Resume keeps the original future, while Branch starts from the selected
+frame under a fresh presentation epoch. F8 can hide the audit panel while leaving
+the dock visible. Input held during inspection must be released before it controls
+the resumed game. This is an offline authoring workflow, independent of the network
+scene and the original Hello projects.</p>
+<p>With <code>REPLAY_DEBUG=1</code>, F10 opens local history inspection. Choose a retained tick
+and a field, then Apply to preview. Reset or Resume discards edits; Branch starts
+from the edited frame. Game invariants are checked before accepting each edit.
+See <a href="../../replay/godot/debug/scrubber.html">ownership, supported values and limits</a>.</p>
+<p>The history dock also exports a portable recent recording: <code>user://hello.rplrec</code>
+on native (override with <code>REPLAY_RECORDING_PATH</code>), or a browser download. Export
+uses original history; preview edits are recorded after Branch. The separate
+<a href="../../replay/diagnostic/recording.html#godot-export-and-hello-verifier">headless verifier</a>
+replays the file with Hello&#39;s shared model and reports the first mismatch.</p>
+<p><strong>Open recording</strong> loads a native <code>.rplrec</code> file or browser file selection. Play
+and the slider inspect recorded frames; Details shows verification results. Return
+to game restores the original pause, while Continue from recording starts a new
+local branch. Rejected replacements keep the previous loaded recording. See the
+<a href="../../replay/diagnostic/playback.html">playback ownership and limits</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_hello_input/README.html"><span>Hello input acceptance</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/debug.html"><span>Local diagnostic overlay</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/scrubber.html"><span>Inspecting and branching local history</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_hello/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#hello" class="">Hello</a><a href="#loot" class="">Loot</a><a href="#validation" class="">Validation</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_hello/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

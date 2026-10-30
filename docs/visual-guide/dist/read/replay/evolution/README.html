@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Revision contracts and explicit conversion · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Revision contracts and explicit conversion</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/evolution/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Use these cold-path tools before changing a saved or networked value type. They
+freeze representation contracts; they do not infer compatible gameplay behavior.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">source, report := evolution.freeze(Old_World, <span class="hljs-string">&quot;game_revision_12&quot;</span>, <span class="hljs-string">&quot;World_12&quot;</span>)
+<span class="hljs-comment">// source is owned; write only after report.error == .None, then delete(source).</span>
+manifest, report := evolution.contract(Old_World, CONTENT_12)
+scaffold, report := evolution.scaffold(Old_World, New_World,
+    <span class="hljs-string">&quot;game_revision_conversion&quot;</span>, <span class="hljs-string">&quot;World_12&quot;</span>, <span class="hljs-string">&quot;World_13&quot;</span>)</code></pre></div><p><code>freeze</code> recursively emits all type dependencies into one self-contained Odin type.
+It retains field names/tags, fixed array bounds, scalar widths, enum names/values
+and bit-set definitions. It normalizes native layout and endianness: Replay&#39;s
+canonical encoding, not <code>memcpy</code> layout, is the contract. No imports of live game
+types remain. Choose globally unique Odin package names for different revisions.</p>
+<p>Supported shapes are canonical scalars, structs, fixed arrays, enums and bit sets.
+Unions, enumerated arrays and unsupported shapes fail with an owned diagnostic
+and no generated source. Existing schema union support remains available; freeze
+those revisions with explicitly authored source until a union-aware generator is
+provided. This tool uses the complete authority projection.</p>
+<p><code>contract</code> returns owned JSON containing the semantic ID, schema fingerprint,
+canonical schema text and leaf field paths/kinds/widths/wire offsets, privacy,
+enum meaning and bit masks. Check it into source control beside the frozen type.
+Compare regenerated manifests in CI. It does not freeze reducer code, authorize
+an old recording for a new reducer, or replace a signed build manifest.</p>
+<p><code>scaffold</code> handles additive schema changes. Its generated procedure deliberately
+returns failure until the author supplies target defaults and changes the review
+flag. Every added leaf is listed by full path, including every array element.
+Removed fields, changed widths/kinds, enum meanings/signedness, privacy changes and
+unions/enumerated arrays require custom authored conversion code instead of an automatic scaffold.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">defaults := New_Catalog{} <span class="hljs-comment">// Deliberate decision: old enemies gain no pulse attack.</span>
+paths := []<span class="hljs-type">string</span>{<span class="hljs-string">&quot;$.enemy.pulse.windup&quot;</span>, <span class="hljs-string">&quot;$.enemy.pulse.damage&quot;</span>}
+value, report := evolution.copy_preserved(old, defaults, paths)
+report = evolution.verify_preserved(old, value, paths)</code></pre></div><p><code>copy_preserved</code> validates both values, copies matching canonical leaf bytes into
+the supplied target defaults and decodes transactionally. It requires exactly one
+acknowledgement for every added field and rejects extra/duplicate acknowledgements.
+It does not validate game invariants: call the target model&#39;s validator before
+publishing a checkpoint. <code>verify_preserved</code> checks every old leaf; separately
+assert the chosen new defaults. <code>remove_added</code> provides an explicit inverse
+projection for fixture builders, acknowledging each discarded leaf.</p>
+<p>These helpers compile schemas, allocate scratch and use linear path lookup within
+field loops. They are intended for authoring, offline upgrades and tests, not the
+simulation tick or a per-frame presentation path.</p>
+<p>Scrapyard demonstrates this with a fully frozen
+<a href="../../examples/replay_scrapyard/shared/revisions/content49/catalog.odin.html"><code>content49</code></a>,
+its committed contract, and the actual content49→50 checkpoint converter. Run:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -p /absolute/staging/revision
+nix develop --<span class="hljs-built_in">command</span> odin run examples/replay_scrapyard/tools/revision \
+  -collection:godot=. -- /absolute/staging/revision
+nix develop --<span class="hljs-built_in">command</span> odin <span class="hljs-built_in">test</span> tests/replay_evolution -collection:godot=.</code></pre></div><p>The example command writes a reviewable pair of frozen catalogs, JSON contracts
+and a disabled conversion scaffold into the staging directory. Review before
+adopting them; retain the historical reducer and real old-file fixtures.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/evolution/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/evolution/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

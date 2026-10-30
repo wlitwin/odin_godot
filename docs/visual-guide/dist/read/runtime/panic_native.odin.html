@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>panic_native.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>panic_native.odin</h1><div class="reader-meta"><span>80 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/runtime/panic_native.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">#+build darwin, linux, windows
+<span class="hljs-keyword">package</span> script_runtime
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;base:runtime&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:os&quot;</span>
+
+<span class="hljs-comment">// ----------------------------------------------------------------------------</span>
+<span class="hljs-comment">// NATIVE panic/assert surfacing for compiled scripts — parity with the WEB build.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// A script `panic`, failed `assert`, or failed type assertion routes through</span>
+<span class="hljs-comment">// `context.assertion_failure_proc`. The stock native default DOES print to stderr —</span>
+<span class="hljs-comment">// but a game launched from the EDITOR shows the child&#x27;s output through Godot&#x27;s</span>
+<span class="hljs-comment">// debugger channel (push_error/print over TCP), NOT piped stderr, so the editor&#x27;s</span>
+<span class="hljs-comment">// Output dock stayed completely silent while the game died. (A Finder-launched</span>
+<span class="hljs-comment">// editor&#x27;s stderr goes nowhere at all.)</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// So the native script context (rt.script_context in context.odin) installs</span>
+<span class="hljs-comment">// `native_script_assertion_failure`, which:</span>
+<span class="hljs-comment">//   1. writes a grep-able &quot;ODIN_SCRIPT_PANIC &lt;prefix&gt;: &lt;msg&gt; (file:line:col)&quot; line to</span>
+<span class="hljs-comment">//      STDERR (always works, even pre-boot / headless), then</span>
+<span class="hljs-comment">//   2. best-effort routes the SAME line through the CORE&#x27;s push_error hook — installed</span>
+<span class="hljs-comment">//      post-boot via `odin_scripts_set_panic_report` below — so the editor Output shows</span>
+<span class="hljs-comment">//      it red, then</span>
+<span class="hljs-comment">//   3. traps, exactly like the default assertion proc would.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// HOOK ARCHITECTURE — mirror of `odin_scripts_set_core_api` (cross.odin): the runtime</span>
+<span class="hljs-comment">// package is compiled INTO the scripts dll (its own copy of these globals), so the core</span>
+<span class="hljs-comment">// cannot assign `panic_report_hook` directly. Instead the core dlsym&#x27;s the exported</span>
+<span class="hljs-comment">// setter right after `odin_scripts_boot` and hands over a core-side `proc &quot;c&quot;` that</span>
+<span class="hljs-comment">// calls push_error with the CORE&#x27;s live godot globals. On WEB the whole file is</span>
+<span class="hljs-comment">// excluded: the web script context installs its own web_assertion_failure_proc from</span>
+<span class="hljs-comment">// core/scripts_web.odin (unchanged).</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// KNOWN GAP (same as web): Odin BOUNDS-CHECK failures take a separate contextless</span>
+<span class="hljs-comment">// runtime path that never consults context.assertion_failure_proc — they still print</span>
+<span class="hljs-comment">// to stderr only, then trap. The fatal-signal crash reporter (core/crash.odin) is the</span>
+<span class="hljs-comment">// net under everything else.</span>
+<span class="hljs-comment">// ----------------------------------------------------------------------------</span>
+
+<span class="hljs-comment">// The core&#x27;s &quot;surface this panic message in the editor&quot; reporter (push_error). C-shaped</span>
+<span class="hljs-comment">// so it crosses the core&lt;-&gt;scripts dll boundary like every other handshake proc.</span>
+Panic_Report_Proc :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (msg: <span class="hljs-type">cstring</span>)
+
+<span class="hljs-meta">@(private)</span>
+panic_report_hook: Panic_Report_Proc
+
+<span class="hljs-comment">// Called by the core (dlsym by name, right after boot — see core/scripts_native.odin)</span>
+<span class="hljs-comment">// to hand the scripts dll its push_error reporter. Pre-boot the hook is nil and panics</span>
+<span class="hljs-comment">// are stderr-only, which is the safe floor.</span>
+<span class="hljs-meta">@(export)</span>
+odin_scripts_set_panic_report :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (report: Panic_Report_Proc) {
+	panic_report_hook = report
+}
+
+<span class="hljs-comment">// context.assertion_failure_proc for compiled scripts on native. Formats into a stack</span>
+<span class="hljs-comment">// buffer (allocation-free — the context may be mid-failure), stderr FIRST, then the</span>
+<span class="hljs-comment">// best-effort editor route, then trap like the default. `loc` is the script-relevant</span>
+<span class="hljs-comment">// source location Odin hands every assertion proc (the panic/assert call site).</span>
+native_script_assertion_failure :: <span class="hljs-keyword">proc</span>(prefix, message: <span class="hljs-type">string</span>, loc: runtime.Source_Code_Location) -&gt; ! {
+	buf: [<span class="hljs-number">1024</span>]<span class="hljs-type">byte</span>
+	<span class="hljs-comment">// Reserve one byte so the NUL for the cstring view below always fits.</span>
+	msg := fmt.bprintf(
+		buf[:len(buf) - <span class="hljs-number">1</span>],
+		<span class="hljs-string">&quot;ODIN_SCRIPT_PANIC %s: %s (%s:%d:%d)&quot;</span>,
+		prefix,
+		message,
+		loc.file_path,
+		loc.line,
+		loc.column,
+	)
+	os.write_string(os.stderr, msg)
+	os.write_string(os.stderr, <span class="hljs-string">&quot;\n&quot;</span>)
+	<span class="hljs-keyword">if</span> panic_report_hook != <span class="hljs-literal">nil</span> {
+		buf[len(msg)] = <span class="hljs-number">0</span> <span class="hljs-comment">// msg starts at buf[0]</span>
+		panic_report_hook(<span class="hljs-type">cstring</span>(raw_data(buf[:])))
+	}
+	runtime.trap()
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">runtime/panic_native.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/runtime/panic_native.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

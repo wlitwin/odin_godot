@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Godot bridge performance assessment · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Godot bridge performance assessment</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/godot-bridge-performance.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#view-ownership">View ownership</a><a href="#copy-codec-and-replay-costs">Copy, codec and replay costs</a><a href="#decisions">Decisions</a></nav></details>
+<article class="reading-body "><p>Measurements on macOS arm64, Odin dev-2026-04, Godot 4.7.1, optimized native builds.
+These are isolated elapsed costs with fixed workloads, not rendered-frame rates,
+confidence intervals or a general guarantee for every game. Raw receipts, binaries&#39;
+hashes, source hashes and workload details are in the
+<span class="local-reference" title="docs/replay/results/godot-bridge-2026-09-20/README.md · available in the repository">delivery evidence</span>.</p>
+<h2 id="view-ownership">View ownership<a class="heading-anchor" href="#view-ownership" aria-label="Link to this section">#</a></h2>
+<p>The initial dense benchmark justified replacing repeated linear lookup and making
+root-property caching opt-in. The final comparison also includes small and sparse
+pools and the additional typed owner. Every timed frame moves x; rotation, scale,
+color and typed paint payload remain constant. Scenes are already instantiated.
+Typed paint is empty here, so real child painting can add game-specific work.</p>
+<p>At 1,024 active views, the first expanded comparison measured original Nodes2 at
+609.7 µs, indexing at 107.0 µs, cached Nodes2 at 45.05 µs and typed ownership at
+70.58 µs per presentation call. Caching avoided roughly 75% of root property writes.
+Typed lifetime/payload bookkeeping adds work; ergonomics are not cost-free.</p>
+<p>That comparison exposed a sparse regression: one active view in a capacity-1,024
+pool still scanned capacity and cleared whole indexes. The final implementation
+tracks occupied buckets and uses a retained-membership path after full duplicate/
+identity preflight. Sparse index clearing visits occupied buckets; dense clearing
+stays contiguous. Unchanged membership skips lifecycle/free-slot/index rebuilding.
+Reordered input is supported; changed membership uses the ordinary lifecycle path.</p>
+<p>An alternating comparison of frozen before/after binaries measured:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Active / capacity</th>
+<th align="right">Cached Nodes2 before → after, µs</th>
+<th align="right">Typed owner before → after, µs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 / 1</td>
+<td align="right">0.033 → 0.033</td>
+<td align="right">0.058 → 0.050</td>
+</tr>
+<tr>
+<td>8 / 8</td>
+<td align="right">0.300 → 0.275</td>
+<td align="right">0.442 → 0.425</td>
+</tr>
+<tr>
+<td>1 / 1,024</td>
+<td align="right">2.167 → 0.033</td>
+<td align="right">4.208 → 0.050</td>
+</tr>
+<tr>
+<td>8 / 1,024</td>
+<td align="right">2.442 → 0.258</td>
+<td align="right">4.533 → 0.358</td>
+</tr>
+<tr>
+<td>64 / 64</td>
+<td align="right">2.317 → 2.242</td>
+<td align="right">3.500 → 3.200</td>
+</tr>
+<tr>
+<td>512 / 512</td>
+<td align="right">21.217 → 20.467</td>
+<td align="right">32.542 → 29.667</td>
+</tr>
+<tr>
+<td>1,024 / 1,024</td>
+<td align="right">44.017 → 42.142</td>
+<td align="right">67.458 → 61.892</td>
+</tr>
+</tbody></table>
+</div><p>Each table cell is the median across three process medians, each with five timed
+120-call batches after warmup. Very small values approach timer granularity;
+interpret broad changes rather than the last decimal. Indexed uncached dense
+1,024-view calls also improved slightly, 106.08 → 103.08 µs. Counts match exactly.
+The two comparisons were separate runs; do not mix their numbers as one paired
+experiment. Membership churn/scene construction, GPU and rendering are excluded.</p>
+<p>Memory increases: each index now retains four bytes per configured entry for its
+occupied-bucket list, in addition to its existing keys/values. Nodes2 owns two
+indexes; the typed owner owns two additional indexes and rig/value/batch storage.
+All remain presentation-only. Stable presentation calls allocate no Odin storage;
+scene entry/exit still creates and retires engine objects. Capacity scans remain
+when membership changes or owners clear/destroy.</p>
+<h2 id="copy-codec-and-replay-costs">Copy, codec and replay costs<a class="heading-anchor" href="#copy-codec-and-replay-costs" aria-label="Link to this section">#</a></h2>
+<p>A second optimized benchmark uses actual Hello and Scrapyard models, a 32-byte
+selective display output, a 64-frame history and a 16-tick replay suffix. Scrapyard
+starts with two players and 40 mobs under the documented combat fixture. Medians:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th align="right">Hello</th>
+<th align="right">Scrapyard</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>State bytes</td>
+<td align="right">960</td>
+<td align="right">61,536</td>
+</tr>
+<tr>
+<td>Complete canonical bytes</td>
+<td align="right">896</td>
+<td align="right">52,608</td>
+</tr>
+<tr>
+<td>Public canonical bytes</td>
+<td align="right">896</td>
+<td align="right">24,032</td>
+</tr>
+<tr>
+<td>Materialized frame read</td>
+<td align="right">0.016 µs</td>
+<td align="right">0.926 µs</td>
+</tr>
+<tr>
+<td>Ordinary read then selective projection</td>
+<td align="right">0.0013 µs</td>
+<td align="right">0.0012 µs</td>
+</tr>
+<tr>
+<td>Detached <code>replay.project</code></td>
+<td align="right">0.0131 µs</td>
+<td align="right">0.0108 µs</td>
+</tr>
+<tr>
+<td>Authority encode / hash</td>
+<td align="right">0.331 / 0.141 µs</td>
+<td align="right">33.641 / 24.474 µs</td>
+</tr>
+<tr>
+<td>Public encode / hash</td>
+<td align="right">0.335 / 0.131 µs</td>
+<td align="right">10.101 / 4.920 µs</td>
+</tr>
+<tr>
+<td>Advance one tick</td>
+<td align="right">0.105 µs</td>
+<td align="right">11.351 µs</td>
+</tr>
+<tr>
+<td>Replay 16 ticks</td>
+<td align="right">1.406 µs</td>
+<td align="right">149.332 µs</td>
+</tr>
+</tbody></table>
+</div><p>The selective projection timing intentionally permits optimizer elimination of
+unused fields. It is not evidence of physically copying 61 KB in a nanosecond.
+<code>project</code> has validation/reentry overhead; its primary benefit here is an explicit
+detached ownership contract, not a speedup over an optimized ordinary read.
+The materialized case retains every field and gives a useful separate copy cost.
+Hello&#39;s real full view-batch adapter expands its small World; it is an ergonomics
+example, not a smaller-buffer optimization.</p>
+<p>Scrapyard&#39;s retained records and replay scratch each occupy 3,941,376 bytes at 64
+frames, excluding separate events and allocator metadata. Default 128-frame
+retention roughly doubles those arrays. Immutable definition catalogs can remove
+truly static data from future Worlds, but the catalog/dependency lifetime must stay
+complete across replay, saves and migration. Cavecrawl intentionally still embeds
+its small baked definitions to preserve its existing checkpoint contract.</p>
+<h2 id="decisions">Decisions<a class="heading-anchor" href="#decisions" aria-label="Link to this section">#</a></h2>
+<p>Implemented: indexed identity lookup, exclusive property caching/invalidation,
+changed-value paint, retained-membership fast paths and sparse index clearing.
+These reduce measured repeated work without changing gameplay assignments.</p>
+<p>Keep detached projections for ownership/ergonomics; make no universal zero-copy
+promise. The measured copy cost does not justify introducing chunked/COW storage
+and mandatory mutation tracking now. Memory can still become significant for much
+larger Worlds/history; revisit with an actual target workload and a storage design
+that retains ordinary assignments and transactional replay.</p>
+<p>Do not add a broad snapshot encoding/hash cache here. Inspection shows snapshot
+construction includes recipient projection, connection generation/serial, action
+settlement/input frontiers and per-recipient baselines. Private authority fields
+and public values are different contracts. Canonical bytes are already retained
+for delta baselines. Safe reuse requires explicit equality of all these dependencies;
+a frame tick alone is insufficient. Public encode/hash costs are material, but this
+bridge profile does not isolate a redundant network call to remove safely.</p>
+<p>Existing opt-in exact correction reuse remains available under its documented full-
+dependency rules. This work leaves wire hashes, schemas, checkpoint versions and
+replay semantics unchanged. A future optimization must preserve those contracts
+or introduce an explicit compatibility change.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/godot-bridge-performance.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#view-ownership" class="">View ownership</a><a href="#copy-codec-and-replay-costs" class="">Copy, codec and replay costs</a><a href="#decisions" class="">Decisions</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/godot-bridge-performance.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

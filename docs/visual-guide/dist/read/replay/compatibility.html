@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay compatibility policy · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay compatibility policy</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../reference/replay/compatibility.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#independent-identities">Independent identities</a><a href="#current-format-map">Current format map</a><a href="#saves-and-migrations">Saves and migrations</a><a href="#upgrade-and-support-workflow">Upgrade and support workflow</a></nav></details>
+<article class="reading-body "><p>Replay is experimental. Pin the repository revision and toolchain used to build
+all participants. Source API/ABI stability and arbitrary old-save compatibility
+are not promised. A version check refusing a peer/file is expected behavior, not
+permission to remove the check or guess a conversion.</p>
+<h2 id="independent-identities">Independent identities<a class="heading-anchor" href="#independent-identities" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Identity</th>
+<th>What changes it</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Application content/policy ID</td>
+<td>Gameplay semantics, immutable assets, scheduling, ownership/authority policy or projection meaning</td>
+<td>The application increments it and supplies explicit conversion when appropriate. Code addresses are not a gameplay version.</td>
+</tr>
+<tr>
+<td>Schema fingerprint</td>
+<td>Canonical logical fields, types, unions, variants, policy-defined representations</td>
+<td>Normal decode requires an exact schema. Native struct padding is not wire data.</td>
+</tr>
+<tr>
+<td>Protocol version</td>
+<td>Incompatible packet/handshake semantics</td>
+<td>Peers negotiate/validate it. Optional compatible encodings use declared feature bits and fallback paths.</td>
+</tr>
+<tr>
+<td>Archive format version</td>
+<td>Layout/meaning of stored sections</td>
+<td>A loader validates it before installing state. Conversion is a separate operation.</td>
+</tr>
+<tr>
+<td>Authority epoch</td>
+<td>A newly authorized authority tenure</td>
+<td>Only the authority policy/coordinator grants it. Incrementing a counter does not establish leadership.</td>
+</tr>
+<tr>
+<td>Process incarnation / connection generation</td>
+<td>A new registered process / physical connection</td>
+<td>Retires previous bindings and queued traffic. Neither replaces content or protocol identity.</td>
+</tr>
+</tbody></table>
+</div><p>An invitation identifies enrollment scope, not a simulation checkpoint. A player
+profile credential, authoritative checkpoint, participant P2P archive, public
+snapshot and diagnostic recording are distinct objects with different disclosure
+and restore rules.</p>
+<h2 id="current-format-map">Current format map<a class="heading-anchor" href="#current-format-map" aria-label="Link to this section">#</a></h2>
+<p>These are source constants, not a single library release number:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Current constant</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Canonical RPLY envelope</td>
+<td><code>schema.FORMAT_VERSION = 1</code>, 52-byte header</td>
+</tr>
+<tr>
+<td>Authority gameplay protocol</td>
+<td><code>net.PROTOCOL_VERSION = 7</code></td>
+</tr>
+<tr>
+<td>Complete authority checkpoint</td>
+<td><code>net.CHECKPOINT_VERSION = 4</code></td>
+</tr>
+<tr>
+<td>Durable authority record / control RPC</td>
+<td><code>authority.VERSION = 3</code> / <code>RPC_VERSION = 2</code></td>
+</tr>
+<tr>
+<td>Enrollment bundle / create-join protocol / client journal</td>
+<td><code>provision.VERSION = 1</code> / <code>PROTOCOL = 1</code> / <code>ENROLLMENT_VERSION = 1</code></td>
+</tr>
+<tr>
+<td>Deterministic P2P input protocol</td>
+<td><code>p2p.VERSION = 2</code></td>
+</tr>
+<tr>
+<td>P2P participant archive / spectator stream</td>
+<td><code>ARCHIVE_VERSION = 1</code> / <code>WATCH_VERSION = 1</code></td>
+</tr>
+<tr>
+<td>Fixed-roster provisioning / pair-key RPC / native link</td>
+<td><code>VERSION = 1</code> / <code>PAIR_VERSION = 1</code> / link <code>VERSION = 1</code></td>
+</tr>
+<tr>
+<td>Local diagnostic recording</td>
+<td><code>diagnostic.RECORDING_VERSION = 1</code></td>
+</tr>
+</tbody></table>
+</div><p>Matching version numbers alone are insufficient. Content, schema, model policy,
+seat counts, timing and scope checks still apply. The shared envelope checksum
+detects corruption; it does not authenticate the sender. TLS, authenticated control
+or the admitted gameplay transport supplies the applicable identity protection.</p>
+<h2 id="saves-and-migrations">Saves and migrations<a class="heading-anchor" href="#saves-and-migrations" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Preserve the original bytes and inspect/decode them under their source contract.</li>
+<li>Choose a named converter for the exact source version/model. Validate input and
+produce a separate owned candidate; do not rewrite the original on failure.</li>
+<li>Verify the converted frame/ledger and every referenced immutable asset before
+publishing it. A field rename or schema match does not prove semantic parity.</li>
+<li>Restore only after the relevant identity, lease, history and policy checks.
+Conversion itself grants no authority and does not advance an epoch.</li>
+</ol>
+<p><code>checkpoint_upgrade_v6</code> bridges compatible protocol-6/layout-4 authority archives
+to protocol 7. State, policy, control/action/event and game-content changes require
+the applicable explicit conversion callbacks/types. The game-specific converters
+in the ports demonstrate that workflow; they are not universal loaders. See
+<a href="net/checkpoint_upgrade.html">checkpoint conversion</a>.</p>
+<p>Recordings retain the model decisions needed to reproduce their historical run.
+Changing gameplay events can require executing the old model, even when a world
+can be converted to a new save. A replay divergence must not be hidden by swapping
+the recorded expected outcome. P2P return also needs compatible retained input and
+checksum history; a frame-only save cannot supply missing protocol history.</p>
+<h2 id="upgrade-and-support-workflow">Upgrade and support workflow<a class="heading-anchor" href="#upgrade-and-support-workflow" aria-label="Link to this section">#</a></h2>
+<p>Run <code>tests/replay_framework/run.sh</code> after a library/toolchain update. Then run the
+focused real-process gate for the transport/recovery profile your game uses.
+Core smoke success is not public-network, all-platform or game-parity acceptance.</p>
+<p>The pinned Odin dev-2026-04 arm64 optimizer has a reproduced fixture-factory
+miscompile, retained in the <span class="local-reference" title="docs/replay/results/framework-audit-2026-09-20/README.md · available in the repository">framework audit</span>.
+The test factory uses a narrow no-inline workaround; normal runner APIs remain
+unchanged. Reevaluate that workaround when changing toolchains, while retaining
+default/optimized native/WASM comparisons.</p>
+<p>List API/format changes and available converters with each future library release.
+Keep supported platform/backend combinations and unverified integrations explicit.
+Do not treat a successful local test as a blanket compatibility or security claim.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net/checkpoint_upgrade.html"><span>Explicit checkpoint conversion</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/compatibility.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#independent-identities" class="">Independent identities</a><a href="#current-format-map" class="">Current format map</a><a href="#saves-and-migrations" class="">Saves and migrations</a><a href="#upgrade-and-support-workflow" class="">Upgrade and support workflow</a></nav><div class="outline-actions"><a href="../../reference/replay/compatibility.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

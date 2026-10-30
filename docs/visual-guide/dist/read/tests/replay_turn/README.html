@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Actual TURN relay gates · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Actual TURN relay gates</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/tests/replay_turn/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#running">Running</a><a href="#evidence-handling">Evidence handling</a></nav></details>
+<article class="reading-body "><p>These fixtures use Coturn and real Chrome peer connections. They force
+<code>iceTransportPolicy: &quot;relay&quot;</code>, inspect the selected candidate pair through the
+browser&#39;s statistics API, and require relay candidates and transferred bytes on
+both sides. A successful direct localhost connection cannot satisfy the gate.</p>
+<p>The relay binds only to <code>127.0.0.1</code>. Test credentials are random and stored in a
+private work directory. The fixture deliberately permits loopback relay peers;
+that exception is for this local test and must not be copied to a public deployment.
+Neither these tests nor the library install a public relay or issue production
+relay credentials.</p>
+<h2 id="running">Running<a class="heading-anchor" href="#running" aria-label="Link to this section">#</a></h2>
+<p>Provide a Coturn executable. Linux installations can use their packaged version.
+The repository&#39;s pinned Coturn derivation is marked broken on macOS; the fixture
+was tested using an isolated build of its pinned 4.9.0 source with existing native
+OpenSSL, libevent and SQLite development libraries:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">COTURN_BUILD=/tmp/replay-coturn \
+bash tests/replay_turn/build_coturn.sh</code></pre></div><p><code>build_coturn.sh</code> prints the executable path. It changes no system installation.
+<code>COTURN_SOURCE</code> supplies a pre-fetched source tree; otherwise Nix fetches the
+pinned source. <code>COTURN_PREFIX</code> defaults to <code>/opt/local</code> for the tested native setup.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">TURNSERVER=/tmp/replay-coturn/bin/turnserver \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh
+
+TURNSERVER=/tmp/replay-coturn/bin/turnserver REPLAY_PREBUILT=1 \
+REPLAY_TURN_PROTOCOL=tcp \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh
+
+TURNSERVER=/tmp/replay-coturn/bin/turnserver REPLAY_PREBUILT=1 \
+REPLAY_TURN_SCENARIO=auth \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh
+
+TURNSERVER=/tmp/replay-coturn/bin/turnserver REPLAY_PREBUILT=1 \
+REPLAY_TURN_SCENARIO=outage \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh
+
+TURNSERVER=/tmp/replay-coturn/bin/turnserver REPLAY_TURN_GAME=scrapyard \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh
+
+TURNSERVER=/tmp/replay-coturn/bin/turnserver REPLAY_TURN_PROVIDER=1 \
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh</code></pre></div><p>Run these serially: the fixtures use relay ports 53000–53100. Cavecrawl is the
+default game; run its normal relay gate before the authentication scenario, which
+uses its built export. <code>REPLAY_PREBUILT=1</code> requires current previously built game
+artifacts. Set <code>REPLAY_TURN_OUT</code> to retain results at a chosen path.</p>
+<p>UDP/TCP selects the browser-to-TURN transport. Relayed peer traffic still uses
+the browser&#39;s WebRTC/DTLS data-channel stack. The selected candidate&#39;s
+<code>relayProtocol</code> must match the requested transport. The normal gates run menu
+enrollment, simultaneous-room isolation where included by the game fixture,
+gameplay, host migration and fresh-process rejoin. Scrapyard additionally checks
+the asset preparation barrier and active-combat checkpoint.</p>
+<p>The authentication scenario gives the guest an intentionally wrong TURN password.
+It requires a candidate error, no connected candidate pair and no gameplay entry.
+A fresh process then uses correct ICE settings with the same stored membership,
+registers a newer incarnation and joins through the relay. This is not a general
+relay-outage/restart test.</p>
+<p>The separate <code>outage</code> scenario retains the coordinator and game processes, stops
+and restarts the relay, and checks a new relay-selected connection, unchanged
+identity/epoch/inventory and a new authority-confirmed guest action. It requires
+the current Cavecrawl export. <code>REPLAY_TURN_DOWNTIME_MS</code> selects 1,000–30,000 ms of
+deliberate downtime before relay startup; actual downtime includes startup time.
+The same fixture can run with UDP or TCP relay transport. See
+<a href="../../replay/godot/transport/rtc-recovery.html">RTC continuation</a> for the reconnect mechanism.</p>
+<h2 id="evidence-handling">Evidence handling<a class="heading-anchor" href="#evidence-handling" aria-label="Link to this section">#</a></h2>
+<p>The browser probe observes real constructors and calls <code>getStats</code>; it does not
+substitute peer connections, candidate pairs or payload traffic. Reports include
+candidate types, relay protocol and byte counters, omitting IPs and credentials.
+Coturn&#39;s verbose allocation/channel logs provide independent relay-side evidence.
+Never copy <code>ice.json</code>, <code>turn.conf</code>, credential databases or browser profiles into
+published results. Screenshots from the game fixtures mask party invite text.</p>
+<p>Configuration validation runs independently:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/config_run.sh</code></pre></div><p>It checks bounded ICE JSON, server/URL/credential shapes, relay-only requirements,
+owned configuration strings and propagation into Room options, plus WASM compilation.</p>
+<p>The authoritative contracts are
+<a href="https://github.com/coturn/coturn/blob/master/examples/etc/turnserver.conf" rel="noreferrer">Coturn&#39;s configuration</a>,
+<a href="https://docs.godotengine.org/en/stable/classes/class_webrtcpeerconnection.html" rel="noreferrer">Godot&#39;s connection API</a>,
+and the browser&#39;s <a href="https://www.w3.org/TR/webrtc-stats/#dom-rtctransportstats-selectedcandidatepairid" rel="noreferrer">selected-pair statistics</a>.
+See <span class="local-reference" title="docs/replay/results/turn-relay-2026-09-07/README.md · available in the repository">recorded results</span> for
+actual acceptance and the remaining public deployment envelope.</p>
+<p>The <a href="../replay_turn_faults/README.html">UDP datagram fault gate</a> adds a bounded
+multi-client loopback proxy and Slopball planned/crash recovery checks under actual
+Chrome-to-TURN packet delay, loss and duplication.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/godot/transport/rtc-recovery.html"><span>RTC continuation during a gameplay reconnect</span><span aria-hidden="true">→</span></a><a href="../replay_turn_faults/README.html"><span>Browser UDP TURN fault gate</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_turn/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#running" class="">Running</a><a href="#evidence-handling" class="">Evidence handling</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_turn/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

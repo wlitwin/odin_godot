@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Fixed-roster P2P admission · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Fixed-roster P2P admission</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/p2p/admission/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#godot-integration">Godot integration</a><a href="#lifecycle-and-boundaries">Lifecycle and boundaries</a><a href="#evidence">Evidence</a></nav></details>
+<article class="reading-body "><p>This package authenticates a participant against a trusted match provider before a
+physical connection is bound to a P2P roster slot. It does not supply gameplay
+state, elect a simulation authority or choose a winning checksum.</p>
+<p><code>Match</code> names a session, content version, epoch and ordered roster of 2–8 nonzero,
+unique member IDs. <code>Registry</code> is owned by the provider and holds the current
+credential incarnation, secret key and enabled flag for each member. Clients get
+the match description and only their own credential. Validate the complete registry
+with <code>registry_valid</code> before publishing it. Stable member order determines player
+roles; the first member may create the signaling room and the others may join.</p>
+<p><code>proof</code> produces a fixed 116-byte request. It binds the create/join role, session,
+epoch, member/incarnation, ordered-match SHA-256 digest and 16-byte connection
+challenge under a domain-separated HMAC-SHA256 using the member&#39;s 32-byte key.
+<code>verify</code> checks the registry, exact identity, enabled status, role, challenge, MAC
+and complete match scope. The domain is <code>replay-p2p-admission-v1</code>; this proof is
+separate from the authority-lease rendezvous proof. A room code is the hexadecimal
+match digest, not a credential. No secret key is sent in the proof.</p>
+<p>The verifier is stateless. The signaling frontend must create a cryptographically
+random challenge per connection, consume it once and enforce a deadline. It must
+assign the sender identity itself when forwarding signaling messages. Authenticate
+the provider through a trusted transport such as verified WSS for deployment;
+client proof does not authenticate an arbitrary server to the client.</p>
+<h2 id="godot-integration">Godot integration<a class="heading-anchor" href="#godot-integration" aria-label="Link to this section">#</a></h2>
+<p>The existing bounded <code>Rendezvous</code> frontend implements the challenge lifecycle,
+rate/size limits and continuation reservations. It now accepts an explicit
+<code>Rendezvous_Provider</code>; ordinary <code>rendezvous_init</code> keeps the authority Service policy.
+For a P2P registry:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">provider := rgd.rendezvous_p2p_provider(&amp;registry, clock)
+cfg := rgd.DEFAULT_RENDEZVOUS_CONFIG
+cfg.mesh = <span class="hljs-literal">true</span>
+ok := rgd.rendezvous_provider_init(&amp;frontend, provider, &amp;websocket, cfg)</code></pre></div><p>The frontend borrows the registry, clock and socket. Keep their addresses stable.
+Poll the socket, route text messages through <code>rendezvous_receive</code>, and pump the
+frontend as documented in <a href="../../godot/rendezvous.html">Rendezvous</a>. Full-mesh
+introductions and signaling are opt-in; ordinary authority rooms remain stars.</p>
+<p>The client owns a stable <code>Rtc_P2P_Auth{match, identity, key}</code> and opens with
+<code>rtc_p2p_config</code>. Peer introductions carry member and incarnation as exact 64-bit
+hex values. <code>require_identity</code> refuses missing/invalid metadata;
+<code>rtc_peer_identity(&amp;rtc, physical_id)</code> exposes the verified introduction only for
+a connected peer on an authenticated signaling connection. Verify that member
+against the expected roster, create the logical-to-physical <code>Remap</code>, then initialize
+or reconnect the P2P runner. A fresh physical ID alone never establishes membership.</p>
+<h2 id="lifecycle-and-boundaries">Lifecycle and boundaries<a class="heading-anchor" href="#lifecycle-and-boundaries" aria-label="Link to this section">#</a></h2>
+<p>Changing credential incarnation invalidates old admission proofs while retaining
+the same match code and stable member roster. Disabling a credential removes its
+signaling permission. The provider owns durable credential storage, monotonic
+incarnation registration, revocation policy and secure personal-key distribution;
+this package does not implement an account database or public provisioning UI.
+Registry updates must happen at an externally synchronized boundary.</p>
+<p>Admission authenticates connection establishment. Established direct gameplay
+channels can outlive signaling loss. Removing signaling permission alone is not a
+complete policy for ejecting a player from an already connected match; the
+application/provider must also fence its gameplay transport or terminate that
+fixed-roster match. Changing the roster requires a new match contract. There is no
+claim that a peer can be trusted to simulate honestly merely because it authenticated.</p>
+<p>The signaling frontend retains the first member as the room creator. Its browser
+process may now return from a compatible archive while peers retain their runners.
+The creator keeps numeric RTC ID 1; the survivor detects the new connection
+generation and the transport wrappers discard retired buffered work. This requires
+the same live provider/match scope; it does not elect a different roster member
+to replace the creator or recover its missing inputs.
+Fresh participants cannot steal an existing continuation reservation using only a
+member key. After the configured reservation expires they may obtain a new ID with
+a fresh challenge; the P2P runner still requires a compatible durable input archive.</p>
+<h2 id="evidence">Evidence<a class="heading-anchor" href="#evidence" aria-label="Link to this section">#</a></h2>
+<p><code>tests/replay_p2p_admission/run.sh</code> checks valid roles and rejection of changed
+scope/roster, key, challenge, incarnation and malformed registries. The real Godot
+<code>service_run.sh</code> admits three members, checks exact identity introductions,
+client-to-client signaling and sender-spoof overwriting, and rejects five bad
+admission attempts using independently constructed Node HMACs.</p>
+<p><code>web_run.sh</code> imports personal fixture credentials in separate Chrome processes,
+then performs the Duel&#39;s Save &amp; pause, SIGKILL and fresh-browser archive rejoin
+for the joining player and the creator in separate scenarios.
+The existing authority-based RTC service, signaling continuation/expiry, P2P core
+and plain browser fault gates also pass. See the
+<span class="local-reference" title="docs/replay/results/p2p-admission-2026-09-08/README.md · available in the repository">recorded results</span>.
+The service fixture binds loopback and contains published test keys. Public WSS,
+account provisioning, authenticated spectator roles and broader platform acceptance
+remain open work.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../godot/rendezvous.html"><span>Coordinator-backed RTC signaling</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/admission/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#godot-integration" class="">Godot integration</a><a href="#lifecycle-and-boundaries" class="">Lifecycle and boundaries</a><a href="#evidence" class="">Evidence</a></nav><div class="outline-actions"><a href="../../../../reference/replay/p2p/admission/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

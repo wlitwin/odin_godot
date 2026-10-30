@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Quickdraw sessions and social UI · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Quickdraw sessions and social UI</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_quickdraw/session-ui.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>The separate Replay game now starts at a scene-authored menu. Enter a name and
+choose Solo, Host, Join or Watch. Address and port are editable before connection.
+Host opens a waiting duel; the first connected player is the match leader and can
+Start. Gameplay remains stationary until that command is accepted. Solo starts
+immediately. Scripted <code>RQ_ROLE</code> launches retain automatic play, and the existing
+credential-based Room launches still open automatically unless <code>RQ_AUTO=0</code>.</p>
+<p>Enter focuses chat; Escape releases focus and preserves the draft. Typing captures
+movement, drone steering, firing, dash, lob and purchase input while networking and
+simulation keep running. Submitted text is displayed literally. Observer chat waits
+for negotiated display-name support before enabling submission, so the selected
+label is included without changing the observer&#39;s admitted identity or seat zero.</p>
+<p>Tab shows the authoritative scoreboard: player name, kills, deaths, gold and measured
+round-trip time. Departed rows remain until their seat is reused. Leave closes the
+session and returns to the menu. Rejoining with the retained identity restores the
+same seat and existing scores; chat history is supplied by the active authority.</p>
+<p>Player names, waiting/started state and the manual-start policy are values inside
+<code>World</code>. Names are declared through validated seat-owned actions. Start is rejected
+for anyone other than the current first connected player, or after play has begun.
+Existing movement, damage, hit-query, respawn, projectile, shop and score rules are
+unchanged once the duel starts.</p>
+<p>Normal native play retains a local identity and display name using the shared
+profile helpers. Explicit <code>RQ_TOKEN</code>, a bot, or <code>RQ_PERSIST=0</code> bypasses these local
+preferences for tests. <code>RQ_PROFILE</code> selects an alternate identity path; the name
+uses that path plus <code>.name</code>. Corrupt data is preserved and joining reports the
+failure. These preferences are distinct from game checkpoints and Room credentials.
+Browser identity/name persistence and service-backed party invitations now use the
+shared <a href="online.html">Party integration</a>. Public deployment remains separate work.</p>
+<p>The experimental content ID is now <code>0x52515549434b4432</code> (D2). Adding names, start
+policy and their actions changes the complete state/action schema. D1 peers and
+archives are intentionally incompatible; there is no implicit old-save conversion.
+Original Kit Quickdraw remains separately runnable with its original content and
+protocol. Host migration still requires a compatible prepared checkpoint; changing
+this UI does not waive lease, rollback-window or admission rules.</p>
+<p>The native UI fixture is <code>tests/replay_quickdraw_ui/run.sh</code>. It drives real menu
+buttons and three processes, tests start authorization and input capture, verifies
+literal and named observer chat, produces a real kill for nonzero scoreboard rows,
+and leaves/rejoins without resetting scores. Separate regression runners retain
+the existing historical/live A/B, predicted lob and combat migration checks.</p>
+<p>This is a session/UI parity increment, not full Quickdraw completion. Broader combat
+feedback review, public/browser/Steam paths, measurements and human
+visual/play-feel review remain in the full roadmap.</p>
+<p><a href="saves.html">Native file saves</a> now add Save/F5 and Resume solo/host. They preserve a
+complete authority checkpoint and require its host identity; coordinated Room
+recovery remains a separate path.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Quickdraw parties</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Native Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/session-ui.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_quickdraw/session-ui.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

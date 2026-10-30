@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Web / WASM target — Odin scripts in the browser · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Web / WASM target — Odin scripts in the browser</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/design/web-internals.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#verdict--green">Verdict: 🟢 GREEN</a><a href="#the-webnative-split-when-web-design">The web/native split (when WEB design)</a><a href="#build-command-sequence-buildbuild_websh">Build command sequence (build/build_web.sh)</a><a href="#the-five-blockers-found-and-fixed-all-wasm-strictness-latent-on-native">The five blockers found and fixed (all wasm-strictness latent on native)</a><a href="#emscripten-version">Emscripten version</a><a href="#in-browser-verification">In-browser verification</a><a href="#the-full-showcase-game-loop-in-the-browser-testsweb_showcase">The FULL showcase game loop in the browser (tests/web_showcase/)</a><a href="#blocker-6--script-context-had-no-usable-allocator-on-web">Blocker #6 — script context had no usable allocator on web</a></nav></details>
+<article class="reading-body "><h2 id="verdict--green">Verdict: 🟢 GREEN<a class="heading-anchor" href="#verdict--green" aria-label="Link to this section">#</a></h2>
+<p>The <strong>full</strong> odin_godot extension (core <code>ScriptLanguageExtension</code> + the generated
+<code>godot</code>/<code>gdext</code> binding + a project&#39;s compiled <code>.odin</code> scripts) builds into <strong>one
+Emscripten <code>SIDE_MODULE</code> wasm</strong>, Godot 4.6.2&#39;s headless web export bundles it, and an
+Odin script&#39;s <code>_ready</code> <strong>verifiably runs in a real browser</strong> — it prints <code>WEB_RAN</code> +
+<code>WEB_ASSERT_OK</code> (the latter from calling an Odin <code>@(gd_method)</code> <code>add(2,3)==5</code>) to the JS
+console, captured by a headless-Chrome driver.</p>
+<p>Reproduce (inside <code>nix develop</code>):</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash tests/web/run.sh&#x27;</span>    <span class="hljs-comment"># -&gt; PHASEWEB_OK</span></code></pre></div><p>This builds the wasm, web-exports <code>tests/web/</code>, serves it with COOP/COEP, drives headless
+Chrome, and asserts the sentinels. Native desktop is untouched: <code>tests/phase{2,3,35,4,5}</code>
+still print <code>PHASE*_OK</code>.</p>
+<hr>
+<h2 id="the-webnative-split-when-web-design">The web/native split (<code>when WEB</code> design)<a class="heading-anchor" href="#the-webnative-split-when-web-design" aria-label="Link to this section">#</a></h2>
+<p>Native ships a stable <strong>core</strong> dll that <code>dlopen</code>s a swappable <strong>scripts</strong> dll (Phase-2
+manifest/boot handshake + Phase-4 hot reload) and an editor <strong>export</strong> pipeline. None of
+that exists in the browser: there is no <code>dlopen</code>, no compiler, no editor, and the whole
+program is one wasm module sharing one linear memory with the engine.</p>
+<p>A build switch <code>WEB :: #config(ODIN_GODOT_WEB, false)</code> (<code>-define:ODIN_GODOT_WEB=true</code>)
+plus <strong>arch-gated files</strong> (<code>#+build</code> tags) split the two worlds. The native path is
+entirely unchanged under <code>when !WEB</code> / <code>#+build darwin, linux, windows</code>.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Native</th>
+<th>Web</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scripts location</td>
+<td>separate <code>libodinscripts</code> dll, <code>dlopen</code>ed</td>
+<td>linked INTO the same module (<code>@(require) import &quot;godot:core&quot;</code> from the scripts package, wasm32-only)</td>
+</tr>
+<tr>
+<td><code>@(init)</code> self-registration</td>
+<td>runs on <code>dlopen</code></td>
+<td>a SIDE_MODULE has no CRT/entry, so <code>odin_godot_init</code> calls <code>runtime._startup_runtime()</code> itself (<code>web_startup</code>)</td>
+</tr>
+<tr>
+<td>Class manifest</td>
+<td>dlsym <code>odin_scripts_manifest</code>, after <code>odin_scripts_boot</code></td>
+<td>call <code>rt.odin_scripts_manifest()</code> directly (same module, shared globals — no boot)</td>
+</tr>
+<tr>
+<td>Hot reload</td>
+<td>copy+<code>dlopen</code>+rebind</td>
+<td>n/a (returns false)</td>
+</tr>
+<tr>
+<td>Export plugin</td>
+<td><code>EditorExportPlugin</code> (os/libc/fmt)</td>
+<td>excluded (<code>export_plugin.odin</code> is <code>#+build darwin, linux, windows</code>)</td>
+</tr>
+<tr>
+<td>Core bookkeeping allocator</td>
+<td>Odin heap allocator</td>
+<td>alignment-correct wrapper over the engine allocator (see below)</td>
+</tr>
+</tbody></table>
+</div><p>Files: <code>core/web.odin</code> (switch + allocator), <code>core/scripts.odin</code> (shared indexing),
+<code>core/scripts_native.odin</code> (<code>#+build darwin, linux, windows</code>), <code>core/scripts_web.odin</code>
+(<code>#+build wasm32, wasm64p32</code>), guards in <code>core/main.odin</code>, tag on
+<code>core/export_plugin.odin</code>. The compose file is generated into the scripts dir as
+<code>odin_godot_web_wasm32.odin</code> by <code>build/build_web.sh</code>.</p>
+<h2 id="build-command-sequence-buildbuild_websh">Build command sequence (<code>build/build_web.sh</code>)<a class="heading-anchor" href="#build-command-sequence-buildbuild_websh" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># 1. scriptgen -&gt; *.gen.odin + res:// stubs   2. emit the wasm32-only compose file</span>
+<span class="hljs-comment"># 3. Odin -&gt; wasm object: freestanding wasm32, PIC, obj, no entry, ODIN_GODOT_WEB</span>
+odin build &lt;project&gt;/scripts -collection:godot=&lt;root&gt; \
+    -target:freestanding_wasm32 -build-mode:obj -no-entry-point -reloc-mode:pic \
+    -define:ODIN_GODOT_WEB=<span class="hljs-literal">true</span> -custom-attribute:gd_method -out:libodin_godot.wasm.o
+<span class="hljs-comment"># 4. object -&gt; Emscripten SIDE_MODULE (entry_symbol odin_godot_init via Odin @(export))</span>
+emcc libodin_godot.wasm.o -sSIDE_MODULE=1 -sSUPPORT_LONGJMP=wasm -O2 -o libodin_godot.wasm</code></pre></div><p>The <code>.gdextension</code> points <code>web.{debug,release}.wasm32</code> at <code>res://bin/libodin_godot.wasm</code>.
+Godot web export needs <code>variant/extensions_support=true</code> (selects the dlink runtime).</p>
+<h2 id="the-five-blockers-found-and-fixed-all-wasm-strictness-latent-on-native">The five blockers found and fixed (all wasm-strictness latent on native)<a class="heading-anchor" href="#the-five-blockers-found-and-fixed-all-wasm-strictness-latent-on-native" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong>PIC.</strong> <code>SIDE_MODULE</code> data relocations require <code>-reloc-mode:pic</code>. Spike W&#39;s leaf
+module had no mutable globals so never hit this.</li>
+<li><strong><code>@(init)</code> never ran.</strong> With <code>-no-entry-point</code> the Odin startup is dead-code
+eliminated. Fix: <code>odin_godot_init</code> calls <code>runtime._startup_runtime()</code> (<code>__$startup_runtime</code>)
+itself.</li>
+<li><strong><code>function signature mismatch</code> (the real &quot;version mismatch&quot;).</strong> <code>gdext.Variant_Type</code>
+was <code>enum u64</code>, but the C <code>GDExtensionVariantType</code> is <code>int</code> (i32) — every other gdext
+enum is already <code>enum c.int</code>. Benign on 64-bit native (the C ABI ignores the high
+word, and 8-byte struct fields are absorbed by padding before 8-aligned pointers); on
+wasm it is a hard <code>call_indirect</code> type trap (and a 4-byte-pointer struct-layout break).
+Fix: <code>Variant_Type :: enum c.int</code> (<code>gdext/lib.odin</code>) — correct on <strong>both</strong> targets.</li>
+<li><strong><code>fd_write</code> abort / detached ArrayBuffer.</strong> Odin&#39;s <code>default_wasm_allocator</code> grows the
+shared linear memory via raw <code>memory.grow</code>, colliding with Emscripten&#39;s arena and
+detaching its cached HEAP views. Fix: route Odin allocations through the <strong>engine</strong>
+allocator (<code>gdext mem_alloc</code>), wrapped to honor alignment (Odin maps assert 64-byte
+cache-line alignment with low bits free for tagging) — <code>core/web.odin</code>
+<code>web_aligned_allocator</code>.</li>
+<li><strong><code>abort()</code> on free — non-zeroed <code>new</code>.</strong> The Godot allocator&#39;s <code>.Alloc</code> does not zero
+(it just wraps <code>mem_alloc</code>), violating Odin&#39;s contract that <code>new</code>/<code>make</code> return zeroed
+memory. Native happened to get zero pages; web&#39;s malloc returns reused memory, so
+<code>new(OdinScript)</code> had garbage <code>source_utf8</code>/<code>base_type</code>/<code>class_name</code> and the first
+<code>delete</code> freed a garbage pointer. Fix: explicit zeroing of the script struct
+(<code>script.odin</code>) and the per-instance user struct (<code>instance.odin</code>), and routing the
+owned-string alloc+free through one stable allocator (<code>core_allocator</code>).</li>
+</ol>
+<h2 id="emscripten-version">Emscripten version<a class="heading-anchor" href="#emscripten-version" aria-label="Link to this section">#</a></h2>
+<p>Godot 4.6.2&#39;s web templates were built with emscripten <strong>4.0.20</strong>. The module was built
+and <strong>runs in the browser</strong> both with the dev shell&#39;s <strong>5.0.6</strong> and with a manual
+<strong>emsdk 4.0.20</strong> install — so the exact match is <em>not</em> required here: <code>-sSUPPORT_LONGJMP=wasm</code>
+keeps the longjmp ABI self-contained and the dylink format is cross-compatible. The
+earlier &quot;must relink under 4.0.20&quot; concern was a red herring (the true blocker was #3
+above). To pin anyway: <code>EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh</code>.</p>
+<h2 id="in-browser-verification">In-browser verification<a class="heading-anchor" href="#in-browser-verification" aria-label="Link to this section">#</a></h2>
+<p><code>tests/web/</code> is a minimal project (a <code>Main</code> node with an attached <code>.odin</code> script).
+<code>tests/web/serve.sh</code> serves the export with <code>Cross-Origin-Opener-Policy: same-origin</code> +
+<code>Cross-Origin-Embedder-Policy: require-corp</code> (Godot web needs SharedArrayBuffer), using
+Node (the macOS system <code>python3</code> is a stub that fails inside <code>nix develop</code>).
+<code>tests/web/drive.mjs</code> drives headless Chrome via <code>puppeteer-core</code> (uses the system
+Chrome, software WebGL2 via SwiftShader) and asserts <code>WEB_RAN</code> + <code>WEB_ASSERT_OK</code> appear
+in the console. <code>tests/web/run.sh</code> wires the whole thing and prints <code>PHASEWEB_OK</code>.</p>
+<p>Constraint note: blocker #3&#39;s one-line fix is in <code>gdext/lib.odin</code> (normally a generated/
+off-limits file). It was the single blocking correctness bug, brings <code>Variant_Type</code> in
+line with every other enum in that file, is verified native-safe (all phase tests pass),
+and is correct on every target — so it was applied rather than left as a remaining step.</p>
+<hr>
+<h2 id="the-full-showcase-game-loop-in-the-browser-testsweb_showcase">The FULL showcase game loop in the browser (<code>tests/web_showcase/</code>)<a class="heading-anchor" href="#the-full-showcase-game-loop-in-the-browser-testsweb_showcase" aria-label="Link to this section">#</a></h2>
+<p><code>tests/web/</code> only proves a trivial <code>_ready</code>. <code>tests/web_showcase/</code> proves the <strong>real</strong>
+pure-Odin coin-collector loop runs in a browser: a GDScript <code>driver.gd</code> (the export&#39;s main
+scene) moves the Player onto a Coin and steps <strong>physics</strong>, so the Area2D&#39;s <code>body_entered</code>
+fires naturally → Odin <code>collect</code> → <code>game_state_add</code> increments the <strong>shared</strong> score →
+script-declared <code>collected</code> signal emits → coin <code>queue_free</code>d → the cross-script HUD Label
+reflects the new score. The driver prints <code>SHOWCASE_WEB_OK score=&lt;n&gt; value=&lt;v&gt;</code>; the
+console shows e.g. <code>physics-collected coin; shared get_score()=5; listener value=5; cross-script HUD=&#39;Score: 5&#39;</code>. No simulated keyboard input is needed — the physics-collide
+path is fully driveable programmatically. Run: <code>bash tests/web_showcase/run.sh</code> →
+<code>PHASEWEBSHOWCASE_OK</code>. Wired into <code>tests/run_all.sh</code> as the browser-gated <code>web_showcase</code>.</p>
+<p>To make the <strong>editor</strong> &quot;Export → Web&quot; work for a project, two things are required and now
+automated:</p>
+<ul>
+<li>The project <code>.gdextension</code> keeps its <strong>native</strong> <code>macos.*</code> entries AND adds
+<code>web.{debug,release}.wasm32 = &quot;res://bin/libodin_godot.wasm&quot;</code>. The native entry is what
+loads the extension <strong>on the macOS export host</strong> so its <code>OdinResourceFormatLoader</code>
+recognizes the authored <code>.odin</code> files and <strong>packs them</strong> — without it the sources are
+excluded from the pck and the scripts&#39; base types cannot be resolved in the browser.</li>
+<li><code>core/export_plugin.odin</code>&#39;s <code>_export_begin</code>, on the <code>web</code> feature, now <strong>builds</strong> the
+SIDE_MODULE by shelling <code>build/build_web.sh &lt;project&gt;</code> (inheriting the editor&#39;s nix PATH
+so <code>odin</code>/<code>emcc</code> resolve), so the <code>res://bin/libodin_godot.wasm</code> the <code>.gdextension</code>
+references actually exists at export. Godot&#39;s GDExtension export handling then bundles it
+automatically (like the macOS dylib). Verified: <code>--export-release &quot;Web&quot;</code> bundles
+<code>libodin_godot.wasm</code> + <code>index.side.wasm</code> with <strong>no</strong> <code>No &quot;wasm32&quot; library found</code> warning.</li>
+</ul>
+<h2 id="blocker-6--script-context-had-no-usable-allocator-on-web">Blocker #6 — script <code>context</code> had no usable allocator on web<a class="heading-anchor" href="#blocker-6--script-context-had-no-usable-allocator-on-web" aria-label="Link to this section">#</a></h2>
+<p>The generated trampolines (lifecycle wrappers + <code>@(gd_method)</code> trampolines) ran their
+user-proc bodies under <code>context = runtime.default_context()</code>. On <code>freestanding_wasm32</code>
+that context is <strong>unusable for allocating scripts</strong>: <code>ODIN_OS == .Freestanding</code> forces
+<code>NO_DEFAULT_TEMP_ALLOCATOR</code>, so <code>temp_allocator</code> is <strong>nil</strong> — any <code>core:fmt</code>/temp
+allocation silently yields <code>&quot;&quot;</code> (the HUD&#39;s <code>fmt.ctprintf(&quot;Score: %d&quot;, …)</code> produced an
+empty Label) — and the main allocator is Odin&#39;s own wasm allocator (the unsafe
+<code>memory.grow</code> path from blocker #4). Benign on native (heap-backed default context); only
+the showcase&#39;s HUD was the first web script to actually allocate.</p>
+<p>Fix (one indirection, native unchanged): scriptgen now emits <code>context = rt.script_context()</code>
+instead of <code>runtime.default_context()</code>. <code>runtime/context.odin</code> defines <code>script_context()</code> —
+on native a settable hook is nil so it returns <code>runtime.default_context()</code> byte-for-byte;
+on web the core installs the hook (<code>core/scripts_web.odin</code> <code>web_script_context</code>) returning a
+context whose <code>allocator</code> <strong>and</strong> <code>temp_allocator</code> are the engine-backed, alignment-correct
+<code>web_aligned_allocator</code>. Files: <code>runtime/context.odin</code> (new), <code>scriptgen/generate.odin</code>,
+<code>core/scripts_web.odin</code>. All native phase tests stay green (the hook is nil there).</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/web-internals.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#verdict--green" class="">Verdict: 🟢 GREEN</a><a href="#the-webnative-split-when-web-design" class="">The web/native split (when WEB design)</a><a href="#build-command-sequence-buildbuild_websh" class="">Build command sequence (build/build_web.sh)</a><a href="#the-five-blockers-found-and-fixed-all-wasm-strictness-latent-on-native" class="">The five blockers found and fixed (all wasm-strictness latent on native)</a><a href="#emscripten-version" class="">Emscripten version</a><a href="#in-browser-verification" class="">In-browser verification</a><a href="#the-full-showcase-game-loop-in-the-browser-testsweb_showcase" class="">The FULL showcase game loop in the browser (tests/web_showcase/)</a><a href="#blocker-6--script-context-had-no-usable-allocator-on-web" class="">Blocker #6 — script context had no usable allocator on web</a></nav><div class="outline-actions"><a href="../../../reference/docs/design/web-internals.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

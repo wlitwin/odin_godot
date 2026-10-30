@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay Cavecrawl · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay Cavecrawl</h1><div class="reader-meta"><span>9 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_cavecrawl/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#implemented-gameplay">Implemented gameplay</a><a href="#comparison-and-intentional-differences">Comparison and intentional differences</a><a href="#browser-authority-migration">Browser authority migration</a></nav></details>
+<article class="reading-body "><p>This is a <strong>separate, in-progress reimplementation</strong> of the original
+<a href="../cavecrawl/README.html">Cavecrawl</a>. Both projects remain independently runnable.
+The new version uses Replay&#39;s complete-world simulation and session facade.</p>
+<p>The <a href="online.html">online party menu</a> now creates and joins rooms through a
+<a href="../replay_room_service/README.html">standalone service</a>, persists credentials,
+selects trusted successors automatically and rejoins recent parties. It has
+native TLS and browser RTC acceptance; public deployment remains open.</p>
+<p>From the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># Open the connection menu; choose Solo, Host, Join, or a native saved run.</span>
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/play.sh
+
+<span class="hljs-comment"># Listen host and a client, from separate terminals.</span>
+REPLAY_CAVE_ROLE=host nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/play.sh
+REPLAY_CAVE_ROLE=client nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/play.sh
+
+<span class="hljs-comment"># Pure gameplay tests, then real Godot solo/co-op acceptance.</span>
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/network_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/replication_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/save_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/recovery_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_migration/run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_migration/crash_run.sh</code></pre></div><p>WASD/arrows move, E uses nearby objects, Space/click throws, Q drops the first bag
+slot, R heals, G sets down the relic, F pings your position, Tab holds the scoreboard,
+Enter focuses chat, and F5 saves the authority&#39;s game. Roles are <code>solo</code>, <code>host</code>, <code>server</code>,
+<code>client</code>, and <code>observer</code>. <code>REPLAY_CAVE_ADDRESS</code>, <code>REPLAY_CAVE_PORT</code>, <code>REPLAY_CAVE_TOKEN</code> (test identity),
+and receive-delay <code>REPLAY_CAVE_LATENCY</code> configure local runs. The co-op test uses
+120 ms receive delay on each process. Opening the project without a role opens the
+connection menu. <code>REPLAY_CAVE_LOBBY=1</code> enables staging for explicit launch roles.</p>
+<p>Save files default to this project&#39;s <code>user://cave.replay</code>; set <code>REPLAY_CAVE_SAVE</code>
+to use another path. Launch with <code>REPLAY_CAVE_RESUME=1</code> to resume as solo/host/server.
+The host/solo profile must be the same one that owns the saved seat. Profiles
+default to <code>user://&lt;role&gt;.token</code>, or an explicit <code>REPLAY_CAVE_PROFILE</code> path. Give
+each local player a distinct profile when running several clients on one machine.
+Keep the token file alongside your save when moving your own game to another
+machine; the checkpoint contains hashes rather than the credentials themselves.
+Original Cavecrawl saves/profiles are separate and are never read or changed.
+Browser saves use the token-scoped IndexedDB slot described below.</p>
+<p>Direct Session save/resume advances the authority epoch. Clients in that profile
+set <code>REPLAY_CAVE_EPOCH</code> to the printed epoch and reuse their profile. The Room flow
+below follows coordinator-approved authority changes automatically; the separate
+direct co-op recovery fixture restarts both runtime processes. Pending actions
+in a loaded save are explicitly retired; already executed actions keep their
+deduplication frontier. See the <a href="../../docs/replay/recovery.html">recovery contract</a>.</p>
+<p>The replication gate keeps the host and guest playing while periodic authority
+checkpoints use their existing ENet connection. It opts the guest into backups
+with <code>REPLAY_CAVE_BACKUP=1</code> and explicitly selects seat 2 through <code>backup_to</code>.
+It verifies a shared checkpoint containing the looted gems and open door under
+120 ms receive delay, 20 ms jitter, 10% loss, and 10% duplication. General live
+runs also accept <code>REPLAY_CAVE_JITTER</code>, <code>REPLAY_CAVE_LOSS</code>, and
+<code>REPLAY_CAVE_DUPLICATE</code> (loss/duplication values are per 10,000). This is replication;
+that gate does not itself invoke takeover. The separate migration gates below do.</p>
+<p>The native coordinator-driven room profile now supports planned handoff and crash
+takeover while guests keep running. Its fixture starts a coordinator, host,
+successor, and guest. The guest keeps its loot and performs a fresh action after
+reconnecting in epoch 2; planned handoff also rejoins the old host as a player.
+The game shows reconnect/host-change feedback and reports known rollback.</p>
+<p>The fixture supplies <code>REPLAY_CAVE_COORD_PORT</code>, <code>REPLAY_CAVE_MEMBER</code>,
+<code>REPLAY_CAVE_INCARNATION</code>, and a 64-character lowercase hex
+<code>REPLAY_CAVE_COORD_KEY</code>. This example currently uses explicit local provisioning
+for room 44; use the generic <a href="../../replay/godot/room.html">Room API</a> for other
+coordinator addresses/configurations. The game now has a party lobby; public account/room provisioning and the
+remaining M5 coverage are still pending.</p>
+<h2 id="implemented-gameplay">Implemented gameplay<a class="heading-anchor" href="#implemented-gameplay" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>The two authored floor layouts, chest stocks, den positions, wave counts, and
+wave rests from the original game.</li>
+<li>120 px/s movement and a 20 Hz simulation matching the original gameplay timing.</li>
+<li>Six-slot bags, chest transfers, drop/grab pickups, and range-gated doors.</li>
+<li>Atomic relic carry/set-down state and a version counter for carrier changes.
+<a href="relic.html">C6 relic rules</a> preserve it across floors and release it in place on restart.
+<a href="carrier.html">C7 carrier rules</a> retain ownership through death, disconnect and recovery.
+<a href="adoption.html">C8 adoption</a> transfers an old host’s relic to its successor.</li>
+<li>Rocks, stamina, cooldowns, damage, chill, death spills, respawn, heal, and revive.</li>
+<li>Dweller chase/flee/bite behavior, frame-owned wave/respawn clocks, floor changes,
+and the final escape condition.</li>
+<li>Replayable pool lifetime and generation-preserving floor teardown.</li>
+<li><a href="projectiles.html">Rock presentation</a>: centered glyphs and bounded motion between
+simulation ticks, preserving simulation collision and impact timing.</li>
+<li><a href="feedback.html">Combat feedback</a>: journal-driven player/dweller death bursts,
+player hit sparks and flashes, with correction/cancellation and detached lifetime.</li>
+<li><a href="moderation.html">Host moderation</a>: remove a selected player and block rejoin,
+with coordinator-durable successor exclusion in Room sessions.</li>
+<li>Solo, listen-host, dedicated authority, client prediction, and observer modes
+through <code>replay/godot.Session</code>.</li>
+</ul>
+<p>The pure tests cover item conservation/capacity, interactions, combat/revive,
+floor progression, old-handle rejection, rift navigation, and the real cave model
+contesting loot through the network runner under loss. Godot tests now include a <a href="campaign.html">full co-op campaign</a>: inventory handoff,
+relic carry, death/revive/respawn, stale pickup rejection, healing, all four waves
+and final escape with a shared victory-frame hash. Normal and faulted runs pass.
+This still does not establish complete authored/visual feature parity.</p>
+<h2 id="comparison-and-intentional-differences">Comparison and intentional differences<a class="heading-anchor" href="#comparison-and-intentional-differences" aria-label="Link to this section">#</a></h2>
+<p>The static <code>levels/level_*.tscn</code> files are byte-for-byte copies of the original
+authored scenes. Entity views retain the original scene presentation while their
+old script attachments are removed. <a href="assets.html">assets.md</a> records source paths
+and hashes. The original scripts/framework are not imported into gameplay.</p>
+<p>The new model keeps all mutable gameplay state inside <code>World</code>. A chest transfer
+updates both the chest and bag directly in one action. Projectiles, AI clocks,
+status effects, and entity existence participate in replay. The original uses
+owner-streamed movement and several authority-only consequences.</p>
+<p>Known differences/gaps:</p>
+<ul>
+<li>This profile keeps server-simulated movement/relic state. The separate
+<a href="../replay_cavecrawl_owned/README.html">owner-motion variant</a> now reuses this gameplay
+with versioned pose producers, scoped command origins, native/Chrome recovery
+and a matched quiet comparison. Broader remote presentation and full parity remain work.</li>
+<li>Dweller pathing uses a pure visibility graph around the authored rectangular
+rift. The original queries Godot&#39;s navigation mesh. Exact paths are not claimed
+identical; this is an explicit physics/navigation port cost to compare.</li>
+<li>Floor resources and markers are captured as saved world values; seeded decorative
+scatter matches the original integer recipe. See <a href="authoring.html">authoring.md</a> for
+validation, local scene assets and explicit conversion of earlier Replay saves.</li>
+<li>Relic races now reject the losing action; the original consequence could accept
+a harmless no-op. Pickups retain any amount that does not fit the receiving bag.</li>
+<li><a href="director.html">Wave pacing</a> now matches the original director in 262 native/WASM
+scenarios. Population beyond the fixed 16-dweller pool and broader floor-state
+correspondence remain separate comparison boundaries.</li>
+<li>Chat/pings and a combat/loot scoreboard now use the optional <a href="../../replay/comms/README.html">Comms service</a>.
+Party names and readiness are replayable, with native/IndexedDB local name preferences.
+<a href="social.html">Score latency and stamped ping names</a> now have native/browser
+rename/rejoin/migration acceptance. Public provisioning, Steam paths, richer
+effects, and the full migration failure matrix remain open. The full old <code>cave_test.gd</code> scenario
+inventory has not been ported yet.</li>
+</ul>
+<p>See <a href="parity.html">parity.md</a> and the repository <a href="../../docs/replay/roadmap.html">roadmap</a>.</p>
+<h2 id="browser-authority-migration">Browser authority migration<a class="heading-anchor" href="#browser-authority-migration" aria-label="Link to this section">#</a></h2>
+<p><code>nix develop --command bash examples/replay_cavecrawl/web_run.sh</code> builds the real
+Cavecrawl project and a native SQLite-backed control/signaling fixture. Three
+independent Chrome processes collect loot, replicate an approved checkpoint and
+complete planned or killed-host migration. The guest retains its inventory/seat
+and performs a newly accepted door action; planned mode rejoins the old host.
+The default matrix includes <code>planned</code>, <code>crash</code>, <code>repeat</code>, <code>partition</code>,
+<code>successor_loss</code>, <code>return</code> and <code>signaling</code>. Use <code>RCB_MODES</code> to select cases. Logs are retained at
+the printed path (<code>RCB_LOGS</code> overrides it).</p>
+<p>Browser launch uses lowercase URL equivalents of <code>REPLAY_CAVE_*</code> options, including
+<code>coord_url</code>, <code>coord_key</code>, <code>member</code>, <code>incarnation</code>, <code>token</code> and <code>role</code>. These fixture
+credentials demonstrate the protocol; they are not public account provisioning.
+Room combines WebSocket control, challenged RTC signaling and direct gameplay
+channels. Its native endpoint encoding is unchanged; RTC destinations are explicit
+provider/code targets derived from the authenticated authority view.</p>
+<p>Each run also records driver timestamps and a timing summary; these include
+waiting for leases and fresh browser startup that the local Room timer can omit.
+The <code>signaling</code> case drops host/client signaling sockets, verifies unchanged
+connection generations and epoch, and performs a new accepted game action.
+TLS/TURN, richer browser workloads and other browser/OS combinations remain open. See the <a href="../../docs/replay/browser-migration.html">browser migration work</a>.</p>
+<p>Set the scene’s <code>debug_enabled</code> inspector property or launch with <code>REPLAY_DEBUG=1</code>
+for the <a href="../../replay/godot/debug/debug.html">local diagnostic overlay</a>. F8 toggles the panel
+and F9 explicitly audits recent replayable history. It is disabled by default.</p>
+<p>Run the full host/client/observer campaign with
+<code>nix develop --command bash examples/replay_cavecrawl/campaign_run.sh</code>.</p>
+<p><code>nix develop --command bash examples/replay_cavecrawl/social_run.sh</code> checks chat
+submission through the actual input signal, typing without moving/firing, late-join
+scrollback, transient ping expiry and live scoreboard loot. Chat is ephemeral
+session history; it is not part of a gameplay save.</p>
+<p><code>nix develop --command bash tests/replay_migration/social_run.sh</code> adds chat before
+and after planned/crash migration. <code>RCB_SOCIAL=1</code> enables the corresponding chat,
+ping and scoreboard assertions in the real-browser migration gate (select
+<code>RCB_MODES=&#39;planned crash&#39;</code>). Lobby names, stamped social names and per-player latency columns have separate
+<a href="social.html">native/browser acceptance</a>; broader social UX remains open.</p>
+<p>Run <code>nix develop --command bash examples/replay_cavecrawl/social_web_run.sh</code> for
+the registered browser social/migration gate.</p>
+<p>The <a href="../../replay/lobby/README.html">party lobby</a> stores names, readiness and a party
+leader in World. Ready up, then let the leader press Start. Recorded departures
+select the lowest present seat as a new leader; reconnecting players ready again
+before a staged run. During play, Escape opens the party/Leave panel. After victory,
+Another run resets the cave/inventory while retaining profiles and cumulative stats.</p>
+<p><code>REPLAY_CAVE_NAME</code> supplies a display name. Normal native menu sessions use a stable
+<code>user://player.token</code>; existing explicit-role launch paths retain their role-specific
+credential defaults. Local names use <code>user://display_name</code>; override with
+<code>REPLAY_CAVE_NAME_PATH</code> or browser <code>profile_namespace</code>. <code>REPLAY_CAVE_PERSIST=0</code> makes
+the preference session-only. Tests use isolated paths/namespaces and explicit tokens.
+Browser multiplayer opens through provisioned Room invite URLs; the menu offers Solo
+when no invite is present. Browser identities and local saves now use IndexedDB, with Resume available after a
+validated slot read. Public provisioning remains separate work.</p>
+<p>Run <code>nix develop --command bash examples/replay_cavecrawl/lobby_run.sh</code> for actual
+menu, readiness, renaming, named chat/scoreboard, leave/reopen and native preference
+reload checks. The current game content is <code>0x4341564552504c39</code>; see
+<a href="authoring.html">authoring.md</a> for explicit conversion of earlier Replay saves.</p>
+<p>Browser Solo now stores its Session identity and complete save archive in IndexedDB.
+The default namespace is <code>replay-cavecrawl</code>; <code>profile_namespace</code> changes it and
+<code>save_slot</code> chooses a slot (default <code>cave</code>). F5 or the party panel&#39;s Save run button
+starts a save. Wait for the completion message; Leave is disabled during the write.
+Resume loads and validates the saved world under the same identity and advances the
+authority epoch. The display name alone does not identify an owning player.</p>
+<p>Each page retains the revision it observed before play. If another page saves first,
+the stale writer is refused. Leave and explicitly resume the latest save before
+continuing; a failed/corrupt record is never silently replaced. Room sessions keep
+using approved checkpoint recovery and cannot be converted into an offline save
+through this button. See the <a href="../../replay/godot/browser_checkpoint.html">browser checkpoint contract</a>.</p>
+<p>Run <code>nix develop --command bash examples/replay_cavecrawl/browser_save_run.sh</code> for
+real Chrome identity creation, forced-process recovery, exact frame restoration,
+stale-tab refusal and corrupt-record preservation checks. The harness uses a new
+isolated browser profile and dedicated test namespaces.</p>
+<p>C5 preserves avatar health, stamina, cooldowns and active chill across descent.
+Initial start and Another run use explicit reset policies. See <a href="floor-state.html">floor state and
+save compatibility</a>; older Replay saves require explicit conversion.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../cavecrawl/README.html"><span>cavecrawl — the co-op reference</span><span aria-hidden="true">→</span></a><a href="online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#implemented-gameplay" class="">Implemented gameplay</a><a href="#comparison-and-intentional-differences" class="">Comparison and intentional differences</a><a href="#browser-authority-migration" class="">Browser authority migration</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

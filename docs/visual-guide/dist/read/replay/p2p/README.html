@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Deterministic peer rollback — initial runner · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="README.html" aria-current="page">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Deterministic peer rollback — initial runner</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/p2p/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#input-and-confirmation-contract">Input and confirmation contract</a><a href="#determinism-and-trust">Determinism and trust</a><a href="#archives-and-participant-recovery">Archives and participant recovery</a><a href="#implemented-envelope-and-remaining-m7-work">Implemented envelope and remaining M7 work</a></nav></details>
+<article class="reading-body "><p><code>Runner(State, Input, Event, Seats)</code> is independent of the server-authoritative
+runner. Each participant owns its input stream and simulates the same complete
+match. No participant supplies authoritative state corrections to another.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">model := p2p.Model(World, Input, Event, <span class="hljs-number">2</span>){
+    step = step_world,
+    input_valid = valid_input,
+    state_valid = valid_world,
+    hold = predict_missing_input,
+}
+error := p2p.init(&amp;peer, initial_frame, model, roster, local_slot, transport)
+error = p2p.pump(&amp;peer, monotonic_ms)
+result := p2p.advance(&amp;peer, sampled_input)
+<span class="hljs-comment">// Consume device edges when result.captured. Consume the clock tick on success.</span>
+<span class="hljs-comment">// Waiting preserves the already captured future input and stalls simulation.</span></code></pre></div><p>The roster is ordered, fixed and supplied by an external admission/transport
+provider. Slot numbers are zero-based. Transport peer IDs determine input ownership;
+packets cannot name another slot. The native Godot example establishes two peers
+through an ENet listening/dialing pair. Listening chooses the transport topology,
+not a simulation authority. A larger roster requires full-mesh delivery through the
+transport abstraction. Native tests exercise two- and three-peer meshes.</p>
+<h2 id="input-and-confirmation-contract">Input and confirmation contract<a class="heading-anchor" href="#input-and-confirmation-contract" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Session/epoch/content, ordered roster, schema, tick rate, delay, history,
+prediction limit and initial state hash are gated before play.</li>
+<li>The first <code>delay</code> ticks after the initial checkpoint use known neutral input.
+<code>advance</code> captures one immutable local sample for <code>head + delay + 1</code>. A repeated
+call while stalled does not replace that sample. <code>Result.captured</code> identifies
+the capture boundary for short presses; it is separate from successful stepping.</li>
+<li>Peers resend bounded windows from their oldest unacknowledged input. ACKs describe
+received input, not simulated or globally committed gameplay. Out-of-order
+receipt advances a contiguous frontier only when all earlier samples exist.</li>
+<li>Missing remote input is derived with <code>hold(previous)</code>. A changed late input
+replays the complete affected suffix, refreshing guesses from actual received
+samples. <code>replay.revise_inputs</code> commits that suffix transactionally without
+incorrectly confirming still-guessed earlier ticks.</li>
+<li>Confirmation advances only through ticks whose inputs from every participant
+are known. The prediction horizon bounds how far simulation can run ahead.
+Blackout exhaustion returns Waiting; it does not approximate a resync from one
+peer&#39;s world. Local input history is also retained until peers acknowledge it.</li>
+<li>A rolling checksum chains every confirmed canonical state and occurrence batch.
+Disagreement produces a Diverged phase and mismatch tick/peer/hash diagnostics.
+Conflicting values for an already received input fail the match. The runner
+does not silently pick a winner or merge states.</li>
+</ul>
+<p>The wire uses canonical RPLY framing, fixed-size input windows and bounded decode
+storage. Input schemas are limited to 256 wire bytes; packet size is at most 8192
+bytes. The pump receives at most 64 packets per call. Configuration allows 2–8
+seats, 32–1024 history frames and a prediction+delay horizon below history capacity.
+Runtime owners contain allocations and must remain at stable addresses.</p>
+<h2 id="determinism-and-trust">Determinism and trust<a class="heading-anchor" href="#determinism-and-trust" aria-label="Link to this section">#</a></h2>
+<p>The runner rejects float-bearing state/input/event schemas and platform-sized
+integer fields. This is a useful constraint, not proof of a deterministic callback:
+authors must avoid hidden state, floating intermediates, unstable ordering and
+external side effects. <code>replay/deterministic</code> supplies checked Q24.8 operations and
+integer queries; the duel uses fixed-width values, deterministic pool allocation
+and frame-owned RNG. Native arm64 and freestanding WASM execute the same four-seed
+2,400-tick corpus to identical canonical state/event hashes.</p>
+<p>Checksums are consistency diagnostics, not authentication or cheat resistance.
+The transport/roster provider must authenticate peers for deployments that need it.
+A peer can withhold inputs; the chosen policy stalls and ultimately disconnects
+after timeout. That does not establish fair-play adjudication.</p>
+<h2 id="archives-and-participant-recovery">Archives and participant recovery<a class="heading-anchor" href="#archives-and-participant-recovery" aria-label="Link to this section">#</a></h2>
+<p><code>archive_capture</code>, <code>archive_encode</code>, <code>archive_decode</code> and <code>restore</code> preserve the
+complete retained execution and protocol state. An archive contains its oldest
+retained frame and occurrences, subsequent input batches and per-tick digests,
+confirmed rolling hashes, speculative suffix, captured future local inputs,
+sparse received inputs, receive/ACK frontiers, roster and original match contract.
+Archives own their storage; destroy them with <code>archive_destroy</code>. The transport
+and callback/user pointers are supplied afresh and are never serialized.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">archive: p2p.Archive(World, Input, Event, <span class="hljs-number">2</span>)
+error = p2p.archive_capture(&amp;peer, &amp;archive)
+bytes, error := p2p.archive_encode(&amp;archive, model)
+<span class="hljs-comment">// Persist bytes with an application save boundary, then release owned storage.</span>
+<span class="hljs-comment">// Decode into an empty Archive; restore into an empty, stable-address Runner.</span>
+report: p2p.Replay_Report
+error = p2p.restore(&amp;fresh_peer, &amp;archive, model, roster, local_slot, fresh_transport,
+                    report = &amp;report)</code></pre></div><p>The version-1 archive envelope is canonical, content/schema gated and limited to
+16 MiB. Counts and exact payload length are checked before count-driven allocation.
+Restore validates frontiers and reexecutes the retained input sequence before
+installing the runtime. A changed model produces <code>Replay_Mismatch</code> with the first
+retained failing tick and expected/actual digest; failure releases staged storage.
+The rolling hash at a wrapped base is an anchor for earlier history, not a replay
+of that discarded history. Archives contain complete private world data, and CRC/
+hash checks provide integrity diagnostics, not authenticity.</p>
+<p>Participants may restore together on fresh transport bindings, or one participant
+may restore while survivors retain their live runners and explicitly reconnect.
+Saves may have different receive/confirmation frontiers:
+protocol version 2 exchanges each peer&#39;s durable received frontier in Hello and
+resends any formerly acknowledged suffix it still retains. If a peer has received
+local inputs that this archive forgot, or the required retransmission history is
+gone, recovery fails with <code>History</code>. Old captured inputs are never regenerated.
+The admission provider must exclude old connection traffic and rebind the same
+ordered logical identities. <code>transport.Remap</code> supplies explicit, one-to-one logical
+to physical bindings; it does not authenticate them.</p>
+<p>For a live rejoin, restore the returning participant&#39;s own archive, then call
+<code>reconnect(&amp;survivor, replacement_transport, monotonic_ms)</code> on every affected
+survivor after the provider verifies the replacement bindings. This restarts Hello
+and its retry/timeout clock while retaining the survivor&#39;s exact timeline,
+captured inputs, ACK/receive frontiers, checksums and allocations. Advancement waits
+for the roster handshake. Reconnect is permitted after a timeout (<code>Disconnected</code>)
+or during a running/connecting session, at a settled runner boundary. It refuses
+failed/divergent runners, an active timeline operation, unresolved input repair,
+backward time and missing transport callbacks. Both transports are borrowed;
+the caller owns their lifetimes and retirement.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Provider has authenticated the same ordered identities and fenced old traffic.</span>
+error = p2p.reconnect(&amp;survivor, replacement_transport, monotonic_ms)
+<span class="hljs-comment">// Continue pumping and advancing normally once phase is Running.</span></code></pre></div><p>The native Duel now exercises either participant returning. When the original
+listener returns, the surviving dialing process closes/reopens its ENet transport,
+rebuilds logical mappings and reconnects the retained runner even though the
+remote physical server ID is again 1. Closing the transport owner retires the old
+receive/delay buffers. This configured loopback provider is not authentication or
+source election; see the example&#39;s native creator-rejoin gate.</p>
+<p>This requires a compatible durable archive. If a crashed player continued sampling
+after its last save, survivors may have inputs that the archive no longer contains;
+that recovery fails with <code>History</code>. A retained input log or another compatible save
+boundary is needed to cover that crash window. Reconnect does not choose another
+peer&#39;s world, change the roster, elect an authority or recover forgotten inputs.
+Caller verification and old-traffic exclusion are requirements, not services
+implemented by this function.</p>
+<p>Capture a settled <code>Diverged</code> runner to retain its mismatch metadata and local
+execution. Replaying with its original deterministic callback reproduces that
+execution and preserves the stopped phase. Replaying with a changed callback
+locates the first different retained state/event digest; it does not identify the
+root cause or prove that either participant was correct. Callback code is not
+serialized, so keep the corresponding build/content version with a recording.
+The Duel includes an offline <a href="../../examples/replay_duel/verify.sh.html">verifier</a>.</p>
+<p>The two-process Godot recovery gate saves at speculative tick 240, kills both
+processes, binds fresh ENet IDs, restores and continues to tick 600 with reference
+world and occurrence reconciliation checks. Native-created session/divergence
+archives also decode and replay inside freestanding WASM to identical reports.
+The separate native <code>rejoin_run.sh</code> saves and kills only the dialing participant,
+keeps the listener alive through timeout, and restores against a new ENet binding.
+Both reach the same tick-600 world and reconciled occurrences. A three-player
+native/WASM corpus exercises two successive individual rejoins after timeout under
+four loss/jitter/duplication seeds, in default and speed builds.
+The browser Duel also exercises a single returning participant in fresh Chrome:
+its Save &amp; pause control freezes capture before download, the process is killed,
+and its file is imported while the other browser retains the running match.
+The joining player receives a new physical RTC ID, rebound to its logical roster
+slot. The authenticated provider also supports the creator returning at the same
+ID 1 with a new connection generation. Delay/fragment/router buffers fence retired
+work; either survivor retains its runner. Both reach the tick-600 reference world.</p>
+<h2 id="implemented-envelope-and-remaining-m7-work">Implemented envelope and remaining M7 work<a class="heading-anchor" href="#implemented-envelope-and-remaining-m7-work" aria-label="Link to this section">#</a></h2>
+<p>The initial runner, integer duel, loss/reordering/duplication tests, timeout,
+divergence checks and native two-process ENet gate exist. A lost input burst
+recovers through retransmission and bounded rollback. The Godot demo reconciles
+speculative events and compares the final world with an independent reference.</p>
+<p>Confirmed <a href="spectators.html">spectators</a> now join a running match, replay received
+history, and reset explicitly after a blackout exceeds retained history. They use
+separate bounded transfer streams and never join the player confirmation roster.
+An admitted spectator can now rebind to another participant using a retained
+state/event/chain anchor. The replacement must prove overlap; missing history or
+conflict is explicit. Native Duel and repeated native/WASM source-switch gates
+exercise this <a href="spectators.html#changing-the-source-without-discarding-the-world">continuity contract</a>.
+Optional <a href="profiling.html">profiling</a> separates forward/replay/hash/pump wall time from
+capture-to-simulation input latency. Standalone benchmarks measure process CPU and
+the effect of fixed input-delay settings using matched recorded gameplay.</p>
+<p>An initial <a href="admission/README.html">authenticated admission provider</a> now checks
+fixed-roster credentials before initial binding and browser rejoin. It reuses the
+bounded challenged signaling frontend and supports full-mesh introductions.</p>
+<p><a href="provision/README.html">Fixed-roster provisioning</a> now supplies durable room/invite
+enrollment, exact retries and authenticated incarnation changes. Its native TLS
+service/client and SQLite crash gates pass. The <a href="../godot/p2p_party.html">P2P party client</a>
+now connects browser Duel&#39;s invite menus to authenticated gameplay and fresh-process
+guest/creator return. The native <a href="../godot/p2p_direct.html">P2P Direct owner</a> now
+supports authenticated two-player ENet and fresh-process endpoint replacement.</p>
+<p>Roster changes, public authenticated provisioning,
+cross-native-platform execution and deployment integration remain pending. A
+copied Frame alone does not resume this session protocol. The fixed-point corpus
+and archive replay execute in WASM. The playable Duel now also passes real WebRTC
+Chrome-process gates for delayed/lost inputs, a bounded blackout, late spectator
+reset and coordinated participant-file restoration. Public rendezvous/TURN and
+other browser engines are not established by these local gates.
+The archive retains a bounded diagnostic window, not a complete input/arrival log
+for arbitrarily long matches. Broader recording tools and field-level diffs remain
+debugger work.</p>
+<p>See <a href="../../examples/replay_duel/README.html">Replay Duel</a> and the full
+<a href="../../docs/replay/roadmap.html">roadmap</a>. This is an M7 increment, not completion of
+all P2P capabilities or the Replay roadmap.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="spectators.html"><span>Confirmed P2P spectators</span><span aria-hidden="true">→</span></a><a href="profiling.html"><span>P2P timing and benchmark contract</span><span aria-hidden="true">→</span></a><a href="admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#input-and-confirmation-contract" class="">Input and confirmation contract</a><a href="#determinism-and-trust" class="">Determinism and trust</a><a href="#archives-and-participant-recovery" class="">Archives and participant recovery</a><a href="#implemented-envelope-and-remaining-m7-work" class="">Implemented envelope and remaining M7 work</a></nav><div class="outline-actions"><a href="../../../reference/replay/p2p/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

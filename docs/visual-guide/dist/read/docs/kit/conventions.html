@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Kit API conventions · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Kit API conventions</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/conventions.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#event-delivery">Event delivery</a><a href="#lifetime-and-ownership-suffixes">Lifetime and ownership suffixes</a><a href="#procedure-prefixes">Procedure prefixes</a><a href="#package-boundaries">Package boundaries</a><a href="#out-of-scope-systems">Out-of-scope systems</a></nav></details>
+<article class="reading-body "><p>This page documents naming, event delivery, and ownership conventions used by
+Kit packages. It is primarily a contributor reference. Game authors do not need
+to memorize it before using the quickstarts.</p>
+<h2 id="event-delivery">Event delivery<a class="heading-anchor" href="#event-delivery" aria-label="Link to this section">#</a></h2>
+<p>Kit chooses an event shape according to the lifetime of the data and whether the
+caller can wait until the next frame.</p>
+<h3 id="queued-events">Queued events<a class="heading-anchor" href="#queued-events" aria-label="Link to this section">#</a></h3>
+<p>Packages with several event types expose a tagged <code>Event</code> union and a poll proc:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">for</span> {
+	event, ok := ksess.session_poll(&amp;session)
+	<span class="hljs-keyword">if</span> !ok {<span class="hljs-keyword">break</span>}
+	<span class="hljs-comment">// handle event</span>
+}</code></pre></div><p><code>session_poll</code>, <code>comms_poll</code>, and <code>xfer_poll</code> use this pattern. Events are queued
+so normal game reactions run from the game&#39;s frame loop, after Kit has completed
+the operation that produced them.</p>
+<p>When a package has one queue shape, the poll proc returns a tuple instead of a
+one-variant union. <code>album_poll</code> and <code>fire_poll</code> follow this rule.</p>
+<h3 id="current-state">Current state<a class="heading-anchor" href="#current-state" aria-label="Link to this section">#</a></h3>
+<p>Queries such as <code>boot_phase</code> and <code>session_count</code> read current state without
+advancing the owner or draining an event queue.</p>
+<p>Drive the owner once per frame before reading its state or draining events.
+The generated <code>&lt;game&gt;_net_frame</code> is the normal game loop. The lower-level
+<code>code_poll</code> both advances a join-code rendezvous and returns its current
+<code>Code_State</code>; it is a service call, not a read-only query or an event drain.
+Boot calls it for games using the generated frame loop.</p>
+<h3 id="synchronous-callbacks">Synchronous callbacks<a class="heading-anchor" href="#synchronous-callbacks" aria-label="Link to this section">#</a></h3>
+<p>A callback is synchronous only when Kit cannot finish an operation without an
+answer. Examples include:</p>
+<ul>
+<li>entity factory create/free procedures;</li>
+<li>the interest-management locator;</li>
+<li>backup blob serialization;</li>
+<li>simulation sample and step procedures;</li>
+<li>command hooks and application-message decoders; and</li>
+<li>effect collision callbacks.</li>
+</ul>
+<p>There are two useful categories:</p>
+<ul>
+<li>A <strong>pull callback</strong> supplies a value Kit cannot derive, such as an entity
+position or serialized game blob.</li>
+<li>An <strong>atomic hook</strong> runs while temporary operation state is valid, such as a
+<code>^knet.Reader</code> over a received app message or an authority consequence that
+must remain in the same transaction.</li>
+</ul>
+<p>Do not retain pointers into temporary readers or re-enter the owning subsystem
+from an atomic hook unless that API explicitly permits it. If a game reaction
+can wait until the next frame, queue it instead. <code>ksess.App_Queue</code> provides this
+file-and-drain pattern for application messages.</p>
+<p>The full session-specific classification is in
+<a href="session.html#three-tiers-of-entry-into-your-code">Three tiers of entry into your code</a>.</p>
+<h3 id="generated-halves">Generated halves<a class="heading-anchor" href="#generated-halves" aria-label="Link to this section">#</a></h3>
+<p>A generated half is a name-paired proc containing game-specific behavior. The
+generator supplies routing and calls it from the appropriate role or timeline.
+For example, <code>&lt;verb&gt;_then</code> is the authority consequence of a command and
+<code>&lt;tick&gt;_fx</code> is presentation associated with a simulation tick.</p>
+<p>Generated routing removes many repeated <code>is_host</code> checks, but it does not make
+authority-specific work disappear. Keep work in an explicit authority half or
+<code>@(gd_step = &quot;authority&quot;)</code> when only the authority can perform it.</p>
+<h3 id="godot-signals">Godot signals<a class="heading-anchor" href="#godot-signals" aria-label="Link to this section">#</a></h3>
+<p>Engine-side node signals use <code>@(gd_connect)</code> or explicit typed signal helpers.
+Transport signals terminate in the forwarding methods configured by
+<code>boot_attach</code>; standard names are generated when <code>Options.methods</code> is left at
+its zero value.</p>
+<h2 id="lifetime-and-ownership-suffixes">Lifetime and ownership suffixes<a class="heading-anchor" href="#lifetime-and-ownership-suffixes" aria-label="Link to this section">#</a></h2>
+<p>Constructor names indicate who supplies and owns storage:</p>
+<ul>
+<li><code>_make</code> returns a value. If it owns Odin allocations, release them with the
+matching <code>_destroy</code> proc. Examples: <code>registry_make</code>, <code>chat_make</code>. A value
+such as <code>reader_make</code> only borrows its input and needs no destructor.</li>
+<li><code>_init</code> initializes caller-owned storage in place. Examples: <code>comms_init</code>,
+<code>xfer_init</code>, <code>lane_init</code>. A zero <code>Session</code> is configured before
+<code>session_host_start</code> or <code>session_client_start</code>; these start procedures
+initialize its live run. <code>session_init</code> is an internal helper.</li>
+<li><code>_attach</code> binds state to a Godot node or engine object whose lifetime remains
+owned by the scene. Examples: <code>wire_attach</code>, <code>boot_attach</code>.</li>
+</ul>
+<p>Teardown names distinguish operations:</p>
+<ul>
+<li><code>_destroy</code> releases allocations owned by the value. It does not free scene
+nodes unless the API explicitly says otherwise.</li>
+<li><code>_clear</code> and <code>_reset</code> remove current contents while preserving reusable
+storage.</li>
+<li><code>_close</code> ends a connection or external session.</li>
+<li><code>_detach</code> removes an attachment and disconnects its engine-facing state.</li>
+</ul>
+<p>Keep owners such as <code>Session</code>, <code>Boot</code>, <code>Comms</code>, and <code>Lane</code> at stable addresses
+from attachment/start until teardown; they retain pointers and callbacks to one
+another. Use the generated <code>&lt;game&gt;_net_detach</code> for a complete live-stack reset.
+It tears down the lane, comms, and Boot before resetting the Session&#39;s run;
+<code>session_destroy</code> also releases the Session&#39;s retained wiring allocations.</p>
+<p>Configuration structs use zero as the documented default for optional fields.
+Check the package reference before assuming that an arbitrary runtime value is
+valid as an uninitialized zero value; initialization procedures may still be
+required.</p>
+<h2 id="procedure-prefixes">Procedure prefixes<a class="heading-anchor" href="#procedure-prefixes" aria-label="Link to this section">#</a></h2>
+<p>Public procedures normally use the snake-case type name as a prefix:</p>
+<ul>
+<li><code>Registry</code> → <code>registry_*</code></li>
+<li><code>Lane</code> → <code>lane_*</code></li>
+<li><code>Chat</code> → <code>chat_*</code></li>
+</ul>
+<p>This makes <code>rg &#39;registry_&#39; kit/net</code> a practical API index. Short UI types use the
+noun shown at call sites, such as <code>Hp_Bar</code> with <code>hp_*</code> and <code>Abilities_Bar</code> with
+<code>abilities_*</code>.</p>
+<p>Generated procedures instead use the declared game, entity, command, or event
+name. Their naming rules are documented in <a href="net.html">kit/net</a>,
+<a href="session.html">kit/session</a>, and <a href="sim.html">kit/sim</a>.</p>
+<h2 id="package-boundaries">Package boundaries<a class="heading-anchor" href="#package-boundaries" aria-label="Link to this section">#</a></h2>
+<p>The dependency direction is intentional:</p>
+<ul>
+<li><code>kit/net</code>, <code>kit/session</code>, and <code>kit/sim</code> are engine-independent mechanisms.</li>
+<li><code>kit/netgd</code>, <code>kit/steamgd</code>, <code>kit/ui</code>, and <code>kit/fx</code> adapt those mechanisms to
+Godot and external transports.</li>
+<li><code>godot:play</code> composes Kit mechanisms into optional gameplay blocks.</li>
+<li>Game code owns genre rules, authored scenes, and backend integration.</li>
+</ul>
+<p>Avoid adding game policy to a mechanism package merely because one example
+needs it. Prefer a <code>play</code> block, a documented recipe, or game code when the rule
+does not apply across genres.</p>
+<h2 id="out-of-scope-systems">Out-of-scope systems<a class="heading-anchor" href="#out-of-scope-systems" aria-label="Link to this section">#</a></h2>
+<p>Kit intentionally does not provide:</p>
+<ul>
+<li>voice or proximity-voice capture and mixing;</li>
+<li>mobile touch controls or responsive mobile UI;</li>
+<li>asynchronous, turn-a-day session storage;</li>
+<li>user accounts, authentication, ranked ladders, or a persistent database;</li>
+<li>matchmaking and dedicated-server orchestration; or</li>
+<li>a native ENet relay for symmetric NAT.</li>
+</ul>
+<p>Steam voice or a separate voice SDK can run beside Kit. Mobile controls and UI
+belong in the game layer. Asynchronous games and account-backed persistence need
+a backend whose authority outlives any one live session.</p>
+<p>Kit&#39;s save package persists a run and reconnect identity; it is not an account
+database. Recipes for character-portable data, private per-player messages, and
+player-to-player transactions are documented in <a href="session.html#recipes-over-existing-pieces">kit/session</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/conventions.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#event-delivery" class="">Event delivery</a><a href="#queued-events" class="subsection">Queued events</a><a href="#current-state" class="subsection">Current state</a><a href="#synchronous-callbacks" class="subsection">Synchronous callbacks</a><a href="#generated-halves" class="subsection">Generated halves</a><a href="#godot-signals" class="subsection">Godot signals</a><a href="#lifetime-and-ownership-suffixes" class="">Lifetime and ownership suffixes</a><a href="#procedure-prefixes" class="">Procedure prefixes</a><a href="#package-boundaries" class="">Package boundaries</a><a href="#out-of-scope-systems" class="">Out-of-scope systems</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/conventions.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

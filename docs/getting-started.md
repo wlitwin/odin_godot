@@ -210,4 +210,3 @@ $GODOT --headless --path /path/to/your/project --quit-after 30   # smoke test
 - **[Workflow](workflow.md)** covers the edit→reload loop, editor squiggles/autocomplete, and
   debugging.
 - Read `examples/survivors/scripts/*.odin`. Each is heavily commented to teach one feature.
-</content>

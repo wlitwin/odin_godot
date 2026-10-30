@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Loaded browser host migration · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Loaded browser host migration</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/tests/replay_loaded_migration/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#real-udp-turn-traffic">Real UDP TURN traffic</a><a href="#snapshot-path-diagnostics">Snapshot-path diagnostics</a><a href="#public-history-projection-and-adaptive-codec-coverage">Public history projection and adaptive codec coverage</a></nav></details>
+<article class="reading-body "><div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_LOADED_OUT=/absolute/fresh/planned REPLAY_LOADED_MODE=planned \
+  nix develop --<span class="hljs-built_in">command</span> bash tests/replay_loaded_migration/run.sh
+REPLAY_LOADED_MODE=crash nix develop --<span class="hljs-built_in">command</span> bash \
+  tests/replay_loaded_migration/execute.sh /absolute/fresh/planned /absolute/fresh/crash</code></pre></div><p>Builds an isolated Scrapyard Replay copy and runs the existing twenty-second,
+forty-mob jam workload in two Chrome processes. The report reuses the native
+workload&#39;s gameplay/observation gates unchanged. Controlled RTC message faults
+apply 40±10 ms delay and 5% unreliable loss/duplication with bounded queues and
+reliable FIFO order. Hardware WebGL, the 1280×704 viewport, and speed WASM match
+the browser stress fixture. These are local signaling/coordinator experiments,
+not raw IP/SCTP loss, public deployment or cross-device performance claims.</p>
+<p>After the workload, both peers resume movement/fire and replenishment for five
+seconds. Planned mode requests an ordinary Room handoff. Crash mode kills the
+exact original host browser process, waits for the nominated candidate to recover,
+then opens member 1 with a new incarnation. The coordinator retains its default
+120-tick maximum known rollback. No wait for a specially fresh checkpoint occurs
+before the trigger.</p>
+<p>Success requires exact restored checkpoint state, the expected recovery kind,
+one authority in epoch 2, both original seats, a newly confirmed follower dash,
+and at least ten common canonical world hashes. Planned transfer must lose zero
+known ticks. Raw and compressed checkpoint sizes, prepared/known ticks, transfer
+credits, assembly bounds, faults and renderer are recorded. A report additionally
+validates the initial gameplay work and rejects altered receipts through
+<code>verify_report.py OUTPUT</code>.</p>
+<p>Godot release exports omit assertions. The handoff call must execute outside
+<code>assert</code>; the initial fixture mistake and its timeout are retained as failed
+harness evidence. <code>execute.sh</code> reuses a built fixture and writes a fresh runtime
+directory. Original Kit and original Scrapyard projects remain separately runnable.</p>
+<p>The trigger now records a fresh population census and shots spent by both players;
+32–44 mobs must be alive and both players must have fired during the resumed load.
+Browser startup is bounded to 120 seconds and the browser is tracked before page
+creation, so a stalled startup can be cleaned up without leaking an owned process.</p>
+<p><code>REPLAY_CAPTURE_ARCHIVES=1</code> optionally captures at most three outgoing checkpoint
+streams before the existing message faults. <code>capture_test.mjs</code> exercises the
+observer&#39;s forwarding, copies and bounds. Native analysis must validate the raw
+hash and typed checkpoint; interception alone is not trusted decoding. To inspect
+a completed capture, write its <code>wire</code> array to a file and run:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin run tests/replay_loaded_migration/analyze \
+  -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -collection:sample=/absolute/build/replay/project/shared \
+  -o:speed -- /absolute/capture.wire RAW_BYTE_COUNT /absolute/capture.raw</code></pre></div><p>Compare the raw file&#39;s SHA-256 to the capture&#39;s <code>hash</code>. The analyzer checks typed
+checkpoint decoding and compares plain, schema-grouped and simple byte-plane
+compression offline. It also roundtrips the schema-grouped result to exact raw
+bytes. These diagnostics do not enable a new transfer format.</p>
+<p>Use <code>REPLAY_SOURCE_ROOT=/absolute/archived/source</code> when validating an older build
+whose live framework checkout has changed. Every framework hash is still checked.
+The early checkpoint scheduling candidates were removed after violating gameplay
+freshness; the regular Session/Link scheduling remains in place.</p>
+<p>Current migration reports also require schema-grouped checkpoints to have been
+selected by the sender and fully validated by the receiver before the trigger.
+The capture observer recognizes both ordinary compressed and schema-grouped
+checkpoint offers, retaining the layout fingerprint for the latter. The analyzer&#39;s
+input remains an ordinary compressed capture; it now also sends that decoded
+checkpoint through the real typed schema-aware transfer and compares the restored
+canonical bytes. The separate <code>tests/replay_transfer/layout_corpus/run.sh</code> executes
+layout transfer, fallback and plan rejection in native and WASM builds.</p>
+<p>Current probes distinguish capture tick, chunk progress, latest validated tick,
+and prepared/approved tick. <code>stages.py OUTPUT</code> derives first-observed stage ages;
+its sampling interval limits precision. Capture files are also saved on failed
+runs. <code>compare_archives/</code> verifies consecutive captured checkpoints, then measures
+self-contained array predictors and inter-checkpoint XOR offline. These diagnostics
+do not enable a delta or new codec.</p>
+<p><code>REPLAY_RELIABLE_HOLD=1</code> adds one FIFO pause to the host&#39;s reliable RPC traffic
+at the first checkpoint chunk at tick 1000 or later. <code>REPLAY_RELIABLE_HOLD_MS</code>
+selects 1–2000 ms (default 200). The wrapper records requested/actual duration,
+copies buffers, preserves order, bounds memory and leaves unreliable traffic flowing.
+The report checks that the requested pause occurred and drained before migration.
+This is message-level injection, not raw SCTP/IP loss.</p>
+<p><code>REPLAY_RELIABLE_HOLD_AT_KILL=1</code> instead arms after the resumed five-second load,
+then kills the host while the next checkpoint transfer is held. It requires crash
+mode and a 1000–2000 ms hold (default 2000), with at least 300 ms observed before
+killing. Queued bytes must still be present. No new completed checkpoint is awaited.
+The previous approved point must support exact recovery within the unchanged
+120-tick rollback limit. Samples during the hold retain the existing 30-tick
+facts-lag, credit, memory and no-resync requirements.</p>
+<p>The declared fault plan and measured hold/frontier records accompany the usual
+workload and migration receipts. <code>reliable_hold_test.mjs</code> checks copied FIFO data,
+transparent unreliable traffic, one-shot/late arming and rejected configurations.
+<code>verify_report.py</code> rejects missing, mistimed or stale held-transfer observations.</p>
+<h2 id="real-udp-turn-traffic">Real UDP TURN traffic<a class="heading-anchor" href="#real-udp-turn-traffic" aria-label="Link to this section">#</a></h2>
+<p><code>build.sh OUTPUT</code> now prepares both an isolated game export and an isolated
+coordinator. <code>run.sh</code> builds in <code>REPLAY_LOADED_OUT</code> and executes into its <code>run/</code>
+subdirectory; <code>execute.sh BUILD FRESH_RUN</code> reuses the recorded artifacts. Native
+and Web binary hashes are verified before execution. Original Kit and Scrapyard
+sources remain separate.</p>
+<p>To run the loaded scenario through the shared datagram proxy:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_loaded_migration/build.sh /absolute/build
+python3 tests/replay_turn_faults/run.py --game loaded --mode crash \
+  --web /absolute/build --out /absolute/fresh/run \
+  --turnserver /absolute/path/to/turnserver</code></pre></div><p><code>--mode planned</code> requests handoff. All other fault arguments match the
+<a href="../replay_turn_faults/README.html">proxy runner</a>. In this mode the driver omits application-message fault injection and installs
+native relay statistics observation,
+and activates UDP faults only after both populated-world barriers and selected
+relay pairs. Faults continue through the workload, resumed combat, migration and
+rejoin. The original gameplay, snapshot-freshness, memory/credit, population/fire,
+rollback and state-equality gates remain in force. The build&#39;s browser contract
+records the default message-fault scenario; the runtime <code>fault-plan.json</code>, zero
+application-fault counters/config, and parent <code>faults.json</code> describe this distinct
+UDP scenario. A mixed or undisclosed application-fault configuration is rejected.</p>
+<p>The proxy runner closes and reconciles its packet record before executing the
+loaded report. <code>browser/turn-network.json</code> contains the checked network summary;
+<code>result.json</code> combines it with the loaded-game report. To recheck original files:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 tests/replay_turn_faults/report.py /absolute/fresh/run --game loaded
+python3 tests/replay_loaded_migration/verify_report.py /absolute/fresh/run/game</code></pre></div><p>Do not infer success from the network summary alone: the final report requires
+both network evidence and all loaded-game gates. This is a local test using
+synthetic identities and an existing deterministic workload, not public deployment
+or a paired Kit/browser benchmark.</p>
+<p><code>REPLAY_RTC_CREDIT_TRACE=1</code> optionally records up to 32,768 credit/fence send and
+receive observations per browser. It preserves the native send result, exceptions
+and exact payload, and records only envelope metadata and browser timestamps.
+<code>credit_report.py RUN/game/browser</code> pairs the pre-migration observations from both
+browsers. These same-machine timestamps approximate send-to-delivery time; they
+are not application acknowledgement latency or a cross-device clock protocol.
+<code>credit_trace_test.mjs</code> checks transparent forwarding, error preservation, channel
+association and bounds.</p>
+<p><code>control_report.py RUN/game/browser separate</code> checks real native channel options
+and bidirectional traffic on negotiated control stream 2. <code>legacy</code> instead requires
+zero traffic on that stream. <code>legacy_run.py --current BUILD --legacy OLD_BUILD --member 1 --out FRESH_OUTPUT</code> (also member 2) runs the complete message-fault
+handoff workload against genuinely earlier compiled two-channel peers. The old
+build&#39;s hashes are checked and recorded before serving its export.</p>
+<h2 id="snapshot-path-diagnostics">Snapshot-path diagnostics<a class="heading-anchor" href="#snapshot-path-diagnostics" aria-label="Link to this section">#</a></h2>
+<p><code>REPLAY_SNAPSHOT_TRACE=1</code> records bounded metadata for native snapshot fragments,
+parity, decode acknowledgments and checkpoint chunks. It preserves native sends,
+results, exceptions and payloads. Recorder version 2 retains generation and serial
+alongside snapshot IDs, avoiding collisions across admission scopes. No raw
+payload is retained. <code>snapshot_trace_test.mjs</code> checks framing, forwarding and bounds.</p>
+<p><code>snapshot_report.py RUN/game/browser</code> separates fragment submission span, native
+send-to-delivery time, and time until the receiver emits a decode acknowledgment.
+The latter is not proof that the snapshot was applied. Where telemetry is available,
+the report also gives an upper bound until a confirmed state at least that new is
+observed. This includes sampling delay and can include fixture pauses; it is not
+an exact correction-latency metric. Earlier version-1 recordings are explicitly
+marked as lacking generation/serial headers.</p>
+<p><code>REPLAY_BACKGROUND_BYTES=1200</code> during <strong>build preparation</strong> produces a separately
+hashed test-only checkpoint pacing variant. Its <code>background-plan.json</code> follows
+runtime copies. The default value is zero, which makes no pacing override.
+No gameplay, freshness or recovery acceptance limit is relaxed by this diagnostic.</p>
+<h2 id="public-history-projection-and-adaptive-codec-coverage">Public history projection and adaptive codec coverage<a class="heading-anchor" href="#public-history-projection-and-adaptive-codec-coverage" aria-label="Link to this section">#</a></h2>
+<p>Scrapyard content 48 excludes rewind <code>hit_history</code> from public snapshots and
+explicitly declares its public replication/prediction policies. Complete recovery
+archives retain that history. The loaded fixture keeps the same forty-mob combat
+workload, input schedule, 30-tick freshness bound, prediction bounds, memory/credit
+limits, 120-tick recovery limit, and canonical public-world equality checks.</p>
+<p>For builds with private fields, <code>snapshot-contract.json</code> must show positive field
+exclusion, identical public snapshot sizes on both peers, a public snapshot smaller
+than half the complete recovery archive, enabled grouped-codec support, and actual
+compressed snapshot delivery. Grouping need not be selected when smaller adaptive
+deltas do not benefit from it. Legacy builds retain the original grouped-snapshot
+selection requirement. Both paths still require actual grouped recovery archives.
+The report mutation suite rejects missing projection, lost codec support, absent
+snapshot delivery and oversized public payloads, alongside the gameplay gates.</p>
+<p><code>REPLAY_SNAPSHOT_APPLY_TRACE=1</code> records a bounded per-frame client frontier probe.
+<code>application_report.py RUN/game/browser</code> classifies measurement-phase freshness
+failures as missing decoded snapshots, decoded snapshots waiting for facts, or
+usable snapshots not applied. Probe cost excludes the subsequent JavaScript write.</p>
+<p><code>REPLAY_CAPTURE_SNAPSHOT_PAIR=1</code> captures one frozen sender baseline/target pair
+between workload completion and resumed combat. <strong>These optional files contain
+synthetic game state</strong>, unlike the metadata-only snapshot trace. The
+<code>analyze_snapshot</code> Odin tool uses the exact prepared model and Public schema,
+validates canonical decoding, scope/IDs and baseline digest, then roundtrips the
+existing sparse/LZ4/grouped codecs and lists changed fields. Supply the prepared
+model using <code>-collection:sample=BUILD/replay/project/shared</code>. It enables no new codec.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_turn_faults/README.html"><span>Browser UDP TURN fault gate</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_loaded_migration/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#real-udp-turn-traffic" class="">Real UDP TURN traffic</a><a href="#snapshot-path-diagnostics" class="">Snapshot-path diagnostics</a><a href="#public-history-projection-and-adaptive-codec-coverage" class="">Public history projection and adaptive codec coverage</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_loaded_migration/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

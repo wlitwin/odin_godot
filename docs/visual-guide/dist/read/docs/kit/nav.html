@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/nav — pathfinding adapters · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/nav — pathfinding adapters</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/nav.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#api">API</a><a href="#worked-example-cavecrawl-examplescavecrawl">Worked example: cavecrawl (examples/cavecrawl)</a><a href="#gotchas">Gotchas</a></nav></details>
+<article class="reading-body "><p>Reach for <code>kit/nav</code> when a brain needs to walk around walls instead of through them. The
+engine already owns the hard parts (nav meshes, region merging, funnel pathfinding);
+kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.</p>
+<p><strong>Lane compatibility: never call these queries inside a resimulating pass; the module
+enforces it.</strong> These calls query the NavigationServer, which holds live engine state that
+does not rewind. Inside <code>@(gd_tick)</code> or the everywhere <code>@(gd_step)</code>, a resim replay queries
+today&#39;s mesh for yesterday&#39;s ticks and diverges from the prediction it is rebuilding. This is
+the same rule as <a href="sim.html">engine casts</a>. A mispredicted cast snaps back, but a bad path
+<em>steers</em>, so the error compounds every tick.</p>
+<p>Every query is default-denied: it asserts that some enclosing scope has called
+<code>pass_never_resims()</code>, the caller&#39;s claim about its own lane. Two scopes may claim it: a coop
+host&#39;s own tick (the host never resims) and the sim lane&#39;s <code>@(gd_step = &quot;authority&quot;)</code> pass
+(the authority never resims). Path <em>following</em> from a stored polyline is pure math and
+sim-safe anywhere; only the <em>query</em> is gated.</p>
+<h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
+<p>Three calls, and the first one is the lane claim:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">knav.pass_never_resims()                                    <span class="hljs-comment">// scoped, closes itself</span>
+path := knav.path_2d(self.owner, from, to, <span class="hljs-keyword">context</span>.temp_allocator)
+goal := knav.next_point(path, &amp;self.path_idx, my_pos, reach = <span class="hljs-number">8</span>)</code></pre></div><p>and the host&#39;s brain steps toward <code>goal</code> with <a href="ai.html">kit/ai</a>&#39;s <code>step_toward</code>. Positions use
+the toolkit&#39;s <code>[3]f32</code> convention (2D in xy, z zero), so brain code doesn&#39;t care which
+adapter fed it.</p>
+<p>Unlike the rest of the brain verbs, the path queries <strong>touch the engine</strong>, which is why they
+need the claim.</p>
+<h2 id="api">API<a class="heading-anchor" href="#api" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// &quot;The pass I am running in never resimulates.&quot; Scoped to the enclosing block,</span>
+<span class="hljs-comment">// closes itself. Every query below asserts this was called.</span>
+pass_never_resims :: <span class="hljs-keyword">proc</span>()
+
+<span class="hljs-comment">// The default 2D / 3D navigation map of the world `node` lives in.</span>
+map_2d :: <span class="hljs-keyword">proc</span>(node: gd.Node) -&gt; gd.Rid
+map_3d :: <span class="hljs-keyword">proc</span>(node: gd.Node) -&gt; gd.Rid
+
+<span class="hljs-comment">// An optimized path across the node&#x27;s default map ([] when unreachable or the</span>
+<span class="hljs-comment">// map hasn&#x27;t synced yet). The caller owns the slice.</span>
+path_2d :: <span class="hljs-keyword">proc</span>(node: gd.Node, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>
+path_3d :: <span class="hljs-keyword">proc</span>(node: gd.Node, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>
+
+<span class="hljs-comment">// The same, against an ALREADY-RESOLVED map. Use these in a loop over agents.</span>
+path_2d_on :: <span class="hljs-keyword">proc</span>(nav_map: gd.Rid, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>
+path_3d_on :: <span class="hljs-keyword">proc</span>(nav_map: gd.Rid, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>
+
+<span class="hljs-comment">// The waypoint to walk toward RIGHT NOW. `idx` is the follower&#x27;s cursor</span>
+<span class="hljs-comment">// (start it at 0 per fresh path): waypoints within `reach` are consumed and</span>
+<span class="hljs-comment">// never re-targeted — a stateless nearest-scan would walk you backwards to</span>
+<span class="hljs-comment">// points you already passed. ok=false = the path is done (or empty).</span>
+next_point :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (path: [][<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, idx: ^<span class="hljs-type">int</span>, pos: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, reach: <span class="hljs-type">f32</span>) -&gt; (goal: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, ok: <span class="hljs-type">bool</span>)</code></pre></div><p><code>path_2d</code>/<code>path_3d</code> query the node&#39;s <em>default</em> world map (via <code>map_2d</code>/<code>map_3d</code>), which is
+what a bare NavigationRegion2D/3D in the scene registers into. Use the <code>_on</code> forms in a loop
+over agents: resolving the default map is three engine round trips (node → viewport → world →
+map), free for one agent but pure waste for a brain tick pathing a whole wave against the
+same map.</p>
+<h2 id="worked-example-cavecrawl-examplescavecrawl">Worked example: cavecrawl (<code>examples/cavecrawl</code>)<a class="heading-anchor" href="#worked-example-cavecrawl-examplescavecrawl" aria-label="Link to this section">#</a></h2>
+<p>Cavecrawl&#39;s floors are authored scenes, so the walkable cave is authored too. A
+<code>NavigationRegion2D</code> sits in <code>levels/level_1.tscn</code> beside the chest and den markers, its
+polygon a big floor minus a <strong>rift</strong>. Every peer loads that scene locally; only the host ever
+queries it.</p>
+<p>The host&#39;s brain tick (<code>scripts/host.odin</code>) is a single <code>@(gd_step = &quot;authority&quot;)</code> pass, and
+that is where the claim goes:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(private = &quot;file&quot;)</span>
+cave_dwellers_think :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby) {
+	knav.pass_never_resims()          <span class="hljs-comment">// closes itself when this proc returns</span>
+	nav_map := knav.map_2d(self.owner) <span class="hljs-comment">// resolved ONCE for the whole wave</span>
+	...
+	pos = cave_dweller_walk(self, nav_map, pos, seen.pos)
+}</code></pre></div><p>and one dweller&#39;s step is a query, a cursor, and a kit/ai step:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cave_dweller_walk :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, nav_map: gd.Rid, from, to: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span> {
+	path := knav.path_2d_on(nav_map, from, to, <span class="hljs-keyword">context</span>.temp_allocator)
+	idx := <span class="hljs-number">0</span>
+	<span class="hljs-keyword">if</span> goal, ok := knav.next_point(path, &amp;idx, from, DWELLER_SPEED); ok {
+		p, _ := kai.step_toward(from, goal, DWELLER_SPEED)
+		<span class="hljs-keyword">return</span> p
+	}
+	p, _ := kai.step_toward(from, to, DWELLER_SPEED) <span class="hljs-comment">// empty path: walk the dumb way</span>
+	<span class="hljs-keyword">return</span> p
+}</code></pre></div><p>Three things about that shape are worth copying:</p>
+<p><strong>The path is re-queried every think tick and thrown away.</strong> No polyline is cached, so the
+cursor is always 0 and <code>next_point</code>&#39;s first job is to consume the dweller&#39;s own snapped
+position. Cavecrawl&#39;s <code>Dweller_Brain</code> map is <code>gd:&quot;backup&quot;</code>, so it rides the host-migration
+snapshot to the heir that inherits the host seat; a cached path would hand that heir routes
+computed against a NavigationServer it never ran. Re-querying also sidesteps invalidation on
+a descent, where the whole floor&#39;s region is swapped out underneath any dweller still
+standing. The cost is one <code>map_get_path</code> per agent per tick, at 20 Hz, for single-digit
+waves.</p>
+<p><strong>An empty path is not an error and must not be a freeze.</strong> It means unreachable <em>or</em>
+not-yet-synced: cavecrawl&#39;s regions enter the tree with the floor&#39;s scenery, a few frames
+before the first den opens. Falling back to the straight-line <code>step_toward</code> keeps a wave
+moving through that gap.</p>
+<p><strong>The fallback is silent, so the game prints a marker.</strong> A navmesh that failed to load would
+leave every dweller walking straight and every test still passing. A path with an interior
+corner can only have come from the mesh, so the host prints <code>CAVE_NAV_BENT</code> once. This is the
+integration test&#39;s proof that the rift is walked <em>around</em> and not through.</p>
+<p>Pathfinding never reaches the wire: the dweller&#39;s <code>x/y</code> are ordinary owner-streamed
+replicated fields, exactly as in the <a href="ai.html">kit/ai</a> NPC model. Clients see a monster that
+respects the terrain and run no navigation code at all.</p>
+<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>The lane claim is an assert, not a fallback.</strong> An empty path is a legitimate answer, so
+a silent fallback in place of a lane violation would swallow the one bug this module exists
+to prevent.</li>
+<li><strong>Regions sync into the map on the server&#39;s physics cadence</strong>, so a path queried the frame
+a region enters the tree is empty. Brains that re-query every think-tick (the normal
+pattern) shrug this off; one-shot queries must wait a few frames (<code>tests/kitnav</code> waits 5
+and retries).</li>
+<li>An empty slice means <em>unreachable or not-yet-synced</em>; treat it as &quot;stand still and ask
+again&quot; or &quot;fall back to the dumb line&quot;, never as an error.</li>
+<li>The caller owns the returned slice. Pass <code>context.temp_allocator</code> for per-tick queries,
+or remember to free.</li>
+<li><code>next_point</code> needs a persistent cursor per follower, reset to 0 per fresh path. Don&#39;t
+nearest-scan the path statelessly: consumed waypoints must never be re-targeted, or the
+follower walks backwards.</li>
+<li><strong>Path <em>around</em>, don&#39;t flee <em>around</em>.</strong> Fleeing has a direction, not a destination, so
+cavecrawl&#39;s flee branch stays on <code>kai.step_away</code> and never queries. A panicked agent can
+back itself off the mesh; the next path home recovers, because <code>map_get_path</code> snaps an
+off-mesh <code>from</code> to the nearest walkable point.</li>
+<li>2D paths come back with <code>z = 0</code>; <code>path_2d</code> drops the z of its inputs. Keep everything in
+the <code>[3]f32</code> convention and the same brain code drives both adapters.</li>
+<li>Nav geometry is a <strong>detour, never a barrier</strong>. Cavecrawl&#39;s rift leaves north and south
+ledges open, because a wave stranded on the wrong side would deadlock the floor-cleared
+gate. Authored obstacles interact with game rules that assume reachability.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="ai.html"><span>kit/ai — NPC verbs and the wave director</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/nav.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api" class="">API</a><a href="#worked-example-cavecrawl-examplescavecrawl" class="">Worked example: cavecrawl (examples/cavecrawl)</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/nav.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

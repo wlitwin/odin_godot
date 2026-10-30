@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>recipes.odin · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>recipes.odin</h1><div class="reader-meta"><span>92 lines · Odin</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_recipes/recipes.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay_recipes
+
+<span class="hljs-keyword">import</span> replay <span class="hljs-string">&quot;godot:replay&quot;</span>
+<span class="hljs-keyword">import</span> net <span class="hljs-string">&quot;godot:replay/net&quot;</span>
+<span class="hljs-keyword">import</span> p2p <span class="hljs-string">&quot;godot:replay/p2p&quot;</span>
+<span class="hljs-keyword">import</span> transport <span class="hljs-string">&quot;godot:replay/transport&quot;</span>
+<span class="hljs-keyword">import</span> view <span class="hljs-string">&quot;godot:replay/view&quot;</span>
+<span class="hljs-keyword">import</span> replaygd <span class="hljs-string">&quot;godot:replay/godot&quot;</span>
+<span class="hljs-keyword">import</span> storagegd <span class="hljs-string">&quot;godot:replay/godot/storage&quot;</span>
+<span class="hljs-keyword">import</span> hello <span class="hljs-string">&quot;godot:examples/replay_hello/shared/hello&quot;</span>
+<span class="hljs-keyword">import</span> duel <span class="hljs-string">&quot;godot:examples/replay_duel/shared/duel&quot;</span>
+
+Hello_Session :: replaygd.Session(hello.World, hello.Controls, hello.Action, hello.Event, <span class="hljs-number">2</span>)
+Hello_Room :: replaygd.Room(hello.World, hello.Controls, hello.Action, hello.Event, <span class="hljs-number">2</span>)
+
+<span class="hljs-comment">// Keep the destination owner stable and close it on every failed/successful</span>
+<span class="hljs-comment">// lifetime. These examples return errors to the caller instead of hiding them.</span>
+open_session :: <span class="hljs-keyword">proc</span>(session: ^Hello_Session, role: replaygd.Session_Role, token: net.Token) -&gt; net.Error {
+	options := replaygd.SESSION_OPTIONS
+	options.role, options.token = role, token
+	options.network.content = <span class="hljs-number">1</span> <span class="hljs-comment">// Replace with the game&#x27;s versioned content ID.</span>
+	<span class="hljs-keyword">return</span> replaygd.session_open(session, replay.Frame(hello.World){state = hello.initial()}, hello.network_model(), options)
+}
+
+session_frame :: <span class="hljs-keyword">proc</span>(session: ^Hello_Session, dt: <span class="hljs-type">f64</span>, controls: hello.Controls,
+                      consume: <span class="hljs-keyword">proc</span>(view.Change(net.Net_Event(hello.Event)))) -&gt; net.Error {
+	<span class="hljs-keyword">if</span> error := replaygd.session_frame(session, dt, controls); error != .None {
+		<span class="hljs-keyword">return</span> error
+	}
+
+	changes: [<span class="hljs-number">64</span>]view.Change(net.Net_Event(hello.Event))
+	<span class="hljs-keyword">for</span> {
+		count := replaygd.session_changes(session, changes[:])
+		<span class="hljs-keyword">if</span> count == <span class="hljs-number">0</span> {
+			<span class="hljs-keyword">break</span>
+		}
+		<span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes[:count] {
+			<span class="hljs-keyword">if</span> consume != <span class="hljs-literal">nil</span> {
+				consume(change)
+			}
+		}
+	}
+	<span class="hljs-comment">// Present the detached session_state after draining changes; do not modify</span>
+	<span class="hljs-comment">// session.server/client timeline values to smooth a scene transform.</span>
+	<span class="hljs-keyword">return</span> .None
+}
+
+open_room_after_enrollment :: <span class="hljs-keyword">proc</span>(room: ^Hello_Room, party: ^replaygd.Party) -&gt; net.Error {
+	session := replaygd.SESSION_OPTIONS
+	session.role = .Client
+	session.network.content = party.config.content
+	options, ready := replaygd.party_room_options(party, session)
+	<span class="hljs-keyword">if</span> !ready {
+		<span class="hljs-keyword">return</span> .Not_Initialized
+	}
+	<span class="hljs-keyword">return</span> replaygd.room_open(room, replay.Frame(hello.World){state = hello.initial()}, hello.network_model(), options)
+}
+
+<span class="hljs-comment">// The native Direct transport exposes stable member IDs only after admission.</span>
+<span class="hljs-comment">// Pump Party before Direct; initialize once. Browser users obtain the analogous</span>
+<span class="hljs-comment">// admitted bindings from RTC and use the same Runner API.</span>
+open_p2p_after_native_admission :: <span class="hljs-keyword">proc</span>(peer: ^p2p.Runner(duel.World, duel.Input, duel.Event, <span class="hljs-number">2</span>),
+                                       party: ^replaygd.P2P_Party, direct: ^replaygd.P2P_Direct) -&gt; p2p.Error {
+	identity, admitted := replaygd.p2p_direct_identity(direct)
+	<span class="hljs-keyword">if</span> !admitted || !party.ready || identity.member != direct.remote {
+		<span class="hljs-keyword">return</span> .Not_Ready
+	}
+	cfg := p2p.DEFAULT_CONFIG
+	cfg.session, cfg.epoch, cfg.content = party.authorization.match.session, party.authorization.match.epoch, duel.CONTENT
+	roster := [<span class="hljs-number">2</span>]transport.Peer_Id{transport.Peer_Id(party.authorization.match.members[<span class="hljs-number">0</span>]), transport.Peer_Id(party.authorization.match.members[<span class="hljs-number">1</span>])}
+	local := <span class="hljs-type">u16</span>(party.authorization.identity.member == <span class="hljs-type">u64</span>(roster[<span class="hljs-number">0</span>]) ? <span class="hljs-number">0</span> : <span class="hljs-number">1</span>)
+	<span class="hljs-keyword">return</span> p2p.init(peer, replay.Frame(duel.World){state = duel.initial(<span class="hljs-number">42</span>)}, duel.model(), roster, local, replaygd.p2p_direct_transport(direct), cfg)
+}
+
+<span class="hljs-comment">// Authoritative archives and P2P participant archives are intentionally different</span>
+<span class="hljs-comment">// APIs. Neither operation replaces the application&#x27;s storage/authority decision.</span>
+save_authority :: <span class="hljs-keyword">proc</span>(session: ^Hello_Session, path: <span class="hljs-type">string</span>) -&gt; storagegd.Storage_Result {
+	<span class="hljs-keyword">return</span> replaygd.session_save(session, path)
+}
+
+planned_handoff :: <span class="hljs-keyword">proc</span>(room: ^Hello_Room) -&gt; net.Error {
+	<span class="hljs-keyword">return</span> replaygd.room_handoff(room)
+}
+
+close_room :: <span class="hljs-keyword">proc</span>(room: ^Hello_Room) {
+	replaygd.room_close(room)
+}
+
+close_session :: <span class="hljs-keyword">proc</span>(session: ^Hello_Session) {
+	replaygd.session_close(session)
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_recipes/recipes.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_recipes/recipes.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

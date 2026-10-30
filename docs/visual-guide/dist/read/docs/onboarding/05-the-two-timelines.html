@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>5 · The two timelines · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>5 · The two timelines</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/05-the-two-timelines.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#why-remote-motion-renders-behind">Why remote motion renders behind</a><a href="#the-rule">The rule</a><a href="#what-delays-and-what-doesnt">What delays and what doesn't</a><a href="#edges-must-outlive-the-slowest-observer">Edges must outlive the slowest observer</a><a href="#put-effects-in-the-presentation-proc-not-the-command">Put effects in the presentation proc, not the command</a></nav></details>
+<article class="reading-body "><p>Picture a co-op game with a powerup gem on the course. When the host&#39;s ball
+rolls over it, the gem disappears too early for clients. When a client&#39;s ball
+rolls over it, the gem disappears too late.</p>
+<p>Nothing is out of sync. Every machine agrees on the state, promptly. The game
+still looks wrong on every screen but the picker-upper&#39;s: the gem vanishes
+while the rolling ball is still visibly half a meter away, or lingers after
+the ball has visibly rolled through it.</p>
+<p>This is a mental-model shift, and it isn&#39;t about the toolkit: it&#39;s about
+physics. <strong>Your screen and a remote screen do not show the same moment.</strong>
+Once you stop fighting that, one small discipline fixes every &quot;the effect
+fired at the wrong time&quot; bug.</p>
+<h2 id="why-remote-motion-renders-behind">Why remote motion renders behind<a class="heading-anchor" href="#why-remote-motion-renders-behind" aria-label="Link to this section">#</a></h2>
+<p>Owner-streamed motion (post 3) is rendered by everyone else through a short
+interpolation buffer (a few ticks of samples), so jitter and dropped packets
+smooth out instead of stuttering. A remote ball you&#39;re watching is rendered
+~100ms behind where its owner&#39;s machine says it is. Call these the two
+timelines:</p>
+<ul>
+<li><strong>State time</strong> is for replicated fields, which arrive as fast as the wire
+allows. The gem&#39;s <code>taken</code> byte flips <em>now</em>.</li>
+<li><strong>Render time</strong> is where remote <em>motion</em> is drawn, at interp-delay in the
+past. The ball <em>reaches</em> the gem on your screen 100ms from now.</li>
+</ul>
+<p>That explains the symptom. The gem&#39;s disappearance was keyed to state time;
+the cause you can <em>see</em> (the ball rolling into it) plays out in render
+time. React to the state delta and the effect precedes its visible cause. No
+amount of &quot;better netcode&quot; fixes it, because nothing is broken. The state was
+never wrong; it was <em>early</em>.</p>
+<p>The picker-upper&#39;s own screen is different again: their prediction ran the
+pickup <em>this frame</em>, in local time, and it stays that way. That instant
+local response is the point of prediction (post 4).</p>
+<h2 id="the-rule">The rule<a class="heading-anchor" href="#the-rule" aria-label="Link to this section">#</a></h2>
+<p>One rule covers it: <strong>present a consequence on the timeline of its visible
+cause.</strong></p>
+<p>The toolkit gives this a primitive. Instead of showing an effect where you
+detect the state change, hand it to the session with one honest boolean:
+<em>was this my own simulation&#39;s doing?</em></p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The taken-edge, ONE place, identical on every peer:</span>
+ksess.session_present(&amp;self.ses,
+	p.net_id == self.my_claim,   <span class="hljs-comment">// mine? show it NOW (my sim touched it)</span>
+	self, present_gem_gone, p.net_id, <span class="hljs-type">u64</span>(p.kind))</code></pre></div><p>If it&#39;s mine, the callback runs this frame. If not, the session queues it for
+<code>interp_delay</code> from now, the moment <em>your screen&#39;s</em> rendition of the cause
+catches up. Transit time cancels out; the gem vanishes as the rolled ball
+touches it, on every screen, and <code>present_gem_gone</code> neither knows nor cares
+which timing path it took. The same presentation proc handles every peer and
+every case.</p>
+<p>The instinct carried over from GDScript (hide the gem in the setter the
+moment the value changes) is exactly the bug. State changes are facts;
+showings are scheduled.</p>
+<h2 id="what-delays-and-what-doesnt">What delays and what doesn&#39;t<a class="heading-anchor" href="#what-delays-and-what-doesnt" aria-label="Link to this section">#</a></h2>
+<p>The rule is &quot;timeline of the visible cause,&quot; not &quot;delay everything.&quot; The full
+catalog lives in <a href="../kit/net.html">kit/net</a>:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>The consequence of…</th>
+<th>…presents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>my own sim / my prediction</td>
+<td><strong>now</strong>: responsiveness is sacred</td>
+</tr>
+<tr>
+<td>a remote <em>moving</em> cause (ball hits gem, avatar steps on plate)</td>
+<td>at <strong>render time</strong> (<code>session_present</code>)</td>
+</tr>
+<tr>
+<td>no spatial cause at all (score, hp bar, chat, UI)</td>
+<td><strong>wire-fresh, never delayed</strong>: delaying truth with no visible cause is just lag you added</td>
+</tr>
+<tr>
+<td>a per-peer local flourish (muzzle flash, footsteps)</td>
+<td>from local fx hooks (it never rode the wire at all)</td>
+</tr>
+<tr>
+<td>a global transition (level change, round end)</td>
+<td>after a <strong>dwell</strong> (see below)</td>
+</tr>
+</tbody></table>
+</div><p>The third row bites people who over-learn the lesson: your scoreboard should
+never wait for a render clock. Delay is a tool for <em>reconciling an effect with
+its visible cause</em>; where there&#39;s no cause on screen, fresh truth wins.</p>
+<h2 id="edges-must-outlive-the-slowest-observer">Edges must outlive the slowest observer<a class="heading-anchor" href="#edges-must-outlive-the-slowest-observer" aria-label="Link to this section">#</a></h2>
+<p>When the ball drops in the cup, puttputt holds the sunk ball there for a
+couple of seconds before building the next hole:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">SINK_DWELL :: <span class="hljs-number">2.5</span></code></pre></div><p>This dwell is for the observers. Every remote screen is watching the roll up
+to interp-delay late; if the host advanced the hole the instant <em>its</em> copy
+sank, half the room would see the world change while their rendition of the
+ball was still rolling toward the cup. A shared moment must stay on screen
+long enough for the <em>slowest</em> view of it to arrive and be seen.</p>
+<p>One corollary: <strong>deltas carry state, not events.</strong> A flag you flip on and off
+within one tick may never ship at all (the diff sees no change). If something
+is genuinely momentary, either let the edge live long enough to be seen, or
+send it as an explicit message: don&#39;t pulse a field.</p>
+<h2 id="put-effects-in-the-presentation-proc-not-the-command">Put effects in the presentation proc, not the command<a class="heading-anchor" href="#put-effects-in-the-presentation-proc-not-the-command" aria-label="Link to this section">#</a></h2>
+<p>Presentation code belongs in the presentation proc, never in a command proc.
+Commands run on the claimer and the host (post 4), so an effect spawned inside
+a command proc (say, a pickup particle burst inside the <code>powerup_claim</code>
+command proc) never reaches observers at all, and reconciliation re-runs can
+spawn it twice.</p>
+<p>Spawn the burst inside <code>present_gem_gone</code> instead: post 4&#39;s hook and this
+post&#39;s scheduling deliver it to every peer, exactly once, at each screen&#39;s
+correct moment. When you find yourself asking <em>&quot;where do I put the juice?&quot;</em>,
+the answer is always in the presentation proc, next to the state edge it
+decorates.</p>
+<p>That completes the model: state that converges (post 3), verbs that predict
+(post 4), and showings that respect the render clock (this post). What remains
+is the encouraging part: seeing how far those three ideas carry a real,
+shippable game, and what the toolkit hands you at the finish line.</p>
+<p><em>Next: <a href="06-the-shape-of-a-shippable-game.html">The shape of a shippable game →</a></em></p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="06-the-shape-of-a-shippable-game.html"><span>6 · The shape of a shippable game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/05-the-two-timelines.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#why-remote-motion-renders-behind" class="">Why remote motion renders behind</a><a href="#the-rule" class="">The rule</a><a href="#what-delays-and-what-doesnt" class="">What delays and what doesn't</a><a href="#edges-must-outlive-the-slowest-observer" class="">Edges must outlive the slowest observer</a><a href="#put-effects-in-the-presentation-proc-not-the-command" class="">Put effects in the presentation proc, not the command</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/05-the-two-timelines.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

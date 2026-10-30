@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>game.odin · odin_godot</title><link rel="icon" href="../../../../../favicon.svg"><link rel="stylesheet" href="../../../../../style.css"><link rel="stylesheet" href="../../../../../reader.css"><link rel="stylesheet" href="../../../../../sdk.css"><script src="../../../../../reader.js" defer></script><script src="../../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../../docs.html" aria-current="page">Docs</a><a href="../../../../../guide.html">Field guide</a><a href="../../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../../docs.html">Overview</a><a href="../../../../../docs/install.html">Installation</a><a href="../../../../../docs/first-script.html">Your first script</a><a href="../../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../../docs/authoring-guide.html">Script API</a><a href="../../../../docs/events.html">Signals and events</a><a href="../../../../docs/workflow.html">Editor workflow</a><a href="../../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../../docs/kit.html">Build with Kit</a><a href="../../../../../docs/replay.html">Build with Replay</a><a href="../../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../../docs/exporting.html">Build and export</a><a href="../../../../docs/exporting.html">Export reference</a><a href="../../../../docs/debugging.html">Debugging</a><a href="../../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../contributor-guide.html">Contributor guide</a><a href="../../code-guide.html">Code guide</a><a href="../../shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../../docs.html">Docs</a><span>/</span><a href="../../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>game.odin</h1><div class="reader-meta"><span>666 lines · Odin</span><span>Odin × Godot</span><a href="../../../../../reference/examples/replay_scrapyard/shared/game/game.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> scrapyard_game
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:math&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:unicode/utf8&quot;</span>
+<span class="hljs-keyword">import</span> r <span class="hljs-string">&quot;godot:replay&quot;</span>
+<span class="hljs-keyword">import</span> h <span class="hljs-string">&quot;godot:replay/history&quot;</span>
+<span class="hljs-keyword">import</span> net <span class="hljs-string">&quot;godot:replay/net&quot;</span>
+<span class="hljs-keyword">import</span> view <span class="hljs-string">&quot;godot:replay/view&quot;</span>
+<span class="hljs-keyword">import</span> p <span class="hljs-string">&quot;godot:replay/play&quot;</span>
+<span class="hljs-keyword">import</span> content <span class="hljs-string">&quot;../content&quot;</span>
+<span class="hljs-keyword">import</span> arena <span class="hljs-string">&quot;../arena&quot;</span>
+<span class="hljs-keyword">import</span> assets <span class="hljs-string">&quot;godot:replay/assets&quot;</span>
+
+SEATS :: <span class="hljs-number">4</span>
+
+CONTENT :: <span class="hljs-type">u64</span>(<span class="hljs-number">0x525343524150304b</span>)
+
+HZ :: <span class="hljs-type">u32</span>(<span class="hljs-number">60</span>)
+
+RUNNER_SPEED :: <span class="hljs-type">f32</span>(<span class="hljs-number">220</span>)
+
+DASH_SPEED :: <span class="hljs-type">f32</span>(<span class="hljs-number">840</span>)
+
+DASH_TICKS :: <span class="hljs-type">u64</span>(<span class="hljs-number">10</span>)
+
+DASH_COOLDOWN :: <span class="hljs-type">u64</span>(<span class="hljs-number">66</span>)
+
+LOOKS :: <span class="hljs-type">u8</span>(<span class="hljs-number">3</span>)
+
+GUNS :: <span class="hljs-type">u8</span>(<span class="hljs-number">7</span>)
+
+Name :: <span class="hljs-keyword">struct</span> {
+	count: <span class="hljs-type">u8</span>,
+	bytes: [<span class="hljs-number">31</span>]<span class="hljs-type">u8</span>,
+}
+
+Stage :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
+	Staging,
+	Yard,
+	Clear,
+	Over,
+}
+
+Meta :: <span class="hljs-keyword">struct</span> {
+	cores: <span class="hljs-type">u32</span>,
+	parts: <span class="hljs-type">u8</span>,
+}
+
+Profile :: <span class="hljs-keyword">struct</span> {
+	meta: Meta,
+	name: Name,
+	look, iron: <span class="hljs-type">u8</span>,
+	abilities: [<span class="hljs-number">2</span>]<span class="hljs-type">u8</span>,
+	ready: <span class="hljs-type">bool</span>,
+}
+
+SPRAY_MAX :: <span class="hljs-number">128</span> * <span class="hljs-number">1024</span>
+
+Spray :: <span class="hljs-keyword">struct</span> {
+	image: assets.Ref,
+	position: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	stamp: <span class="hljs-type">u32</span>,
+	floor: <span class="hljs-type">u8</span>,
+}
+
+Player :: <span class="hljs-keyword">struct</span> {
+	connected, in_yard, meta_claimed: <span class="hljs-type">bool</span>,
+	generation, warp: <span class="hljs-type">u32</span>,
+	profile: Profile,
+	spray: Spray,
+	position, aim, dash_velocity: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	hp: <span class="hljs-type">u8</span>,
+	dash_until, dash_ready: <span class="hljs-type">u64</span>,
+	dashes: <span class="hljs-type">u32</span>,
+	gun: p.Gun_State,
+	gun_id, parts, boost_damage, boost_rate, boost_speed: <span class="hljs-type">u8</span>,
+	revive: p.Channel,
+	revives, purchases: <span class="hljs-type">u32</span>,
+	next_pull: <span class="hljs-type">u64</span>,
+	shots, damage, kills, scrap: <span class="hljs-type">u32</span>,
+	rail_queries, historical_queries, rejected_queries, healed, blasts: <span class="hljs-type">u32</span>,
+	last_query: net.View_Status,
+	last_judged: <span class="hljs-type">u64</span>,
+	fx: [<span class="hljs-number">4</span>]p.Effect,
+	fx_credit: [<span class="hljs-number">4</span>]Credit,
+	cores: <span class="hljs-type">u32</span>,
+	ability_cd: [<span class="hljs-number">2</span>]p.Cooldown,
+	casts: <span class="hljs-type">u32</span>,
+	casts_by_ability: [content.MAX_ABILITIES]<span class="hljs-type">u32</span>,
+}
+
+World :: <span class="hljs-keyword">struct</span> {
+	seed: <span class="hljs-type">u32</span>,
+	floor: <span class="hljs-type">u8</span>,
+	stage: Stage,
+	run: <span class="hljs-type">u32</span>,
+	rules: Run_Rules,
+	director: p.Director,
+	waves: [<span class="hljs-number">3</span>]p.Wave,
+	wave_count: <span class="hljs-type">u8</span>,
+	spawn_index: <span class="hljs-type">u32</span>,
+	depart: p.Telegraph,
+	over_until: <span class="hljs-type">u64</span>,
+	clears, descents, wipes: <span class="hljs-type">u32</span>,
+	host: <span class="hljs-type">u16</span>,
+	spawn_placed: <span class="hljs-type">bool</span>,
+	spawn_positions: [SEATS][<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	starting_hp: <span class="hljs-type">u8</span>,
+	clock, started_at: <span class="hljs-type">u64</span>,
+	layout: arena.Layout,
+	players: [SEATS]Player,
+	catalog: content.Catalog,
+	encounter_count: <span class="hljs-type">u8</span>,
+	encounter_kinds: [<span class="hljs-number">4</span>]<span class="hljs-type">u8</span>,
+	encounter_placed: <span class="hljs-type">bool</span>,
+	encounter_positions: [<span class="hljs-number">4</span>][<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	boss_hp: <span class="hljs-type">u16</span>,
+	spits, pops, slams, adds, barrel_blasts, defeated, status_applied, status_refused, reactions, dot_pulses: <span class="hljs-type">u32</span>,
+	mobs: r.Pool(Mob, MAX_MOBS),
+	lobs: r.Pool(Lob, MAX_LOBS),
+	zones: r.Pool(Zone, MAX_ZONES),
+	lobs_landed, zones_spawned, zone_pulses: <span class="hljs-type">u32</span>,
+	shots: r.Pool(Shot, MAX_SHOTS),
+	drops: r.Pool(Drop, MAX_DROPS),
+	hit_history: h.History([SEATS + MAX_MOBS]Proxy, <span class="hljs-number">32</span>) <span class="hljs-string">`replay:&quot;authority&quot;`</span>,
+	flashes: r.Pool(Flash, MAX_FLASHES),
+	flash_evictions, visual_serial: <span class="hljs-type">u32</span>,
+	authority_epoch: <span class="hljs-type">u64</span>,
+	turrets: r.Pool(Turret, MAX_TURRETS),
+}
+
+<span class="hljs-comment">// dash is retained for already-recorded scheduled controls in older saves.</span>
+<span class="hljs-comment">// Current authored input submits Action.Dash and never sets this compatibility bit.</span>
+Control :: <span class="hljs-keyword">struct</span> {
+	move, aim: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	dash, fire, revive: <span class="hljs-type">bool</span>,
+}
+
+Action_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
+	Profile,
+	Ready,
+	Start,
+	Cast,
+	Buy,
+	Workshop,
+	Set_Spray,
+	Stamp,
+	Dev_Spawn,
+	Dev_Edit,
+	Dash,
+	Turret_Mount,
+	Turret_Dismount,
+}
+
+Action :: <span class="hljs-keyword">struct</span> {
+	kind: Action_Kind,
+	profile: Profile,
+	ready: <span class="hljs-type">bool</span>,
+	slot: <span class="hljs-type">u8</span>,
+	aim: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	aim_is_point: <span class="hljs-type">bool</span>,
+	item: <span class="hljs-type">u8</span>,
+	image: assets.Ref,
+	development: Development,
+	turret: r.Handle(Turret),
+}
+
+Event_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
+	Started,
+	Entered,
+	Dash,
+	Shot,
+	Jam,
+	Hit,
+	Killed,
+	Hurt,
+	Pickup,
+	Healed,
+	Blast,
+	Wall,
+}
+
+Event :: <span class="hljs-keyword">struct</span> {
+	kind: Event_Kind,
+	seat: <span class="hljs-type">u16</span>,
+	generation: <span class="hljs-type">u32</span>,
+	serial: <span class="hljs-type">u32</span>,
+	position: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+	detail: <span class="hljs-type">u8</span>,
+}
+
+name :: <span class="hljs-keyword">proc</span>(text: <span class="hljs-type">string</span>) -&gt; Name {
+	result: Name
+	result.count = <span class="hljs-type">u8</span>(min(len(text), len(result.bytes)))
+	<span class="hljs-keyword">for</span> result.count &gt; <span class="hljs-number">0</span> &amp;&amp; !utf8.valid_string(text[:result.count]) {
+		result.count -= <span class="hljs-number">1</span>
+	}
+	copy(result.bytes[:result.count], <span class="hljs-keyword">transmute</span>([]<span class="hljs-type">u8</span>)text[:result.count])
+	<span class="hljs-keyword">return</span> result
+}
+
+name_string :: <span class="hljs-keyword">proc</span>(value: ^Name) -&gt; <span class="hljs-type">string</span> {
+	<span class="hljs-keyword">return</span> <span class="hljs-type">string</span>(value.bytes[:value.count])
+}
+
+name_valid :: <span class="hljs-keyword">proc</span>(value: Name) -&gt; <span class="hljs-type">bool</span> {
+	value := value
+	<span class="hljs-keyword">if</span> value.count &gt; <span class="hljs-type">u8</span>(len(value.bytes)) {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	<span class="hljs-keyword">if</span> !utf8.valid_string(<span class="hljs-type">string</span>(value.bytes[:value.count])) {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	<span class="hljs-keyword">for</span> b, i <span class="hljs-keyword">in</span> value.bytes {
+		<span class="hljs-keyword">if</span> i &lt; <span class="hljs-type">int</span>(value.count) {
+			<span class="hljs-keyword">if</span> b &lt; <span class="hljs-number">32</span> || b == <span class="hljs-number">127</span> {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> b != <span class="hljs-number">0</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+profile_valid :: <span class="hljs-keyword">proc</span>(p: Profile) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">return</span>(
+		p.meta.parts &amp; ~<span class="hljs-type">u8</span>(<span class="hljs-number">15</span>) == <span class="hljs-number">0</span> &amp;&amp;
+		name_valid(p.name) &amp;&amp;
+		p.look &lt; LOOKS &amp;&amp;
+		p.iron &lt; content.MAX_GUNS &amp;&amp;
+		p.abilities[<span class="hljs-number">0</span>] &lt; content.MAX_ABILITIES &amp;&amp;
+		p.abilities[<span class="hljs-number">1</span>] &lt; content.MAX_ABILITIES \
+	)
+}
+
+spray_ref_valid :: <span class="hljs-keyword">proc</span>(ref: assets.Ref) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">return</span> ref == (assets.Ref{}) || assets.ref_valid(ref) &amp;&amp; ref.bytes &lt;= SPRAY_MAX
+}
+
+spawn :: <span class="hljs-keyword">proc</span>(seat: <span class="hljs-type">u16</span>) -&gt; [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span> {
+	<span class="hljs-keyword">return</span> {arena.WIDTH / <span class="hljs-number">2</span> + <span class="hljs-type">f32</span>(<span class="hljs-type">int</span>(seat) % <span class="hljs-number">8</span>) * <span class="hljs-number">40</span> - <span class="hljs-number">160</span>, arena.HEIGHT / <span class="hljs-number">2</span>}
+}
+
+initial :: <span class="hljs-keyword">proc</span>(seed: <span class="hljs-type">u32</span> = <span class="hljs-number">1337</span>, dedicated: <span class="hljs-type">bool</span> = <span class="hljs-literal">false</span>, encounter_count: <span class="hljs-type">u8</span> = <span class="hljs-number">8</span>) -&gt; World {
+	w := World {
+		seed = seed,
+		floor = <span class="hljs-number">1</span>,
+		host = dedicated ? <span class="hljs-number">0</span> : <span class="hljs-number">1</span>,
+		layout = arena.generate(seed, <span class="hljs-number">1</span>),
+		catalog = content.stock(),
+		encounter_count = encounter_count,
+		encounter_kinds = {<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>},
+		starting_hp = <span class="hljs-number">10</span>,
+	}
+	<span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> w.players {
+		player = fresh_player(<span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), <span class="hljs-number">1</span>)
+		p.gun_equip(&amp;player.gun, w.catalog.guns[player.gun_id].mechanism)
+	}
+	<span class="hljs-keyword">return</span> w
+}
+
+fresh_player :: <span class="hljs-keyword">proc</span>(seat: <span class="hljs-type">u16</span>, generation: <span class="hljs-type">u32</span>) -&gt; Player {
+	<span class="hljs-keyword">return</span> {
+		generation = generation,
+		profile = {look = <span class="hljs-type">u8</span>(seat) % LOOKS, iron = <span class="hljs-type">u8</span>(seat - <span class="hljs-number">1</span>) % GUNS, abilities = {<span class="hljs-number">1</span>, <span class="hljs-number">2</span>}},
+		position = spawn(seat),
+		aim = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>},
+		hp = <span class="hljs-number">10</span>,
+		gun_id = <span class="hljs-type">u8</span>(seat - <span class="hljs-number">1</span>) % GUNS,
+	}
+}
+
+control_valid :: <span class="hljs-keyword">proc</span>(c: Control) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">for</span> value <span class="hljs-keyword">in</span> c.move {
+		<span class="hljs-keyword">if</span> math.is_nan(value) || math.is_inf(value) || abs(value) &gt; <span class="hljs-number">1</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	<span class="hljs-keyword">for</span> value <span class="hljs-keyword">in</span> c.aim {
+		<span class="hljs-keyword">if</span> math.is_nan(value) || math.is_inf(value) || abs(value) &gt; <span class="hljs-number">1</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+state_valid :: <span class="hljs-keyword">proc</span>(w: World) -&gt; <span class="hljs-type">bool</span> {
+	value := w
+	<span class="hljs-keyword">return</span> state_valid_borrowed(&amp;value)
+}
+
+<span class="hljs-comment">// Synchronous borrowed read; never retain or mutate the world.</span>
+<span class="hljs-meta">@(private)</span>
+state_valid_borrowed :: <span class="hljs-keyword">proc</span>(w: ^World) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">if</span> w.starting_hp == <span class="hljs-number">0</span> ||
+	   w.starting_hp &gt; <span class="hljs-number">10</span> ||
+	   w.floor == <span class="hljs-number">0</span> ||
+	   w.stage &gt; .Over ||
+	   w.host &gt; SEATS ||
+	   !arena.valid(w.layout, w.seed, w.floor) ||
+	   !content.valid(w.catalog) ||
+	   w.encounter_count &gt; MAX_MOBS {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	<span class="hljs-keyword">for</span> player <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> player.generation == <span class="hljs-number">0</span> ||
+		   !profile_valid(player.profile) ||
+		   player.hp &gt; max_health(player.parts) ||
+		   !content.gun_present(&amp;w.catalog, player.profile.iron) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		<span class="hljs-keyword">if</span> !spray_ref_valid(player.spray.image) ||
+		   player.spray.stamp != <span class="hljs-number">0</span> &amp;&amp; (player.spray.floor != w.floor || !position_valid(player.spray.position)) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		<span class="hljs-keyword">if</span> player.position[<span class="hljs-number">0</span>] &lt; arena.MARGIN ||
+		   player.position[<span class="hljs-number">0</span>] &gt; arena.WIDTH - arena.MARGIN ||
+		   player.position[<span class="hljs-number">1</span>] &lt; arena.MARGIN ||
+		   player.position[<span class="hljs-number">1</span>] &gt; arena.HEIGHT - arena.MARGIN {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		<span class="hljs-keyword">for</span> value <span class="hljs-keyword">in</span> player.position {
+			<span class="hljs-keyword">if</span> math.is_nan(value) || math.is_inf(value) {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+		<span class="hljs-keyword">for</span> value <span class="hljs-keyword">in</span> player.aim {
+			<span class="hljs-keyword">if</span> math.is_nan(value) || math.is_inf(value) || abs(value) &gt; <span class="hljs-number">1</span> {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+		<span class="hljs-keyword">for</span> value <span class="hljs-keyword">in</span> player.dash_velocity {
+			<span class="hljs-keyword">if</span> math.is_nan(value) || math.is_inf(value) || abs(value) &gt; DASH_SPEED {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+		<span class="hljs-keyword">if</span> w.stage == .Staging &amp;&amp; player.in_yard {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	<span class="hljs-keyword">if</span> w.spawn_placed {
+		<span class="hljs-keyword">for</span> point <span class="hljs-keyword">in</span> w.spawn_positions {
+			<span class="hljs-keyword">if</span> !position_valid(point) ||
+			   point[<span class="hljs-number">0</span>] &lt; arena.MARGIN ||
+			   point[<span class="hljs-number">0</span>] &gt; arena.WIDTH - arena.MARGIN ||
+			   point[<span class="hljs-number">1</span>] &lt; arena.MARGIN ||
+			   point[<span class="hljs-number">1</span>] &gt; arena.HEIGHT - arena.MARGIN {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+	}
+	<span class="hljs-keyword">return</span> combat_valid_borrowed(w) &amp;&amp; abilities_valid_borrowed(w) &amp;&amp; run_valid_borrowed(w) &amp;&amp; turrets_valid(w)
+}
+
+model :: <span class="hljs-keyword">proc</span>() -&gt; net.Model(World, Control, Action, Event, SEATS) {
+	<span class="hljs-keyword">return</span> {
+		step_view = step_view,
+		action = action,
+		reset_player = reset_player,
+		control_valid = control_valid,
+		replication = public_replication(),
+		group = public_prediction(),
+		action_schedule = dash_schedule(),
+		authority = succession_policy(),
+		action_valid = action_valid,
+		state_valid = state_valid,
+		action_admit = <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, seat: <span class="hljs-type">u16</span>, a: Action) -&gt; <span class="hljs-type">bool</span> {
+			<span class="hljs-keyword">return</span> development_allowed(<span class="hljs-literal">false</span>, <span class="hljs-number">0</span>, seat, a)
+		},
+		hold = <span class="hljs-keyword">proc</span>(c: Control) -&gt; Control {
+			<span class="hljs-keyword">return</span> {move = c.move, aim = c.aim, fire = c.fire, revive = c.revive}
+		},
+		event_owner = <span class="hljs-keyword">proc</span>(e: Event) -&gt; <span class="hljs-type">u16</span> {
+			<span class="hljs-keyword">return</span> e.seat
+		},
+		event_policy = <span class="hljs-keyword">proc</span>(e: Event) -&gt; view.Policy {
+			<span class="hljs-keyword">return</span> (e.kind == .Dash || e.kind == .Shot || e.kind == .Jam) ? .Speculative : .Confirmed
+		},
+	}
+}
+
+dash_schedule :: <span class="hljs-keyword">proc</span>() -&gt; net.Action_Schedule(Action) {
+	<span class="hljs-keyword">return</span> {id = <span class="hljs-number">0x5253594143543032</span>, timing = <span class="hljs-keyword">proc</span>(a: Action) -&gt; net.Action_Timing {
+			<span class="hljs-keyword">return</span> (a.kind == .Dash || a.kind == .Turret_Mount || a.kind == .Turret_Dismount) ? .Receipt : .Scheduled
+		}}
+}
+
+dash_start :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, direction: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>, ctx: ^r.Step(Event), after_step: <span class="hljs-type">bool</span> = <span class="hljs-literal">false</span>) -&gt; <span class="hljs-type">bool</span> {
+	player := &amp;w.players[seat - <span class="hljs-number">1</span>]
+	<span class="hljs-keyword">if</span> !player.connected ||
+	   !player.in_yard ||
+	   player.hp == <span class="hljs-number">0</span> ||
+	   turret_operator(w, seat) ||
+	   ctx.tick &lt; player.dash_ready {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	<span class="hljs-keyword">if</span> player.dashes == max(<span class="hljs-type">u32</span>) || ctx.tick &gt; max(<span class="hljs-type">u64</span>) - DASH_COOLDOWN {
+		r.abort(ctx)
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	direction := direction
+	<span class="hljs-keyword">if</span> direction == ([<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{}) {
+		direction = player.aim
+	}
+	n := math.sqrt(direction[<span class="hljs-number">0</span>] * direction[<span class="hljs-number">0</span>] + direction[<span class="hljs-number">1</span>] * direction[<span class="hljs-number">1</span>])
+	<span class="hljs-keyword">if</span> n &lt;= <span class="hljs-number">0</span> {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	player.dash_velocity = direction / n * DASH_SPEED
+	<span class="hljs-comment">// Actions run after the movement step. Preserve ten future movement ticks;</span>
+	<span class="hljs-comment">// an imported legacy control begins movement in its current step instead.</span>
+	player.dash_until, player.dash_ready = ctx.tick + DASH_TICKS + <span class="hljs-type">u64</span>(after_step), ctx.tick + DASH_COOLDOWN
+	player.dashes += <span class="hljs-number">1</span>
+	r.emit(
+		ctx,
+		<span class="hljs-type">u64</span>(player.generation) &lt;&lt; <span class="hljs-number">32</span> | <span class="hljs-type">u64</span>(seat),
+		<span class="hljs-type">u64</span>(Event_Kind.Dash),
+		Event{.Dash, seat, player.generation, player.dashes, player.position, <span class="hljs-number">0</span>},
+	)
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+reset_player :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, ctx: ^r.Step(Event)) {
+	generation := w.players[seat - <span class="hljs-number">1</span>].generation
+	turret_release_player(w, seat)
+	<span class="hljs-keyword">if</span> generation == max(<span class="hljs-type">u32</span>) {
+		r.abort(ctx)
+		<span class="hljs-keyword">return</span>
+	}
+	w.players[seat - <span class="hljs-number">1</span>] = fresh_player(seat, generation + <span class="hljs-number">1</span>)
+}
+
+enter :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, ctx: ^r.Step(Event)) {
+	player := &amp;w.players[seat - <span class="hljs-number">1</span>]
+	<span class="hljs-keyword">if</span> player.in_yard {
+		<span class="hljs-keyword">return</span>
+	}
+	<span class="hljs-keyword">if</span> player.warp == max(<span class="hljs-type">u32</span>) {
+		r.abort(ctx)
+		<span class="hljs-keyword">return</span>
+	}
+	player.warp += <span class="hljs-number">1</span>
+	player.in_yard, player.position, player.hp =
+		<span class="hljs-literal">true</span>,
+		w.spawn_placed ? w.spawn_positions[seat - <span class="hljs-number">1</span>] : spawn(seat),
+		max_health(player.parts) == <span class="hljs-number">10</span> ? w.starting_hp : max_health(player.parts)
+	player.gun_id = player.profile.iron
+	<span class="hljs-keyword">if</span> p.gun_equip(
+		   &amp;player.gun,
+		   w.catalog.guns[player.gun_id].mechanism,
+		   <span class="hljs-type">u32</span>(seat) * <span class="hljs-number">2654435761</span> + <span class="hljs-type">u32</span>(w.floor) * <span class="hljs-number">2246822519</span>,
+	   ) !=
+	   .None {
+		r.abort(ctx)
+		<span class="hljs-keyword">return</span>
+	}
+	r.emit(
+		ctx,
+		<span class="hljs-type">u64</span>(player.generation) &lt;&lt; <span class="hljs-number">32</span> | <span class="hljs-type">u64</span>(seat),
+		<span class="hljs-type">u64</span>(Event_Kind.Entered),
+		Event{.Entered, seat, player.generation, <span class="hljs-number">0</span>, player.position, <span class="hljs-number">0</span>},
+	)
+}
+
+all_ready :: <span class="hljs-keyword">proc</span>(w: ^World) -&gt; <span class="hljs-type">bool</span> {
+	count := <span class="hljs-number">0</span>
+	<span class="hljs-keyword">for</span> player <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> player.connected {
+			count += <span class="hljs-number">1</span>
+			<span class="hljs-keyword">if</span> !player.profile.ready {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+	}
+	<span class="hljs-keyword">return</span> count &gt; <span class="hljs-number">0</span>
+}
+
+start :: <span class="hljs-keyword">proc</span>(w: ^World, ctx: ^r.Step(Event)) {
+	w.stage, w.started_at = .Yard, ctx.tick
+	r.emit(ctx, <span class="hljs-number">100</span>, <span class="hljs-type">u64</span>(Event_Kind.Started), Event{kind = .Started})
+	<span class="hljs-keyword">for</span> player, i <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> player.connected &amp;&amp; player.profile.ready {
+			enter(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), ctx)
+		}
+	}
+	<span class="hljs-keyword">if</span> w.rules.enabled {
+		arm_floor(w, ctx, <span class="hljs-literal">false</span>)
+	} <span class="hljs-keyword">else</span> {
+		encounter_start(w, ctx)
+	}
+}
+
+action :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, a: Action, ctx: ^r.Step(Event)) -&gt; <span class="hljs-type">bool</span> {
+	player := &amp;w.players[seat - <span class="hljs-number">1</span>]
+	<span class="hljs-keyword">if</span> !player.connected {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	<span class="hljs-keyword">switch</span> a.kind {
+	<span class="hljs-keyword">case</span> .Turret_Mount:
+		<span class="hljs-keyword">return</span> turret_mount(w, seat, a.turret)
+	<span class="hljs-keyword">case</span> .Turret_Dismount:
+		<span class="hljs-keyword">return</span> turret_dismount(w, seat, a.turret)
+	<span class="hljs-keyword">case</span> .Dash:
+		<span class="hljs-keyword">if</span> !dash_start(w, seat, a.aim, ctx, after_step = <span class="hljs-literal">true</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	<span class="hljs-keyword">case</span> .Profile:
+		<span class="hljs-keyword">if</span> player.in_yard || !content.gun_present(&amp;w.catalog, a.profile.iron) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		<span class="hljs-keyword">for</span> id, slot <span class="hljs-keyword">in</span> a.profile.abilities {
+			<span class="hljs-keyword">if</span> !content.ability_present(&amp;w.catalog, id == <span class="hljs-number">0</span> ? <span class="hljs-type">u8</span>(slot + <span class="hljs-number">1</span>) : id) {
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+			}
+		}
+		<span class="hljs-keyword">if</span> !player.meta_claimed {
+			player.cores, player.parts, player.meta_claimed = a.profile.meta.cores, a.profile.meta.parts, <span class="hljs-literal">true</span>
+		}
+		player.profile = a.profile
+		player.profile.meta = {player.cores, player.parts}
+		<span class="hljs-keyword">for</span> &amp;id, slot <span class="hljs-keyword">in</span> player.profile.abilities {
+			<span class="hljs-keyword">if</span> id == <span class="hljs-number">0</span> {
+				id = <span class="hljs-type">u8</span>(slot + <span class="hljs-number">1</span>)
+			}
+		}
+	<span class="hljs-keyword">case</span> .Ready:
+		player.profile.ready = a.ready
+		<span class="hljs-keyword">if</span> a.ready &amp;&amp; w.stage != .Staging {
+			enter(w, seat, ctx)
+		}
+	<span class="hljs-keyword">case</span> .Start:
+		<span class="hljs-keyword">if</span> w.stage != .Staging || seat != w.host || !all_ready(w) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		start(w, ctx)
+	<span class="hljs-keyword">case</span> .Dev_Spawn:
+		<span class="hljs-keyword">if</span> w.stage == .Staging || a.slot &gt;= SEATS || !w.players[a.slot].in_yard {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		anchor := w.players[a.slot].position
+		point := [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span> {
+			clamp(anchor[<span class="hljs-number">0</span>] + a.aim[<span class="hljs-number">0</span>], <span class="hljs-number">40</span>, arena.WIDTH - <span class="hljs-number">40</span>),
+			clamp(anchor[<span class="hljs-number">1</span>] + a.aim[<span class="hljs-number">1</span>], <span class="hljs-number">40</span>, arena.HEIGHT - <span class="hljs-number">40</span>),
+		}
+		<span class="hljs-keyword">if</span> !spawn_mob(w, a.item, point) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	<span class="hljs-keyword">case</span> .Dev_Edit:
+		<span class="hljs-keyword">return</span> development_apply(w, seat, a.development, ctx)
+	<span class="hljs-keyword">case</span> .Set_Spray:
+		player.spray.image = a.image
+	<span class="hljs-keyword">case</span> .Stamp:
+		<span class="hljs-keyword">if</span> !player.in_yard || player.spray.stamp == max(<span class="hljs-type">u32</span>) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		player.spray.position, player.spray.floor = player.position, w.floor
+		player.spray.stamp += <span class="hljs-number">1</span>
+	<span class="hljs-keyword">case</span> .Buy:
+		<span class="hljs-keyword">if</span> !buy(w, seat, a.item, ctx) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	<span class="hljs-keyword">case</span> .Workshop:
+		<span class="hljs-keyword">if</span> !workshop(w, seat, a.item) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	<span class="hljs-keyword">case</span> .Cast:
+		<span class="hljs-keyword">if</span> !cast_ability(w, seat, a.slot, a.aim, a.aim_is_point, ctx) {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	h.record(&amp;w.hit_history, ctx.tick, proxies(w))
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+step :: <span class="hljs-keyword">proc</span>(w: ^World, controls: [SEATS]Control, joins, leaves: <span class="hljs-type">u64</span>, ctx: ^r.Step(Event)) {
+	views: [SEATS]net.View_Time
+	<span class="hljs-keyword">for</span> &amp;view <span class="hljs-keyword">in</span> views {
+		view = {ctx.tick, ctx.tick, <span class="hljs-number">0</span>, .Live}
+	}
+	step_view(w, controls, views, joins, leaves, ctx)
+}
+
+step_view :: <span class="hljs-keyword">proc</span>(
+	w: ^World,
+	controls: [SEATS]Control,
+	views: [SEATS]net.View_Time,
+	joins, leaves: <span class="hljs-type">u64</span>,
+	ctx: ^r.Step(Event),
+) {
+	<span class="hljs-keyword">if</span> ctx.tick &gt; max(<span class="hljs-type">u64</span>) - <span class="hljs-number">65536</span> {
+		r.abort(ctx)
+		<span class="hljs-keyword">return</span>
+	}
+	w.clock = ctx.tick
+	feedback: Notices
+	update_roster(w, joins, leaves)
+	turret_cleanup(w)
+	player_upkeep(w, &amp;feedback, ctx)
+	move_players(w, controls, ctx)
+	<span class="hljs-keyword">if</span> w.host == <span class="hljs-number">0</span> &amp;&amp; w.stage == .Staging &amp;&amp; all_ready(w) {
+		start(w, ctx)
+	}
+	<span class="hljs-keyword">if</span> w.stage != .Staging {
+		<span class="hljs-keyword">if</span> w.rules.enabled &amp;&amp; w.stage == .Yard {
+			director_step(w, ctx)
+		}
+		revive_step(w, controls, &amp;feedback, ctx)
+		combat_step(w, controls, views, &amp;feedback, ctx)
+		<span class="hljs-keyword">if</span> w.rules.enabled {
+			run_step(w, ctx)
+		}
+	}
+	turret_cleanup(w)
+	flush(w, &amp;feedback, ctx)
+	h.record(&amp;w.hit_history, ctx.tick, proxies(w))
+}
+
+update_roster :: <span class="hljs-keyword">proc</span>(w: ^World, joins, leaves: <span class="hljs-type">u64</span>) {
+	<span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> joins &amp; (<span class="hljs-type">u64</span>(<span class="hljs-number">1</span>) &lt;&lt; <span class="hljs-type">uint</span>(i)) != <span class="hljs-number">0</span> {
+			player.connected = <span class="hljs-literal">true</span>
+		}
+		<span class="hljs-keyword">if</span> leaves &amp; (<span class="hljs-type">u64</span>(<span class="hljs-number">1</span>) &lt;&lt; <span class="hljs-type">uint</span>(i)) != <span class="hljs-number">0</span> {
+			player.connected, player.profile.ready = <span class="hljs-literal">false</span>, <span class="hljs-literal">false</span>
+		}
+	}
+	<span class="hljs-comment">// Lobby permission is replayable roster state, independent of transport</span>
+	<span class="hljs-comment">// authority. Keep a connected leader; replace a departed leader in seat</span>
+	<span class="hljs-comment">// order. Zero remains the dedicated server&#x27;s automatic-start policy.</span>
+	<span class="hljs-keyword">if</span> w.host != <span class="hljs-number">0</span> &amp;&amp; !w.players[w.host - <span class="hljs-number">1</span>].connected {
+		<span class="hljs-keyword">for</span> player, i <span class="hljs-keyword">in</span> w.players {
+			<span class="hljs-keyword">if</span> player.connected {
+				w.host = <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>)
+				<span class="hljs-keyword">break</span>
+			}
+		}
+	}
+}
+
+move_players :: <span class="hljs-keyword">proc</span>(w: ^World, controls: [SEATS]Control, ctx: ^r.Step(Event)) {
+	<span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> w.players {
+		<span class="hljs-keyword">if</span> !player.connected || !player.in_yard || player.hp == <span class="hljs-number">0</span> {
+			<span class="hljs-keyword">continue</span>
+		}
+		input := controls[i]
+		<span class="hljs-keyword">if</span> input.aim[<span class="hljs-number">0</span>] != <span class="hljs-number">0</span> || input.aim[<span class="hljs-number">1</span>] != <span class="hljs-number">0</span> {
+			n := math.sqrt(input.aim[<span class="hljs-number">0</span>] * input.aim[<span class="hljs-number">0</span>] + input.aim[<span class="hljs-number">1</span>] * input.aim[<span class="hljs-number">1</span>])
+			<span class="hljs-keyword">if</span> n &gt; <span class="hljs-number">0.00001</span> {
+				player.aim = input.aim / n
+			}
+		}
+		<span class="hljs-keyword">if</span> handle, mounted := turret_for(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>)); mounted {
+			t, _ := r.pool_get(&amp;w.turrets, handle)
+			t.aim = player.aim
+			<span class="hljs-keyword">continue</span>
+		}
+		<span class="hljs-keyword">if</span> input.dash {
+			dash_start(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), input.move, ctx)
+		}
+		velocity :=
+			ctx.tick &lt; player.dash_until ? player.dash_velocity : input.move * ((RUNNER_SPEED + <span class="hljs-type">f32</span>(player.boost_speed) * <span class="hljs-number">50</span>) * status_multiplier(w, player.fx[:], .Move))
+		player.position = arena.move(&amp;w.layout, player.position, velocity, <span class="hljs-number">1.0</span> / <span class="hljs-type">f32</span>(HZ))
+	}
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/shared/game/game.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../../docs.html">Documentation</a><a href="../../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../../reference/examples/replay_scrapyard/shared/game/game.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

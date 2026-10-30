@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Confirmed P2P spectators · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Confirmed P2P spectators</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/p2p/spectators.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#delivery-and-validation">Delivery and validation</a><a href="#history-gaps-and-presentation">History gaps and presentation</a><a href="#trust-and-scope">Trust and scope</a><a href="#changing-the-source-without-discarding-the-world">Changing the source without discarding the world</a></nav></details>
+<article class="reading-body "><p><code>Watch(State, Input, Event, Seats)</code> consumes confirmed history from an admitted
+source participant. It never occupies a player slot, samples an input, or contributes
+to the players&#39; confirmation frontier. One <code>Watch_Source</code> serves one spectator;
+applications can provision several bounded source streams. The source borrows its
+participant Runner and a separate transport lane or connection.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Source participant; binding identifies this admitted spectator connection.</span>
+error := p2p.watch_source_init(&amp;source, &amp;peer, spectator_id, spectator_transport, binding)
+error = p2p.watch_source_pump(&amp;source, monotonic_ms)
+
+<span class="hljs-comment">// Spectator; use the same initial frame, model, roster and player configuration.</span>
+error = p2p.watch_init(&amp;watch, initial_frame, model, roster, source_id,
+                      spectator_transport, binding, player_config)
+error = p2p.watch_pump(&amp;watch, monotonic_ms)
+frame, available := p2p.watch_current(&amp;watch)
+timeline := p2p.watch_timeline(&amp;watch) <span class="hljs-comment">// read-only borrow, valid until next pump</span></code></pre></div><p>Keep both owners at stable addresses. Destroy with <code>watch_source_destroy</code> and
+<code>watch_destroy</code>; their borrowed transports are closed separately. A source stream
+must be destroyed/rebound when its participant runner or admitted connection is
+replaced. The stream&#39;s session/epoch/content/binding remain fixed for its lifetime.</p>
+<h2 id="delivery-and-validation">Delivery and validation<a class="heading-anchor" href="#delivery-and-validation" aria-label="Link to this section">#</a></h2>
+<p>Each version-1 watch record contains a confirmed base frame and its occurrence
+batch, the original match contract, rolling base anchor, and later confirmed input
+batches with per-tick rolling state/event hashes. It contains no speculative world,
+future captured inputs, or player delivery frontiers. Its canonical encoded size
+is limited to 1 MiB; count and exact-length validation precede replay allocation.</p>
+<p>The first record selects the source&#39;s current confirmed tick. Following records
+start at the spectator&#39;s last acknowledged tick and reexecute through the new
+confirmed head. A shadow runtime stages the complete candidate. Installation occurs
+only after every input, state/event digest and final chain passes. Overlapping
+history must agree with the spectator&#39;s existing confirmed world. A changed
+already-observed baseline or divergent execution preserves the previous world and
+leaves a stopped error/report, rather than silently accepting the next baseline.</p>
+<p>Delivery uses <code>recovery.Sender</code> and <code>Blob_Receiver</code>: 1,024-byte chunks, bounded
+reassembly, SHA-256 integrity, explicit receipts, retries, timeout and byte/work
+budgets. Metadata/schema/CRC validation remains separate from callback validation.
+Lost Ready packets do not reinstall a completed record. A timeout can start a
+new transfer; a rejected archive or missing retained receipt is explicit. The
+source publishes at a configurable interval (50 ms by default), and only after
+the previous transfer completes. This favors bounded work over minimum viewer
+latency; snapshot cadence and codec/replay costs need larger-workload measurement.</p>
+<p>The player Runner&#39;s receive/ACK frontiers remain unchanged by all spectator
+traffic, even when spectator delivery stalls. Shared connections should use the
+transport Router&#39;s background budgets; the Duel uses a separate ENet connection.</p>
+<h2 id="history-gaps-and-presentation">History gaps and presentation<a class="heading-anchor" href="#history-gaps-and-presentation" aria-label="Link to this section">#</a></h2>
+<p>When the source no longer retains the last acknowledged frame, it sends a current
+confirmed baseline. <code>watch.reset</code> supplies an increasing sequence and the previous/
+new baseline ticks. <code>stats.skipped_ticks</code> records the omitted interval. The first
+late join is also a reset from the known initial tick. This is an explicit spectator
+resynchronization; it never changes a player&#39;s world or stalls simulation.</p>
+<p>On a new reset sequence, seed the event journal at <code>baseline_tick</code> and reconstruct
+views from the new complete world. Skip historical cosmetics through that baseline.
+For later delivered ticks, consume occurrences normally; they are already confirmed.
+The Duel verifies its new shot occurrences against the new baseline&#39;s shot counter.
+<code>watch.transfer.latest.at_ms</code> exposes the last validated receipt time for a stale
+view indicator. <code>watch_current</code> retains the last valid world when transport is lost.</p>
+<h2 id="trust-and-scope">Trust and scope<a class="heading-anchor" href="#trust-and-scope" aria-label="Link to this section">#</a></h2>
+<p>The initial contract gates configuration, ordered roster, content and schemas;
+the transport/admission layer must authenticate the selected source and binding.
+A late spectator accepts a rolling anchor for history it never executed. It trusts
+that source for the initial world: these hashes do not prove agreement of all
+participants, prevent a dishonest broadcaster, or authenticate packets. Full P2P
+world values are disclosed to spectators; games needing delayed disclosure or
+recipient filtering need an explicit viewing policy.</p>
+<p>Spectators can change admitted sources within a fixed-epoch match using the
+continuity API below. Automatic spectator restoration after process restart,
+match recording playback UX and delayed anti-coaching feeds remain follow-through
+work. Browser viewing exists; its provider integration for source failover remains
+separate from the native gate.
+The current whole-frame base and two staged value runtimes prioritize correctness;
+input-only incremental records and memory/codec reuse should follow measured costs.</p>
+<p>See <a href="../../examples/replay_duel/README.html">Replay Duel</a> for the separate three-process
+late-join/blackout gate. The spectator fixture uses the same deterministic model
+and Godot views as the participating players.</p>
+<h2 id="changing-the-source-without-discarding-the-world">Changing the source without discarding the world<a class="heading-anchor" href="#changing-the-source-without-discarding-the-world" aria-label="Link to this section">#</a></h2>
+<p>After the provider authenticates a replacement participant and fences the old
+connection, rebind the existing watcher at a stable runner boundary:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">anchor, error := p2p.watch_rebind(&amp;watch, replacement_source_id,
+                                 replacement_transport, next_binding, now_ms)
+<span class="hljs-comment">// Send this anchor to the admitted replacement through the provider&#x27;s control path.</span>
+error = p2p.watch_source_init(&amp;source, &amp;replacement_player, spectator_id,
+                              source_transport, next_binding, resume = &amp;anchor)</code></pre></div><p>The binding is a strictly increasing generation for this spectator stream, even
+when the physical source ID is reused. Rebind resets only the blob-transfer owner;
+the last confirmed world, chain, event history and presentation-reset sequence
+remain available. The caller owns both transport lifetimes. Invalid arguments,
+backward time or a busy timeline leave the watcher untouched. A detected divergence
+or replay mismatch cannot be cleared through this API.</p>
+<p><code>Watch_Anchor</code> identifies session, epoch, content, match contract, confirmed tick,
+rolling chain and the state/event digest at that tick. The replacement must retain
+that confirmed tick and agree with both hashes. A source still behind it returns
+<code>Waiting</code>; missing retained history returns <code>History</code>; conflicting hashes return
+<code>Diverged</code> without changing its player runner. The source rechecks retention before
+its first publication, since history may expire while the provider connects peers.</p>
+<p>Until the first valid record installs, the watcher refuses a base later than its
+retained head. Thus an incorrect source cannot substitute a fresh baseline to
+bypass continuity. Successful replay through the anchor clears <code>rebind_pending</code>
+without a presentation reset or duplicated old cosmetics. Later ordinary history
+exhaustion retains the existing explicit reset behavior.</p>
+<p><code>watch_anchor</code> also exposes the current continuity point without rebinding. Keep
+control-path ordering explicit: do not continue accepting old-source updates after
+publishing a point that the replacement will use. <code>watch_rebind</code> returns the exact
+point it retained, avoiding that race when provisioning follows the rebind.</p>
+<p>This is continuity validation, not authentication, source election or a proof that
+all participants are honest. The native Duel fixture uses two configured loopback
+participants and a private control file to exercise replacement; public spectator
+admission and automatic selection remain application/provider work.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/spectators.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#delivery-and-validation" class="">Delivery and validation</a><a href="#history-gaps-and-presentation" class="">History gaps and presentation</a><a href="#trust-and-scope" class="">Trust and scope</a><a href="#changing-the-source-without-discarding-the-world" class="">Changing the source without discarding the world</a></nav><div class="outline-actions"><a href="../../../reference/replay/p2p/spectators.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

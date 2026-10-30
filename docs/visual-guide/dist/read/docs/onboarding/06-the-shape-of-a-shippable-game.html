@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>6 · The shape of a shippable game · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>6 · The shape of a shippable game</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/06-the-shape-of-a-shippable-game.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#persistent-identity">Persistent identity</a><a href="#saves">Saves</a><a href="#host-migration">Host migration</a><a href="#transports-steam-and-web">Transports: Steam and web</a><a href="#testing-under-latency">Testing under latency</a><a href="#where-to-go-next">Where to go next</a></nav></details>
+<article class="reading-body "><p>This post covers what takes a game from &quot;my friends can connect&quot; to
+something you would hand to strangers: persistent identity, saves, host
+migration, Steam and web transports, and the testing habit that keeps them
+honest. Most of it is one call plus a concept the earlier posts already gave
+you.</p>
+<h2 id="persistent-identity">Persistent identity<a class="heading-anchor" href="#persistent-identity" aria-label="Link to this section">#</a></h2>
+<p><code>ksave.token</code> gives each player a persistent identity: an env var for tests,
+a file under <code>user://</code> for real, and an opt-in per-instance salt for
+same-machine testing. Seats key on tokens, not connections, so:</p>
+<ul>
+<li><strong>Crash and rejoin</strong> → same seat, same stats, same entities. There is no
+lobby re-negotiation, and no &quot;player 2 is now player 5.&quot;</li>
+<li><strong>Kick and ban</strong> apply to the <em>person</em>, not the socket
+(<code>session_kick(player, ban)</code>).</li>
+<li><strong>A locked session</strong> (<code>session_set_locked</code>) still admits returning
+identities. Their seat is theirs.</li>
+</ul>
+<p>Tokens are hashed on the host and never relayed to other peers.</p>
+<h2 id="saves">Saves<a class="heading-anchor" href="#saves" aria-label="Link to this section">#</a></h2>
+<p>Because the session replicates state, it can serialize the whole world at any
+moment, and it does so continuously, for late joiners. A save file is that
+same serialization written to disk:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ksave.save_write(&amp;self.ses, &amp;w, GAME_VERSION, my_campaign_blob)  <span class="hljs-comment">// save</span>
+blob, err := ksave.resume(&amp;self.ses, name, path, GAME_VERSION)   <span class="hljs-comment">// the whole Resume button</span></code></pre></div><p>Identity, stats, every entity, and every replicated field are carried. Your
+blob holds only what the session can&#39;t know (AI clocks, wave director). A
+resumed save is a reconnect: friends rejoin a resumed run with their tokens
+exactly as they would after any drop.</p>
+<h2 id="host-migration">Host migration<a class="heading-anchor" href="#host-migration" aria-label="Link to this section">#</a></h2>
+<p>Backup snapshots stream to a designated client every few seconds. On host
+loss, that client <strong>rebinds as the server, resumes the session from the
+backup, and everyone else auto-rejoins with their tokens</strong>, all of it
+hands-free, mid-run. The test suite proves it by <code>kill -9</code>-ing the host
+process.</p>
+<p>Your part is wiring two events and providing an address (<code>Ev_Backup_Target</code>
+/ <code>Ev_Succession</code>). The party keeps playing; nobody re-lobbies. This works
+because state, not a stream of in-flight messages, is what gets replicated;
+there is no list of pending RPCs to lose.</p>
+<h2 id="transports-steam-and-web">Transports: Steam and web<a class="heading-anchor" href="#transports-steam-and-web" aria-label="Link to this section">#</a></h2>
+<p>Everything above runs over plain ENet: localhost, LAN, a VPS. The session
+sits behind Godot&#39;s MultiplayerPeer abstraction, so shipping over Steam is
+the lobby ritual and nothing else: create or join a Steam lobby, hand the
+peer to the same wire, and invite through the overlay. Gameplay code,
+replication, prediction, and migration are untouched. The browser export
+runs the same session over WebRTC.</p>
+<h2 id="testing-under-latency">Testing under latency<a class="heading-anchor" href="#testing-under-latency" aria-label="Link to this section">#</a></h2>
+<p>Multiplayer bugs live in timing, latency, and role asymmetry: places a unit
+test can&#39;t reach and a quick playtest samples only once. The kit games test
+themselves against exactly those conditions:</p>
+<ul>
+<li>launch <strong>two or three real game processes</strong> headless, over real sockets,
+with <strong>120ms injected latency</strong>;</li>
+<li>a driver script plays each role through the game&#39;s own <code>@(gd_method)</code>
+surface (host, join, act, kill the host mid-run);</li>
+<li>each process prints one-line facts (<code>GOLF_CLAIM kind=1</code>,
+<code>GOLF_GEM_GONE kind=1</code>), and the harness greps that every peer saw what it
+should, including that the <em>observer&#39;s</em> screen presented the effect, not
+just the actor&#39;s.</li>
+</ul>
+<p>The addon ships the harness template (<code>build/template/test/</code> +
+<a href="../kit/testing.html">kit/testing</a>); adapting it to a new game is an
+afternoon. When your acceptance test is green under injected latency, you can
+ship.</p>
+<h2 id="where-to-go-next">Where to go next<a class="heading-anchor" href="#where-to-go-next" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong><a href="../getting-started.html">Getting Started</a></strong> covers the toolchain through
+moving a node, if you haven&#39;t already.</li>
+<li><strong><a href="../kit/build-a-game-in-a-day.html">Build a game in a day</a></strong> is the
+step-by-step recipe: lobby → entity → movement → verbs → combat → levels
+→ save → migration → Steam, each brick under an hour.</li>
+<li><strong>Read a finished game against it</strong>, such as <code>examples/cavecrawl</code> (every
+toolkit system in one project), and keep <a href="../kit/index.html">kit/</a> open
+as the per-package reference.</li>
+<li><strong>Then build yours</strong>, one brick per session, and keep the acceptance test
+green before the next brick.</li>
+</ol>
+<p>None of this asked you to be a network programmer. You wrote structs with
+tagged fields, verbs that return bool, and presentation procs: single-player-
+shaped code under a discipline. What that discipline buys is reconnects,
+drop-in joins, saves, host migration, and honest-feeling latency, and you
+keep the editor, the scene tree, and the engine you already know.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/testing.html"><span>Integration-test your game</span><span aria-hidden="true">→</span></a><a href="../getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="../kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/06-the-shape-of-a-shippable-game.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#persistent-identity" class="">Persistent identity</a><a href="#saves" class="">Saves</a><a href="#host-migration" class="">Host migration</a><a href="#transports-steam-and-web" class="">Transports: Steam and web</a><a href="#testing-under-latency" class="">Testing under latency</a><a href="#where-to-go-next" class="">Where to go next</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/06-the-shape-of-a-shippable-game.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

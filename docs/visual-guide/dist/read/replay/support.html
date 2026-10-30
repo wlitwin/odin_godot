@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Experimental support envelope · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Experimental support envelope</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../reference/replay/support.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#modes-and-tested-combinations">Modes and tested combinations</a><a href="#recovery-and-failure-policy">Recovery and failure policy</a><a href="#bounds-not-scale-promises">Bounds, not scale promises</a><a href="#authoring-and-performance-assessment">Authoring and performance assessment</a><a href="#security-and-compatibility-boundaries">Security and compatibility boundaries</a></nav></details>
+<article class="reading-body "><p>This is the support assessment for the framework-first implementation as of
+2026-09-20. <strong>Retain Replay as an experimental library alongside Kit.</strong> It has
+working primitives for the requested multiplayer styles and representative
+integration evidence. It is not a certified production service, an automatic
+replacement for Kit, or proof that arbitrary gameplay is deterministic.</p>
+<p>Start with <a href="getting-started.html">getting started</a>, then use the
+<a href="compatibility.html">compatibility policy</a> and the exact package contracts below.
+The <a href="../docs/replay/framework-audit.html">framework audit</a> maps implementation gates.</p>
+<h2 id="modes-and-tested-combinations">Modes and tested combinations<a class="heading-anchor" href="#modes-and-tested-combinations" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Implementation and representative evidence</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Offline value simulation</td>
+<td>Timeline/pools/RNG; standalone Loot; Godot Hello input, history and recordings</td>
+<td>All mutable simulation dependencies must be explicit; bounded value storage, not arbitrary node/reference snapshots</td>
+</tr>
+<tr>
+<td>Server authority and competitive prediction</td>
+<td><code>net</code> + Session/Room; Quickdraw/Claimball, recipient filtering and historical-view tests</td>
+<td>Authority rules, prediction footprint, action timing and disclosure policies remain authored game decisions</td>
+</tr>
+<tr>
+<td>Cooperative owner-driven physics</td>
+<td><code>owned</code>, Body2/Body3 and authoritative observations; Slopball and owner Cavecrawl</td>
+<td>Cooperative trust; Godot contact solving is not deterministic rollback or an anti-cheat proof</td>
+</tr>
+<tr>
+<td>Host migration and durable recovery</td>
+<td>Room/coordinator/leases, private checkpoints; planned/crash, repeat, partition, successor loss, return and cold restore fixtures</td>
+<td>Requires a reachable trusted coordinator and eligible complete backup; crash loss is bounded by the accepted checkpoint, not zero by definition</td>
+</tr>
+<tr>
+<td>Deterministic P2P</td>
+<td>Fixed-roster runner; native/WASM/Rosetta corpus, participant archives and spectator failover</td>
+<td>Determinism is established for tested models/targets, not arbitrary floats/physics/callbacks; missing history stalls or fails explicitly</td>
+</tr>
+<tr>
+<td>Native provisioned P2P</td>
+<td>P2P_Party + P2P_Direct; two-player TLS enrollment/pair service and encrypted ENet recovery</td>
+<td>Convenience owner supports two players. Reachable/forwarded endpoints are configured; no automatic NAT traversal</td>
+</tr>
+<tr>
+<td>Browser provisioned P2P</td>
+<td>P2P_Party + authenticated RTC mesh; independent Chrome profiles and guest/creator archive return</td>
+<td>Fixed roster; credentials and participant history are separate. Authenticated spectator enrollment is not supplied by this party flow</td>
+</tr>
+<tr>
+<td>Dedicated authority</td>
+<td>Server/Observer infrastructure Room profile; native and Chrome recovery</td>
+<td>Infrastructure identities/standbys must be provisioned; player-hosted backup disclosure is a different trust choice</td>
+</tr>
+</tbody></table>
+</div><p>ENet gameplay is native. Browser gameplay uses WebRTC; a native ENet peer cannot
+directly join a browser RTC peer. A common backend/native RTC extension is required
+for such mixed-platform matches. The shared Transport API does not confer backend
+availability or network reachability.</p>
+<p>Most live integration evidence is macOS arm64 + Godot 4.7.1 and local Chrome.
+Standalone WASM is executed, not only type-checked, in deterministic/archive/trace
+fixtures. Rosetta checks another ISA binary on the same Mac; it is not independent
+x86 hardware, Linux or Windows validation. SQLite adapters currently have native
+darwin/linux implementations; available source is not proof of deployment on both.</p>
+<p>RTC/TURN evidence includes local Coturn relay-only UDP/TCP configurations and real
+datagram loss/delay tests, including migration. Native service fixtures verify
+localhost TLS with a test CA. Public WSS certificates, real Internet NAT/relay
+availability, independent hardware and other browser engines remain deployment
+acceptance work. See <span class="local-reference" title="docs/replay/results/browser-turn-udp-faults-2026-09-14/README.md · available in the repository">TURN datagram evidence</span>.</p>
+<p>Steam&#39;s packet/Room lifecycle integration has native ABI and local API-contract
+tests. Live multi-account Valve networking, lobby UX and SteamGameServer are not
+validated by those fixtures. They remain experimental integrations, not supported
+live-network claims. See <a href="godot/transport/steam.html">Steam</a> and <a href="godot/steam_room.html">Steam Room</a>.</p>
+<h2 id="recovery-and-failure-policy">Recovery and failure policy<a class="heading-anchor" href="#recovery-and-failure-policy" aria-label="Link to this section">#</a></h2>
+<p>Room planned handoff freezes after accepted work settles and transfers an approved
+final checkpoint. Abrupt takeover uses the newest approved usable checkpoint after
+authority fencing; it can lose later unreplicated work. Retained, rejected, retired
+and unknown command outcomes have explicit recovery classifications. Complete
+authority state must only go to a trusted successor. Public projections are not
+authority archives. See <a href="../docs/replay/recovery.html">recovery guarantees</a>.</p>
+<p>P2P peers retain simulation/input history; a returning process restores its own
+compatible participant archive and registers a newer incarnation. The native
+owner refreshes pair decisions for a replacement connection and rejects retired
+connection generations. A saved world alone is insufficient.</p>
+<p><strong>P2P control outage policy:</strong> registration/pair control failure clears Party
+readiness and prevents new admission. It does not by itself invalidate an already
+authenticated direct link. A signed denial/invalid registration does retire the
+native link&#39;s keys. The current owner does not automatically reconnect failed
+background control; after service recovery, the application closes/reopens the
+party and restores/rejoins using its durable enrollment and participant archive.
+This deliberate distinction prevents an unreviewed background rebind from changing
+an active process identity underneath its transport. Continuous automatic control
+recovery is a follow-up capability, not a claimed guarantee.</p>
+<p>A final native test kills the actual service after admission. Party readiness
+fails after about 10.46 seconds while both existing encrypted links remain live;
+the peers still match the full reference at tick 1200. See the
+<span class="local-reference" title="docs/replay/results/framework-release-2026-09-20/README.md · available in the repository">release receipts</span>.</p>
+<p>The service cannot authorize new joins/rebinds while unavailable. Existing-link
+continuation is not offline revocation awareness. Applications requiring continuous
+online authorization must choose a stricter session policy.</p>
+<h2 id="bounds-not-scale-promises">Bounds, not scale promises<a class="heading-anchor" href="#bounds-not-scale-promises" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Enforced implementation bounds</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Local timeline</td>
+<td>2–4096 history frames; 0–4096 events/tick; complete staged suffix before commit</td>
+</tr>
+<tr>
+<td>Authoritative model</td>
+<td>1–8 playable seats; 16 peer records including nonplayer connections; 16 queued/recent actions per peer</td>
+</tr>
+<tr>
+<td>P2P runner</td>
+<td>2–8 participants; 32–1024 history frames; delay + prediction + 2 must fit history; input encoding ≤256 bytes; initialization storage guard 256 MiB</td>
+</tr>
+<tr>
+<td>Complete authority checkpoint</td>
+<td>1 MiB archive, explicit policy/asset validation; runtime history/transport queues are not serialized</td>
+</tr>
+<tr>
+<td>P2P archive</td>
+<td>16 MiB maximum; retained input/checksum/history windows remain bounded</td>
+</tr>
+<tr>
+<td>Provisioning service</td>
+<td>Up to 32 resident rooms; fixed P2P rooms 2–8 members; bounded invitation and request budgets</td>
+</tr>
+<tr>
+<td>Packet/router</td>
+<td>65536-byte Transport ceiling; bounded per-lane buffers, ingress/egress budgets and retention on short receives</td>
+</tr>
+</tbody></table>
+</div><p>These are validation/allocation limits. They do not promise that a maximum-size
+world or maximum population meets a frame budget. Timeline storage includes both
+history and replay scratch; server peer/baseline caches add further state copies.
+Measure the concrete World/input/event types, history, packet settings and target
+hardware. Profile callbacks must not change simulation or block network progress.</p>
+<h2 id="authoring-and-performance-assessment">Authoring and performance assessment<a class="heading-anchor" href="#authoring-and-performance-assessment" aria-label="Link to this section">#</a></h2>
+<p>The strongest authoring result is specific: the same paid-revive transfer in
+isolated Scrapyard variants added the predicate and both wallet assignments to
+Replay&#39;s existing value reducer, reused for prediction and authority. Its feature
+patch changed 3 files with 11 added physical lines versus Kit&#39;s 4 files/19 added
+lines, and the 72 peer receipts preserved the agreed transfer behavior. These are
+agent-authored structural measurements, not human productivity or debugging-time
+proof. A separate existing-family weapon required the same authored resource in
+both implementations. See <span class="local-reference" title="docs/replay/results/paid-revive-authoring-2026-09-08/README.md · available in the repository">revive</span>
+and <span class="local-reference" title="docs/replay/results/weapon-authoring-2026-09-08/README.md · available in the repository">weapon</span>.</p>
+<p>Costs are mixed. The quiet Cavecrawl comparison measured Replay callbacks around
+340–401 µs mean versus Kit&#39;s 81–85 µs on one machine, while owner motion had similar
+local-response ranges and Replay predicted the complete inventory transfer.
+Subsequent same-binary encoding pairs reduced client application traffic 41.7%
+and host traffic 30.6%, respectively; they did not demonstrate CPU speedups.
+See <span class="local-reference" title="docs/replay/results/cave-profile-comparison-2026-09-20/README.md · available in the repository">comparison</span>,
+<span class="local-reference" title="docs/replay/results/compact-observations-2026-09-20/README.md · available in the repository">observations</span> and
+<span class="local-reference" title="docs/replay/results/compact-recent-facts-2026-09-20/README.md · available in the repository">facts</span>.</p>
+<p>The older Scrapyard encounter comparison also measured higher Replay callback and
+bandwidth costs. Its peak RSS was lower for the Replay host but higher for the
+Replay client; process-lifetime peaks include startup and cannot be summed as
+simultaneous memory use. Those historical game/protocol builds are evidence of
+tradeoffs, not current universal benchmarks. The small 520-byte-world P2P benchmark
+measured about 19.5–21.4 ms process CPU for two peers over 2400 ticks in accelerated
+test time. It does not predict full-game rollback cost. See <span class="local-reference" title="docs/replay/results/scrapyard-combat-comparison-2026-09-08/README.md · available in the repository">combat</span>
+and <span class="local-reference" title="docs/replay/results/p2p-profile-2026-09-05/README.md · available in the repository">P2P profiling</span>.</p>
+<p>The evidence supports trying the complete-world authoring approach and profiling
+representative workloads. It does <strong>not</strong> justify replacing Kit everywhere or
+claiming performance/ergonomic superiority. Keep both implementations available.</p>
+<h2 id="security-and-compatibility-boundaries">Security and compatibility boundaries<a class="heading-anchor" href="#security-and-compatibility-boundaries" aria-label="Link to this section">#</a></h2>
+<p>Canonical checksums are not authentication. Plain direct Session/ENet fixtures
+must not be described as encrypted Internet sessions merely because they use
+tokens. Use the appropriate authenticated/confidential setup and transport policy.
+Native P2P pair-link framing uses core cryptographic primitives but is new,
+experimental framing without independent review or forward secrecy against later
+enrollment/service-key compromise. Functional packet tests are not certification.</p>
+<p>There is no human account system, exactly-once external-effect outbox, arbitrary
+dynamic reference-graph snapshotter, deterministic Godot physics solver, general
+NAT service or automatic game-content converter. Those are explicit support
+boundaries. Full game parity and subjective play-feel superiority remain separate
+follow-up work under the user&#39;s framework-first direction.</p>
+<p>Run <a href="../tests/replay_framework/run.sh.html">the smoke command</a>, then the focused
+integration gate for your selected transport and recovery profile. Pin source and
+toolchain versions. Future source/API, protocol, content and archive changes must
+follow <a href="compatibility.html">compatibility</a>; experimental status does not excuse
+silently loading incompatible data.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>Starting a Replay game</span><span aria-hidden="true">→</span></a><a href="compatibility.html"><span>Replay compatibility policy</span><span aria-hidden="true">→</span></a><a href="../docs/replay/framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/support.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#modes-and-tested-combinations" class="">Modes and tested combinations</a><a href="#recovery-and-failure-policy" class="">Recovery and failure policy</a><a href="#bounds-not-scale-promises" class="">Bounds, not scale promises</a><a href="#authoring-and-performance-assessment" class="">Authoring and performance assessment</a><a href="#security-and-compatibility-boundaries" class="">Security and compatibility boundaries</a></nav><div class="outline-actions"><a href="../../reference/replay/support.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

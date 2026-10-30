@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Inspecting a saved gameplay recording · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Inspecting a saved gameplay recording</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/diagnostic/playback.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#godot-controls">Godot controls</a><a href="#file-selection-and-bounds">File selection and bounds</a></nav></details>
+<article class="reading-body "><p><code>Playback(State, Input, Event)</code> loads a portable recording, verifies it once, and
+provides a presentation cursor over copied expected frames. Seeking and playback
+do not execute the simulation or deliver old events. The original game stays
+independent until its owner explicitly accepts a selected frame as a new branch.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">player: d.Playback(World, Input, Event)
+<span class="hljs-keyword">defer</span> d.playback_destroy(&amp;player)
+loaded := d.playback_load(&amp;player, bytes, identity, model)
+<span class="hljs-keyword">if</span> loaded.accepted {
+    frame, ok := d.playback_read(&amp;player)
+    d.playback_seek(&amp;player, player.recording.base.tick)
+    d.playback_play(&amp;player, <span class="hljs-literal">true</span>)
+    d.playback_advance(&amp;player, render_dt)
+    <span class="hljs-comment">// Paint copied frames. Do not send the recording&#x27;s old events to effects.</span>
+}</code></pre></div><p>A successful load starts paused at the first recorded frame. A state/event
+mismatch is accepted for inspection, starts at its first divergent tick, and keeps
+an owned <code>Audit_Capture</code> plus <code>report</code> text. <code>verification</code> distinguishes agreement
+from divergence; accepting a file is not a claim that it reproduces correctly.
+Malformed files, context/type mismatch, model-invalid values and aborted replay
+steps reject replacement, preserving the old recording, report and cursor.</p>
+<p>Playback shows the <strong>recorded expected state</strong>, including at a mismatch. The
+report compares expected and replayed values. Full replay of the loaded window
+occurs only during load; the cursor never simulates or emits effects. Playback
+ends at the recorded head, and Play at the end restarts at its beginning. A
+zero-step recording remains stopped. Seek validates u64 ticks without converting
+absolute ticks to floating point. Invalid/nonfinite elapsed time does nothing;
+a render stall contributes at most 250 ms. Large elapsed steps skip intermediate
+visual frames in constant time, retaining the fractional tick between frames.</p>
+<p>The owner and its recording/capture allocations must not be copied. Destroy
+before its owner leaves scope. Imported immutable asset identifiers still need
+the application&#39;s matching assets, just as in the <a href="recording.html">recording contract</a>.</p>
+<h2 id="godot-controls">Godot controls<a class="heading-anchor" href="#godot-controls" aria-label="Link to this section">#</a></h2>
+<p><code>Debug_Playback(State, Input, Event)</code> provides Open recording, a native or browser
+file chooser, Play/Pause, a relative-tick slider, Details, Return to game, and
+Continue from recording. It returns commands; the application owns its clock,
+input buffering, rendering and branch operation.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">debuggd.debug_playback_init(&amp;viewer, owner)
+action := debuggd.debug_playback_frame(&amp;viewer, identity, model, render_dt)
+<span class="hljs-keyword">switch</span> action {
+<span class="hljs-keyword">case</span> .Enter: <span class="hljs-comment">// Save previous pause, pause the local clock, clear device edges.</span>
+<span class="hljs-keyword">case</span> .Leave: <span class="hljs-comment">// Restore previous pause and gate held input until released.</span>
+<span class="hljs-keyword">case</span> .Branch:
+    frame, ok := debuggd.debug_playback_read(&amp;viewer)
+    <span class="hljs-comment">// Copy first. If accepted, initialize a new local timeline/presentation epoch</span>
+    <span class="hljs-comment">// at frame.tick, then end playback. Never replay the file&#x27;s historical effects.</span>
+<span class="hljs-keyword">case</span> .None:
+}
+frame, showing := debuggd.debug_playback_read(&amp;viewer)
+<span class="hljs-comment">// Paint frame while showing. While owns_pause but no frame is loaded, keep the</span>
+<span class="hljs-comment">// original world paused and visible while the chooser is pending.</span>
+debuggd.debug_playback_end(&amp;viewer)     <span class="hljs-comment">// Explicit reset; owner restores its clock.</span>
+debuggd.debug_playback_destroy(&amp;viewer) <span class="hljs-comment">// Disconnect callbacks and release imports.</span></code></pre></div><p>Keep the widget at a stable address until destroy. <code>owns_pause</code> covers both file
+selection and loaded playback. A canceled/failed first import releases that pause;
+a failed replacement keeps the old loaded view. Opening a replacement pauses its
+playback cursor. The application can read <code>loads</code>, <code>rejections</code> and <code>last_load</code>
+for diagnostics. Continue is an explicit branch from the displayed expected frame,
+including when the report shows a reproducibility mismatch. It does not repair
+that mismatch or change the imported archive.</p>
+<p>Hello enables this alongside <code>REPLAY_DEBUG=1</code>. Entering the viewer ends a local
+history inspection, preserves its prior pause, and temporarily hides the live
+history/audit controls. Return restores the original game; Continue resets from
+the selected complete frame under a fresh local presentation epoch. Held gameplay
+input remains suppressed until released. Restart closes loaded/pending playback.
+No Session/Room/P2P runner or network authority is modified.</p>
+<h2 id="file-selection-and-bounds">File selection and bounds<a class="heading-anchor" href="#file-selection-and-bounds" aria-label="Link to this section">#</a></h2>
+<p><code>File_Import</code> is the stable owner for a bounded asynchronous selection. Native
+Godot uses its filesystem dialog, clamped to the parent window so its buttons
+remain reachable in Hello&#39;s 640×360 viewport. The <code>.rplrec</code> filter helps selection;
+codec checks still decide whether a file is valid. Native file bytes are read only
+after selection and are bounded before allocation.</p>
+<p>Chrome uses an ordinary file input and checks size before <code>File.arrayBuffer()</code>.
+Each import has an ID; closing it discards the job, removes its DOM input and
+fences late completions. At most eight browser selections can exist at once.
+Cancellation, failed reads, zero/oversized files and byte-length changes terminate
+the request. Return to game can also cancel a pending selection. Teardown clears
+both pending jobs and callbacks. No upload to a server occurs.</p>
+<p>Files retain the recording codec&#39;s 16 MiB limit and content/build/schema checks.
+Verification runs synchronously on load and can take time for a large world/window.
+This is an opt-in local developer workflow. It is not continuous recording,
+multi-window assembly, an editable imported timeline, movie export, or network
+recovery. To edit an imported frame in Hello, Continue from it, then use the local
+history field editor.</p>
+<p>Run <a href="../../tests/replay_recording/README.html">the native/Chrome acceptance</a> to test
+real file selection, presentation, rejection, pause restoration and branching.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="recording.html"><span>Portable local gameplay recordings</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_recording/README.html"><span>Local recording acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/diagnostic/playback.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#godot-controls" class="">Godot controls</a><a href="#file-selection-and-bounds" class="">File selection and bounds</a></nav><div class="outline-actions"><a href="../../../reference/replay/diagnostic/playback.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

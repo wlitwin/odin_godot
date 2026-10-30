@@ -1,0 +1,6 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://entities/runner.tscn" id="runner"]
+[node name="RunnerPreview" instance=ExtResource("runner")]
+position = Vector2(320, 240)
+preview = true
+preview_reload = true

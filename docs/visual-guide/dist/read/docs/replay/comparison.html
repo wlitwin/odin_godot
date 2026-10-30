@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Paired game ports and comparison protocol · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Paired game ports and comparison protocol</h1><div class="reader-meta"><span>21 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/comparison.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#baseline-inventory">Baseline inventory</a><a href="#preservation-and-content-rules">Preservation and content rules</a><a href="#scrapyard-acceptance-inventory">Scrapyard acceptance inventory</a><a href="#scenario-matrix">Scenario matrix</a><a href="#measures">Measures</a><a href="#result-format-and-reproducibility">Result format and reproducibility</a><a href="#decision-record">Decision record</a><a href="#active-range-comparison">Active range comparison</a><a href="#active-combat-encounter-comparison">Active combat encounter comparison</a><a href="#measured-snapshot-scan-optimization">Measured snapshot scan optimization</a><a href="#compatibility-authoring-example">Compatibility authoring example</a><a href="#executable-authoring-change-paid-revive">Executable authoring change: paid revive</a><a href="#executable-authoring-change-existing-family-weapon">Executable authoring change: existing-family weapon</a><a href="#sustained-offensive-population-comparison">Sustained offensive population comparison</a><a href="#snapshot-delivery-tradeoff">Snapshot delivery tradeoff</a><a href="#canonical-payload-attribution-and-compression">Canonical payload attribution and compression</a><a href="#raw-udp-fault-envelope">Raw-UDP fault envelope</a><a href="#speedball-sessionsocial-port">Speedball session/social port</a><a href="#speedball-native-room-integration">Speedball native Room integration</a><a href="#speedball-match-and-local-identity-lifecycle">Speedball match and local identity lifecycle</a><a href="#speedball-saveresume-and-direct-epoch-query">Speedball save/resume and direct epoch query</a><a href="#speedball-native-parties-and-observers">Speedball native parties and observers</a><a href="#speedball-browser-party-lifecycle">Speedball browser party lifecycle</a><a href="#speedball-browser-solo-saves">Speedball browser solo saves</a><a href="#movingstatus-swarm-comparison">Moving/status swarm comparison</a><a href="#owner-unwind-qualification-of-the-mixed-cohort">Owner-unwind qualification of the mixed cohort</a><a href="#mixed-comparison-with-the-isolated-owner-unwind-repair">Mixed comparison with the isolated owner-unwind repair</a><a href="#staged-lz4-encoding-follow-up">Staged LZ4 encoding follow-up</a><a href="#exact-correction-reuse-experiment">Exact correction reuse experiment</a></nav></details>
+<article class="reading-body "><p>Both framework implementations and both versions of every ported game must
+remain available. A port is a new project with a separate launch command, save
+namespace, cache/build output, and network defaults. It never overwrites the
+original project&#39;s gameplay or turns its original runner into a compatibility shim.</p>
+<p>The <span class="local-reference" title="docs/replay/results/cave-profile-comparison-2026-09-20/README.md · available in the repository">three-profile Cavecrawl cohort</span>
+adds a quiet two-player comparison of Kit, Replay server motion and Replay owner
+motion. Nine pairs pass a common movement/interaction contract with separate
+visible/confirmed timing. Owner motion approaches Kit&#39;s responsiveness here while
+retaining substantially higher application traffic and callback cost. The measured
+scope, isolated Kit reference-release overlay and superseded first contract are
+explicit; source counts are not a human usability score.</p>
+<p>The <span class="local-reference" title="docs/replay/results/public-history-comparison-2026-09-14/README.md · available in the repository">current public-history cohort</span>
+passes the full 24-window native comparison and 64 report checks. It records lower
+Replay host traffic with continued client CPU cost, and distinguishes the isolated
+Kit control, content/prediction differences and separate browser TURN conditions.
+It is the latest loaded Scrapyard native cost baseline, not a declaration of full library readiness.</p>
+<p>The <span class="local-reference" title="docs/replay/results/compact-observations-2026-09-20/README.md · available in the repository">observation encoding A/B</span>
+then measures a targeted optimization on one owner-profile binary: raw and compact
+modes keep the same accepted workload, cadence and recovery settings. Median client
+application traffic drops 41.7%; no downstream or total-CPU improvement is claimed.</p>
+<p>The <span class="local-reference" title="docs/replay/results/compact-recent-facts-2026-09-20/README.md · available in the repository">recent-fact encoding A/B</span>
+then shares repeated bundle headers on the downstream path. Six same-binary cases
+retain the workload, cadence, full occurrences and backups; median host application
+traffic drops 30.6%, from 9.869 to 6.849 KiB/s. Client traffic is essentially unchanged,
+and callback measurements do not establish a CPU improvement. The quiet-world
+cost gap, broader comparisons and adoption decision remain open.</p>
+<p>See <a href="roadmap.html">roadmap</a> for dependencies and <a href="architecture.html">architecture</a>
+for the frame contract.</p>
+<p>The <span class="local-reference" title="docs/replay/results/p2p-live-rejoin-2026-09-08/README.md · available in the repository">P2P live rejoin gate</span> adds
+recovery evidence for the separate Duel: one participant restores while survivors
+retain their live runners. This validates a bounded recovery capability; it is not
+a paired Kit performance measurement or a general stale-save recovery guarantee.
+The <span class="local-reference" title="docs/replay/results/p2p-browser-rejoin-2026-09-08/README.md · available in the repository">browser extension of that gate</span>
+uses the real Save &amp; pause button and file import in separate Chrome processes,
+with only the returning participant killed and restarted.
+The <span class="local-reference" title="docs/replay/results/p2p-admission-2026-09-08/README.md · available in the repository">authenticated P2P extension</span>
+verifies fixed-roster credentials before binding, including negative admission
+cases and a three-member signaling mesh. This is capability evidence, not a
+framework performance comparison.
+The <span class="local-reference" title="docs/replay/results/p2p-creator-recovery-2026-09-08/README.md · available in the repository">creator-recovery gate</span> now
+retains the joining player while creator ID 1 returns under a new connection
+generation, with retired transport buffers fenced.</p>
+<p>The <span class="local-reference" title="docs/replay/results/watch-failover-2026-09-09/README.md · available in the repository">spectator source-failover gate</span>
+adds continuity-checked replacement of a viewing source while players continue.
+It preserves spectator state/events and rejects missing or conflicting anchors.
+This is native and cross-target capability evidence, not a paired Kit performance
+result or public spectator-authentication claim.</p>
+<p>The <span class="local-reference" title="docs/replay/results/native-creator-rejoin-2026-09-09/README.md · available in the repository">native creator-return gate</span>
+adds transport replacement when the saved listening participant returns. It
+preserves the survivor&#39;s runner/frontiers and verifies continued reference gameplay.
+This is fixed-roster recovery evidence, not a new authority election or a paired
+framework performance measurement.</p>
+<p>The <span class="local-reference" title="docs/replay/results/native-generations-2026-09-09/README.md · available in the repository">native-generation gate</span>
+adds connection metadata and queued-packet fencing to the shared Godot adapter,
+with real ENet, Steam API-contract and native rejoin checks. This is transport
+correctness evidence, not a new paired performance or live Steam-account result.</p>
+<p>The <span class="local-reference" title="docs/replay/results/action-intent-2026-09-09/README.md · available in the repository">action-intent authoring slice</span>
+replaces Scrapyard&#39;s manual ticket bookkeeping with a reusable helper that also
+handles recovery dispositions and epoch-scoped sequence reuse. Mechanical source
+counts and functional gates are recorded separately from human usability and
+paired runtime performance conclusions.</p>
+<p>The <span class="local-reference" title="docs/replay/results/scrapyard-endurance-2026-09-08/README.md · available in the repository">endurance workload</span> adds
+injury/healing, surge, dash and reload. Twelve delay-condition windows pass; the
+raw-loss condition remains a failed gate for missing short input edges. Its raw
+observations are retained separately from the accepted performance comparison.</p>
+<p>The <span class="local-reference" title="docs/replay/results/input-frontier-2026-09-08/README.md · available in the repository">input-frontier audit</span> fixes the
+observed Replay dash loss. The latest raw-loss Replay scope passes; the paired
+condition is rejected for a Kit cast refusal. Scoped acceptance never substitutes
+for a complete paired result.</p>
+<p>The <span class="local-reference" title="docs/replay/results/cast-submission-2026-09-09/README.md · available in the repository">cast-submission correction</span>
+separates Kit local prediction from actual command submission. It corrects the
+prior refusal diagnosis; a fresh raw-loss cohort still fails gameplay/observation
+gates and is not presented as an accepted paired performance result.</p>
+<p>The <span class="local-reference" title="docs/replay/results/receipt-resync-2026-09-09/README.md · available in the repository">latest endurance cohort</span> passes
+both conditions: 24 process windows and 56 report cases. It follows the explicit
+resync-queue implementation and separate branch tests. Prior failures and temporal
+costs remain recorded; this is one supported workload, not a general adoption result.</p>
+<p>The separate <span class="local-reference" title="docs/replay/results/jam-clearing-2026-09-09/README.md · available in the repository">jam-clearing workload</span>
+passes twelve delay-condition windows and 60 report checks, including seeded
+dud/shot and clear-pull accounting. Its full matrix is rejected for stale Kit
+cooldown observations and a lost Replay dash under raw loss. The accepted subset
+and failed cohort remain distinct from the earlier jam-disabled endurance result.</p>
+<p>The <span class="local-reference" title="docs/replay/results/dash-actions-2026-09-09/README.md · available in the repository">dash-action port</span> confirms all 120
+local Replay dash requests in a new full cohort, with a separate sequence audit
+proving successful late arrivals. The paired workload remains rejected because
+three Replay games fall below its kill-count requirement. Delivery acceptance
+does not replace matched workload or responsiveness evidence.</p>
+<p>The subsequent <span class="local-reference" title="docs/replay/results/aim-origin-2026-09-09/README.md · available in the repository">aim-origin correction</span>
+fixes the stress helper&#39;s use of an older local-body position. Its fresh delay
+condition passes twelve windows and 61 report cases. A ballistic ledger accounts
+for the earlier low kill output; the raw-loss condition still fails observation
+freshness. No collision/damage rule or acceptance threshold was relaxed.</p>
+<p>The <span class="local-reference" title="docs/replay/results/snapshot-ack-2026-09-09/README.md · available in the repository">snapshot-ACK result</span> demonstrates
+ACK-induced action blocking and removes that dependency. Replay passes its fresh
+delay/raw-loss scope, while paired raw-loss acceptance still fails for a Kit client
+observation. The paired delay result and controlled ENet regression remain distinct
+from full-matrix acceptance and general responsiveness claims.</p>
+<h2 id="baseline-inventory">Baseline inventory<a class="heading-anchor" href="#baseline-inventory" aria-label="Link to this section">#</a></h2>
+<p>Source revisions inspected when this experiment was created:</p>
+<ul>
+<li>odin_godot: <code>13e7d946223745711fbaafe161c46b204fd38b80</code>.</li>
+<li>Scrapyard sibling repository: <code>6bdef4f437d9a4e2c98f1d49472f840879301ccf</code>;
+its working tree was clean at inspection.</li>
+</ul>
+<p>These identify source baselines, not benchmark results. Record the actual old and
+new revisions, dirty diff, dependency versions, and content hashes for every
+subsequent comparison. Existing projects remain in place; pin a temporary
+baseline checkout when source changes would otherwise invalidate paired runs.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Existing project</th>
+<th>New project path</th>
+<th>What it tests</th>
+<th>Port status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="../../examples/hello_net/README.html">hello_net</a>, <a href="../../examples/hello_sim/README.html">hello_sim</a></td>
+<td><a href="../../examples/replay_hello/README.html">replay_hello</a></td>
+<td>Common offline/network gameplay, movement, spawn/join, presentation</td>
+<td>Offline views and initial real-process networking tested</td>
+</tr>
+<tr>
+<td><a href="../../examples/cavecrawl/README.html">Cavecrawl</a></td>
+<td><a href="../../examples/replay_cavecrawl/README.html">Replay Cavecrawl</a></td>
+<td>Doors, contested loot, inventory, AI, progression, recovery</td>
+<td>Full normal/faulted gameplay campaign and recovery slices tested; complete authored/UI parity pending</td>
+</tr>
+<tr>
+<td><a href="../../examples/slopball/README.html">Slopball</a>, <a href="../../examples/slopball3d/README.html">Slopball3D</a></td>
+<td><code>examples/replay_slopball/</code>, <code>examples/replay_slopball3d/</code></td>
+<td>Owner authority, Godot physics, control handoff</td>
+<td>2D/3D native session/social/rejoin UI and separate solver/network/migration gates pass; fuller parity pending</td>
+</tr>
+<tr>
+<td><a href="../../examples/quickdraw/README.html">Quickdraw</a></td>
+<td><a href="../../examples/replay_quickdraw/README.html"><code>examples/replay_quickdraw/</code></a></td>
+<td>Prediction, hitscan rewind, spawning, competitive rules</td>
+<td>Initial duel/lob/boots, archive and live combat migration gates; full parity/comparison pending</td>
+</tr>
+<tr>
+<td><a href="../../examples/speedball/README.html">Speedball</a></td>
+<td><a href="../../examples/replay_speedball/README.html">Replay Speedball</a></td>
+<td>Full-world contested ball, spikes, goals and correction smoothing</td>
+<td>Native contested-ball, UI, migration, restart/saves and native/browser party flows pass; public deployment/visual review pending</td>
+</tr>
+<tr>
+<td><a href="../../examples/claimball/README.html">Claimball</a></td>
+<td><a href="../../examples/replay_claimball/README.html">Replay Claimball</a></td>
+<td>Local/shared prediction group and claim-weighted presentation</td>
+<td>Group/claim contests, native/browser menus and saves, Party migration/restore tested; intermittent faults and broader parity/comparison remain open</td>
+</tr>
+<tr>
+<td>Workspace sibling <code>../scrapyard/</code></td>
+<td><a href="../../examples/replay_scrapyard/README.html">Replay Scrapyard</a></td>
+<td>Full-game complexity, content, sustained churn, migration</td>
+<td>Arena/staging, stock combat, abilities, run loop, profiles and initial run/Room recovery; full-game and paired comparison pending</td>
+</tr>
+</tbody></table>
+</div><p><code>examples/replay_loot/</code> is the first new runnable headless experiment. It borrows
+the contested-loot scenario from Cavecrawl but is <strong>not</strong> a Cavecrawl port and
+does not yet exercise a network. No full-game parity result is claimed.</p>
+<h2 id="preservation-and-content-rules">Preservation and content rules<a class="heading-anchor" href="#preservation-and-content-rules" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Keep the old project and its run/test commands. A new implementation uses its
+new path and explicitly imports <code>godot:replay</code>.</li>
+<li>Share assets only through a deliberate, versioned content boundary. A shared
+mutable resource/configuration must not let one game silently alter the other.
+Copy small assets or use a pinned asset package for independently runnable exports.</li>
+<li>Preserve attribution/licenses and record asset/content hashes. No need to
+copy generated DLLs, addons, <code>node_modules</code>, caches, or exported bundles.</li>
+<li>Keep per-game save/profile names distinct. Comparison harnesses run scratch
+project copies with isolated user data and ports. They must not clear a
+developer&#39;s existing profiles to obtain repeatable tests.</li>
+<li>A shared test driver may send the same gameplay intent to each game through
+thin adapters. It must not replace gameplay logic with a comparison-only path.</li>
+<li>If the new framework changes gameplay rules, network trust, physics, tick rate,
+or content, mark the scenario unmatched until the difference is accounted for.</li>
+</ol>
+<p>The original Scrapyard <code>run.sh</code> currently clears persistent profile files during
+setup. Do not execute it unmodified against personal data as part of a benchmark;
+establish isolated scratch runs first. Its source was inspected here, not run.</p>
+<h2 id="scrapyard-acceptance-inventory">Scrapyard acceptance inventory<a class="heading-anchor" href="#scrapyard-acceptance-inventory" aria-label="Link to this section">#</a></h2>
+<p>The inspected original harness contains these acts. Use their assertions as
+behavioral specifications, and add corresponding Replay fixtures as each slice lands.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Original acts</th>
+<th>New acceptance focus</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>duo</code>, <code>solo</code>, <code>server</code></td>
+<td>Seed/content agreement, seat control, mode parity</td>
+</tr>
+<tr>
+<td><code>guns</code>, <code>combo</code>, <code>lance</code></td>
+<td>Cadence/reload, weapon variants, statuses, lag compensation</td>
+</tr>
+<tr>
+<td><code>run</code>, <code>boss</code>, <code>gauntlet</code></td>
+<td>Wave progression, transitions, boss state, long-run stability</td>
+</tr>
+<tr>
+<td><code>vault</code>, <code>doppelganger</code></td>
+<td>Persistence, stable identity, duplicate-seat behavior</td>
+</tr>
+<tr>
+<td><code>succession</code></td>
+<td>Abrupt host loss, restored director state, reseating, continued play</td>
+</tr>
+<tr>
+<td><code>stress</code></td>
+<td>Fire volume, entity churn, CPU, memory, bandwidth</td>
+</tr>
+<tr>
+<td><code>spray</code>, <code>mod</code></td>
+<td>Asset transfer, compatibility/version decisions, late join</td>
+</tr>
+<tr>
+<td><code>chain</code>, <code>delivery</code>, <code>zone</code></td>
+<td>Multi-entity effects and delayed consequences</td>
+</tr>
+<tr>
+<td><code>storm</code>, <code>surge</code>, <code>mend</code></td>
+<td>Area effects, sustained combat, healing and attribution</td>
+</tr>
+</tbody></table>
+</div><p>The full-game port should also test migration during these behaviors, even where
+the original migration act only covers a simpler case. Record a parity matrix with
+<code>unstarted</code>, <code>implemented</code>, <code>headless-tested</code>, and <code>playtested</code> independently.</p>
+<h2 id="scenario-matrix">Scenario matrix<a class="heading-anchor" href="#scenario-matrix" aria-label="Link to this section">#</a></h2>
+<p>Apply this matrix to each port where meaningful. Fault schedules should be seeded
+and recorded, not just random per-run percentages.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Conditions</th>
+<th>Assertions/measurements</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Offline reference</td>
+<td>Same inputs/content/tick rate</td>
+<td>Correct game rules, reproducibility, authored-code comparison</td>
+</tr>
+<tr>
+<td>Local network</td>
+<td>Host/client/observer, no injected faults</td>
+<td>Agreement, correct authority and seat identity</td>
+</tr>
+<tr>
+<td>Latency</td>
+<td>0, 60, 120, 240 ms RTT</td>
+<td>Input-to-visible delay, correction magnitude, effects timing</td>
+</tr>
+<tr>
+<td>Jitter and loss</td>
+<td>Seeded jitter, 1%/5% loss, short loss bursts</td>
+<td>Convergence, held-input behavior, missing/duplicate effects</td>
+</tr>
+<tr>
+<td>Disorder</td>
+<td>Duplicated/reordered packets</td>
+<td>Deduplication and monotonic protocol state</td>
+</tr>
+<tr>
+<td>Long blackout</td>
+<td>Beyond input/history capacity</td>
+<td>Explicit stall/resync behavior and time to playable recovery</td>
+</tr>
+<tr>
+<td>Join/rejoin</td>
+<td>Mid-action, mid-wave, after disconnect</td>
+<td>State completeness, identity, no historic cosmetic replay</td>
+</tr>
+<tr>
+<td>Contested action</td>
+<td>Both players take/hit/claim together</td>
+<td>Conservation, winner rule, reversible feedback</td>
+</tr>
+<tr>
+<td>Host migration</td>
+<td>Planned handoff, crash, successor loss</td>
+<td>Interruption, lost ticks, duplicated actions, resumed gameplay</td>
+</tr>
+<tr>
+<td>Content mismatch</td>
+<td>Different schema/content/config version</td>
+<td>Clear rejection before live state mutation</td>
+</tr>
+<tr>
+<td>Sustained workload</td>
+<td>Same entity population/action trace</td>
+<td>p50/p95/p99 CPU, memory, bytes, replay depth</td>
+</tr>
+</tbody></table>
+</div><p>RTT is round-trip time. The existing shims may specify per-direction latency;
+record the actual injected parameters and measured RTT so a nominal &quot;120 ms&quot;
+test cannot accidentally compare 120 ms RTT with 240 ms RTT.</p>
+<h2 id="measures">Measures<a class="heading-anchor" href="#measures" aria-label="Link to this section">#</a></h2>
+<h3 id="authoring-and-maintenance">Authoring and maintenance<a class="heading-anchor" href="#authoring-and-maintenance" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>Handwritten gameplay and handwritten framework wiring separately; exclude
+generated code and report content/UI separately.</li>
+<li>Number of places changed to implement the same feature: add a weapon, transfer
+an item, spawn an effectful entity, add a replay-dependent status, persist a
+director field, and migrate during an ability.</li>
+<li>Explicit authority/time branches and callbacks an author must understand.
+Count them as evidence, not a target to game by hiding decisions in wrappers.</li>
+<li>Time to identify and fix a seeded issue; number and quality of diagnostics.</li>
+<li>Qualitative port notes: awkward ownership, excessive declarations, missing
+game primitives, and where the new model is less convenient.</li>
+</ul>
+<h3 id="runtime-and-player-experience">Runtime and player experience<a class="heading-anchor" href="#runtime-and-player-experience" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>Simulation, snapshot, presentation, and replay CPU separated; p50/p95/p99 and
+worst replay burst, with warm-up excluded.</li>
+<li>Resident/peak bytes, bytes per stored frame, history length, and allocations
+per normal tick and correction.</li>
+<li>Application and transport bytes per peer by message class, join/checkpoint
+size, send frequency, and ingress/outbound queue pressure.</li>
+<li>Input-to-visible response, correction distance/angle, correction frequency,
+speculative effect duration, cancellation frequency, missing/duplicate effects.</li>
+<li>Migration interruption and rollback distance, checkpoint age, reconnect/resync
+time, and preservation of persistent/session outcomes.</li>
+<li>Human paired playtests, with network conditions and game-rule differences
+disclosed. A numerically converged game can still feel worse.</li>
+</ul>
+<h2 id="result-format-and-reproducibility">Result format and reproducibility<a class="heading-anchor" href="#result-format-and-reproducibility" aria-label="Link to this section">#</a></h2>
+<p>Store runs under ignored <code>tests/.logs/replay-comparison/</code>; promote selected
+summaries and machine-readable data to a documented results directory after review.
+The harness should capture:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">scenario and seed
+old/new repository revision and dirty diff
+Odin, Godot, compiler flags, platform, CPU, render settings
+content and gameplay configuration hashes
+runner/topology/trust profile, players/entities, tick and send rates
+input trace and complete network fault schedule
+history, prediction, interpolation, and checkpoint settings
+warm-up, repetitions, raw samples, percentile method
+scenario invariants and explicit parity gaps</code></pre></div><p>Use repeated paired runs on the same machine and alternate run order. Report raw
+data and variability; avoid drawing conclusions from a single best run. Measure
+optimized builds for performance and keep debug/diagnostic overhead separately.</p>
+<p>For host migration, do not describe survival from a recent checkpoint as zero
+lost progress. For deterministic P2P, actual execution and matching logical hashes
+on each target are required; successful cross-compilation is not that evidence.</p>
+<h2 id="decision-record">Decision record<a class="heading-anchor" href="#decision-record" aria-label="Link to this section">#</a></h2>
+<p>For each completed port, publish: which gameplay became simpler, what new
+constraints appeared, the latency/performance tradeoffs, unresolved failures,
+and whether the next port is justified. Keep the raw scenarios usable even if
+the experiment&#39;s final outcome is to retain both frameworks for different games.</p>
+<h2 id="active-range-comparison">Active range comparison<a class="heading-anchor" href="#active-range-comparison" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../../tests/replay_comparison/README.html">paired harness</a> now includes a
+stationary firing/reload scenario alongside the idle arena. Each game uses the
+same bolter settings and accepts exactly nine rounds per player. Both real input
+and weapon paths run; a sampled trace records different firing/reload times and
+projectile occupancy instead of presuming them equal. Three alternating pairs
+and source/build hashes are required for a comparison result. This adds active
+weapon work; AI/damage/movement stress, further ports and human playtests remain
+separate requirements of M9.</p>
+<h2 id="active-combat-encounter-comparison">Active combat encounter comparison<a class="heading-anchor" href="#active-combat-encounter-comparison" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../../tests/replay_comparison/README.html#combat-encounter">combat harness</a> now
+adds four explicit stock-enemy spawn requests, live AI approach/bites, target-seeking
+fire, damage/death and scrap collection. Its shared driver requires matching final
+kill, damage, pickup and shot totals while recording different player health,
+attribution, NPC positions/occupancy and timing. Spawning/targeting run inside each
+measured game callback. An additional read-only census is measured separately.</p>
+<p>This advances full-combat evidence beyond the firing range. It does not complete
+the remaining sustained stress, movement/status/migration comparisons, other ports,
+authoring-change measurements or paired human playtests. Exact gameplay parity is
+not inferred from matching aggregate totals.</p>
+<h2 id="measured-snapshot-scan-optimization">Measured snapshot scan optimization<a class="heading-anchor" href="#measured-snapshot-scan-optimization" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/snapshot-scans-2026-09-08/README.md · available in the repository">scan result</span> pairs independent
+byte-format oracles and executed native/WASM equivalence with six input-density
+microbenchmarks, three real combat pairs and a separate phase diagnostic. Canonical
+hashes and delta bytes remain identical. Long zero/equal regions improve, with a
+retained fragmented-input regression. Host callback cost falls in the new cohort;
+client median changes little and the overall Kit/Replay cost gap remains. Wider
+stress/latency and authoring comparisons remain required for an adoption decision.</p>
+<h2 id="compatibility-authoring-example">Compatibility authoring example<a class="heading-anchor" href="#compatibility-authoring-example" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/scrapyard-cast-paths-2026-09-08/README.md · available in the repository">recorded spread-hop change</span>
+adds one explicit Flash discriminator without widening world bytes. Preserving
+older saves still required an old-world descriptor and field mapping (112 lines),
+CLI routing and historical/fresh-resume validation. This is concrete compatibility
+work beyond gameplay code; it is not a timed comparison against Kit. Include it
+in the remaining M9 authoring/API evaluation before claiming singleplayer-like
+change effort or deciding to adopt the framework.</p>
+<h2 id="executable-authoring-change-paid-revive">Executable authoring change: paid revive<a class="heading-anchor" href="#executable-authoring-change-paid-revive" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/paid-revive-authoring-2026-09-08/README.md · available in the repository">paid-revive experiment</span>
+installs the same cross-player wallet/health rule into isolated Kit and Replay
+copies, preserves the actual feature patches and runs a shared three-player
+contract. The first full matrix covers funded, funding-while-held and contended
+revives locally and with receive delay. It separates source-change evidence from
+sampled replication behavior and explicitly excludes human productivity claims.
+The <a href="../../tests/replay_authoring/README.html">harness</a> rebuilds both playable variants;
+other feature changes and authoring/debugging measurements remain required.</p>
+<h2 id="executable-authoring-change-existing-family-weapon">Executable authoring change: existing-family weapon<a class="heading-anchor" href="#executable-authoring-change-existing-family-weapon" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/weapon-authoring-2026-09-08/README.md · available in the repository">weapon experiment</span> adds one
+identical resource in both games, with no handwritten gameplay/network changes.
+Replay&#39;s separate generated stock table is recorded as derived work. Independently
+built clients without the resource receive the host&#39;s definition and use it for
+selection, presentation, damage and reloads. This complements the paid-revive
+case; it does not measure human authoring time or a new weapon family&#39;s cost.</p>
+<h2 id="sustained-offensive-population-comparison">Sustained offensive population comparison<a class="heading-anchor" href="#sustained-offensive-population-comparison" aria-label="Link to this section">#</a></h2>
+<p>The <a href="../../tests/replay_swarm_comparison/README.html">swarm harness</a> keeps forty stock
+scrapbots active for twenty seconds with ordinary combat/pickups and replenishment.
+Shared zero-bite and large-magazine fixtures prevent player wipes/reload pauses.
+Three alternating pairs and twenty report checks pass with 38–40 living enemies,
+measured turnover, authority conservation and converged final peer state.</p>
+<p>The <span class="local-reference" title="docs/replay/results/scrapyard-swarm-2026-09-08/README.md · available in the repository">result</span> reports callback cost,
+application output, instrumented RSS and receive freshness. Large snapshots awaiting
+acknowledgment leave authority frames behind received facts; a separate diagnostic
+hit a presentation error during fill. Both remain readiness findings. Versioned
+contracts and rejected cohorts are retained. This advances sustained offensive
+evidence; movement, statuses/abilities, player damage, faults and full-game/human
+comparisons remain distinct requirements.</p>
+<h2 id="snapshot-delivery-tradeoff">Snapshot delivery tradeoff<a class="heading-anchor" href="#snapshot-delivery-tradeoff" aria-label="Link to this section">#</a></h2>
+<p><span class="local-reference" title="docs/replay/results/snapshot-parts-2026-09-08/README.md · available in the repository">Snapshot parts</span> repeat the same swarm
+contract after adding negotiated bounded unreliable delivery for large state.
+Median/p95 extra lag behind received facts falls from 9/17 ticks to 4–5/6, while
+Replay host output rises from about 43 KB/s to 263 KB/s and client correction work
+increases. Kit remains lower in callback and traffic cost. The retained artifacts
+include the controlled delivery comparison, current cohort, old/new protocol
+interoperability and actual browser part counters. This is measured progress with
+visible costs; payload reduction, sustained real faults and the full adoption gate
+remain requirements.</p>
+<h2 id="canonical-payload-attribution-and-compression">Canonical payload attribution and compression<a class="heading-anchor" href="#canonical-payload-attribution-and-compression" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/lz4-deltas-2026-09-08/README.md · available in the repository">payload/codec result</span> attributes exact
+sparse delta bytes to state groups, then compares lossless encodings while retaining
+all history/query data. The selected age-sixteen payload falls from about 9,774 to
+6,969 bytes. Native/WASM and reference checks preserve decoded bytes; the repeated
+swarm reaches 3/4-tick median/p95 extra lag behind received facts. Host output stays
+near its configured budget and client correction work increases. Source/build
+identity, initial/final cohorts, rejected prototypes and mixed-peer browser evidence
+are retained; this is not a full adoption or human-responsiveness verdict.</p>
+<h2 id="raw-udp-fault-envelope">Raw-UDP fault envelope<a class="heading-anchor" href="#raw-udp-fault-envelope" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/raw-udp-faults-2026-09-08/README.md · available in the repository">native ENet fault matrix</span> adds
+packet-level loss/jitter/duplication and a bounded rate/queue model to the sustained
+Replay offensive swarm. Both conditions pass twice with final state convergence,
+packet accounting and explicitly allowed recovery intervals. It is Replay acceptance,
+not a paired Kit benchmark. The evidence includes the corrected token-bucket proxy,
+rejected initial runs, sender/timing/fact-delivery changes and browser/migration
+follow-up. Full mixed gameplay, wider platforms/routes and adoption remain separate
+requirements.</p>
+<h2 id="speedball-sessionsocial-port">Speedball session/social port<a class="heading-anchor" href="#speedball-sessionsocial-port" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-ui-2026-09-08/README.md · available in the repository">separate Speedball UI result</span> adds
+direct session menus, validated names, host-only start, chat/input capture, held
+scores/telemetry and leave/rejoin handling. Existing solo/contested-ball rules and
+response gates still pass. Native captures provide initial layout evidence; the
+port ledger retains trust/timeline differences and unimplemented paths. This is
+port acceptance, not a paired authoring-time or performance result.</p>
+<h2 id="speedball-native-room-integration">Speedball native Room integration<a class="heading-anchor" href="#speedball-native-room-integration" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-room-2026-09-08/README.md · available in the repository">Speedball migration result</span>
+exercises a nonzero score and moving ball through planned handoff and abrupt host
+loss. The successor restores the exact prepared frame; surviving peers agree on
+a later canonical world after two fresh spikes and new-epoch chat. Rendered native
+captures cover the handoff/recovery UI. Existing direct-session and contested-ball
+gates remain separate checks.</p>
+<p>This is a functional Replay port result, not a matched Kit/Replay timing study.
+Reported interruption is the Room driver&#39;s local recovery interval; it excludes
+some time before failure detection and must not be described as total outage.
+The fixed local roster/credentials do not establish public enrollment or discovery.</p>
+<h2 id="speedball-match-and-local-identity-lifecycle">Speedball match and local identity lifecycle<a class="heading-anchor" href="#speedball-match-and-local-identity-lifecycle" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-rounds-2026-09-08/README.md · available in the repository">round/profile result</span> adds a
+validated Play again command and native reconnect/name profiles. Three peers finish
+two matches in one session, reject a guest restart, retain their roster and resume
+chat. A killed client is replaced by a fresh process using its persisted identity,
+which must reclaim seat 2 and the chosen name. Corrupt-profile cases preserve the
+files; deterministic token overrides bypass profile storage.</p>
+<p>Original Speedball inherits persistent reconnect identity from Kit boot. Its game
+scripts do not supply restart or match save/load menus. Play again and persisted
+display names are added Replay behavior; this result is not evidence of a matched
+legacy authoring/runtime comparison. The subsequent save/discovery result below
+supplies the native direct-session save/resume flow.</p>
+<h2 id="speedball-saveresume-and-direct-epoch-query">Speedball save/resume and direct epoch query<a class="heading-anchor" href="#speedball-saveresume-and-direct-epoch-query" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-save-2026-09-08/README.md · available in the repository">save/discovery result</span> restores a
+scored, moving pitch in fresh solo and host processes, then admits a fresh client
+through the normal Join flow. The new opt-in query learns a direct host&#39;s epoch
+before the existing strict handshake; no epoch number is supplied by the harness.
+Wrong-profile and damaged/missing archives fail before creating a session. Continued
+spikes, match completion, restart and chat pass after restore.</p>
+<p>This fills a Replay lifecycle flow, not an original Speedball save-menu parity
+claim or a Kit/Replay timing comparison. Room retains coordinator-controlled
+recovery; direct file resume does not elect or fence competing hosts. Browser saves
+and public-room integration remain separate work.</p>
+<h2 id="speedball-native-parties-and-observers">Speedball native parties and observers<a class="heading-anchor" href="#speedball-native-parties-and-observers" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-party-2026-09-08/README.md · available in the repository">native party result</span> adds the shared
+Party helper to Speedball&#39;s scene. Verified WSS enrollment and private credential
+storage precede Room admission; personal identity/name storage stays separate.
+Planned handoff and owner loss restore a moving scored checkpoint, then a fresh
+former-host process rejoins the same seat with a stable invite and newer incarnation.
+The observer remains seat 0, receives no checkpoint and can leave/rejoin in that
+mode. New spikes/chat and a common later world are required among the final trio.</p>
+<p>The Room driver had forced joining members to the player role. It now preserves an
+explicit Observer request. This result covers that native lifecycle; it does not
+establish observer invitation permission isolation, browser/Steam behavior, Internet
+reachability or a comparative authoring/performance advantage over Kit.</p>
+<h2 id="speedball-browser-party-lifecycle">Speedball browser party lifecycle<a class="heading-anchor" href="#speedball-browser-party-lifecycle" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-browser-2026-09-08/README.md · available in the repository">Chrome/WebRTC result</span> ports the
+same scene/model/Party flow to a Web export. Personal identity/name and room
+credentials persist separately. Planned handoff and host-browser closure restore
+an exact moving/scored checkpoint; a true observer leaves/rejoins, and the former
+host returns in a fresh browser process with the same identity/name/invite/seat.
+New spikes/chat precede a common retained canonical world on all three clients.</p>
+<p>This is local browser functional evidence, not a native/browser determinism claim
+or Kit/Replay performance comparison. The gate does not cover public TLS/TURN,
+raw network faults, OS-kill durability or other browser engines. Those remain
+separate requirements along with browser saves and broader playtest coverage.</p>
+<h2 id="speedball-browser-solo-saves">Speedball browser solo saves<a class="heading-anchor" href="#speedball-browser-solo-saves" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/speedball-browser-save-2026-09-08/README.md · available in the repository">browser save result</span> adds
+named, identity-scoped IndexedDB slots through the existing Browser_Checkpoint
+adapter. A completed save survives a killed Chrome process, restores exactly,
+continues gameplay and restarts into round 2. Stale tabs cannot replace a newer
+revision; damaged archive/identity records remain intact, and a different slot can
+be used for new play. Native saves and browser parties remain regression gates.</p>
+<p>This measures local process-crash recovery and explicit storage failure behavior,
+not a Kit/Replay timing advantage, power-loss guarantee or general browser-storage
+availability. Room save publication, other browsers and broader deployment/
+playtest/comparison requirements remain.</p>
+<h2 id="movingstatus-swarm-comparison">Moving/status swarm comparison<a class="heading-anchor" href="#movingstatus-swarm-comparison" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/scrapyard-mixed-2026-09-08/README.md · available in the repository">mixed cohort</span> measures three
+alternating Kit/Replay pairs using the existing replenished forty-enemy fixture,
+cardinal player movement and stock frostwave/battlecry casts. All twelve processes
+pass population/freshness, status/cooldown exposure, movement, conservation and
+settled-peer convergence checks; thirty report acceptance/rejection cases pass.</p>
+<p>Median p95 callbacks are 791/656 µs for Kit host/client and 1,901/3,229 µs for Replay.
+Median application output is about 30,856/2,092 B/s and 252,362/17,583 B/s,
+respectively. Replay clients remain at p95 five extra fact-lag ticks with no
+measurement resync. Movement paths and kills differ; this is an identical intent/
+fixture envelope with measured outcomes, not identical execution or a framework-only
+ratio. Kit remains cheaper in these inclusive callback/traffic measurements. The
+result advances the mixed-workload gate without settling the full M9 adoption case.</p>
+<h2 id="owner-unwind-qualification-of-the-mixed-cohort">Owner-unwind qualification of the mixed cohort<a class="heading-anchor" href="#owner-unwind-qualification-of-the-mixed-cohort" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/owner-unwind-2026-09-08/README.md · available in the repository">causal control</span> identifies a reproduced
+Kit defect behind the mixed cohort&#39;s second-player movement loss. Pending-command
+delta unwind restores an older owner-streamed position. An engine-free case fails
+at x=100 instead of 140; an isolated owner-preserving control passes it and all 58
+existing Kit networking tests. Three live original/control pairs show 401–442
+backward packet-processing moves per original client and zero under the control.
+The movement step itself never reverses the active input.</p>
+<p>Original game/framework sources remain preserved. Earlier costs are still the
+observations of those binaries, but now carry this explicit baseline qualification.
+The instrumented control is not a replacement timing cohort. Further comparison
+with a corrected baseline, plus remaining gameplay/transient differences, is needed
+before attributing costs or choosing adoption.</p>
+<h2 id="mixed-comparison-with-the-isolated-owner-unwind-repair">Mixed comparison with the isolated owner-unwind repair<a class="heading-anchor" href="#mixed-comparison-with-the-isolated-owner-unwind-repair" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/mixed-owner-control-2026-09-08/README.md · available in the repository">corrected-baseline cohort</span>
+uses the copied Kit repair from the movement audit and the normal mixed benchmark
+adapters, with no extra packet-bracketing instrumentation. Replay uses the original
+collection root. Twelve process windows and thirty-five report validation cases
+pass; the declared collection/source control is checked explicitly.</p>
+<p>No backward owner motion occurs in the corrected Kit client traces. Median p95
+callbacks are 899/804 µs for Kit host/client and 2,024/3,467 µs for Replay; application
+output is about 29,110/2,092 B/s and 252,349/17,645 B/s. Player travel is much closer
+than in the defective baseline, while shots, kills and timeline observations still
+differ. The cost gap persists in this supported envelope; it remains an inclusive
+product-workload result, not a framework-only ratio or a final adoption decision.
+Original Kit and game sources stay untouched.</p>
+<h2 id="staged-lz4-encoding-follow-up">Staged LZ4 encoding follow-up<a class="heading-anchor" href="#staged-lz4-encoding-follow-up" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/lz4-staging-2026-09-08/README.md · available in the repository">staging result</span> replaces two encoder
+search passes with one pass into bounded scratch and a final copy. It retains exact
+wire bytes and atomic output failure, with 65,808 additional workspace bytes. The
+corrected mixed cohort passes again: Replay host median p95 is 1,845 µs versus 2,024
+in the preceding cohort. Host p50 does not improve, and separate instrumented
+whole-frame means vary upward even while snapshot-delta work falls from 401.1 to
+301.9 µs. The result is a targeted encoder improvement, not a uniform game speedup.</p>
+<h2 id="exact-correction-reuse-experiment">Exact correction reuse experiment<a class="heading-anchor" href="#exact-correction-reuse-experiment" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/correction-reuse-2026-09-08/README.md · available in the repository">reuse result</span> verifies an explicit
+fast path for byte-identical predecessor states and rewritten inputs. A matching
+64 KiB synthetic state improves substantially, but the mixed cohort reuses only
+111–133 correction records per client alongside roughly 9,925 simulated ticks.
+Client p95 is 3,266 µs versus 3,273 in the preceding cohort, so no broad workload
+speedup is established. It stays opt-in; atomic correction, event handling and
+ordinary audit/full-replay behavior remain separately checked.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="roadmap.html"><span>Replay roadmap and implementation plan</span><span aria-hidden="true">→</span></a><a href="architecture.html"><span>The Replay frame contract</span><span aria-hidden="true">→</span></a><a href="../../examples/hello_net/README.html"><span>hello_net — the co-op quickstart's living copy</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/comparison.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#baseline-inventory" class="">Baseline inventory</a><a href="#preservation-and-content-rules" class="">Preservation and content rules</a><a href="#scrapyard-acceptance-inventory" class="">Scrapyard acceptance inventory</a><a href="#scenario-matrix" class="">Scenario matrix</a><a href="#measures" class="">Measures</a><a href="#result-format-and-reproducibility" class="">Result format and reproducibility</a><a href="#decision-record" class="">Decision record</a><a href="#active-range-comparison" class="">Active range comparison</a><a href="#active-combat-encounter-comparison" class="">Active combat encounter comparison</a><a href="#measured-snapshot-scan-optimization" class="">Measured snapshot scan optimization</a><a href="#compatibility-authoring-example" class="">Compatibility authoring example</a><a href="#executable-authoring-change-paid-revive" class="">Executable authoring change: paid revive</a><a href="#executable-authoring-change-existing-family-weapon" class="">Executable authoring change: existing-family weapon</a><a href="#sustained-offensive-population-comparison" class="">Sustained offensive population comparison</a><a href="#snapshot-delivery-tradeoff" class="">Snapshot delivery tradeoff</a><a href="#canonical-payload-attribution-and-compression" class="">Canonical payload attribution and compression</a><a href="#raw-udp-fault-envelope" class="">Raw-UDP fault envelope</a><a href="#speedball-sessionsocial-port" class="">Speedball session/social port</a><a href="#speedball-native-room-integration" class="">Speedball native Room integration</a><a href="#speedball-match-and-local-identity-lifecycle" class="">Speedball match and local identity lifecycle</a><a href="#speedball-saveresume-and-direct-epoch-query" class="">Speedball save/resume and direct epoch query</a><a href="#speedball-native-parties-and-observers" class="">Speedball native parties and observers</a><a href="#speedball-browser-party-lifecycle" class="">Speedball browser party lifecycle</a><a href="#speedball-browser-solo-saves" class="">Speedball browser solo saves</a><a href="#movingstatus-swarm-comparison" class="">Moving/status swarm comparison</a><a href="#owner-unwind-qualification-of-the-mixed-cohort" class="">Owner-unwind qualification of the mixed cohort</a><a href="#mixed-comparison-with-the-isolated-owner-unwind-repair" class="">Mixed comparison with the isolated owner-unwind repair</a><a href="#staged-lz4-encoding-follow-up" class="">Staged LZ4 encoding follow-up</a><a href="#exact-correction-reuse-experiment" class="">Exact correction reuse experiment</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/comparison.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

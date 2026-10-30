@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Network profiles · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html" aria-current="page">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Network profiles</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/profiles.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-by-authority-model">Choose by authority model</a><a href="#defaults-at-a-glance">Defaults at a glance</a><a href="#supported-starting-envelopes">Supported starting envelopes</a><a href="#overrides-remain-ordinary-fields">Overrides remain ordinary fields</a><a href="#hand-wired-stacks">Hand-wired stacks</a></nav></details>
+<article class="reading-body "><p>Kit&#39;s named network profiles configure the session and simulation lane as one
+validated unit. They are starting points, not hidden modes: a profile returns an
+ordinary <code>kboot.Network_Config</code>, so the game can inspect and override every
+field before attaching.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_profile(.Listen_Server_Action)
+cfg.session.max_players = <span class="hljs-number">4</span>
+cfg.lane.smooth_cut = <span class="hljs-number">48</span>
+cfg.lane.rewind_max = <span class="hljs-number">30</span>
+
+my_game_net_attach(self, kboot.Options{
+	title = <span class="hljs-string">&quot;MY GAME&quot;</span>,
+	env = <span class="hljs-string">&quot;MY_GAME&quot;</span>,
+}, cfg)</code></pre></div><p><code>rewind_max</code> is an absolute gameplay ceiling, not automatic credit granted to
+every client. For each shooter the authority derives a tighter live envelope
+from its measured RTT/jitter, input margin, snapshot cadence, and configured
+watch delay (with one cadence of interpolation-phase slack). Until that clock
+sample is warm, competitive rewind judges live.</p>
+<p>Omitting the third argument is exactly <code>.Friends_Coop</code>. Prefer naming the
+profile in production game code because it records the intended trust and
+latency model where the stack is attached.</p>
+<h2 id="choose-by-authority-model">Choose by authority model<a class="heading-anchor" href="#choose-by-authority-model" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Use it for</th>
+<th>What it assumes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.Friends_Coop</code></td>
+<td>Invited co-op, reliable shared state, owner-streamed movement</td>
+<td>Players are allowed to author their own fast state. The host still validates shared commands.</td>
+</tr>
+<tr>
+<td><code>.Listen_Server_Action</code></td>
+<td>Player-hosted action games using server simulation and prediction</td>
+<td>Clients send inputs; the listen host decides outcomes. The hosting player still controls the authority process.</td>
+</tr>
+<tr>
+<td><code>.Dedicated_Competitive</code></td>
+<td>An action game refereed by an avatarless server</td>
+<td>Clients are adversarial and the authority runs on infrastructure they do not control. Every simulation input class must use <code>@(gd_input)</code> constraints or a semantic validator.</td>
+</tr>
+</tbody></table>
+</div><p>A profile does not create a trust boundary. <code>.Dedicated_Competitive</code> only has
+that meaning when the authority is actually started with <code>kboot.boot_serve</code> on
+a trusted machine. Running the same configuration through <code>boot_host</code> is still
+a listen server. Encryption, account identity, moderation, deployment policy,
+and game-specific command predicates remain application responsibilities.</p>
+<p>The generated attach knows whether the game has a simulation lane and whether
+all of its input classes have generated <code>@(gd_input)</code> constraints or an
+authored validator. It refuses a dedicated profile with an unvalidated input
+class before the network starts:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_input)</span>
+Player_Input :: <span class="hljs-keyword">struct</span> {
+	move: [<span class="hljs-number">2</span>]<span class="hljs-type">i8</span> <span class="hljs-string">`gd:&quot;range=-1:1&quot;`</span>,
+}
+
+<span class="hljs-meta">@(gd_sample)</span>
+player_sample :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span class="hljs-type">u64</span>, input: ^Player_Input) {
+	<span class="hljs-comment">// Read local controls.</span>
+}</code></pre></div><p>Structural decoding only proves that bytes fit <code>Player_Input</code>; the generated
+sanitizer proves that their values obey the declared input language. Add the
+sample validator hook as well when legality depends on multiple fields or game
+state.</p>
+<h2 id="defaults-at-a-glance">Defaults at a glance<a class="heading-anchor" href="#defaults-at-a-glance" aria-label="Link to this section">#</a></h2>
+<p>All three profiles use bounded admission and the generated wire fingerprint
+gate. Their main timing choices are:</p>
+<p>| Profile | Session rate | Session interpolation | Sim / snapshot rate | History | Rewind limit | Future-input limit | Watched delay | Snapshot budget |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: |
+| Friends co-op | 20 Hz | fixed 150 ms | 60 / 20 Hz | 128 ticks | 250 ms | 64 ticks | 100 ms | 64 KiB/recipient |
+| Listen-server action | 20 Hz | adaptive 150–400 ms | 60 / 20 Hz | 128 ticks | 400 ms | 64 ticks | 100 ms | 32 KiB/recipient |
+| Dedicated competitive | 20 Hz | adaptive 100–250 ms | 60 / 30 Hz | 128 ticks | 250 ms | 24 ticks | 67 ms | 24 KiB/recipient |</p>
+<p>Authority-ingress budgets are token buckets; rates below are per seated peer
+(<code>actions</code> is per stable player seat). The friends profile allows a two-second
+reliable burst for loading/transfer spikes; the others are tighter:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Profile</th>
+<th align="right">Reliable ingress</th>
+<th align="right">Stream ingress</th>
+<th align="right">Action ingress</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Friends co-op</td>
+<td align="right">512 pkt/s, 2 MiB/s</td>
+<td align="right">240 pkt/s, 2 MiB/s</td>
+<td align="right">64 act/s, 256 KiB/s</td>
+</tr>
+<tr>
+<td>Listen-server action</td>
+<td align="right">256 pkt/s, 1 MiB/s</td>
+<td align="right">240 pkt/s, 2 MiB/s</td>
+<td align="right">60 act/s, 256 KiB/s</td>
+</tr>
+<tr>
+<td>Dedicated competitive</td>
+<td align="right">128 pkt/s, 512 KiB/s</td>
+<td align="right">120 pkt/s, 1 MiB/s</td>
+<td align="right">30 act/s, 128 KiB/s</td>
+</tr>
+</tbody></table>
+</div><p>The dedicated profile also shortens command and join timeouts, requires a
+bounded player count, and refuses <code>Session_Config.fingerprint = ksess.FINGERPRINT_NONE</code>. Its tighter future-input limit reduces how far an
+untrusted client can stamp work ahead of authority time.</p>
+<p>The profiles deliberately leave co-op outbound <code>stream_budget = 0</code>: an
+owner-stream budget requires a game-authored interest function. Simulation
+snapshot budgets are safe without AOI and are enabled above; they prioritize
+owned/stale rows and force a full row after deferral or AOI re-entry. Public
+games should still install AOI. <code>traffic.stream</code> is the distinct bounded
+client-to-authority ingress shown above.</p>
+<h2 id="supported-starting-envelopes">Supported starting envelopes<a class="heading-anchor" href="#supported-starting-envelopes" aria-label="Link to this section">#</a></h2>
+<p><code>network_profile_envelope(profile)</code> publishes the scale limits verified by the
+engine-free benchmark gate. These are framework envelopes, not promises about
+your game logic, physics, engine nodes, transport overhead, or hosting machine:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Profile</th>
+<th align="right">Players</th>
+<th align="right">Persistent replicated entities</th>
+<th align="right">Hot entities per recipient/tick</th>
+<th align="right">Predicted entities/client</th>
+<th align="right">Forced replay</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Friends co-op</td>
+<td align="right">8</td>
+<td align="right">2,000</td>
+<td align="right">500</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Listen-server action</td>
+<td align="right">8</td>
+<td align="right">2,000</td>
+<td align="right">500</td>
+<td align="right">128</td>
+<td align="right">8 ticks</td>
+</tr>
+<tr>
+<td>Dedicated competitive</td>
+<td align="right">8</td>
+<td align="right">2,000</td>
+<td align="right">500</td>
+<td align="right">512</td>
+<td align="right">8 ticks</td>
+</tr>
+</tbody></table>
+</div><p><code>tests/kitstress</code> measures server CPU, application egress bytes, session
+resident/peak allocation, join/snapshot/resume cost, per-recipient AOI fanout,
+and reconciliation cost at increasing sizes. Its optimized native reference
+run exercises 2/100, 4/500, and 8/2,000 player/entity fanout shapes plus
+32/128/512 predicted entities. The test uses generous complexity tripwires;
+repeat it on deployment hardware and add the engine/game frame before raising
+an envelope. “Hot” means dirty and inside one recipient&#39;s AOI in the same tick;
+unchanged and out-of-interest entities are sparse and do not consume snapshot
+rows.</p>
+<h2 id="overrides-remain-ordinary-fields">Overrides remain ordinary fields<a class="heading-anchor" href="#overrides-remain-ordinary-fields" aria-label="Link to this section">#</a></h2>
+<p><code>network_profile</code> materializes every timing field, including booleans. That
+means an override never has to fight the lower-level &quot;zero means default&quot;
+convention:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_profile(.Listen_Server_Action)
+cfg.session.interp_adapt = <span class="hljs-literal">false</span>
+cfg.session.interp_delay = <span class="hljs-number">0.12</span>
+cfg.lane.echo_inputs = <span class="hljs-literal">true</span>
+cfg.lane.tolerance = <span class="hljs-number">0.5</span>
+my_game_net_attach(self, opts, cfg)</code></pre></div><p>The complete value is validated before <code>boot_attach</code> or <code>lane_init</code>. Validation
+covers positive rates and durations, adaptive interpolation floor/ceiling,
+bounded history indices, redundancy wire limits, the 31-tick watched-offset
+ceiling, smoothing values, and trust-profile requirements. Predict-world input
+echo also requires positive float tolerance; exact held-input comparison would
+otherwise trigger reconciliation on nearly every snapshot.</p>
+<p>Build overrides by editing a value returned from <code>network_profile</code>. A partial
+<code>Network_Config{...}</code> literal is rejected rather than silently combining two
+different default systems.</p>
+<h2 id="hand-wired-stacks">Hand-wired stacks<a class="heading-anchor" href="#hand-wired-stacks" aria-label="Link to this section">#</a></h2>
+<p>The generated facade is the normal path. A game using the lower-level lifecycle
+can apply the same contract directly:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_configure(
+	&amp;self.ses,
+	kboot.network_profile(.Listen_Server_Action),
+	kboot.Network_Capabilities{
+		has_lane = <span class="hljs-literal">true</span>,
+		all_inputs_validated = <span class="hljs-literal">true</span>,
+	},
+)
+kboot.boot_attach(&amp;self.boot, self.owner, &amp;self.ses, &amp;self.comms, opts)
+my_game_lane_init(self, &amp;self.lane, &amp;self.ses, cfg = cfg.lane)
+kboot.boot_lane(&amp;self.boot, &amp;self.lane)</code></pre></div><p><code>godot:kit/netcfg</code> contains the engine-free implementation and can be imported
+directly for tooling or tests. <code>kit/boot</code> re-exports its game-facing types and
+procedures so normal scripts need only <code>kboot</code>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/profiles.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-by-authority-model" class="">Choose by authority model</a><a href="#defaults-at-a-glance" class="">Defaults at a glance</a><a href="#supported-starting-envelopes" class="">Supported starting envelopes</a><a href="#overrides-remain-ordinary-fields" class="">Overrides remain ordinary fields</a><a href="#hand-wired-stacks" class="">Hand-wired stacks</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/profiles.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

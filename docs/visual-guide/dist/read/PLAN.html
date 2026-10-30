@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>odin_godot — Odin as a first-class Godot scripting language · odin_godot</title><link rel="icon" href="../favicon.svg"><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../reader.css"><link rel="stylesheet" href="../sdk.css"><script src="../reader.js" defer></script><script src="../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../docs.html" aria-current="page">Docs</a><a href="../guide.html">Field guide</a><a href="../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../docs.html">Overview</a><a href="../docs/install.html">Installation</a><a href="../docs/first-script.html">Your first script</a><a href="../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="docs/authoring-guide.html">Script API</a><a href="docs/events.html">Signals and events</a><a href="docs/workflow.html">Editor workflow</a><a href="docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../docs/multiplayer.html">Choose a model</a><a href="../docs/kit.html">Build with Kit</a><a href="../docs/replay.html">Build with Replay</a><a href="docs/kit/timelines.html">Prediction and timelines</a><a href="docs/kit/profiles.html">Authority profiles</a><a href="replay/getting-started.html">Replay sessions and rooms</a><a href="replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../docs/exporting.html">Build and export</a><a href="docs/exporting.html">Export reference</a><a href="docs/debugging.html">Debugging</a><a href="../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="examples/replay_scrapyard/code-guide.html">Code guide</a><a href="examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../guide.html">Illustrated field guide <span>↗</span></a><a href="../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../docs.html">Docs</a><span>/</span><a href="../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>odin_godot — Odin as a first-class Godot scripting language</h1><div class="reader-meta"><span>9 min read</span><span>Odin × Godot</span><a href="../reference/PLAN.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#1-the-core-insight-odin--miniml">1. The core insight: Odin ≠ MiniML</a><a href="#2-architecture-overview">2. Architecture overview</a><a href="#3-how-an-odin-script-declares-a-class-the-key-ergonomic-decision">3. How an .odin script declares a &quot;class&quot; (the key ergonomic decision)</a><a href="#4-the-boundary-concretely">4. The boundary, concretely</a><a href="#5-build--toolchain-nix-flake">5. Build &amp; toolchain (Nix flake)</a><a href="#6-phased-delivery-risk-front-loaded">6. Phased delivery (risk-front-loaded)</a><a href="#7-top-risks--mitigations">7. Top risks &amp; mitigations</a><a href="#8-decisions-to-confirm">8. Decisions to confirm</a></nav></details>
+<article class="reading-body "><p>A <strong>Godot 4.x GDExtension</strong> that implements the full <code>ScriptLanguageExtension</code>
+API so that <code>.odin</code> files are first-class Godot scripts — attach a <code>.odin</code> file to
+a Node, and its lifecycle (<code>_ready</code>, <code>_process</code>, signals, exported vars…) runs in
+compiled Odin. The goal is to <strong>fully replace GDScript</strong>, with <strong>native + WASM</strong>
+compilation, made reproducible with <strong>Nix flakes</strong>.</p>
+<p>Modeled on the sibling project <code>~/data/code/ocaml/miniml_godot</code> (a <code>ScriptLanguageExtension</code>
+that embeds the MiniML interpreter). This document is the implementation plan.</p>
+<h3 id="locked-decisions-2026-06-22">Locked decisions (2026-06-22)<a class="heading-anchor" href="#locked-decisions-2026-06-22" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><strong>Godot pin:</strong> <strong>4.7.1 stable</strong> (matches the installed <code>/Applications/Godot.app</code>).
+Its web build uses <strong>emscripten 4.0.11</strong> (per miniml&#39;s lesson) — pin that exactly.</li>
+<li><strong>Script declaration:</strong> a <strong>codegen preprocessor</strong> (Godin-style) is the primary authoring
+surface — scripts use struct tags / attributes and the tool generates the registration
+boilerplate (see §3). The <code>@(init)</code> self-registration form remains the underlying
+mechanism the codegen emits into.</li>
+<li><strong>Binding layer:</strong> <strong>vendor</strong> the relevant generator code from
+<code>dresswithpockets/odin-godot</code> (not a tracking fork) — our repo will diverge substantially,
+so we copy what we need and own it outright (respect its license/attribution).</li>
+<li><strong><code>compatibility_minimum</code>:</strong> 4.6.</li>
+</ul>
+<hr>
+<h2 id="1-the-core-insight-odin--miniml">1. The core insight: Odin ≠ MiniML<a class="heading-anchor" href="#1-the-core-insight-odin--miniml" aria-label="Link to this section">#</a></h2>
+<p><code>miniml_godot</code> had it easy in one respect: MiniML ships an <strong>interpreter</strong>, so the
+dev loop could <em>interpret</em> <code>.mml</code> source per-node (fast iteration, hot reload, <code>eval</code>),
+and only <em>optionally</em> compile for export. <strong>Odin has no interpreter</strong> — it is a
+statically-typed, ahead-of-time, LLVM-backed native language. That single fact drives
+the whole architecture:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>miniml_godot</th>
+<th>odin_godot</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dev iteration</td>
+<td>interpret source per node</td>
+<td><strong>compile</strong> scripts → shared lib, <code>dlopen</code></td>
+</tr>
+<tr>
+<td>Hot reload</td>
+<td>re-eval into live env</td>
+<td><strong>recompile</strong> scripts lib, swap via <code>dlclose</code>/<code>dlopen</code>, re-instantiate</td>
+</tr>
+<tr>
+<td><code>eval</code>/REPL</td>
+<td>yes (interpreter)</td>
+<td><strong>no</strong> — not possible; honest gap vs GDScript</td>
+</tr>
+<tr>
+<td>Engine→script dispatch</td>
+<td>stringly-typed <code>mml_embed_call_*</code></td>
+<td><strong>typed proc pointers</strong> in a registry</td>
+</tr>
+<tr>
+<td>Script→engine calls</td>
+<td><code>Godot.*</code> string wrappers</td>
+<td><strong>typed <code>godot</code> binding</strong> generated from <code>extension_api.json</code></td>
+</tr>
+<tr>
+<td>Export</td>
+<td>compile mode (optional)</td>
+<td>compile mode (the <em>only</em> mode)</td>
+</tr>
+</tbody></table>
+</div><p>So odin_godot is essentially <strong>&quot;miniml_godot&#39;s compiled-mode, everywhere&quot;</strong> — but with
+a <em>typed</em> API on both sides of the boundary, because Odin speaks the GDExtension C ABI
+natively (<code>foreign import</code> to call in, <code>@(export) -build-mode:dll</code> to be called).</p>
+<h3 id="honest-scope-note--what-fully-replace-gdscript-can-and-cant-mean">Honest scope note — what &quot;fully replace GDScript&quot; can and can&#39;t mean<a class="heading-anchor" href="#honest-scope-note--what-fully-replace-gdscript-can-and-cant-mean" aria-label="Link to this section">#</a></h3>
+<p>Achievable: <code>extends &lt;any class&gt;</code>, lifecycle hooks, custom methods (callable from
+GDScript and cross-script), <code>@export</code> vars in the Inspector, signals (declare/connect/emit
+with typed multi-arg payloads), tool scripts, the full engine API surface. <strong>Not</strong>
+achievable with AOT Odin: runtime <code>eval</code>/<code>expression</code> evaluation, and <em>instant</em> in-editor
+hot-reload (we get <em>fast recompile-and-swap</em> reload instead, on the order of an Odin build).
+These gaps are inherent to a compiled language and will be documented, not hidden.</p>
+<hr>
+<h2 id="2-architecture-overview">2. Architecture overview<a class="heading-anchor" href="#2-architecture-overview" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">                    .gdextension  (entry_symbol = odin_godot_init)
+                          │
+          ┌───────────────┴────────────────┐
+          │   CORE dll  (stable, prebuilt)  │     ← written in Odin, -build-mode:dll
+          │   - odin_godot_init entry       │
+          │   - OdinLanguage   (ScriptLanguageExtension)
+          │   - OdinScript     (ScriptExtension)
+          │   - script instance (ScriptInstanceInfo3)
+          │   - OdinLoader/Saver (ResourceFormat*)
+          │   - OdinExportPlugin (EditorExportPlugin)
+          │   - Class REGISTRY  ◄──────────────┐
+          └───────────────┬───────────────────┼──┘
+                          │ dlopen / dlclose   │ @(init) self-registration
+          ┌───────────────┴───────────────────┴──┐
+          │  SCRIPTS dll  (swappable, recompiled) │  ← all res://**/*.odin, -build-mode:dll
+          │  each script: a struct + procs + an   │
+          │  @(init) that registers a ClassDesc   │
+          └───────────────┬───────────────────────┘
+                          │ typed calls
+          ┌───────────────┴───────────────────────┐
+          │  godot  binding package (generated)    │  ← from extension_api.json
+          │  Variant, builtins, every class+method │     shared by CORE and SCRIPTS
+          └────────────────────────────────────────┘</code></pre></div><p>Two dlls on desktop: a <strong>stable core</strong> and a <strong>swappable scripts</strong> lib. Keeping them
+separate is what makes hot reload tractable — the core stays loaded and holds engine
+handles while the scripts lib is swapped underneath it. On <strong>web</strong>, hot reload is
+irrelevant, so core+scripts are linked together (or declared as two Emscripten
+<code>SIDE_MODULE</code>s at link time) and shipped AOT.</p>
+<h3 id="components-map-to-subdirectories">Components (map to subdirectories)<a class="heading-anchor" href="#components-map-to-subdirectories" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><strong><code>flake.nix</code></strong> — pins Odin, LLVM (Odin&#39;s backend), Emscripten (emsdk, version matched
+to Godot&#39;s web build), a Godot 4.x binary, clang/lld/binutils. <code>nix develop</code> shell +
+<code>nix build</code> of the extension. Mirrors <code>~/data/code/ocaml/interpreter/flake.nix</code>.</li>
+<li><strong><code>bindgen/</code></strong> — generates the typed <code>godot</code> Odin package from <code>extension_api.json</code>.
+Start by <strong>vendoring/forking <code>dresswithpockets/odin-godot</code>&#39;s bindgen</strong> (verify license),
+which already covers all enums/classes/utility-fns/singletons/native-structs.</li>
+<li><strong><code>godot/</code></strong> — the <em>generated</em> binding package (typed Variant + builtins + every class).
+This is the &quot;full API&quot; surface; checked-in generated output + a regen command.</li>
+<li><strong><code>core/</code></strong> — the extension core (Odin, <code>-build-mode:dll</code>). The bulk of novel work:
+<code>ScriptLanguageExtension</code>, <code>ScriptExtension</code>, script-instance dispatch, resource
+loader/saver, export plugin, the class registry.</li>
+<li><strong><code>runtime/</code></strong> — small shared package imported by <em>both</em> core and scripts: the
+<code>ClassDesc</code> registry types, the registration entry points, the <code>@export</code>/signal/method
+descriptors, and ergonomic helpers scripts use to declare a class.</li>
+<li><strong><code>scripts/</code></strong> — user <code>.odin</code> scripts (and the showcase&#39;s scripts).</li>
+<li><strong><code>build/</code></strong> — the compose+compile pipeline (compile all scripts → one dll / wasm obj).</li>
+<li><strong><code>tests/</code></strong> — headless GDScript drivers (<code>test_*.gd</code>) + a <code>Makefile</code>, mirroring miniml.</li>
+<li><strong><code>showcase/</code></strong> — a playable coin-collector scene written purely in Odin (no GDScript).</li>
+<li><strong><code>docs/</code></strong> — design notes, the script-authoring guide, the WASM/reload spike writeups.</li>
+</ul>
+<hr>
+<h2 id="3-how-an-odin-script-declares-a-class-the-key-ergonomic-decision">3. How an <code>.odin</code> script declares a &quot;class&quot; (the key ergonomic decision)<a class="heading-anchor" href="#3-how-an-odin-script-declares-a-class-the-key-ergonomic-decision" aria-label="Link to this section">#</a></h2>
+<p>Odin has no classes and no macro-style compile-time reflection, so we need a convention
+to express <code>extends</code>, <code>@export</code>, <code>signal</code>, and lifecycle. <strong>Chosen approach: a codegen
+preprocessor</strong> (Godin-style) reads struct tags + attributes and emits the registration
+boilerplate. The author writes:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> player
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot&quot;</span>
+
+Player :: <span class="hljs-keyword">struct</span> {
+    <span class="hljs-keyword">using</span> _: gd.CharacterBody2D,   <span class="hljs-comment">// `extends CharacterBody2D`</span>
+    speed:   <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;export&quot;`</span>,    <span class="hljs-comment">// Inspector-exported tunable</span>
+    score:   <span class="hljs-type">int</span>,
+}
+
+<span class="hljs-meta">@(gd_lifecycle)</span> ready   :: <span class="hljs-keyword">proc</span>(self: ^Player) { gd.set_position(self, {<span class="hljs-number">100</span>, <span class="hljs-number">50</span>}) }
+<span class="hljs-meta">@(gd_lifecycle)</span> process :: <span class="hljs-keyword">proc</span>(self: ^Player, delta: <span class="hljs-type">f64</span>) { <span class="hljs-comment">/* ... */</span> }
+<span class="hljs-meta">@(gd_signal_handler)</span> on_body_entered :: <span class="hljs-keyword">proc</span>(self: ^Player, body: ^gd.Node) { self.score += <span class="hljs-number">1</span> }
+<span class="hljs-comment">// signals declared via a struct tag or a `@(gd_signal)` marker; codegen collects them.</span></code></pre></div><p>…and the preprocessor generates the <code>@(init) register()</code> shown below. The codegen is a
+thin layer over the underlying mechanism, which is <strong><code>@(init)</code> self-registration</strong> — what
+the generator emits and what the core consumes:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> player
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot&quot;</span>
+<span class="hljs-keyword">import</span> rt <span class="hljs-string">&quot;runtime&quot;</span>
+
+Player :: <span class="hljs-keyword">struct</span> {
+    <span class="hljs-keyword">using</span> _: gd.CharacterBody2D,   <span class="hljs-comment">// `extends CharacterBody2D`</span>
+    speed:   <span class="hljs-type">f32</span>,                  <span class="hljs-comment">// exported below</span>
+    score:   <span class="hljs-type">int</span>,
+}
+
+ready :: <span class="hljs-keyword">proc</span>(self: ^Player) {
+    gd.set_position(self, {<span class="hljs-number">100</span>, <span class="hljs-number">50</span>})
+}
+
+process :: <span class="hljs-keyword">proc</span>(self: ^Player, delta: <span class="hljs-type">f64</span>) {
+    dir := gd.get_axis(<span class="hljs-string">&quot;ui_left&quot;</span>, <span class="hljs-string">&quot;ui_right&quot;</span>)
+    gd.translate(self, {<span class="hljs-type">f32</span>(dir) * self.speed * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">0</span>})
+}
+
+on_body_entered :: <span class="hljs-keyword">proc</span>(self: ^Player, body: ^gd.Node) { self.score += <span class="hljs-number">1</span> }
+
+<span class="hljs-meta">@(init)</span>  <span class="hljs-comment">// runs when the scripts dll loads</span>
+register :: <span class="hljs-keyword">proc</span>() {
+    rt.class(<span class="hljs-string">&quot;Player&quot;</span>, gd.CharacterBody2D, size_of(Player), align_of(Player),
+        lifecycle = { ready = ready, process = process },
+        exports   = { rt.export_f32(<span class="hljs-string">&quot;speed&quot;</span>, &amp;Player{}.speed, default = <span class="hljs-number">200</span>) },
+        signals   = { rt.signal(<span class="hljs-string">&quot;hit&quot;</span>, {.OBJECT}) },
+        methods   = { rt.method(<span class="hljs-string">&quot;on_body_entered&quot;</span>, on_body_entered) },
+    )
+}</code></pre></div><p>The core&#39;s registry maps <code>&quot;Player&quot;</code> → a <code>ClassDesc</code> with typed proc pointers; engine
+lifecycle/method/signal calls are dispatched through it with the node pointer + typed
+args — <strong>no per-call string marshalling</strong>. <code>@(init)</code> procs run automatically on dll load,
+so loading the scripts lib populates the registry for free.</p>
+<p>The core&#39;s registry maps <code>&quot;Player&quot;</code> → a <code>ClassDesc</code> with typed proc pointers; engine
+lifecycle/method/signal calls are dispatched through it. The codegen preprocessor lives in
+<code>bindgen/</code> (or a sibling <code>scriptgen/</code>), runs as a pre-build step over <code>res://**/*.odin</code>,
+and emits one generated <code>*_gen.odin</code> per script plus the composed registration unit.</p>
+<hr>
+<h2 id="4-the-boundary-concretely">4. The boundary, concretely<a class="heading-anchor" href="#4-the-boundary-concretely" aria-label="Link to this section">#</a></h2>
+<p><strong>Engine → script</strong> (in the script-instance <code>call</code>): the engine hands us a method name +
+<code>Variant*</code> args. The registry resolves the name to a typed proc pointer; we convert each
+<code>Variant</code> to the Odin parameter type once (cached constructors, as miniml does) and call.
+Lifecycle (<code>_ready</code>, <code>_process(delta)</code>, <code>_physics_process</code>, <code>_enter_tree</code>, …), signal
+handlers (all payload args forwarded), and custom methods all route here.</p>
+<p><strong>Script → engine</strong> (<code>godot.*</code>): direct typed calls through the generated binding, which
+holds the cached GDExtension interface function pointers and <code>StringName</code>/method-bind
+handles. No string wrappers like miniml&#39;s <code>Godot.call_s</code> — the binding exposes
+<code>set_position(node, Vector2)</code> etc. with real types.</p>
+<p><strong><code>@export</code> / properties:</strong> <code>OdinScript._get_script_property_list</code> reports the exports from
+the <code>ClassDesc</code>; the instance <code>get</code>/<code>set</code> read/write the field at its offset in the node&#39;s
+Odin struct (offsets captured at registration). Inspector-configurable, scene-serialized.</p>
+<p><strong>Signals:</strong> declared in <code>ClassDesc</code>; <code>_get_script_signal_list</code> reports them; connect routes
+a signal into a registered method, forwarding <strong>all</strong> typed payload args (miniml&#39;s multi-arg
+signal behavior is the bar). Emit via the typed binding.</p>
+<hr>
+<h2 id="5-build--toolchain-nix-flake">5. Build &amp; toolchain (Nix flake)<a class="heading-anchor" href="#5-build--toolchain-nix-flake" aria-label="Link to this section">#</a></h2>
+<p><code>nix develop</code> provides: <code>odin</code>, <code>llvm</code>/<code>lld</code>, <code>emscripten</code> (pinned to Godot&#39;s version —
+critical, see miniml&#39;s <code>-sSUPPORT_LONGJMP=wasm</code> lesson), <code>godot</code>, <code>clang</code>, <code>make</code>.</p>
+<ul>
+<li><strong>Core dll:</strong> <code>odin build core -build-mode:dll -out:libodin_godot.&lt;ext&gt;</code></li>
+<li><strong>Scripts dll (desktop):</strong> compose <code>res://**/*.odin</code> into a package →
+<code>odin build … -build-mode:dll -out:libodinscripts.&lt;ext&gt;</code></li>
+<li><strong>Scripts → web:</strong> <code>odin build … -build-mode:obj -target:freestanding_wasm32</code> → <code>.wasm.o</code>,
+then <code>emcc script.wasm.o -sSIDE_MODULE=1 -sSUPPORT_LONGJMP=wasm -O2 -o libodinscripts.wasm</code>,
+emscripten version == Godot&#39;s. (Highest-risk path — Phase-0 spike de-risks it first.)</li>
+<li><strong><code>.gdextension</code>:</strong> <code>entry_symbol = &quot;odin_godot_init&quot;</code>; per-platform library entries
+(<code>macos.*</code>, <code>linux.*</code>, <code>windows.*</code>, <code>web.*.wasm32</code>); export plugin rewrites paths.</li>
+<li><strong>Regenerate inputs from the pinned engine:</strong>
+<code>godot --headless --dump-gdextension-interface</code> and <code>--dump-extension-api</code> →
+<code>gdextension_interface.h</code> + <code>extension_api.json</code> feed <code>bindgen</code>.</li>
+</ul>
+<p><code>nix build</code> produces the extension as a reproducible artifact; <code>tests/Makefile</code> mirrors
+miniml&#39;s headless <code>make test-*</code> targets.</p>
+<hr>
+<h2 id="6-phased-delivery-risk-front-loaded">6. Phased delivery (risk-front-loaded)<a class="heading-anchor" href="#6-phased-delivery-risk-front-loaded" aria-label="Link to this section">#</a></h2>
+<p>Each phase ends in a <strong>headless-verifiable milestone</strong>, like miniml&#39;s tracks.</p>
+<h3 id="phase-0--foundations--spikes-de-risk-before-building">Phase 0 — Foundations &amp; spikes (de-risk before building)<a class="heading-anchor" href="#phase-0--foundations--spikes-de-risk-before-building" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><code>flake.nix</code> pinning Odin + LLVM + emscripten + Godot; <code>nix develop</code> works.</li>
+<li>Dump <code>gdextension_interface.h</code> + <code>extension_api.json</code> from the pinned Godot.</li>
+<li>Vendor/fork the <code>odin-godot</code> bindgen; generate the <code>godot</code> package; build a trivial
+<strong>Odin-authored GDExtension class</strong> registered &amp; callable from GDScript (proves the
+Odin→GDExtension ABI end-to-end). <em>Milestone: GDScript calls an Odin method, headless.</em></li>
+<li><strong>Spike W (WASM):</strong> compile a trivial Odin proc to a Godot-loadable <code>SIDE_MODULE</code> and
+call it from an actual web export. <em>This is the single biggest risk — prove it early.</em></li>
+<li><strong>Spike R (reload):</strong> <code>dlopen</code>/<code>dlclose</code> an Odin scripts dll, swap it, re-resolve the
+registry — confirm Odin global/<code>context</code> init survives a reload cycle.</li>
+</ul>
+<h3 id="phase-1--scriptlanguageextension-skeleton">Phase 1 — ScriptLanguageExtension skeleton<a class="heading-anchor" href="#phase-1--scriptlanguageextension-skeleton" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>Register the <strong>&quot;Odin&quot;</strong> language; <code>.odin</code> recognized (extension, reserved words,
+comment delimiters). <code>OdinScript</code> resource + <code>OdinLoader</code> so <code>load(&quot;res://x.odin&quot;)</code> works.</li>
+<li>Attach a <code>.odin</code> script to a Node in a <code>.tscn</code>; <code>_can_instantiate</code>, <code>_get_language</code>,
+<code>_has_method</code> wired; <code>_ready</code> is a stub. <em>Milestone: a <code>.odin</code> script attaches and the
+editor/scene-tree recognizes it.</em></li>
+</ul>
+<h3 id="phase-2--compiled-dispatch-the-heart">Phase 2 — Compiled dispatch (the heart)<a class="heading-anchor" href="#phase-2--compiled-dispatch-the-heart" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>The <code>runtime</code> registry + <code>@(init)</code> convention (§3); compose+compile the scripts dll.</li>
+<li>Script-instance <code>call</code> routes <code>_ready</code>/<code>_process(delta)</code>/<code>_physics_process</code> into Odin
+procs with <code>self</code> + <code>delta</code>; scripts drive their node via the typed <code>godot</code> API.
+<em>Milestone: the showcase player <strong>moves</strong> under keyboard input, pure Odin, headless-verified.</em></li>
+</ul>
+<h3 id="phase-3--full-gdscript-parity-surface">Phase 3 — Full GDScript-parity surface<a class="heading-anchor" href="#phase-3--full-gdscript-parity-surface" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><code>@export</code> vars: property list + Inspector get/set + scene serialization.</li>
+<li>Signals: declare + connect (multi-arg typed payloads forwarded) + emit.</li>
+<li>Custom methods callable from GDScript and cross-script; <code>extends</code> any base; tool scripts.</li>
+<li>Per-instance state (each node its own struct instance). Autoload/<code>class_name</code> modules.
+<em>Milestone: coin collector fully playable — collect + score + HUD + exported tunables +
+signals — with <strong>no GDScript glue</strong> (miniml&#39;s showcase bar).</em></li>
+</ul>
+<h3 id="phase-4--hot-reload-dev-loop">Phase 4 — Hot-reload dev loop<a class="heading-anchor" href="#phase-4--hot-reload-dev-loop" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>Core watches <code>res://**/*.odin</code>; on change shells <code>odin build</code>, <code>dlclose</code>/<code>dlopen</code> the
+scripts dll, repopulates the registry, re-instantiates live nodes preserving state.
+<em>Milestone: edit a <code>.odin</code>, see the running scene pick up the new behavior after a rebuild.</em></li>
+</ul>
+<h3 id="phase-5--export-pipeline-native--wasm">Phase 5 — Export pipeline (native + WASM)<a class="heading-anchor" href="#phase-5--export-pipeline-native--wasm" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><code>OdinExportPlugin</code>: compile all scripts per target desktop platform (<code>-build-mode:dll</code>
+cross-targets) and <strong>web</strong> (<code>-build-mode:obj</code> → <code>emcc -sSIDE_MODULE</code>), rewrite the
+<code>.gdextension</code>, bundle into the export. <em>Milestone: an exported desktop build <strong>and</strong> a
+web build of the showcase both run the Odin scripts.</em></li>
+</ul>
+<h3 id="phase-6--polish--showcase">Phase 6 — Polish &amp; showcase<a class="heading-anchor" href="#phase-6--polish--showcase" aria-label="Link to this section">#</a></h3>
+<ul>
+<li>Pure-Odin coin-collector <code>showcase.tscn</code>; full <code>tests/</code> headless E2E suite (script,
+signal, reload, autoload, export, web-smoke); editor diagnostics via <code>odin check</code> in
+<code>_validate</code>; README + authoring guide. <em>Milestone: <code>make test-*</code> green; web demo plays.</em></li>
+</ul>
+<hr>
+<h2 id="7-top-risks--mitigations">7. Top risks &amp; mitigations<a class="heading-anchor" href="#7-top-risks--mitigations" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong>Odin→WASM side-module compatibility w/ Godot&#39;s Emscripten</strong> (longjmp mode, runtime
+<code>context</code> init, version match, possibly a 2nd <code>SIDE_MODULE</code> for scripts). → Phase-0 Spike W.</li>
+<li><strong>Native hot reload safety</strong> (<code>dlclose</code> of live code, preserving node state, Odin global
+re-init). → Phase-0 Spike R; keep core/scripts as separate dlls.</li>
+<li><strong>Script-class ergonomics without reflection</strong> (the <code>@(init)</code>/<code>ClassDesc</code> convention is
+pleasant or it isn&#39;t). → validate in Phase 2; optional codegen sugar later.</li>
+<li><strong>Off-main-thread resource loading</strong> (Odin <code>context</code> per thread; don&#39;t call scripts off
+the loader thread — miniml&#39;s constraint). → loader builds the resource only; instantiate
+on main thread.</li>
+<li><strong><code>bindgen</code> coverage/upkeep</strong> vs writing our own. → start from <code>odin-godot</code>, own the fork.</li>
+</ol>
+<h2 id="8-decisions-to-confirm">8. Decisions to confirm<a class="heading-anchor" href="#8-decisions-to-confirm" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Script declaration:</strong> <code>@(init)</code> self-registration (recommended) vs codegen preprocessor.</li>
+<li><strong>Binding layer:</strong> fork <code>dresswithpockets/odin-godot</code>&#39;s bindgen (faster) vs slim in-house.</li>
+<li><strong>dll split:</strong> stable core + swappable scripts dll (recommended, enables reload) vs one dll.</li>
+<li><strong>Godot version target:</strong> pin which 4.x (suggest matching the installed <code>/Applications/Godot.app</code>).</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">PLAN.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#locked-decisions-2026-06-22" class="subsection">Locked decisions (2026-06-22)</a><a href="#1-the-core-insight-odin--miniml" class="">1. The core insight: Odin ≠ MiniML</a><a href="#honest-scope-note--what-fully-replace-gdscript-can-and-cant-mean" class="subsection">Honest scope note — what &quot;fully replace GDScript&quot; can and can't mean</a><a href="#2-architecture-overview" class="">2. Architecture overview</a><a href="#components-map-to-subdirectories" class="subsection">Components (map to subdirectories)</a><a href="#3-how-an-odin-script-declares-a-class-the-key-ergonomic-decision" class="">3. How an .odin script declares a &quot;class&quot; (the key ergonomic decision)</a><a href="#4-the-boundary-concretely" class="">4. The boundary, concretely</a><a href="#5-build--toolchain-nix-flake" class="">5. Build &amp; toolchain (Nix flake)</a><a href="#6-phased-delivery-risk-front-loaded" class="">6. Phased delivery (risk-front-loaded)</a><a href="#phase-0--foundations--spikes-de-risk-before-building" class="subsection">Phase 0 — Foundations &amp; spikes (de-risk before building)</a><a href="#phase-1--scriptlanguageextension-skeleton" class="subsection">Phase 1 — ScriptLanguageExtension skeleton</a><a href="#phase-2--compiled-dispatch-the-heart" class="subsection">Phase 2 — Compiled dispatch (the heart)</a><a href="#phase-3--full-gdscript-parity-surface" class="subsection">Phase 3 — Full GDScript-parity surface</a><a href="#phase-4--hot-reload-dev-loop" class="subsection">Phase 4 — Hot-reload dev loop</a><a href="#phase-5--export-pipeline-native--wasm" class="subsection">Phase 5 — Export pipeline (native + WASM)</a><a href="#phase-6--polish--showcase" class="subsection">Phase 6 — Polish &amp; showcase</a><a href="#7-top-risks--mitigations" class="">7. Top risks &amp; mitigations</a><a href="#8-decisions-to-confirm" class="">8. Decisions to confirm</a></nav><div class="outline-actions"><a href="../reference/PLAN.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

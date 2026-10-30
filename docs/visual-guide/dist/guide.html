@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ed">
+  <meta name="description" content="How Odin gameplay fits into Godot, and how Kit and Replay distribute it across machines. Diagrams, a replay lab, and runnable examples.">
+  <title>Multiplayer field guide · odin_godot</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+<link rel="stylesheet" href="sdk.css"><script src="site.js" defer></script></head>
+<body class="guide-page">
+<a class="skip" href="#article">Skip to article</a>
+<header class="sdk-header"><div class="sdk-header-inner"><a class="sdk-brand" href="index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="docs.html">Docs</a><a href="guide.html" aria-current="page">Field guide</a><a href="examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="layout" id="top">
+  <aside class="contents" aria-label="On this page">
+    <p class="eyebrow">In this article</p>
+    <nav>
+      <a href="#scrapyard"><span>▶</span> Play Scrapyard</a>
+      <a href="#boundary"><span>01</span> The engine boundary</a>
+      <a href="#kit"><span>02</span> Kit: fields & commands</a>
+      <a href="#replay"><span>03</span> Replay: complete frames</a>
+      <a href="#lab"><span>04</span> Follow a correction</a>
+      <a href="#clocks"><span>05</span> What the screen shows</a>
+      <a href="#choose"><span>06</span> Choose a policy</a>
+      <a href="#start"><span>07</span> Build the first version</a>
+    </nav>
+    <div class="aside-bottom">
+      <a href="#artifacts">Diagrams & reading ↓</a>
+      <button type="button" id="print-guide">Print / save PDF</button>
+      <p>Based on this checkout.<br>Replay is experimental.</p>
+    </div>
+  </aside>
+  <main id="article">
+    <section class="hero">
+      <p class="eyebrow"><span class="status-dot"></span> ENGINEERING / MULTIPLAYER SYSTEMS</p>
+      <h1>A world on<br>every machine.</h1>
+      <p class="dek">Making a game with Odin and Godot means deciding where state lives, who can change it, and what happens when two machines disagree.</p>
+      <div class="byline"><span>Kit & Replay</span><span>Illustrated guide + working model</span><span id="revision">Repository edition</span></div>
+      <div class="hero-links"><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span aria-hidden="true">↗</span></a><a href="https://github.com/wlitwin/odin_godot">SDK on GitHub <span aria-hidden="true">↗</span></a></div>
+      <figure class="hero-figure">
+        <div class="figure-top"><span><b>FIG. 01</b> TWO AUTHORING MODELS</span><a href="diagrams/two-models.svg" download>SVG ↓</a></div>
+        <img src="diagrams/two-models.svg" width="1000" height="430" alt="Kit starts with Odin script structs attached to Godot nodes and synchronizes their fields. Replay starts with a complete Odin world and presents copies through Godot views. Both connect to remote machines through a session and transport.">
+        <figcaption>The useful distinction is the unit of state: fields on registered entities, or a complete frame that can be restored and stepped again.</figcaption>
+      </figure>
+      <div class="prose intro">
+        <p>Suppose two players reach the same chest. Both press Take. Each screen should respond immediately, but the item must end up in one inventory. The game needs a rule for choosing the winner and a way to repair the losing prediction.</p>
+        <p>This repository has two independent ways to write that game. <strong>Kit</strong> works from script structs, tagged fields, and generated commands. <strong>Replay</strong> works from a typed world, recorded inputs, and a step function. The distinction matters most when an action changes several things at once.</p>
+        <p>Both frameworks can run co-op games. Both have an authoritative prediction path. Kit’s cooperative examples are a convenient starting point; Replay makes the complete simulation history explicit. We will follow the same pickup through each design.</p>
+      </div>
+    </section>
+
+    <section id="scrapyard" class="chapter scrapyard-showcase">
+      <div class="section-number">BUILT WITH ODIN × GODOT / PLAYABLE EXAMPLE</div>
+      <h2>Take it into the yard.</h2>
+      <div class="prose">
+        <p><strong>Scrapyard</strong> is an arena shooter built with Odin and Godot. Play the browser build on itch.io to try the movement and combat, then follow the code through a complete game.</p>
+      </div>
+      <figure class="scrapyard-preview">
+        <a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer" aria-label="Play Scrapyard on itch.io, opens in a new tab"><img src="assets/scrapyard-game.jpg" width="1440" height="720" loading="lazy" alt="Scrapyard running in the browser: a top-down arena with the player, enemies, projectiles, and the combat interface."><span class="preview-play"><span aria-hidden="true">▶</span> Play Scrapyard <span aria-hidden="true">↗</span></span></a>
+        <figcaption>Captured from the live browser build on itch.io.</figcaption>
+      </figure>
+      <div class="showcase-links"><a class="play-game" href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play in your browser <span aria-hidden="true">↗</span></a><a href="read/examples/replay_scrapyard/contributor-guide.html">Study the Replay Scrapyard port <span aria-hidden="true">→</span></a></div>
+      <p class="source-line">The repository’s Replay port has a <a href="read/examples/replay_scrapyard/contributor-guide.html">visual contributor guide</a> and a <a href="read/examples/replay_scrapyard/code-guide.html">file-by-file code guide</a> covering input, World, session startup, and Godot views.</p>
+    </section>
+
+    <section id="boundary" class="chapter">
+      <div class="section-number">01 / THE ENGINE BOUNDARY</div>
+      <h2>Godot is still the editor.</h2>
+      <div class="prose">
+        <p>You still author scenes, place nodes, wire signals, and use the Inspector. An Odin script is a struct plus free procedures, attached to an engine node. The first field, conventionally <code>owner</code>, holds that node’s handle. Your <code>self</code> pointer addresses the script data; <code>self.owner</code> addresses the engine object.</p>
+        <p>The build runs <code>scriptgen</code> over the scripts, generates registration and bindings, then compiles the scripts library. The core GDExtension registers Odin with Godot and loads that library. Kit and Replay sit on this boundary in different ways.</p>
+      </div>
+      <figure class="figure paper">
+        <div class="figure-top"><span><b>FIG. 02</b> FROM SOURCE TO A RUNNING SCENE</span><a href="diagrams/engine-boundary.svg" download>SVG ↓</a></div>
+        <img src="diagrams/engine-boundary.svg" width="1000" height="320" loading="lazy" alt="Odin script source passes through scriptgen and the Odin compiler into the scripts library. The core GDExtension loads this library and connects it to the Godot scene tree. Pure Replay gameplay can also compile without Godot.">
+        <figcaption>The core extension and the scripts library are separate. Pure Replay models also run in an ordinary Odin executable.</figcaption>
+      </figure>
+      <p class="source-line">Read the implementation guide: <a href="read/docs/getting-started.html">project wiring</a> · <a href="read/docs/onboarding/02-thinking-in-structs.html">scripts and structs</a></p>
+    </section>
+
+    <section id="kit" class="chapter">
+      <div class="section-number">02 / KIT</div>
+      <h2>Start with the object.<br>Declare its writers.</h2>
+      <div class="prose">
+        <p>In Kit, the network registry knows each entity’s type, ID, and owning player. Field tags decide how its data travels. A host-owned field such as health uses <code>gd:"replicate"</code>. Cooperative motion can use <code>gd:"owner"</code>: the owner writes its pose, while other machines interpolate received samples.</p>
+        <p>The small player in <code>examples/hello_net</code> makes this split visible:</p>
+      </div>
+      <div class="code-block"><div class="code-title"><span>examples/hello_net/scripts/player.odin · excerpt</span><button class="copy-code" type="button">Copy</button></div><pre><code>Player :: struct {
+    owner:  gd.Node2d,
+    skin:   gd.Polygon2d `gd:"onready=Skin"`,
+    net_id: knet.Net_Id,
+    x, y:   f32 `gd:"owner,wire=f16"`,
+    pid:    u8  `gd:"replicate"`,
+    mine:   bool,
+    tinted: bool,
+}</code></pre></div>
+      <div class="prose">
+        <p>Taking an item is a command. A <code>@(gd_command)</code> procedure checks the request and mutates its target. The generated wrapper handles submission, optional local prediction, and the host’s verdict. The host’s accepted changes travel through ordinary field replication.</p>
+        <p>There is an important boundary: <strong>a predicted Kit command mutates only its target</strong>. The chest command removes the item from the chest. Crediting the player’s bag belongs in the authority command hook, after acceptance. Code that changes the chest, bag, quest, and enemy state inside the predicted command crosses that boundary.</p>
+      </div>
+      <figure class="figure paper">
+        <div class="figure-top"><span><b>FIG. 03</b> A KIT PICKUP</span><a href="diagrams/kit-pickup.svg" download>SVG ↓</a></div>
+        <img src="diagrams/kit-pickup.svg" width="1000" height="490" loading="lazy" alt="A client predicts a change to the chest and submits Take. The authority checks and mutates the chest, then credits the bag in the command hook. Acceptance and state return to the client; rejection reverts the target prediction.">
+        <figcaption>The target prediction and the cross-entity consequence have different owners. The authority hook is the place to connect them.</figcaption>
+      </figure>
+      <div class="margin-note"><span class="label kit-label">KIT ALSO PREDICTS</span><p>For server-driven motion, <code>kit/sim</code> uses <code>gd:"predict,interp"</code> fields and a pure <code>@(gd_tick)</code> procedure. The Hello Sim example promotes the cooperative square to this lane. Choosing Kit does not commit the game to trusting client movement.</p></div>
+      <p class="source-line"><a href="read/docs/onboarding/04-verbs-not-rpcs.html">Command rules</a> · <a href="read/docs/kit/quickstart-sim.html">Kit prediction tutorial</a></p>
+    </section>
+
+    <section id="replay" class="chapter">
+      <div class="section-number">03 / REPLAY</div>
+      <h2>Make the whole tick<br>restorable.</h2>
+      <div class="prose">
+        <p>Now give the pickup more consequences. It empties the chest, changes a bag, destroys an entity, and perhaps advances a quest. If a correction restores only the chest, the remaining values describe an event that no longer happened.</p>
+        <p>Replay puts mutable gameplay dependencies in one <code>World</code>. A frame contains that state at a tick. The runner saves frames and inputs; a step transforms one frame into the next. Cross-entity changes are ordinary writes within that world.</p>
+      </div>
+      <div class="equation"><span>frame at T</span><b>+</b><span>input for T+1</span><b>→</b><strong>frame at T+1</strong><b>+</b><span>occurrences</span></div>
+      <div class="code-block"><div class="code-title"><span>examples/replay_loot/game/game.odin · excerpt</span><button class="copy-code" type="button">Copy</button></div><pre><code>World :: struct {
+    players:  [2]Player,
+    entities: r.Pool(Entity, 16),
+    chest:    r.Handle(Entity),
+    rng:      r.Rng,
+}
+
+// Inside step, after movement and the range check:
+amount := chest.items
+p.bag += amount
+r.pool_remove(&amp;w.entities, w.chest)
+r.emit(ctx, u64(i + 1), u64(control.seq) &lt;&lt; 8 | 1,
+       Event{.Item_Taken, u8(i), p.x, amount})</code></pre></div>
+      <div class="prose">
+        <p>The frame includes more than visible positions. RNG, cooldowns, pending work, entity existence, and pool allocation metadata affect the next tick. They need to be restored too. Node references, sockets, textures, and live audio stay outside it.</p>
+      </div>
+      <figure class="figure dark-figure">
+        <div class="figure-top"><span><b>FIG. 04</b> WHAT BELONGS IN A FRAME?</span><a href="diagrams/frame-boundary.svg" download>SVG ↓</a></div>
+        <img src="diagrams/frame-boundary.svg" width="1000" height="420" loading="lazy" alt="A replay frame contains players and bags, chest existence, entity pool generations, RNG, cooldowns, and scheduled work. Immutable content is a versioned input. Godot nodes and audio receive views and occurrences; networking and storage stay outside the frame.">
+        <figcaption>Restore the values needed to compute the next tick. Present the result through detached views.</figcaption>
+      </figure>
+      <div class="prose">
+        <p>A replayed step must read its state, typed input, tick, and fixed definitions. Reading the wall clock or a live Godot transform introduces a dependency that the recorded frame cannot reproduce. Playing a sound inside the step repeats a side effect whenever the runner replays it.</p>
+        <p>Instead, <code>emit</code> records an occurrence with an identity: <code>(epoch, tick, source, key)</code>. The presentation journal compares old and replacement occurrences and reports Begin, Update, Confirm, or Cancel. Effects are attached to those changes outside the simulation.</p>
+      </div>
+      <p class="source-line"><a href="read/docs/replay/architecture.html">Frame and transaction contract</a> · <a href="read/replay/view/README.html">Presentation journal</a> · <a href="read/examples/replay_loot/game/game.odin.html">Complete loot model</a></p>
+    </section>
+
+    <section id="lab" class="chapter lab-chapter">
+      <div class="section-number">04 / WORKING MODEL</div>
+      <h2>Change the winner.<br>Rebuild the consequences.</h2>
+      <div class="prose">
+        <p>The local Loot executable predicts that player A takes five items at tick 1. At tick 8, it revises that input: player B took them. The runner restores tick 0 and rebuilds ticks 1–8. An independent run with the corrected input checks the result.</p>
+        <p>The model below isolates that operation. Apply the correction, then replay one tick at a time. During replay, the view previews staged frames and the pending journal diff; the live revision would publish only after the complete suffix succeeds.</p>
+      </div>
+      <div class="lab" aria-label="Interactive replay correction illustration">
+        <div class="lab-header"><span><span class="status-dot"></span> REPLAY / LOOT TRANSFER</span><span id="lab-phase" class="phase">PREDICTED</span></div>
+        <div class="lab-toolbar"><button id="correct" class="primary" type="button">Apply authority correction <span aria-hidden="true">↩</span></button><button id="step" type="button" disabled>Replay one tick →</button><button id="finish" type="button" disabled>Replay to head</button><button id="reset" type="button" class="quiet">Reset</button></div>
+        <div class="lab-grid">
+          <div class="arena" aria-label="World view">
+            <div class="arena-caption"><span id="world-view-label">WORLD VIEW</span><span id="view-tick">TICK 08</span></div>
+            <svg viewBox="0 0 520 245" role="img" aria-labelledby="arena-title arena-desc">
+              <title id="arena-title">Two players contest one chest</title><desc id="arena-desc">Player A is blue, player B is orange. The inventory readouts below show the selected frame.</desc>
+              <defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M 26 0 L 0 0 0 26" fill="none" stroke="#d9ded8" stroke-width="1"/></pattern></defs>
+              <rect x="22" y="15" width="476" height="200" rx="4" fill="url(#grid)"/>
+              <ellipse cx="160" cy="155" rx="28" ry="8" fill="#1d5fe41a"/><ellipse cx="360" cy="155" rx="28" ry="8" fill="#c44b271a"/>
+              <g id="player-a"><rect x="140" y="110" width="40" height="40" rx="8" fill="#2461d9"/><rect x="148" y="120" width="7" height="7" fill="white"/><rect x="166" y="120" width="7" height="7" fill="white"/><text x="160" y="185" text-anchor="middle" class="arena-label">PLAYER A</text></g>
+              <g id="player-b"><rect x="340" y="110" width="40" height="40" rx="8" fill="#b84424"/><rect x="348" y="120" width="7" height="7" fill="white"/><rect x="366" y="120" width="7" height="7" fill="white"/><text x="360" y="185" text-anchor="middle" class="arena-label">PLAYER B</text></g>
+              <g id="chest"><rect x="237" y="105" width="46" height="36" rx="3" fill="#ccaa69" stroke="#6e552d" stroke-width="2"/><path d="M237 117H283M260 105V141" stroke="#6e552d" stroke-width="2"/><rect x="255" y="114" width="10" height="11" fill="#f6e6ac"/><text x="260" y="88" text-anchor="middle" class="arena-label">5 ITEMS</text></g>
+              <g id="empty-chest" hidden><path d="M243 130H277M248 136H272" stroke="#8a9289" stroke-width="2"/><text x="260" y="100" text-anchor="middle" class="arena-label">REMOVED</text></g>
+              <path id="transfer" d="M260 108 Q210 48 160 100" fill="none" stroke="#2461d9" stroke-width="2" stroke-dasharray="5 5"/>
+              <circle id="projectile" cx="260" cy="49" r="5" fill="#69765c" hidden/>
+            </svg>
+            <div class="inventories"><div><span class="swatch blue"></span> A’s bag <strong id="bag-a">5</strong></div><div><span class="swatch orange"></span> B’s bag <strong id="bag-b">0</strong></div><div>Chest <strong id="chest-state">absent</strong></div></div>
+          </div>
+          <div class="ledger"><div class="mini-label" id="journal-label">PRESENTATION JOURNAL</div><div id="journal" class="journal" aria-live="polite"></div><div class="mini-label ledger-label">CHECK AGAINST A FRESH RUN</div><p id="check-state">Prediction has A’s take. The corrected reference gives the items to B.</p></div>
+        </div>
+        <div class="timeline" id="frames" aria-label="Select retained frame"></div>
+        <div class="scrub"><label for="tick">Inspect tick <output id="tick-output">8</output></label><input type="range" id="tick" min="0" max="8" value="8" step="1"><span id="replayed">0 / 8 ticks rebuilt</span></div>
+        <p id="lab-status" class="lab-status" aria-live="polite">Predicted head at tick 8. A has taken the chest.</p>
+      </div>
+      <p class="caption">Browser illustration, not the Odin runtime or a network benchmark. It models a pickup at tick 1 and an unrelated projectile at ticks 2–4; the full example also restores pool allocation and RNG.</p>
+      <div class="prose">
+        <p>In this local experiment, <code>revise_input</code> replaces a recorded input batch. In an authoritative network game, the runner instead verifies the authority’s frame and calls <code>correct</code>, then replays the speculative suffix. These operations share the restore-and-replay idea, but an input revision does not establish network authority.</p>
+        <p>The complete suffix is staged before publication. If any step fails, the revision does not leave half of the world corrected. This protects frame state; it cannot undo a sound, file write, or global mutation performed inside a callback.</p>
+      </div>
+    </section>
+
+    <section id="clocks" class="chapter">
+      <div class="section-number">05 / PRESENTATION</div>
+      <h2>One screen can show<br>two different moments.</h2>
+      <div class="prose">
+        <p>Your own avatar responds to current input. A remote avatar usually comes from a short buffer of received history. Drawing both at the same nominal “now” would require predicting the remote player’s next decision.</p>
+        <p>This matters for effects. If a remote player picks up a gem, removing it as soon as the fact arrives can make it vanish before the visible avatar reaches it. The watched effect needs to follow the watched display clock.</p>
+      </div>
+      <div class="clock-demo">
+        <div class="clock-controls"><label for="delay">Remote display delay <output id="delay-value">100 ms</output></label><input type="range" id="delay" min="0" max="250" step="10" value="100"></div>
+        <div class="clock-row"><span>Your prediction</span><div class="track"><span class="clock-dot local-dot"></span></div><code>now</code></div>
+        <div class="clock-row"><span>Remote view</span><div class="track"><span class="clock-dot remote-dot" id="remote-dot"></span><span class="delay-gap" id="delay-gap"></span></div><code id="remote-clock">−100 ms</code></div>
+        <p class="caption">Illustrative display offset. This slider is not round-trip latency or a recommended interpolation setting.</p>
+      </div>
+      <div class="prose">
+        <p>A contested ball adds another choice. Kit’s Claimball predicts the local player and the ball, while watching the opponent in the past. Its presentation claim weights the ball toward the local predicted pose while the local player is driving it. When that influence ends, the ball blends back toward the watched view. The claim changes presentation; the authority still resolves the game.</p>
+        <p>Godot rigid-body physics needs a separate policy. Saving a node’s pose does not save the solver’s contact history. Replay’s owner-stream profile records accepted body observations. It does not turn the Godot contact solver into a deterministic rollback simulation.</p>
+      </div>
+      <p class="source-line"><a href="read/docs/kit/timelines.html">Kit timelines</a> · <a href="read/docs/replay/owner-streams.html">Replay owner streams</a></p>
+    </section>
+
+    <section id="choose" class="chapter">
+      <div class="section-number">06 / NETWORK POLICY</div>
+      <h2>Choose who decides.</h2>
+      <div class="prose"><p>A framework does not choose the game’s trust model. A listen host is a player’s process; a dedicated authority is infrastructure. Deterministic peers exchange inputs under a different contract. Use the smallest example that matches the policy you intend to ship.</p></div>
+      <figure class="figure paper">
+        <div class="figure-top"><span><b>FIG. 05</b> REPLAY / AUTHORITATIVE NETWORK PATH</span><a href="diagrams/authority-path.svg" download>SVG ↓</a></div>
+        <img src="diagrams/authority-path.svg" width="1000" height="450" loading="lazy" alt="A client samples input and predicts through a runner with frame history and copied Godot views. The authority runs the same game model, settles state and occurrences, and returns verified corrections to the client history.">
+        <figcaption>Controls carry ticks. Actions carry sequence IDs and an authored delivery policy. Authority state corrects the prediction; occurrence history also has to reach presentation.</figcaption>
+      </figure>
+      <div class="policy-tabs" role="tablist" aria-label="Network policy"><button id="policy-tab-coop" role="tab" aria-selected="true" aria-controls="policy-panel" data-policy="coop" tabindex="0">Invited co-op</button><button id="policy-tab-server" role="tab" aria-selected="false" aria-controls="policy-panel" data-policy="server" tabindex="-1">Server authority</button><button id="policy-tab-p2p" role="tab" aria-selected="false" aria-controls="policy-panel" data-policy="p2p" tabindex="-1">Deterministic peers</button></div>
+      <div class="policy-panel" id="policy-panel" role="tabpanel" aria-labelledby="policy-tab-coop" tabindex="0"></div>
+      <div class="table-scroll"><table><caption>What changes when you choose a framework</caption><thead><tr><th scope="col">Question</th><th scope="col"><span class="kit-label">Kit</span></th><th scope="col"><span class="replay-label">Replay</span></th></tr></thead><tbody>
+        <tr><th scope="row">Where do I write gameplay?</th><td>Script structs, generated commands, optional sim ticks.</td><td>A typed World with step/action callbacks, outside the scene tree.</td></tr>
+        <tr><th scope="row">What is restored?</th><td>Command target state; sim-lane predicted history under its contract.</td><td>A complete frame for the authored simulation group.</td></tr>
+        <tr><th scope="row">How do I change several entities?</th><td>Keep command prediction target-local; use the authority hook for consequences.</td><td>Mutate the frame’s entities in the same simulation operation.</td></tr>
+        <tr><th scope="row">How does Godot draw it?</th><td>Generated presentation fields and per-frame script code.</td><td>Copied views and identity-aware occurrence changes.</td></tr>
+        <tr><th scope="row">What should I read first?</th><td><a href="read/docs/kit/quickstart.html">Kit quickstart</a>, then Hello Sim.</td><td><a href="read/replay/getting-started.html">Choosing a runner</a>, then Loot and Hello.</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section id="start" class="chapter">
+      <div class="section-number">07 / BUILD THE FIRST VERSION</div>
+      <h2>A small game with<br>a useful failure case.</h2>
+      <div class="prose"><p>Build one room, two players, and a chest with one item. Add movement first, then make both players take the item under injected delay. This gives prediction, authority, and correction something observable to do before you add combat or procedural content.</p></div>
+      <ol class="build-steps">
+        <li><span class="step-count">1</span><div><h3>Get a square on screen.</h3><p>Use the existing scene and project wiring. In Kit, start with <code>examples/hello_net</code>. In Replay, start with the offline Hello scene. Keep input sampling and drawing easy to find.</p></div></li>
+        <li><span class="step-count">2</span><div><h3>Give the item a single owner.</h3><p>Kit: put the chest mutation in a command and bag credit in its authority hook. Replay: put both bags, the chest, and its lifetime in World. Define how simultaneous requests are ordered.</p></div></li>
+        <li><span class="step-count">3</span><div><h3>Force the prediction to lose.</h3><p>Delay the connection or revise the local Loot input. Check that the losing inventory is repaired and its pickup effect is canceled. Repeating the correction should not duplicate an effect.</p></div></li>
+        <li><span class="step-count">4</span><div><h3>Move to the intended session policy.</h3><p>Kit: compare owner movement with Hello Sim’s authoritative tick. Replay: use Session for the direct server/client lifecycle, Party → Room for invitations and migration, or the admitted P2P runner for deterministic peers.</p></div></li>
+      </ol>
+      <div class="run-tabs" role="tablist" aria-label="Runnable examples"><button id="run-tab-kit" role="tab" aria-selected="true" aria-controls="run-panel" data-run="kit" tabindex="0">Kit / co-op</button><button id="run-tab-sim" role="tab" aria-selected="false" aria-controls="run-panel" data-run="sim" tabindex="-1">Kit / sim</button><button id="run-tab-loot" role="tab" aria-selected="false" aria-controls="run-panel" data-run="loot" tabindex="-1">Replay / local</button><button id="run-tab-net" role="tab" aria-selected="false" aria-controls="run-panel" data-run="net" tabindex="-1">Replay / network</button></div>
+      <div id="run-panel" class="run-panel" role="tabpanel" aria-labelledby="run-tab-kit" tabindex="0"></div>
+      <p class="caption">Commands run from the repository root. The development shell supplies the pinned toolchain and <code>GODOT</code>. These are existing project commands, not a new build pipeline.</p>
+      <div class="prose"><p>Once the pickup works, add one dependency at a time: a cooldown that gates movement, a projectile with a lifetime, a moving door. Each addition should answer the same question: if this tick changes, which values must be rebuilt with it?</p></div>
+    </section>
+
+    <section id="artifacts" class="chapter artifacts">
+      <div class="section-number">KEEP BESIDE THE CODE</div>
+      <h2>Diagrams and reading.</h2>
+      <p class="prose">The diagrams are standalone SVG files. The <a href="reading.html">reading library</a> brings together the tutorials, architecture notes, and examples behind this guide. Each page includes its original source as a download.</p>
+      <div class="artifact-list">
+        <a href="diagrams/two-models.svg" download><span>01</span><strong>The two authoring models</strong><small>SVG ↓</small></a>
+        <a href="diagrams/engine-boundary.svg" download><span>02</span><strong>The engine boundary</strong><small>SVG ↓</small></a>
+        <a href="diagrams/kit-pickup.svg" download><span>03</span><strong>A Kit command, end to end</strong><small>SVG ↓</small></a>
+        <a href="diagrams/frame-boundary.svg" download><span>04</span><strong>Inside and outside a frame</strong><small>SVG ↓</small></a>
+        <a href="diagrams/authority-path.svg" download><span>05</span><strong>Replay’s authoritative network path</strong><small>SVG ↓</small></a>
+        <a href="diagrams/correction.svg" download><span>06</span><strong>Restore and replay a suffix</strong><small>SVG ↓</small></a>
+        <a href="field-guide.md" download><span>↳</span><strong>Desk reference: rules, paths, commands</strong><small>MD ↓</small></a>
+        <a href="field-guide.pdf" download><span>↳</span><strong>Print edition of the guide</strong><small>PDF ↓</small></a>
+      </div>
+      <details class="reading"><summary>Further reading and examples <span>+</span></summary><ul id="source-list"></ul><a href="reading.html">Browse the complete reading library ↗</a></details>
+      <p class="provenance" id="provenance">Repository sources are the authority for API details. Diagrams and browser models are explanatory artifacts.</p>
+    </section>
+    <footer><span class="brand">o/g <span>ODIN × GODOT</span></span><a href="#top">Back to the beginning ↑</a></footer>
+  </main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

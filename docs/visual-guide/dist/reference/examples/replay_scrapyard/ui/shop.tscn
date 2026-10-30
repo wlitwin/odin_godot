@@ -1,0 +1,125 @@
+[gd_scene format=3]
+[ext_resource type="Texture2D" path="res://assets/ui/metal_btn_dark.png" id="steel"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="theme"]
+
+[node name="Shop" type="NinePatchRect"]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -440.0
+offset_top = -178.0
+offset_right = 440.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme = ExtResource("theme")
+texture = ExtResource("steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Wallet" type="Label" parent="."]
+modulate = Color(1, 0.9, 0.55, 1)
+layout_mode = 0
+offset_left = 12.0
+offset_top = 4.0
+offset_right = 500.0
+offset_bottom = 27.0
+text = ""
+
+[node name="Card0" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 12.0
+offset_top = 30.0
+offset_right = 100.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card1" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 107.0
+offset_top = 30.0
+offset_right = 195.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card2" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 202.0
+offset_top = 30.0
+offset_right = 290.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card3" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 297.0
+offset_top = 30.0
+offset_right = 385.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card4" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 398.0
+offset_top = 30.0
+offset_right = 486.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card5" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 493.0
+offset_top = 30.0
+offset_right = 581.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card6" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 588.0
+offset_top = 30.0
+offset_right = 676.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card7" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 683.0
+offset_top = 30.0
+offset_right = 771.0
+offset_bottom = 124.0
+text = ""
+
+[node name="Card8" type="Button" parent="."]
+theme_override_font_sizes/font_size = 14
+layout_mode = 0
+offset_left = 784.0
+offset_top = 30.0
+offset_right = 872.0
+offset_bottom = 124.0
+text = ""
+
+[node name="CardHint" type="Label" parent="."]
+modulate = Color(0.78, 0.84, 0.95, 1)
+layout_mode = 0
+offset_left = 12.0
+offset_top = 128.0
+offset_right = 700.0
+offset_bottom = 151.0
+text = ""

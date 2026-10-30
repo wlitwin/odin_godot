@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/comms — chat, pings, system lines · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/comms — chat, pings, system lines</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/comms.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#api-by-task">API by task</a><a href="#worked-example-cavecrawl">Worked example (cavecrawl)</a><a href="#gotchas">Gotchas</a></nav></details>
+<article class="reading-body "><p>How players talk while they play: text chat, positional pings/markers, and host-authored
+system lines (&quot;alice joined the cave&quot;). It rides the <a href="session.html">session</a>&#39;s SES_APP
+extension point on the reliable channel, so a game wires <strong>zero</strong> extra networking for chat:
+it needs no packet type, no kind byte, and no route of its own.</p>
+<p><strong>Lane compatibility: lane-agnostic.</strong> Chat is session-level: it works identically
+beside the coop lane, the sim lane, or both. Nothing here touches ticks or prediction.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> kcomms <span class="hljs-string">&quot;godot:kit/comms&quot;</span></code></pre></div><h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
+<p>Everything routes through the host, which stamps the speaker and rebroadcasts, so every peer
+sees the same lines in the same order (<strong>the host&#39;s order</strong>), on any transport. Your own chat
+line comes back with the broadcast rather than echoing locally, so what you see is what
+everyone sees.</p>
+<p>The send half lives in
+<a href="session.html#host-relay"><code>ksess.Host_Relay</code></a>
+(stamp, spoof-drop, echo policy, addressed replay), and comms runs it with <code>echo = true</code> (that
+is the &quot;comes back with the broadcast&quot; behavior). What kit/comms adds on top is a payload
+codec (two message kinds) over a bounded log and the shared rider queue. <code>comms_say</code> writes
+the same bytes on the host and on a client, and the relay picks the arm. There is no
+<code>is_host</code> at any send door in the package.</p>
+<p>Two shapes come out the other end:</p>
+<ul>
+<li><strong>Lines</strong> land in a bounded log (<code>LOG_MAX :: 64</code> lines, older evict) that a UI repaints
+from; <a href="ui.html">kit/ui&#39;s chat box</a> does exactly this.</li>
+<li><strong>Markers</strong> (pings) are transient poll-once events, not log lines. The game turns them
+into world visuals.</li>
+</ul>
+<p>The session already vouches for senders (only seated players reach the handler), and clients
+drop chat frames that don&#39;t come from the host&#39;s peer. A peer broadcasting lines directly is
+spoofing.</p>
+<h2 id="api-by-task">API by task<a class="heading-anchor" href="#api-by-task" aria-label="Link to this section">#</a></h2>
+<p><strong>Bind it:</strong> call this once, next to the session (host or client, before or after it starts):</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">comms_init :: <span class="hljs-keyword">proc</span>(c: ^Comms, ses: ^ksess.Session, tag := COMMS_TAG)
+comms_destroy :: <span class="hljs-keyword">proc</span>(c: ^Comms)</code></pre></div><p><code>COMMS_TAG</code> is <code>u8(0)</code>; pass another tag if the game claims 0 for itself (cavecrawl keeps
+comms on 0 and puts fire announcements on <code>TAG_FIRE :: u8(1)</code>). Destroy the comms before the
+session: it must outlive the session&#39;s traffic.</p>
+<p><strong>Speak:</strong> anyone can call this:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">comms_say :: <span class="hljs-keyword">proc</span>(c: ^Comms, text: <span class="hljs-type">string</span>)                  <span class="hljs-comment">// clipped to MAX_SAY (240 bytes)</span>
+comms_ping :: <span class="hljs-keyword">proc</span>(c: ^Comms, kind: <span class="hljs-type">u8</span>, pos: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>)        <span class="hljs-comment">// kind is game-defined; 2D leaves z zero</span></code></pre></div><p><strong>Narrate:</strong> only the host may call this. The GAME words these lines (&quot;bob joined the cave&quot;); comms just ships them:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">comms_system :: <span class="hljs-keyword">proc</span>(c: ^Comms, text: <span class="hljs-type">string</span>)</code></pre></div><p>System lines carry <code>SYSTEM_LINE :: knet.Player_Id(0)</code> as the speaker (real ids start at 1).</p>
+<p><strong>Catch a drop-in joiner up:</strong> the host calls this on <code>Ev_Player_Joined</code>; it replays the whole
+log to that one player:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">comms_catchup :: <span class="hljs-keyword">proc</span>(c: ^Comms, player: knet.Player_Id)</code></pre></div><p><strong>Consume:</strong> call this every frame:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">comms_poll :: <span class="hljs-keyword">proc</span>(c: ^Comms) -&gt; (ev: Event, ok: <span class="hljs-type">bool</span>)      <span class="hljs-comment">// Event :: union { Ev_Line, Ev_Marker }</span>
+comms_lines :: <span class="hljs-keyword">proc</span>(c: ^Comms) -&gt; []Line                    <span class="hljs-comment">// the log, oldest first</span>
+comms_line_name :: <span class="hljs-keyword">proc</span>(c: ^Comms, line: Line) -&gt; <span class="hljs-type">string</span>    <span class="hljs-comment">// &quot;&quot; for system lines</span></code></pre></div><p><code>Ev_Line.text</code> points into the log. Copy it if you keep it past a frame.</p>
+<h2 id="worked-example-cavecrawl">Worked example (cavecrawl)<a class="heading-anchor" href="#worked-example-cavecrawl" aria-label="Link to this section">#</a></h2>
+<p>The pump polls events, repaints the chat box only when a line landed, and visualizes markers.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">refresh_chat := <span class="hljs-literal">false</span>
+<span class="hljs-keyword">for</span> {
+    cev, cok := kcomms.comms_poll(&amp;self.comms)
+    <span class="hljs-keyword">if</span> !cok {<span class="hljs-keyword">break</span>}
+    <span class="hljs-keyword">switch</span> e <span class="hljs-keyword">in</span> cev {
+    <span class="hljs-keyword">case</span> kcomms.Ev_Line:
+        refresh_chat = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">case</span> kcomms.Ev_Marker:
+        gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;CAVE_MARK player=%d kind=%d x=%.1f&quot;</span>, <span class="hljs-type">u64</span>(e.player), e.kind, e.pos.x))
+    }
+}
+<span class="hljs-keyword">if</span> refresh_chat {
+    kui.chat_refresh(&amp;self.chat, &amp;self.comms)
+}</code></pre></div><p>The host&#39;s join handling is one call. <code>comms_welcome</code> owns the ordering (catchup first,
+skipped on rejoin, THEN the join line), so you don&#39;t have to:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">case</span> ksess.Ev_Player_Joined:
+    <span class="hljs-keyword">if</span> self.ses.is_host {
+        <span class="hljs-keyword">if</span> p, ok := ksess.session_player(&amp;self.ses, e.id); ok {
+            verb := e.rejoin ? <span class="hljs-string">&quot;returned to&quot;</span> : <span class="hljs-string">&quot;joined&quot;</span>
+            kcomms.comms_welcome(&amp;self.comms, e.id, e.rejoin, fmt.tprintf(<span class="hljs-string">&quot;%s %s the cave&quot;</span>, p.name, verb))
+        }
+    }</code></pre></div><h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>No kind byte for chat.</strong> Comms frames live <em>inside</em> the session&#39;s SES_APP framing under
+one tag; the game never multiplexes chat into its own packets. If your game also uses
+SES_APP, claim a different tag (see <a href="session.html">session.md</a>).</li>
+<li><strong>Catchup before the join line.</strong> <code>comms_welcome</code> handles this ordering for you. The join
+line is about to be minted and broadcast to everyone <em>including</em> the joiner; replay the log
+first or the joiner sees their own arrival twice. Rejoins skip catchup (a same-session
+reconnect may still hold this run&#39;s log). Use <code>comms_catchup</code>/<code>comms_system</code> directly only
+when your ritual differs.</li>
+<li><strong>Your own line does not echo locally</strong> (on a client). It lands when the host&#39;s broadcast
+comes back. Don&#39;t paint an optimistic local copy or you&#39;ll double it.</li>
+<li><strong><code>comms_system</code> asserts <code>is_host</code>.</strong> System lines come from the authority; clients that
+want flavor text ask the host (or just say it).</li>
+<li><strong>Bytes, not runes:</strong> <code>MAX_SAY</code> is a 240-<em>byte</em> budget, clipped at a rune boundary (never
+mid-UTF-8). The host clips again on receipt; it doesn&#39;t take the client&#39;s word for the
+length.</li>
+</ul>
+<p>Siblings: <a href="session.html">session.md</a> (SES_APP routing, roster, events) ·
+<a href="ui.html">ui.md</a> (the chat box that repaints from this log) · <a href="net.html">net.md</a> (Writer/Reader).</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/comms.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api-by-task" class="">API by task</a><a href="#worked-example-cavecrawl" class="">Worked example (cavecrawl)</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/comms.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

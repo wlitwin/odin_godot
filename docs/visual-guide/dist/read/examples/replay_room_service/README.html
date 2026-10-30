@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay room service · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay room service</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_room_service/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#local-cavecrawl">Local Cavecrawl</a><a href="#configuration">Configuration</a><a href="#durable-checkpoints">Durable checkpoints</a><a href="#verification">Verification</a></nav></details>
+<article class="reading-body "><p>This standalone Godot/Odin service runs the durable admission hub, authenticated
+authority coordinator and per-room RTC signaling. It supports one game content ID
+and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
+browser clients use RTC. The service now stores and transfers durable checkpoints
+for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball and Slopball3D models. It does not run gameplay;
+checkpoint download does not grant authority or automatically resume a game.</p>
+<p>The bundled SQLite service currently runs on macOS/Linux. Both frameworks and all
+original games remain separate. This is an experimental deployment example, not
+a hosted service or a completed Internet operational profile.</p>
+<h2 id="local-cavecrawl">Local Cavecrawl<a class="heading-anchor" href="#local-cavecrawl" aria-label="Link to this section">#</a></h2>
+<p>From the repository root, create a private data directory and start the service:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -m 700 -p .replay-room-data
+REPLAY_ROOM_CONTENT=0x4341564552504c33 \
+REPLAY_ROOM_DB=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/.replay-room-data/rooms.sqlite3&quot;</span> \
+REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_room_service/run.sh</code></pre></div><p>Creation is explicit. On subsequent runs omit <code>REPLAY_ROOM_CREATE_DB=1</code>, so losing
+the database does not silently recreate an empty authority floor.</p>
+<p>In another terminal:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_CAVE_ROOM_SERVICE=ws://127.0.0.1:49740 \
+REPLAY_CAVE_ROOM_LOCAL=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/play.sh</code></pre></div><p>Choose <strong>Create party</strong>, then share <strong>Copy party invite</strong>. Another player pastes
+it and chooses <strong>Join party</strong>. <strong>Rejoin recent party</strong> loads that game&#39;s stored
+credential. See <a href="../replay_cavecrawl/online.html">the game flow</a> for profile separation,
+gameplay addresses, browser use and recovery boundaries.</p>
+<h2 id="configuration">Configuration<a class="heading-anchor" href="#configuration" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Environment variable</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>REPLAY_ROOM_CONTENT</code></td>
+<td>Required nonzero decimal or <code>0x</code> hexadecimal game content ID</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_CHECKPOINT_MODEL</code></td>
+<td>Optional required model: <code>cavecrawl</code>, <code>cavecrawl-owned</code>, <code>speedball</code>, <code>scrapyard</code>, <code>quickdraw</code>, <code>claimball</code>, <code>slopball</code>, <code>slopball3d</code>; <code>disabled</code> turns checkpoint endpoints off. By default, a matching compiled content ID enables its model; other content IDs remain admission-only</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_DB</code></td>
+<td>Required private SQLite file path; protect its directory/backups</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_CREATE_DB=1</code></td>
+<td>Explicit first-time database creation</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_BIND</code></td>
+<td>Listener address, default <code>127.0.0.1</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_PORT</code></td>
+<td>Listener port, default <code>49740</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_CAPACITY</code></td>
+<td>Resident/persisted room limit, 1–32, default 16</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_CERT</code>, <code>REPLAY_ROOM_KEY</code></td>
+<td>TLS certificate/chain and private-key file paths</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_LOCAL_DEVELOPMENT=1</code></td>
+<td>Permit plain WS only on literal <code>127.0.0.1</code> or <code>::1</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_MODE</code></td>
+<td>New-room policy: <code>cooperative</code> (default) or <code>dedicated</code></td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_TURN_SECRET_FILE</code></td>
+<td>Optional server-only Coturn shared-secret file</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_TURN_URLS</code></td>
+<td>Comma-separated TURN endpoints for credential issuance</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_TURN_TTL</code></td>
+<td>Credential lifetime, 5–3600 seconds, default 600</td>
+</tr>
+<tr>
+<td><code>REPLAY_ROOM_TURN_RELAY_ONLY=1</code></td>
+<td>Require relay-only ICE in issued settings</td>
+</tr>
+</tbody></table>
+</div><p>The optional <a href="../../replay/relay/README.html">relay provider</a> authenticates enabled
+members through a connection-bound challenge and issues expiring credentials.
+Clients never receive the signing secret. Coturn uses the same server-only secret
+with <code>use-auth-secret</code>; the client helper refreshes credentials in the background.</p>
+<p>Without explicit loopback development mode, certificate/key material is required.
+The client must verify the certificate and hostname. Public browser origins need
+appropriate HTTPS/WSS deployment and reachable ICE/TURN infrastructure; those
+deployment gates remain open. The loopback fixture is not evidence of Internet
+reachability.</p>
+<p>Dedicated mode refuses public creation of infrastructure credentials. Preload
+dedicated rooms using trusted admission administration. Existing records retain
+their policies; changing the new-room mode does not rewrite them. The service
+rejects wrong-content/corrupt or excessive startup inventories rather than dropping
+records to fit capacity.</p>
+<h2 id="durable-checkpoints">Durable checkpoints<a class="heading-anchor" href="#durable-checkpoints" aria-label="Link to this section">#</a></h2>
+<p>The deployment&#39;s content ID selects validation code; client requests cannot select
+a model or schema. An explicit model/content mismatch fails before opening the
+database. Current compiled models are:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Content ID</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cavecrawl</td>
+<td><code>0x4341564552504c33</code></td>
+</tr>
+<tr>
+<td>Speedball</td>
+<td><code>0x5253504545444234</code></td>
+</tr>
+<tr>
+<td>Scrapyard</td>
+<td><code>0x5253435241503047</code></td>
+</tr>
+<tr>
+<td>Quickdraw</td>
+<td><code>0x52515549434b4432</code></td>
+</tr>
+<tr>
+<td>Claimball</td>
+<td><code>0x52434c41494d4233</code></td>
+</tr>
+<tr>
+<td>Slopball</td>
+<td><code>0x52534c4f50423234</code></td>
+</tr>
+<tr>
+<td>Slopball3D</td>
+<td><code>0x52534c4f50334434</code></td>
+</tr>
+</tbody></table>
+</div><p>Each admitted room receives one bounded checkpoint endpoint. Unknown-room traffic
+does not create endpoints, load storage or restart coordinators. Metadata and
+checkpoint bytes commit atomically with publication and full coordinator-Record
+CAS. A final authorization guard rejects a lease that expires during validation or
+storage work. A normal player cannot read authority-only checkpoints; reads require
+trusted hosting permission, and dedicated rooms additionally require infrastructure.</p>
+<p>Use the <a href="../../replay/provision/checkpoint/README.html">checkpoint client API</a> on the
+same connection as the registered authority RPC. Upload/download/status packets
+are signed, and the service multiplexes them with admission, authority, signaling
+and relay traffic. Each endpoint holds at most one 1 MiB transfer with a 30-second
+lifetime and bounded packet budgets. Room capacity bounds the total endpoint count.
+An exact committed retry returns its publication without renewing authority.</p>
+<p>This stores the game model&#39;s complete checkpoint, including embedded definitions
+and its declared external asset bytes. Scrapyard&#39;s current and executable pending
+spray dependencies use a <a href="../../replay/provision/checkpoint/assets.html">complete atomic package</a>,
+validated by the service and installed before restoration. Personal profiles remain
+separate. <a href="../../replay/godot/room_save.html">Room/Party</a> handles manual/automatic
+publication and Cavecrawl exposes its save status; other games still need UI and
+asset preparation, and
+all-members-gone gameplay needs the complete Room/Party restore flow. The service
+now supports an explicit <a href="../../replay/provision/checkpoint/restore.html">published restore grant</a>:
+expired-owner registration remains lease/quarantine fenced, then a separate CAS
+authorizes an exact saved publication under a newer epoch. Native model fixtures
+exercise this. Room/Party now drives it through Cavecrawl&#39;s native/browser rejoin
+menu, with callback-gated asset preparation. Scrapyard now also passes native/browser
+restoration after deleting its local spray copy. Broader asset profiles and game
+acceptance remain open. Slopball now has native WSS and browser RTC acceptance
+for restoring its published owner-streamed world and first actual solver momentum
+after all game processes and the service stop; see <a href="../replay_slopball/online.html#reopening-a-saved-party">its restore flow</a>.
+Slopball3D also has native/browser acceptance for quaternion and angular-momentum
+recovery, including restoration by another trusted saved player before the creator
+returns; see <a href="../replay_slopball3d/online.html#reopening-a-saved-party">the 3D flow</a>.</p>
+<p>All binary admission and control packets share the socket. An initial RTC text
+message selects a current opaque room code; the existing challenge/MAC still
+authenticates that connection against that room&#39;s registered members. Later signals
+stay bound to the selected room. Room/epoch changes and poisoned coordinators close
+their signaling connections. Other rooms retain their own mappings and state.</p>
+<p>This service owns its whole room set. Concurrent copies using the same database
+fence each other&#39;s CAS writes; this is not a highly available coordinator cluster.
+Anonymous co-op creation is bounded by the hub&#39;s room and request limits. Account
+authorization, per-user quotas, room retirement, public abuse controls and operational
+monitoring remain additional deployment work.</p>
+<h2 id="verification">Verification<a class="heading-anchor" href="#verification" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/online_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl/online_web_run.sh
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_room_checkpoint/run.sh
+CHECKPOINT_RESTORE=1 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_room_checkpoint/run.sh</code></pre></div><p>These drive actual menus, durable enrollment, automatic successor selection,
+handoff, loot conservation and fresh-process rejoin. Browser acceptance includes
+two simultaneous isolated rooms. Native uses verified fixture TLS; browser uses
+explicit loopback WS and real RTC. See <span class="local-reference" title="docs/replay/results/cave-online-menu-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
+<p>The checkpoint gate uses the actual standalone service and each of the three game
+models over verified TLS. It publishes and downloads a tick-1 checkpoint, kills
+the service, reopens the same database, and verifies the identical archive from a
+fresh trusted incarnation 2 with zero authority lease. It also rejects mismatched
+deployment models before database creation. This is native seeded-state persistence
+evidence. Cavecrawl&#39;s native/browser Room tests additionally publish during active
+play and after migration. Its <code>party_restore_run.sh</code> and <code>party_restore_web_run.sh</code>
+gates resume actual saved cave play after every original process has exited, then
+admit a new guest and publish the continued game.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="../../replay/provision/checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_room_service/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#local-cavecrawl" class="">Local Cavecrawl</a><a href="#configuration" class="">Configuration</a><a href="#durable-checkpoints" class="">Durable checkpoints</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_room_service/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

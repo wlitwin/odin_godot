@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>drawing.odin · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../contributor-guide.html">Contributor guide</a><a href="../code-guide.html">Code guide</a><a href="../shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>drawing.odin</h1><div class="reader-meta"><span>271 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_scrapyard/scripts/drawing.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay_scrapyard
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:math&quot;</span>
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;godot:gdext&quot;</span>
+<span class="hljs-keyword">import</span> r <span class="hljs-string">&quot;godot:replay&quot;</span>
+<span class="hljs-keyword">import</span> net <span class="hljs-string">&quot;godot:replay/net&quot;</span>
+<span class="hljs-keyword">import</span> v <span class="hljs-string">&quot;godot:replay/view&quot;</span>
+<span class="hljs-keyword">import</span> game <span class="hljs-string">&quot;../shared/game&quot;</span>
+<span class="hljs-keyword">import</span> arena <span class="hljs-string">&quot;../shared/arena&quot;</span>
+<span class="hljs-keyword">import</span> content <span class="hljs-string">&quot;../shared/content&quot;</span>
+<span class="hljs-keyword">import</span> flow <span class="hljs-string">&quot;../shared/flow&quot;</span>
+<span class="hljs-keyword">import</span> display <span class="hljs-string">&quot;../shared/presentation&quot;</span>
+<span class="hljs-keyword">import</span> views <span class="hljs-string">&quot;views&quot;</span>
+<span class="hljs-keyword">import</span> rt <span class="hljs-string">&quot;godot:runtime&quot;</span>
+<span class="hljs-keyword">import</span> scenegd <span class="hljs-string">&quot;godot:replay/godot/scene&quot;</span>
+
+Textures :: <span class="hljs-keyword">struct</span> {
+	idle, run: [<span class="hljs-number">3</span>]gd.Texture2d,
+	zombies: [<span class="hljs-number">3</span>]gd.Texture2d,
+	floor, objects, weapons, ui: gd.Texture2d,
+}
+
+
+textures_load :: <span class="hljs-keyword">proc</span>(t: ^Textures) -&gt; <span class="hljs-type">bool</span> {
+	names := [<span class="hljs-number">3</span>]<span class="hljs-type">string</span>{<span class="hljs-string">&quot;becca&quot;</span>, <span class="hljs-string">&quot;joe&quot;</span>, <span class="hljs-string">&quot;unknow&quot;</span>}
+	<span class="hljs-keyword">for</span> name, i <span class="hljs-keyword">in</span> names {
+		t.idle[i] = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(fmt.ctprintf(<span class="hljs-string">&quot;res://assets/gz2/runner_%s_idle.png&quot;</span>, name))
+		t.run[i] = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(fmt.ctprintf(<span class="hljs-string">&quot;res://assets/gz2/runner_%s_run.png&quot;</span>, name))
+		<span class="hljs-keyword">if</span> t.idle[i] == <span class="hljs-literal">nil</span> || t.run[i] == <span class="hljs-literal">nil</span> {
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+	}
+	t.zombies[<span class="hljs-number">0</span>] = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/zombie_puncher.png&quot;</span>)
+	t.zombies[<span class="hljs-number">1</span>] = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/zombie_heavy.png&quot;</span>)
+	t.zombies[<span class="hljs-number">2</span>] = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/zombie_cop.png&quot;</span>)
+	<span class="hljs-keyword">if</span> t.zombies[<span class="hljs-number">0</span>] == <span class="hljs-literal">nil</span> || t.zombies[<span class="hljs-number">1</span>] == <span class="hljs-literal">nil</span> || t.zombies[<span class="hljs-number">2</span>] == <span class="hljs-literal">nil</span> {
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+	}
+	t.floor = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/bg_floor.png&quot;</span>)
+	t.objects = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/objects.png&quot;</span>)
+	t.weapons = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/weapons.png&quot;</span>)
+	t.ui = <span class="hljs-keyword">cast</span>(gd.Texture2d)gd.load(<span class="hljs-string">&quot;res://assets/gz2/ui.png&quot;</span>)
+	<span class="hljs-keyword">return</span> t.floor != <span class="hljs-literal">nil</span> &amp;&amp; t.objects != <span class="hljs-literal">nil</span> &amp;&amp; t.weapons != <span class="hljs-literal">nil</span> &amp;&amp; t.ui != <span class="hljs-literal">nil</span>
+}
+
+release :: <span class="hljs-keyword">proc</span>(texture: gd.Texture2d) {
+	<span class="hljs-keyword">if</span> texture != <span class="hljs-literal">nil</span> &amp;&amp; gd.ref_counted_unreference(texture) {
+		gdext.object_destroy(texture)
+	}
+}
+
+textures_destroy :: <span class="hljs-keyword">proc</span>(t: ^Textures) {
+	<span class="hljs-keyword">for</span> texture <span class="hljs-keyword">in</span> t.idle {
+		release(texture)
+	}
+	<span class="hljs-keyword">for</span> texture <span class="hljs-keyword">in</span> t.run {
+		release(texture)
+	}
+	<span class="hljs-keyword">for</span> texture <span class="hljs-keyword">in</span> t.zombies {
+		release(texture)
+	}
+	release(t.floor)
+	release(t.objects)
+	release(t.weapons)
+	release(t.ui)
+	t^ = {}
+}
+
+rect :: <span class="hljs-keyword">proc</span>(parent: gd.Node, position, size: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>, color: gd.Color) {
+	node := gd.new_color_rect()
+	gd.color_rect_set_color(node, color)
+	gd.control_set_position(node, position, <span class="hljs-literal">false</span>)
+	gd.control_set_size(node, size, <span class="hljs-literal">false</span>)
+	gd.control_set_mouse_filter(node, .Mouse_Filter_Ignore)
+	gd.add_child(parent, node)
+}
+
+build_arena :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, layout: arena.Layout) {
+	<span class="hljs-keyword">if</span> self.arena_node != <span class="hljs-literal">nil</span> {
+		scenery_name(self.arena_node, <span class="hljs-string">&quot;RetiredArena&quot;</span>)
+		gd.canvas_item_set_visible(self.arena_node, <span class="hljs-literal">false</span>)
+		gd.node_queue_free(self.arena_node)
+	}
+	self.arena_node = gd.new_node2d()
+	scenery_name(self.arena_node, <span class="hljs-string">&quot;Arena&quot;</span>)
+	gd.add_child(self.world_node, self.arena_node)
+	ground := gd.new_sprite2d()
+	gd.sprite2d_set_texture(ground, self.textures.floor)
+	gd.sprite2d_set_centered(ground, <span class="hljs-literal">false</span>)
+	gd.sprite2d_set_region_enabled(ground, <span class="hljs-literal">true</span>)
+	gd.sprite2d_set_region_rect(ground, {{<span class="hljs-number">0</span>, <span class="hljs-number">0</span>}, {arena.WIDTH / <span class="hljs-number">2</span>, arena.HEIGHT / <span class="hljs-number">2</span>}})
+	gd.canvas_item_set_texture_repeat(ground, .Texture_Repeat_Enabled)
+	gd.node2d_set_scale(ground, {<span class="hljs-number">2</span>, <span class="hljs-number">2</span>})
+	gd.canvas_item_set_z_index(ground, <span class="hljs-number">-10</span>)
+	gd.add_child(self.arena_node, ground)
+	scenery_dressing(self, layout.key)
+	wall := gd.Color{<span class="hljs-number">0.28</span>, <span class="hljs-number">0.24</span>, <span class="hljs-number">0.20</span>, <span class="hljs-number">1</span>}
+	rect(self.arena_node, {<span class="hljs-number">0</span>, <span class="hljs-number">0</span>}, {arena.WIDTH, <span class="hljs-number">16</span>}, wall)
+	rect(self.arena_node, {<span class="hljs-number">0</span>, arena.HEIGHT - <span class="hljs-number">16</span>}, {arena.WIDTH, <span class="hljs-number">16</span>}, wall)
+	rect(self.arena_node, {<span class="hljs-number">0</span>, <span class="hljs-number">0</span>}, {<span class="hljs-number">16</span>, arena.HEIGHT}, wall)
+	rect(self.arena_node, {arena.WIDTH - <span class="hljs-number">16</span>, <span class="hljs-number">0</span>}, {<span class="hljs-number">16</span>, arena.HEIGHT}, wall)
+	defs := arena.JUNK
+	<span class="hljs-keyword">for</span> cover <span class="hljs-keyword">in</span> layout.covers {
+		def := defs[cover.kind]
+		node := gd.new_sprite2d()
+		gd.sprite2d_set_texture(node, self.textures.objects)
+		gd.sprite2d_set_region_enabled(node, <span class="hljs-literal">true</span>)
+		gd.sprite2d_set_region_rect(
+			node,
+			{{<span class="hljs-type">f32</span>(def.region[<span class="hljs-number">0</span>]), <span class="hljs-type">f32</span>(def.region[<span class="hljs-number">1</span>])}, {<span class="hljs-type">f32</span>(def.region[<span class="hljs-number">2</span>]), <span class="hljs-type">f32</span>(def.region[<span class="hljs-number">3</span>])}},
+		)
+		gd.node2d_set_position(
+			node,
+			{<span class="hljs-type">f32</span>(cover.x) + <span class="hljs-type">f32</span>(cover.w) / <span class="hljs-number">2</span>, <span class="hljs-type">f32</span>(cover.y) + <span class="hljs-type">f32</span>(cover.h) / <span class="hljs-number">2</span> + <span class="hljs-type">f32</span>(def.art_dy)},
+		)
+		gd.node2d_set_scale(node, {<span class="hljs-number">2</span>, <span class="hljs-number">2</span>})
+		gd.add_child(self.arena_node, node)
+	}
+	self.gate = scenery_gate(self)
+	self.arena_built, self.built_key = <span class="hljs-literal">true</span>, layout.key
+}
+
+runner_scenes_init :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard) -&gt; <span class="hljs-type">bool</span> {
+	<span class="hljs-keyword">for</span> &amp;view, i <span class="hljs-keyword">in</span> self.rigs {
+		node := scenegd.scene_instance(self.world_node, <span class="hljs-string">&quot;res://entities/runner.tscn&quot;</span>)
+		report := scenegd.script_bind(
+			&amp;self.runner_bindings[i],
+			<span class="hljs-keyword">cast</span>(gd.Node2d)node,
+			views.scrap_runner_view_replay_binding(),
+		)
+		<span class="hljs-keyword">if</span> report.error != .None {
+			content_report(&amp;report)
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+		}
+		view = self.runner_bindings[i].script
+		scenery_name(view.owner, fmt.tprintf(<span class="hljs-string">&quot;Runner%d&quot;</span>, i + <span class="hljs-number">1</span>))
+		gd.canvas_item_set_visible(view.owner, <span class="hljs-literal">false</span>)
+	}
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+paint :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, predicted, truth: r.Frame(game.World), dt: <span class="hljs-type">f64</span>) {
+	w := truth.state
+	<span class="hljs-keyword">if</span> !self.arena_built || self.built_key != w.layout.key {
+		build_arena(self, w.layout)
+		gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;RSY_ARENA seed=%d floor=%d sum=%d&quot;</span>, w.seed, w.floor, w.layout.checksum))
+	}
+	seat := self.session.authority ? self.session.server.local_seat : self.session.client.seat
+	epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+	observed := w
+	interpolate_observation(self, &amp;observed)
+	self.bot_scene[<span class="hljs-number">0</span>] = observed
+	<span class="hljs-comment">// Turrets use the local predicted shared simulation; spectators observe authority.</span>
+	turret_world := seat &gt; <span class="hljs-number">0</span> ? predicted.state : observed
+	turret_bridge_paint(self, turret_world)
+	paint_runner_views(self, &amp;observed, predicted.state.players, &amp;turret_world, seat, epoch, dt)
+	camera_paint(self, &amp;w, seat)
+	inside := seat &gt; <span class="hljs-number">0</span> &amp;&amp; w.players[seat - <span class="hljs-number">1</span>].in_yard
+	<span class="hljs-keyword">if</span> seat == <span class="hljs-number">0</span> {
+		<span class="hljs-keyword">for</span> player <span class="hljs-keyword">in</span> w.players {
+			inside = inside || player.in_yard
+		}
+	}
+	gd.canvas_item_set_visible(self.world_node, inside)
+	gd.canvas_item_set_visible(self.lobby, !inside)
+	muster_paint(self, &amp;w, seat, inside)
+	combat_paint(self, observed, predicted.state, seat, dt)
+	abilities_paint(self, observed, predicted.state, seat, dt)
+	paint_ability_cooldowns(self, &amp;w, predicted.state.players[seat &gt; <span class="hljs-number">0</span> ? seat - <span class="hljs-number">1</span> : <span class="hljs-number">0</span>], seat, inside)
+	hud_present(
+		self.hud,
+		display.hud(turret_world, predicted.state.players[seat &gt; <span class="hljs-number">0</span> ? seat - <span class="hljs-number">1</span> : <span class="hljs-number">0</span>], predicted.tick, seat, inside),
+		gd.control_get_size(self.shop).y,
+	)
+	status := gameplay_status(&amp;w, predicted.state.players[seat &gt; <span class="hljs-number">0</span> ? seat - <span class="hljs-number">1</span> : <span class="hljs-number">0</span>], seat, inside)
+	shop_paint(self, &amp;w, predicted.state.players[seat &gt; <span class="hljs-number">0</span> ? seat - <span class="hljs-number">1</span> : <span class="hljs-number">0</span>], inside &amp;&amp; seat &gt; <span class="hljs-number">0</span>)
+	scenery_gate_paint(self, &amp;w, seat, dt)
+	transitions_paint(self.transitions, inside ? flow.derive(&amp;w, truth.tick, seat) : flow.View{})
+	status = session_status(self, &amp;w, seat, inside, status)
+	gd.set_string(self.status, <span class="hljs-string">&quot;text&quot;</span>, status)
+	paint_profile_status(self)
+	flow_paint(self, &amp;w)
+}
+
+interpolate_observation :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard, observed: ^game.World) {
+	<span class="hljs-keyword">if</span> !self.session.authority {
+		a, b, alpha, ok := net.client_present(&amp;self.session.client)
+		<span class="hljs-keyword">if</span> ok {
+			observed^ = a.state
+			<span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> observed.players {
+				<span class="hljs-keyword">if</span> player.generation == b.state.players[i].generation &amp;&amp; player.warp == b.state.players[i].warp {
+					player.position = player.position + (b.state.players[i].position - player.position) * alpha
+				}
+			}
+			<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> observed.mobs.alive {
+				<span class="hljs-keyword">if</span> alive &amp;&amp; b.state.mobs.alive[i] &amp;&amp; observed.mobs.generations[i] == b.state.mobs.generations[i] {
+					observed.mobs.values[i].position +=
+						(b.state.mobs.values[i].position - observed.mobs.values[i].position) * alpha
+				}
+			}
+			<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> observed.drops.alive {
+				<span class="hljs-keyword">if</span> alive &amp;&amp; b.state.drops.alive[i] &amp;&amp; observed.drops.generations[i] == b.state.drops.generations[i] {
+					observed.drops.values[i].position +=
+						(b.state.drops.values[i].position - observed.drops.values[i].position) * alpha
+				}
+			}
+		}
+	}
+}
+
+paint_runner_views :: <span class="hljs-keyword">proc</span>(
+	self: ^ReplayScrapyard,
+	observed: ^game.World,
+	predicted_players: [game.SEATS]game.Player,
+	turret_world: ^game.World,
+	seat: <span class="hljs-type">u16</span>,
+	epoch: <span class="hljs-type">u64</span>,
+	dt: <span class="hljs-type">f64</span>,
+) {
+	<span class="hljs-keyword">for</span> view, i <span class="hljs-keyword">in</span> self.rigs {
+		player := observed.players[i]
+		<span class="hljs-keyword">if</span> <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>) == seat {
+			player = predicted_players[i]
+		}
+		pose := v.smooth_present(&amp;self.smoothing[i], {position = player.position}, dt)
+		scenegd.script_present(
+			&amp;self.runner_bindings[i],
+			display.runner(turret_world^, player, pose.position, epoch, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>)),
+		)
+	}
+}
+
+paint_ability_cooldowns :: <span class="hljs-keyword">proc</span>(
+	self: ^ReplayScrapyard,
+	w: ^game.World,
+	predicted_player: game.Player,
+	seat: <span class="hljs-type">u16</span>,
+	inside: <span class="hljs-type">bool</span>,
+) {
+	player := predicted_player
+	gd.set_string(self.ability_label, <span class="hljs-string">&quot;text&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+	<span class="hljs-keyword">if</span> inside &amp;&amp; seat &gt; <span class="hljs-number">0</span> {
+		first, second := game.ability_id(&amp;player, <span class="hljs-number">0</span>), game.ability_id(&amp;player, <span class="hljs-number">1</span>)
+		gd.set_string(
+			self.ability_label,
+			<span class="hljs-string">&quot;text&quot;</span>,
+			fmt.ctprintf(
+				<span class="hljs-string">&quot;Q  %s  %.1fs   |   E  %s  %.1fs&quot;</span>,
+				content.name_string(&amp;w.catalog.abilities[first].name),
+				<span class="hljs-type">f32</span>(player.ability_cd[<span class="hljs-number">0</span>].remaining) / <span class="hljs-number">60</span>,
+				content.name_string(&amp;w.catalog.abilities[second].name),
+				<span class="hljs-type">f32</span>(player.ability_cd[<span class="hljs-number">1</span>].remaining) / <span class="hljs-number">60</span>,
+			),
+		)
+	}
+}
+
+unit :: <span class="hljs-keyword">proc</span>(vector: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span> {
+	length := math.sqrt(vector[<span class="hljs-number">0</span>] * vector[<span class="hljs-number">0</span>] + vector[<span class="hljs-number">1</span>] * vector[<span class="hljs-number">1</span>])
+	<span class="hljs-keyword">return</span> length &gt; <span class="hljs-number">0</span> ? vector / length : [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{}
+}
+
+runner_scenes_close :: <span class="hljs-keyword">proc</span>(self: ^ReplayScrapyard) {
+	<span class="hljs-keyword">for</span> &amp;binding <span class="hljs-keyword">in</span> self.runner_bindings {
+		scenegd.script_release(&amp;binding)
+	}
+	self.rigs = {}
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/scripts/drawing.odin · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_scrapyard/scripts/drawing.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

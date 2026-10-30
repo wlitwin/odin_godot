@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Presenting Replay state · odin_godot</title><meta name="description" content="Sample frames and reconcile occurrences without writing presentation values back into simulation."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Presenting Replay state</h1><p class="reader-dek">Sample frames and reconcile occurrences without writing presentation values back into simulation.</p><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/view/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#frames-and-poses">Frames and poses</a><a href="#event-journal">Event journal</a></nav></details>
+<article class="reading-body "><p>Simulation state stays in <code>replay.Timeline</code>; presentation reads detached frames
+and owns its own smoothing, scene nodes, and effect state.</p>
+<h2 id="frames-and-poses">Frames and poses<a class="heading-anchor" href="#frames-and-poses" aria-label="Link to this section">#</a></h2>
+<p><code>frames_at(&amp;timeline, lower_tick, alpha)</code> copies two adjacent frames. A missing
+lower frame is an explicit failure; sampling the current head holds that frame
+without extrapolation. Use the lower frame&#39;s entity membership/discrete state
+until the presentation clock reaches the next tick. Extract poses and pass them
+through <code>pose_blend</code>; a teleport explicitly selects the destination pose.</p>
+<p><code>Smoother2</code> and <code>Smoother3</code> carry position and angular correction error. Use
+<code>smooth_correct_pose</code> / <code>smooth3_correct_pose</code> for same-tick corrections, then
+present each render frame; ordinary motion continues while the error decays.
+Large discontinuities cut. <a href="rotation.html">Angular smoothing</a> documents shortest
+arcs, quaternion composition, finite-input handling and Godot integration.</p>
+<h2 id="event-journal">Event journal<a class="heading-anchor" href="#event-journal" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">journal: view.Journal(Event)
+err := view.journal_init(&amp;journal, epoch = epoch, baseline = checkpoint_tick)
+<span class="hljs-comment">// Optional: view.journal_set_policy(&amp;journal, classify_event)</span>
+<span class="hljs-comment">// For every complete tick batch (empty ticks included):</span>
+err = view.sync_tick(&amp;journal, tick, occurrences)
+err = view.advance_time(&amp;journal, confirmed_tick, watched_tick)
+count := view.drain(&amp;journal, changes[:])</code></pre></div><p>Each new occurrence chooses a policy. Existing IDs keep their policy:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Policy</th>
+<th>When it begins</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Speculative</code> (default)</td>
+<td>On first observation; later changes may update/cancel it</td>
+</tr>
+<tr>
+<td><code>Confirmed</code></td>
+<td>When authority confirms its tick</td>
+</tr>
+<tr>
+<td><code>Watched</code></td>
+<td>When confirmed and the visible cause&#39;s watch clock reaches its tick</td>
+</tr>
+</tbody></table>
+</div><p>Drain notifications outside simulation:</p>
+<ul>
+<li><code>Begin</code>: start the effect. <code>confirmed</code> distinguishes an already final occurrence.</li>
+<li><code>Update</code>: adjust an existing speculative effect; <code>previous</code> carries its old payload.</li>
+<li><code>Cancel</code>: remove or stop an effect whose occurrence disappeared during replay.</li>
+<li><code>Confirm</code>: an already begun speculative occurrence has become final; do not begin it again.</li>
+</ul>
+<p>Payloads are stored by value, independent of live entity pointers. An impact or
+death effect can still begin after its source entity is destroyed. Put the
+required pose/details in its payload.</p>
+<p>The journal has bounded tick/event history and a bounded output queue. Each
+<code>sync_tick</code> or <code>advance_time</code> is atomic with respect to tracked events and output.
+On <code>Output_Full</code>, drain and retry. It will not evict unconfirmed events or pending
+watched effects to make room. Capacity/history errors require backpressure or an
+explicit presentation reset/resync; do not silently drop them.</p>
+<p>Synchronize complete batches through a frontier before confirming them. Once
+confirmed, batch membership and payloads cannot change. <code>advance_time</code> is monotonic
+within an epoch. To inspect an older committed playback, use a fresh epoch and
+explicitly tear down old effects/views. Rejoin initialization sets a baseline so
+historical one-shots cannot replay as new occurrences.</p>
+<p>A newer checkpoint in the <strong>same epoch</strong> uses <code>journal_rebase(&amp;journal, tick)</code>.
+It retains already queued output, matures effects from previously confirmed
+batches at the new visible baseline, and cancels abandoned speculative effects.
+Already final effects do not begin again. Unconfirmed occurrences and missing
+batches in the gap do not become confirmed merely because a newer checkpoint
+exists. The new baseline must be at least the old confirmed and watched ticks.</p>
+<p>Rebase is atomic. <code>journal_rebase_check</code> lets a runner check queue capacity before
+resetting its simulation timeline; the journal must stay unchanged between that
+check and commit. <code>Output_Full</code> requires draining and retrying. <code>Capacity</code> means
+the required notifications cannot fit even in an empty queue. A <strong>new epoch</strong>
+still uses <code>journal_reset</code>, with its separate old-scope cancellation contract.</p>
+<p><code>replay.confirm_through</code> separately protects the simulation frontier. A runner
+must establish authority before calling it. Neither counter elects a host,
+authenticates packets, or guarantees durable external effects; those belong to
+the upcoming network/session/outbox layers.</p>
+<p><code>One_Shots</code> retains consumed event IDs independently of active effects. It prevents
+an already heard one-shot from replaying when a cancelled occurrence reappears.
+Retirement is explicit and monotonic; retired IDs remain expired after their ring
+slots are reused. See the <a href="../godot/scene/audio.html">Godot audio adapter</a> for the consumer
+contract, bounded capacities and voice-reuse behavior.</p>
+<p><a href="cues.html">Visual cues</a> turn journal changes into bounded, detached render instances
+with correction, cancellation, expiry and consumed-ID retention. Cavecrawl uses
+them for its event-backed combat bursts and hit flashes.</p>
+<p><a href="phase.html">Bounded tick phases and linear previews</a> support render-frame motion
+without stepping simulation or wrapping backward during prediction stalls.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="rotation.html"><span>Angular correction smoothing</span><span aria-hidden="true">→</span></a><a href="../godot/scene/audio.html"><span>Bounded event audio</span><span aria-hidden="true">→</span></a><a href="cues.html"><span>Visual cues</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/view/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#frames-and-poses" class="">Frames and poses</a><a href="#event-journal" class="">Event journal</a></nav><div class="outline-actions"><a href="../../../reference/replay/view/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

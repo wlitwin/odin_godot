@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Replay authoring tools · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay authoring tools</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/editor/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#installation-and-project-contract">Installation and project contract</a><a href="#isolated-previews">Isolated previews</a><a href="#canonical-scrapyard-example">Canonical Scrapyard example</a></nav></details>
+<article class="reading-body "><p>Optional Godot-native editor UI over explicit project authoring commands. The
+library/editor tools do not infer gameplay policy or change a live match.
+Scrapyard is the complete worked example; model, extractors and validation remain
+Odin. The small EditorPlugin/preview controls use GDScript for normal Godot UI.</p>
+<h2 id="installation-and-project-contract">Installation and project contract<a class="heading-anchor" href="#installation-and-project-contract" aria-label="Link to this section">#</a></h2>
+<p>A project opts in with <code>replay_authoring.json</code>:</p>
+<div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;worker&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;res://tools/authoring.py&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;ability&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;res://data/abilities/salvefield.tres&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;workbench&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;res://dev/ability_workbench.tscn&quot;</span>
+<span class="hljs-punctuation">}</span></code></pre></div><p>The normal <code>build/build_scripts.sh PROJECT</code> installs the addon when this file is
+present. Enable <code>res://addons/replay_authoring/plugin.cfg</code> in project settings
+(Scrapyard already does). Installation writes local framework/Python toolchain
+paths; re-run it when relocating the project/toolchain. It does not install tools
+or send anything to external services. Current process/job helpers target native
+macOS/Linux authoring with Python and an Odin build environment. If Odin is not
+on PATH, the example worker can enter the framework&#39;s Nix environment.</p>
+<p>The panel supplies Validate/Bake tools, current/stale content status, clickable
+issues, Resource selection, workbench/scenario actions and feature drafts. The
+project worker accepts project/framework/Godot/result paths, an action and optional
+selection/name/kind/latency arguments. It publishes an atomic JSON result with
+<code>ok</code>, <code>running</code>, <code>message</code>, <code>issues</code>, optional <code>stale</code> and retained log paths.
+Issues contain <code>source</code>, <code>path</code>, <code>message</code> and optionally a source line. Source
+links open Resources, scenes or scripts through the editor&#39;s normal interfaces.</p>
+<p>Save &amp; Validate/Bake saves open scenes and the selected saved Resource. Save other
+independently edited Resources before running a project-wide action. The worker
+builds current Odin code and runs typed checks in a separate bounded process.
+Checks that instantiate authored views run in that isolated process; they are not
+performed against a live game&#39;s World. Actual scene scripts may run their normal
+construction/ready code, so choose appropriate leaf view scenes for validation.</p>
+<p><code>jobs.py</code> supplies bounded process-group ownership, per-stage logs, cancellation
+files and atomic result publication. UI waits are nonblocking. Cancellation and
+failure retain logs and prevent incomplete content publication. The existing
+artifact exporter still checks source/build provenance before replacing data;
+<code>--check</code> detects interrupted artifact/receipt replacement. Process cleanup ignores
+missing/dead groups but still signals a live owned parent if group signalling fails.</p>
+<h2 id="isolated-previews">Isolated previews<a class="heading-anchor" href="#isolated-previews" aria-label="Link to this section">#</a></h2>
+<p><code>preview_controls.gd</code> is a reusable CanvasLayer controller for Node2D previews.
+A preview implements <code>preview_refresh</code>, <code>preview_apply(phase, fraction, speed)</code>,
+<code>preview_radius</code> and optionally <code>preview_range</code>, <code>preview_phase</code>, <code>preview_message</code>
+and <code>preview_can_refresh</code>. The controller offers idle/attack/charge/hurt/death,
+scrubbing, 0–4× playback and radius/range guides. It reloads authored resources
+before explicit refresh; live-bound enemy views refuse refresh before reloading.</p>
+<p>Scrapyard copies validated gameplay display values. Enemy previews also own a
+validated appearance Resource copy, so invalid frame/texture/timing edits preserve
+the last valid display. Child charge animation follows the preview playback rate.
+These clocks/Resources stay outside World. An ability preview depicts its configured
+area/status; actual hits, healing, cooldowns and replay behavior are tested in the
+isolated encounter and scenario runner.</p>
+<h2 id="canonical-scrapyard-example">Canonical Scrapyard example<a class="heading-anchor" href="#canonical-scrapyard-example" aria-label="Link to this section">#</a></h2>
+<p>See <a href="../../examples/replay_scrapyard/editor-workflow.html">the walkthrough</a>. It covers
+Resource-based status references, shared checked extraction, a complete Salvefield
+workflow, authored runner appearances, non-overwriting stable-ID draft scaffolding,
+recording verification and real local peers. Actor drafts preserve the game&#39;s
+existing root binding and compose a generated visual child; rules and feature
+assertions remain explicit TODOs. Drafts do not enter the stock catalog automatically.</p>
+<p>The UI uses the same commands as CI, including the existing recording verifier and
+<code>replay/testing</code> correction/takeover helpers. In-memory checkpoint comparison does
+not claim to test transport/security/lease failure. The network command runs real
+local peers under the chosen latency profile; the framework&#39;s separate host-crash
+fixture remains available for full migration testing.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/editor-workflow.html"><span>Authoring a feature in Godot</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/editor/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#installation-and-project-contract" class="">Installation and project contract</a><a href="#isolated-previews" class="">Isolated previews</a><a href="#canonical-scrapyard-example" class="">Canonical Scrapyard example</a></nav><div class="outline-actions"><a href="../../../reference/replay/editor/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

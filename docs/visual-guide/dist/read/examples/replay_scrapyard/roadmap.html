@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Scrapyard port ledger · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Scrapyard port ledger</h1><div class="reader-meta"><span>9 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/roadmap.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Original repository: <code>../../../scrapyard</code>, revision
+<code>6bdef4f437d9a4e2c98f1d49472f840879301ccf</code>. Its project, source, saves and run commands
+remain independent. This project is a reimplementation against Replay, not a renamed
+Kit shell. The full <a href="../../docs/replay/roadmap.html">Replay roadmap</a> remains the goal.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Concrete requirements</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Arena and runners</td>
+<td>Same cover generator/footprints, movement/cover slide, names/loadouts, ready/start, local prediction, remote views, camera</td>
+<td>Native/network gates; original dirt/tufts, animated gate and direction arrow restored; three-floor scene lifecycle and spectator clear-stage visibility tested</td>
+</tr>
+<tr>
+<td>Guns and enemies</td>
+<td>Data resources, ballistic cadence/mag/reload/jam, projectiles, mobs, damage, drops</td>
+<td>All stock gun families and enemy brains implemented; baseline/native/network evidence recorded</td>
+</tr>
+<tr>
+<td>Combat composition</td>
+<td>Abilities, statuses, combinations, chain/rail/lance/lobber/mend behavior</td>
+<td>Grenade, historical rails/healing, statuses, reaction rules and barrel chains implemented; all stock ability deliveries implemented; full original scenario parity remains pending</td>
+</tr>
+<tr>
+<td>Run progression</td>
+<td>Waves, bosses, floors, gate, shop/workbench, wipe/reset, meta progression</td>
+<td>Run/director/gate/shop/parts/revive/reset implemented; local co-op profiles implemented; inspector-driven workbench previews tested; audio/settings and spray preview implemented; complete listening/visual parity pending</td>
+</tr>
+<tr>
+<td>Recovery and identity</td>
+<td>Drop-in/reconnect, spectator/server parity, saves, host migration during combat, returned host</td>
+<td>Local profiles, saves, party menus/durable enrollment, and asset-aware combat handoff/rejoin tested; full recovery/identity matrix pending</td>
+</tr>
+<tr>
+<td>Stress and content</td>
+<td>Zones, delivery/storm/surge/healing, gauntlet, spray/mod content, audio/UI polish</td>
+<td>Zone/delivery/healing, cross-seat storm/surge, continuous three-wave/barrel finale and fault gates; spray exchange/recovery, host-only JSON overlays and 40-enemy stress tested; matched solo waves and cover-aware finales pass in eight required games plus a reversed obstruction control; difficulty comparison and polish pending</td>
+</tr>
+<tr>
+<td>Deployment/comparison</td>
+<td>Web/Steam paths, matched old/new acts, measurements and human playtests</td>
+<td>Local Chrome party enrollment/asset-aware migration, world equality, profiles/run/spray persistence pass; optimized paired idle and firing/reload comparisons pass; public deployment, Steam, full combat comparisons and human playtests pending</td>
+</tr>
+</tbody></table>
+</div><p>The original harness acts map to the new implementation as follows. “Pending”
+remains a requirement; it is not an intentional omission or agreed parity gap.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Original act</th>
+<th>Replay acceptance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>duo / solo / server</td>
+<td>Dedicated server act now passes in both isolated games: two clients, six-enemy clear, rewards and floor advance with no authority avatar; broader mode/movement parity pending</td>
+</tr>
+<tr>
+<td>guns</td>
+<td>Ballistic families, cadence, magazine/reload/jam, mob hits and drops</td>
+</tr>
+<tr>
+<td>combo / lance</td>
+<td>Data-driven effects, directional/time queries and cross-entity effects</td>
+</tr>
+<tr>
+<td>run / boss / gauntlet</td>
+<td>Complete progression/director state and sustained play</td>
+</tr>
+<tr>
+<td>vault / doppelganger</td>
+<td>Durable profiles tested; duplicate live identity policy differs (see below)</td>
+</tr>
+<tr>
+<td>succession</td>
+<td>Complete checkpoint, fenced takeover, recorded 150-tick timer reset; native/Chrome dedicated combat planned/crash continuation passes; broader matrix pending</td>
+</tr>
+<tr>
+<td>stress</td>
+<td>Matched entity/shot workload and CPU/memory/bandwidth measurements</td>
+</tr>
+<tr>
+<td>spray / mod</td>
+<td>Asset transfer, declared content compatibility and late join</td>
+</tr>
+<tr>
+<td>chain / delivery / zone</td>
+<td>Deferred multi-entity consequences and lifetime</td>
+</tr>
+<tr>
+<td>storm / surge / mend</td>
+<td>Area/status/healing behavior and attribution</td>
+</tr>
+</tbody></table>
+</div><p>The <span class="local-reference" title="docs/replay/results/dedicated-rooms-2026-09-14/README.md · available in the repository">dedicated-server increment</span>
+compares the original server act in separate projects and fixes avatarless Room
+bootstrap/standby/takeover. Native planned, crash/return and repeated infrastructure
+failover preserve both real player seats and exact checkpoint frames. The
+<span class="local-reference" title="docs/replay/results/dedicated-browser-2026-09-14/README.md · available in the repository">browser infrastructure gate</span>
+now exercises those role transitions in four real Chrome processes over RTC.
+Dedicated combat-failover and broader deployment remain open.</p>
+<p>The <span class="local-reference" title="docs/replay/results/network-recording-2026-09-14/README.md · available in the repository">network recording increment</span>
+adds developer-menu exports and a headless verifier for complete network batches.
+Real native authority/prediction and Chrome solo recordings execute in native/WASM,
+including accepted/rejected actions and historical aim. It preserves gameplay and
+recovery formats; it is an explicit diagnostic with measured synchronous cost,
+not a full-game parity or adoption result.</p>
+<p>Current comparison boundaries:</p>
+<ul>
+<li><p>The <span class="local-reference" title="docs/replay/results/solo-navigation-2026-09-14/README.md · available in the repository">cover-aware solo cohort</span>
+passes normal stopping positions and a deterministic blocked-shot control using
+ordinary movement. Barrels, cover, damage and all wave/rest/reward requirements
+remain. It is a new controller contract; the older stationary result below stays
+rejected and is not a difficulty or human-feel verdict.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/solo-gauntlet-2026-09-13/README.md · available in the repository">solo gauntlet comparison</span>
+runs one circle-strafing player with nearest-target autofire in both real games.
+All six fresh-profile games clear 4/4/5 enemies, retain all three 300-tick rests,
+and award one core. Five complete the barrel chain; one Replay stopping position
+leaves both fixed-offset barrels behind cover. That failure is retained, and the
+overall cohort is rejected. This is sustained solo evidence, with differing
+health/timing observations, not difficulty or human-feel equivalence.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/action-intent-2026-09-09/README.md · available in the repository">action-intent helper</span>
+replaces manual dash ticket storage, preserves input guards and handles recovery
+dispositions across epoch changes. Native input, party and live request checks
+pass; the source-count reduction is not a human usability or performance claim.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/snapshot-ack-2026-09-09/README.md · available in the repository">snapshot-ACK comparison</span>
+passes Replay&#39;s twelve delay/raw-loss windows and paired delay acceptance with
+61 report cases. The paired raw-loss scope still fails a Kit client observation;
+Replay&#39;s observed-state gaps reach 1.369 seconds. Controlled ENet and core tests
+verify the removed ACK/action blocking dependency.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/aim-origin-2026-09-09/README.md · available in the repository">stress-aim correction</span>
+uses the predicted local origin with the observed enemy census. Native regression
+and impact-ledger checks pass; the fresh delay condition passes twelve windows
+and 61 report cases. Raw loss still fails a client battlecry observation, and a
+separate diagnostic records a cooldown refusal caused by bunched arrivals.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/dash-actions-2026-09-09/README.md · available in the repository">dash-action port</span>
+uses receipt-time dash intents and explicit results, with content 42–46 conversion
+and native input/save/model plus WASM-build validation. All 120 local dash
+requests in the new cohort settle, including raw-loss cases. The paired workload
+still fails minimum kill counts in three Replay games; observation freshness
+and broader authoring/platform/human validation remain open.
+The current-content native TLS party handoff/asset-recovery/returned-host gate
+also passes; a fresh browser party run after this content change remains pending.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/jam-clearing-2026-09-09/README.md · available in the repository">jam-clearing comparison</span>
+passes twelve delay windows and 60 report cases, including seeded duds, live
+shots, three-pull clears and settled gun-state convergence. Raw-loss acceptance
+remains failed for stale Kit cooldown observations and a lost Replay dash.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/receipt-resync-2026-09-09/README.md · available in the repository">latest endurance cohort</span>
+passes delay and raw-loss conditions with 24 windows and 56 report cases. Prior
+failures remain recorded; long observation gaps and broader injury/jam/wave,
+platform and human-playtest coverage remain open.</p>
+</li>
+<li><p><span class="local-reference" title="docs/replay/results/cast-submission-2026-09-09/README.md · available in the repository">Cast submission measurement</span>
+now distinguishes Kit local prediction rejection from a sent request. The prior
+refusal diagnosis was incorrect; current raw-loss workload failures remain
+recorded and still prevent full paired acceptance.</p>
+</li>
+<li><p>The <span class="local-reference" title="docs/replay/results/scrapyard-endurance-2026-09-08/README.md · available in the repository">endurance comparison</span>
+adds stock reloads, dash inputs and burn/salve/surge during the moving swarm.
+The delay condition passes, using an explicit Receipt action policy only in the
+isolated Replay copy. Raw-loss acceptance fails for missing remote dash edges;
+the subsequent <span class="local-reference" title="docs/replay/results/input-frontier-2026-09-08/README.md · available in the repository">input audit</span>
+fixes Replay capture across catch-up, while the latest paired raw-loss gate
+remains rejected for a Kit-side cast refusal. This is not
+full combat/fault parity or an adoption result.</p>
+</li>
+<li><p>Cover generation and ordered axis collision are compared against selected
+unmodified original procedures, compiled in an isolated native oracle. The
+independent project does not run the original harness or touch its user data.</p>
+</li>
+<li><p>Ordinary movement preserves the original non-normalized per-axis input rule.
+Replay schedules movement at 60 Hz with server authority and local prediction;
+the original streams owner-local movement at render cadence. Network authority
+and variable-frame timing are therefore not matched yet.</p>
+</li>
+<li><p>Dash uses ten simulation ticks and a 66-tick cooldown. The original specifies
+0.16 s / 1.1 s on the owner clock. These require paired feel/timing evaluation.</p>
+</li>
+<li><p>The renderer includes original runner strips, weapon regions, ground, solid
+junk, dirt/tufts and animated gate/arrow. <span class="local-reference" title="docs/replay/results/scrapyard-scenery-2026-09-07/README.md · available in the repository">Scenery evidence</span>
+covers three peers/floors and visual captures. The <a href="shop.html">bottom shop cards</a>
+replace the tall overlay, restore the original purchase-key order and validate
+clicks/shortcuts through the same action path. The <a href="hud.html">combat HUD</a> restores
+health/status/cooldown displays, magazine states, boss health and revive prompts.
+<a href="transitions.html">Run transitions</a> add departure/wipe panels, current wave/rest
+information and recovery narration. The <a href="camera.html">downed-player camera</a> now
+follows a living teammate and handles revival, host loss and rendered floor
+warps. <a href="chat.html">Chat/system history</a> now includes named text, late-join history,
+per-tick yard announcements and asset-aware migration. <a href="pings.html">Positional pings</a>
+restore middle-mouse input, fading markers and stamped names with expiry and
+floor/run scope checks. Named observer chat now passes native and browser checks, including planned
+host migration and retained historical labels. Broader observer/actor/menu/interaction
+parity remains work.
+<a href="browser_ui.html">Browser UI acceptance</a> covers chat, pings, shop, HUD and
+camera/revival in three Chrome processes; broader browser/device and presentation
+coverage remains required.
+Audio is implemented, but hardware playback and listening parity
+remain unverified; the local CoreAudio path stalls even in plain Godot.</p>
+</li>
+<li><p><a href="actors.html">Actor presentation</a> now covers downed poses/beacons, muzzle and
+reload cues, ghost tint, hit feedback, enemy attack/death rows and pooled slot
+reuse. <a href="feedback.html">Combat feedback</a> supplies bounded bursts/debris, target
+damage numbers and pickup effects. The <a href="menu.html">Escape menu/tally</a> now adds
+dimming, responsive panels, healing credit, keyboard focus guards and Quit.
+<a href="muster.html">Staging muster</a> now restores fixed idle previews, readiness rows,
+bidirectional pickers and late Drop In. <a href="automatic.html">Automatic loadouts</a> now
+preserve choice modes across native/browser restarts and seat changes.
+The tally now includes the original zero-valued deaths column and fresh session
+round-trip measurements; remaining actor/front-door details still need work. <a href="screen.html">Screen effects</a>
+restore lens kicks, health vignette and transition veil with motion-setting
+and native/browser validation.</p>
+</li>
+<li><p><a href="wounds.html">Directional wounds</a> now use the hit origin and recorded victim pose,
+reject stale generations/history and correct hurt burst/sound placement.
+<a href="walls.html">Wall contacts</a> now preserve ballistic/spit endpoints and normals,
+with bounded confirmed sparks, sound and content-45 save conversion.
+<a href="ordnance_view.html">Ordnance presentation</a> extends contact facts to rails and
+restores grenade shells and confirmed ember trails; bounce/fuse laws are unchanged.
+<a href="globs.html">Glob discs</a> restore slime/sparkjar/spit shapes, colors and pulse.
+The original has straight-moving discs, correcting the earlier arc/trail claim.
+<a href="areas.html">Area effects</a> restore filled nova/reaction/blast discs, standing zones
+and buff bursts. <a href="cast_paths.html">Cast paths</a> now restore local/remote tongues and recorded spread
+bolts, with explicit content-46 conversion. Remaining launch/contact feedback
+and paired timing/feel still need work.</p>
+</li>
+<li><p>All stock gun/mob resources load into a validated value catalog carried by the
+host world. Ballistic guns, melee enemies, damage and pickups now run in the
+simulation; <a href="combat.html">combat.md</a> records timing, ordering, capacity and
+presentation differences. PNG spray transfer is implemented; host-only JSON overlays now ship through the world catalog.</p>
+</li>
+</ul>
+<p>Before claiming full parity, every row needs its real-process scenario, source/content
+fingerprints, recovery cases where relevant, and visual/playtest evidence. Initial
+movement gates do not establish full-game completion or framework superiority.</p>
+<p>Identity policy under review: the original <code>doppelganger</code> act assigns a live duplicate
+token a fresh seat. Replay currently rejects a duplicate live identity, preserving
+one token-to-seat binding and requiring a separate identity for a second player.
+The user has been asked whether the new game should retain that rule or create a
+fresh guest identity for the duplicate. This row is not an agreed parity waiver.</p>
+<p>The <span class="local-reference" title="docs/replay/results/scrapyard-succession-2026-09-19/README.md · available in the repository">content-49 succession result</span>
+reproduces the original attack/director timer reset on the first committed takeover
+tick. Exact restore, replay, repeated pending recovery, active boss/popper damage,
+nine old-save Godot resumes, and native/Chrome dedicated combat continuation pass.
+Complete projectile/lob/zone preservation remains Replay behavior; the original
+clears some transient pools. This does not close full gameplay/identity parity or
+the broader recovery/deployment matrix.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/replay/roadmap.html"><span>Replay roadmap and implementation plan</span><span aria-hidden="true">→</span></a><a href="shop.html"><span>The counter</span><span aria-hidden="true">→</span></a><a href="hud.html"><span>Combat HUD</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/roadmap.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/roadmap.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

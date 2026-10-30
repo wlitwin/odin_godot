@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Typed scene adapters · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Typed scene adapters</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/adapter-bindings.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#script-descriptors">Script descriptors</a><a href="#iteration-and-scope">Iteration and scope</a><a href="#diagnostics-and-data-ownership">Diagnostics and data ownership</a><a href="#optional-generation">Optional generation</a><a href="#authoring-previews">Authoring previews</a></nav></details>
+<article class="reading-body "><p>The adapter chooses presentation data and game lifetime boundaries. Shared owners
+handle script resolution, borrowed pointers, asset retention, callback configuration,
+entity membership and diagnostics. Scrapyard uses the same binding declarations
+for authored enemy scenes and permanent runner scenes.</p>
+<h2 id="script-descriptors">Script descriptors<a class="heading-anchor" href="#script-descriptors" aria-label="Link to this section">#</a></h2>
+<p><code>Script_View(Value, Script)</code> has one optional <code>validate</code> callback returning a
+<code>definitions.Report</code> identifying the exact failed component. The display type must
+be a bounded replayable value. Script pointers, local clocks and Godot objects
+belong to the view script, not its display value.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">descriptor := scenegd.Script_View(Runner_Display, Runner_View){
+    present  = runner_present,
+    validate = runner_validate,
+}</code></pre></div><p>When migrating an older descriptor, replace <code>valid = check</code> with
+<code>validate = validate_view</code>. Return <code>{}</code> on success or
+<code>definitions.problem(.Invalid, field, message)</code> on failure; retain every check
+from the old predicate. <code>valid</code> is no longer a descriptor field and old
+initializers fail compilation. In an archetype binding, validation checks scene
+components before <code>configure</code> supplies the appearance. A directly bound scene
+that requires an authored appearance must validate that appearance as well.</p>
+<p><code>Script_Binding(Value, Script)</code> stores that descriptor by value and borrows a
+permanent authored node. <code>script_bind</code> resolves and validates its script;
+<code>script_present</code> passes a detached value; <code>script_release</code> invokes optional
+retirement and releases the binding, without freeing the node. Release before the
+node is freed or rebound. It never decides that a body generation, warp or epoch
+change should replace a permanent scene. Scrapyard&#39;s runner retains its node and
+handles those display transitions explicitly in its script.</p>
+<p>For entity scenes with authored appearances:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">descriptor := scenegd.Script_Archetype(Enemy_Display, Enemy_View, Enemy_Style){
+    view = {
+        present  = enemy_present,
+        validate = enemy_validate,
+        retired  = enemy_retire,
+    },
+    configure = enemy_configure, <span class="hljs-comment">// proc(^Enemy_View, ^Enemy_Style)-&gt;defs.Report</span>
+}
+views: scenegd.Script_Archetypes(Enemy, Enemy_Display, Enemy_View, Enemy_Style)
+report := scenegd.script_archetypes_init(&amp;views, &amp;assets, parent, CAPACITY,
+    select_kind, descriptor)</code></pre></div><p>This owner copies configuration, allocates stable callback contexts, and retains
+appearance resources. Underlying view pools retain their scenes. The source
+registry can close after successful initialization. Keep the owner at a stable
+address and destroy it before its parent/script module disappears. It resolves
+the root script after <code>_ready</code>, validates scene components, resolves the exact
+appearance script, then calls configure. Configure validates/applies appearance;
+scene validation should not require appearance configuration to have happened yet.</p>
+<p><code>script_archetypes_present</code> returns an owned diagnostic on failure. <code>retired</code> must
+accept partial initialization and end all borrowed-resource use; queued node
+removal completes later. Ordinary process callbacks should stop after retirement.
+Nodes/scripts remain Godot-owned. No callback may reenter or mutate membership of
+its view owner.</p>
+<h2 id="iteration-and-scope">Iteration and scope<a class="heading-anchor" href="#iteration-and-scope" aria-label="Link to this section">#</a></h2>
+<p><code>view_pool_visit</code>, <code>archetype_pool_visit</code> and <code>script_archetypes_visit</code> provide typed
+entity handles and rigs/scripts to a callback with a typed user pointer. Use them
+to drain local visual notices without depending on bucket/index storage. Borrowed
+storage must not escape the visit. Matching <code>*_stats</code> functions provide aggregate
+node/paint/property counters.</p>
+<p><code>view.Scope_Tracker(Key)</code> compares explicit inputs:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">scope, error := view.scope_update(&amp;tracker,
+    {epoch, reset_serial, observed_tick},
+    World_View_Key{run, floor},
+    rewind_resets = <span class="hljs-literal">true</span>)</code></pre></div><p>The caller chooses the key and whether backwards observation time resets a view
+lifetime. Forward ticks and unchanged keys preserve scope; epoch/reset/key changes
+advance the revision. Zero/stale epochs, unsupported key types and revision
+exhaustion fail without changing the tracker. It does not infer authority, sample
+prediction, use correction counts as reset events, or know what a floor means.</p>
+<h2 id="diagnostics-and-data-ownership">Diagnostics and data ownership<a class="heading-anchor" href="#diagnostics-and-data-ownership" aria-label="Link to this section">#</a></h2>
+<p><code>view_pool_problem</code> and <code>archetype_pool_problem</code> retain detailed diagnostics while
+existing low-level presentation functions still return their original error enum.
+Script-based owners return the diagnostic directly. Errors identify archetype,
+scene path, entity key and the component/field supplied by the typed validator.
+Input validation precedes membership changes; arbitrary scene <code>_ready</code> code and
+instantiation side effects do not become transactional.</p>
+<p><code>Resource_Batch</code> loads a bounded directory of <code>.tres</code>/<code>.res</code> resources, retaining the
+whole candidate set until <code>resource_batch_destroy</code>. Loading failure publishes no
+partial batch. It rejects reinitializing a live batch, preserving the existing one.
+Use <code>resource_script(resource, Script, path)</code> for checked borrowed script access,
+or <code>bake_resource(ctx, resource, Script, path)</code> inside an extractor.</p>
+<p><code>bake_integer(ctx, u16, source, minimum, maximum, path)</code> checks explicit domain and
+representation bounds before narrowing. Supported targets are fixed 8/16/32-bit
+signed/unsigned integers. Inspector ranges are editing hints, not inferred game
+validation. Complex mappings, nested dependencies and cross-field rules remain
+explicit functions. Scrapyard shares one <code>defs.bake_mob</code> among live admission,
+artifact export and previews; no second generated extractor is introduced.</p>
+<h2 id="optional-generation">Optional generation<a class="heading-anchor" href="#optional-generation" aria-label="Link to this section">#</a></h2>
+<p>Place this declaration above the script&#39;s <code>package</code> line:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:replay_view value=value,present=enemy_present,validate=enemy_validate,retired=enemy_retire,appearance=skin,configure=enemy_configure</span></code></pre></div><p><code>value</code> names a direct display field; <code>appearance</code> names a direct typed Resource
+script pointer. <code>present</code> is required, <code>validate</code> and <code>retired</code> are optional;
+<code>appearance</code> and <code>configure</code> must appear together. Procedures are ordinary
+same-package Odin procedures. The script must extend Node2D or a compatible class.</p>
+<p>The generated <code>&lt;snake_script_name&gt;_replay_binding()</code> returns <code>Script_View</code> or
+<code>Script_Archetype</code>, with compile-time assertions on callback signatures. Types come
+from the named fields, so imported display types need no duplicate import/mapping
+in generated code. Unknown/duplicate options and missing fields fail generation.
+It emits no simulation state, wire registration, sampling policy, signals or extra
+lifecycle callbacks. Unannotated scripts keep their existing generation behavior.</p>
+<p>Handwritten descriptors use exactly the same public helpers. Actual scene nodes,
+Resource scripts and required components are validated in Godot; code generation
+alone cannot prove that every PackedScene has the expected hierarchy.</p>
+<h2 id="authoring-previews">Authoring previews<a class="heading-anchor" href="#authoring-previews" aria-label="Link to this section">#</a></h2>
+<p>Use existing typed <code>onready</code> fields for composed scripts:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">charge: ^ScrapChargeView <span class="hljs-string">`gd:&quot;onready=Charge&quot;`</span>,</code></pre></div><p>Scrapyard&#39;s <code>ScrapEnemyPreview</code> Resource references a MobDef and supplies sample
+attack/warning/charge state. The same mob extractor validates the definition, and
+a detached display is baked on scene startup. A pulse radius comes from the
+selected definition; there is no switch over known enemy IDs. The <a href="../../editor/README.html">authoring tools</a> provide explicit refresh of isolated
+preview data; live-bound views reject refresh. Appearance and normal scene-local animations remain
+independent of Session/World, with the same display interface as live play.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../editor/README.html"><span>Replay authoring tools</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/adapter-bindings.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#script-descriptors" class="">Script descriptors</a><a href="#iteration-and-scope" class="">Iteration and scope</a><a href="#diagnostics-and-data-ownership" class="">Diagnostics and data ownership</a><a href="#optional-generation" class="">Optional generation</a><a href="#authoring-previews" class="">Authoring previews</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/adapter-bindings.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

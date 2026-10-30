@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>odin_godot documentation website · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>odin_godot documentation website</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/visual-guide/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#publish-from-the-sdk-repository-with-github-pages">Publish from the SDK repository with GitHub Pages</a><a href="#scrapyard-showcase">Scrapyard showcase</a></nav></details>
+<article class="reading-body "><p>The SDK home page, task-based documentation, API notes, examples, and illustrated
+multiplayer guide. The site uses a shared <code>o/g</code> header, documentation sidebar,
+on-page navigation, and keyboard-accessible search.</p>
+<p>Open the <span class="local-reference" title="docs/visual-guide/dist/index.html · available in the repository">home page</span>, or serve it from this repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 -m http.server 8765 --<span class="hljs-built_in">bind</span> 127.0.0.1 --directory docs/visual-guide/dist</code></pre></div><p>Visit <a href="http://127.0.0.1:8765" rel="noreferrer">http://127.0.0.1:8765</a>. There is no installation or build step. Serving over
+HTTP enables documentation search and legacy reference redirects. Use Print /
+save PDF on an article for a paper copy.</p>
+<p>The main entry points are <span class="local-reference" title="docs/visual-guide/dist/docs.html · available in the repository">SDK docs</span>, <span class="local-reference" title="docs/visual-guide/dist/examples.html · available in the repository">examples</span>,
+the <span class="local-reference" title="docs/visual-guide/dist/guide.html · available in the repository">multiplayer field guide</span>, and the
+<span class="local-reference" title="docs/visual-guide/dist/reading.html · available in the repository">complete library</span>. Existing article URLs remain valid.</p>
+<p>The <a href="dist/field-guide.html">desk reference</a>, <span class="local-reference" title="docs/visual-guide/dist/field-guide.pdf · available in the repository">print edition</span>,
+and six <span class="local-reference" title="docs/visual-guide/dist/diagrams · available in the repository">SVG diagrams</span> are standalone artifacts. <code>dist/</code> is the
+complete portable website. The PDF captures the article in its initial state;
+the website retains the interactive controls.</p>
+<p>The home page is generated by <code>build-product.mjs</code>. <code>site-structure.mjs</code> defines
+routes and documentation navigation. <code>dist/sdk.css</code> and <code>dist/site.js</code> supply the
+shared layout and search. The visual field guide remains authored in
+<code>dist/guide.html</code>; <code>dist/app.js</code> drives its interactive models.</p>
+<p>Task-based tutorials live in <code>content/</code>. <code>build-readers.mjs</code> renders them and the
+repository&#39;s linked documents into HTML, with highlighted code, tables, and
+static diagrams. Related Markdown links resolve to other reading pages. Original
+source files remain available as downloads.</p>
+<p>Viewing the site needs no dependencies. To regenerate the reading pages, SVGs,
+and source snapshots after API changes, install the pinned build dependencies once:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">cd</span> docs/visual-guide
+npm ci</code></pre></div><p>Then, from the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">node docs/visual-guide/prepare.mjs</code></pre></div><p><code>build-readers.mjs</code> follows links from the guide&#39;s selected references and generates
+the supplemental reading library. New Mermaid diagrams are rendered to static SVG
+using Chrome; set <code>GUIDE_CHROME</code> if Chrome is installed at a nonstandard path.
+Cached SVGs do not require a browser. Newly rendered diagrams are serialized as
+XML and decoded as images before publication. The link checker also rejects
+malformed SVGs and unresolved escape tokens. No Markdown parser or diagram
+runtime ships to visitors.</p>
+<p>The generator reads repository files, records their Git baseline in
+<code>dist/reference-manifest.json</code>, and refreshes the bundled copies. It does not
+change the original docs, frameworks, or game examples. The browser correction
+model is deliberately smaller than the Odin Loot model; it is not a runtime port.</p>
+<p>The hosting manifest in <code>.openai/hosting.json</code> identifies the private Sites
+publication. The website needs no connected apps, credentials, or backend.</p>
+<h2 id="publish-from-the-sdk-repository-with-github-pages">Publish from the SDK repository with GitHub Pages<a class="heading-anchor" href="#publish-from-the-sdk-repository-with-github-pages" aria-label="Link to this section">#</a></h2>
+<p>Keep this guide in <code>odin_godot</code>. GitHub calls this a <strong>project site</strong>, with the
+default address <a href="https://wlitwin.github.io/odin_godot/" rel="noreferrer">https://wlitwin.github.io/odin_godot/</a>. A user site at
+<code>wlitwin.github.io</code> would instead need a repository named <code>wlitwin.github.io</code>.
+The project site keeps documentation changes with the SDK versions they describe.</p>
+<p>The <span class="local-reference" title=".github/workflows/pages.yml · available in the repository">Documentation workflow</span> installs the pinned
+documentation tools, regenerates the guide and reading pages, checks local links
+and section anchors, and publishes only <code>docs/visual-guide/dist</code>. Pull requests
+build and check the site; pushes to <code>main</code> deploy it independently of the game tests.
+No GitHub token or hosting secret needs to be added.</p>
+<p>One-time setup after committing and pushing these files:</p>
+<ol>
+<li>Open <a href="https://github.com/wlitwin/odin_godot/settings/pages" rel="noreferrer">Settings → Pages</a>.</li>
+<li>Under <strong>Build and deployment</strong>, choose <strong>GitHub Actions</strong> as the source.</li>
+<li>Run <strong>Documentation</strong> from the Actions tab, or push the next change to <code>main</code>.</li>
+<li>After the deployment succeeds, use <code>https://wlitwin.github.io/odin_godot/</code> for
+the repository&#39;s website field and documentation link.</li>
+</ol>
+<p>All assets, reading links, and JavaScript fetches use relative paths, so the same
+output works at a project subpath, a user-site root, or a custom domain. The Pages
+artifact is the contents of <code>dist</code>, with its <code>index.html</code> at the artifact root;
+it does not need Jekyll or a <code>gh-pages</code> branch.</p>
+<p>Check an updated build locally with:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">node docs/visual-guide/prepare.mjs
+python3 docs/visual-guide/check-site.py</code></pre></div><p>GitHub&#39;s instructions: <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages" rel="noreferrer">project and user sites</a>
+and <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages" rel="noreferrer">publishing through Actions</a>.</p>
+<h2 id="scrapyard-showcase">Scrapyard showcase<a class="heading-anchor" href="#scrapyard-showcase" aria-label="Link to this section">#</a></h2>
+<p>The home page links to the <a href="https://itchyitches.itch.io/scrapyard" rel="noreferrer">live Scrapyard browser build</a>
+and uses a screenshot captured from that build. It also links to the repository&#39;s
+Replay Scrapyard contributor and code guides. The live build and the Replay port
+have separate implementation histories; the showcase does not assign a framework
+or parity claim to an unversioned itch.io upload.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="dist/field-guide.html"><span>Odin × Godot: desk reference</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/visual-guide/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#publish-from-the-sdk-repository-with-github-pages" class="">Publish from the SDK repository with GitHub Pages</a><a href="#scrapyard-showcase" class="">Scrapyard showcase</a></nav><div class="outline-actions"><a href="../../../reference/docs/visual-guide/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

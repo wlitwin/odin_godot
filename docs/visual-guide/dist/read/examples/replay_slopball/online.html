@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Slopball Parties and browser play · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Slopball Parties and browser play</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_slopball/online.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#identity-and-authority">Identity and authority</a><a href="#connection-and-save-settings">Connection and save settings</a><a href="#verification">Verification</a><a href="#reopening-a-saved-party">Reopening a saved party</a></nav></details>
+<article class="reading-body "><p>Configure <code>RSL_ROOM_SERVICE</code> to expose <strong>Create party</strong>, <strong>Join party</strong>, <strong>Watch
+only</strong>, <strong>Copy invite</strong> and <strong>Rejoin recent</strong>. These controls use Replay&#39;s shared
+Party/Room adapters on native Godot and in the browser. Solo uses a local session.
+Without a service, native Host/Join/Watch retain their direct connection flow.</p>
+<p>For a local service and native game, use separate terminals:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">mkdir</span> -m 700 -p .replay-slopball-data
+REPLAY_ROOM_CONTENT=0x52534c4f50423234 REPLAY_ROOM_CHECKPOINT_MODEL=slopball \
+REPLAY_ROOM_DB=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/.replay-slopball-data/rooms.sqlite3&quot;</span> \
+REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_room_service/run.sh</code></pre></div><div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">RSL_ROOM_SERVICE=ws://127.0.0.1:49740 RSL_ROOM_LOCAL=1 \
+nix develop --<span class="hljs-built_in">command</span> bash examples/replay_slopball/play.sh</code></pre></div><p>Omit <code>REPLAY_ROOM_CREATE_DB=1</code> when reopening an existing service database. Choose
+Create party and share the invite. Other players paste it and choose Join party;
+Watch only joins as an observer. The first connected player starts the match.</p>
+<p>Native launch settings use <code>RSL_*</code> environment variables. Browser settings use
+the lowercase suffix as URL query parameters, for example <code>room_service</code>,
+<code>room_local</code>, <code>name</code>, <code>port</code> and <code>latency</code>. Browser multiplayer requires the
+configured service and uses WebRTC. Profile loading completes before admission.
+The test runner below prepares and exports a separate Web build.</p>
+<h2 id="identity-and-authority">Identity and authority<a class="heading-anchor" href="#identity-and-authority" aria-label="Link to this section">#</a></h2>
+<p>Personal identity/name preferences use the <code>replay-slopball</code> namespace; Party
+credentials use <code>replay-slopball-rooms</code>. Native Party storage defaults to
+<code>user://slopball_rooms.sqlite3</code>, overridden by <code>RSL_ROOMS_DB</code>. Browser records
+use the shared IndexedDB adapters. Credentials are distinct from game state.
+Rejoin recent uses a stored credential, preserving the member while obtaining a
+new process incarnation. Personal name and identity survive a browser restart.</p>
+<p>The invite admits up to three trusted peers who may host. Watch only selects
+seat zero and disables succession-checkpoint acceptance in that session. Observers
+keep their ball solver frozen and cannot submit player actions. Handoff becomes
+available when the authority has an eligible successor.</p>
+<p>Migration restores the approved checkpoint under a newer epoch. The Body2 adapter
+seeds the new owner&#39;s actual solver from the saved pose and momentum before new
+scoped observations can commit. It does not serialize Godot contact caches.
+An abrupt loss can roll back recent progress to the approved backup.</p>
+<h2 id="connection-and-save-settings">Connection and save settings<a class="heading-anchor" href="#connection-and-save-settings" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><code>RSL_ROOM_ADDRESS</code> and <code>RSL_PORT</code> describe native gameplay reachability; default
+gameplay port is 49570. The grant supplies the Room connection information.</li>
+<li><code>RSL_ROOM_LOCAL=1</code> permits the shared literal-loopback WS development exception.
+Secure deployments use the service&#39;s normal WSS configuration. <code>RSL_ROOM_CA</code>
+supplies a native trusted certificate when needed.</li>
+<li><code>RSL_ICE_JSON</code> and <code>RSL_ROOM_RELAY</code> configure existing RTC/relay adapters.</li>
+<li>Save/F5 in a Party publishes through the service, reporting a committed receipt.
+<code>RSL_ROOM_CHECKPOINT_MS</code> optionally requests automatic publication. A later
+successful save replaces that room&#39;s published progress.</li>
+<li>Party publication is separate from native file saves and browser-local storage.
+Standalone native Save/Resume keeps its matching-profile policy. Browser-local
+Solo saves are described in the <a href="session-ui.html#browser-local-checkpoints">session guide</a>.</li>
+</ul>
+<p>The operator-selected <code>slopball</code> service backend validates complete B24
+(<code>0x52534c4f50423234</code>) checkpoints. Client requests cannot choose validation code.
+This integration does not change the model or checkpoint schema.</p>
+<h2 id="verification">Verification<a class="heading-anchor" href="#verification" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_SLOPBALL_ONLINE_OUT=/absolute/fresh/output \
+  nix develop --<span class="hljs-built_in">command</span> bash tests/replay_slopball_online/run.sh</code></pre></div><p>The fixture covers native Party UI and four-browser planned/crash migration,
+including exact recovery, moving solver seeding, continued kicks/goals, observer
+rejoin, fresh host return, named chat, common world digests and durable publication.
+It checks actual RTC traffic and rejects WebGL errors. <code>RSL_PROBE=1</code> enables the
+extra checkpoint diagnostics used by the browser fixture.</p>
+<p>Static pitch, kicker and ball geometry uses authored immutable meshes to avoid
+Polygon2D redraw buffer conflicts in the pinned Web renderer. Geometry and physics
+remain the same. Public deployment, broader network/OS/hardware testing, repeated
+failures, Steam and human play comparison remain roadmap work.</p>
+<p>See <span class="local-reference" title="docs/replay/results/slopball-online-2026-09-14/README.md · available in the repository">recorded results and limitations</span>.</p>
+<h2 id="reopening-a-saved-party">Reopening a saved party<a class="heading-anchor" href="#reopening-a-saved-party" aria-label="Link to this section">#</a></h2>
+<p>After every game process has stopped, Rejoin recent can reopen the service&#39;s
+published progress under a new authority epoch. Keep the service database and the
+returning members&#39; Party credentials. The service can restart with database creation
+disabled. An observer may register first but cannot create an authority runtime;
+a returning trusted player restores the publication and players reclaim their saved seats.</p>
+<p>The saved world includes ownership scopes, accepted body observations, movement
+baselines, pose, linear/angular velocity, score and names. The first eligible local
+solver receives that saved pose/momentum before publishing in the new epoch. The
+UI reports restored progress and known rolled-back ticks. New play can publish a
+replacement save. Progress after the publication can be lost, and cosmetic chat
+history is not guaranteed after every process disappears.</p>
+<p>Native WSS/ENet and browser RTC shutdown/restart fixtures are available in
+<a href="../../tests/replay_slopball_native_restore/README.html">the native gate</a> and
+<a href="../../tests/replay_slopball_party_restore/README.html">the browser gate</a>. They compare
+the saved world and actual first solver seed independently, then require another
+kick/goal, returning named players/observer, new chat and renewed publication.</p>
+<p>See <span class="local-reference" title="docs/replay/results/slopball-party-restore-2026-09-14/README.md · available in the repository">shutdown-recovery results and limitations</span>.</p>
+<p>The restore gates also cover a trusted player in seat two restoring before the
+creator returns. The creator subsequently reclaims seat one; the new authority can
+continue play and publish a replacement checkpoint under its own identity.</p>
+<p>See <span class="local-reference" title="docs/replay/results/owner-streamed-party-restore-2026-09-14/README.md · available in the repository">the expanded recovery matrix and its limits</span>.</p>
+<p>The recovery notice uses the shared <a href="../../replay/godot/room_backup.html">backup-status observation</a>.
+It distinguishes an approved backup from preparation, stale progress or uncertain
+control; a prior host change does not imply the next backup is ready.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session-ui.html"><span>Slopball session UI</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_slopball_native_restore/README.html"><span>Slopball native published-party restore</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_slopball_party_restore/README.html"><span>Slopball browser published-party restore</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_slopball/online.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#identity-and-authority" class="">Identity and authority</a><a href="#connection-and-save-settings" class="">Connection and save settings</a><a href="#verification" class="">Verification</a><a href="#reopening-a-saved-party" class="">Reopening a saved party</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_slopball/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

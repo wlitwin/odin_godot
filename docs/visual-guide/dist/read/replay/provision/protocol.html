@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Create/join protocol and Godot connection · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Create/join protocol and Godot connection</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/provision/protocol.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#server-ownership">Server ownership</a><a href="#wire-and-retry-contract">Wire and retry contract</a><a href="#godot-connection-and-tls">Godot connection and TLS</a><a href="#remaining-integration">Remaining integration</a></nav></details>
+<article class="reading-body "><p>The admission backend now has a canonical request/reply protocol, a bounded room
+hub and a Godot client connection that requires verified TLS by default. Native
+processes create rooms, issue/use invites, authenticate authority RPCs, reconnect,
+and recover the same credentials after a server kill/restart. The
+<span class="local-reference" title="docs/replay/results/provision-tls-2026-09-07/README.md · available in the repository">recorded gate</span> separates
+this local TLS acceptance from public deployment and browser enrollment.</p>
+<h2 id="server-ownership">Server ownership<a class="heading-anchor" href="#server-ownership" aria-label="Link to this section">#</a></h2>
+<p><code>Hub_Config</code> selects one game content ID, the policy for new rooms, and a resident
+room limit (1–32, default 16). <code>hub_open</code> receives the complete existing bundle set
+before accepting traffic. <code>sqlite.load_all</code> reads that inventory transactionally
+into a caller-bounded destination; excessive, corrupt or wrong-content rows fail
+without returning a partial inventory. One service owns this room set. Multiple
+instances sharing the database fence each other&#39;s writes; this is not an available
+multi-node coordinator cluster.</p>
+<p>New cooperative rooms use a client-supplied nonzero room ID and fresh 32-byte
+creator claim. Retain both before sending. A collision with another creator&#39;s room
+fails the claim check. Retrying a successful create with the same room, claim and
+endpoint returns the same credential; changed endpoints fail. Content and policy
+come from server configuration, not client permission fields. Existing rooms retain
+their persisted policy after restart.</p>
+<p>Public creation in a <strong>dedicated</strong> deployment is denied: its bootstrap credential
+belongs to infrastructure. Trusted deployment code must construct and persist such
+rooms before public admission starts. Ordinary-player invites remain available;
+trusted-player invites remain denied. A previously provisioned dedicated creator
+claim is an explicit infrastructure capability.</p>
+<p>Creation persists before publishing a room or grant. An uncertain create commit
+poisons the whole hub until startup reloads its inventory. An uncertain join follows
+the room owner&#39;s existing fail-closed rule. Unknown-room requests neither load
+storage nor trigger coordinator generation changes.</p>
+<p>Poll the transport once per update and bound its ingress loop. Pass provisioning
+packets to <code>hub_receive</code> and authority RPCs to <code>hub_control_receive</code>. Both can share
+a connection; authority still checks its MAC, nonce/incarnation, request frontier,
+lease and own budget. <code>hub_room</code> exposes a room to trusted embedding code. RTC
+rendezvous can bind to that room&#39;s service; multi-room signaling routing and game
+frontends still need integration.</p>
+<p>Admission has a global burst/rate of 32 requests and 32 requests/sec, and per
+connection a burst of 8 and 4 requests/sec. It retains at most 128 peer budget
+entries, reusing entries after 10 seconds of inactivity. The transport must also
+bound handshakes, connections, ingress and buffers. These limits do not replace
+account authorization, per-user creation quotas or room retirement. Rooms remain
+resident for the hub&#39;s lifetime and persist across restarts.</p>
+<h2 id="wire-and-retry-contract">Wire and retry contract<a class="heading-anchor" href="#wire-and-retry-contract" aria-label="Link to this section">#</a></h2>
+<p>Protocol version 1 uses canonical envelopes: request kind <code>0x5051</code>, reply kind
+<code>0x5053</code>, epoch 1, tick zero and the configured content ID. Fixed-size messages
+fit within <code>PACKET_BYTES</code> (1024). Wrong schema/version/content, noncanonical fields,
+invalid enums and wrong sizes are rejected before admission mutation.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Required fields beyond room/content/version/verb</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Create</td>
+<td><code>claim</code>: creator secret; <code>endpoint</code>: advertised gameplay endpoint</td>
+</tr>
+<tr>
+<td>Invite</td>
+<td><code>claim</code>: creator secret; <code>ticket</code>: new invite secret; <code>role</code>; <code>uses</code></td>
+</tr>
+<tr>
+<td>Join</td>
+<td><code>claim</code>: guest&#39;s fresh retry secret; <code>ticket</code>: invite secret; <code>endpoint</code></td>
+</tr>
+<tr>
+<td>Revoke</td>
+<td><code>claim</code>: creator secret; <code>ticket</code>: invite secret</td>
+</tr>
+</tbody></table>
+</div><p>Unused fields must be zero. Replies contain the SHA-256 hash of the exact request
+and matching room/content, plus a grant, ticket or error with empty result values.
+Clients reject unrelated or malformed replies. Durable idempotency survives fresh
+request wrappers and transport connections.</p>
+<p>The generic <code>Client</code> borrows a transport and clock. It keeps one request pending,
+retries identical bytes every 250 ms, and returns <code>Not_Ready</code> after 10 seconds
+without a correlated reply. Timeout is an uncertain outcome, not proof of failure;
+retry the same persisted request. Clock failure/reversal is explicit.
+<code>client.complete</code> and <code>client.reply</code> expose completion. Closing clears owned
+protocol buffers/credentials but does not close the borrowed transport.</p>
+<p><strong>This protocol is not encryption.</strong> The embedding must provide authenticated,
+confidential transport or an explicitly local test channel. Claims and credentials
+are bearer capabilities. Never put them in URLs, logs, gameplay snapshots or
+authority backup archives.</p>
+<h2 id="godot-connection-and-tls">Godot connection and TLS<a class="heading-anchor" href="#godot-connection-and-tls" aria-label="Link to this section">#</a></h2>
+<p><code>replay/godot.Provision_Connection</code> owns the socket and protocol client:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">connection: rgd.Provision_Connection
+err := rgd.provision_connect(&amp;connection, <span class="hljs-string">&quot;wss://rooms.example.test/admission&quot;</span>)
+<span class="hljs-comment">// Persist room_id and creator_claim before submission. Check every error.</span>
+err = rgd.provision_request(&amp;connection, {
+    version = provision.PROTOCOL, verb = .Create,
+    room = room_id, content = content_id,
+    claim = creator_claim, endpoint = advertised_endpoint,
+})
+err = rgd.provision_frame(&amp;connection) <span class="hljs-comment">// call from _process until complete</span>
+<span class="hljs-comment">// Consume connection.client.reply only when connection.client.complete is true.</span>
+<span class="hljs-comment">// Persist a successful grant before treating enrollment as recoverable.</span>
+rgd.provision_disconnect(&amp;connection)</code></pre></div><p>The URL must use <code>wss://</code>. Explicit <code>local_development=true</code> permits only literal
+<code>localhost</code>, <code>127.0.0.1</code> or <code>[::1]</code> with a valid port. Userinfo, misleading suffixes
+and non-loopback WS endpoints are rejected. Godot validates remaining URL syntax.
+The wrapper reconnects dropped sockets at most every 500 ms, retaining its request.</p>
+<p>Optional native <code>TLSOptions.client</code> can supply a private CA. Unsafe client and
+server options are refused on client connections. Browsers use their trust store;
+WASM compilation does not prove browser TLS enrollment. The test fixture installs
+no trusted root on the host machine.</p>
+<p><code>websocket_host(..., tls=server_options)</code> retains server TLS options and wraps
+accepted TCP streams. Handshakes occupy bounded slots and must complete within
+the configured deadline before HTTP/WebSocket acceptance. Closing releases open
+peers and pending TLS streams. Existing plain WebSocket callers retain their
+behavior. Godot documents these underlying
+<a href="https://docs.godotengine.org/en/stable/classes/class_streampeertls.html" rel="noreferrer">TLS stream</a>
+and <a href="https://docs.godotengine.org/en/stable/classes/class_websocketpeer.html" rel="noreferrer">WebSocket acceptance</a>
+APIs; fixtures verify the adapter under Godot 4.7.1.</p>
+<p><code>room_with_grant(options, grant)</code> validates content/credential shape and copies
+room, identity, key and stable game token into <code>Room_Options</code>. It keeps challenged
+process registration, clearing <code>provisioned_incarnation</code> and the session incarnation
+hint. Creator member 1 is bootstrap. Connection settings/model configuration remain
+game inputs. Membership and hosting permission do not confer a live authority lease.</p>
+<h2 id="remaining-integration">Remaining integration<a class="heading-anchor" href="#remaining-integration" aria-label="Link to this section">#</a></h2>
+<p>The <a href="enrollment.html">client enrollment journal</a> now persists pending requests before
+submission and successful credentials before use, with native SQLite and browser
+IndexedDB acceptance. The older TLS fixture still uses predetermined test claims
+and fingerprints; the enrollment fixture generates fresh claims and exercises the
+actual journal. The <a href="../../examples/replay_room_service/README.html">room service</a>
+and the Cavecrawl/Scrapyard party menus now integrate it with per-room RTC signaling and a
+reproducible co-op invite. Other game menus, general invite-operation persistence,
+public TLS/relay deployment and account/room lifecycle remain work.
+Original games and their existing fixture provisioning remain separately runnable.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/protocol.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#server-ownership" class="">Server ownership</a><a href="#wire-and-retry-contract" class="">Wire and retry contract</a><a href="#godot-connection-and-tls" class="">Godot connection and TLS</a><a href="#remaining-integration" class="">Remaining integration</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/protocol.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

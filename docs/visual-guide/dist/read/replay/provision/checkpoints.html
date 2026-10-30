@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Durable room checkpoints · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Durable room checkpoints</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/provision/checkpoints.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#api-and-ownership">API and ownership</a><a href="#persistence-contract">Persistence contract</a><a href="#remaining-all-members-gone-recovery-work">Remaining all-members-gone recovery work</a><a href="#validation">Validation</a></nav></details>
+<article class="reading-body "><p>The native <code>replay/provision/sqlite</code> store can retain one complete checkpoint per
+provisioned room. This is a server-side storage primitive for M5 room persistence;
+the room service can now accept publications for the three compiled game models.
+Godot Room handles manual and optional automatic publication. A separate
+<a href="checkpoint/restore.html">published restore API</a> now grants fresh-process authority;
+Room/Party now drives that lifecycle, with native and browser Cavecrawl rejoin UI
+acceptance. Scrapyard now includes declared external assets in atomic room packages;
+its cold-cache native/browser restoration is validated. Broader profiles and game
+paths remain open.
+Existing live host migration still uses replicated recovery checkpoints. The
+<a href="checkpoint/README.html">authenticated checkpoint protocol</a> now provides library
+client/server endpoints and a typed SQLite adapter, with native TLS restart
+acceptance. The standalone service now wires these endpoints through a bounded
+room hub. <a href="../godot/room_save.html">Room save handling</a> integrates status, capture,
+publication and exact lost-reply recovery with normal authority renewal.</p>
+<h2 id="api-and-ownership">API and ownership<a class="heading-anchor" href="#api-and-ownership" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">publication, error := storage.checkpoint_publish(
+    &amp;store, room.bundle.record, expected_publication_revision,
+    prepared.point, prepared.bytes, game_model,
+)
+
+saved, found, load_error := storage.checkpoint_load(
+    &amp;store, room_id, content_id, game_model,
+)
+<span class="hljs-keyword">defer</span> storage.stored_checkpoint_destroy(&amp;saved)</code></pre></div><p>Check every error before using outputs. The model and content ID come from the
+trusted deployment, not uploaded metadata. Keep the Store at a stable address,
+serialize its calls, and retain immutable input bytes until publication returns.
+Loads return an owned copy that remains valid across later writes and Store close.
+Destroy it once by pointer. A failed typed load returns no usable checkpoint.</p>
+<p><code>checkpoint_publish</code> is a trusted storage call, <strong>not an authentication endpoint</strong>.
+The protocol server authenticates the requesting current host and authorizes
+the operation against its live coordinator before calling it. Supplying an
+<code>authority.Record</code> does not prove possession of credentials or a live lease.
+Complete archives contain authority-only world data; future downloads must be
+restricted to eligible trusted hosts (infrastructure for dedicated games).</p>
+<h2 id="persistence-contract">Persistence contract<a class="heading-anchor" href="#persistence-contract" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Archives are bounded by <code>net.MAX_CHECKPOINT_BYTES</code> (currently 1 MiB). The typed
+decoder checks the complete current checkpoint schema and model contract,
+permit requirement, epoch and tick. Point room/content/epoch/size/SHA must agree.
+A cooperative checkpoint&#39;s local seat must belong to the recorded owner by
+game-token digest. A zero local seat requires dedicated authority policy.</li>
+<li>A write acquires <code>BEGIN IMMEDIATE</code>, reloads the durable private room Bundle and
+compares its entire authority Record to the supplied expected Record. A newer
+coordinator decision or competing coordinator restart fences the old writer.
+Released authority cannot publish a new checkpoint through this call.</li>
+<li>Publication has its own monotonically increasing revision. The caller supplies
+zero for the first publication, then the last known publication revision. In
+the same authority epoch, archive sequence must increase and tick cannot move
+backward. A later epoch may contain the explicit rollback approved by authority
+recovery. Storage itself does not approve that recovery or choose its limit.</li>
+<li>An exact retry of the currently stored publisher/Point/model contract returns
+the existing publication without writing, including after coordinator changes.
+This acknowledges a lost reply; it does not renew or reactivate the old host.
+Once superseded, an older publication is no longer an idempotent retry target.</li>
+<li>Metadata and bytes enter one transaction on the existing checked SQLite
+FULL/WAL connection. Publication does not mutate the authority Record, grant a
+lease, or change membership. A write error may be resolved by reloading/exact
+retry; callers must not assume an uncertain commit did not happen.
+The protocol&#39;s typed adapter supplies the expected contract and a commit guard;
+the guard rechecks live authorization after validation/update immediately before
+COMMIT. Rejection rolls the transaction back. Direct trusted storage calls may
+omit the guard, retaining the original storage-only API contract.</li>
+<li>Loads validate metadata framing and context, archive SHA, envelope checksum,
+kind, epoch and tick before returning bytes. <code>checkpoint_load</code> also validates
+the game-specific archive and stored contract. <code>publication_load</code> provides the
+envelope/integrity-only variant for trusted tooling; it is insufficient for
+starting a game.</li>
+</ul>
+<p>The additional <code>replay_room_checkpoint</code> table uses publication metadata version 1.
+The private Bundle version 1, authority Record version 3, gameplay protocol and
+checkpoint version remain unchanged. Existing databases gain an empty table when
+opened. Corrupt rows fail closed; they are not interpreted as absent saves or
+silently overwritten. File privacy and backup requirements match the room store.</p>
+<h2 id="remaining-all-members-gone-recovery-work">Remaining all-members-gone recovery work<a class="heading-anchor" href="#remaining-all-members-gone-recovery-work" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>The standalone room service now integrates authenticated upload/download/status
+with deployment-selected Cavecrawl, Speedball and Scrapyard models and bounded
+per-room endpoint ownership. The library binds exact requests,
+content/contracts and revisions to registered identity/nonce/connection
+generations, reusing bounded blob transfer. It never exposes a private Bundle
+or trusts a client-supplied authority Record.</li>
+<li>Extend Room publication acceptance across the game ports.
+The library now rechecks live ownership during transfer and at final commit,
+rejects revocation/expiry/competing durable CAS, and resolves exact committed
+retries. Native TLS now verifies the three actual game models&#39; tick-1 archives
+followed by service restart and a fresh trusted incarnation&#39;s identical download.
+Room/Party now support save cadence/status and Cavecrawl&#39;s active-game save path;
+native acceptance preserves actual loot across host and successor publications.
+Cavecrawl&#39;s browser gate also publishes before and after RTC host migration while
+preserving room isolation and stable rejoin. The remaining ports, broader browser
+acceptance and broader asset profiles still need
+integration before treating these checkpoints as complete resumable game saves.</li>
+<li>The durable restore decision now binds an exact publication and an eligible
+member&#39;s registered process to a newer epoch. A recovery-enabled service permits
+expired-owner Rebind only after lease expiry/quarantine; this grants no lease.
+The separate Restore operation atomically compares the publication and Record,
+persists epoch/request outcome together, and applies trust, seat reservation,
+release and rollback rules. Native TLS restores all three actual game models.</li>
+<li>Preserve lease expiry/restart quarantine and known rollback limits. A competing
+live migration or restore must win one CAS; old uploads, registrations and
+gameplay packets must not mutate the new epoch. Exact retries after a lost
+recovery grant must retain the already approved source point.</li>
+<li>Room now downloads/validates and owns the checkpoint, waits for the existing
+asset-preparation callback, requests the guarded grant and creates Session only
+under its live newer epoch. It preserves stable seats/tokens and the normal
+explicit pending-action disposition, separates profiles, and reports the saved
+tick plus service-known rollback. Complete asset packages now commit atomically
+with the checkpoint; typed collectors and content validators reject missing or
+extra dependencies. Restore compares the package descriptor again at commit.</li>
+<li>Cavecrawl&#39;s Room/Party resume/retry UX now passes native and fresh-browser
+service-kill/rejoin gates with continued play, new guests and a new publication.
+Continue broader native and browser
+service/client restarts with every participant absent, competing resumes,
+partial uploads, lost replies, stale credentials, changed assets/content,
+corrupt storage and dedicated-policy restrictions. Port and compare Cavecrawl,
+Speedball and Scrapyard while keeping their original games runnable.</li>
+</ol>
+<h2 id="validation">Validation<a class="heading-anchor" href="#validation" aria-label="Link to this section">#</a></h2>
+<p><code>nix develop --command bash tests/replay_provision_sqlite/run.sh</code> covers ownership,
+reopen, exact retries, publication/coordinator CAS, sequence/tick monotonicity,
+model mismatch, wrong owner/context/hash, read-only storage and corruption.
+Real subprocesses are killed at SQLite&#39;s
+<a href="https://www.sqlite.org/c3ref/commit_hook.html" rel="noreferrer">commit hook</a> before publication
+commit completes, and after successful commit. Fresh processes verify either the
+entire old or entire new publication and that coordinator reopening does not
+activate authority. These are process-crash tests, not power-loss or disk-failure
+certification. See <span class="local-reference" title="docs/replay/results/room-publication-2026-09-09/README.md · available in the repository">captured evidence</span>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../godot/room_save.html"><span>Durable Room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoints.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-and-ownership" class="">API and ownership</a><a href="#persistence-contract" class="">Persistence contract</a><a href="#remaining-all-members-gone-recovery-work" class="">Remaining all-members-gone recovery work</a><a href="#validation" class="">Validation</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/checkpoints.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

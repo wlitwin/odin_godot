@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Controls and discrete intents · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Controls and discrete intents</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/controls.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Movement, aim, held fire and revive remain sampled controls. The current Godot
+driver submits dash as <code>Action{kind=.Dash, aim=direction}</code>. A versioned
+<code>dash_schedule()</code> selects receipt-time delivery for dash and turret mount/release; other actions retain
+scheduled timing. The comparison fixture explicitly chooses receipt timing for
+every action and disables the classifier in its isolated game copy.</p>
+<p><strong>T</strong> captures a generation-checked turret target for mount/release through the
+same action-intent helper. Aim/fire operate the mounted turret; movement, dash,
+revive and casting are blocked until dismount. See <a href="shared-turret.html">shared turret</a>.</p>
+<p>The driver captures a dash direction once it has a readable player state, keeps
+the request through queue-capacity or recovery delays, and clears it only after
+<code>issue_action</code> returns a sequence ID. Sampling movement/fire cannot consume that
+pending request. The lobby, spectators, typing and menus discard unsubmitted input, and holding Shift
+while leaving an overlay does not manufacture a new press. A request during an
+unreadable interval remains latched until the driver can capture its direction.</p>
+<p>The reusable <a href="../../replay/godot/input/intents.html">action-intent helper</a> now owns the
+copied payload, pending tickets and recovery bookkeeping. Tickets include their
+epoch, so a reused sequence after migration cannot consume an old result.</p>
+<p>After queue admission the normal action ledger owns delivery. The driver tracks
+confirmed outcomes by sequence, removing each tracked ID once. A game rejection
+is a result, not an instruction to retry the dash automatically. <code>dash_probe</code>
+exposes submitted, confirmed, refused and pending counts for diagnostics. Dash
+effects use the existing speculative event and correction/cancellation path.</p>
+<p>The authority still checks connection, yard membership, health and cooldown.
+Direction is bounded and normalized; zero direction uses the player&#39;s current
+facing. Actions run after the movement step, so their dash expiry includes ten
+future movement ticks. The legacy control path starts its ten ticks immediately.
+Both use <code>dash_start</code>, the same speed, cooldown, event identity and counter rules.</p>
+<p><code>Control.dash</code> remains a compatibility field for already-recorded scheduled
+inputs in earlier Replay saves. The current authored driver never sets it. Its
+presence does not give those historical inputs receipt-time delivery or a new
+action verdict. This preserves their original execution semantics during import
+and replay while the new input path uses explicit action results.</p>
+<p>Content 47 adds the Dash enum member and timing contract. The offline converter
+accepts content 42–47, using frozen old action enums and preserving world state,
+pending action IDs/ticks, recorded controls and assets. A newly loaded game does
+not silently reinterpret an older save; use the explicit converter described in
+<a href="saves.html">saves</a>.</p>
+<p>The stress-fire development helper uses the same local origin as ordinary input:
+predicted position on a client, current authoritative position on a host. Its
+nearest-target census still uses the authoritative enemy observation. This does
+not add line-of-sight filtering, target leading, damage changes or guaranteed hits;
+cover and stale enemy observations can still produce misses.</p>
+<p><code>RSY_SNAPSHOT_EVERY=N</code> (browser query <code>snapshot_every=N</code>) sets the requested
+snapshot interval in simulation ticks, clamped to 1..30 (default 3). Simulation remains at
+60 Hz; three ticks requests 20 snapshots per second. Actual delivery also depends
+on backpressure, loss and recipient budgets. This is a local delivery preference,
+not a change to gameplay speed or saved world content.</p>
+<p>Current content 48 adds <a href="authority-history.html">authority-only rewind history</a>; dash timing remains unchanged.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="shared-turret.html"><span>Shared turret</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/input/intents.html"><span>Copied action intents</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/controls.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/controls.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

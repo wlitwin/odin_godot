@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Cavecrawl with owner motion · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Cavecrawl with owner motion</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_cavecrawl_owned/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#authoring-and-execution">Authoring and execution</a><a href="#recovery-and-acceptance">Recovery and acceptance</a><a href="#action-time-context-and-o1-saves">Action-time context and O1 saves</a></nav></details>
+<article class="reading-body "><p>This is an explicit cooperative motion profile beside the original Kit game and
+the server-simulated <a href="../replay_cavecrawl/README.html">Replay Cavecrawl</a>. It reuses
+that port&#39;s gameplay reducer, scenes and interface. A local producer moves its
+avatar and carried relic; authenticated, versioned pose samples become values in
+the authoritative replayable world. Inventory, combat, AI, progression and room
+authority remain server decisions.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl_owned/play.sh
+REPLAY_CAVE_ROLE=host nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl_owned/play.sh
+REPLAY_CAVE_ROLE=client nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl_owned/play.sh
+REPLAY_CAVE_ROLE=observer nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl_owned/play.sh</code></pre></div><p>The default port is <strong>49585</strong>. The native user directory is <code>ReplayCavecrawlOwned</code>;
+browser profile and Party namespaces also differ from the server-simulated port.
+Content <code>0x434156454f574e33</code> and the latest-observation contract are incompatible
+with server-motion peers/saves. There is no implicit cross-profile conversion.
+Both Replay profiles and the original Kit game remain independently runnable.</p>
+<h2 id="authoring-and-execution">Authoring and execution<a class="heading-anchor" href="#authoring-and-execution" aria-label="Link to this section">#</a></h2>
+<p>Edit shared gameplay in <code>examples/replay_cavecrawl/shared/cave/</code> and shared Godot
+authoring in <code>examples/replay_cavecrawl/scripts/</code> and its scenes/resources. The
+<code>owner_cave</code> package composes that world with ownership/sample metadata. Its step
+supplies accepted positions to the common reducer instead of integrating movement
+there. Validation requires both representations to agree.</p>
+<p><code>prepare.py OUTPUT</code> creates a fresh isolated project, binds the common scripts to
+the owner model, changes defaults, and records source hashes. <code>build.sh OUTPUT</code>
+also builds/imports it. Existing output projects are refused. For a persistent
+project to inspect in Godot:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_cavecrawl_owned/build.sh /absolute/fresh/output</code></pre></div><p><code>play.sh</code> uses a temporary generated project and removes it on exit; game profiles
+and saves live in the separate persistent user directory. Edit the shared authored
+source, rather than the temporary project. Assets retain the common port&#39;s
+<a href="../replay_cavecrawl/assets.html">original provenance</a>.</p>
+<p>Keyboard motion is normalized; scripted <code>walk_to</code> uses the original independent
+axis stepping. Local poses render immediately and are sampled into controls.
+The original&#39;s manual owner movement is not a rigid-body solver, so this variant
+does not add one or clip movement to the viewport/rift. Late owner poses can settle
+after a health/victory update; the producer gates new movement from observed state.</p>
+<p>Owner changes, floor transitions, respawn/revive, fresh identities and authority
+epochs invalidate previous sample scopes. Respawn/revive cuts the scope even when
+coordinates are unchanged. Checkpoints retain accepted pose/velocity, ownership,
+revision and sample frontiers; replay consumes those values without invoking the
+local producer. Scope and finite-value bounds are checked, but a cooperative owner
+is trusted to supply its own pose. This is not competitive movement validation or
+deterministic Godot physics.</p>
+<h2 id="recovery-and-acceptance">Recovery and acceptance<a class="heading-anchor" href="#recovery-and-acceptance" aria-label="Link to this section">#</a></h2>
+<p>The existing Room path supports this model. A provision/checkpoint service can use
+<code>REPLAY_ROOM_CONTENT=0x434156454f574e33</code> and
+<code>REPLAY_ROOM_CHECKPOINT_MODEL=cavecrawl-owned</code>; see the
+<a href="../replay_room_service/README.html">service configuration</a>. Service state must be
+separate from deployments of the other content IDs.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_CAVE_OWNER_OUT=/absolute/fresh/tests nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave_owner/run.sh
+CHECKPOINT_GAMES=cavecrawl-owned CHECKPOINT_RESTORE=1 REPLAY_CHECKPOINT_OUT=/absolute/fresh/checkpoints nix develop --<span class="hljs-built_in">command</span> bash tests/replay_room_checkpoint/run.sh</code></pre></div><p>The first native gates cover loot/door play, a faulted host → unowned → guest relic
+handoff, and planned/crash recovery with either successor or surviving guest carrying
+the relic. Pure model tests check stale/foreign/recycled samples, exact checkpoint
+installation, epoch rebinding, inventory retention and life/floor cuts. The existing
+shared reducer and native solo/network gates remain passing.</p>
+<p>Three real Chrome instances now pass planned carried-relic handoff; abrupt host
+loss passes with the two survivors. Owner epochs/revisions, fresh samples, social
+state, RTC traffic and profile reload are checked. Browser solo saves pass exact
+restore after a killed browser, continued actions, stale-writer rejection and
+corruption preservation in the default isolated namespace.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_CAVE_OWNER_WEB_OUT=/absolute/fresh/browser nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave_owner/browser_run.sh</code></pre></div><p>See <span class="local-reference" title="docs/replay/results/cave-owner-browser-2026-09-19/README.md · available in the repository">browser evidence and limits</span>.
+This is a new profile, not full original-game parity. Broader browsers and public
+network deployment, richer fault/recovery cases, remote presentation and paired gameplay/performance/ergonomics comparisons remain
+acceptance work.</p>
+<h2 id="action-time-context-and-o1-saves">Action-time context and O1 saves<a class="heading-anchor" href="#action-time-context-and-o1-saves" aria-label="Link to this section">#</a></h2>
+<p>O2 attaches the local producer&#39;s pose and ownership scope to range interactions
+and throws. The reliable action can be judged before its movement observation, or
+after a newer observation, without overwriting the avatar&#39;s accepted current pose.
+Take/door/pickup/carry/revive use the issued origin; thrown rocks clamp that origin
+to within 64 pixels of the accepted avatar position, matching the original rule.
+Current actor eligibility and target state still apply. Commands entered while a
+restored producer scope is not ready are held in a bounded 16-entry local FIFO;
+their origin is captured when submission becomes possible. Leave discards these
+unsubmitted intents. Respawn, ownership changes
+and authority epochs retire old contexts. This is a scoped owner claim, not a
+verified historical simulation pose or competitive anti-cheat.</p>
+<p>The lower-level action also supports <code>Accepted_Pose</code> for server-authored commands
+and O1 compatibility. Ordinary UI actions use <code>Owner_Pose</code>. Action IDs retain the
+runner&#39;s existing ordering and deduplication; contexts do not consume or rewind
+pose-stream sequences. A preserved pending context from a previous authority epoch
+is refused normally; a fresh command needs the newly observed scope.</p>
+<p>Convert an O1 or O2 native save explicitly to a new destination:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin build examples/replay_cavecrawl_owned/tools/upgrade_save \
+  -collection:godot=. -out:/tmp/upgrade-owned-cave
+/tmp/upgrade-owned-cave /path/to/owner1.replay /path/to/owner3.replay</code></pre></div><p>World, ownership, controls, membership and action frontiers remain unchanged.
+Pending O1 commands retain accepted-pose semantics; the converter does not invent
+an issue-time origin. Existing destinations/corrupt files are preserved, and
+coordinated archives require an application-owned upgrade. The converter does not
+rewrite browser IndexedDB records. Older browser archives remain protected by strict
+content checks; interactive cross-version browser import is still pending.</p>
+<p>O3 adds the common <a href="../replay_cavecrawl/impacts.html">generation-bound dweller impacts</a>.
+O2 saves convert with exact world/action preservation; explicit O2 recording
+verification retains the old event sequence.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/README.html"><span>Replay Cavecrawl</span><span aria-hidden="true">→</span></a><a href="../replay_cavecrawl/assets.html"><span>Asset provenance</span><span aria-hidden="true">→</span></a><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl_owned/README.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authoring-and-execution" class="">Authoring and execution</a><a href="#recovery-and-acceptance" class="">Recovery and acceptance</a><a href="#action-time-context-and-o1-saves" class="">Action-time context and O1 saves</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl_owned/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

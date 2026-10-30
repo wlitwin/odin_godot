@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>ICE settings for party and Room connections · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>ICE settings for party and Room connections</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/ice-deployment.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#supplying-settings">Supplying settings</a><a href="#reachability-and-limits">Reachability and limits</a></nav></details>
+<article class="reading-body "><p><code>Party_Config.ice_json</code> supplies a bounded RTC configuration, copied when Party
+opens and carried into <code>Room_Options.session.rtc.ice_json</code>. Room keeps that copy
+through authority changes and reconnects. Direct <code>Rtc_Config</code> / <code>Session_Options</code>
+users can continue supplying <code>ice_json</code> themselves. An empty value retains the
+local-only default with no ICE servers.</p>
+<p>The validator rejects oversized/deep JSON, non-dictionary roots, invalid server
+arrays, malformed URLs, missing TURN username/password fields and invalid transport
+policies before opening signaling. It allows at most 8 servers, 8 URLs per server
+and 8192 JSON bytes. URLs use <code>stun:</code>, <code>stuns:</code>, <code>turn:</code> or <code>turns:</code> with bounded
+host/port and optional TURN UDP/TCP transport. Other RTCConfiguration fields are
+passed to the platform; this validator does not certify arbitrary platform options.</p>
+<p>Relay-only mode requires at least one authenticated TURN entry:</p>
+<div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;iceTransportPolicy&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;relay&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;iceServers&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;urls&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;turn:relay.example.com:3478?transport=udp&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;username&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;issued-user&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;credential&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;issued-password&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span></code></pre></div><p>Godot forwards the configuration dictionary into its browser peer-connection
+constructor. Relay-only selection is a browser policy; the test harness verifies
+the actual selected pair rather than treating the configuration alone as evidence.
+<a href="https://github.com/godotengine/godot/blob/4.7.1-stable/modules/webrtc/webrtc_peer_connection_js.cpp" rel="noreferrer">Godot implementation</a>,
+<a href="https://www.w3.org/TR/webrtc/#rtcconfiguration-dictionary" rel="noreferrer">WebRTC configuration</a>.</p>
+<h2 id="supplying-settings">Supplying settings<a class="heading-anchor" href="#supplying-settings" aria-label="Link to this section">#</a></h2>
+<p>Native Cavecrawl reads <code>REPLAY_CAVE_ICE_JSON</code>; native Scrapyard reads <code>RSY_ICE_JSON</code>.
+These settings matter when using a native RTC extension; ordinary native ENet does
+not gain NAT traversal from an ICE configuration.</p>
+<p>Browser hosts set <code>globalThis.replayIceConfig</code> before starting Godot. It may be the
+configuration object or its JSON string. The game calls <code>rtc_ice_settings</code>, validates
+and copies the value during setup. It is intentionally not read from URL query
+parameters, party invitations or saved enrollment records.</p>
+<p>The optional <a href="../../relay/README.html">authenticated relay provider</a> now mints short-lived
+TURN credentials for enrolled members. <code>Party_Config.relay_credentials</code> enables
+background refresh and a source that refuses expired credentials when building new
+connections. Static ICE JSON remains available for other provider channels. Never
+ship the provider&#39;s shared signing secret to clients. In-place ICE restart, broader
+expiry/outage combinations and public deployment remain separate integration work.</p>
+<p>The configuration is runtime connection data, not gameplay state. It does not enter
+authority checkpoints, recipient snapshots, saved progression or invitation codes.
+Errors shown by the games describe the configuration failure without echoing the
+JSON. The configuration&#39;s strings are owned by Party/Room/Rtc for their respective
+lifetimes; changing the caller&#39;s original buffer cannot alter a live configuration.</p>
+<p>Same-term gameplay reconnect now retains the authenticated RTC reservation in
+memory when scope/incarnation match. Actual relay-stop/restart gates preserve the
+logical peer ID and action ledger while rebuilding data channels. See
+<a href="rtc-recovery.html">RTC recovery</a>. This does not renew expired TURN credentials.</p>
+<h2 id="reachability-and-limits">Reachability and limits<a class="heading-anchor" href="#reachability-and-limits" aria-label="Link to this section">#</a></h2>
+<p>Actual Coturn UDP and TCP relay fixtures exercise party gameplay, handoff and rejoin.
+The authentication fixture proves a bad password cannot silently fall back to a
+direct candidate when relay-only mode is selected. See
+<a href="../../../tests/replay_turn/README.html">relay tests</a> and
+<span class="local-reference" title="docs/replay/results/turn-relay-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
+<p>These local tests are not public Internet deployment acceptance. Public DNS,
+HTTPS/WSS certificates, firewall/NAT rules, provider credentials/quotas, additional
+browser engines, relay TLS (<code>turns:</code>), long-session expiry and combined outages
+need their own evidence. Coturn&#39;s loopback-peer exception is enabled only in the
+isolated local fixture, not prescribed for production.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="rtc-recovery.html"><span>RTC continuation during a gameplay reconnect</span><span aria-hidden="true">→</span></a><a href="../../../tests/replay_turn/README.html"><span>Actual TURN relay gates</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/ice-deployment.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#supplying-settings" class="">Supplying settings</a><a href="#reachability-and-limits" class="">Reachability and limits</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/ice-deployment.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

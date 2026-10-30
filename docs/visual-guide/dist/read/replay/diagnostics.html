@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Explaining a local replay failure · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Explaining a local replay failure</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../reference/replay/diagnostics.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#canonical-field-differences">Canonical field differences</a><a href="#persistent-gameplay-windows">Persistent gameplay windows</a></nav></details>
+<article class="reading-body "><p><code>audit</code> reports the first tick whose re-executed state or event batch differs from
+recorded history. <code>audit_capture</code> performs the same single audit execution and
+retains the evidence at that first mismatch:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">capture: r.Audit_Capture(World, Input, Event)
+<span class="hljs-keyword">defer</span> r.audit_capture_destroy(&amp;capture)
+result := r.audit_capture(&amp;timeline, first_tick, &amp;capture)
+<span class="hljs-keyword">if</span> capture.ready {
+    <span class="hljs-comment">// capture.parent: the preceding frame used to execute the failing tick</span>
+    <span class="hljs-comment">// capture.input: the recorded input for that tick</span>
+    <span class="hljs-comment">// capture.expected / capture.actual: independent owned frame values</span>
+    <span class="hljs-comment">// capture.expected_events / actual_events: independent owned arrays</span>
+}</code></pre></div><p>The capture is populated only for <code>Diverged_State</code> or <code>Diverged_Event</code>. Successful
+audit, missing history, invalid arguments and a step that aborts do not produce a
+capture. The returned <code>Result</code> still explains those errors. An occupied capture
+must be destroyed before reuse. Destroy even when no mismatch was captured; the
+operation is safe for an empty owner.</p>
+<p>Captures do not alias the timeline, its recorded events or replay scratch. They
+remain available after another audit/correction reuses scratch, and modifying a
+capture cannot change the original history. All frame/input/event values still
+obey the core&#39;s no-reference value contract. Only the diagnostic event arrays
+allocate, and only after a divergence has actually been found. Ordinary <code>audit</code>
+retains its existing behavior and does not allocate a capture.</p>
+<p>This is evidence from one local replay, not a proof of determinism or a recorder
+of illegal external side effects. Callbacks must still obey the simulation contract.
+The captured preceding frame and input help reproduce one tick with the same code
+and explicitly supplied model configuration; hidden external state is not captured.</p>
+<h2 id="canonical-field-differences">Canonical field differences<a class="heading-anchor" href="#canonical-field-differences" aria-label="Link to this section">#</a></h2>
+<p>The optional <code>replay/schema</code> layer locates differing fields in schema-supported
+values. It remains separate from the core, whose value rules also permit types
+without a portable network schema.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">schema: sc.Schema
+sc.init(&amp;schema, World)
+<span class="hljs-keyword">defer</span> sc.destroy(&amp;schema)
+fields: [<span class="hljs-number">32</span>]sc.Difference
+report := sc.diff(&amp;schema, capture.expected.state, capture.actual.state, fields[:])
+<span class="hljs-keyword">for</span> field <span class="hljs-keyword">in</span> fields[:report.count] {
+    expected := sc.diff_value(&amp;schema, field, .Left)
+    actual := sc.diff_value(&amp;schema, field, .Right)
+    fmt.println(field.path, expected, actual)
+    delete(expected); delete(actual)
+}</code></pre></div><p><code>report.total</code> counts every differing field, while <code>report.count</code> is the number
+written into the caller&#39;s bounded buffer. Paths and enum names borrow the schema&#39;s
+metadata; keep it alive while using them. Formatted values are owned strings.
+Both complete inputs are validated before any output entry is written. Reports
+identify which side failed validation. Public projection excludes private fields
+from comparison and output. Compare authority fields only in trusted local tooling.</p>
+<p>These are canonical scalar-bit differences: padding is ignored, endian-qualified
+fields are normalized, and signed zero or permitted NaN payload differences remain
+visible. The core audit compares logical Odin values, so its equality rule can differ
+from canonical byte equality. <code>diff_encoded</code> compares exact canonical payloads;
+validate framing/context/authenticity separately before supplying untrusted bytes.</p>
+<p>For event failures, compare the captured event counts and use a schema for
+<code>r.Occurrence(Event)</code> to compare corresponding entries. Event order and semantic IDs
+are part of the core&#39;s recorded batch, so a different order is itself useful evidence.</p>
+<p>The <a href="../examples/replay_scrapyard/tools/inspect_run/README.html">Scrapyard inspection tool</a>
+shows the field-diff API applied to validated real game checkpoints. It emits bounded
+JSON without modifying either save or opening a network session.</p>
+<p><code>audit_window</code> finds the latest bounded replayable suffix without copying gameplay
+values. It stops at an initial/corrected checkpoint or retained-history edge.
+<code>audit_recent</code> captures a failure from that suffix. This is useful for clients,
+whose authority correction did not come from locally recorded generating input.
+The <a href="godot/debug/debug.html">Godot overlay</a> uses these boundaries and the owned plain-text
+formatter in <code>replay/diagnostic</code> for explicit developer audits.</p>
+<h2 id="persistent-gameplay-windows">Persistent gameplay windows<a class="heading-anchor" href="#persistent-gameplay-windows" aria-label="Link to this section">#</a></h2>
+<p><a href="diagnostic/recording.html">Portable local recordings</a> retain a complete replayable
+suffix, including input, expected frames and events. They can be exported from
+Hello, loaded by the headless verifier and executed in native/WASM independently
+of the original process. This complements the failure-only <code>Audit_Capture</code> and
+transport-interface trace recorder.</p>
+<p><a href="diagnostic/playback.html">Loaded recording playback</a> adds a transactional recording
+owner and expected-frame cursor. Hello&#39;s Open recording control verifies files,
+shows mismatch details, and explicitly returns to the original game or starts a
+new branch. Native and Chrome import workflows preserve pause and effect ownership.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../examples/replay_scrapyard/tools/inspect_run/README.html"><span>Inspect two Replay Scrapyard saves</span><span aria-hidden="true">→</span></a><a href="godot/debug/debug.html"><span>Local diagnostic overlay</span><span aria-hidden="true">→</span></a><a href="diagnostic/recording.html"><span>Portable local gameplay recordings</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/diagnostics.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#canonical-field-differences" class="">Canonical field differences</a><a href="#persistent-gameplay-windows" class="">Persistent gameplay windows</a></nav><div class="outline-actions"><a href="../../reference/replay/diagnostics.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

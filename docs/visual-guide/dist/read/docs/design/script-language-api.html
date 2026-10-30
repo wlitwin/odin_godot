@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The ScriptLanguageExtension surface (Godot 4.6.2) — implementation reference · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>The ScriptLanguageExtension surface (Godot 4.6.2) — implementation reference</h1><div class="reader-meta"><span>12 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/design/script-language-api.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#1-gdextensionscriptinstanceinfo3--per-node-dispatch-the-hot-path">1. GDExtensionScriptInstanceInfo3 — per-node dispatch (the hot path)</a><a href="#2-scriptextension--one-per-odin-file-odinscript-37-virtuals">2. ScriptExtension — one per .odin file (OdinScript, 37 virtuals)</a><a href="#3-scriptlanguageextension--the-singleton-odinlanguage-60-virtuals">3. ScriptLanguageExtension — the singleton (OdinLanguage, 60 virtuals)</a><a href="#key-design-implications">Key design implications</a><a href="#editor-developer-experience-features-implemented">Editor developer-experience features (implemented)</a></nav></details>
+<article class="reading-body "><p>The &quot;fully replace GDScript&quot; goal means implementing three engine interfaces. Extracted
+from the pinned engine (<code>extension_api.json</code> + <code>gdextension_interface.h</code>):</p>
+<ul>
+<li><strong><code>ScriptLanguageExtension</code></strong> — 60 virtual methods (the language singleton, <code>OdinLanguage</code>)</li>
+<li><strong><code>ScriptExtension</code></strong> — 37 virtual methods (one per <code>.odin</code> resource, <code>OdinScript</code>)</li>
+<li><strong><code>GDExtensionScriptInstanceInfo3</code></strong> — 26 function pointers (per-node instance dispatch)</li>
+</ul>
+<p>Not all 123 entry points need real bodies. Below, each is tiered <strong>MUST</strong> (core behavior),
+<strong>SHOULD</strong> (editor/tooling polish), or <strong>STUB</strong> (return a safe default — empty list / false /
+nil). Phase numbers refer to PLAN.md. Cross-referenced against the miniml_godot reference,
+which shipped with a working subset.</p>
+<blockquote>
+<p><strong>Registration mechanics</strong> (proven by <code>examples/hello/</code>): we register <code>OdinLanguage</code> and
+<code>OdinScript</code> as GDExtension classes whose parent is <code>ScriptLanguageExtension</code> /
+<code>ScriptExtension</code>, and supply the virtuals through <code>get_virtual_func</code> (name → fn ptr),
+exactly like the hello example dispatches <code>_process</code>. The per-instance vtable is passed to
+<code>script_instance_create3</code>.</p>
+</blockquote>
+<hr>
+<h2 id="1-gdextensionscriptinstanceinfo3--per-node-dispatch-the-hot-path">1. <code>GDExtensionScriptInstanceInfo3</code> — per-node dispatch (the hot path)<a class="heading-anchor" href="#1-gdextensionscriptinstanceinfo3--per-node-dispatch-the-hot-path" aria-label="Link to this section">#</a></h2>
+<p>This is where engine lifecycle/method/signal calls enter Odin. The crux is <code>call_func</code>.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>fn ptr</th>
+<th>tier</th>
+<th>phase</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>call_func</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>dispatch a method name → registered Odin proc; convert Variant args to typed params. <code>_process</code>/<code>_physics_process</code>/signal handlers/custom methods all arrive here.</td>
+</tr>
+<tr>
+<td><code>notification_func</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td><code>NOTIFICATION_READY</code>(13)/<code>ENTER_TREE</code>/<code>EXIT_TREE</code>/etc. → lifecycle procs. <strong><code>_ready</code> arrives as a notification, not a call</strong> (miniml: it&#39;s deferred a frame).</td>
+</tr>
+<tr>
+<td><code>get_owner_func</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>return the node Object* (stored at instance create).</td>
+</tr>
+<tr>
+<td><code>get_script_func</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>return the <code>OdinScript</code> Object*.</td>
+</tr>
+<tr>
+<td><code>get_language_func</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>return the <code>OdinLanguage</code> singleton.</td>
+</tr>
+<tr>
+<td><code>free_func</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>free the Odin instance struct + env.</td>
+</tr>
+<tr>
+<td><code>has_method_func</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>does the registered class have this method?</td>
+</tr>
+<tr>
+<td><code>set_func</code> / <code>get_func</code></td>
+<td><strong>MUST</strong></td>
+<td>3</td>
+<td><code>@export</code> property write/read (field at offset in the Odin struct).</td>
+</tr>
+<tr>
+<td><code>get_property_list_func</code> / <code>free_property_list_func</code></td>
+<td><strong>MUST</strong></td>
+<td>3</td>
+<td>report <code>@export</code> vars to Inspector/serializer.</td>
+</tr>
+<tr>
+<td><code>get_property_type_func</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>Variant type of a property.</td>
+</tr>
+<tr>
+<td><code>get_method_list_func</code> / <code>free_method_list_func</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>enumerate methods (editor/introspection).</td>
+</tr>
+<tr>
+<td><code>get_method_argument_count_func</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>arg count for a method.</td>
+</tr>
+<tr>
+<td><code>property_can_revert_func</code> / <code>property_get_revert_func</code></td>
+<td>STUB</td>
+<td>3</td>
+<td>default value revert (return false).</td>
+</tr>
+<tr>
+<td><code>validate_property_func</code></td>
+<td>STUB</td>
+<td>3</td>
+<td>Inspector tweaks (no-op).</td>
+</tr>
+<tr>
+<td><code>to_string_func</code></td>
+<td>STUB</td>
+<td>6</td>
+<td><code>&quot;&lt;OdinScript:Class&gt;&quot;</code>.</td>
+</tr>
+<tr>
+<td><code>refcount_incremented_func</code> / <code>refcount_decremented_func</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>for RefCounted-based scripts; default.</td>
+</tr>
+<tr>
+<td><code>is_placeholder_func</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>false (we instantiate real).</td>
+</tr>
+<tr>
+<td><code>set_fallback_func</code> / <code>get_fallback_func</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>dynamic prop fallback (nil).</td>
+</tr>
+<tr>
+<td><code>get_class_category_func</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>Inspector grouping (nil).</td>
+</tr>
+<tr>
+<td><code>get_property_state_func</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>serialize live property values (for reload/save).</td>
+</tr>
+</tbody></table>
+</div><hr>
+<h2 id="2-scriptextension--one-per-odin-file-odinscript-37-virtuals">2. <code>ScriptExtension</code> — one per <code>.odin</code> file (<code>OdinScript</code>, 37 virtuals)<a class="heading-anchor" href="#2-scriptextension--one-per-odin-file-odinscript-37-virtuals" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>method</th>
+<th>tier</th>
+<th>phase</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>_get_language</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>the <code>OdinLanguage</code> singleton.</td>
+</tr>
+<tr>
+<td><code>_can_instantiate</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>true at runtime (false for tool-only in editor unless <code>@tool</code>).</td>
+</tr>
+<tr>
+<td><code>_instance_create</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>build a script instance (ScriptInstanceInfo3 + Odin struct) for an owner node.</td>
+</tr>
+<tr>
+<td><code>_get_instance_base_type</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>the <code>extends</code> base class name (e.g. <code>CharacterBody2D</code>).</td>
+</tr>
+<tr>
+<td><code>_has_source_code</code> / <code>_get_source_code</code> / <code>_set_source_code</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>the <code>.odin</code> text.</td>
+</tr>
+<tr>
+<td><code>_reload</code></td>
+<td><strong>MUST</strong></td>
+<td>4</td>
+<td>recompile + re-bind live instances (hot reload).</td>
+</tr>
+<tr>
+<td><code>_has_method</code></td>
+<td><strong>MUST</strong></td>
+<td>2</td>
+<td>registered class has method?</td>
+</tr>
+<tr>
+<td><code>_is_tool</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td><code>@tool</code> scripts run in editor.</td>
+</tr>
+<tr>
+<td><code>_is_valid</code></td>
+<td><strong>MUST</strong></td>
+<td>1</td>
+<td>compiled/registered OK?</td>
+</tr>
+<tr>
+<td><code>_get_script_property_list</code></td>
+<td><strong>MUST</strong></td>
+<td>3</td>
+<td><code>@export</code> vars.</td>
+</tr>
+<tr>
+<td><code>_get_script_signal_list</code> / <code>_has_script_signal</code></td>
+<td><strong>MUST</strong></td>
+<td>3</td>
+<td>declared signals.</td>
+</tr>
+<tr>
+<td><code>_get_script_method_list</code> / <code>_get_method_info</code> / <code>_get_script_method_argument_count</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>method introspection.</td>
+</tr>
+<tr>
+<td><code>_has_property_default_value</code> / <code>_get_property_default_value</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td><code>@export</code> defaults.</td>
+</tr>
+<tr>
+<td><code>_get_base_script</code> / <code>_inherits_script</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>script inheritance chain (likely nil — Odin extends engine classes, not other scripts, at least initially).</td>
+</tr>
+<tr>
+<td><code>_get_global_name</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td><code>class_name</code>-equivalent for cross-script typing/autoload.</td>
+</tr>
+<tr>
+<td><code>_has_static_method</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>static methods.</td>
+</tr>
+<tr>
+<td><code>_get_rpc_config</code></td>
+<td>SHOULD</td>
+<td>5</td>
+<td>multiplayer RPC annotations.</td>
+</tr>
+<tr>
+<td><code>_placeholder_instance_create</code> / <code>_placeholder_erased</code> / <code>_is_placeholder_fallback_enabled</code> / <code>_instance_has</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>editor placeholder instances; default.</td>
+</tr>
+<tr>
+<td><code>_editor_can_reload_from_file</code></td>
+<td>SHOULD</td>
+<td>4</td>
+<td>true (enables editor reload).</td>
+</tr>
+<tr>
+<td><code>_is_abstract</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>false.</td>
+</tr>
+<tr>
+<td><code>_get_member_line</code></td>
+<td>SHOULD</td>
+<td>6</td>
+<td>editor go-to-symbol (via <code>odin</code> source map).</td>
+</tr>
+<tr>
+<td><code>_get_constants</code> / <code>_get_members</code></td>
+<td>STUB</td>
+<td>—</td>
+<td>empty.</td>
+</tr>
+<tr>
+<td><code>_update_exports</code></td>
+<td>SHOULD</td>
+<td>3</td>
+<td>refresh Inspector after edit.</td>
+</tr>
+<tr>
+<td><code>_get_doc_class_name</code> / <code>_get_documentation</code> / <code>_get_class_icon_path</code></td>
+<td>STUB</td>
+<td>6</td>
+<td>docs.</td>
+</tr>
+</tbody></table>
+</div><hr>
+<h2 id="3-scriptlanguageextension--the-singleton-odinlanguage-60-virtuals">3. <code>ScriptLanguageExtension</code> — the singleton (<code>OdinLanguage</code>, 60 virtuals)<a class="heading-anchor" href="#3-scriptlanguageextension--the-singleton-odinlanguage-60-virtuals" aria-label="Link to this section">#</a></h2>
+<h3 id="identity--registration--must-phase-1">Identity &amp; registration — MUST (Phase 1)<a class="heading-anchor" href="#identity--registration--must-phase-1" aria-label="Link to this section">#</a></h3>
+<p><code>_get_name</code>(&quot;Odin&quot;), <code>_get_type</code>(&quot;OdinScript&quot;), <code>_get_extension</code>(&quot;odin&quot;),
+<code>_get_recognized_extensions</code>([&quot;odin&quot;]), <code>_get_reserved_words</code>(Odin keywords),
+<code>_get_comment_delimiters</code>([&quot;//&quot;,&quot;/* */&quot;]), <code>_get_string_delimiters</code>([&quot;&quot; &quot;&quot;,&quot;<code> </code>&quot;]),
+<code>_create_script</code>(→ OdinScript), <code>_init</code>, <code>_finish</code>, <code>_make_template</code>,
+<code>_supports_builtin_mode</code>(false), <code>_can_inherit_from_file</code>(false at first),
+<code>_is_using_templates</code>, <code>_get_built_in_templates</code>.</p>
+<h3 id="threading--must-stub-phase-2">Threading — MUST-stub (Phase 2)<a class="heading-anchor" href="#threading--must-stub-phase-2" aria-label="Link to this section">#</a></h3>
+<p><code>_thread_enter</code> / <code>_thread_exit</code> — set up/tear down the Odin <code>context</code> per engine thread
+(or assert main-thread-only, like miniml). Important: the resource loader runs off-main.</p>
+<h3 id="reload--phase-4">Reload — Phase 4<a class="heading-anchor" href="#reload--phase-4" aria-label="Link to this section">#</a></h3>
+<p><code>_reload_all_scripts</code>, <code>_reload_scripts</code>, <code>_reload_tool_script</code> — drive the recompile+swap.</p>
+<h3 id="editor-tooling--should-phase-6">Editor tooling — SHOULD (Phase 6)<a class="heading-anchor" href="#editor-tooling--should-phase-6" aria-label="Link to this section">#</a></h3>
+<p><code>_validate</code> (run <code>odin check</code>, map diagnostics to line/col), <code>_validate_path</code>, <code>_lookup_code</code>,
+<code>_complete_code</code>, <code>_auto_indent_code</code>, <code>_find_function</code>, <code>_make_function</code>, <code>_can_make_function</code>,
+<code>_open_in_external_editor</code>, <code>_overrides_external_editor</code>, <code>_preferred_file_name_casing</code>,
+<code>_is_control_flow_keyword</code>, <code>_get_doc_comment_delimiters</code>, <code>_supports_documentation</code>,
+<code>_has_named_classes</code>, <code>_frame</code> (miniml used this to register a syntax highlighter on the
+editor main thread — deferred because UI isn&#39;t ready at init).</p>
+<blockquote>
+<p><code>_lookup_code</code> (editor &quot;Lookup Symbol&quot;) is a stub, but its Dictionary still needs BOTH
+<code>result</code> AND <code>type</code> — <code>ScriptLanguageExtension::lookup_code</code> does <code>ERR_FAIL_COND_V(!ret.has(&quot;type&quot;))</code>
+UNCONDITIONALLY (even on a failed lookup), so <code>{result}</code>-only would log
+<code>Condition &quot;!ret.has(&quot;type&quot;)&quot; is true</code>. <code>lv_dict_result_failed</code> returns
+<code>{result: FAILED, type: LOOKUP_RESULT_SCRIPT_LOCATION(0)}</code>.</p>
+</blockquote>
+<h3 id="global-classes--cross-script-typing--should-phase-3">Global classes / cross-script typing — SHOULD (Phase 3)<a class="heading-anchor" href="#global-classes--cross-script-typing--should-phase-3" aria-label="Link to this section">#</a></h3>
+<p><code>_handles_global_class_type</code>, <code>_get_global_class_name</code> — enables <code>class_name</code>-style autoloads
+and typed cross-script references (miniml did this via a <code>modules</code> project setting).</p>
+<h3 id="stub-safe-defaults--emptyfalsenil-unless-we-add-a-debugger-later">STUB (safe defaults — empty/false/nil) unless we add a debugger later<a class="heading-anchor" href="#stub-safe-defaults--emptyfalsenil-unless-we-add-a-debugger-later" aria-label="Link to this section">#</a></h3>
+<p><code>_get_public_functions</code>, <code>_get_public_constants</code>, <code>_get_public_annotations</code>,
+<code>_add_global_constant</code>, <code>_add_named_global_constant</code>, <code>_remove_named_global_constant</code>,
+all 12 <code>_debug_*</code> (stack/locals/expression eval — note: expression eval is impossible in
+AOT Odin, so the debugger is structural only), all 5 <code>_profiling_*</code>.</p>
+<hr>
+<h2 id="key-design-implications">Key design implications<a class="heading-anchor" href="#key-design-implications" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong><code>_ready</code> is a notification, not a method call</strong> — handle <code>NOTIFICATION_READY</code> in
+<code>notification_func</code>; <code>_process</code>/<code>_physics_process</code> come through <code>call_func</code> after
+<code>set_process(true)</code> (set when the registered class defines them).</li>
+<li><strong><code>@export</code> get/set work on struct field offsets</strong> captured at registration — this is why
+the registry stores field layout, and why the generator&#39;s new <em>property</em> rendering
+(in flight) matters for reading/writing engine-side base-class properties.</li>
+<li><strong>The whole language is one GDExtension class pair</strong> (<code>OdinLanguage</code>/<code>OdinScript</code>) plus a
+per-instance vtable — not one classdb class per script. The <code>examples/hello/</code> classdb
+path proves the <em>primitives</em>; the script path composes them differently.</li>
+<li><strong>Most of the 123 entry points are STUBs.</strong> Real work concentrates in ~15 MUST methods:
+instance <code>call</code>/<code>notification</code>/<code>set</code>/<code>get</code>/<code>property_list</code>, script <code>instance_create</code>/
+<code>source</code>/<code>reload</code>/<code>base_type</code>, language identity + <code>create_script</code>.</li>
+</ol>
+<hr>
+<h2 id="editor-developer-experience-features-implemented">Editor developer-experience features (implemented)<a class="heading-anchor" href="#editor-developer-experience-features-implemented" aria-label="Link to this section">#</a></h2>
+<p>Two editor-only features built on the language singleton. Both are NATIVE-only
+(<code>core/validate.odin</code>, <code>core/highlighter.odin</code>, <code>core/diag/</code>); the web build gets no-op
+stubs (<code>core/devtools_web.odin</code>).</p>
+<h3 id="_validate--real-odin-compiler-squiggles"><code>_validate</code> — real Odin compiler squiggles<a class="heading-anchor" href="#_validate--real-odin-compiler-squiggles" aria-label="Link to this section">#</a></h3>
+<p><code>OdinLanguage._validate(script, path, ...)</code> returns
+<code>{ &quot;valid&quot;: bool, &quot;errors&quot;: [ { &quot;line&quot;, &quot;column&quot;, &quot;message&quot; } ] }</code> driving the editor&#39;s
+inline error squiggles + the Errors panel.</p>
+<ul>
+<li><strong>Whole-package check.</strong> A single <code>.odin</code> file is not a compile unit, so we type-check its
+PACKAGE: globalize <code>path</code>, take its directory, and run
+<code>odin check &lt;pkgdir&gt; -collection:godot=&lt;root&gt; -no-entry-point -custom-attribute:gd_method</code>,
+parsing <code>‹file›(‹line›:‹col›) Error: ‹msg›</code> / <code>Syntax Error:</code> lines and keeping those whose
+basename matches the validated file. <code>valid = (errors == 0)</code>.</li>
+<li><strong>LIVE buffer overlay.</strong> <code>script</code> (arg 0) is the possibly-unsaved editor text. We copy the
+package dir to a temp overlay, overwrite the one edited file with <code>script</code>, then check —
+so errors update as you type, not only on save. The overlay&#39;s <code>*.gen.odin</code> siblings are
+the LAST-built ones (stale until the next scriptgen run); existing-code type errors still
+surface correctly.</li>
+<li><strong>Collection root config.</strong> The <code>&lt;root&gt;</code> for <code>-collection:godot</code> is resolved as: project
+setting <code>odin_godot/root</code> -&gt; env <code>ODIN_GODOT_ROOT</code> -&gt; the repo default. <strong>A consuming
+project must point one of these at wherever odin_godot lives.</strong></li>
+<li><strong>Never breaks the editor.</strong> Any failure (can&#39;t globalize/copy, <code>odin</code> missing, etc.)
+returns <code>{ valid:true, errors:[] }</code>.</li>
+<li><strong>NON-BLOCKING (background worker + cache).</strong> <code>_validate</code> runs on the editor MAIN THREAD and
+is called on every (debounced) edit. Because <code>-collection:godot=&lt;root&gt;</code> makes each check
+re-type-check the whole <code>godot</code> binding, running <code>odin check</code> synchronously here froze the
+UI for the full check duration (seconds, up to 10-20s cold on a large collection). So the
+check is now run on a BACKGROUND THREAD and <code>_validate</code> returns instantly:<ul>
+<li>A coordinator (<code>core/diag/async.odin</code>, <code>validate_async</code>) keeps a cache of the latest
+completed diagnostics keyed by a content hash of <code>script</code>+<code>path</code>, guarded by a <code>sync.Mutex</code>.</li>
+<li>On each call (main thread): a cache HIT for the exact content builds + returns the result
+immediately; otherwise it (re)schedules ONE background worker to run <code>run_check_overlay</code> and
+returns the LAST-KNOWN result instantly. The editor re-validates on its own debounce timer,
+so fresh diagnostics appear ~check-duration later WITHOUT ever freezing the UI.</li>
+<li>At most ONE worker is in-flight; edits arriving while it runs COALESCE into a single
+latest-pending job (no thread pile-up). The worker touches NO Godot/gdext objects — it runs
+on a private heap+temp-arena context and stores plain <code>Diagnostic{line,col,message}</code> data;
+only the main-thread <code>_validate</code> builds the Godot Dictionary. The <code>odin</code> binary is resolved
+on the main thread and passed to the worker. Measured: first-call latency ~0.03 ms vs a
+~34 ms warm (≈0.5 s cold) check — the main thread never blocks on the check.</li>
+<li><strong>Why not route diagnostics through the persistent <code>ols</code> (see <code>_complete_code</code>)?</strong> <code>ols</code>
+computes diagnostics by shelling out to the SAME <code>odin check</code> (its <code>src/server/check.odin</code>,
+config <code>odin_command</code> / <code>enable_checker_only_saved</code>) over the on-disk package — so it is NOT
+incremental and gives NO speed win over this async path (both are one <code>odin check</code>; warm
+~34 ms). Measured experiments also showed <code>ols</code> did not reliably push <code>publishDiagnostics</code>
+on open/change in this setup. So validation INTENTIONALLY stays on the async <code>odin check</code>
+worker (already non-blocking + warm-fast); the persistent <code>ols</code> session is used only where it
+is a real win — <strong>autocomplete</strong> (it avoids re-indexing the whole <code>godot</code> collection per
+request). Honest-partial by design: a same-speed-but-riskier ols diagnostics path was not
+shipped.</li>
+</ul>
+</li>
+<li><strong>Reachability / test.</strong> The virtual is engine-dispatched and NOT callable from GDScript,
+so the load-bearing overlay+check+parse pipeline AND the async coordinator live in
+<code>core/diag/</code> and are proven by <code>tests/validate/</code>: clean fixture -&gt; 0 errors; broken live
+buffer -&gt; 1 error at the exact line/column; the async path is non-blocking (first-call
+latency « check duration), eventually correct (broken still flags after the worker finishes),
+and coalescing (rapid edits keep one worker + one pending). <code>core/validate.odin</code> is the thin
+main-thread Godot glue on top.</li>
+</ul>
+<h3 id="_complete_code--autocomplete-backed-by-a-persistent-ols-session"><code>_complete_code</code> — autocomplete backed by a PERSISTENT <code>ols</code> session<a class="heading-anchor" href="#_complete_code--autocomplete-backed-by-a-persistent-ols-session" aria-label="Link to this section">#</a></h3>
+<p><code>OdinLanguage._complete_code(code, path, owner)</code> returns
+<code>{ &quot;result&quot;: int(Error), &quot;force&quot;: bool, &quot;call_hint&quot;: String, &quot;options&quot;: Array }</code> (the engine
+asserts <code>result</code> is present). As the user types, the editor calls it with the full buffer + a
+<code>U+FFFF</code> caret marker; we drive the <code>ols</code> Odin language server over a LIVE-buffer overlay of the
+script&#39;s PACKAGE and map its LSP <code>CompletionItem</code>s to Godot options (typing <code>gd.node2d_set_p</code>
+offers <code>node2d_set_position</code>, etc.).</p>
+<ul>
+<li><p><strong>Each option Dictionary must be FULLY-FORMED.</strong> Godot&#39;s <code>ScriptLanguageExtension::complete_code</code>
+(<code>core/object/script_language_extension.h</code>, ~L407-420) does <code>ERR_CONTINUE(!op.has(&quot;&lt;key&gt;&quot;))</code> on
+EVERY one of <code>kind</code> (int), <code>display</code> (String), <code>insert_text</code> (String), <code>font_color</code> (Color),
+<code>icon</code> (Ref&lt;Texture2D&gt;, nil ok), <code>default_value</code> (Variant, nil ok), <code>location</code> (int) before
+reading it — a missing key both drops the option AND spams the editor log
+(<code>Condition &quot;!op.has(&quot;font_color&quot;)&quot; is true ... at: complete_code (...:413)</code>). The canonical key
+set lives ONCE in <code>core/complete/option_shape.odin</code> (<code>Completion_Option_Field</code>); <code>core/complete.odin</code>
+builds each option by iterating it (so keys can&#39;t drift) and <code>tests/complete</code> asserts it covers the
+full required set. <code>font_color</code>/<code>icon</code> are placeholders here — the editor recomputes the shown
+color/icon in <code>CodeTextEditor::_complete_request</code>; only the KEYS&#39; presence + types matter.</p>
+</li>
+<li><p><strong>One long-lived <code>ols</code>, not a fresh spawn per keystroke.</strong> The naive path (<code>run_completion</code>,
+<code>core/complete/complete.odin</code>) starts a brand-new <code>ols</code>, makes it index the whole <code>godot</code>
+collection (<del>1059 files), answers ONE completion, and exits — **</del>0.5-1.25 s every time**. The
+persistent session (<code>core/complete/session.odin</code>, <code>session_complete</code>) keeps ONE <code>ols</code>
+subprocess alive for the editor session over real bidirectional stdio pipes (<code>core:os</code>
+process + pipe API), does the <code>initialize</code> handshake + <code>ols.json</code> write ONCE, then answers each
+request as <code>didOpen</code>/<code>didChange</code> + <code>textDocument/completion</code> against the resident index.
+<strong>Measured (tests/lsp): COLD first completion ~0.67 s; WARM completions ~17-19 ms</strong> — a
+~35-40x speedup on the hot path.</p>
+</li>
+<li><p><strong>Threading.</strong> A dedicated READER THREAD owns <code>ols</code> stdout, parses every <code>Content-Length</code>
+frame, and hands the awaited response (correlated by request id) to the caller via a cond var;
+notifications (<code>logMessage</code>, <code>publishDiagnostics</code>) are ignored. Mutexes guard the single
+in-flight request, stdin writes, the shared session/doc state, and start/teardown. The reader
+runs on a private heap+temp-arena context and NEVER touches Godot/gdext. <code>session_complete</code>
+blocks only the calling thread for the request round-trip (warm: tens of ms) — completion is a
+discrete action, far cheaper than the fresh spawn it replaces.</p>
+</li>
+<li><p><strong>Robust / never hangs.</strong> If <code>ols</code> can&#39;t start, dies, or a request times out, <code>session_complete</code>
+returns <code>ok=false</code> and the glue (<code>core/complete.odin</code>) transparently FALLS BACK to fresh-spawn
+<code>run_completion</code>, so completion never regresses or breaks the editor. A killed <code>ols</code> is detected
+(reader EOF) and the session RESTARTS on the next call; a short retry backoff prevents
+spawn-storms; a bogus <code>ols</code> binary fails in ~8 ms. The warn-once-if-<code>ols</code>-missing behavior and
+the <code>odin_godot/ols_bin</code> -&gt; <code>OLS</code> -&gt; PATH resolution are unchanged. <code>_finish</code> (<code>lv_finish_session</code>)
+kills the subprocess + reader + temp workspace on editor teardown.</p>
+</li>
+<li><p><strong>Reachability / test.</strong> The virtual is engine-dispatched, so the persistent session is proven
+by <code>tests/lsp/</code>: COLD vs WARM latency (asserts warm « cold and warm-avg &lt; 300 ms),
+<code>node2d_set_position</code> present (REAL godot procs), crash recovery after killing the live <code>ols</code>,
+clean shutdown, and the bogus-<code>ols</code> fast-fail fallback. <code>tests/complete/</code> still proves the
+fresh-spawn fallback (<code>run_completion</code>).</p>
+</li>
+</ul>
+<h3 id="odin-syntax-highlighter">Odin syntax highlighter<a class="heading-anchor" href="#odin-syntax-highlighter" aria-label="Link to this section">#</a></h3>
+<p><code>OdinSyntaxHighlighter</code> (extends <code>EditorSyntaxHighlighter</code>) token-colors <code>.odin</code> in the
+Script panel: <code>_get_name</code>-&gt;&quot;Odin&quot;, <code>_get_supported_languages</code>-&gt;[&quot;Odin&quot;] (matched against the
+language name), <code>_create</code>-&gt; a fresh clone, and <code>_get_line_syntax_highlighting(line)</code> -&gt;
+<code>{ start_col(int): { &quot;color&quot;: Color } }</code>. The byte-based, rune-column-accurate tokenizer
+covers keywords (control-flow distinct), <code>//</code> and single-line <code>/* */</code> comments, string/char
+/raw-string literals, numbers, PascalCase types, and proc-call identifiers.</p>
+<ul>
+<li><strong>Deferred registration.</strong> Registered on the FIRST editor <code>_frame</code> (guarded by a one-time
+flag + editor-hint check + a ~30s attempt cap), touching ONLY <code>ScriptEditor</code>
+(<code>register_syntax_highlighter</code>) — NEVER <code>EditorHelp</code>, whose doc-gen paths crash on
+extension classes. The class itself is registered lazily there too, so an exported game
+(no editor) never registers an editor-only class.</li>
+<li><strong>Limitations.</strong> Block comments are highlighted per-line (an unterminated <code>/*</code> colors to
+end-of-line); a <code>/* ... */</code> opened on a previous line is not tracked across lines. Colors
+are sensible dark-theme constants (pulling from <code>EditorSettings</code> is an easy later refine).
+Actual on-screen colors need a display to eyeball; <code>tests/editor_smoke</code> only proves the
+registration path runs in a headless editor without crashing.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/script-language-api.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#1-gdextensionscriptinstanceinfo3--per-node-dispatch-the-hot-path" class="">1. GDExtensionScriptInstanceInfo3 — per-node dispatch (the hot path)</a><a href="#2-scriptextension--one-per-odin-file-odinscript-37-virtuals" class="">2. ScriptExtension — one per .odin file (OdinScript, 37 virtuals)</a><a href="#3-scriptlanguageextension--the-singleton-odinlanguage-60-virtuals" class="">3. ScriptLanguageExtension — the singleton (OdinLanguage, 60 virtuals)</a><a href="#identity--registration--must-phase-1" class="subsection">Identity &amp; registration — MUST (Phase 1)</a><a href="#threading--must-stub-phase-2" class="subsection">Threading — MUST-stub (Phase 2)</a><a href="#reload--phase-4" class="subsection">Reload — Phase 4</a><a href="#editor-tooling--should-phase-6" class="subsection">Editor tooling — SHOULD (Phase 6)</a><a href="#global-classes--cross-script-typing--should-phase-3" class="subsection">Global classes / cross-script typing — SHOULD (Phase 3)</a><a href="#stub-safe-defaults--emptyfalsenil-unless-we-add-a-debugger-later" class="subsection">STUB (safe defaults — empty/false/nil) unless we add a debugger later</a><a href="#key-design-implications" class="">Key design implications</a><a href="#editor-developer-experience-features-implemented" class="">Editor developer-experience features (implemented)</a><a href="#_validate--real-odin-compiler-squiggles" class="subsection">_validate — real Odin compiler squiggles</a><a href="#_complete_code--autocomplete-backed-by-a-persistent-ols-session" class="subsection">_complete_code — autocomplete backed by a PERSISTENT ols session</a><a href="#odin-syntax-highlighter" class="subsection">Odin syntax highlighter</a></nav><div class="outline-actions"><a href="../../../reference/docs/design/script-language-api.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Durable client enrollment · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="../../../reading.html">All documentation <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Durable client enrollment</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/provision/enrollment.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#state-and-crash-behavior">State and crash behavior</a><a href="#godot-integration">Godot integration</a><a href="#storage-contract-and-supported-platforms">Storage contract and supported platforms</a><a href="#evidence-and-remaining-work">Evidence and remaining work</a></nav></details>
+<article class="reading-body "><p>Create/join now has a client-side journal that persists the exact request before
+it can be sent, and persists a successful credential before it can be used. Its
+native SQLite and browser IndexedDB drivers use compare-and-swap, so another
+process/tab cannot silently replace the identity in the same slot.</p>
+<p><code>Enrollment_Journal</code> owns the state machine and canonical codec without depending
+on Godot, a network or storage. <code>replay/godot.Enrollment_Profile</code> drives storage;
+<code>provision_enrollment_frame</code> connects the durable pending state to the existing
+verified-TLS provisioning connection. This is separate from gameplay saves,
+display names, authority bundles and migration checkpoints.</p>
+<h2 id="state-and-crash-behavior">State and crash behavior<a class="heading-anchor" href="#state-and-crash-behavior" aria-label="Link to this section">#</a></h2>
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-e1d9f94951e7b7.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-e1d9f94951e7b7.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-e1d9f94951e7b7.svg" alt="System diagram: Durable client enrollment" loading="lazy"></figure><p><code>enrollment_request</code> returns nothing before the request write&#39;s receipt.
+<code>enrollment_grant</code> returns nothing until the credential write&#39;s receipt. A storage
+failure preserves the previous in-memory record, clears staged buffers and stops
+the owner. It does not assume that a missing acknowledgement proves the storage
+transaction failed. Reopen the slot to resolve that uncertainty.</p>
+<p>If the game dies after storing a request but before sending it, the next process
+loads exactly the same room ID, endpoint and retry claim. If the server commits
+enrollment but the game dies before storing its grant, the next process repeats
+that request and receives the same credential. A ready slot loads directly without
+another enrollment request. The game still performs Room&#39;s challenged process
+registration; a stored credential is not a live authority lease.</p>
+<p>The slot is immutable: absent → pending (revision 1) → ready (revision 2). It
+cannot become another identity or service. Both a competing initial creator and a
+stale grant writer fail with <code>Conflict</code>; neither receives usable state from its
+failed write. A fresh owner can then load the winner. There is no automatic
+read-latest-and-overwrite path, deletion, account reset or credential retirement.</p>
+<p>The server URL and game content ID must exactly match the slot. No URL alias or
+redirect silently moves a credential to a different service. Unreadable, malformed,
+wrong-content and wrong-scope records are retained and rejected. Server refusal
+retains the durable request in <code>Refused</code>; <code>enrollment_retry</code> explicitly retries it.
+Closing and reopening also reloads that pending request. Permanent refusals need
+an application decision about choosing another slot or retiring the failed attempt.</p>
+<h2 id="godot-integration">Godot integration<a class="heading-anchor" href="#godot-integration" aria-label="Link to this section">#</a></h2>
+<p>Open <code>Enrollment_Profile</code> with a service URL, content, namespace and key. Browser
+reads are asynchronous. Native storage is an explicitly supplied
+<code>Enrollment_Backing</code>, avoiding a SQLite dependency for every Replay/Godot user.
+The optional <code>replay/godot/provision_sqlite.backing</code> borrows a native, already-open
+<code>provision/sqlite.Client_Store</code>. That store selects the native file and slot; its
+lifetime must exceed the profile&#39;s. Browser namespace/key select the IndexedDB slot.</p>
+<p>When an empty slot is ready, generate a cryptographic claim and construct a Create
+or Join request. The creator must also choose and retain a nonzero room ID; a guest
+uses the room/invite secret it was given. Submit with <code>enrollment_profile_begin</code>.
+The journal stages it; <code>enrollment_profile_frame</code> performs the storage operation.</p>
+<p>Open the matching <code>Provision_Connection</code> and call <code>provision_enrollment_frame</code> each
+frame. It pumps storage, submits only the durably pending request, handles its
+correlated reply, and writes the credential. It checks the connection&#39;s exact
+service URL before sending. A connection carrying an unrelated pending/completed
+request is rejected. Transport errors/timeouts leave the durable enrollment intact.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">profile: rgd.Enrollment_Profile
+connection: rgd.Provision_Connection
+<span class="hljs-comment">// Native: obtain backing from a slot/content-scoped Client_Store first.</span>
+ok := rgd.enrollment_profile_open(&amp;profile, service_url, game_content,
+                                  <span class="hljs-string">&quot;my-game&quot;</span>, <span class="hljs-string">&quot;active-room&quot;</span>, native_backing)
+<span class="hljs-comment">// Wait for Loading to complete. Ready can immediately resume with its grant.</span>
+<span class="hljs-comment">// Empty: construct a fresh create/join request, then stage it.</span>
+ok = rgd.enrollment_profile_begin(&amp;profile, request)
+err := rgd.provision_connect(&amp;connection, service_url)
+<span class="hljs-comment">// In _process, while enrollment is pending:</span>
+err = rgd.provision_enrollment_frame(&amp;connection, &amp;profile)
+grant, ready := provision.enrollment_grant(&amp;profile.value)
+<span class="hljs-comment">// Only ready grants go to room_with_grant / room_open.</span>
+rgd.provision_disconnect(&amp;connection)
+rgd.enrollment_profile_close(&amp;profile)
+<span class="hljs-comment">// Close the native backing after closing the profile.</span></code></pre></div><p>Check errors and phases at each step; the example abbreviates the menu controller.
+Reading a ready slot does not require opening a connection. The local-development
+WS opt-in must be explicit at both profile and connection. The default URL policy
+requires WSS, and the connection verifies TLS. On native, <code>provision.secret</code> supplies
+cryptographic claims. Browser callers can use Godot&#39;s cryptographic random-byte
+API; the test fixture checks its exact output length and rejects an empty result.</p>
+<h2 id="storage-contract-and-supported-platforms">Storage contract and supported platforms<a class="heading-anchor" href="#storage-contract-and-supported-platforms" aria-label="Link to this section">#</a></h2>
+<p>The client record is version 1, kind <code>0x5043</code>, envelope epoch 1, revision in tick,
+and game content in content. It contains a bounded canonical service URL, the exact
+Create/Join request, pending/ready state and that member&#39;s grant. Maximum encoded
+storage is 4096 bytes. State/revision, request shape, URL tail, content and credential
+shape are validated when loading. It contains no shared authority state.</p>
+<p>The native SQLite adapter is currently <strong>macOS/Linux</strong>. It uses a separate client
+file/table with the existing checked private-file, WAL/FULL/fullfsync setup. New
+files are private; missing creation is explicit, and the containing directory and
+backups remain the deployment/application&#39;s responsibility. Reads and transitions
+run under a revision CAS transaction. Other native platforms need an appropriate
+<code>Enrollment_Backing</code>; the API does not silently substitute an unsafe writer.</p>
+<p>The browser adapter uses the existing bounded IndexedDB operations and their
+transaction completion receipts. It compares the stored revision with the record&#39;s
+own canonical revision and preserves abort/conflict outcomes. Browser data belongs
+to the application origin/profile; changing origin is not automatic identity
+transfer. Native and browser records hold bearer credentials in private application
+storage, not encrypted vaults. Do not log, export or include them in game archives.</p>
+<h2 id="evidence-and-remaining-work">Evidence and remaining work<a class="heading-anchor" href="#evidence-and-remaining-work" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="docs/replay/results/client-enrollment-2026-09-07/README.md · available in the repository">enrollment gate</span>
+covers pure state/codec/transition rules, SQLite reopen/races/failures, native TLS
+client kills at three boundaries, actual Chrome kills, an aborted IndexedDB grant
+write, competing tabs and corrupt-record preservation. Native uses verified TLS;
+the browser fixture explicitly opts into loopback WS. Public browser TLS deployment
+remains a separate gate.</p>
+<p>Cavecrawl and Scrapyard now use the shared <a href="../godot/party.html">Party API</a> with this
+flow and a separate CAS recent-room reference. Their fixed co-op invitation is
+reproducible from the persisted creator claim and scoped request inputs, so issuance
+retries survive restart without a separate generated-secret record. Other game
+menus, profile retirement, account/device transfer, additional native storage
+platforms and public deployment remain work. Only Create/Join enrollment is
+journaled here; general Invite/Revoke intent and rotation workflows still need
+their own durable operation records.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/enrollment.md · source 446540144e3c with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#state-and-crash-behavior" class="">State and crash behavior</a><a href="#godot-integration" class="">Godot integration</a><a href="#storage-contract-and-supported-platforms" class="">Storage contract and supported platforms</a><a href="#evidence-and-remaining-work" class="">Evidence and remaining work</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/enrollment.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">All documentation ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
