@@ -6,19 +6,24 @@ ball's solver state to Kit's owner stream. The entity owner—the player permitt
 to write its owner-controlled fields—simulates the ball and sends its pose and
 velocity to the other peers.
 
-## The model
+<a id="the-model"></a>
 
-- **Your kicker is yours.** Each peer runs `move_and_slide` for its OWN CharacterBody2D
-  and owner-streams the resulting pose; every other screen glides the body to the stream.
-  Remote kickers stay solid (frozen kinematic to the solver), so crowds feel like crowds.
-- **One peer simulates the ball.** `play.Puppet` wraps the RigidBody2D: the entity's
-  owner runs the solver and streams pose + velocity; everyone else freezes the body and
-  follows. The HOST hands the seat to the **last toucher** by plain proximity arbitration
-  (`host.odin`) — granted a step *before* contact, so your kicks resolve on your own
-  solver with no round trip. The handoff carries momentum.
-- **Goals are host truth.** The host scores off the *streamed* pose and bumps plain
-  `gd:"replicate"` fields on the ball entity — host-authoritative deltas and a client's
-  owner stream sharing one entity is exactly what the field tags mean.
+## Ownership and scoring
+
+Each peer runs `move_and_slide` for its own CharacterBody2D and streams the
+resulting pose. Other peers interpolate that pose while keeping remote
+kickers solid and fixed relative to their local solver.
+
+One peer at a time simulates the RigidBody2D ball through `play.Puppet`. Its
+entity owner streams pose and velocity; other peers freeze their solver and
+follow the stream. The host's proximity arbitration in `host.odin` transfers
+ownership to the last toucher, anticipating contact by one step so that the
+receiving player's local solver can resolve the kick before a round trip.
+The transfer includes momentum.
+
+The host judges goals from the streamed pose and updates `gd:"replicate"`
+fields on the ball. An entity can therefore combine authority-written score
+with owner-streamed motion, with each field selecting its policy.
 
 ## Run it
 
@@ -33,28 +38,29 @@ SLOP_NAME=righty godot --path .    # Join
 WASD moves, Space kicks, first to `SLOP_GOALS` (default 3) takes the match. Odd seats
 defend the left goal, even the right.
 
-## The feel ledger
+<a id="the-feel-ledger"></a>
 
-The example applies seven measures to avoid stutter during ownership changes
-and display frames:
+## Solver and presentation timing
 
-1. **RigidBody2D ignores node transform writes** — live ones are stomped by the
-   server sync; frozen ones vanish when the freeze lifts. Every imposed pose
-   goes through `PhysicsServer2D.body_set_state` (`play.Puppet` does this).
-2. **Ownership transfers must flush the freshest sample** into the fields
-   before the ring resets, and **seed the fresh ring** so watcher interp flows
-   through the seam instead of pausing an interp window (kit does both now).
-3. **Run the session at the solver's rate** (60Hz here; `SLOP_HZ` drives both).
-4. **Arbitration is feel**: grant the seat *before* contact (anticipation),
-   make possession sticky, debounce moving-ball challenges, and let statues
-   never claim — an idle body doesn't need the seat.
-5. **Smooth corrections, never authority**: the body snaps to truth; the drawn
-   skin glides in (~63ms half-life). Deliberate cuts snap outright.
-6. **Predict possession**: `puppet_claim` seizes the sim the frame your screen
-   sees the touch; the host confirms it or denies it with a smoothed correction.
-7. **The last stutter wasn't netcode**: physics-tick stepping vs display
-   refresh. `physics/common/physics_interpolation=true`, reset it at cuts,
-   and never lerp an angle across the ±π wrap.
+The example uses these rules to manage ownership changes and display frames:
+
+1. Write imposed poses through `PhysicsServer2D.body_set_state`, as
+   `play.Puppet` does. Solver synchronization can overwrite direct node
+   transforms on a live RigidBody2D, and unfreezing can discard transforms
+   written while frozen.
+2. Flush the latest sample into the fields before resetting the interpolation
+   ring, then seed the new ring. Kit performs both operations so observers
+   can continue interpolating across an ownership change.
+3. Run the session at the solver's rate: 60Hz here, controlled by `SLOP_HZ`.
+4. Grant ownership before contact, retain possession across small gaps, and
+   debounce challenges from a moving ball. Idle bodies do not claim it.
+5. Apply accepted corrections to the physics body immediately, then smooth
+   only the drawn skin with a ~63ms half-life. Explicit cuts snap the skin too.
+6. `puppet_claim` predicts possession when the local screen sees contact. The
+   host confirms or denies that claim; a denial produces a smoothed correction.
+7. Enable `physics/common/physics_interpolation=true` to interpolate between
+   physics ticks and display frames, and reset it at cuts. Do not linearly
+   interpolate an angle across the ±π wrap.
 
 ## Automated tests
 

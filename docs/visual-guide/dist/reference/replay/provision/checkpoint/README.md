@@ -1,9 +1,8 @@
 # Authenticated checkpoint transfer
 
 Use `replay/provision/checkpoint` to publish or retrieve a room checkpoint
-through authenticated upload, download and status operations. It connects those
-operations to durable room storage. It reuses `replay/transfer` for bounded,
-retriable chunks. A per-room `Server` borrows the existing authority service and a
+through authenticated upload, download and status operations. It stores and retrieves durable room publications through `replay/transfer`,
+which splits data into bounded chunks and retries delivery. A per-room `Server` borrows the existing authority service and a
 typed storage backend; a `Client` borrows the registered process's control
 connection. Ordinary transfer operations grant no authority. Protocol 2 adds a
 separate [guarded restore decision](restore.md) for an exact durable publication.
@@ -42,8 +41,7 @@ loss, duplication and reordering. Control requests/replies always use reliable
 delivery. Selecting a channel the underlying transport does not support fails to
 make progress; there is no implicit transport downgrade.
 
-The client first registers through the existing authority RPC on the **same
-connection**, then opens with its control key, clock and borrowed transport. Build
+The client first registers through the authority RPC on the same connection, then opens with its control key, clock and borrowed transport. Build
 a `Request` with its identity, process nonce, current coordinator generation,
 room/content, model contract and a nonzero operation sequence. Keep operation
 sequences increasing within that process; control request retries reuse the entire
@@ -126,16 +124,18 @@ together; there is no silent wire fallback. Publication metadata remains version
 gameplay, authority RPC, Bundle/Record and archive formats are unchanged. The
 protocol package also checks for WASM.
 
-## Remaining integration
+<a id="remaining-integration"></a>
+
+## Integration coverage and limits
 
 The [standalone room service](../../../examples/replay_room_service/README.md)
 registers deployment-selected Cavecrawl, Speedball and Scrapyard backends through
-the bounded checkpoint Hub. Native TLS gates verify each actual game model across
+the bounded checkpoint Hub. Native TLS tests verify each actual game model across
 service restart. [Room/Party save handling](../../godot/room_save.md) owns
 status, capture, publication and retries, with native/browser Cavecrawl acceptance.
 Room/Party drives the full guarded restore lifecycle, with actual Cavecrawl
-resume/retry UI and native/browser acceptance. Other game paths and durable external
-assets beyond the bounded package profile still need integration. Scrapyard
+resume/retry UI and native/browser acceptance. Other game paths and external
+asset profiles beyond the bounded package still require integration. Scrapyard
 declares and validates its current/pending spray dependencies. Download alone
 grants no authority. See the broader
 [all-members-gone recovery plan](../checkpoints.md).

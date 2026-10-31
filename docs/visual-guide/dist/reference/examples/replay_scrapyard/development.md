@@ -22,13 +22,15 @@ as well as its own checks. The Godot adapter combines it with spray admission.
 and stops within 35 pixels of the target; it does not teleport or edit saved state.
 It is useful for reproducible setup before an interaction.
 
-The gauntlet gate uses this path after all three waves/rests. Players stop fighting
+The gauntlet test uses this path after all three waves/rests. Players stop fighting
 and walk to a clear setup area; only the host then spawns the original two barrels
 at offsets (150, 0) and (150, 50). The guest's attempted development spawn must
 receive an Invalid verdict. One ordinary host shot must cause both barrel blasts,
 without another clear reward, before all peers compare the complete world.
 
-The action enum changes the schema fingerprint and Scrapyard's experimental
-content ID advances to `0x5253435241503041`. Older experimental run archives and
-gameplay peers require explicit conversion/update; they are rejected rather than
-silently interpreted under the new contract. Profile values are unchanged.
+Adding the development action changed the schema fingerprint and introduced
+Scrapyard content ID `0x5253435241503041`. Archives and peers from before that
+transition require explicit conversion/update. They are rejected rather than
+interpreted under the changed schema. Profile values were unchanged by that
+transition. The [save guide](saves.md) records the current content identity and
+accepted conversion inputs.

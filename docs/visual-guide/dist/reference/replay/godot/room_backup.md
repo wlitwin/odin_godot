@@ -5,10 +5,11 @@ It reads Room's clock; the overload with `now_ms` accepts a time in that same cl
 domain and is otherwise read-only. Neither form renews, retires or changes the Lease,
 requests a transfer, elects a host or authorizes a handoff.
 
-For a current steady observation, the report includes the last accepted nominee/Point, observation epoch/revision/time,
-known progress, known age and configured rollback limit. Room retains that accepted
-observation while another RPC is pending, rather than treating the transient empty
-RPC reply as lost approval.
+When the observation is current and stable, the report identifies the last
+accepted backup nominee and Point, the observation's epoch/revision/time, known
+progress and age, and the configured rollback limit. The approved Point
+identifies the exact recovery checkpoint. Room retains accepted metadata while another
+RPC is pending; an empty in-progress reply does not revoke that approval.
 
 | Phase | Meaning |
 | --- | --- |
@@ -41,7 +42,7 @@ also retains disclosure of a completed host change or published restore, while
 still distinguishing a current pending/stale/checking backup. A previous successful
 restore is not evidence of a fresh backup now.
 
-Planned handoff keeps its existing API and eligibility checks; it can prepare a
-new final checkpoint. The readiness report is not a replacement for that protocol
+Planned handoff can prepare a new final checkpoint after its own eligibility
+checks. The readiness report is not a replacement for that protocol
 or a permanent guarantee against subsequent failures. Tests cover policy/clock
 edges and a live delayed-preparation, refresh, handoff and departing-peer scenario.

@@ -1,9 +1,9 @@
 # Typed authored archetypes
 
-For ordinary scripted actors, use [Script_Archetypes](adapter-bindings.md) over
-these foundations. It owns callback configuration and retains appearances, so its
-source registry may close after initialization. The lower-level API below keeps
-its explicit borrowing requirements.
+For scripted actors, [Script_Archetypes](adapter-bindings.md) owns callback
+configuration and retains appearance resources. Its source registry can close
+after initialization. Use the lower-level APIs below when custom bindings need
+explicit control of the borrowed registry and callback lifetimes.
 
 Use a stable gameplay ID to connect a value definition to local scene assets:
 
@@ -37,19 +37,20 @@ definition and local assets. Present ordinary `View_Item` batches through
 across archetypes before changing view lifetimes. Different IDs may use different
 PackedScenes and scene compositions with the same typed display interface.
 
-Each registered scene has a `View_Pool2`; the owner partitions into fixed scratch
-buffers. Steady presentation allocates no partition buffers. Scene creation still
-runs normal Godot lifecycle and can fail as with an ordinary view pool. Input
-preflight does not promise a transaction spanning arbitrary user `_ready` code.
+Each registered scene has a `View_Pool2`. The archetype pool partitions input
+items into fixed scratch buffers, with no partition-buffer allocation during
+steady presentation. Creating scenes runs their normal Godot lifecycle and
+can fail. Preflight validates input before scene changes, but it cannot roll
+back arbitrary work performed by user `_ready` procedures.
 
 Keep the parent and asset owner alive until all dependent views have been destroyed.
 Destroy/recreate the pools before replacing the asset registry. Keep callback
 configuration at stable addresses. Views may borrow appearance scripts only for
 that lifetime. Resource pointers never enter Display, World, input or checkpoints.
 
-Memory scales with the ID limit and per-kind capacity, even when few nodes are
-active. The partition bound is 1,048,576 item slots; each individual capacity is
-also bounded by `view.MAX_INDEX_CAPACITY`. During a kind change or scope reset,
+Memory use grows with the configured ID limit and capacity per archetype,
+even when few nodes are active. The partition bound is 1,048,576 item slots;
+each individual capacity is also bounded by `view.MAX_INDEX_CAPACITY`. During a kind change or scope reset,
 retired Godot nodes may await deferred deletion, as in the underlying view pool.
 Applications with very large catalogs may prefer their own shared-capacity scene
 pool or a specialized renderer. This convenience layer is optional.

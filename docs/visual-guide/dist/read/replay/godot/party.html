@@ -4,11 +4,11 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Party setup shared by games</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/party.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#lifecycle">Lifecycle</a><a href="#storage-and-permission-rules">Storage and permission rules</a><a href="#game-specific-ownership">Game-specific ownership</a></nav></details>
-<article class="reading-body "><p><code>Party</code> coordinates durable enrollment, recent-room selection, invite issuance and
-Room configuration. Cavecrawl, Scrapyard, Speedball and Quickdraw use it; their scene code supplies menu
-controls, game options and any game-specific recovery prerequisites. It does not
-own the simulation, choose loadouts, store progression or make an asset checkpoint
-ready by itself.</p>
+<article class="reading-body "><p><code>Party</code> durably stores room enrollment requests and credentials, selects recent
+rooms, issues invites, and configures Room. Cavecrawl, Scrapyard, Speedball, and
+Quickdraw use it. Their scene code supplies menus, game options, and recovery
+prerequisites. The game retains responsibility for simulation, loadouts,
+progression, and assets required to prepare a checkpoint.</p>
 <h2 id="lifecycle">Lifecycle<a class="heading-anchor" href="#lifecycle" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>Open a native <code>Party_Store</code> if applicable, then call <code>party_open</code> with the
@@ -45,10 +45,10 @@ provides a short default explanation for menus. The caller must prevent competin
 game starts while an attempt is active and avoid calling <code>room_open</code> repeatedly.
 The helper does not silently close an existing game session to start another one.</p>
 <h2 id="storage-and-permission-rules">Storage and permission rules<a class="heading-anchor" href="#storage-and-permission-rules" aria-label="Link to this section">#</a></h2>
-<p>The service URL hashes to the same slot/reference keys used by Cavecrawl&#39;s original
-online implementation. The helper preserves its enrollment/cursor formats, so existing
-enrollment records retain their identities. Namespace/content and an
-exact service URL remain the application&#39;s configuration. <code>Party_Storage</code> supplies
+<p>The service URL determines storage slot and reference keys. These keys and the
+enrollment/cursor formats remain compatible with Cavecrawl&#39;s original online
+implementation, so existing records retain their identities. Configure the
+namespace, content, and exact service URL in the application. <code>Party_Storage</code> supplies
 native slot selection and recent-reference CAS callbacks. The optional
 <code>provision_sqlite.Party_Store</code> owns a database connection and a copied path, and
 returns those callbacks.</p>
@@ -74,7 +74,7 @@ separate from the room token. Changing parties therefore does not create another
 progression identity. Its local profile still supplies the saved name, loadout,
 cores and parts under the existing co-op profile rules. Its asset preparation
 callback still verifies every spray dependency before acknowledging a takeover
-checkpoint. The shared helper does not replace either policy.</p>
+checkpoint. The game implements both policies separately from Party.</p>
 <p>Defaults require verified WSS. Native private CA options and explicit loopback WS
 development mode remain supported. Public TLS/TURN deployment, general invite
 rotation/revocation intent storage, account/device transfer, room retirement and
@@ -101,5 +101,5 @@ the underlying invite&#39;s trusted membership permissions.</p>
 create/join/rejoin and browser combat recovery, observer permissions, fresh host
 return and original/successor checkpoint publication through the same component.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/online.html"><span>Online party menus</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/party.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/online.html"><span>Online party menus</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/party.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#lifecycle" class="">Lifecycle</a><a href="#storage-and-permission-rules" class="">Storage and permission rules</a><a href="#game-specific-ownership" class="">Game-specific ownership</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/party.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

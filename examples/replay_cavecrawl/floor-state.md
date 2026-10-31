@@ -17,7 +17,7 @@ The original `cave_descend` does not rewrite spelunker HP, stamina, cooldowns, b
 or effects. Its `cave_restart` restores vitals and clears bags/cooldowns but leaves
 active effects alone. The owner-side depth edge changes position. Replay keeps
 its existing seat-based spawn positions and authoritative movement policy; the
-field-preservation behavior now follows those original rules.
+field-preservation behavior follows those original rules.
 
 The descent tick still performs ordinary cooldown/chill decay and stamina
 regeneration first. Preserving state does not freeze those clocks. A reserved
@@ -59,6 +59,7 @@ updates, restart effects/ledger, a disconnected respawn, corrected descent input
 conversion, and complete normal/faulted campaigns. Browser handoff and durable
 checkpoint publication/restart have separate regression evidence.
 
-This closes the avatar-vitals/cooldown descent gap. Other correspondence work
-remains, including spawn-position policy, owner-streamed motion, and broader
-visual/human comparisons. C6 separately corrects relic descent/restart behavior.
+The comparison above covers avatar vitals and cooldowns across descent.
+Spawn-position policy, owner-streamed motion, and broader visual/human
+comparisons require separate work. C6 separately corrects relic
+descent/restart behavior.

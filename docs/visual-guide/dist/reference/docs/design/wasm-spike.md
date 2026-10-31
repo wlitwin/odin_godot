@@ -6,10 +6,11 @@ experiment; they are not the current web-export status. See the subsequent
 
 ## Verdict: 🟡 YELLOW
 
-The full compile + link + dynamic-linking ABI path is **proven**, and Godot 4.6.2's
-web exporter **accepts and bundles** an Odin-produced wasm SIDE_MODULE as a
-GDExtension. No fundamental blocker found. Two explicit, named steps remain before
-🟢 GREEN (an actual extension loading and running in a browser):
+The spike verified compilation, linking, and the dynamic-linking ABI for its
+leaf module. Godot 4.6.2's web exporter accepted and bundled that wasm
+SIDE_MODULE as a GDExtension. The experiment found no fundamental blocker,
+but two steps remained before 🟢 GREEN: loading and running an extension in a
+browser.
 
 1. **Emscripten version reconciliation.** The spike was linked with emscripten **5.0.6**
    (current dev shell). Godot 4.6.2's web templates were built with emscripten **4.0.20**.
@@ -20,16 +21,17 @@ GDExtension. No fundamental blocker found. Two explicit, named steps remain befo
    execution, which the spike did not exercise. (The spike used a leaf `add()` module; the real binding must also
    compile the full `godot/` package to `freestanding_wasm32` and export `*_init`.)
 
-**Single most important finding:** Godot 4.6.2's headless web export, with
-`variant/extensions_support=true`, automatically uses the **dlink** web runtime template
+Godot 4.6.2's headless web export with `variant/extensions_support=true` used
+the dlink web runtime template
 (`godot.side.wasm`, 41 MB) and copies the Odin `web.release.wasm32` wasm into the output
-unchanged. The GDExtension web pipeline exists and accepts our artifact today.
+unchanged. This verified that the export pipeline accepted the spike artifact;
+it did not verify browser loading.
 
 ---
 
 ## 1. Godot 4.6.2's emscripten version: **4.0.20** (authoritative)
 
-Source — the *installed* export template, not hearsay:
+The installed export template recorded the compiler version:
 
 - `~/Library/Application Support/Godot/export_templates/4.6.2.stable/web_dlink_release.zip`
   → `godot.js` contains literally:
@@ -38,8 +40,9 @@ Source — the *installed* export template, not hearsay:
   4.0.0 (LTO-thin ≥ 4.0.9, closure ≥ 4.0.11). The exact build version lives in the binary,
   and that is **4.0.20**.
 
-The previous note claiming **4.0.11** (in `flake.nix` and `PLAN.md`) was **wrong**;
-4.0.11 is merely the closure-compiler threshold from `detect.py`, not the build version.
+The previous **4.0.11** claim in `flake.nix` and `PLAN.md` confused the
+closure-compiler threshold in `detect.py` with the build version. That threshold
+is 4.0.11; the installed template was built with 4.0.20.
 
 Installed templates present for 4.6.2.stable include the GDExtension-capable dlink set:
 `web_dlink_release.zip`, `web_dlink_debug.zip`, `web_dlink_nothreads_*`. So no
@@ -47,7 +50,8 @@ multi-hundred-MB download is needed for step 4 on this machine.
 
 ## 2. Emscripten pin resolution
 
-**Time-boxed out** (per the spike brief). nixpkgs's `emscripten` derivation is coupled to
+The spike did not complete pinning within its time budget. nixpkgs's
+`emscripten` derivation is coupled to
 a specific bundled LLVM/binaryen; overriding just `emscripten.version` does not work
 (source hash + toolchain mismatch). The dev shell ships 5.0.6.
 
@@ -79,7 +83,7 @@ emcc spike.wasm.o \
 ```
 
 Result: `spike.wasm` is a valid wasm module whose **first custom section is `dylink.0`**
-— the Emscripten marker that identifies a true SIDE_MODULE (this is what Godot's web
+— the Emscripten marker for a SIDE_MODULE (this is what Godot's web
 runtime reads to dynamically link it). Its imports are minimal
 (`env.memory`, `env.__memory_base`, `env.__stack_pointer`) and it exports our procs
 (`add`, `sum_to`) plus a few Odin runtime helpers (`memcpy`, `__ashlti3`, …).
@@ -96,8 +100,8 @@ sum_to(5)  = 15
 RESULT: PASS
 ```
 
-This de-risks the SIDE_MODULE ABI: Odin codegen links and runs correctly through the
-emscripten side-module relocation model.
+These calls verified that the spike's Odin code linked and executed through
+the Emscripten side-module relocation model.
 
 ## 4. Freestanding-wasm runtime shim details
 
@@ -118,8 +122,8 @@ For a **leaf** module (no setjmp/longjmp, no OS/syscalls) **no shim was needed**
 
 Open item for the full binding: compiling the entire `godot/` package to
 `freestanding_wasm32` may surface missing libc/runtime symbols; resolve by importing them
-from the Godot main module (they exist in `godot.side.wasm`'s environment) rather than
-shimming. Not exercised here (the `godot/` package is being regenerated concurrently).
+from the Godot main module (they exist in `godot.side.wasm`'s environment) rather than adding a shim. The spike did not exercise this; the `godot/`
+package was being regenerated during the experiment.
 
 ## 5. Godot-web export integration (proven as far as headless allows)
 

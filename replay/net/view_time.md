@@ -2,8 +2,10 @@
 
 Use `Model.step_view` when hit judgment or another historical query must refer to
 the remote state a player aimed at. It is the simulation callback for games that
-need the displayed view associated with each control sample. It replaces `Model.step` for that model; existing models
-can keep `step`. Both execute the same complete-world prediction/correction loop.
+need the displayed view associated with each control sample. For that model,
+it replaces `Model.step`; existing models can keep `step`. Both callbacks use
+the runner's ordinary prediction and correction path, including its configured
+prediction group.
 
 Draw remote players with `client_present(&client)`. It returns two authoritative
 frames and a quantized interpolation fraction and remembers their snapshot IDs.
@@ -56,8 +58,8 @@ snapshots, saves and migration. `read`/`bracket` return copies and explicit miss
 they never temporarily move live entities. This initial representation trades
 copying/bandwidth for a straightforward complete-world contract.
 
-`query_view(&history, view, live, tick, blend)` resolves the validated `View_Time`
-against that ring and returns `{value, status, tick, available}`. Live requests use
+`query_view(&history, view, live, tick, blend)` looks up the validated `View_Time`
+in that ring and returns `{value, status, tick, available}`. Live requests use
 the supplied current value. Historical requests require both retained endpoints;
 missing history becomes Unavailable, malformed ranges become Invalid, and rejected
 view statuses stay unavailable. There is no live fallback. Read `value` only when
@@ -96,9 +98,9 @@ on epoch/Welcome reset and scopes active beam cancellation to the full event ID,
 so cancellation of an old shot cannot erase a newer shot's beam.
 
 Quickdraw predicts the complete world but draws remote bodies/projectiles from
-observed frames. This is mixed presentation, not a partial-world predictor or an
-owner-authoritative physics mode. [Owner observations](../owned/README.md) and
-prediction groups have separate contracts.
+observed frames. This mixes predicted and observed display times while retaining
+complete-world prediction. [Owner observations](../owned/README.md) and prediction groups
+provide separate policies for owner-authoritative input and simulation scope.
 
 `replay/play.spawn_key(tick, seat, ordinal)` supplies a bounded semantic ID for
 predicted view lifetime. Authority and prediction can allocate different pool

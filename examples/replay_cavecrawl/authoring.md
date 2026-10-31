@@ -40,7 +40,7 @@ they do not consume gameplay RNG or enter collision state.
 
 ## Existing Replay saves
 
-Cavecrawl content is now `0x4341564552504c39`. C4 corrected wave pacing and den
+Cavecrawl content is `0x4341564552504c39`. C4 corrected wave pacing and den
 selection; C5 preserves avatar state on descent and separates run reset rules.
 C6 retains the relic across descent and releases it in place on restart.
 C7 retains relic ownership through death, respawn and ordinary disconnect.
@@ -61,17 +61,22 @@ The converter validates the old archive, copies its complete world and session
 ledgers, maps pending actions into the new command shape, and adds an already-playing
 lobby with default seat names. Content 1 receives the original default floors;
 content 2 retains its captured floors. The first connected seat becomes party leader.
-It then computes the new schema contract and hashes. It preserves the source and refuses to replace an existing
-file or symlink. Publication requires same-directory hard-link support. Conversion
+It then computes the new schema contract and hashes. The source remains
+unchanged, and the converter refuses to replace an existing file or symlink. Publication requires same-directory hard-link support. Conversion
 alone grants no authority and does not increment the epoch; normal resume or Room
 recovery still applies its authority rules. Use the owning profile/token when
-resuming and retain the original archive. Protocol-7/content-1 through content-8 saves are
-supported by this converter. C3 conversion preserves the complete checkpoint and
+resuming and retain the original archive.
+
+The converter supports Protocol-7/content-1 through content-8 saves. C3 conversion preserves the complete checkpoint and
 its scheduled spawn/rest deadlines; later spawns use corrected pacing. C4/C5/C6/C7 conversion
-also preserves all saved values; future transitions use current rules. Lobby metadata/commands motivated content 3; gameplay
+also preserves all saved values; future transitions use current rules.
+
+Content 3 added lobby metadata/commands; gameplay
 protocol 7 and checkpoint layout 4 remain unchanged.
 
-## Acceptance gates
+<a id="acceptance-gates"></a>
+
+## Validation
 
 ```sh
 nix develop --command bash examples/replay_cavecrawl/definitions_run.sh

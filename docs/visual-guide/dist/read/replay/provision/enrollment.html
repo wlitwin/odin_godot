@@ -6,8 +6,8 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#state-and-crash-behavior">State and crash behavior</a><a href="#godot-integration">Godot integration</a><a href="#storage-contract-and-supported-platforms">Storage contract and supported platforms</a><a href="#evidence-and-remaining-work">Evidence and remaining work</a></nav></details>
 <article class="reading-body "><p>Use the client enrollment journal to preserve identity across a crash during
 Create or Join. It persists the exact request before sending it, then persists a
-successful credential before exposing it for use. Its
-native SQLite and browser IndexedDB drivers use compare-and-swap, so another
+successful credential before exposing it for use. Its native SQLite and browser
+IndexedDB drivers use compare-and-swap, so another
 process/tab cannot silently replace the identity in the same slot.</p>
 <p><code>Enrollment_Journal</code> owns the state machine and canonical codec without depending
 on Godot, a network or storage. <code>replay/godot.Enrollment_Profile</code> drives storage;
@@ -15,8 +15,8 @@ on Godot, a network or storage. <code>replay/godot.Enrollment_Profile</code> dri
 verified-TLS provisioning connection. This is separate from gameplay saves,
 display names, authority bundles and migration checkpoints.</p>
 <h2 id="state-and-crash-behavior">State and crash behavior<a class="heading-anchor" href="#state-and-crash-behavior" aria-label="Link to this section">#</a></h2>
-<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-e1d9f94951e7b7.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-e1d9f94951e7b7.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-e1d9f94951e7b7.svg" alt="System diagram: Durable client enrollment" loading="lazy"></figure><p><code>enrollment_request</code> returns nothing before the request write&#39;s receipt.
-<code>enrollment_grant</code> returns nothing until the credential write&#39;s receipt. A storage
+<figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-e1d9f94951e7b7.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-e1d9f94951e7b7.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-e1d9f94951e7b7.svg" alt="System diagram: Durable client enrollment" loading="lazy"></figure><p><code>enrollment_request</code> exposes the request only after its write completes.
+<code>enrollment_grant</code> exposes the credential only after its write completes. A storage
 failure preserves the previous in-memory record, clears staged buffers and stops
 the owner. It does not assume that a missing acknowledgement proves the storage
 transaction failed. Reopen the slot to resolve that uncertainty.</p>
@@ -26,8 +26,8 @@ enrollment but the game dies before storing its grant, the next process repeats
 that request and receives the same credential. A ready slot loads directly without
 another enrollment request. The game still performs Room&#39;s challenged process
 registration; a stored credential is not a live authority lease.</p>
-<p>The slot is immutable: absent → pending (revision 1) → ready (revision 2). It
-cannot become another identity or service. Both a competing initial creator and a
+<p>The slot permits only absent → pending (revision 1) → ready (revision 2). Once
+assigned, it cannot change to another identity or service. Both a competing initial creator and a
 stale grant writer fail with <code>Conflict</code>; neither receives usable state from its
 failed write. A fresh owner can then load the winner. There is no automatic
 read-latest-and-overwrite path, deletion, account reset or credential retirement.</p>
@@ -78,8 +78,8 @@ API; the test fixture checks its exact output length and rejects an empty result
 <p>The client record is version 1, kind <code>0x5043</code>, envelope epoch 1, revision in tick,
 and game content in content. It contains a bounded canonical service URL, the exact
 Create/Join request, pending/ready state and that member&#39;s grant. Maximum encoded
-storage is 4096 bytes. State/revision, request shape, URL tail, content and credential
-shape are validated when loading. It contains no shared authority state.</p>
+storage is 4096 bytes. Loading validates state/revision, request structure,
+URL tail, content, and credential structure. It contains no shared authority state.</p>
 <p>The native SQLite adapter is currently <strong>macOS/Linux</strong>. It uses a separate client
 file/table with the existing checked private-file, WAL/FULL/fullfsync setup. New
 files are private; missing creation is explicit, and the containing directory and
@@ -108,5 +108,5 @@ platforms and public deployment remain work. Only Create/Join enrollment is
 journaled here; general Invite/Revoke intent and rotation workflows still need
 their own durable operation records.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/enrollment.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/enrollment.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#state-and-crash-behavior" class="">State and crash behavior</a><a href="#godot-integration" class="">Godot integration</a><a href="#storage-contract-and-supported-platforms" class="">Storage contract and supported platforms</a><a href="#evidence-and-remaining-work" class="">Evidence and remaining work</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/enrollment.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

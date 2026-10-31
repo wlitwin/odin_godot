@@ -10,8 +10,8 @@ and the pre-feature source snapshot are in <code>/private/tmp/replay-turret-2026
 selected evidence is retained in <span class="local-reference" title="docs/replay/results/shared-turret-2026-09-21/README.md · available in the repository">results</span>.</p>
 <ul>
 <li>Content51/K adds an eight-entry turret pool, authored TurretDef and targeted
-mount/release actions. Real content50 source checkpoint captured before edits;
-frozen catalog/action codecs and explicit conversions preserve previous state
+mount/release actions. A real checkpoint was captured from content50 before
+edits. Frozen catalog/action codecs and explicit conversions preserve previous state
 and pending actions, adding zero turret fields. Protocol remains 7.</li>
 <li>One generation/warp-checked operator credit lives in each turret. Shared ammo
 and cadence survive handoffs/recovery. The final bullet removes occupancy and
@@ -20,22 +20,22 @@ occupancy. Mounted movement/dash/revive/casting/handheld fire are blocked.</li>
 <li>Authored 24-round ability, composed turret scene, generated typed view binding,
 reliable T input, predicted turret presentation and HUD implemented. Existing
 workbench runs and validates it without a feature-specific framework API.</li>
-<li><strong>Seven pure tests pass</strong>: shared claims/handoffs/exhaustion, stale handles and
+<li>Seven pure tests pass: shared claims/handoffs/exhaustion, stale handles and
 lifecycle, late correction, content50 import, occupied checkpoint/cadence
 continuation, mounted actions/projectile saturation, placement/cover/capacity.
 The last-round tick cannot double-fire the handheld weapon. A nearby wall
 catches the first turret bullet; operators cannot mount through cover.</li>
-<li><strong>Native/WASM corpus agrees: 15191278264882830483</strong>, with zero retained native
+<li>Native/WASM corpus agrees: 15191278264882830483, with zero retained native
 allocations after the test. This is correctness evidence, not a throughput
 benchmark; the harness includes complete takeover/checkpoint comparisons.</li>
-<li><strong>Real authored workbench and host/client/observer pass</strong> at configured 120 ms
+<li>Real authored workbench and host/client/observer pass at configured 120 ms
 latency: occupied rejection, first operator fires, second inherits remaining
 ammo and empties the turret, automatic dismount, scene cleanup and equal hashes.</li>
-<li><strong>Real occupied host-crash recovery passes</strong>: member1 deploys/hosts, member2
+<li>Real occupied host-crash recovery passes: member1 deploys/hosts, member2
 operates; after a backed-up occupied state, member1&#39;s process is killed.
 Members2/3 restore at epoch2 with the same operator and remaining ammo, hand
 it to member3, empty it and converge on a complete world hash.</li>
-<li>Existing <strong>108 game model, four Stormcaller and six evolution tests pass</strong>;
+<li>Existing 108 game model, four Stormcaller and six evolution tests pass;
 six Godot editor/HUD scene tests pass. Historical upgrade CLI tests pass,
 including new zero-field checks and existing invalid-publication cases.
 Stock artifact matches the authored sources (digest 7605822622581753901).</li>
@@ -48,10 +48,10 @@ the corrected fixtures and the final cover/muzzle rules.</p>
 <p>No transport, rollback, recovery or codegen implementation changes were required.
 The primary authoring cost beyond game/view code was extending the saved catalog
 and action contracts; explicit enum mapping was necessary. Capacity is bounded
-and snapshots now carry turret state, but no new performance comparison is claimed.
+and snapshots carry turret state, but no new performance comparison is claimed.
 Interactive browser behavior and human balance/feel remain unmeasured.</p>
 <p>All 65 pre-recorded Kit Odin-file hashes are unchanged. Sibling <code>../scrapyard</code>
 remains clean at <code>6bdef4f437d9a4e2c98f1d49472f840879301ccf</code>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="turret-plan.html"><span>Shared turret ability</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/shared-turret.html"><span>Shared turret</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/turret-progress.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="turret-plan.html"><span>Shared turret ability</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_scrapyard/shared-turret.html"><span>Shared turret</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/turret-progress.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/turret-progress.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

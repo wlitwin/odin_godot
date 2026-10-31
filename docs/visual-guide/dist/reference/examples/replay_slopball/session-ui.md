@@ -25,7 +25,7 @@ connection and is preserved. A migration epoch clears name-submission bookkeepin
 so a rolled-back declaration can be submitted again.
 
 Names and manual start are replayable game values/commands. Waiting rejects solver
-observations in the reducer as well as disabling local control. Content B24
+observations in the simulation rule as well as disabling local control. Content B24
 (`0x52534c4f50423234`) identifies the changed world/action schema; B21/B22/B23 peers and
 checkpoints are incompatible without an explicit conversion.
 

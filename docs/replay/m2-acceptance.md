@@ -1,8 +1,8 @@
 # M2 acceptance audit — 2026-09-20
 
-M2 remains open. The technical presentation/input gates below have concrete
-implementation and runtime evidence. The shared-type alias authoring defect is now
-fixed and validated; human visual/play-feel review has not been performed.
+As of this 2026-09-20 audit, M2 remained open. The technical presentation/input
+gates had implementation and runtime evidence. The shared-type alias authoring
+defect was fixed and validated; human visual/play-feel review had not been performed.
 That remaining review is not waived by automated tests or screenshot inspection.
 
 ## Implementation requirements
@@ -27,12 +27,14 @@ That remaining review is not waived by automated tests or screenshot inspection.
 | Presentation does not alter simulation checksums | Hello audit after painting, detached frame/smoother tests, playback's unchanged live head, explicit frozen-frame Cavecrawl render hashes | No claim about arbitrary game code outside these adapters |
 | Held/short inputs, pause and variable render rates remain consistent | New native four-rate pause tests and controlled edge/catch-up tests; Chrome keyboard pause test; full inspector/recording regressions | Two same-button presses before a tick coalesce by the documented Buttons contract |
 
-## Open follow-through
+<a id="open-follow-through"></a>
+
+## Authoring fix and outstanding human review
 
 **Closed authoring defect:** [shared runtime alias resolution](results/shared-alias-2026-09-20/README.md)
-now accepts `timeline: game.Timeline` through `../shared/hello` after proving that
+accepts `timeline: game.Timeline` through `../shared/hello` after proving that
 no Godot composition metadata is lost. Tagged fields/methods/signals, ambiguous
-imports and unresolved shapes remain refused. The real Hello script uses the alias;
+imports and unresolved types remain refused. The real Hello script uses the alias;
 31 focused cases, the full generator suite and native/Chrome workflows pass.
 
 **Human visual/play-feel review.** Rendered native/Chrome captures establish

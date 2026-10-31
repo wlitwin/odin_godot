@@ -9,55 +9,58 @@ repository root, then choose Solo to try the game. Scrapyard calls its player
 characters <strong>runners</strong> and its guns <strong>irons</strong>. Replay&#39;s runtime runner is separate:
 it schedules simulation steps and manages input/history. Godot presents the
 resulting state and effects through authored scenes.</p>
-<p><strong>Start with the <a href="contributor-guide.html">visual contributor guide</a>:</strong>
-run the game, learn the state boundaries, follow a turret from input to scene,
-and choose a first change with the right tests.</p>
+<p>The <a href="contributor-guide.html">visual contributor guide</a> starts with running the
+game, then follows a turret from input to scene. Use it to choose a first change
+and identify the tests that cover it.</p>
 <p>The <a href="code-guide.html">code guide</a> maps the frame loop, input, session startup,
 event handling and presentation, with the project&#39;s formatting command.</p>
 <p><a href="shared-turret.html">Shared turret</a> adds a deployable ability that any player can
 operate, with shared ammunition, predicted claims, handoffs and occupied recovery.</p>
-<p><a href="stormcaller.html">Stormcaller</a> is a new Replay-only enemy built through this workflow: an authored pulse attack, composed charge view, and tested correction/recovery behavior.</p>
+<p><a href="stormcaller.html">Stormcaller</a> demonstrates a Replay-only enemy with an authored
+pulse attack, a composed charge view, and tested correction/recovery behavior.</p>
 <p>The <a href="editor-workflow.html">editor workflow</a> adds validation/baking, refreshable
 previews, Resource pickers, feature drafts and an ability workbench with replay tests.</p>
 <p>The <a href="authoring-tools.html">authoring tools workflow</a> covers typed enemy registration,
 one canonical bake, frozen revisions and reusable feature tests.</p>
-<p>Start with the <a href="editor-first.html">editor-first authoring guide</a>: authored actor scenes,
-reusable child view components, detached HUD/display values and validated gameplay
-Resources around the replayable model. Enemy, runner and HUD scenes have independent
-F6 previews. The <a href="bridge.html">initial bridge comparison</a> records the earlier migration
-and its measured tradeoffs; current composition is described in the authoring guide.</p>
-<p><a href="controls.html">Dash input</a> now uses receipt-time actions with explicit outcomes;
+<p>For scene composition, read the <a href="editor-first.html">editor-first authoring guide</a>.
+It explains authored actor scenes, reusable child components, detached HUD/display
+values, and validated gameplay Resources around the replayable model. Enemy,
+runner, and HUD scenes have independent F6 previews. The
+<a href="bridge.html">initial bridge comparison</a> retains the earlier integration&#39;s measured
+tradeoffs; use the authoring guide for current composition.</p>
+<p><a href="controls.html">Dash input</a> uses receipt-time actions with explicit outcomes;
 movement and held combat input retain scheduled controls.</p>
-<p>The <a href="online.html">online party menu</a> now creates, joins and rejoins rooms through
+<p>The <a href="online.html">online party menu</a> creates, joins and rejoins rooms through
 the standalone Replay room service. It uses the shared Party helper while keeping
 personal progression separate from network credentials and retaining asset-aware
 takeover checks. Native TLS and local browser RTC gates pass; the full port and
 public deployment remain in progress.</p>
-<p>This is a separate reimplementation of the sibling Scrapyard project using Replay.
-The original game remains runnable. This version currently covers seeded cover,
-runner movement/dash, staging, ballistics, grenades, historical rail/healing queries, all enemy brains, status/reaction rules, damage, drops, camera
-and multiplayer views. The <a href="roadmap.html">historical port ledger</a> records remaining comparison work; exhaustive
-parity is outside the current canonical-authoring goal.</p>
-<p><a href="audio.html">Audio and local settings</a> now include the original sound assets, music
+<p>This separate Replay implementation keeps the sibling Scrapyard game runnable.
+It covers seeded cover, runner movement/dash, staging, ballistics, grenades,
+historical rail/healing queries, all enemy brains, status/reaction rules, damage,
+drops, camera, and multiplayer views. The <a href="roadmap.html">historical port ledger</a>
+records remaining comparison work. This authoring example does not establish
+exhaustive parity with the original game.</p>
+<p><a href="audio.html">Audio and local settings</a> include the original sound assets, music
 crossfades, persisted volume/shake preferences and menu controls.</p>
 <p>Original dirt/grass dressing and the animated gate/direction arrow are restored.
 The <span class="local-reference" title="docs/replay/results/scrapyard-scenery-2026-09-07/README.md · available in the repository">scenery gate</span>
 checks three floors across host/client/observer. The <a href="shop.html">bottom shop cards</a>
-now restore clickable purchases and the original shortcut order; broader HUD and
+provide clickable purchases in the original shortcut order; broader HUD and
 hardware-audio parity remain work.</p>
-<p>The <a href="hud.html">combat HUD</a> now includes the original health/cooldown/status displays,
+<p>The <a href="hud.html">combat HUD</a> includes the original health/cooldown/status displays,
 large magazine, boss health and revive prompt, driven from Replay state.</p>
-<p><a href="transitions.html">Run transitions</a> now include large departure/wipe panels,
+<p><a href="transitions.html">Run transitions</a> include large departure/wipe panels,
 current wave/rest information and recovery narration reconstructed from state.</p>
 <p><a href="camera.html">Borrowed eyes</a> follows a living teammate while downed, returns on
 revival and handles a watched host&#39;s loss without changing local controls or HUD.</p>
-<p><a href="chat.html">Chat and yard history</a> now include named messages, a late-join scrollback,
+<p><a href="chat.html">Chat and yard history</a> include named messages, a late-join scrollback,
 wave/run announcements and history retained through asset-aware host migration.</p>
 <p><a href="pings.html">Positional pings</a> use middle mouse, with a stamped floating name and
 the original fading diamond; late-join history excludes old markers.</p>
-<p><a href="browser_ui.html">Browser UI acceptance</a> now exercises chat, pings, shop, HUD and
+<p><a href="browser_ui.html">Browser UI acceptance</a> exercises chat, pings, shop, HUD and
 camera/revival in three actual Chrome processes with shared world-state checks.</p>
-<p><a href="actors.html">Actor presentation</a> now restores downed poses/beacons, muzzle/reload
+<p><a href="actors.html">Actor presentation</a> provides downed poses/beacons, muzzle/reload
 cues, ghost tint and enemy attack/hit/death behavior with lifecycle checks.</p>
 <p><a href="feedback.html">Combat feedback</a> adds bounded bursts, debris, damage numbers and
 pickup effects, with expiry, floor-change and recovery checks.</p>
@@ -77,7 +80,7 @@ pickers, host Start and late Drop In.</p>
 for the current seat while keeping gameplay profiles concrete.</p>
 <p><a href="workbench.html">Editor workbench</a> provides inspector-driven previews of the real
 game, with a live tally and Esc menu.</p>
-<p><a href="browser.html">Browser play and migration</a> now have a real three-browser gate,
+<p><a href="browser.html">Browser play and migration</a> have a three-browser gate,
 including PNG upload, an asset-dependent checkpoint, planned/crash recovery and
 continued combat with whole-world state comparison.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh
@@ -125,15 +128,16 @@ nix develop --<span class="hljs-built_in">command</span> bash examples/replay_sc
 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/mod_migration_run.sh
 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/stress_run.sh
 RSY_JITTER=20 RSY_LOSS=1000 RSY_DUPLICATE=1000 nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/run.sh
-REPLAY_REQUIRE_BASELINE=1 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard/run.sh</code></pre></div><p>The menu offers Solo, Host, Join, Watch and Resume solo at localhost; port defaults to 49610.
-Pick a name, skin and iron, mark ready, then the displayed lobby leader starts. WASD moves and Shift
-dashes; hold the left mouse button to fire. All seven irons have
+REPLAY_REQUIRE_BASELINE=1 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard/run.sh</code></pre></div><p>The menu offers Solo, Host, Join, Watch, and Resume solo, using localhost and
+port 49610 by default. Pick a name, skin, and iron, then mark ready. The displayed
+lobby leader starts the game. WASD moves, Shift dashes, and holding the left
+mouse button fires. All seven irons have
 magazines, automatic reloads and deterministic jams (continued trigger pulls
 clear jams). The lobber bounces and blasts mobs; the lance pierces; the mender
-heals the first living friend. Interactive play now runs waves, floor clears,
+heals the first living friend. Interactive play runs waves, floor clears,
 shops, regroup/departure and wipe/reset. Hold F to revive; the clear-stage panel
 lists purchases and parts. <a href="run.html">Run rules</a> explain what persists within the
-world. <a href="profiles.html">Local co-op profiles</a> now save cores, parts and loadouts;
+world. <a href="profiles.html">Local co-op profiles</a> save cores, parts and loadouts;
 <a href="recovery.html">Room recovery</a> carries live combat checkpoints to a successor.
 F5 saves an uncoordinated solo/host run; <a href="saves.html">run saves</a> describe fresh-process
 resume and identity requirements. <code>RSY_RUN=0</code> retains isolated
@@ -143,13 +147,13 @@ E a direction. Cooldowns appear below the status line.
 Equip shared turret to deploy one; press T nearby to mount/release, then aim/fire
 normally. Its last round despawns it and automatically dismounts the operator.
 Project name, custom user-data directory and port are separate from the original.</p>
-<p>One reducer—a function that applies inputs to gameplay values—handles
-roster/profile actions, readiness, start/drop-in,
-movement, dash, gun mechanisms, enemies, projectiles, drops and events. Server
-authority and local prediction replace the original&#39;s owner-streamed movement;
-remote player characters are displayed using the observed view clock.
-The model never calls Godot. Arena rendering and collision use the same saved cover
-list, and camera/animation/smoothing do not modify it.</p>
+<p>The reducer applies input to gameplay values: roster/profile actions, readiness,
+start/drop-in, movement, dash, gun mechanisms, enemies, projectiles, drops, and
+events. The server computes accepted state, the local player predicts, and remote
+characters display on the observed view clock. This differs from the original&#39;s
+owner-streamed movement. The model never calls Godot. Arena rendering and
+collision use the same saved cover list; camera movement, animation, and
+smoothing do not modify it.</p>
 <p>The test compiles selected unmodified original arena/movement procedures into an
 isolated oracle and compares every cover plus final position bits for 12 layouts
 and 48 movement traces. It never runs the original <code>run.sh</code> or clears its profiles.
@@ -181,7 +185,7 @@ spread. A support runner supplies rally/salve and every participant must observe
 surge. The normal ability gate now explicitly checks that friendly transmutation too.</p>
 <p><code>gauntlet_run.sh</code> exercises all three floor-one waves (4/4/5 enemies), records each
 saved rest deadline and refuses early wave/floor completion. Its players use normal
-weapons and support casts, then gathers the crew for a separately spawned barrel
+weapons and support casts, then gather the crew for a separately spawned barrel
 chain. The <span class="local-reference" title="docs/replay/results/solo-gauntlet-2026-09-13/README.md · available in the repository">matched solo comparison</span>
 uses isolated original/Replay games with one player and no support casts. All six
 games clear the waves; one Replay stationary barrel finale is blocked by cover,
@@ -193,7 +197,9 @@ replacement, and Room preparation waits for referenced image bytes.</p>
 use the host’s catalog, including sparse loadouts, and saves retain that catalog.</p>
 <p>The <span class="local-reference" title="docs/replay/results/scrapyard-stress-2026-09-06/README.md · available in the repository">stress/profiling record</span>
 includes a 40-enemy workload, raw timings and memory/traffic observations. The <span class="local-reference" title="docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md · available in the repository">optimized-build copy fix</span>
-now permits ordinary -o:speed builds. A fair baseline comparison remains open.</p>
+permits ordinary -o:speed builds. That stress record did not establish a matched
+baseline comparison. Later optimized paired idle and firing/reload comparisons
+passed; the <a href="roadmap.html">port ledger</a> links those results and their workloads.</p>
 <p><a href="authority-history.html">Authority-only rewind history</a> reduces ordinary snapshot traffic while preserving complete recovery checkpoints.</p>
 <p>The <span class="local-reference" title="docs/replay/results/solo-navigation-2026-09-14/README.md · available in the repository">cover-aware solo comparison</span> now verifies blocked shots and ordinary movement around cover through complete wave/barrel finales in both games.</p>
 <p>With <code>RSY_DEV=1</code>, the Escape menu includes <strong>Export recording</strong>. It saves recent
@@ -204,5 +210,5 @@ verifier, compatibility and cost. This diagnostic does not pause the live sessio
 or replace its recovery checkpoint.</p>
 <p>Dedicated authorities can run with <code>RSY_ROLE=server</code>. The <a href="../../tests/replay_dedicated_comparison/README.html">server-act comparison</a> checks two clients through combat and floor progression. For coordinator-managed avatarless authorities, see the <a href="../../replay/godot/dedicated.html">Room infrastructure profile</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="contributor-guide.html"><span>Start here: contributing to Replay Scrapyard</span><span aria-hidden="true">→</span></a><a href="code-guide.html"><span>Reading and editing the Scrapyard code</span><span aria-hidden="true">→</span></a><a href="shared-turret.html"><span>Shared turret</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="contributor-guide.html"><span>Start here: contributing to Replay Scrapyard</span><span aria-hidden="true">→</span></a><a href="code-guide.html"><span>Reading and editing the Scrapyard code</span><span aria-hidden="true">→</span></a><a href="shared-turret.html"><span>Shared turret</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

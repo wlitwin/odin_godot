@@ -1,10 +1,11 @@
 # Adding and evolving a Replay feature
 
-Scrapyard is the canonical example for these optional Replay helpers. The Godot
-editor owns composition and local appearance; Odin value types own gameplay state,
-decisions and configuration. Stormcaller exercises all four parts of the workflow. The
-[typed adapter layer](../../replay/godot/scene/adapter-bindings.md) now owns binding
-configuration, asset lifetimes, view traversal and contextual diagnostics.
+Use Scrapyard to follow the optional Replay helpers through enemy registration,
+content baking, schema conversion, and feature tests. Godot authors scene
+composition and local appearance; Odin values contain gameplay state, decisions,
+and configuration. Stormcaller exercises all four steps. The
+[typed adapter layer](../../replay/godot/scene/adapter-bindings.md) owns binding
+configuration, asset lifetimes, view traversal, and contextual diagnostics.
 
 ## Register an enemy
 
@@ -24,7 +25,9 @@ lifetime. The adapter selects by copied display ID; the view remains concerned
 with one enemy. New IDs still require deliberate gameplay/version decisions.
 [Framework API and bounds](../../replay/godot/scene/archetypes.md).
 
-## Bake content once
+<a id="bake-content-once"></a>
+
+## Bake a shared content catalog
 
 Baking validates authored Godot Resources and copies their gameplay values into a
 portable catalog. Tests and headless servers can load that catalog without opening
@@ -139,8 +142,9 @@ The player-character view uses the simpler declaration without appearance/config
 //gd:replay_view value=value,present=runner_view_present,validate=runner_view_validate
 ```
 
-Its generated `Script_View` descriptor binds the four permanent runner scenes.
-Body generations, warps and epochs still reset cues inside each runner script;
+Its generated `Script_View` descriptor binds four permanent player-character
+scenes. Scrapyard calls these characters runners. Body generations, warps, and
+epochs reset cues inside each runner script;
 they do not respawn its node. Enemy view scope explicitly includes run/floor and
 observed rewind policy through `Scope_Tracker`. Sampling and feedback policies
 remain visible game code.
@@ -149,9 +153,10 @@ Both views use typed `onready` component fields. Enemy F6 scenes supply a
 `ScrapEnemyPreview` Resource that references a definition and sample attack state;
 there is no preview-kind switch. The sample is baked at scene startup using the
 same `defs.bake_mob` function as gameplay/export. Use the isolated preview
-refresh controls to admit saved gameplay data; see [the editor workflow](editor-workflow.md). Generic Resource batches and checked access/narrowing
-helpers simplify that explicit mapping; codegen does not infer it from Inspector
-hints or generate a second extractor.
+refresh controls to load saved gameplay values into the isolated preview; see
+[the editor workflow](editor-workflow.md). Generic Resource batches and checked
+access/narrowing helpers support the explicit mapping. Codegen neither infers it
+from Inspector hints nor generates a second extractor.
 
 [Adapter acceptance](../../docs/replay/results/adapter-2026-09-21/README.md) records
 codegen regression, component/ownership checks, independent ID-7 preview,

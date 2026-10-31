@@ -23,16 +23,17 @@ value, age, duration and confirmation. Detach releases any rig-owned resources.<
 ok := scenegd.effect_route_load(&amp;route, parent, <span class="hljs-string">&quot;res://flash.tscn&quot;</span>, epoch,
     <span class="hljs-number">0.3</span>, binding, capacity=<span class="hljs-number">32</span>)
 <span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes { scenegd.effect_route_change(&amp;route, change) }
-error := scenegd.effect_route_frame(&amp;route, render_delta)</code></pre></div><p>Journal policy already determines speculative or watched delivery. Default route
-policy Journal follows it. Confirmed delays this route until a confirmed Begin or
-Confirm, useful for effects that should not be shown speculatively. The first
-accepted start creates a lifetime; Update changes its value, Confirm marks it, and
-Cancel retires it. Neither Update nor Confirm restarts its age or scene. Reused
-slots get fresh generations and child bindings. Expired, canceled and capacity-
-dropped IDs remain consumed so replay cannot restart them.</p>
-<p>Changing the filter to exclude an active event cancels it. A later Update does
-not invent a speculative Begin; use a stable event category for routing, and
-ordinary value changes for animation. When a confirmed-only effect has not begun,
+error := scenegd.effect_route_frame(&amp;route, render_delta)</code></pre></div><p>The journal decides when to deliver speculative or watched occurrences. The
+default route policy, Journal, uses that timing. Confirmed waits for a confirmed
+Begin or a Confirm change before showing an effect. The first accepted start
+creates its scene lifetime. Update changes its value, Confirm marks it confirmed,
+and Cancel retires it; Update and Confirm do not restart the age or scene.
+Reused slots receive new generations and child bindings. IDs remain consumed
+after expiry, cancellation, or capacity drops, preventing replay from starting
+them again.</p>
+<p>If the filter excludes an active event, the route cancels it. A later Update
+cannot start a new speculative effect. Keep event-category filtering stable
+and animate through value changes. When a confirmed-only effect has not begun,
 its Confirm may start it, subject to its consumption ledger.</p>
 <p><code>effect_route_clear</code> removes live visuals without forgetting consumed IDs.
 <code>effect_route_epoch</code> requires a strictly newer epoch, clears visuals and resets the
@@ -41,7 +42,8 @@ no new Begin at or below it can arrive, including delayed watched/confirmed even
 Do not use the render clock as that frontier. Full cue pools drop new effects;
 check <code>route.route.cues.stats</code>. Ledger history/per-tick capacity is explicit.
 Root properties and Rig lifetimes follow the <a href="view-pools.html">view ownership contract</a>.
-Scene instances are created on entry; bounded capacity does not mean prewarming.</p>
+Scene instances are created when effects enter the route. Setting a capacity
+does not instantiate those scenes in advance.</p>
 <p>For audio, the callback returns <code>(Audio_Cue, include)</code> and may borrow streams from
 a presentation asset owner through <code>user</code>. Godot players retain their own stream
 reference while assigned. Destroy the route before the parent or borrowed callback
@@ -52,9 +54,9 @@ ok := scenegd.audio_route_init(&amp;audio, parent, epoch, sound_for_event,
 <span class="hljs-keyword">for</span> change <span class="hljs-keyword">in</span> changes { scenegd.audio_route_change(&amp;audio, change) }</code></pre></div><p>Update moves an active spatial voice; it does not change the clip or restart
 playback. Confirmed-only routes play once upon confirmation. Cancel stops only a
 voice still owned by that occurrence, so canceling a stolen old voice cannot stop
-its replacement. Full voice pools steal in bounded round-robin order; consumed
-IDs remain tombstoned. <code>audio_route_epoch</code> clears voices under a newer epoch and
-<code>audio_route_retire</code> has the same safe-frontier requirement as visual routes.
+its replacement. Full voice pools steal in bounded round-robin order; the
+ledger continues to record consumed IDs after their voices are gone.
+<code>audio_route_epoch</code> clears voices under a newer epoch and <code>audio_route_retire</code> has the same safe-frontier requirement as visual routes.
 Use <code>audio_pool_volume(&amp;audio.pool, volume)</code> for a local volume setting.</p>
 <p>The pure <code>view.Cue_Route(Event, Value)</code> is also usable without Godot. Native and
 executed WASM corpus checks cover lifetime/overflow/epoch behavior. Actual Godot
@@ -68,9 +70,9 @@ same bounded voices, policy and consumption ledger as <code>audio_route_init</co
 one initializer. Cancel retires matching voices without calling either projector.
 A contextual projector sees the original Confirm even when the route delays its
 start until confirmation, so it can choose the correct historical placement.</p>
-<p>Scrapyard uses this callback for pitch derived from the occurrence ID and wound
-positions reconstructed at the event tick. Event-only routing remains available
+<p>Scrapyard uses this callback to derive pitch from occurrence IDs and reconstruct
+damage-effect positions at the event&#39;s tick. Event-only routing remains available
 when a sound depends only on its gameplay payload.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="view-pools.html"><span>View pool foundations</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/effect-routes.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="view-pools.html"><span>View pool foundations</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/effect-routes.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#routes-that-need-event-identity-or-history" class="">Routes that need event identity or history</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/effect-routes.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

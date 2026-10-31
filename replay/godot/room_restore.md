@@ -21,7 +21,8 @@ substituted for missing, corrupt, disallowed or too-old saved progress.
 ## Lifecycle
 
 After fresh process registration and an authenticated view with no live authority,
-Room computes its schema/config contract without creating a simulation timeline.
+Room computes the schema and configuration needed to validate the saved state
+without creating a simulation timeline.
 It reads publication status, downloads the selected revision, decodes the complete
 typed checkpoint and verifies the stable token's playable reservation. Dedicated
 authority uses local seat zero.
@@ -50,7 +51,7 @@ or install a runtime using the expired permit. A successful correlated renewal
 can make the same epoch usable. If the coordinator has also expired or replaced
 the reservation, renewal is refused and normal recovery/join rules apply.
 
-Current request retries cannot change the service's policy result. `Busy` during
+Retrying a request does not override the service's policy decision. `Busy` during
 status/download means another bounded transfer is in progress; Room retries a new
 status request after backoff instead of showing a terminal recovery error. `Busy`
 on an authority request retains the prepared bytes for a later new attempt. Stale
@@ -85,11 +86,11 @@ available through the existing recovery metrics.
 
 ## Acceptance and remaining work
 
-Cavecrawl's **Rejoin recent party** now resumes stored progress after the original
+Cavecrawl's **Rejoin recent party** resumes stored progress after the original
 game process exits and the service is killed/restarted. Native verified-TLS and
 fresh-browser/RTC tests restore the exact saved tick with three gems in epoch 2,
 accept a new guest and its loot action, then publish the continued game again.
-The browser gate uses explicit loopback development WS. Separate database readers
+The browser test uses explicit loopback development WS. Separate database readers
 validate the final saved inventories. The original live handoff/rejoin gate still
 passes with publication enabled.
 
@@ -101,8 +102,9 @@ loot in the next durable publication. A browser RTC race exercises the same
 transition. Temporary Busy responses must not strand a participant before it can
 reach that transition.
 
-This completes that Cavecrawl recovery path. Bounded atomic asset packages now also
-support Scrapyard sprays and its native/browser cold-cache restoration. Broader
-asset profiles, other game UI/state acceptance, public
-deployment and broader recovery/failure policy cases remain roadmap work. See the
+The tested recovery path covers Cavecrawl under these conditions. Bounded
+atomic asset packages also support Scrapyard sprays and native/browser
+restoration with an empty asset cache. Broader asset profiles, acceptance of
+other games' UI/state, public deployment, and broader recovery/failure policies
+remain outside this coverage. See the
 [guarded service decision](../provision/checkpoint/restore.md).

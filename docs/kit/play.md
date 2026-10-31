@@ -2,22 +2,23 @@
 
 `godot:play` contains small gameplay components and presentation helpers used by
 the Kit examples. Networked blocks are embedded in an entity struct. Script
-generation flattens their tagged fields into the entity descriptor and hoists
-their commands onto the entity's generated command table.
+generation collects their tagged fields in the parent entity’s descriptor and
+adds their commands to its generated command table.
 
-The package provides policy and reusable state, not complete game features. A
-weapon block can decide whether a trigger pull fires; the game still decides
-what projectile to spawn, what it may hit, and how the result affects the world.
+A weapon block checks whether a trigger pull can fire and updates its weapon
+state. The game chooses the projectile, validates hits, and applies consequences
+to other entities. The other blocks separate reusable state operations from
+these game-specific rules in the same way.
 
 ## Networked blocks
 
 | Block | Replication model | Responsibility |
 | --- | --- | --- |
-| `play.Gun` | Reliable host state with an optimistic command | Magazine, reload, jam, and clear state. `Gun_Def` supplies configuration. |
-| `play.Ability` | Reliable host state with an optimistic command | Cooldown-gated casts. The game supplies resource cost and effect policy. |
-| `play.Channel` | Owner stream plus a host command | Hold progress and target for revive, capture, hack, or cast-bar interactions. The host must validate the final claim. |
-| `play.Health` | Reliable host state | Hit points, maximum hit points, damage, heal, and death-transition helpers. It declares no player command. |
-| `play.Telegraph` | Reliable host state | A tick-based wind-up and landing test for warnings, traps, and enemy attacks. |
+| `play.Gun` | Reliable authority state with an optimistic command | Magazine, reload, jam, and clear state. `Gun_Def` supplies configuration. |
+| `play.Ability` | Reliable authority state with an optimistic command | Cooldown-gated casts. The game supplies resource cost and effect policy. |
+| `play.Channel` | Owner stream plus an authority command | Hold progress and target for revive, capture, hack, or cast-bar interactions. The authority must validate the final claim. |
+| `play.Health` | Reliable authority state | Hit points, maximum hit points, damage, heal, and death-transition helpers. It declares no player command. |
+| `play.Telegraph` | Reliable authority state | A tick-based wind-up and landing test for warnings, traps, and enemy attacks. |
 | `play.Puppet` | Owner stream | A `RigidBody2D` simulated by one peer and displayed by all others. |
 | `play.Puppet3` | Owner stream | The corresponding `RigidBody3D` block, including quaternion rotation and angular velocity. |
 
@@ -38,7 +39,8 @@ commands such as `runner_weapon_fire_cmd` and `runner_lob_cast_cmd`. See
 [Composing commands from embedded blocks](net.md#composing-verbs-from-embedded-blocks)
 for naming and override rules.
 
-Use generated replicated-field edge halves for presentation:
+Use a generated field-change callback, named `<entity>_<field>_edge` and declared
+with `@(gd_half)`, to update presentation when replicated state changes:
 
 ```odin
 @(gd_half)
@@ -72,8 +74,7 @@ Predicted blocks live in `godot:play/sim`, conventionally imported as `psim`:
 
 Their fields use `gd:"predict"` and their ticks compose with the embedding
 entity's tick. Do not mix a root `play` network block and a `play/sim` block
-without checking which replication lane its fields select. The complete
-contract is in [Simulation blocks](sim.md#simulation-blocks-in-godotplaysim).
+without checking which replication lane its fields select. See the supported composition rules in [Simulation blocks](sim.md#simulation-blocks-in-godotplaysim).
 
 ## Local helpers
 
@@ -165,14 +166,16 @@ The authority changes ownership with `session_set_owner`. The game decides the
 policy: last toucher, current carrier, current driver, or a permanent host
 owner.
 
-`puppet_claim` allows a client to begin simulating provisionally while it waits
-for an ownership command. If the authority grants ownership, the provisional
-flight continues. If the claim is denied or times out, the body freezes and the
-visual correction returns it to the actual owner's stream. Treat the claim as
-presentation prediction, not authority.
+`puppet_claim` starts provisional local body simulation while a client waits
+for an ownership decision. The registered owner stays unchanged, so the client
+does not publish that provisional motion. If authority grants ownership, the
+flight continues. If it is denied or times out, the body freezes and returns to
+the actual owner’s stream with visual smoothing. This changes local simulation,
+unlike the simulation lane’s `lane_claim`, which selects a displayed pose; neither
+operation transfers network authority on its own.
 
 `puppet_place` performs a reset or teleport. Pair it with the entity kind's
-generated teleport door—such as `ball_teleport(&game.boot, ball)`—so remote
+generated teleport helper, such as `ball_teleport(&game.boot, ball)`, so remote
 interpolation cuts instead of blending through the discontinuity.
 `puppet_shove` applies an impulse on the current simulator.
 

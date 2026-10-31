@@ -5,9 +5,9 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Recipient views and interest management</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/replication.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#prediction-and-presentation">Prediction and presentation</a><a href="#contracts-and-recovery">Contracts and recovery</a><a href="#current-scope-and-evidence">Current scope and evidence</a></nav></details>
 <article class="reading-body "><p>Use <code>Model.replication</code> to control which state, held inputs and occurrences each
-recipient receives. It is an optional server-side transmission policy. It changes what
-a recipient receives, independently of the client&#39;s <code>Prediction_Group</code>. The
-server still simulates and archives the complete World.</p>
+recipient receives. This optional server-side policy filters transmitted data;
+the client&#39;s <code>Prediction_Group</code> separately selects what the client predicts.
+The server continues to simulate and archive the complete World.</p>
 <figure class="figure paper reading-diagram"><div class="figure-top"><span>SYSTEM DIAGRAM</span><span><a href="../../../diagrams/reading-ca9a717831a78c.svg" target="_blank" rel="noopener">Open full size ↗</a> · <a href="../../../diagrams/reading-ca9a717831a78c.svg" download>SVG ↓</a></span></div><img src="../../../diagrams/reading-ca9a717831a78c.svg" alt="System diagram: Recipient views and interest management" loading="lazy"></figure><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">model.replication = net.Replication(World, Control, Event, SEATS){
     id = GAME_VIEW_V1,
     project = project_recipient,
@@ -21,12 +21,14 @@ client-supplied visibility mask. Store team/visibility permissions in replayable
 state if they affect historical decisions.</p>
 <p><code>valid(replica, recipient)</code> checks the received representation. It replaces the
 complete-world state validator for incoming Welcome/snapshot values. The authority
-continues using <code>Model.state_valid</code> for its initial world and archives. All controls
-still pass <code>control_valid</code>. Authority-only schema fields in both state and held controls are zeroed through
-the public replica codec before the server calls this validator, matching the client decoder.
+continues using <code>Model.state_valid</code> for its initial world and archives, and all
+controls still pass <code>control_valid</code>. Before calling <code>valid</code>, the server runs
+state and held controls through the public replica codec, which zeroes
+authority-only schema fields. The validator therefore sees the same
+representation as the client decoder.
 A rejected projection sends no fallback full state and increments
-<code>Stats.rejected_replica_views</code>; fix the authored policy rather than hiding the
-failure. The affected client may stall/resync while no valid view is available.</p>
+<code>Stats.rejected_replica_views</code>. The affected client may stall or resynchronize
+until the authored policy produces a valid view.</p>
 <p><code>event(frame, recipient, occurrence)</code> returns <code>(redacted_event, include)</code>. It sees
 the exact complete authority frame at the event&#39;s tick, including when facts are
 sent later. Omitted events never enter that recipient&#39;s fact packet. Included
@@ -39,7 +41,8 @@ none. Empty fact ticks remain present so confirmation can advance normally.</p>
 They do not query current scene nodes or mutable side services. Decisions describe
 the supplied frame/event tick; they do not retroactively revoke already transmitted
 knowledge, hide traffic timing, or prevent inference from intentionally public data.
-The framework validates the authored invariant, not arbitrary Odin information flow.</p>
+The framework checks the invariants implemented by the game&#39;s validator; it
+cannot prove that arbitrary Odin code preserves information-flow restrictions.</p>
 <h2 id="prediction-and-presentation">Prediction and presentation<a class="heading-anchor" href="#prediction-and-presentation" aria-label="Link to this section">#</a></h2>
 <p>A player using a nonzero replication policy must also supply a nonzero prediction
 group. The group&#39;s <code>project</code> receives the filtered replica. Include every
@@ -94,5 +97,5 @@ traffic; it is not a general game bandwidth or CPU claim. Real Godot/ENet peers 
 under configured latency, jitter, unreliable loss and duplication. See the
 <span class="local-reference" title="docs/replay/results/recipient-views-2026-09-07/README.md · available in the repository">retained evidence</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/replication.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/replication.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#prediction-and-presentation" class="">Prediction and presentation</a><a href="#contracts-and-recovery" class="">Contracts and recovery</a><a href="#current-scope-and-evidence" class="">Current scope and evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/replication.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

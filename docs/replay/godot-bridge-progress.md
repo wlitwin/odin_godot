@@ -1,7 +1,10 @@
-# Godot bridge goal progress
+<a id="godot-bridge-goal-progress"></a>
+
+# Godot bridge delivery record
 
 Completed scope: [B1–B7 plan](godot-bridge-plan.md). This is separate from the completed
-framework-first implementation. The typed authoring layers and final measured delivery gate are now complete.
+framework-first implementation. This record describes the completed typed
+authoring layers and final measured delivery gate.
 
 ## B1 foundation — 2026-09-20
 
@@ -27,7 +30,7 @@ See [API/lifetime contract](../../replay/godot/scene/view-pools.md) and
 Implemented detached `replay.project`, bounded typed entity projections, explicit
 predicted/observed/authoritative selection, interpolation and teleport cuts, and
 `View_Pool2(Entity, Value, Rig)`. Child bindings attach once per lifetime, paint
-skips unchanged values, and epoch/reset changes recreate rigs. Hello now uses the
+skips unchanged values, and epoch/reset changes recreate rigs. Hello was moved to the
 bridge; gameplay code and World hashes remain unchanged.
 
 32 core tests and 29 view tests pass, with WASM compilation. Actual Godot checks

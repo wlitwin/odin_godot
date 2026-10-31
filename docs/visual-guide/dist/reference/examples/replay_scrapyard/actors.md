@@ -1,7 +1,7 @@
 # Actor presentation
 
-Downed runners now freeze their idle frame, tilt 1.4 radians, dim, hide their gun
-and reload/muzzle cues, and display a pulsing beacon. Revival and respawn restore
+Downed player characters, called runners, freeze their idle frame, tilt 1.4
+radians, dim, hide their gun and reload/muzzle cues, and display a pulsing beacon. Revival and respawn restore
 the upright pose. Disconnected living runners use the original gray ghost tint.
 The logical rig and nameplate stay upright so camera tracking and names remain
 stable; the body sprite carries the tilt and the beacon stays above it.
@@ -13,14 +13,16 @@ epoch/tick events cannot replace a newer cue. Generation/warp/epoch boundaries
 reset transient state. The reload flag and downed pose derive from the displayed
 player state, including local prediction and remote presentation.
 
-Enemies now use attack rows when stopped near living prey or winding a boss slam,
-face nearby prey, and use the original row frame counts and 12-FPS death playback.
-Observed health loss produces a short hit flash and wobble. Initial observations,
-rewinds and epoch/body replacements seed silently. The typed view adapter manages scene lifetime and gives a reused simulation slot
-a fresh scene instance,
-including when a zombie slot becomes a barrel; rotation/facing/cue state cannot
-leak from the previous entity. Status
-washes follow the original last-visible-status rule and damaging-status flicker.
+Enemies use attack animation rows while stopped near a living target or
+preparing a boss slam. They face nearby targets and use the original frame
+counts and 12-FPS death playback. Observed health loss triggers a short hit
+flash and wobble. Initial observations, rewinds, and epoch/body replacements
+establish a baseline without those effects.
+
+The typed view adapter creates a new scene when a simulation slot receives a
+new entity, including when a zombie slot becomes a barrel. Rotation, facing,
+and transient cues from the prior entity therefore cannot carry over. Status
+tint follows the original last-visible-status rule and damaging-status flicker.
 
 ```sh
 nix develop --command bash examples/replay_scrapyard/actors_run.sh
@@ -31,8 +33,8 @@ RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
 
 The gate uses the actual workbench/game and ordinary firing, damage, reset and
 enemy lifecycles. It checks cue decay, hidden equipment while down, frozen body
-animation, respawn, attack facing, death and fresh prop binding after slot reuse. Revival and
-watched-host-crash fixtures also inspect downed/revived/ghost poses.
+animation, respawn, attack facing, death, and a fresh binding after slot reuse.
+Revival and watched-host-crash fixtures also inspect downed/revived/ghost poses.
 
 See [evidence](../../docs/replay/results/scrapyard-actors-2026-09-07/README.md).
 Native captures use Dummy audio, and this slice has a WASM compile check.

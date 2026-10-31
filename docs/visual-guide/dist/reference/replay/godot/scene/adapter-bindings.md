@@ -2,9 +2,10 @@
 
 Use typed scene adapters to pass detached gameplay display values into ordinary
 Godot scripts. The game chooses those values and their lifetime boundaries; shared
-runtime owners handle script resolution, borrowed pointers, asset retention, callback configuration,
-entity membership and diagnostics. Scrapyard uses the same binding declarations
-for authored enemy scenes and permanent runner scenes.
+runtime owners handle script resolution, borrowed pointers, asset retention,
+callback configuration, entity membership, and diagnostics. Scrapyard uses these
+bindings for authored enemy scenes and permanent runner scenes, where runner
+means the game's character rather than the runtime advancing simulation.
 
 ## Script descriptors
 
@@ -20,11 +21,11 @@ descriptor := scenegd.Script_View(Runner_Display, Runner_View){
 }
 ```
 
-When migrating an older descriptor, replace `valid = check` with
-`validate = validate_view`. Return `{}` on success or
-`definitions.problem(.Invalid, field, message)` on failure; retain every check
-from the old predicate. `valid` is no longer a descriptor field and old
-initializers fail compilation. In an archetype binding, validation checks scene
+Return `{}` on success or `definitions.problem(.Invalid, field, message)` on
+failure. Older descriptors using `valid = check` must replace it with
+`validate = validate_view` and retain every check from the predicate. `valid`
+is no longer a descriptor field, so old initializers fail compilation.
+In an archetype binding, validation checks scene
 components before `configure` supplies the appearance. A directly bound scene
 that requires an authored appearance must validate that appearance as well.
 
@@ -95,8 +96,8 @@ prediction, use correction counts as reset events, or know what a floor means.
 existing low-level presentation functions still return their original error enum.
 Script-based owners return the diagnostic directly. Errors identify archetype,
 scene path, entity key and the component/field supplied by the typed validator.
-Input validation precedes membership changes; arbitrary scene `_ready` code and
-instantiation side effects do not become transactional.
+Input validation runs before membership changes. Scene instantiation and
+`_ready` code can still have side effects that these checks cannot roll back.
 
 `Resource_Batch` loads a bounded directory of `.tres`/`.res` resources, retaining the
 whole candidate set until `resource_batch_destroy`. Loading failure publishes no
@@ -109,7 +110,7 @@ representation bounds before narrowing. Supported targets are fixed 8/16/32-bit
 signed/unsigned integers. Inspector ranges are editing hints, not inferred game
 validation. Complex mappings, nested dependencies and cross-field rules remain
 explicit functions. Scrapyard shares one `defs.bake_mob` among live admission,
-artifact export and previews; no second generated extractor is introduced.
+artifact export, and previews, so each path uses the same validation function.
 
 ## Optional generation
 
@@ -146,6 +147,8 @@ charge: ^ScrapChargeView `gd:"onready=Charge"`,
 Scrapyard's `ScrapEnemyPreview` Resource references a MobDef and supplies sample
 attack/warning/charge state. The same mob extractor validates the definition, and
 a detached display is baked on scene startup. A pulse radius comes from the
-selected definition; there is no switch over known enemy IDs. The [authoring tools](../../editor/README.md) provide explicit refresh of isolated
-preview data; live-bound views reject refresh. Appearance and normal scene-local animations remain
-independent of Session/World, with the same display interface as live play.
+selected definition without a switch over known enemy IDs. The
+[authoring tools](../../editor/README.md) provide explicit refresh of isolated
+preview data; live-bound views reject refresh. Appearance and scene-local
+animation use the live-play display interface while remaining independent of
+Session/World.

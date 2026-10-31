@@ -47,5 +47,6 @@ writers, archive corruption and identity corruption. Captures contain isolated t
 identities and game packets. Runtime databases, browser profiles and service secrets
 must not be published as evidence.
 
-These cases do not close full owner-profile parity, public deployment or paired
-comparison. WASM type checking alone is not browser execution acceptance.
+These cases establish the behavior listed above. Full owner-profile parity,
+public deployment, and paired comparison require separate evidence. WASM type
+checking alone does not establish browser execution.

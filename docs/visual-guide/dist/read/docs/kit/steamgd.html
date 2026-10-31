@@ -3,26 +3,25 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/steamgd — Steam transport and invite flow</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/steamgd.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#talking-to-godotsteam-by-name">Talking to GodotSteam by name</a><a href="#the-flow">The flow</a><a href="#the-wire-is-transport-agnostic">The wire is transport-agnostic</a><a href="#api">API</a><a href="#the-transport-record">The Transport record</a><a href="#worked-example-cavecrawl">Worked example: cavecrawl</a><a href="#live-verification">Live verification</a></nav></details>
-<article class="reading-body "><p>This module provides Steam lobbies, overlay invites, and a Steam <code>MultiplayerPeer</code>. Reach for this when you
-want players to host and join over Steam (friends clicking &quot;Join Game&quot; in the Steam
-overlay) instead of typing IP addresses. It runs on the <strong>GodotSteam</strong> GDExtension (the
-&quot;MultiplayerPeer&quot; build, which registers both the <code>Steam</code> singleton and the
-<code>SteamMultiplayerPeer</code> class) and plugs in under <a href="netgd.html">kit/netgd</a>&#39;s <code>Session_Wire</code>. The
-wire is the same wire ENet uses; only the transport underneath changes.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#talking-to-godotsteam-by-name">Talking to GodotSteam by name</a><a href="#overlay-invite-sequence">Overlay invite sequence</a><a href="#the-wire-is-transport-agnostic">The wire is transport-agnostic</a><a href="#api">API</a><a href="#the-transport-record">The Transport record</a><a href="#worked-example-cavecrawl">Worked example: cavecrawl</a><a href="#live-verification">Live verification</a></nav></details>
+<article class="reading-body "><p>Use <code>kit/steamgd</code> to host and join through Steam lobbies and overlay invites.
+Friends can select &quot;Join Game&quot; in the overlay without entering an IP address.
+The package requires the GodotSteam GDExtension&#39;s MultiplayerPeer build,
+which registers both the <code>Steam</code> singleton and <code>SteamMultiplayerPeer</code> class.
+It supplies a transport beneath <a href="netgd.html">kit/netgd</a>&#39;s <code>Session_Wire</code>, sharing
+the session integration used by ENet.</p>
 <h2 id="talking-to-godotsteam-by-name">Talking to GodotSteam by name<a class="heading-anchor" href="#talking-to-godotsteam-by-name" aria-label="Link to this section">#</a></h2>
-<p>Everything here reaches GodotSteam <strong>by name</strong> (engine singleton lookup, dynamic
-<code>object_call</code>s, ClassDB instantiation), never a compile-time link, since the toolkit cannot
-link against classes another extension may or may not register. The results:</p>
-<ul>
-<li>this package compiles and ships with <strong>no GodotSteam installed</strong>;</li>
-<li><code>available()</code> answers at runtime, and every proc no-ops safely without it;</li>
-<li>your game keeps <strong>one</strong> code path: its <code>Session_Wire</code> never changes.</li>
-</ul>
-<p>The GodotSteam name surface lives in this one file (the <code>SINGLETON</code> / <code>PEER_CLASS</code>
-constants and the <code>gd.sname(...)</code> method names), so version drift across GodotSteam builds
-lands in a single place.</p>
-<h2 id="the-flow">The flow<a class="heading-anchor" href="#the-flow" aria-label="Link to this section">#</a></h2>
+<p>The package looks up GodotSteam at runtime through the engine singleton,
+dynamic <code>object_call</code>s, and ClassDB instantiation. It cannot link at compile
+time to classes that another extension may not register. This lets the game
+compile and ship without GodotSteam installed. <code>available()</code> checks for it at
+runtime, and package procedures safely skip unavailable operations. The same
+<code>Session_Wire</code> handles either transport.</p>
+<p>GodotSteam names are centralized in this module: <code>SINGLETON</code>, <code>PEER_CLASS</code>,
+and the <code>gd.sname(...)</code> method names. Update those lookups if a supported
+GodotSteam build changes its API names.</p>
+<p><span id="the-flow"></span></p>
+<h2 id="overlay-invite-sequence">Overlay invite sequence<a class="heading-anchor" href="#overlay-invite-sequence" aria-label="Link to this section">#</a></h2>
 <p>The invite-via-overlay flow is:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">host:   init(APP_ID) -&gt; create_lobby(max) -&gt; [signal lobby_created] -&gt;
         host_peer(node) -&gt; session_host_start -&gt; invite_overlay(lobby_id)
@@ -32,14 +31,15 @@ guest:  friend hits &quot;Join Game&quot; in the Steam overlay -&gt;
         [signal lobby_joined] -&gt; client_peer(node, lobby_owner(lobby_id)) -&gt;
         connected_to_server fires -&gt; the wire's on_net_up joins the session
         exactly like ENet</code></pre></div><h2 id="the-wire-is-transport-agnostic">The wire is transport-agnostic<a class="heading-anchor" href="#the-wire-is-transport-agnostic" aria-label="Link to this section">#</a></h2>
-<p>SceneMultiplayer&#39;s signals (<code>peer_packet</code>, <code>peer_disconnected</code>, <code>connected_to_server</code>,
-<code>connection_failed</code>, <code>server_disconnected</code>) fire identically over <strong>any</strong> <code>MultiplayerPeer</code>.
-The wire binds to SceneMultiplayer, not to a transport, so swapping ENet for Steam is
-swapping <code>gd.host</code> / <code>gd.join</code> for <code>host_peer</code> / <code>client_peer</code>. Nothing else moves: not the
-four forwards, not the channel plan, not the session.</p>
+<p><code>Session_Wire</code> listens to SceneMultiplayer&#39;s <code>peer_packet</code>, <code>peer_disconnected</code>,
+<code>connected_to_server</code>, <code>connection_failed</code>, and <code>server_disconnected</code> signals.
+Replacing ENet&#39;s <code>gd.host</code> / <code>gd.join</code> calls with <code>host_peer</code> / <code>client_peer</code>
+changes the installed <code>MultiplayerPeer</code> while retaining those signals, the
+four forwarders, the channel plan, and the session.</p>
 <h2 id="api">API<a class="heading-anchor" href="#api" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><code>available() -&gt; bool</code>: is GodotSteam in this process at all? (Never changes mid-run.)</li>
+<li><code>available() -&gt; bool</code>: reports whether GodotSteam is registered in this
+process. The result does not change during the run.</li>
 <li><code>init(app_id := TEST_APP_ID) -&gt; bool</code>: brings Steamworks up (<code>steamInitEx</code>, callbacks
 embedded in the engine loop). False means Steam is not running, there is no appid, or there is no
 extension, so show your non-Steam lobby instead. Call once, before any lobby work. <code>TEST_APP_ID</code> is 480
@@ -58,9 +58,9 @@ handler signatures:<ul>
 <code>Friends_Only</code> (the default), <code>Public</code>, or <code>Invisible</code>.</li>
 <li><code>join_lobby(lobby_id: u64)</code>: the answer arrives on <code>lobby_joined</code>.</li>
 <li><code>leave_lobby(lobby_id: u64)</code>: releases the one piece of Steam state that outlives the multiplayer
-peer. A replaced peer drops the connection; Steam keeps you <em>seated</em> in the lobby, still
-listed to your friends, until you say this. Say it on the way back to the menu and before
-joining a different lobby; harmless if you are not in it.</li>
+peer. Replacing the peer drops its connection but leaves Steam lobby
+membership active and visible to friends. Call this when returning to the
+menu or before joining another lobby; it is harmless when not a member.</li>
 <li><code>lobby_owner(lobby_id: u64) -&gt; u64</code>: identifies the host of the lobby, the steam id the client peer
 connects to.</li>
 <li><code>my_steam_id() -&gt; u64</code>, <code>persona_name(allocator := context.temp_allocator) -&gt; string</code>:
@@ -77,31 +77,31 @@ wire&#39;s <code>on_net_up</code> forward joins the session exactly like ENet.</
 <p>Both peer procs print an actionable error and return false if <code>SteamMultiplayerPeer</code> isn&#39;t
 registered (i.e. you installed a non-MultiplayerPeer build of GodotSteam).</p>
 <h2 id="the-transport-record">The Transport record<a class="heading-anchor" href="#the-transport-record" aria-label="Link to this section">#</a></h2>
-<p><code>ksteam.TRANSPORT</code> is a <a href="netgd.html#swapping-transports"><code>netgd.Transport</code></a> record, so the
-generic kit/boot doors work with Steam:</p>
+<p><code>ksteam.TRANSPORT</code> implements the
+<a href="netgd.html#swapping-transports"><code>netgd.Transport</code></a> record used by Kit&#39;s generic
+connection helpers:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// on_lobby_created(result, lobby_id):   host</span>
 kboot.boot_open_host(&amp;self.boot, &amp;ksteam.TRANSPORT, {}, name)
 ksteam.invite_overlay(<span class="hljs-type">u64</span>(lobby_id))
 
 <span class="hljs-comment">// on_lobby_joined(lobby_id, ...):       guest</span>
-kboot.boot_open_join(&amp;self.boot, &amp;ksteam.TRANSPORT, ksteam.endpoint_of(<span class="hljs-type">u64</span>(lobby_id)), name, token)</code></pre></div><p>The lobby half stays in your signal handlers: asking for a lobby and getting the answer
-back on a signal is a Steam conversation, not a transport verb. What the doors take is the
-<code>Endpoint</code> that conversation produces: <code>endpoint_of(lobby_id)</code> is
-<code>{peer_id = lobby_owner(lobby_id)}</code>, because Steam addresses peers by steam id and the
-lobby is only the phonebook.</p>
-<p><strong>Three slots are nil.</strong> Each names a capability Steam does not offer through the generic
-door:</p>
+kboot.boot_open_join(&amp;self.boot, &amp;ksteam.TRANSPORT, ksteam.endpoint_of(<span class="hljs-type">u64</span>(lobby_id)), name, token)</code></pre></div><p>The game still creates and joins lobbies in its Steam signal handlers. Once
+that lookup completes, pass the resulting <code>Endpoint</code> to the connection helper.
+<code>endpoint_of(lobby_id)</code> returns <code>{peer_id = lobby_owner(lobby_id)}</code>: Steam
+connects to the host&#39;s Steam id, using the lobby to find it.</p>
+<p>Three <code>Transport</code> callbacks are nil in the current Steam integration:</p>
 <ul>
 <li><code>pump</code>: the engine polls the peer, like ENet, so there is nothing to pump.</li>
 <li><code>close</code>: the peer is replaced by the next install; lobby membership is the part that
 outlives it, and the lobby id is yours (call <code>leave_lobby</code>).</li>
 <li><code>address</code>: there is no verified way to ask which steam id is behind a multiplayer peer.
-Without it the host-migration handoff cannot name an heir, so <code>rendezvous</code> is <code>.None</code> and
-<strong>host migration is off on Steam</strong>; <code>succession_torch</code> reports this once, naming the
-transport. GodotSteam exposes the peer-to-steam-id mapping on builds that have it, but it
-cannot be verified from this repo (there is no Steam client, no linked extension, and
-every call is by name). To turn migration on, fill the <code>address</code> slot against a real build,
-add the <code>Rendezvous_Kind</code> arm, and Steam migrates.</li>
+Without a verified mapping, host migration cannot identify a successor.
+<code>rendezvous</code> is therefore <code>.None</code>, and host migration is disabled on Steam;
+<code>succession_torch</code> reports this once with the transport name. Some GodotSteam
+builds expose peer-to-Steam-id mapping, but this repository has not verified
+it against a running Steam client and extension. Enabling migration requires
+implementing <code>address</code> against a real build, adding the <code>Rendezvous_Kind</code>
+branch, and verifying the handoff.</li>
 </ul>
 <h2 id="worked-example-cavecrawl">Worked example: cavecrawl<a class="heading-anchor" href="#worked-example-cavecrawl" aria-label="Link to this section">#</a></h2>
 <p><code>examples/cavecrawl/scripts/net.odin</code> runs both transports through the same session code. In
@@ -111,9 +111,9 @@ add the <code>Rendezvous_Kind</code> arm, and Steam migrates.</li>
 	<span class="hljs-keyword">if</span> self.steam_on {
 		steamgd.listen(self.owner, <span class="hljs-string">&quot;on_lobby_created&quot;</span>, <span class="hljs-string">&quot;on_lobby_joined&quot;</span>, <span class="hljs-string">&quot;on_join_requested&quot;</span>)
 	}
-}</code></pre></div><p>The Host button branches on the transport, then both paths converge on <code>begin_hosting</code>,
-shared <strong>verbatim</strong> by ENet (<code>gd.host</code>) and Steam (<code>lobby_created</code>): the session cannot tell
-the transports apart. The shape is the same for <code>begin_joining</code>.</p>
+}</code></pre></div><p>The Host handler selects the transport. ENet calls <code>gd.host</code>; Steam waits for
+<code>lobby_created</code>. Both then call the shared <code>begin_hosting</code> session setup.
+Joining uses the corresponding shared <code>begin_joining</code> procedure.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method)</span>
 cave_lobby_on_lobby_created :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, result: gd.Int, lobby_id: gd.Int) {
 	<span class="hljs-keyword">if</span> <span class="hljs-type">int</span>(result) != <span class="hljs-number">1</span> { ... <span class="hljs-keyword">return</span> }
@@ -121,8 +121,8 @@ cave_lobby_on_lobby_created :: <span class="hljs-keyword">proc</span>(self: ^Cav
 	<span class="hljs-keyword">if</span> !steamgd.host_peer(self.owner) { ... <span class="hljs-keyword">return</span> }
 	begin_hosting(self)
 	steamgd.invite_overlay(self.steam_lobby)
-}</code></pre></div><p>The guest side has one guard to remember: <strong><code>lobby_joined</code> fires for the host&#39;s own lobby
-too</strong> (hosts join what they create), so check the owner before making a client peer:</p>
+}</code></pre></div><p><code>lobby_joined</code> also fires when the host joins the lobby it created. Check the
+lobby owner before creating a client peer so the host does not connect to itself:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method)</span>
 cave_lobby_on_lobby_joined :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, lobby_id: gd.Int, _perms: gd.Int, _locked: gd.Bool, _response: gd.Int) {
 	owner := steamgd.lobby_owner(<span class="hljs-type">u64</span>(lobby_id))
@@ -131,17 +131,18 @@ cave_lobby_on_lobby_joined :: <span class="hljs-keyword">proc</span>(self: ^Cave
 	}
 	self.steam_lobby = <span class="hljs-type">u64</span>(lobby_id)
 	<span class="hljs-keyword">if</span> !steamgd.client_peer(self.owner, owner) { ... <span class="hljs-keyword">return</span> }
-	<span class="hljs-comment">// connected_to_server will fire -&gt; the wire&#x27;s on_net_up seats us.</span>
+	<span class="hljs-comment">// connected_to_server triggers the wire&#x27;s on_net_up session join.</span>
 	begin_joining(self)
 }
 
 <span class="hljs-meta">@(gd_method)</span>
 cave_lobby_on_join_requested :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, lobby_id: gd.Int, _friend: gd.Int) {
-	steamgd.join_lobby(<span class="hljs-type">u64</span>(lobby_id)) <span class="hljs-comment">// the overlay&#x27;s &quot;Join Game&quot; lands here</span>
+	steamgd.join_lobby(<span class="hljs-type">u64</span>(lobby_id)) <span class="hljs-comment">// handles the overlay&#x27;s &quot;Join Game&quot; request</span>
 }</code></pre></div><p>The four wire forwards, <code>wire_attach</code>/<code>wire_listen</code>, kicks, and the latency shim are all identical
 to the ENet path; see <a href="netgd.html">netgd.md</a>.</p>
 <h2 id="live-verification">Live verification<a class="heading-anchor" href="#live-verification" aria-label="Link to this section">#</a></h2>
-<p>This cannot run headless; it needs the Steam client. The checklist:</p>
+<p>The Steam connection path requires a running Steam client and cannot be
+verified by the headless test. To check it live:</p>
 <ol>
 <li>Drop the <strong>GodotSteam MultiplayerPeer</strong> GDExtension into the project (the build that
 registers <code>SteamMultiplayerPeer</code>, not just the <code>Steam</code> singleton).</li>
@@ -149,10 +150,10 @@ registers <code>SteamMultiplayerPeer</code>, not just the <code>Steam</code> sin
 <li>Use two logged-in Steam accounts that are friends; run host on one, and accept the overlay
 invite on the other.</li>
 </ol>
-<p>Until you&#39;ve done that, <code>available()</code> false-ing into your non-Steam lobby is the correct,
-tested behavior: cavecrawl&#39;s <code>run.sh</code> asserts the headless runs log <code>CAVE_STEAM off</code>
-(graceful absence), and the <code>CAVE_STEAM=0</code> env knob switches the paths off even with
-GodotSteam installed.</p>
+<p>Cavecrawl&#39;s headless <code>run.sh</code> checks the fallback path: when <code>available()</code> is
+false, the game uses its non-Steam lobby and logs <code>CAVE_STEAM off</code>. That test
+does not verify a live Steam connection. Set <code>CAVE_STEAM=0</code> to disable the Steam
+path even when GodotSteam is installed.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/steamgd.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#talking-to-godotsteam-by-name" class="">Talking to GodotSteam by name</a><a href="#the-flow" class="">The flow</a><a href="#the-wire-is-transport-agnostic" class="">The wire is transport-agnostic</a><a href="#api" class="">API</a><a href="#the-transport-record" class="">The Transport record</a><a href="#worked-example-cavecrawl" class="">Worked example: cavecrawl</a><a href="#live-verification" class="">Live verification</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/steamgd.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/steamgd.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#talking-to-godotsteam-by-name" class="">Talking to GodotSteam by name</a><a href="#overlay-invite-sequence" class="">Overlay invite sequence</a><a href="#the-wire-is-transport-agnostic" class="">The wire is transport-agnostic</a><a href="#api" class="">API</a><a href="#the-transport-record" class="">The Transport record</a><a href="#worked-example-cavecrawl" class="">Worked example: cavecrawl</a><a href="#live-verification" class="">Live verification</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/steamgd.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

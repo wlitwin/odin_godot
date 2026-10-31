@@ -7,19 +7,21 @@
 <article class="reading-body "><p>The menu and tally are separate authored scenes using the original steel theme.
 The Escape menu dims the whole local view, centers horizontally and scrolls at
 smaller window heights. It keeps the existing save, spray, invite and settings
-controls and adds Quit. Quit first unloads the game and closes its session. Native builds allow a brief
-cleanup interval and then exit; browser builds display a closed-yard screen and
+controls and adds Quit. Quit first unloads the game and closes its session.
+Native builds allow a brief cleanup interval and then exit; browser builds
+display a closed-yard screen and
 leave the tab open.</p>
 <p>Menu input does not move, dash, shoot, cast, ping or buy. The simulation and
 networking continue. Resume gets keyboard focus when the menu opens, and closing
 it consumes that frame&#39;s input so Enter does not also focus chat or a click fire
 a shot. Physical held-key state is retained while pending button presses are
-discarded, so holding Shift through Resume does not create a fresh dash. Tab opens the centered tally and releases unrelated gameplay UI focus;
-releasing Tab still closes the tally while chat has focus.</p>
+discarded, so holding Shift through Resume does not create a fresh dash. Tab
+opens the centered tally and releases unrelated gameplay UI focus. Releasing
+Tab still closes the tally while chat has focus.</p>
 <p>The tally reads confirmed gameplay counters for connected players: kills, damage,
 healing credit (Mends), scrap and cores, plus the original registered Deaths
 column and application round-trip time (Ping ms). Observers do not acquire player rows.
-The original registers deaths but never credits runner downs as deaths; that
+The original registers deaths but never credits player downs as deaths; that
 column remains zero here too. Telemetry is session metadata from the current
 authority, with zero for its local seat and <code>--</code> until a peer has a fresh sample.
 The <a href="../../replay/telemetry/README.html">telemetry component</a> measures application
@@ -35,10 +37,10 @@ RSY_ARMORY=mend nix develop --<span class="hljs-built_in">command</span> bash ex
 focus and peer departure, alongside the earlier UI and ordnance checks.
 <span class="local-reference" title="docs/replay/results/scrapyard-menu-2026-09-07/README.md · available in the repository">Evidence</span> records the
 native/browser results and a communications-adapter regression found during this
-work. A gameplay resync now preserves chat on the still-admitted connection;
+work. A gameplay resync preserves chat on the still-admitted connection;
 fencing, failed admission and new connection/epoch boundaries retain their guards.</p>
 <p>Broader actor presentation parity, additional platform and browser tests, hardware
 listening, playtests and full M9 comparisons remain requirements.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/telemetry/README.html"><span>Session round-trip telemetry</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="browser_ui.html"><span>Browser UI acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/menu.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/telemetry/README.html"><span>Session round-trip telemetry</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="browser_ui.html"><span>Browser UI acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/menu.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/menu.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

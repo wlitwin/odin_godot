@@ -58,11 +58,13 @@ recovery point and kind. Competing/old-owner claims and stale incarnations fail.
 
 ## Durable store and coordinator restart
 
-Every mutation calls `Commit(user, expected_revision, next_record)` before changing
-the active record or exposing a grant. The backend must atomically compare the
-revision and durably store the complete next record. A failure poisons that
-coordinator instance and suppresses further grants/views. Model tests use an
-in-memory CAS ledger; the separate SQLite adapter has transaction/restart gates.
+Before changing the active record or exposing a grant, every mutation calls
+`Commit(user, expected_revision, next_record)`. The backend must atomically
+compare the expected revision and durably store the complete next record.
+This compare-and-swap (CAS) prevents a stale coordinator from replacing newer
+decisions. A failed commit permanently disables grants and views from that
+coordinator instance. Model tests use an in-memory CAS ledger; separate SQLite
+adapter tests check transactions and restart behavior.
 
 Initialization also commits a new coordinator generation/revision, invalidating
 an earlier instance's subsequent CAS writes. When reopening a record that has
@@ -77,12 +79,12 @@ one authoritative, linearizable durable store; independent writable copies of a
 room's store are not a supported coordination topology. Do not reset the record
 or reuse a room ID to bypass unavailable storage or the quarantine.
 
-Coordinator loss therefore stops authority after existing leases expire. A
-partition cannot independently elect a host through this profile. The coordinator
-reachable side may recover after the old lease expires; isolated participants
-freeze and later replace their state from the approved authority. Divergent
-inventories are never merged. A quorum-based decentralized profile remains separate
-work for deployments that cannot use a decision service.
+If the coordinator becomes unavailable, authority stops when existing leases
+expire. Participants cannot elect a host independently under this profile.
+Those that can reach the coordinator may recover after the old lease expires.
+Isolated participants freeze, then replace their state with the approved
+authority's state when they reconnect; divergent inventories are never merged.
+Deployments without a decision service would need a separate quorum-based policy.
 
 ## Clock and reply contract
 
@@ -118,11 +120,11 @@ Set `Config.require_permit=true` and provide `Permit` at server/client initializ
 requires that the view's owner match this process's identity. An observer/client
 lease tracks the currently approved epoch without granting itself authority.
 
-The runner checks before accepting local gameplay, pumping gameplay packets,
-predicting/advancing ticks, and issuing gameplay sends. `Timeline.advance` also
-checks an optional `Commit_Gate` after simulation but **before** publishing the
-candidate. Rejection preserves the entire history ring, including its oldest slot,
-and the action frontier. Client prediction also restores its action's pending flag.
+The runner checks its permit before accepting local gameplay, pumping packets,
+advancing or predicting ticks, and sending gameplay data. `Timeline.advance`
+also checks an optional `Commit_Gate` after simulating a candidate and before
+publishing it. Rejection preserves the entire history ring, including its oldest
+slot, and the action frontier. Client prediction also restores its action's pending flag.
 Checking before publication preserves the oldest frame even when the ring is
 full; rewinding after publication would be too late to recover it.
 

@@ -6,9 +6,9 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#server-ownership">Server ownership</a><a href="#wire-and-retry-contract">Wire and retry contract</a><a href="#godot-connection-and-tls">Godot connection and TLS</a><a href="#remaining-integration">Remaining integration</a></nav></details>
 <article class="reading-body "><p>Use this protocol to create rooms and issue, consume or revoke invitations
 through the admission backend. It provides canonical request/reply messages, a
-bounded room hub and a Godot client connection requiring verified TLS by default. Native
-processes create rooms, issue/use invites, authenticate authority RPCs, reconnect,
-and recover the same credentials after a server kill/restart. The
+bounded room hub and a Godot client connection requiring verified TLS by default.
+Native tests create rooms, issue/use invites, authenticate authority RPCs,
+reconnect, and recover the same credentials after a server kill/restart. The
 <span class="local-reference" title="docs/replay/results/provision-tls-2026-09-07/README.md · available in the repository">recorded gate</span> separates
 this local TLS acceptance from public deployment and browser enrollment.</p>
 <h2 id="server-ownership">Server ownership<a class="heading-anchor" href="#server-ownership" aria-label="Link to this section">#</a></h2>
@@ -17,8 +17,8 @@ room limit (1–32, default 16). <code>hub_open</code> receives the complete exi
 before accepting traffic. <code>sqlite.load_all</code> reads that inventory transactionally
 into a caller-bounded destination; excessive, corrupt or wrong-content rows fail
 without returning a partial inventory. One service owns this room set. Multiple
-instances sharing the database fence each other&#39;s writes; this is not an available
-multi-node coordinator cluster.</p>
+instances sharing the database reject stale writes from one another. This does
+not provide a highly available coordinator cluster.</p>
 <p>New cooperative rooms use a client-supplied nonzero room ID and fresh 32-byte
 creator claim. Retain both before sending. A collision with another creator&#39;s room
 fails the claim check. Retrying a successful create with the same room, claim and
@@ -31,7 +31,7 @@ rooms before public admission starts. Ordinary-player invites remain available;
 trusted-player invites remain denied. A previously provisioned dedicated creator
 claim is an explicit infrastructure capability.</p>
 <p>Creation persists before publishing a room or grant. An uncertain create commit
-poisons the whole hub until startup reloads its inventory. An uncertain join follows
+stops the whole hub from serving until startup reloads its inventory. An uncertain join follows
 the room owner&#39;s existing fail-closed rule. Unknown-room requests neither load
 storage nor trigger coordinator generation changes.</p>
 <p>Poll the transport once per update and bound its ingress loop. Pass provisioning
@@ -77,8 +77,8 @@ invalid enums and wrong sizes are rejected before admission mutation.</p>
 </tbody></table>
 </div><p>Unused fields must be zero. Replies contain the SHA-256 hash of the exact request
 and matching room/content, plus a grant, ticket or error with empty result values.
-Clients reject unrelated or malformed replies. Durable idempotency survives fresh
-request wrappers and transport connections.</p>
+Clients reject unrelated or malformed replies. Retrying the same committed
+request through a new client or transport connection returns its saved result.</p>
 <p>The generic <code>Client</code> borrows a transport and clock. It keeps one request pending,
 retries identical bytes every 250 ms, and returns <code>Not_Ready</code> after 10 seconds
 without a correlated reply. Timeout is an uncertain outcome, not proof of failure;
@@ -134,5 +134,5 @@ reproducible co-op invite. Other game menus, general invite-operation persistenc
 public TLS/relay deployment and account/room lifecycle remain work.
 Original games and their existing fixture provisioning remain separately runnable.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/protocol.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/protocol.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#server-ownership" class="">Server ownership</a><a href="#wire-and-retry-contract" class="">Wire and retry contract</a><a href="#godot-connection-and-tls" class="">Godot connection and TLS</a><a href="#remaining-integration" class="">Remaining integration</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/protocol.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

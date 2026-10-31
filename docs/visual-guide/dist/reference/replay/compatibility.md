@@ -25,7 +25,7 @@ and restore rules.
 
 These are source constants, not a single library release number:
 
-| Surface | Current constant |
+| Format or protocol | Current constant |
 | --- | --- |
 | Canonical RPLY envelope | `schema.FORMAT_VERSION = 1`, 52-byte header |
 | Authority gameplay protocol | `net.PROTOCOL_VERSION = 7` |

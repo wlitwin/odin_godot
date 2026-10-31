@@ -1,9 +1,9 @@
 # Fixed-roster P2P admission
 
-Use this package to authenticate a participant against a trusted match provider
-before a
-physical connection is bound to a P2P roster slot. It does not supply gameplay
-state, elect a simulation authority or choose a winning checksum.
+Use this package to authenticate a participant through a trusted match provider
+before binding a physical connection to a P2P roster slot. Admission does not
+supply gameplay state, elect a simulation authority, or resolve a checksum
+disagreement by selecting a winning state.
 
 `Match` names a session, content version, epoch and ordered roster of 2–8 nonzero,
 unique member IDs. `Registry` is owned by the provider and holds the current
@@ -62,12 +62,13 @@ incarnation registration, revocation policy and secure personal-key distribution
 this package does not implement an account database or public provisioning UI.
 Registry updates must happen at an externally synchronized boundary.
 
-Admission authenticates connection establishment. Established direct gameplay
-channels can outlive signaling loss. Removing signaling permission alone is not a
-complete policy for ejecting a player from an already connected match; the
-application/provider must also fence its gameplay transport or terminate that
-fixed-roster match. Changing the roster requires a new match contract. There is no
-claim that a peer can be trusted to simulate honestly merely because it authenticated.
+Admission authenticates connection establishment, while direct gameplay
+channels may remain connected after signaling is lost. Revoking signaling
+permission therefore does not disconnect an existing player. The application
+or provider must also fence that player's gameplay transport or terminate the
+fixed-roster match. Changing the roster requires a new match contract.
+Authentication identifies the participant; it does not establish that their
+simulation is honest.
 
 The signaling frontend retains the first member as the room creator. Its browser
 process may return from a compatible archive while peers retain their runners.

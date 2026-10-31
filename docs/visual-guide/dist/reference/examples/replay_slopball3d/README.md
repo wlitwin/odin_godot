@@ -1,8 +1,8 @@
 # Replay Slopball3D
 
-A separate initial port of [Slopball3D](../slopball3d/README.md), preserving its original
-project. Each entity owner—the player permitted to submit its body state—sends
-pose and momentum observations to Replay. Kickers use CharacterBody3D nodes and
+This separate port of [Slopball3D](../slopball3d/README.md) preserves the original
+project. Each entity's network owner is the player permitted to submit its body
+state. That player sends pose and momentum observations to Replay. Kickers use CharacterBody3D nodes and
 the ball uses RigidBody3D with gravity, loft and tumble. Reused pitch, camera, materials
 and body scenes have [asset provenance](assets.md).
 
@@ -27,8 +27,8 @@ physics path. The network gate uses host + client striker + observer and 120 ms
 receive delay per process, requiring ownership transfer, one goal per screen,
 vertical motion, tumble and settled convergence within 10 cm near tick 600.
 
-The game reducer records accepted observations, ownership and scoring without engine
-calls. Body3, the adapter between a Godot physics body and those recorded
+The simulation step records accepted observations, ownership, and scoring
+without engine calls. Body3, the adapter between a Godot physics body and those recorded
 observations, handles solver preparation/seeding, frozen observers, quaternion-aware
 view interpolation and skin smoothing. The moving/spinning handoff probe checks all
 velocity components and orientation. Planned/crash Room gates compare the exact
@@ -37,14 +37,14 @@ the successor's team, and compare surviving clients at a common tick. The old ho
 rejoins in planned mode.
 
 The first implementation had a material-reference ownership error at shutdown.
-Raw RefCounted materials now receive an explicit owned reference before assignment
+Raw RefCounted materials receive an explicit owned reference before assignment
 and local release. Subsequent solo/network/probe/migration runs exit cleanly.
 
 This is initial coverage, not full game parity. Native lobby, profiles, chat,
-scoreboard and leave/rejoin now have acceptance. Netgraph UI, broader multi-goal
-contests, preview denial/
-timeout, broader reconnect/recovery and human feel review remain pending. Ownership intent now uses accepted ground-plane displacement at arbitration
-passes, matching the original measure and threshold. Handoff still uses
+scoreboard, and leave/rejoin have acceptance. Netgraph UI, broader multi-goal
+contests, preview denial/timeout, broader reconnect/recovery, and human feel
+review remain pending. Ownership intent uses accepted ground-plane
+displacement at arbitration passes, matching the original measure and threshold. Handoff still uses
 prepare/commit rather than immediate SETOWNER. Solver contacts/joints
 are not serialized or replayed. Broader browser deployment and independent platform testing
 remain open. See [Body3](../../replay/godot/scene/body3.md) and the [roadmap](../../docs/replay/roadmap.md).

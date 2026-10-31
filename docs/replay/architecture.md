@@ -4,7 +4,9 @@ Status: experimental. See the [framework audit](framework-audit.md) for implemen
 contracts and remaining work. The original [Kit](../kit/index.md)
 remains a separate supported implementation.
 
-## Objective
+<a id="objective"></a>
+
+## Simulation model
 
 Gameplay operates on a **World**, the typed value containing all mutable
 simulation state. A **frame** stores that value at one tick. A **step** applies
@@ -74,8 +76,9 @@ flowchart TD
 
 The core, canonical codecs, presentation, authoritative and deterministic P2P
 runners, owner streams, diagnostics and coordinated recovery are implemented.
-Their supported envelopes differ; engine physics remains an explicit cooperative
-policy rather than a deterministic rollback solver.
+Their tested configurations differ. Engine physics remains an explicit
+cooperative policy; saving its output does not provide a deterministic rollback
+solver.
 
 Implemented package boundaries:
 
@@ -245,13 +248,16 @@ for failure cases and acceptance gates.
 
 ## Diagnostic and performance direction
 
-Start with value copies and explicit step order. Measure snapshot bytes, copy
-cost, replay cost, event backlog, and allocation pressure before implementing
-page sharing or incremental snapshots. A typed arena or component store can
+The initial performance direction was to start with value copies and explicit
+step order, then measure snapshot bytes, copy cost, replay cost, event backlog,
+and allocation pressure before implementing page sharing or incremental snapshots. A typed arena or component store can
 replace fixed pools without changing the frame contract, but requires restore,
 allocation-order, and codec tests first.
 
-Extend audit to emit a path such as `players[1].inventory[3].count`, both values,
-the triggering input, and a reusable reproduction file. Allow deliberate replay
-every frame during offline play. Keep multiplayer fault schedules recorded so a
-failure is reproducible independently of real packet arrival timing.
+The diagnostic goals included an audit report with a field path such as
+`players[1].inventory[3].count`, both values, the triggering input, and a reusable
+reproduction file. They also called for deliberate replay during offline play
+and recorded multiplayer fault schedules so failures could be reproduced
+independently of live packet arrival timing. See the current
+[diagnostics guide](../../replay/diagnostics.md) for implemented capture,
+field-difference, recording, and playback APIs.

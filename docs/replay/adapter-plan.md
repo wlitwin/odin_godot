@@ -1,7 +1,8 @@
 # Replay adapter ergonomics
 
-Completed goal: make the remaining scene adapter work reusable, use it in Scrapyard,
-and add narrow optional generation over the resulting public helpers.
+This record summarizes completed reusable scene-adapter work, its Scrapyard
+integration, and optional generation over the public helpers. In the table,
+runner means Scrapyard's character scene, not the simulation runtime.
 
 | Gate | Implementation | Acceptance |
 | --- | --- | --- |

@@ -4,10 +4,10 @@
 REPLAY_QUICKDRAW_SAVE_OUT=/absolute/fresh/output nix develop --command bash tests/replay_quickdraw_save/run.sh
 ```
 
-The runner builds an isolated game and runs the existing UI/profile prerequisites.
+The test harness builds an isolated game and runs the existing UI/profile prerequisites.
 It starts a named host/client pair, buys equipment, causes a real death, launches a
 lob and uses F5 during the live combat window. A blocked staging path must fail
-without changing the committed save. Only after that receipt does the runner kill
+without changing the committed save. Only after that receipt does the harness kill
 its exact writer processes.
 
 An independent Odin reader decodes the actual archive and verifies combat state,

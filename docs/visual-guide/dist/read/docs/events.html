@@ -3,14 +3,14 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html" aria-current="page">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Pure-Odin events — events.Event(T)</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../reference/docs/events.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#which-tool-when">Which tool when</a><a href="#two-rules-for-safe-use">Two rules for safe use</a><a href="#hot-reload">Hot reload</a><a href="#semantics-reference">Semantics reference</a></nav></details>
-<article class="reading-body "><p>When both ends of a notification are Odin scripts <strong>in the same dll</strong>, an engine signal
-is more machinery than you need: every emit does a StringName lookup, boxes one Variant
-per argument, runs <code>Object::emit_signal</code> connection dispatch, and trampolines back into
-your script through C. <code>import events &quot;godot:events&quot;</code> gives you a typed observer that
-dispatches with direct proc calls instead. There is no engine, no boxing, and no
-allocation on the emit path. It is the same split C# users know: a C# <code>event</code> inside the
-assembly, Godot signals at the edges.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-events-or-engine-signals">Choose events or engine signals</a><a href="#module-and-subscriber-lifetime-requirements">Module and subscriber lifetime requirements</a><a href="#hot-reload">Hot reload</a><a href="#semantics-reference">Semantics reference</a></nav></details>
+<article class="reading-body "><p>Use <code>events.Event(T)</code> for typed notifications between Odin scripts in the same
+library. <code>import events &quot;godot:events&quot;</code> provides an observer list that invokes
+subscribers through direct procedure calls, without engine dispatch, Variant
+boxing, or allocation during emit. Engine signals also perform a StringName
+lookup, box arguments into Variants, dispatch through <code>Object::emit_signal</code>,
+and call back into Odin through C. Use those signals when the notification
+crosses a module or engine boundary.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> events <span class="hljs-string">&quot;godot:events&quot;</span>
 
 Spawner :: <span class="hljs-keyword">struct</span> {
@@ -21,16 +21,18 @@ Spawner :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-comment">// publisher</span>
 events.emit(&amp;self.slow_changed, <span class="hljs-number">0.5</span>)
 
-<span class="hljs-comment">// subscriber (ctx round-trips to your struct, like flow&#x27;s callbacks)</span>
+<span class="hljs-comment">// subscriber (ctx points to the receiving script struct, as in flow callbacks)</span>
 events.subscribe(&amp;spawner.slow_changed, self, enemy_on_slow, owner_id)
 
 enemy_on_slow :: <span class="hljs-keyword">proc</span>(ctx: <span class="hljs-type">rawptr</span>, factor: <span class="hljs-type">f64</span>) {
 	self := <span class="hljs-keyword">cast</span>(^Enemy)ctx
 	self.slow = <span class="hljs-type">f32</span>(factor)
-}</code></pre></div><p>The payload is any Odin type (a struct, a slice, a pointer) passed by value, fully
-typed at compile time. There is no Variant in the path, so there is no
-<code>gd.Int</code>/<code>f64</code>-only restriction and no marshalling cost for big payloads.</p>
-<h2 id="which-tool-when">Which tool when<a class="heading-anchor" href="#which-tool-when" aria-label="Link to this section">#</a></h2>
+}</code></pre></div><p>The payload can be any Odin type, including a struct, slice, or pointer. It is
+passed by value and checked at compile time, without the <code>gd.Int</code>/<code>f64</code>
+restrictions or Variant marshalling required by engine signals. Normal Odin
+value-copy and referenced-data lifetime rules still apply.</p>
+<p><span id="which-tool-when"></span></p>
+<h2 id="choose-events-or-engine-signals">Choose events or engine signals<a class="heading-anchor" href="#choose-events-or-engine-signals" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -39,25 +41,27 @@ typed at compile time. There is no Variant in the path, so there is no
 </tr>
 </thead>
 <tbody><tr>
-<td>Crossing ANY boundary: another script module, GDScript, <code>.tscn</code> <code>[connection]</code>s, the Inspector, the editor</td>
-<td><strong>engine signal</strong> (<code>gd.Signal1(int)</code> / <code>gd.SignalN(struct{...})</code> fields): the engine is the contract</td>
+<td>Crossing a boundary: another script module, GDScript, <code>.tscn</code> <code>[connection]</code>s, the Inspector, the editor</td>
+<td><strong>engine signal</strong> (<code>gd.Signal1(int)</code> / <code>gd.SignalN(struct{...})</code> fields): uses the engine&#39;s connection mechanism</td>
 </tr>
 <tr>
-<td>Decoupled one-to-many between scripts in the SAME module/dll</td>
+<td>One-to-many notifications between scripts in the same module/dll</td>
 <td><strong><code>events.Event(T)</code></strong>: direct calls, typed payloads</td>
 </tr>
 <tr>
-<td>The hottest loops (per-bullet, per-frame-per-entity)</td>
-<td><strong>neither</strong>: batch the data and iterate (see barrage&#39;s SOA bullet field); a callback per element is still a call per element</td>
+<td>Per-bullet or per-frame-per-entity loops</td>
+<td><strong>batch and iterate</strong> when callback overhead matters (see barrage&#39;s SOA bullet field)</td>
 </tr>
 </tbody></table>
-</div><h2 id="two-rules-for-safe-use">Two rules for safe use<a class="heading-anchor" href="#two-rules-for-safe-use" aria-label="Link to this section">#</a></h2>
+</div><p><span id="two-rules-for-safe-use"></span></p>
+<h2 id="module-and-subscriber-lifetime-requirements">Module and subscriber lifetime requirements<a class="heading-anchor" href="#module-and-subscriber-lifetime-requirements" aria-label="Link to this section">#</a></h2>
 <p><strong>1. Same module only.</strong> Script modules are isolated dlls with no cross-imports
 (<a href="modules.html">modules</a>). A subscription is a raw proc pointer plus a struct pointer, and
-those are meaningless in another dll: typeids are module-local, and <code>rt.script_of</code> on
-another module&#39;s class returns nil. When the <em>trigger</em> comes from another module, keep
-the cross-module edge as <strong>one engine call</strong> into the module that owns the event, and let
-the <code>Event</code> fan out inside that module. Barrage&#39;s SlowEnemies powerup shows the shape:
+these are not a supported cross-module interface: typeids are module-local,
+and <code>rt.script_of</code> returns nil for another module&#39;s class. When a trigger
+comes from another module, make one engine call into the module that owns the
+event, then use <code>Event</code> to notify its subscribers. Barrage&#39;s SlowEnemies powerup
+uses this arrangement:
 <code>pickup.odin</code> (powerups module) makes one <code>object_call(&quot;slow_all_enemies&quot;)</code> into the
 Spawner (enemies module), which <code>events.emit</code>s to every subscribed Enemy:</p>
 <div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">powerups dll                       enemies dll
@@ -73,12 +77,13 @@ teardown:</p>
 	}
 }</code></pre></div><p>The publisher frees its list in its own <code>exit_tree</code> with <code>events.destroy</code>.</p>
 <h2 id="hot-reload">Hot reload<a class="heading-anchor" href="#hot-reload" aria-label="Link to this section">#</a></h2>
-<p>Subscriptions contain procedure-bearing state, so the core requires a reload hook before it
-will move a live publisher/subscriber instance to a new DLL generation. Without one, that
-instance stays safely on its old code and warns. A changed-layout reload also reallocates
-structs and can dangle ctx pointers. Resubscribe in the <code>&lt;class&gt;_reload</code> hook, tagged by owner so it stays
-idempotent and order-independent across the reload&#39;s rebind loop (the same pattern
-<a href="workflow.html">flow</a>&#39;s <code>Action</code> trees use):</p>
+<p>Subscriptions store procedure pointers. Before moving a live publisher or
+subscriber to a new DLL generation, the core requires a reload hook. Without
+one, it keeps the instance on the old generation and emits a warning. A reload
+that changes layout also reallocates structs, invalidating old ctx pointers.
+Resubscribe in <code>&lt;class&gt;_reload</code>, using an owner tag to remove stale
+subscriptions first. This makes repeated calls safe regardless of the order
+in which instances are rebound, as with <a href="workflow.html">flow</a>&#39;s <code>Action</code> trees:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">enemy_subscribe_slow :: <span class="hljs-keyword">proc</span>(self: ^Enemy) {
 	sp := find_spawner(self)
 	<span class="hljs-keyword">if</span> sp == <span class="hljs-literal">nil</span> {<span class="hljs-keyword">return</span>}
@@ -88,10 +93,11 @@ idempotent and order-independent across the reload&#39;s rebind loop (the same p
 }
 
 enemy_ready  :: <span class="hljs-keyword">proc</span>(self: ^Enemy) { <span class="hljs-comment">/* ... */</span> enemy_subscribe_slow(self) }
-enemy_reload :: <span class="hljs-keyword">proc</span>(self: ^Enemy) { enemy_subscribe_slow(self) }</code></pre></div><p>After every affected reload hook returns, the old generation is eligible to unload. Treat the
-hook as the boundary after which no subscription may retain its previous fn or ctx pointer.</p>
-<p>(Ordinary game scripts never hot-reload mid-run. This matters for <code>//gd:tool</code> scripts
-and editor-driven reloads.)</p>
+enemy_reload :: <span class="hljs-keyword">proc</span>(self: ^Enemy) { enemy_subscribe_slow(self) }</code></pre></div><p>After all affected reload hooks return, the old generation may unload. Each
+hook must therefore remove or replace subscriptions holding an old fn or ctx
+pointer before returning.</p>
+<p>This applies to <code>//gd:tool</code> scripts and editor-driven reloads. Ordinary game
+scripts do not hot-reload during a run.</p>
 <h2 id="semantics-reference">Semantics reference<a class="heading-anchor" href="#semantics-reference" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><code>subscribe(e, ctx, fn, owner = 0)</code> appends the subscription. Duplicates are allowed,
@@ -102,14 +108,14 @@ bulk removal.</li>
 <li><code>emit(e, payload)</code> calls live subscribers in subscription order. It is
 reentrancy-safe: subscribing during an emit defers to the <em>next</em> emit, and
 unsubscribing during an emit takes effect immediately (a not-yet-called subscriber
-removed mid-emit won&#39;t fire). Nested emits are fine.</li>
+removed mid-emit will not fire). Nested emits are supported.</li>
 <li><code>count(e)</code> returns the live count, <code>clear(e)</code> drops all subscriptions, and
 <code>destroy(e)</code> frees the event. <code>destroy</code> must not run from inside one of the event&#39;s
 own callbacks.</li>
-<li><strong>Not thread-safe.</strong> This is a main-thread gameplay tool, like the rest of a script.</li>
+<li><strong>Not thread-safe.</strong> Use events on the main gameplay thread.</li>
 </ul>
 <p>The package is engine-agnostic (no <code>godot</code> import) and unit-tested standalone:
 <code>tests/events/run.sh</code> (suite entry <code>events</code>, sentinel <code>EVENTS_OK</code>).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/events.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#which-tool-when" class="">Which tool when</a><a href="#two-rules-for-safe-use" class="">Two rules for safe use</a><a href="#hot-reload" class="">Hot reload</a><a href="#semantics-reference" class="">Semantics reference</a></nav><div class="outline-actions"><a href="../../reference/docs/events.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow: builds, editor tools, and debugging</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/events.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-events-or-engine-signals" class="">Choose events or engine signals</a><a href="#module-and-subscriber-lifetime-requirements" class="">Module and subscriber lifetime requirements</a><a href="#hot-reload" class="">Hot reload</a><a href="#semantics-reference" class="">Semantics reference</a></nav><div class="outline-actions"><a href="../../reference/docs/events.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

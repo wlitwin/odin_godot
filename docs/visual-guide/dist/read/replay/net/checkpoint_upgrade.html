@@ -6,10 +6,11 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#authority-and-assets">Authority and assets</a><a href="#action-schema-changes">Action-schema changes</a><a href="#world-schema-changes">World-schema changes</a><a href="#combined-world-and-action-changes">Combined world and action changes</a></nav></details>
 <article class="reading-body "><p>Use an explicit checkpoint converter when a saved archive&#39;s protocol or game
 schema differs from the current model. <code>checkpoint_decode</code> and <code>server_restore</code>
-require the current protocol,
-archive layout, schemas, model and application-supplied content ID. A failed load
-never guesses a conversion or changes the source bytes.</p>
-<p>The first bridge is <code>checkpoint_upgrade_v6(bytes, model, content, allocator)</code>.
+require the current protocol, archive layout, schemas, model and
+application-supplied content ID. If these do not match, loading fails without
+inferring a conversion or changing the source bytes.</p>
+<p><code>checkpoint_upgrade_v6(bytes, model, content, allocator)</code> converts protocol 6
+archives to the current protocol.
 It accepts gameplay protocol 6 / checkpoint layout 4 and returns owned protocol-7
 archive bytes, or an error and no output. Free a successful result with the same
 allocator. The input is borrowed, remains unchanged and can be released after
@@ -30,7 +31,7 @@ model values, roster, pending work and old protocol&#39;s complete contract hash
 settled outcomes, bans and opaque admission-policy bytes are preserved. Scheduled
 and latest-observation models retain distinct contracts. Passing the wrong control
 timing fails. Passing an already-current archive also fails; this is a specific
-bridge rather than an idempotent generic loader.</p>
+converter for protocol 6, not a generic loader that accepts repeated conversion.</p>
 <p>The bridge only applies while the current protocol is 7. It does not convert older
 archive layouts, different state schemas, removed fields, changed gameplay content
 or application semantics. Those require explicit source-version types and a
@@ -83,8 +84,8 @@ shape when importing into content 44.</p>
 <h2 id="world-schema-changes">World-schema changes<a class="heading-anchor" href="#world-schema-changes" aria-label="Link to this section">#</a></h2>
 <p><code>checkpoint_convert_state(bytes, source_model, source_content, target_model, target_content, convert)</code> maps a complete source world into a target world. The
 source must use the current protocol; controls, actions, events, seat count and
-control timing remain shared. Keep explicit source-version world types instead of
-making normal decode guess older layouts.</p>
+control timing remain shared. Define explicit world types for each supported
+source version; normal decode does not infer older layouts.</p>
 <p>The mapper returns <code>(target_world, ok)</code>. A refused mapping, invalid target world or
 insufficient restored egress budget fails without output. Full source validation
 precedes the mapper. Target contract/schema validation follows it. The frame tick,
@@ -92,7 +93,7 @@ epoch, roster, held and future controls, pending actions, outcomes, bans and pol
 bytes remain intact. Output is owned; the borrowed source is unchanged. This
 conversion has the same authority and external-asset limitations described above.</p>
 <p><a href="../../examples/replay_cavecrawl/authoring.html">Cavecrawl&#39;s explicit importer</a>
-uses this boundary to add two captured floor definitions to an older Replay world.
+uses this converter to add two captured floor definitions to an older Replay world.
 Its fixture is a real save produced by the earlier game binary, then converted and
 resumed by the current game in a fresh process.</p>
 <h2 id="combined-world-and-action-changes">Combined world and action changes<a class="heading-anchor" href="#combined-world-and-action-changes" aria-label="Link to this section">#</a></h2>
@@ -109,5 +110,5 @@ borrowed and unchanged; output is owned. The authority/asset limitations above s
 apply. Cavecrawl uses this path to add lobby state and commands while importing its
 two earlier Replay content versions. It does not attempt to import original Kit saves.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/checkpoint_upgrade.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_cavecrawl/authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/checkpoint_upgrade.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authority-and-assets" class="">Authority and assets</a><a href="#action-schema-changes" class="">Action-schema changes</a><a href="#world-schema-changes" class="">World-schema changes</a><a href="#combined-world-and-action-changes" class="">Combined world and action changes</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/checkpoint_upgrade.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

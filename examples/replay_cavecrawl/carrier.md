@@ -18,14 +18,16 @@ Replay can explicitly replace a reserved seat with a different identity. Its
 the version once. This prevents a new occupant from inheriting a former player's
 possession. Ordinary rejoin does not call this identity-reset path.
 
-## What is still different
+<a id="what-is-still-different"></a>
+
+## Differences from owner-streamed Kit behavior
 
 Replay computes attachment in the simulation. Original Kit streams owner poses.
 A disconnected Replay avatar may move to a new floor under the existing reserved
 avatar policy; the parked relic does not follow until the carrier returns.
 Original floor progression includes disconnected avatar bodies in its gate.
 
-C8 now [adopts the old host’s relic](adoption.md) on a recorded authority change,
+C8 [adopts the old host’s relic](adoption.md) on a recorded authority change,
 matching Kit’s non-avatar orphan sweep. Successor/guest carriers retain ownership.
 Owner-streamed pose behavior and the disconnected-body floor gate remain separate
 comparison boundaries.

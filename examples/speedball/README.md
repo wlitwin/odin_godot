@@ -1,4 +1,6 @@
-# speedball — the contested twin
+<a id="speedball--the-contested-twin"></a>
+
+# speedball — whole-pitch prediction with Kit
 
 Compare this game with [slopball](../slopball/) to choose a simulation policy.
 Slopball hands the ball's physics simulation to the last toucher using
@@ -19,11 +21,11 @@ applies the correction and replays its remaining predicted ticks. Display
 smoothing eases the resulting position change. Each peer pays the CPU cost of
 replay and may show a speculative touch that is later corrected.
 
-Also showcased: the GOAL RESET is predicted (detection + kickoff freeze live
-in the ball's own tick — every screen snaps the ball home the instant its
-sim crosses the line), while the SCORE is authority-only (`ball_tick_then`,
-delta lane). The world pass is pure sim — contact and kicks for whichever
-kicker⟷ball pairs this peer has inputs for, no role gates anywhere.
+Goal detection and the kickoff freeze run in the ball's predicted tick.
+A peer can therefore reset the ball locally when its simulation detects a
+goal. The authority accepts the score through `ball_tick_then` on the delta
+lane. The world pass computes contact and kicks for the kicker⟷ball pairs
+whose inputs are available to that peer.
 
 Speedball also predicts the players (`echo_inputs`). The kickers are `contested`,
 and batches echo each player's held input so every peer simulates the whole
@@ -36,7 +38,7 @@ docs/kit/sim.md's contested section for the tradeoff.
 ```sh
 bash build/build_scripts.sh examples/speedball
 $GODOT --path examples/speedball                  # host, join from a second window
-SPB_LATENCY=120 $GODOT --path examples/speedball  # feel the touches at 240ms RTT
+SPB_LATENCY=120 $GODOT --path examples/speedball  # observe local response at 240ms RTT
 
 bash examples/speedball/run.sh          # solo gate (SPEEDBALL_SINGLE_OK)
 bash examples/speedball/native_run.sh   # contested-ball integration test (three peers)

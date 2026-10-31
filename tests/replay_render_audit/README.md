@@ -5,7 +5,7 @@ REPLAY_RENDER_OUT=/absolute/fresh/output \
   nix develop --command bash tests/replay_render_audit/run.sh
 ```
 
-The runner copies the real Replay Scrapyard project and stock content to an
+The test harness copies the Replay Scrapyard project and stock content to an
 isolated directory, adds an ownership probe, builds native and speed WASM, and runs
 native view tests followed by the complete three-peer browser UI scenario.
 Graphics tracing rejects invalid WebGL operations. The final report verifies
@@ -23,7 +23,7 @@ polygon vertex/color/modulate/mesh modes. Export it using Godot's Web preset and
 run `line_drive.mjs URL OUTPUT`; `verify_primitives.py OUTPUT` validates conflict
 counts and compares captured PNG pixels. Changing Polygon2D vertex color or points
 fails; self modulation alone still encounters the path on viewport resize. The
-immutable mesh case stays clean. Pixel comparisons permit at most one 8-bit channel
+immutable mesh case reports no buffer conflicts. Pixel comparisons permit at most one 8-bit channel
 step for vertex-color versus instance-color quantization.
 
 `convert_scrap.gd SOURCE_SCENE OUTPUT_SCENE` reproduces the loot scene's authored

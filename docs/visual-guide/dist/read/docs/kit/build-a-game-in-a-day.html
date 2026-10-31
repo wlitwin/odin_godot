@@ -3,7 +3,7 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Build a multiplayer game in a day</h1><div class="reader-meta"><span>10 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/build-a-game-in-a-day.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#0-the-one-struct">0. The one struct</a><a href="#1-boot-and-lobby-15-minutes">1. Boot and lobby (15 minutes)</a><a href="#2-your-first-replicated-entity-30-minutes">2. Your first replicated entity (30 minutes)</a><a href="#3-movement-that-feels-right-30-minutes">3. Movement that feels right (30 minutes)</a><a href="#4-verbs--the-intent-pipeline-1-hour">4. Verbs — the intent pipeline (1 hour)</a><a href="#5-combat-that-never-feels-sloppy-1-2-hours">5. Combat that never feels sloppy (1-2 hours)</a><a href="#6-enemies-1-hour">6. Enemies (1 hour)</a><a href="#7-levels-replicate-the-byte-not-the-scenery-1-hour">7. Levels: replicate the byte, not the scenery (1 hour)</a><a href="#8-runs-end-match-flow-1-hour">8. Runs end: match flow (1 hour)</a><a href="#9-quit-and-resume-30-minutes">9. Quit and resume (30 minutes)</a><a href="#9b-carryable-entities-30-minutes">9b. Carryable entities (30 minutes)</a><a href="#9c-host-migration-30-minutes">9c. Host migration (30 minutes)</a><a href="#9d-shared-seed-procgen-30-minutes">9d. Shared-seed procgen (30 minutes)</a><a href="#10-ship-it-on-steam-1-hour--a-friend">10. Ship it on Steam (1 hour + a friend)</a><a href="#11-headless-acceptance-tests">11. Headless acceptance tests</a><a href="#12-moving-contested-state-to-the-simulation-lane">12. Moving contested state to the simulation lane</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#0-the-main-game-script">0. The main game script</a><a href="#1-boot-and-lobby-15-minutes">1. Boot and lobby (15 minutes)</a><a href="#2-your-first-replicated-entity-30-minutes">2. Your first replicated entity (30 minutes)</a><a href="#3-owner-streamed-movement-30-minutes">3. Owner-streamed movement (30 minutes)</a><a href="#4-commands-and-authority-consequences-1-hour">4. Commands and authority consequences (1 hour)</a><a href="#5-predicted-combat-presentation-1-2-hours">5. Predicted combat presentation (1-2 hours)</a><a href="#6-enemies-1-hour">6. Enemies (1 hour)</a><a href="#7-loading-levels-from-replicated-state-1-hour">7. Loading levels from replicated state (1 hour)</a><a href="#8-runs-end-match-flow-1-hour">8. Runs end: match flow (1 hour)</a><a href="#9-quit-and-resume-30-minutes">9. Quit and resume (30 minutes)</a><a href="#9b-carryable-entities-30-minutes">9b. Carryable entities (30 minutes)</a><a href="#9c-host-migration-30-minutes">9c. Host migration (30 minutes)</a><a href="#9d-shared-seed-procgen-30-minutes">9d. Shared-seed procgen (30 minutes)</a><a href="#10-connecting-through-steam-1-hour--a-friend">10. Connecting through Steam (1 hour + a friend)</a><a href="#11-headless-acceptance-tests">11. Headless acceptance tests</a><a href="#12-moving-contested-state-to-the-simulation-lane">12. Moving contested state to the simulation lane</a></nav></details>
 <article class="reading-body "><p>This guided tour explains the co-op replication workflow by following the
 structure of <code>examples/cavecrawl</code>. Its snippets are excerpts, not a complete
 project. Start with the <a href="quickstart.html">session quickstart</a> if you want the
@@ -12,23 +12,25 @@ terminology.</p>
 <p>The tutorial builds an invited-peer game in which one player hosts a small
 co-op cave crawler. Cavecrawl is the complete reference implementation for the
 features introduced below.</p>
-<p>Generated wrappers handle routine authority, prediction, rejection, and
-presentation policy. Gameplay mutations can therefore remain direct and
-compact. Code that differs by role remains explicit in authority
-steps, command consequences, and presentation hooks.</p>
-<h2 id="0-the-one-struct">0. The one struct<a class="heading-anchor" href="#0-the-one-struct" aria-label="Link to this section">#</a></h2>
-<p>Everything hangs off your main script (cavecrawl calls it <code>CaveLobby</code>):</p>
+<p>Generated wrappers apply the declared authority, prediction, rejection, and
+presentation policies. The game implements target validation and mutation,
+accepted cross-entity consequences, authority steps, and presentation hooks.</p>
+<p><span id="0-the-one-struct"></span></p>
+<h2 id="0-the-main-game-script">0. The main game script<a class="heading-anchor" href="#0-the-main-game-script" aria-label="Link to this section">#</a></h2>
+<p>Declare the session, communications, and Boot fields on the main game script.
+Cavecrawl calls this script <code>CaveLobby</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">CaveLobby :: <span class="hljs-keyword">struct</span> {
 	owner: gd.Node,
 	ses:   ksess.Session,
 	comms: kcomms.Comms,
 	boot:  kboot.Boot,
 	<span class="hljs-comment">// ...your world: entity maps, UI handles, campaign state</span>
-}</code></pre></div><p>One session, one boot, no globals. Everything the toolkit needs to survive a
-re-host or a resumed save lives in the session. Everything engine-shaped
-(lobby, chat, scoreboard, the stage/world containers, the transport wire)
-lives in the boot (<a href="boot.html">kit/boot</a>), and every widget is a public field
-you may restyle or ignore.</p>
+}</code></pre></div><p>Keep one session and one Boot on the script instead of in package globals.
+The session retains network identity, entities, and stats for rehosting and
+saved runs. Boot (<a href="boot.html">kit/boot</a>) holds the Godot-facing lobby, chat,
+scoreboard, stage/world containers, and transport wire. Its widgets are public
+fields that the game can restyle or ignore. Game-specific campaign state will
+need a separate save blob, described below.</p>
 <h2 id="1-boot-and-lobby-15-minutes">1. Boot and lobby (15 minutes)<a class="heading-anchor" href="#1-boot-and-lobby-15-minutes" aria-label="Link to this section">#</a></h2>
 <p>In <code>ready()</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">my_game_net_attach(self, kboot.Options{
@@ -38,21 +40,23 @@ you may restyle or ignore.</p>
 	env      = <span class="hljs-string">&quot;MY&quot;</span>, <span class="hljs-comment">// MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim</span>
 	methods  = {<span class="hljs-string">&quot;on_host&quot;</span>, <span class="hljs-string">&quot;on_join&quot;</span>, <span class="hljs-string">&quot;on_start&quot;</span>, <span class="hljs-string">&quot;on_chat&quot;</span>,
 	            <span class="hljs-string">&quot;on_packet&quot;</span>, <span class="hljs-string">&quot;on_peer_left&quot;</span>, <span class="hljs-string">&quot;on_net_up&quot;</span>, <span class="hljs-string">&quot;on_net_down&quot;</span>},
-}, kboot.network_profile(.Friends_Coop))</code></pre></div><p>That is a hosted, joinable lobby: title, status line, player list, Host/Join/
-Start buttons, chat, scoreboard, and the session&#39;s transport wire. The four
-transport forwards (<code>on_packet</code>/<code>on_peer_left</code>/<code>on_net_up</code>/<code>on_net_down</code>) are
-<strong>generated</strong>: your <code>boot: kboot.Boot</code> field declares them, and a peer that
-drops (Alt-F4, crash, lost connection) is cleared from the roster
-automatically. Hand-write a same-named method to override one.</p>
+}, kboot.network_profile(.Friends_Coop))</code></pre></div><p>The attach call creates the lobby title, status, player list, Host/Join/Start
+buttons, chat, scoreboard, and session transport wire. The <code>boot: kboot.Boot</code>
+field also generates four transport forwarders:
+<code>on_packet</code>/<code>on_peer_left</code>/<code>on_net_up</code>/<code>on_net_down</code>. They report transport
+changes to the session, which clears disconnected peers from the roster after
+Alt-F4, a crash, or connection loss. A hand-written method with the same name
+overrides a generated forwarder.</p>
 <p><code>.Friends_Coop</code> records that invited entity owners may author their streamed
 movement. Choose <code>.Listen_Server_Action</code> when clients send validated inputs to
 a player-hosted simulation, or <code>.Dedicated_Competitive</code> when that authority
 runs on trusted infrastructure. See <a href="profiles.html">Network profiles</a>.</p>
-<p>You declare the four game-facing methods: Host presses land on
-<code>kboot.boot_host(&amp;self.boot, port, name)</code>, Join on
-<code>kboot.boot_join(&amp;self.boot, addr, port, token, name)</code>. Each is just a guard,
-the boot call, and a flavor status line. Copy either example game&#39;s <code>net.odin</code>
-to start (it is about 60 lines, all doors).</p>
+<p>Implement the four UI methods for hosting, joining, starting, and chat. The
+Host handler calls <code>kboot.boot_host(&amp;self.boot, port, name)</code>; Join calls
+<code>kboot.boot_join(&amp;self.boot, addr, port, token, name)</code>. Each connection handler
+checks whether the action is allowed, calls Boot, and updates status text.
+Use an example game&#39;s <code>net.odin</code> as a starting point; its connection handlers
+take about 60 lines.</p>
 <p>The join&#39;s <code>token</code> is the player identity (<code>kboot.boot_token(&amp;self.boot)</code>,
 persisted in <code>user://my_token</code>, overridable via <code>MY_TOKEN</code> so same-machine
 tests pick distinct seats). Presenting the same token later (after a crash, a
@@ -64,12 +68,11 @@ fields. It also installs generated entity/message/migration wiring. In
 stock reactions, and dispatches your <a href="session.html#event-halves-and-generated-dispatch">event
 halves</a>. A co-op authority step
 remains an explicit game decision because it commonly runs only while playing:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">frame := my_game_net_frame(self, delta, now_s())</code></pre></div><p>This is an events model, not an asynchronous callback model: generated dispatch
-runs synchronously inside <code>my_game_net_frame</code> and applies each hook&#39;s execution
-policy. The component calls (<code>boot_attach</code>/<code>boot_pump</code>/<code>my_game_events</code>) and raw
-layer underneath (<code>wire_attach</code>/<code>wire_pump</code>, <code>session_tick</code>/<code>session_poll</code>) stay
-public for games that need custom ordering: <a href="boot.html">boot</a>, <a href="netgd.html">netgd</a>,
-<a href="session.html">session</a>.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">frame := my_game_net_frame(self, delta, now_s())</code></pre></div><p>Generated dispatch runs synchronously inside <code>my_game_net_frame</code>, applying
+each hook&#39;s execution policy. For custom ordering, the component calls
+<code>boot_attach</code>/<code>boot_pump</code>/<code>my_game_events</code> and underlying
+<code>wire_attach</code>/<code>wire_pump</code>, <code>session_tick</code>/<code>session_poll</code> remain public.
+See <a href="boot.html">boot</a>, <a href="netgd.html">netgd</a>, and <a href="session.html">session</a>.</p>
 <h2 id="2-your-first-replicated-entity-30-minutes">2. Your first replicated entity (30 minutes)<a class="heading-anchor" href="#2-your-first-replicated-entity-30-minutes" aria-label="Link to this section">#</a></h2>
 <p>An entity is a plain script struct with tagged fields:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node2D</span>
@@ -79,15 +82,15 @@ Chest :: <span class="hljs-keyword">struct</span> {
 	net_id: knet.Net_Id,
 	x, y:   <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	slots:  [<span class="hljs-number">4</span>]kitems.Slot <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
-}</code></pre></div><p>scriptgen generates the serialization, dirty-tracking, and a <code>Command_Set</code>;
-<code>registry_insert</code> writes <code>net_id</code> back so you can&#39;t forget it. The factory is
-one tag on the scene export you already have, and it names what the scene
-embodies and its stable wire id:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// on CaveLobby — an ordinary drag-drop export, plus the declaration:</span>
-chest_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Chest:2&quot;`</span>,</code></pre></div><p>The generated <code>cave_lobby_net_attach</code> installs <code>cave_lobby_entities</code> as part of
-the standard stack. Every peer, the host included, builds a spawn the same way
-(instantiate under <code>boot.world</code>, free on despawn, id→node ledger). The same tag
-generates the typed census, so ordinary lookup and iteration need no mirror map:</p>
+}</code></pre></div><p>Scriptgen generates serialization, dirty tracking, and a <code>Command_Set</code>.
+<code>registry_insert</code> writes the registered id into <code>net_id</code>. Add an <code>entity=</code> tag
+to the scene export to declare the scene&#39;s entity type and stable wire id:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// CaveLobby field: assign the scene in the Inspector and declare its entity type.</span>
+chest_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Chest:2&quot;`</span>,</code></pre></div><p>The generated <code>cave_lobby_net_attach</code> installs <code>cave_lobby_entities</code>. On every
+peer, including the host, that factory instantiates scenes under <code>boot.world</code>,
+records each id and node, and frees the node on despawn. The tag also generates
+typed lookup and iteration procedures, so the game does not need a parallel
+entity map:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">if</span> chest, ok := chest_of(&amp;self.boot, id); ok {
 	inspect(chest)
 }
@@ -96,169 +99,172 @@ generates the typed census, so ordinary lookup and iteration need no mirror map:
 }</code></pre></div><p>A custom shell may call the entity installer directly. Typed <code>_spawned</code> and
 <code>_freed</code> hooks remain for game-specific indexes or bookkeeping, not for
 recreating the registry.</p>
-<p>The host spawns typed. The tag generates a <code>chest_spawn</code> helper, so
-world-building code exists exactly once and no cast ever appears:</p>
+<p>On the host, call the generated <code>chest_spawn</code> helper. It returns a typed
+<code>Chest</code> pointer and id; initialize its fields, then announce the spawn:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">chest, id := chest_spawn(&amp;self.boot)
 chest.x, chest.y = <span class="hljs-number">300</span>, <span class="hljs-number">180</span>
 kboot.boot_spawn_send(&amp;self.boot, id)</code></pre></div><p>After replication starts, the per-tick delta walk sends changes to registered
 authority-written fields. Clients receive the current value; late joiners
 receive it in their snapshot.</p>
-<h2 id="3-movement-that-feels-right-30-minutes">3. Movement that feels right (30 minutes)<a class="heading-anchor" href="#3-movement-that-feels-right-30-minutes" aria-label="Link to this section">#</a></h2>
+<p><span id="3-movement-that-feels-right-30-minutes"></span></p>
+<h2 id="3-owner-streamed-movement-30-minutes">3. Owner-streamed movement (30 minutes)<a class="heading-anchor" href="#3-owner-streamed-movement-30-minutes" aria-label="Link to this section">#</a></h2>
 <p>Give players&#39; avatars owner-streamed fields:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span></code></pre></div><p>The owner writes them every frame; the toolkit ships last-value snapshots on
-the unreliable channel and remote screens interpolate about 3 ticks in the
-past, staying smooth through jitter and drops. Two contracts to respect:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span></code></pre></div><p>The entity owner writes these fields every frame. Kit sends their latest
+values over the unreliable channel; remote peers interpolate about 3 ticks
+in the past to absorb jitter and packet loss. Follow two rules:</p>
 <ul>
-<li><strong>Only the owner moves the owner.</strong> Respawns, level changes, and knockbacks
-on someone else&#39;s avatar are expressed as replicated state the owner reacts
-to (hp came back → walk out of the grave yourself).</li>
-<li><strong>Jumps are teleports.</strong> On a level change, blink, or respawn, call
-the generated typed door—<code>spelunker_teleport(&amp;self.boot, self.me)</code>, for
-example—on the frame you write the jumped
-position, or remote screens will slide your avatar across the whole map.</li>
+<li>Only the entity owner writes its owner-streamed position. For respawns,
+level changes, and knockbacks, the authority replicates state that tells the
+owner how to move its avatar. For example, restored hp can trigger the
+owner&#39;s respawn positioning.</li>
+<li>Announce discontinuous position changes as teleports. On the frame of a
+level change, blink, or respawn, call the generated helper, such as
+<code>spelunker_teleport(&amp;self.boot, self.me)</code>. Otherwise remote peers interpolate
+across the position jump and show the avatar sliding across the map.</li>
 </ul>
-<h2 id="4-verbs--the-intent-pipeline-1-hour">4. Verbs — the intent pipeline (1 hour)<a class="heading-anchor" href="#4-verbs--the-intent-pipeline-1-hour" aria-label="Link to this section">#</a></h2>
-<p>A verb is a plain proc on the entity it mutates:</p>
+<p><span id="4-verbs--the-intent-pipeline-1-hour"></span></p>
+<h2 id="4-commands-and-authority-consequences-1-hour">4. Commands and authority consequences (1 hour)<a class="heading-anchor" href="#4-commands-and-authority-consequences-1-hour" aria-label="Link to this section">#</a></h2>
+<p>A Kit command is a procedure on the entity it validates and mutates. Here a
+player requests items from a chest:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
 chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span class="hljs-type">u8</span>, count: <span class="hljs-type">u16</span>, px, py: <span class="hljs-type">f32</span>) -&gt; (ok: <span class="hljs-type">bool</span>, taken: kitems.Slot) {
 	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>, {}}
 	taken = kitems.take(self.slots[:], <span class="hljs-type">int</span>(slot), count)
 	<span class="hljs-keyword">return</span> taken.count &gt; <span class="hljs-number">0</span>, taken
-}</code></pre></div><p>The command body is ordinary mutation code. The generated <code>chest_take_cmd</code>
-wrapper runs it authoritatively on the host and predictively
-on clients; a false first return means no: state auto-reverts on every peer,
-and a rejection carries the authoritative truth back. Two players race the
-last item: both predict success, the host runs them in arrival order, the
-loser reverts. The command pipeline serializes the attempts and returns the
-authority&#39;s verdict.</p>
-<p>A command may only mutate its target. The cross-entity half (&quot;loot lands in my
-bag&quot;) is the verb&#39;s name-paired
-<strong><a href="net.html#command-consequences">consequence</a></strong>: results after the applied
-bool are its payload, threaded into <code>&lt;verb&gt;_then</code> with the issuer and the wire
-args. It runs on the authority only (for client commands and the host&#39;s own)
-and never for a prediction:</p>
+}</code></pre></div><p>The generated <code>chest_take_cmd</code> wrapper runs this command authoritatively on
+the host and predictively on clients. Returning false as the first result
+rejects the request and reverts its writes. An authority rejection also sends
+accepted state back to the predicting client. If two players request the last
+item, both can predict success. The host executes requests in arrival order,
+accepts the first, and rejects the second; that client then reverts its
+prediction.</p>
+<p>A command may mutate only its target. To add the accepted loot to the player&#39;s
+inventory, implement its paired <a href="net.html#command-consequences">consequence</a>,
+<code>&lt;verb&gt;_then</code>. Results after the applied boolean become payload arguments to
+that procedure, alongside the issuer and wire arguments. The consequence runs
+only on the authority, for both client-issued and host-issued commands. Client
+prediction never calls it:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span>
 chest_take_then :: <span class="hljs-keyword">proc</span>(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: <span class="hljs-type">u8</span>, count: <span class="hljs-type">u16</span>, px, py: <span class="hljs-type">f32</span>, taken: kitems.Slot) {
-	cave_credit(game, by, self, taken) <span class="hljs-comment">// an ordinary host mutation — deltas carry it to everyone</span>
-}</code></pre></div><p>Gate verbs before issuing (stamina, cooldown, death): a refused prediction
-still rides the wire, and spamming ungated verbs floods your log with
-rejections. See <a href="items.html">items</a> and <a href="interact.html">interact</a> for the
+	cave_credit(game, by, self, taken) <span class="hljs-comment">// authority mutation replicated through deltas</span>
+}</code></pre></div><p>Check stamina, cooldown, and life state before issuing a command. A locally
+refused prediction is still sent, so repeated unavailable actions create
+avoidable requests and rejection logs. See <a href="items.html">items</a> and <a href="interact.html">interact</a> for the
 deterministic ops that are safe inside command procs.</p>
-<h2 id="5-combat-that-never-feels-sloppy-1-2-hours">5. Combat that never feels sloppy (1-2 hours)<a class="heading-anchor" href="#5-combat-that-never-feels-sloppy-1-2-hours" aria-label="Link to this section">#</a></h2>
-<p>The pattern (cavecrawl&#39;s <code>rocks.odin</code>, about 100 lines with kit/fx doing the
-flying):</p>
+<p><span id="5-combat-that-never-feels-sloppy-1-2-hours"></span></p>
+<h2 id="5-predicted-combat-presentation-1-2-hours">5. Predicted combat presentation (1-2 hours)<a class="heading-anchor" href="#5-predicted-combat-presentation-1-2-hours" aria-label="Link to this section">#</a></h2>
+<p>Cavecrawl&#39;s <code>rocks.odin</code> implements this projectile pattern in about 100 lines,
+using kit/fx for presentation:</p>
 <ul>
-<li>The <strong>cast</strong> is a predicted command (ability slot: cooldown + cost checked in
-the proc, <a href="combat.html">combat</a>).</li>
-<li>The shooter&#39;s screen draws its projectile <strong>at cast time</strong>: a <code>kfx.Tracers</code>
-visual, no entity, no wire. Press fire, and you see the rock immediately.</li>
-<li>The <strong>host</strong> simulates the authoritative projectile (the only one that hurts)
-and announces the <code>kcombat.Fire</code> on an app tag; other screens draw their
-visuals from that. Everyone skips their own echo.</li>
-<li>Visual contact plays the impact now: <code>kcombat.php_note_hit</code> dips the hp you
-display (an overlay, never the replicated field); truth arrives a beat later
-as ordinary deltas and squares the number. A host-side miss heals the dip
-back.</li>
+<li>The cast is a predicted command that checks its ability slot&#39;s cooldown and
+cost; see <a href="combat.html">combat</a>.</li>
+<li>At cast time, the shooter starts a local <code>kfx.Tracers</code> visual. It needs no
+replicated projectile entity or network message before appearing.</li>
+<li>The host simulates the projectile that applies damage and announces a
+<code>kcombat.Fire</code> through an app tag. Other peers start their visuals from the
+announcement, while the shooter skips the echo of its predicted cast.</li>
+<li>On local visual contact, <code>kcombat.php_note_hit</code> reduces displayed hp through
+an overlay without changing the replicated field. An authoritative hp delta
+later consumes the overlay. If the host judges a miss, the overlay expires
+and displayed hp returns to its authoritative value.</li>
 </ul>
-<p><strong>The moving cast rule:</strong> the Fire must carry the shooter&#39;s own origin (their
-screen&#39;s truth), not the host&#39;s lagged copy of their position. The origin is
-leashed within reach on the host (<code>kcombat.leash</code>). Without it, a strafing
-shooter watches rocks connect while the host sails them wide.</p>
-<p>Prove the feel with the latency shim before you trust it: set
+<p>Include the shooter&#39;s local origin in <code>Fire</code>. The host&#39;s owner-streamed copy
+of the shooter is delayed and would launch along a different path, especially
+while strafing. Bound the supplied origin on the host with <code>kcombat.leash</code>.</p>
+<p>Test this behavior with injected latency: set
 <code>Options.latency_env = &quot;MY_LATENCY&quot;</code> and run under <code>MY_LATENCY=120</code> (or call
 <code>netgd.wire_set_latency(&amp;self.boot.wire, 120)</code> directly).</p>
 <h2 id="6-enemies-1-hour">6. Enemies (1 hour)<a class="heading-anchor" href="#6-enemies-1-hour" aria-label="Link to this section">#</a></h2>
-<p>There is no NPC framework (<a href="ai.html">ai</a>). A dweller is an ordinary entity owned
-by the host player: the host&#39;s brain tick writes its streamed position like any
-owner, its mood is one replicated byte, and every client watches the hunt
-through the same machinery that carries everything else. <code>kai.Director</code> +
-<code>director_tick</code> pace waves from data; brains live in a host-side map keyed by
-net id, rebuilt on resume from your save blob.</p>
-<h2 id="7-levels-replicate-the-byte-not-the-scenery-1-hour">7. Levels: replicate the byte, not the scenery (1 hour)<a class="heading-anchor" href="#7-levels-replicate-the-byte-not-the-scenery-1-hour" aria-label="Link to this section">#</a></h2>
-<p>A <code>Level</code> entity with a <code>depth: u8</code> byte is the entire level-migration wire
-protocol. Each peer loads <code>level_N.tscn</code> locally on the depth edge (static
-geometry never rides the wire); the host reads Marker2D spawn points from its
-own instance and session-spawns the dynamic entities; wave plans live in <code>.tres</code>
-resources. Descending means despawning the old floor&#39;s entities, bumping the
-byte, and building the next floor. Drop-in joiners and resumed saves need no
-special casing: the byte is already in the snapshot.</p>
+<p>Use <a href="ai.html">ai</a>&#39;s helpers from a game-owned NPC update loop. A dweller is an
+ordinary entity owned by the host player. The host writes its streamed position
+and one replicated behavior byte; clients interpolate its motion and display
+that behavior. <code>kai.Director</code> and <code>director_tick</code> schedule waves from data.
+Private decision state lives in a host-side map keyed by net id and is rebuilt
+from the game&#39;s save blob on resume.</p>
+<p><span id="7-levels-replicate-the-byte-not-the-scenery-1-hour"></span></p>
+<h2 id="7-loading-levels-from-replicated-state-1-hour">7. Loading levels from replicated state (1 hour)<a class="heading-anchor" href="#7-loading-levels-from-replicated-state-1-hour" aria-label="Link to this section">#</a></h2>
+<p>Store the current floor in a <code>Level</code> entity&#39;s <code>depth: u8</code> field. When that
+value changes, each peer loads <code>level_N.tscn</code> locally. Static geometry stays in
+the scene files. The host reads Marker2D spawn points from its own scene and
+creates the dynamic session entities; <code>.tres</code> resources hold wave plans.</p>
+<p>To descend, despawn the old floor&#39;s entities, increment depth, and build the
+next floor. New joiners and resumed saves receive the depth in the snapshot,
+so they can load the corresponding local scene through the same path.</p>
 <h2 id="8-runs-end-match-flow-1-hour">8. Runs end: match flow (1 hour)<a class="heading-anchor" href="#8-runs-end-match-flow-1-hour" aria-label="Link to this section">#</a></h2>
-<p>One more byte on the Level entity: <code>won: u8</code>. The last floor&#39;s cleared door
-sets it; every peer keys its end screen (scoreboard + status + the host&#39;s Start
-reading as &quot;again&quot;) off the won edge; restart clears it and rebuilds floor 1
-<strong>in the same session</strong>: seats, tokens, and the cumulative ledger persist,
-because a restart is just deltas.</p>
-<p><strong>Deltas carry state, not events.</strong> A byte flipped 1→0 within one net tick
-never ships (the shadow diff sees no change). Edges must outlive a tick;
-anything genuinely event-shaped belongs in an explicit message
-(<a href="comms.html">comms</a> or an app tag).</p>
+<p>Add <code>won: u8</code> to the Level entity. Clearing the last floor sets it, and peers
+respond to the change by showing the scoreboard and status; the host&#39;s Start
+button offers another run. Restart clears <code>won</code> and rebuilds floor 1 within
+the same session. Seats, tokens, and cumulative stats remain in place while
+deltas carry the new run state.</p>
+<p>Keep replicated state changes visible across a network tick. A byte that
+changes 1→0 within one tick produces no delta if its final value equals the
+stored comparison value. Use an explicit <a href="comms.html">comms</a> message or app tag
+for one-shot events that must be delivered.</p>
 <p>If strangers can join, add moderation and admission policy deliberately.
 The tools are <code>session_kick(player, ban)</code>, <code>session_set_locked</code>, and
 <code>Session_Config.max_players</code>, with <code>netgd.wire_drop</code> closing the kicked socket
 after the &quot;you were kicked&quot; message flushes. Returning identities pass lock and
-capacity: their seat is theirs.</p>
+capacity checks when reclaiming their existing seats.</p>
 <h2 id="9-quit-and-resume-30-minutes">9. Quit and resume (30 minutes)<a class="heading-anchor" href="#9-quit-and-resume-30-minutes" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// save: one call for everything the session knows + your blob for the rest</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Save session state and the game-specific campaign blob.</span>
 ksave.save_write(&amp;self.ses, &amp;w, GAME_VERSION, my_campaign_blob)
-<span class="hljs-comment">// resume: the whole Resume button</span>
-blob, err := ksave.resume(&amp;self.ses, name, path, GAME_VERSION)</code></pre></div><p>The session snapshot already carries identity, stats, and every entity. Saving
-is the backup-host contract pointed at a file. Your blob carries what only you
-know (wave director, AI clocks). Friends rejoin a resumed run with their
-persisted tokens like any reconnect. See <a href="save.html">save</a>.</p>
+<span class="hljs-comment">// Restore session state and read the campaign blob.</span>
+blob, err := ksave.resume(&amp;self.ses, name, path, GAME_VERSION)</code></pre></div><p>The save snapshot carries session identity, stats, and entities using the
+same data used for backup hosting. The game adds a blob for private state such
+as the wave director and AI clocks. Friends rejoin the resumed run with their
+persisted tokens through the normal reconnect path. See <a href="save.html">save</a>.</p>
 <h2 id="9b-carryable-entities-30-minutes">9b. Carryable entities (30 minutes)<a class="heading-anchor" href="#9b-carryable-entities-30-minutes" aria-label="Link to this section">#</a></h2>
-<p>Give an entity owner-streamed position and it can be carried: a grab command
-whose <code>_then</code> calls <code>session_set_owner(ses, id, by)</code>, an <code>Ev_Owner_Changed</code>
-handler, and per-frame glue on the carrier (<code>relic.x = me.x + 10</code>). Drop hands
-it to <code>PLAYER_ID_INVALID</code>, and it rests where it was left. Mounts, possession,
-and dragging bodies are the same three pieces.</p>
-<p>On top of that, the co-op staple, <strong>downed/revive</strong>, is one predicted command
-on the downed player&#39;s entity (<code>hp = REVIVE_HP</code> behind a range gate), a
-bleed-out clock on the host, and an hp-at-the-edge check so the owner knows a
-revive-in-place from a bleed-out respawn. No new machinery is needed; see
-cavecrawl&#39;s <code>spelunker_revive</code>.</p>
+<p>To carry an entity, give it owner-streamed position. A grab command&#39;s <code>_then</code>
+calls <code>session_set_owner(ses, id, by)</code>. The game handles <code>Ev_Owner_Changed</code>
+and lets the carrier update its position each frame, such as
+<code>relic.x = me.x + 10</code>. Dropping assigns <code>PLAYER_ID_INVALID</code>, leaving the
+entity at its last position. Mounts, possession, and dragging bodies use the
+same ownership transfer and position update pattern.</p>
+<p>For downed players, add a predicted revive command that checks range and sets
+<code>hp = REVIVE_HP</code>. The host tracks bleed-out time. When hp changes, the owner
+checks its value to distinguish revival in place from a bleed-out respawn.
+Cavecrawl&#39;s <code>spelunker_revive</code> demonstrates the pattern.</p>
 <h2 id="9c-host-migration-30-minutes">9c. Host migration (30 minutes)<a class="heading-anchor" href="#9c-host-migration-30-minutes" aria-label="Link to this section">#</a></h2>
-<p>The backup snapshots that ship every few seconds make the loss of the host
-survivable. The handoff is driven by <code>kboot.boot_migration</code>: declare four halves
-and make one <code>ready</code> call with the generated table.</p>
+<p>Periodic authority backups let another player resume hosting after the host
+disconnects. Declare four halves and pass their generated table to
+<code>kboot.boot_migration</code> in <code>ready</code>:</p>
 <ul>
-<li><code>&lt;game&gt;_backup</code> writes your campaign bytes onto every backup.</li>
-<li><code>&lt;game&gt;_took_over</code> reads them back on the heir and mends.</li>
-<li><code>&lt;game&gt;_wiped</code> clears the never-entity pools after the kit&#39;s census-driven
-wipe.</li>
-<li><code>&lt;game&gt;_migrating</code> words each arm.</li>
+<li><code>&lt;game&gt;_backup</code> writes game-specific campaign bytes into each backup.</li>
+<li><code>&lt;game&gt;_took_over</code> reads them on the successor and restores private game state.</li>
+<li><code>&lt;game&gt;_wiped</code> clears non-entity pools after Kit removes tracked entities.</li>
+<li><code>&lt;game&gt;_migrating</code> updates status for each migration step.</li>
 </ul>
-<p>The kit begins the handoff on <code>Ev_Backup_Target</code>, runs the takeover/chase fork
-hands-free off the events tail, caps the retries, and holds the window latches.
-Cavecrawl is the worked example, and its acceptance test act 4 kills the host
-with <code>kill -9</code> to prove nobody has to press anything. See
-<a href="session.html#backup-hosting-and-resume">session.md</a> for the recipe.</p>
+<p>Kit starts the handoff on <code>Ev_Backup_Target</code>. After dispatching session events,
+it either takes over or reconnects to the successor, bounds retries, and
+retains the timing state needed to manage the attempt. Act 4 of Cavecrawl&#39;s
+acceptance test kills the host with <code>kill -9</code> and checks that handoff needs no
+manual input. See <a href="session.html#backup-hosting-and-resume">session.md</a> for setup.</p>
 <h2 id="9d-shared-seed-procgen-30-minutes">9d. Shared-seed procgen (30 minutes)<a class="heading-anchor" href="#9d-shared-seed-procgen-30-minutes" aria-label="Link to this section">#</a></h2>
-<p>Replicate the <em>seed</em>, not the scenery: one <code>seed: u32</code> field on your level
-entity, and every peer grows identical decoration locally: zero wire bytes for
-the world it implies. The one rule: <strong>integer math end to end</strong> (cavecrawl&#39;s
-<code>splitmix32</code> scatter). Floats are the classic procgen divergence trap: FMA
-contraction, libm differences, and fast-math flags all vary by platform, and a
-single divergent low bit becomes two different caves. Cavecrawl&#39;s acceptance
-test proves convergence directly: both processes print a checksum of what they
-grew, and the test demands they match.</p>
-<h2 id="10-ship-it-on-steam-1-hour--a-friend">10. Ship it on Steam (1 hour + a friend)<a class="heading-anchor" href="#10-ship-it-on-steam-1-hour--a-friend" aria-label="Link to this section">#</a></h2>
-<p>Swap the transport and change nothing else (<a href="steamgd.html">steamgd</a>):</p>
+<p>Replicate a <code>seed: u32</code> field on the level entity and generate decoration
+locally on each peer. Only the seed crosses the wire; generated scenery needs
+zero additional wire bytes. Cavecrawl&#39;s <code>splitmix32</code> scatter uses integer math
+throughout so peers derive the same result. Floating-point generation can vary
+with FMA contraction, libm implementations, and fast-math flags; even a low-bit
+difference can change the generated cave. Cavecrawl&#39;s acceptance test compares
+checksums printed by both processes to verify matching decoration.</p>
+<p><span id="10-ship-it-on-steam-1-hour--a-friend"></span></p>
+<h2 id="10-connecting-through-steam-1-hour--a-friend">10. Connecting through Steam (1 hour + a friend)<a class="heading-anchor" href="#10-connecting-through-steam-1-hour--a-friend" aria-label="Link to this section">#</a></h2>
+<p>Use <a href="steamgd.html">steamgd</a> to connect the existing session through Steam lobby
+and peer APIs:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">if</span> steamgd.available() &amp;&amp; steamgd.init(APP_ID) {
 	steamgd.listen(self.owner, <span class="hljs-string">&quot;on_lobby_created&quot;</span>, <span class="hljs-string">&quot;on_lobby_joined&quot;</span>, <span class="hljs-string">&quot;on_join_requested&quot;</span>)
 }
 <span class="hljs-comment">// host: create_lobby -&gt; lobby_created -&gt; host_peer -&gt; invite_overlay</span>
-<span class="hljs-comment">// guest: overlay &quot;Join Game&quot; -&gt; join_requested -&gt; join_lobby -&gt; client_peer</span></code></pre></div><p>The Session_Wire never changes: SceneMultiplayer&#39;s signals fire identically
-over any MultiplayerPeer. Verify live with the Spacewar app id (480), a
-<code>steam_appid.txt</code>, and one friend.</p>
+<span class="hljs-comment">// guest: overlay &quot;Join Game&quot; -&gt; join_requested -&gt; join_lobby -&gt; client_peer</span></code></pre></div><p>Session_Wire continues receiving SceneMultiplayer signals through the selected
+MultiplayerPeer. Verify the Steam connection live with the Spacewar app id
+(480), a <code>steam_appid.txt</code>, and one friend.</p>
 <h2 id="11-headless-acceptance-tests">11. Headless acceptance tests<a class="heading-anchor" href="#11-headless-acceptance-tests" aria-label="Link to this section">#</a></h2>
-<p>The Cavecrawl example exercises these features with a headless acceptance test:
-two real
-processes, real ENet, 120ms injected latency, driving the real scene tree and
-grepping log lines (<code>examples/cavecrawl/run.sh</code> + <code>cave_test.gd</code>). When
-something feels wrong in play, reproduce it in the driver rather than in
-playtests. The log assertions check the behavior on each peer. Use the same pattern: your
-game&#39;s <code>@(gd_method)</code> surface is drivable by a test script exactly like keys
-drive it in play.</p>
+<p>Cavecrawl&#39;s headless acceptance test starts two processes over ENet with
+120ms injected latency. Its driver operates the scene tree and checks log
+lines from each peer (<code>examples/cavecrawl/run.sh</code> + <code>cave_test.gd</code>). Reproduce
+observed gameplay failures in a driver so its assertions can check the result
+on both peers. A test script can call the same <code>@(gd_method)</code> procedures used
+by gameplay input.</p>
 <h2 id="12-moving-contested-state-to-the-simulation-lane">12. Moving contested state to the simulation lane<a class="heading-anchor" href="#12-moving-contested-state-to-the-simulation-lane" aria-label="Link to this section">#</a></h2>
 <p>This tutorial uses peer-owned movement, which is appropriate when the host
 trusts each owner to report its fast state. A duel, ranked game, or other
@@ -268,5 +274,5 @@ the simulation lane. Session identity, entities, commands, chat, and saves can
 remain on their existing lanes. Read <a href="timelines.html">Timelines</a> to choose a
 model and <a href="sim.html#promoting-a-coop-game">kit/sim</a> for the migration checklist.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="glossary.html"><span>Kit glossary</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/build-a-game-in-a-day.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#0-the-one-struct" class="">0. The one struct</a><a href="#1-boot-and-lobby-15-minutes" class="">1. Boot and lobby (15 minutes)</a><a href="#2-your-first-replicated-entity-30-minutes" class="">2. Your first replicated entity (30 minutes)</a><a href="#3-movement-that-feels-right-30-minutes" class="">3. Movement that feels right (30 minutes)</a><a href="#4-verbs--the-intent-pipeline-1-hour" class="">4. Verbs — the intent pipeline (1 hour)</a><a href="#5-combat-that-never-feels-sloppy-1-2-hours" class="">5. Combat that never feels sloppy (1-2 hours)</a><a href="#6-enemies-1-hour" class="">6. Enemies (1 hour)</a><a href="#7-levels-replicate-the-byte-not-the-scenery-1-hour" class="">7. Levels: replicate the byte, not the scenery (1 hour)</a><a href="#8-runs-end-match-flow-1-hour" class="">8. Runs end: match flow (1 hour)</a><a href="#9-quit-and-resume-30-minutes" class="">9. Quit and resume (30 minutes)</a><a href="#9b-carryable-entities-30-minutes" class="">9b. Carryable entities (30 minutes)</a><a href="#9c-host-migration-30-minutes" class="">9c. Host migration (30 minutes)</a><a href="#9d-shared-seed-procgen-30-minutes" class="">9d. Shared-seed procgen (30 minutes)</a><a href="#10-ship-it-on-steam-1-hour--a-friend" class="">10. Ship it on Steam (1 hour + a friend)</a><a href="#11-headless-acceptance-tests" class="">11. Headless acceptance tests</a><a href="#12-moving-contested-state-to-the-simulation-lane" class="">12. Moving contested state to the simulation lane</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/build-a-game-in-a-day.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="glossary.html"><span>Kit glossary</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/build-a-game-in-a-day.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#0-the-main-game-script" class="">0. The main game script</a><a href="#1-boot-and-lobby-15-minutes" class="">1. Boot and lobby (15 minutes)</a><a href="#2-your-first-replicated-entity-30-minutes" class="">2. Your first replicated entity (30 minutes)</a><a href="#3-owner-streamed-movement-30-minutes" class="">3. Owner-streamed movement (30 minutes)</a><a href="#4-commands-and-authority-consequences-1-hour" class="">4. Commands and authority consequences (1 hour)</a><a href="#5-predicted-combat-presentation-1-2-hours" class="">5. Predicted combat presentation (1-2 hours)</a><a href="#6-enemies-1-hour" class="">6. Enemies (1 hour)</a><a href="#7-loading-levels-from-replicated-state-1-hour" class="">7. Loading levels from replicated state (1 hour)</a><a href="#8-runs-end-match-flow-1-hour" class="">8. Runs end: match flow (1 hour)</a><a href="#9-quit-and-resume-30-minutes" class="">9. Quit and resume (30 minutes)</a><a href="#9b-carryable-entities-30-minutes" class="">9b. Carryable entities (30 minutes)</a><a href="#9c-host-migration-30-minutes" class="">9c. Host migration (30 minutes)</a><a href="#9d-shared-seed-procgen-30-minutes" class="">9d. Shared-seed procgen (30 minutes)</a><a href="#10-connecting-through-steam-1-hour--a-friend" class="">10. Connecting through Steam (1 hour + a friend)</a><a href="#11-headless-acceptance-tests" class="">11. Headless acceptance tests</a><a href="#12-moving-contested-state-to-the-simulation-lane" class="">12. Moving contested state to the simulation lane</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/build-a-game-in-a-day.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

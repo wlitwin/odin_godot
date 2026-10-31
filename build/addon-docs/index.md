@@ -1,7 +1,8 @@
 # odin_godot documentation
 
-Write Godot scripts in compiled Odin. New here? Start at the addon
-[README](../README.md), then follow this path: **learn → build → use → ship.**
+Write Godot scripts in compiled Odin. Start with the addon
+[README](../README.md) for installation, then choose a guide below for setup,
+authoring, multiplayer, or export.
 
 ## Start here
 
@@ -14,24 +15,24 @@ Write Godot scripts in compiled Odin. New here? Start at the addon
   struct convention (`owner` first field) and `//gd:` markers, `@export` of every type,
   lifecycle, methods, signals, resources, autoloads, cross-script access, and the `gd.*`
   helper catalog.
-- **[Workflow](workflow.md)** — the day-to-day build/edit/iterate loop, editor DX
-  (autocomplete, goto-definition, rebuild-on-save), and the honest limits of AOT scripting.
+- **[Workflow](workflow.md)** — the build/edit/iterate loop and editor tools
+  (autocomplete, goto-definition, rebuild-on-save), with the limits of ahead-of-time scripting.
 
 ## Build multiplayer
 
 - **[Replay](replay.md)** — the experimental value-world, rollback and session
   library, with a separately included offline/native multiplayer starter.
 
-- **[The friendslop toolkit](kit/index.md)** — reusable multiplayer systems under
+- **[Kit](kit/index.md)** — reusable multiplayer systems under
   `godot:kit/*`: host-authoritative sessions with reconnect identity, declarative
   replication with client prediction, chat, items, combat, NPCs, save/resume,
   moderation, and ENet + Steam transports — for 2-8 player co-op games.
 - **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial arc.
-- **[Gameplay recipes](recipes.md)** — the compositional pattern for `kit` + `play`: an
-  entity is a struct of `play` primitives, and each networked behavior is sliced into seven
-  authority/time slots (State, Cadence, Intent, Authority, Prediction, Reconcile, Cue). One
-  worked gun, five real items against the skeleton — the multiplayer answer to Godot's
-  component-composition pattern.
+- **[Gameplay recipes](recipes.md)** — embedding `play` fields in entities and
+  assigning State, Cadence, Intent, Authority, Prediction, Reconcile, and Cue
+  responsibilities across peers and clocks. A gun example and five gameplay
+  items illustrate the pattern. The page identifies older API examples that
+  remain as design references.
 
 ## Ship
 

@@ -3,11 +3,12 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replay Godot integration</h1><div class="reader-meta"><span>9 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/README.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-an-import">Choose an import</a><a href="#the-lifecycle">The lifecycle</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-an-import">Choose an import</a><a href="#session-lifecycle-and-ownership">Session lifecycle and ownership</a></nav></details>
 <article class="reading-body "><p>Use <code>Session(State, Control, Action, Event, Seats)</code> to drive a local or networked
-game from Godot. It owns the lifecycle around the engine-free runner, which
-schedules simulation steps and manages input and history. The application supplies a typed model,
-initial frame, options, sampled controls/actions, and presentation.</p>
+game from Godot. It opens, advances, and closes the engine-free runner, which
+schedules simulation steps and manages input and history. The application
+supplies a typed model, initial frame, options, sampled controls/actions, and
+presentation.</p>
 <h2 id="choose-an-import">Choose an import<a class="heading-anchor" href="#choose-an-import" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -50,7 +51,7 @@ initial frame, options, sampled controls/actions, and presentation.</p>
 </tbody></table>
 </div><p>Start with the root import for a Session or Room. Its selected transport is
 managed internally; using Session does not require driving a transport adapter.
-Add a feature import when the game uses that feature&#39;s owners directly.
+Add a feature import when the game directly creates or manages its types.
 Scene, input and debug packages extend the lifecycle package. Storage and
 transport are independent foundations. The internal wire helpers are implementation
 details shared by the lifecycle and transport packages.</p>
@@ -65,7 +66,8 @@ not re-export feature APIs; old qualified names fail compilation.</p>
 stay at root. Session-specific <code>Browser_Checkpoint</code> also stays at root because
 it checks the live Session&#39;s authority, identity and recovery policy; it uses
 the storage package for I/O.</p>
-<h2 id="the-lifecycle">The lifecycle<a class="heading-anchor" href="#the-lifecycle" aria-label="Link to this section">#</a></h2>
+<p><span id="the-lifecycle"></span></p>
+<h2 id="session-lifecycle-and-ownership">Session lifecycle and ownership<a class="heading-anchor" href="#session-lifecycle-and-ownership" aria-label="Link to this section">#</a></h2>
 <p>Start with a zero-initialized owner and copy <code>SESSION_OPTIONS</code> for its settings;
 an empty <code>Session_Options{}</code> does not contain the network defaults. Keep the live
 owner at a stable address, usually a field on the game&#39;s Godot script. Call
@@ -103,7 +105,7 @@ defer its close in <code>_ready</code>, which would close it as soon as <code>_r
 do not call <code>session_frame</code> separately on <code>room.session</code>. Party remains alive
 while Room borrows its authorization. Close Room before Party and its storage.</p>
 <p><a href="scene/editor-first.html">Editor-first authoring</a> connects ordinary scene-local scripts to
-typed display values. Replay Scrapyard is the canonical composition example, with
+typed display values. Replay Scrapyard demonstrates this integration with
 standalone actor/HUD previews and validated Resource baking.</p>
 <p><a href="scene/view-pools.html">Typed view pools</a> bind generation-safe entity projections to cached
 Godot child references and skip unchanged property writes.</p>
@@ -112,9 +114,10 @@ markers to validated immutable values with content identity and retained version
 Further boundary work is tracked in the <a href="../../docs/replay/godot-bridge-plan.html">bridge plan</a>.</p>
 <p><a href="debug/debug.html">Local diagnostic overlay</a> adds optional runtime counters and explicit
 recent-history audits without game-specific reporting code.</p>
-<p><a href="debug/scrubber.html">Local history inspection</a> adds a retained-frame slider with explicit
-resume/branch commands and validated scalar edits to a copied preview. Replay Hello demonstrates pause, historical views, input
-guards and a new presentation epoch for an alternate local future.</p>
+<p><a href="debug/scrubber.html">Local history inspection</a> adds a slider for retained frames,
+explicit resume/branch commands, and validated scalar edits to a copied preview.
+Replay Hello demonstrates pausing, historical views, suppression of gameplay
+input while inspecting, and a new presentation epoch for an alternate local future.</p>
 <p><a href="../diagnostic/recording.html">Portable local recordings</a> export replayable gameplay
 windows from the history dock and verify them in a separate headless process.
 <a href="../diagnostic/playback.html">Loaded recording playback</a> opens those files in Godot,
@@ -161,11 +164,11 @@ frame, valid := replaygd.session_state(&amp;session)
 <span class="hljs-keyword">if</span> valid {
 	present_state(frame.state) <span class="hljs-comment">// Application presentation callback.</span>
 }</code></pre></div><p><code>session_issue</code> routes a local player&#39;s action to the authority or predicting
-client. Consume <code>session_changes</code> before the next frame. It carries gameplay
-effects and action verdicts; an authoritative verdict is a <code>Confirm</code>, or a change
-whose <code>confirmed</code> flag is set. Simulation never renders or accesses device state.
-The facade drains the lower-level duplicate outcome convenience queue so normal
-games consume outcomes through <code>session_changes</code>.</p>
+client. Drain <code>session_changes</code> before the next frame to receive gameplay
+effects and action verdicts. An authority verdict is a <code>Confirm</code>, or a change
+whose <code>confirmed</code> flag is set. Simulation code must not render or read devices.
+The facade drains the lower-level duplicate outcome queue so games using
+Session consume results through <code>session_changes</code>.</p>
 <p>The caller supplies the <code>changes</code> scratch array. Drain until zero even when that
 array is smaller than the pending batch; leaving changes queued makes the next
 <code>session_frame</code> return <code>.Presentation</code>. The checked
@@ -175,7 +178,7 @@ loop with concrete types.</p>
 pause/focus/menu gates and capture copied UI actions.</p>
 <p><a href="input/intents.html">Copied action intents</a> retain a pending payload through submission
 failure and track epoch-scoped tickets through confirmation and recovery. They
-provide the common latch/result bookkeeping without changing gameplay policy.</p>
+retain one pending payload and track submitted results without changing gameplay policy.</p>
 <p>For mixed local/remote presentation, supply <code>Model.event_owner</code> and set
 <code>options.remote_observed=true</code>. Local effects remain speculative; remote effects
 wait for the observed clock. The option survives Room promotion, redirection and
@@ -183,9 +186,9 @@ old-host rejoin. Bind aiming input to the displayed remote frames using
 <a href="../net/view_time.html"><code>net.client_present</code></a>. This changes presentation policy;
 the default runner predicts the complete public world. <code>Model.group</code> can opt into
 an authored closed group; see <a href="../net/groups.html">prediction groups</a>.</p>
-<p><code>scenegd.Nodes2</code> maintains bounded scene instances by presentation identity, with
-retained scene ownership. <code>scenegd.nodes_get</code> supports game-specific dressing of
-child nodes. <code>scenegd.scene_instance</code> loads/instances an authored stage and
+<p><code>scenegd.Nodes2</code> maintains bounded scene instances by presentation identity,
+retaining ownership of their scenes. <code>scenegd.nodes_get</code> lets the game customize
+child nodes. <code>scenegd.scene_instance</code> loads and instantiates an authored stage, then
 releases the temporary resource reference. <code>inputgd.bind_key</code>/<code>inputgd.bind_mouse</code>
 release constructor references after InputMap retains the events.
 <code>storagegd.session_token</code> uses random credentials normally; deterministic labels
@@ -213,8 +216,8 @@ is one simulation second. <code>session_backup_receipt</code> reports a validate
 <code>session.link.error</code> and <code>model_error</code> report backup failures without stopping play.</p>
 <p>This authorization discloses authority-only state. It does not make the recipient
 an elected host. Connection replacement requires explicit authorization of the new
-live binding. The Room driver adds coordinator fencing and tested surviving-client
-takeover; broader M5 cases remain open.</p>
+live binding. The Room driver adds coordinator fencing and tested takeover with surviving
+clients. Broader milestone M5 cases remain open.</p>
 <p>The authority model and permit enforcement are available in <code>replay/authority</code>.
 For a leased session, set <code>options.network.require_permit=true</code> and supply
 <code>options.permit</code>. <code>session.fenced</code> reports an expected pause when it is unavailable;
@@ -223,13 +226,13 @@ coordinator/UI loop separately. The authenticated decision service and durable s
 are available, along with the Room takeover driver. See the
 <a href="../authority/service.html">service contract</a>.</p>
 <p>The facade is experimental. It supports full-public and authored group prediction with
-the existing ENet/fault adapters. <a href="room.html">Room</a> now adds coordinator-driven planned
+the existing ENet/fault adapters. <a href="room.html">Room</a> adds coordinator-driven planned
 and crash migration with surviving-client reconnection in tested Cavecrawl and
 Quickdraw combat scenarios.
 <a href="../comms/README.html">Session communications</a> adds optional bounded chat and markers
 through an independent application lane. Owner-streamed physics has separate
 <a href="scene/body2.html">2D</a> and <a href="scene/body3.html">3D</a> adapters. Matchmaking and a complete lobby UI remain
-roadmap work rather than implicit guarantees of the convenience wrapper.</p>
+roadmap work; Session does not supply them.</p>
 <p>For direct sessions, <code>Session_Options.discover_epoch=true</code> enables a small pre-join
 query of the selected host. It discovers the current epoch before the strict
 Hello/Welcome exchange, so a fresh client can join a manually resumed host. It
@@ -241,16 +244,16 @@ obtain authority epochs from its coordinator.</p>
 correction-reuse path. It defaults off and requires stable deterministic step
 semantics. <code>client.stats.reused_correction_ticks</code> reports retained records while
 <code>replayed_ticks</code> counts simulated correction steps. It changes local work only,
-not snapshot cadence, packet contracts or authoritative validation. Mixed Scrapyard
-initially exposes few matching records, so this is not enabled by default as a
-universal performance improvement.</p>
+not snapshot cadence, packet contracts or authoritative validation. Mixed
+Scrapyard workloads initially expose few matching records, so the option is
+disabled by default. Measure the workload before enabling it.</p>
 <p><code>Session.control_consumed</code> reports whether the supplied control was used by an
 actual local/authority input step during the last <code>session_frame</code> call. It is false
 when there was no prepared tick, prediction is blocked, a snapshot merely moves
 or bootstraps the timeline, or the role does not consume local controls. Use this
 receipt to clear pending device edges; a larger timeline head alone does not prove
-input was sampled. The field resets at each Session or Room frame call, including early returns. It is not an authority acceptance
-or delivery acknowledgment.</p>
+input was sampled. The field resets at each Session or Room frame call, including early returns.
+It does not report authority acceptance or delivery acknowledgment.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">error = replaygd.session_frame(&amp;session, dt, control)
 <span class="hljs-keyword">if</span> session.control_consumed {replay.buttons_consume(&amp;buttons)}</code></pre></div><p>Immutable procedural polygons can use <a href="scene/mesh2.html">mesh2_polygon</a>, with ordinary
 Godot node transforms and instance tint for animation.</p>
@@ -272,5 +275,5 @@ IDs and baked definitions to independently authored local scenes and appearances
 owned script/archetype bindings, permanent scene bindings, scope tracking, typed
 visitation, contextual errors and checked Resource/bake helpers.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="scene/README.html"><span>Replay scene adapters</span><span aria-hidden="true">→</span></a><a href="input/README.html"><span>Replay input adapters</span><span aria-hidden="true">→</span></a><a href="storage/README.html"><span>Replay Godot storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-an-import" class="">Choose an import</a><a href="#migrating-the-earlier-single-package-api" class="subsection">Migrating the earlier single-package API</a><a href="#the-lifecycle" class="">The lifecycle</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="scene/README.html"><span>Replay scene adapters</span><span aria-hidden="true">→</span></a><a href="input/README.html"><span>Replay input adapters</span><span aria-hidden="true">→</span></a><a href="storage/README.html"><span>Replay Godot storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-an-import" class="">Choose an import</a><a href="#migrating-the-earlier-single-package-api" class="subsection">Migrating the earlier single-package API</a><a href="#session-lifecycle-and-ownership" class="">Session lifecycle and ownership</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,11 +1,13 @@
 # Replay networking implementation notes
 
-M3 is in progress. The initial [server/client runner](../../replay/net/README.md)
-now combines schema/codecs, transports, admission, reliable actions, authoritative
-facts/snapshots, prediction, correction, and reconnect. Engine-free fault scenarios
-and the separate four-process Hello network scene pass. Acknowledged baselines,
-delta compression, compact facts, and outbound budgets are now implemented.
-Further admission/recovery review remains necessary before M3 is complete.
+This record describes the initial M3 implementation and the work still open at
+that stage. The initial [server/client runner](../../replay/net/README.md) combined
+schema/codecs, transports, admission, reliable actions, authority facts/snapshots,
+prediction, correction, and reconnect. Engine-free fault scenarios and the
+four-process Hello network scene passed, along with acknowledged baselines,
+delta compression, compact facts, and outbound budgets. Further admission/recovery
+review was required before M3 completion. The linked runner reference describes
+the current API and capabilities.
 
 ## Authoritative correction API
 
@@ -51,16 +53,16 @@ an older checkpoint. The function does not elect/authenticate the authority.
    prefix, then reconcile the newly replayed speculative suffix. Simulation and
    presentation confirmation counters remain separate. Preserve authoritative
    snapshot history for remote views rather than treating predicted old frames
-   as observed truth.
+   as observations of authority state.
 7. Implement a full resync request for history exhaustion, baseline loss, or
    prolonged blackout. Preserve/retire unacknowledged actions explicitly; resetting
    a timeline alone does not provide reconnect or exactly-once execution.
 8. Integrate the runner into the separate Hello project and test actual
    server/client/observer gameplay under recorded network faults.
 
-The first prediction runner may simulate one complete public group with held
+The first prediction runner was scoped to one complete public group with held
 remote controls. Prediction of self/contested subgroups and historical boundary
-inputs remain M6 work. If private state is omitted from a public projection, a
+inputs were left for M6. If private state is omitted from a public projection, a
 client cannot automatically predict code that depends on it; require a suitable
 public simulation model/projection or reject that configuration explicitly.
 
@@ -68,16 +70,17 @@ public simulation model/projection or reject that configuration explicitly.
 
 `tests/replay_net/run.sh` covers initial admission, controls, contested/rejected
 actions, retries/deduplication, malformed input and sender binding, loss/jitter,
-blackout resync, reconnect, and WASM type-checking. The gameplay gate is now
+blackout resync, reconnect, and WASM type-checking. The initial gameplay gate is
 `examples/replay_hello/network_run.sh`: a real dedicated authority, two predicting
 players, and an observer at 120 ms receive delay on every process. It checks local
 motion response, one accepted firing action per player, and matching shot/effect
 counts. The ENet echo test remains a separate lower-level transport check.
 
 Acknowledged baselines/deltas, compact facts, outbound scheduling, ACK-loss recovery,
-and a real jitter/loss/duplication run now pass. Broader hostile/recovery review and
-a wider clock/latency matrix remain open M3 work. Richer admission/moderation and deliberate seat replacement
-also remain: the initial runner reserves stable seats for the session lifetime.
+and a real jitter/loss/duplication run passed at this stage. Broader
+hostile/recovery review, a wider clock/latency matrix, richer admission/moderation,
+and deliberate seat replacement remained open M3 work. The initial runner
+reserved stable seats for the session lifetime.
 Bearer reconnect credentials do not supply account identity or transport encryption.
 
 Host migration requires all M5 checkpoint/session/authority-fencing work. No

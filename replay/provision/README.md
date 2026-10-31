@@ -1,17 +1,21 @@
 # Room admission and private coordinator storage
 
-`replay/provision` supplies the server-side create/invite/join state machine for
-an authority-controlled room. `Room` owns an existing `authority.Service`; its
-durable `Bundle` contains the authority record, member credentials, enrollment
-retry records and invite consumption. Every change uses the same revision CAS.
-Membership and its service keys therefore commit together. The game simulation and host-migration protocol are unchanged.
+`replay/provision` handles create, invite, and join requests for an
+authority-controlled room. Its server-side `Room` owns an `authority.Service`.
+The durable `Bundle` contains the authority record, member credentials,
+enrollment retry records, and invite consumption. Each change uses the same
+revision compare-and-swap (CAS): the stored revision must match the caller's
+expected revision for the update to commit. Membership and service keys
+therefore commit together. This enrollment protocol does not change game
+simulation or host migration.
 
 The SQLite store also provides [durable room checkpoint publication](checkpoints.md)
 with separate revision CAS, typed validation and atomic metadata/bytes. The
-[authenticated transfer endpoints](checkpoint/README.md) have native TLS restart
-acceptance. The standalone service registers the three compiled game models;
-Room/Party owns publication and authenticated cold restore with native/browser
-acceptance. Game models/dependencies must still opt into the typed service contract;
+[authenticated transfer endpoints](checkpoint/README.md) are tested across
+native TLS service restarts. The standalone service registers three compiled
+game models. Godot Room/Party drives publication and fresh-process restore,
+with native/browser acceptance. Each game must configure its model and
+dependencies for the typed service;
 see [published restore](../godot/room_restore.md).
 
 The [create/join protocol and Godot connection](protocol.md) expose this
@@ -20,7 +24,8 @@ acceptance passes on loopback. The [client journal](enrollment.md) adds durable
 native/browser enrollment. Shared Party menus and Room recovery are integrated into
 multiple example games. Public deployment, human accounts, global room discovery
 and room retirement remain separate product/deployment work. Tests use isolated
-provisioning and profile data; these local gates are not public reachability claims.
+provisioning and profile data. These local tests do not establish public
+reachability.
 
 ## API and ownership
 
@@ -154,7 +159,8 @@ nix develop --command bash tests/replay_provision_sqlite/run.sh
 Core tests exercise exact retries, revoked/exhausted invites, disabled/rebound
 members, dedicated policy, entropy failure, capacity, uncertain commits and a
 complete authenticated authority handoff using newly enrolled credentials. The
-package also checks for freestanding WASM; this does not claim browser provisioning.
+package also checks freestanding WASM compilation. That check does not
+exercise browser provisioning.
 SQLite tests cover reopen, another owner's CAS, read-only storage, corrupt blobs
 and private file modes. Separate process-kill fixtures interrupt a real join before
 and after SQLite commit and verify the corresponding retry behavior in fresh

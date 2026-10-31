@@ -6,9 +6,9 @@
 
 <article class="reading-body "><p>Use <code>Input_Binding(Control)</code> to preserve button edges between Godot frames and
 simulation ticks. It interns InputMap names once and maps buffered button values
-to your ordinary game Control type. It stays outside World. A mapper can
-also read presentation-owned aim/device data through its borrowed user pointer;
-it must return a detached value and must not mutate the simulation.</p>
+to the game&#39;s Control type. Keep the binding outside World. A mapper can also
+read presentation-owned aim/device data through its borrowed user pointer.
+It must return a copied value without mutating the simulation.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">bindings := [<span class="hljs-number">2</span>]inputgd.Input_Action{{<span class="hljs-string">&quot;ui_left&quot;</span>, <span class="hljs-number">0</span>}, {<span class="hljs-string">&quot;ui_right&quot;</span>, <span class="hljs-number">1</span>}}
 controls: inputgd.Input_Binding(Control)
 ok := inputgd.input_binding_init(&amp;controls, bindings[:], Control{},
@@ -23,14 +23,15 @@ value := inputgd.input_binding_read(&amp;controls)
 inputgd.input_binding_consume(&amp;controls)</code></pre></div><p>Up to 64 unique actions map to unique bits. Capture coalesces repeated presses of
 the same button within one simulation tick, while preserving simultaneous press
 and release. Reading does not consume; failed simulation steps keep their edges.
-Held state remains after consuming edges. For a Session, consume when <code>session.control_consumed</code> reports that an actual
-simulation step used the control. A successful frame call alone does not establish
-that. This helper does not change the runner&#39;s scheduling.</p>
+Held state remains after consuming edges. For a Session, consume when
+<code>session.control_consumed</code> reports that a simulation step used the control.
+A successful frame call alone does not establish that. This helper does not
+change the runner&#39;s scheduling.</p>
 <p><code>Paused</code>, <code>Unfocused</code>, <code>Menu</code> and <code>Inspecting</code> gates return the supplied neutral
 Control and discard buffered edges. A button held across a gate transition must
 be released before reuse. Supply gates before sampling each frame; application
-code decides focus/menu eligibility rather than the library guessing from an
-arbitrary Control node. Analog axes can be sampled in the mapper; applications
+code supplies focus/menu eligibility explicitly; the library does not infer it
+from an arbitrary Control node. Analog axes can be sampled in the mapper; applications
 with analog hold/rearm requirements must apply their own dead-zone policy.
 The engine-free <code>replay.Control_Capture</code> exposes the same bit/edge/gate behavior.</p>
 <h1 id="signal-actions">Signal actions<a class="heading-anchor" href="#signal-actions" aria-label="Link to this section">#</a></h1>
@@ -68,5 +69,5 @@ order, and use explicit session lifecycle boundaries before reusing an owner.
 See <a href="intents.html">intent contracts</a> for counters and result semantics, and
 <code>tests/replay_nodes/scripts/input.odin</code> for the compile-checked engine example.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="intents.html"><span>Copied action intents</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/input/controls.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="intents.html"><span>Copied action intents</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/input/controls.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/input/controls.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

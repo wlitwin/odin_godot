@@ -47,11 +47,12 @@ packets older than the replay window are discarded.</li>
 <li>Every encryption consumes a sequence, even if the base reports backpressure.
 A retry cannot encrypt different plaintext with a previously used key/nonce.</li>
 </ul>
-<p>The grant represents the provider&#39;s identity snapshot. It is not an offline
-revocation oracle. The embedding must refresh admission before binding a new
-connection and retire links on newer authenticated incarnation/revocation notices.
-Peers sharing a pair secret can authenticate that pair; this is not anti-cheat
-authority between participants who simulate the complete match.</p>
+<p>The grant records the identities approved by the provider when it was issued;
+it does not detect later revocation while offline. Before binding a new
+connection, the embedding must refresh admission. It must retire existing links
+when authenticated notices report a newer incarnation or revocation. A shared
+pair secret authenticates the connection between those participants, but does
+not let either participant judge the other&#39;s simulation as a trusted referee.</p>
 <p><code>tests/replay_p2p_link/run.sh</code> currently passes seven native tests and WASM checking:
 scope/identity key separation, handshake faults, encrypted bidirectional traffic,
 tampering/replay/reflection/channel substitution, retained receive buffers,
@@ -59,5 +60,5 @@ generation replacement, channel-window independence, bounded denial and nonce
 consumption under backpressure. The native party fixture additionally exercises
 real encrypted ENet gameplay and connection replacement after a process kill.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../godot/p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/link/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../godot/p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/link/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-bounds" class="">Ownership and bounds</a></nav><div class="outline-actions"><a href="../../../../reference/replay/p2p/link/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -4,13 +4,13 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Player abilities</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/abilities.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Staging selects two abilities. Q sends a world point; E sends a direction. Both
-become reliable <code>Action.Cast</code> requests with an explicit slot and aim convention.
-The tick reducer checks the live player, slot, catalog ID and cooldown, then applies
-all consequences to the ordinary world. Client prediction uses the same reducer.
-Rejection restores the candidate state and feedback; a full lob/zone pool refuses
-the cast without starting its cooldown. No claimed caster position is needed because
-the authority simulates movement.</p>
+<article class="reading-body "><p>Select two abilities in staging. Q sends a world point and E sends a direction
+through reliable <code>Action.Cast</code> requests with an explicit slot and aim convention.
+The tick reducer validates the player, slot, catalog ID, and cooldown, then applies
+the cast to World. Client prediction runs the same reducer. Rejection restores
+both candidate state and feedback; a full lob/zone pool rejects the cast before
+starting its cooldown. The authority derives the cast origin from its simulated
+movement, so the request needs no claimed caster position.</p>
 <p>All six stock resources load through Godot into the saved catalog: slime lob,
 igniter cone, frostwave nova, battlecry buff, salvefield zone and sparkjar lob.
 The native generator reads the same files, and Godot gates compare the catalogs.
@@ -27,7 +27,7 @@ radius. Both apply scaled direct damage first, then status to survivors. Seconda
 reactions can hurt the crew even though those primary deliveries target mobs.</li>
 <li>Buff selects self or the nearest living friend according to the row, with self
 fallback. Stable seat order resolves equal-distance candidates.</li>
-<li>Zone clamps its placement to range and stamps the cast&#39;s scaled wound. It pulses
+<li>Zone clamps its placement to range and records the cast&#39;s scaled damage. It pulses
 damage/status onto mobs and crew, including its caster. Its remaining lifetime
 decrements before the modulo pulse test; expiry removes it without a final pulse.</li>
 </ul>
@@ -40,10 +40,11 @@ earlier event it modified.</p>
 state, matching the original presentation policy. Zones are ordinary observed
 entities, so a late spectator receives the existing patch and its remaining time.
 <a href="globs.html">Glob discs</a> restore the original shapes, payload colors and pulse.
-The original uses straight flights without an arc or trail; earlier wording here
-was inaccurate. <a href="areas.html">Area discs and buff bursts</a> restore nova/reaction
-fills, constant standing-zone fill and once-only wearer bursts. <a href="cast_paths.html">Cast paths</a> restore local/remote cone tongues and recorded spread
-bolts. Launch/contact feedback, audio listening and feel remain review work.</p>
+Flights follow the original straight path without an arc or trail.
+<a href="areas.html">Area discs and buff bursts</a> provide nova/reaction fills, constant
+standing-zone fill, and once-only wearer bursts. <a href="cast_paths.html">Cast paths</a>
+provide local/remote cone tongues and recorded spread bolts. Launch/contact
+feedback, audio listening, and feel remain review work.</p>
 <p>The original&#39;s owner-streamed origins and frame timing differ from this fixed-tick,
 server-authoritative version. Requests execute after the tick&#39;s ordinary simulation;
 new lobs/zones first advance on the following tick. Enemy/status/zone processing
@@ -56,8 +57,9 @@ zone. The gate exercises all six resources, freeze/shatter/spread/surge reaction
 generation-aware credit, regeneration, eleven zone pulses and expiry. It compares
 the complete world at a shared authoritative tick. These controlled encounters do
 not establish full original-game parity, profile persistence or run progression.</p>
-<p><code>storm_run.sh</code> assigns slime/frost to one runner and spark/ignite to another,
-verifying that the second runner owns shatter damage and later shock damage.
+<p><code>storm_run.sh</code> assigns slime/frost to one player character (called a runner)
+and spark/ignite to another, verifying that the second receives credit for
+shatter damage and later shock damage.
 It also burns/douses both targets and explicitly observes the support runner&#39;s
 friendly surge. Observation receipts delay each test&#39;s next consuming action until
 all participants have seen its prerequisite; ordinary gameplay does not use those
@@ -65,5 +67,5 @@ barriers. <span class="local-reference" title="docs/replay/results/scrapyard-sto
 include network faults, exact world comparisons and the fixture&#39;s differences from
 the original acts.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="globs.html"><span>Slime, sparkjar and spit discs</span><span aria-hidden="true">→</span></a><a href="areas.html"><span>Area effects and buff bursts</span><span aria-hidden="true">→</span></a><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/abilities.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="globs.html"><span>Slime, sparkjar and spit discs</span><span aria-hidden="true">→</span></a><a href="areas.html"><span>Area effects and buff bursts</span><span aria-hidden="true">→</span></a><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/abilities.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/abilities.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

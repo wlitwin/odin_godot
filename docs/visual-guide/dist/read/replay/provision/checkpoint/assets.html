@@ -6,8 +6,8 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#dependency-policy">Dependency policy</a><a href="#package-and-persistence">Package and persistence</a><a href="#room-integration">Room integration</a></nav></details>
 <article class="reading-body "><p>Use a checkpoint package when restoring gameplay requires external assets as
 well as state. A room publication can include its complete external asset set in
-the same transaction as its checkpoint. The authority Point continues to name the raw typed
-checkpoint. A separate signed payload descriptor names the transferred package;
+the same transaction as its checkpoint. The authority Point identifies the raw typed checkpoint. A separate signed
+payload descriptor identifies the transferred package;
 the package verifies its root against that Point and checks every asset&#39;s content
 hash. Restore grants still select the exact checkpoint publication.</p>
 <h2 id="dependency-policy">Dependency policy<a class="heading-anchor" href="#dependency-policy" aria-label="Link to this section">#</a></h2>
@@ -36,8 +36,8 @@ the existing bounded Godot image decoder. Rejected/retired declarations do not
 require an asset that will never be installed.</p>
 <p>The service requires an exact asset set: missing, extra, corrupt and semantically
 invalid entries are refused before publication. A game without declared external
-dependencies continues to use raw checkpoints. Undeclared extra uploads are not
-accepted as a general-purpose storage bucket.</p>
+dependencies continues to use raw checkpoints. The endpoint rejects uploads containing undeclared assets; it does not provide
+general-purpose asset storage.</p>
 <h2 id="package-and-persistence">Package and persistence<a class="heading-anchor" href="#package-and-persistence" aria-label="Link to this section">#</a></h2>
 <p>The transfer package is a canonical envelope around the existing asset bundle.
 The full payload, including checkpoint and assets, is limited to <strong>1 MiB</strong> and <strong>32
@@ -74,11 +74,11 @@ Installing bytes does not grant authority.</p>
 <p>Checkpoint-transfer protocol <strong>3</strong> adds the payload descriptors and v3 HMAC domain.
 Clients and services must upgrade together. Publication metadata, authority Record,
 private Bundle, gameplay protocol and raw checkpoint formats remain unchanged.</p>
-<p>Bundled transfer deliberately starts with one complete durable snapshot. It does
-not implement cross-publication deduplication, independent asset uploads or saves
-beyond this transfer bound. Save age, transfer duration and the room&#39;s existing
+<p>Each transfer contains one complete durable package. There is no
+cross-publication deduplication, independent asset upload, or save larger
+than this transfer bound. Save age, transfer duration and the room&#39;s existing
 rollback policy remain separate: a durable checkpoint can still be too old for a
 restore grant. No recovery-policy limit is relaxed by asset publication.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/assets.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/assets.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#dependency-policy" class="">Dependency policy</a><a href="#package-and-persistence" class="">Package and persistence</a><a href="#room-integration" class="">Room integration</a></nav><div class="outline-actions"><a href="../../../../reference/replay/provision/checkpoint/assets.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

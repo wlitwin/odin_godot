@@ -1,6 +1,6 @@
 # Chat and yard history
 
-Scrapyard now uses the shared [Replay communications service](../../replay/comms/README.md)
+Scrapyard uses the shared [Replay communications service](../../replay/comms/README.md)
 for named player chat, observer chat, late-join scrollback and host-ordered yard
 announcements. It runs on its own application lane alongside spray assets;
 gameplay world/action/checkpoint schemas are unchanged.
@@ -51,13 +51,15 @@ announcement, live combat recovery and the spray dependency barrier during plann
 and crash migration. [Evidence](../../docs/replay/results/scrapyard-chat-2026-09-07/README.md)
 records actual outcomes and the setup correction.
 
-[Positional pings](pings.md) now have input, presentation, expiry and scope checks.
+[Positional pings](pings.md) have input, presentation, expiry, and scope checks.
 Broader chat layout/feel parity remains work. Browser
 interaction, additional platforms, hardware audio, playtests and the full framework
 comparison remain requirements.
 
 
-Observers now use the name from the personal/front-door name field after capability
+## Observer names and recovery
+
+Observers use the name from the personal/front-door name field after capability
 negotiation. Named messages show `Name (observer): message`; the role label remains
 visible even when the chosen text matches a player's name. Historical messages keep
 their originally stamped name, and a surviving observer negotiates again after a
@@ -66,8 +68,8 @@ Legacy servers retain the generic `Observer` label. Display names are descriptiv
 not unique account identities.
 
 
-The observer recovery gate now includes abrupt host loss, fresh-process return of
+The observer recovery test includes abrupt host loss, fresh-process return of
 the old host, and a fresh observer process with a new name. Existing history keeps
 its stamped labels; the reconnecting observer remains seat zero and cannot ping.
-The observer status line now lists chat/tally/menu controls and waiting information,
+The observer status line lists chat/tally/menu controls and waiting information,
 rather than advertising player-only combat controls.

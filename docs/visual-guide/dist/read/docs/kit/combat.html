@@ -3,39 +3,45 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/combat — health, abilities, effects, projectiles</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/combat.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#health-and-abilities">Health and abilities</a><a href="#blocks-or-low-level-helpers">Blocks or low-level helpers</a><a href="#status-effects">Status effects</a><a href="#projectiles">Projectiles</a><a href="#cast-origin-and-leash">Cast origin and leash</a><a href="#fire-announcements">Fire announcements</a><a href="#predicted-hp">Predicted hp</a><a href="#auto-published-combat-stats">Auto-published combat stats</a><a href="#pools">Pools</a><a href="#worked-example">Worked example</a><a href="#gotchas">Gotchas</a></nav></details>
-<article class="reading-body "><p>Reach for <code>kit/combat</code> when entities need hp that goes down, abilities with cooldowns and
-costs, buffs/debuffs on a clock, or projectiles that must feel instant on the shooter&#39;s
-screen while only the host deals damage. It also auto-publishes damage/kill/death tallies
-into the <a href="session.html">session</a> stat registry.</p>
-<p><strong>Lane compatibility: COOP.</strong> The wire halves here (<code>Predicted_Hp</code> keyed to delta
-confirmation, host-validated hits, <code>fire_announce</code>/tracers) are the coop lane&#39;s model. A
-<a href="sim.html">sim-lane</a> game expresses the same ideas natively: hp as a <code>predict</code> field, hits
-as verbs judged under <a href="sim.html">lag comp</a>, fired shots as predicted spawns or declared
-events (in the sim lane, projectile <em>entities</em> supersede tracers; see <a href="sim.html">sim.md</a>).
-The pure math (range/cone checks and damage arithmetic) is replay-safe. The
-<code>Cooldowns</code> and ability bundles have not been covered by
-simulation-descriptor tests; do not put them on the simulation lane without
-adding that coverage.</p>
-<h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
-<p>Combat state is <strong>plain replicated fields on your entity</strong> (<code>hp: i32</code>, <code>cds: [4]u16</code>,
-<code>fx: [4]Effect</code>) riding the <a href="net.html">kit/net</a> delta walk. kit/combat is the <em>operations</em>
-on them: deterministic, allocation-free, and engine-free. They run identically inside
-predicted commands and host ticks, since client and host execute the same gates from the
-same bytes. Projectiles are <strong>not entities</strong>: the shooter&#39;s cast is predicted (cost and
-cooldown bite instantly), everyone draws local visuals from the same sim math, and only
-the <em>host&#39;s</em> sim deals damage. Visuals are peer-owned; hits are host-validated.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#replicated-combat-state-and-local-projectiles">Replicated combat state and local projectiles</a><a href="#health-and-abilities">Health and abilities</a><a href="#blocks-or-low-level-helpers">Blocks or low-level helpers</a><a href="#status-effects">Status effects</a><a href="#projectiles">Projectiles</a><a href="#cast-origin-and-leash">Cast origin and leash</a><a href="#fire-announcements">Fire announcements</a><a href="#predicted-hp">Predicted hp</a><a href="#publishing-combat-stats">Publishing combat stats</a><a href="#pools">Pools</a><a href="#worked-example">Worked example</a><a href="#timing-and-validation-constraints">Timing and validation constraints</a></nav></details>
+<article class="reading-body "><p>Use <code>kit/combat</code> to apply damage, check ability costs and cooldowns, maintain
+timed effects, and simulate projectiles. Coop games can display a shot
+immediately on the shooter&#39;s screen while the host decides damage. The package
+also provides helpers for recording damage, kills, and deaths in the
+<a href="session.html">session</a> stat registry; the game calls them at impact and death.</p>
+<p>The network examples here use coop replication: <code>Predicted_Hp</code> displays local
+damage until an hp delta arrives, the host validates hits, and
+<code>fire_announce</code> distributes projectile visuals. A <a href="sim.html">sim-lane</a> game
+instead schedules commands within ticks and can judge hits with
+<a href="sim.html">lag comp</a>. Health may remain reliably replicated, as in Quickdraw;
+state that must replay with a tick uses <code>predict</code> fields. Fired shots can use
+predicted projectile entities or declared presentation events; see
+<a href="sim.html">sim.md</a>.</p>
+<p>Range/cone checks and damage arithmetic are pure and replay-safe. The
+<code>Cooldowns</code> and ability bundles lack simulation-descriptor test coverage;
+do not put them on the simulation lane without adding that coverage.</p>
+<p><span id="mental-model"></span></p>
+<h2 id="replicated-combat-state-and-local-projectiles">Replicated combat state and local projectiles<a class="heading-anchor" href="#replicated-combat-state-and-local-projectiles" aria-label="Link to this section">#</a></h2>
+<p>Declare combat state as ordinary replicated entity fields: <code>hp: i32</code>,
+<code>cds: [4]u16</code>, and <code>fx: [4]Effect</code>. <a href="net.html">kit/net</a> sends their changes as
+deltas. The operations in <code>kit/combat</code> are deterministic, allocation-free, and
+independent of Godot, so a predicted command and an authority tick apply the
+same checks when given the same bytes.</p>
+<p>In this coop pattern, projectiles are local simulations rather than replicated
+entities. The shooter predicts the cast&#39;s cost and cooldown immediately. Each
+peer draws its own visual with the same projectile math, while the host&#39;s
+simulation validates hits and applies damage.</p>
 <h2 id="health-and-abilities">Health and abilities<a class="heading-anchor" href="#health-and-abilities" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The scalar damage core: a corpse-guarded clamp, generic over the</span>
-<span class="hljs-comment">// game&#x27;s hp integer. `dealt` is what actually landed (0 on a corpse — hit</span>
-<span class="hljs-comment">// credit reads it); `died` reports the killing blow exactly once.</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Apply damage using the game&#x27;s hp integer type, clamping at zero.</span>
+<span class="hljs-comment">// `dealt` reports applied damage (0 on a corpse) for hit credit;</span>
+<span class="hljs-comment">// `died` reports the killing blow exactly once.</span>
 hurt :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (hp: ^$T, dmg: T) -&gt; (dealt: T, died: <span class="hljs-type">bool</span>)
 <span class="hljs-comment">// Restore `amount`, clamped to `maximum`. Reviving a corpse is a heal from 0</span>
-<span class="hljs-comment">// — whether that is allowed is policy, gated by the caller.</span>
+<span class="hljs-comment">// The caller decides whether healing from 0 is allowed.</span>
 heal :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (hp: ^$T, maximum: T, amount: T)
-<span class="hljs-comment">// The died-only i32 convenience over `hurt`: clamps at zero, no double kills,</span>
-<span class="hljs-comment">// no negative hp. hit and play.Health both delegate to the same `hurt` — one</span>
-<span class="hljs-comment">// death definition for raw fields and blocks alike.</span>
+<span class="hljs-comment">// The i32 helper over `hurt` returns only `died`. It clamps hp at zero</span>
+<span class="hljs-comment">// and reports each death once. hit and play.Health both call `hurt`,</span>
+<span class="hljs-comment">// so raw fields and blocks apply the same damage and death rules.</span>
 hit :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (hp: ^<span class="hljs-type">i32</span>, amount: <span class="hljs-type">i32</span>) -&gt; (died: <span class="hljs-type">bool</span>)
 
 Ability_Def :: <span class="hljs-keyword">struct</span> {
@@ -43,55 +49,56 @@ Ability_Def :: <span class="hljs-keyword">struct</span> {
 	cooldown: <span class="hljs-type">u16</span>, <span class="hljs-comment">// net ticks</span>
 	cost:     <span class="hljs-type">i32</span>, <span class="hljs-comment">// spent from whatever resource the game passes in</span>
 }
-<span class="hljs-comment">// The whole cast gate, shared by prediction and authority: ready + affordable</span>
-<span class="hljs-comment">// -&gt; pay and start the cooldown. Call from inside the ability&#x27;s command proc.</span>
+<span class="hljs-comment">// Check readiness and cost, then pay and start the cooldown. Prediction</span>
+<span class="hljs-comment">// and authority call this from inside the ability&#x27;s command proc.</span>
 ability_try :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (cds: []<span class="hljs-type">u16</span>, slot: <span class="hljs-type">int</span>, def: Ability_Def, resource: ^<span class="hljs-type">i32</span>) -&gt; <span class="hljs-type">bool</span>
 ability_ready :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (cds: []<span class="hljs-type">u16</span>, slot: <span class="hljs-type">int</span>) -&gt; <span class="hljs-type">bool</span>
 <span class="hljs-comment">// The authority&#x27;s per-net-tick decay (clients receive it as deltas).</span>
 abilities_tick :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (cds: []<span class="hljs-type">u16</span>)
 
-<span class="hljs-comment">// The `cds: [N]u16 gd:&quot;replicate&quot;` field, packaged: embed it (`using cd:</span>
-<span class="hljs-comment">// kcombat.Cooldowns(3)`) and the array replicates like a flat field, while</span>
-<span class="hljs-comment">// cd_try/cd_ready/cd_tick forward to `cds[:]` so you never spell the slice.</span>
+<span class="hljs-comment">// Embed the `cds: [N]u16 gd:&quot;replicate&quot;` field with `using cd:</span>
+<span class="hljs-comment">// kcombat.Cooldowns(3)`. The array replicates as a flat field;</span>
+<span class="hljs-comment">// cd_try/cd_ready/cd_tick pass `cds[:]` to the underlying helpers.</span>
 Cooldowns :: <span class="hljs-keyword">struct</span>($N: <span class="hljs-type">int</span>) {
 	cds: [N]<span class="hljs-type">u16</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
-}</code></pre></div><p>Defs are code constants (cavecrawl&#39;s <code>ROCK_ABILITY</code> has <code>cooldown = 20</code>, one second at
-20 Hz). The predicted cast is one command proc; generated command policy runs
-it in the appropriate prediction and authority contexts (<code>spelunker.odin</code>):</p>
+}</code></pre></div><p>Define abilities as code constants. Cavecrawl&#39;s <code>ROCK_ABILITY</code> has
+<code>cooldown = 20</code>, which lasts one second at 20 Hz. A predicted cast is a command
+procedure; generated policy runs it for client prediction and authority
+execution. This example is from <code>spelunker.odin</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_OWNER_PREDICTED)</span>
 spelunker_heal :: <span class="hljs-keyword">proc</span>(self: ^Spelunker) -&gt; <span class="hljs-type">bool</span> {
-	<span class="hljs-keyword">if</span> self.hp &lt;= <span class="hljs-number">0</span> || self.hp &gt;= MAX_HP {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>} <span class="hljs-comment">// corpses and the hale need no bandage</span>
+	<span class="hljs-keyword">if</span> self.hp &lt;= <span class="hljs-number">0</span> || self.hp &gt;= MAX_HP {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>} <span class="hljs-comment">// reject dead or already fully healed targets</span>
 	<span class="hljs-keyword">if</span> !kcombat.ability_try(self.cds[:], <span class="hljs-number">1</span>, HEAL_ABILITY, &amp;self.stamina) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
 	self.hp = min(self.hp + HEAL_AMOUNT, MAX_HP)
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
-}</code></pre></div><p>The verb that issues it pre-gates with <code>ability_ready</code> (<code>input.odin</code>): a refused
-prediction still rides the wire, so a key held at full hp would otherwise flood the host
-with doomed commands. <a href="ui.html">kit/ui</a>&#39;s ability bar renders the same <code>cds</code> and defs.</p>
+}</code></pre></div><p>Check <code>ability_ready</code> before issuing the command, as <code>input.odin</code> does.
+A locally refused prediction is still sent, so repeated input while an ability
+is unavailable would send requests the host must reject. <a href="ui.html">kit/ui</a>&#39;s
+ability bar renders the same <code>cds</code> and definitions.</p>
 <h2 id="blocks-or-low-level-helpers">Blocks or low-level helpers<a class="heading-anchor" href="#blocks-or-low-level-helpers" aria-label="Link to this section">#</a></h2>
-<p>For the common cases the <a href="play.html"><code>play</code></a> blocks are the default:</p>
+<p>Start with the <a href="play.html"><code>play</code></a> blocks for entity health and named abilities:</p>
 <ul>
-<li><strong><code>play.Health</code></strong> instead of a raw hp field plus <code>hit</code>: you get max, the damage edge,
-and the current health fraction in one block.</li>
-<li><strong><code>play.Ability</code></strong> instead of a <code>Cooldowns</code> slot plus a hand-written command: the cast
-command is generated onto the embedding entity, the cooldown knob replicates, and the
-applied-vs-rejected semantics are already right.</li>
+<li><code>play.Health</code> combines hp, maximum health, a damage-change notification, and
+the current health fraction.</li>
+<li><code>play.Ability</code> generates a cast command on the containing entity, replicates
+cooldown configuration, and handles command acceptance and rejection.</li>
 </ul>
-<p><code>play.Health</code>&#39;s clamp and <code>play.Ability</code>&#39;s gate delegate to the same <code>hurt</code> and <code>cast_gate</code>
-these helpers expose, so a raw field and a block agree on what &quot;ready&quot; and &quot;a death&quot; mean.
-The def type is <code>kcombat.Ability_Def</code> at every layer: name and cost live in the game&#39;s
-declared table (a string can&#39;t ride a replicated blob, and a wire verb can&#39;t carry your
-resource pointer), which is also what feeds <a href="ui.html">kit/ui</a>&#39;s ability bar for block and
-slot-array games alike.</p>
-<p>Reach for the low-level forms when you&#39;re outside the blocks&#39; shape:</p>
+<p><code>play.Health</code> calls <code>hurt</code> for its clamp, and <code>play.Ability</code> calls <code>cast_gate</code>
+for its readiness check. Blocks and raw fields therefore use the same rules
+for readiness and death. Both use <code>kcombat.Ability_Def</code>. The game&#39;s definition
+table retains names and costs because a replicated blob cannot contain a
+string and a wire command cannot carry a resource pointer. That table also
+feeds <a href="ui.html">kit/ui</a>&#39;s ability bar for either blocks or slot arrays.</p>
+<p>Use the low-level helpers for cases that need different storage or checks:</p>
 <ul>
-<li><strong><code>ability_try</code></strong> when a cast <em>spends a resource</em> at the gate: cost is a game gate, so
-check it where you issue and in the authority&#39;s hook, against the same def row.</li>
-<li><strong><code>Cooldowns(N)</code>&#39;s slot array</strong> when slots are <em>dynamic</em>: castable inventory items
-indexed at runtime, where named block fields can&#39;t reach.</li>
-<li><strong><code>hit</code>/<code>hurt</code></strong> when hp lives somewhere a block can&#39;t reach: a transient, an off-entity pool.</li>
+<li><code>ability_try</code> checks and spends a resource when casting. Check the same
+definition row before issuing and in the authority hook.</li>
+<li><code>Cooldowns(N)</code> stores slots indexed at runtime, such as castable inventory
+items that cannot be represented by named block fields.</li>
+<li><code>hit</code>/<code>hurt</code> operate on hp outside an entity block, such as a transient value
+or a separate pool.</li>
 </ul>
-<p>cavecrawl and homestead show the low-level way; scrapyard shows the block way. New games
-start with the blocks. See
+<p>Cavecrawl and Homestead use the low-level helpers; Scrapyard uses blocks. See
 <a href="net.html#composing-verbs-from-embedded-blocks">kit/net — composing verbs from embedded blocks</a>.</p>
 <h2 id="status-effects">Status effects<a class="heading-anchor" href="#status-effects" aria-label="Link to this section">#</a></h2>
 <p>One buff/debuff is 4 POD bytes, embedded as a fixed array (<code>fx: [4]Effect</code>); kind 0
@@ -101,20 +108,20 @@ start with the blocks. See
 	power: <span class="hljs-type">i8</span>,
 	left:  <span class="hljs-type">u16</span>, <span class="hljs-comment">// ticks remaining</span>
 }
-<span class="hljs-comment">// Apply an effect: an existing one of the same kind REFRESHES (strongest</span>
-<span class="hljs-comment">// power, longest clock); otherwise the first empty slot. False = all busy.</span>
+<span class="hljs-comment">// Refresh an effect of the same kind with the strongest power and longest</span>
+<span class="hljs-comment">// duration, or use the first empty slot. Return false when all slots are busy.</span>
 effects_add :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (fx: []Effect, kind: <span class="hljs-type">u8</span>, power: <span class="hljs-type">i8</span>, ticks: <span class="hljs-type">u16</span>) -&gt; <span class="hljs-type">bool</span>
-<span class="hljs-comment">// The authority&#x27;s per-net-tick decay; a row clears on its LAST tick, expired</span>
-<span class="hljs-comment">// slots zero back to empty. Underflow-guarded: a hand-written {kind, left = 0}</span>
-<span class="hljs-comment">// row clears instead of wrapping into a 65535-tick immortal effect.</span>
+<span class="hljs-comment">// The authority decrements durations each net tick and clears expired slots.</span>
+<span class="hljs-comment">// A hand-written {kind, left = 0} row also clears immediately,</span>
+<span class="hljs-comment">// preventing underflow into a 65535-tick duration.</span>
 effects_tick :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (fx: []Effect)
 effect_of :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (fx: []Effect, kind: <span class="hljs-type">u8</span>) -&gt; (Effect, <span class="hljs-type">bool</span>)</code></pre></div><h2 id="projectiles">Projectiles<a class="heading-anchor" href="#projectiles" aria-label="Link to this section">#</a></h2>
-<p>The same math runs as the host&#39;s authoritative sim (damage) and as every peer&#39;s local
-visual (<a href="fx.html">kit/fx</a> tracers): what you see is what the host computes, offset only by
-latency.</p>
+<p>The host uses the projectile math to judge damage, and peers use it to animate
+local <a href="fx.html">kit/fx</a> tracers. They start from the announced origin and velocity;
+network transit delays when remote peers begin their visuals.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Projectile :: <span class="hljs-keyword">struct</span> {
 	pos:  [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>,
-	vel:  [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, <span class="hljs-comment">// per TICK, not per second</span>
+	vel:  [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, <span class="hljs-comment">// velocity per tick, not per second</span>
 	left: <span class="hljs-type">u16</span>, <span class="hljs-comment">// ticks to live</span>
 }
 Target :: <span class="hljs-keyword">struct</span> {
@@ -126,64 +133,64 @@ Target :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-comment">// hit-test the swept segment before discarding).</span>
 projectile_step :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (p: ^Projectile) -&gt; (alive: <span class="hljs-type">bool</span>)
 <span class="hljs-comment">// First target the tick&#x27;s travel touches (earliest along the path wins, not</span>
-<span class="hljs-comment">// nearest to the muzzle). `from` is the position BEFORE projectile_step.</span>
+<span class="hljs-comment">// nearest to the muzzle). `from` is the position before projectile_step.</span>
 projectile_hit :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (from: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, vel: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, targets: []Target) -&gt; (best: Target, ok: <span class="hljs-type">bool</span>)</code></pre></div><h2 id="cast-origin-and-leash">Cast origin and leash<a class="heading-anchor" href="#cast-origin-and-leash" aria-label="Link to this section">#</a></h2>
-<p>A moving shooter&#39;s projectile must carry the <strong>owner-true origin</strong>. Its position is
-owner-streamed, so the host&#39;s copy lags a stream behind. Launching from the lagged copy
-makes the authoritative rock fly a different line than the one the shooter <em>saw</em> hit. So
-the throw command carries the caster&#39;s own origin, leashed:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// leash clamps a CLAIMED point into a disc of radius r around anchor.</span>
+<p>Include the shooter&#39;s local cast origin in the throw command. With
+owner-streamed movement, the host receives the shooter&#39;s position after a delay.
+Launching from that older copy makes the authority projectile follow a different
+path from the shooter&#39;s visual. The host bounds the supplied origin with
+<code>leash</code>:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// leash clamps a claimed point into a disc of radius r around anchor.</span>
 leash :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (claimed, anchor: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, r: <span class="hljs-type">f32</span>) -&gt; [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span></code></pre></div><p>Origins within the permitted latency offset pass unchanged; larger displacements
 are clamped to the allowed distance.
-Run it in the command proc itself: on the caster&#39;s own prediction <code>claimed == anchor</code> and
-it is a no-op, so there is no role branch (<code>spelunker_throw</code> in <code>spelunker.odin</code>).</p>
+Call it in the command procedure, as <code>spelunker_throw</code> in <code>spelunker.odin</code>
+does. During local prediction, <code>claimed == anchor</code>, so the same call leaves
+the origin unchanged.</p>
 <h2 id="fire-announcements">Fire announcements<a class="heading-anchor" href="#fire-announcements" aria-label="Link to this section">#</a></h2>
-<p>When the host confirms a cast it broadcasts a <code>Fire</code> over the session&#39;s app channel
-(<a href="session.html">session.md</a>); every peer runs the same projectile sim locally for the
-visual. The shooter starts theirs at cast time (zero RTT), everyone else on the
-announcement, which rides the same one-way path as the eventual hp delta, so remote
-impacts and health drops coincide.</p>
+<p>When the host accepts a cast, it broadcasts a <code>Fire</code> through the session&#39;s app
+channel (<a href="session.html">session.md</a>). Each peer simulates that projectile locally
+for presentation. The shooter starts at cast time (zero RTT); other peers start
+when the announcement arrives. The announcement and later hp delta travel the
+same one-way path, aligning remote visual impacts with health changes.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Fire :: <span class="hljs-keyword">struct</span> {
-	shooter:   knet.Player_Id, <span class="hljs-comment">// WHO CAUSED IT — always honest (the echo skip reads `predicted`)</span>
+	shooter:   knet.Player_Id, <span class="hljs-comment">// actual causer; echo suppression uses `predicted`</span>
 	origin:    [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>,
-	vel:       [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, <span class="hljs-comment">// per tick; a no-flight kind may reuse it for SPATIAL payload (a radius)</span>
+	vel:       [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, <span class="hljs-comment">// per tick; a no-flight kind may use it for spatial data such as radius</span>
 	ttl:       <span class="hljs-type">u16</span>,
 	kind:      <span class="hljs-type">u8</span>,  <span class="hljs-comment">// game-defined (which ability/visual)</span>
 	arg:       <span class="hljs-type">u16</span>, <span class="hljs-comment">// the game&#x27;s payload word beside kind — an ability/status id, a variant</span>
-	                <span class="hljs-comment">// (ids used to be float-packed into vel.z, which only works in 2D)</span>
-	predicted: <span class="hljs-type">bool</span>, <span class="hljs-comment">// the shooter&#x27;s OWN screen drew this at cast time — skip its echo.</span>
-	                 <span class="hljs-comment">// false = nobody drew it yet: EVERY screen draws, the causer&#x27;s included</span>
+	                <span class="hljs-comment">// (use arg for ids; packing them into vel.z limits the payload to 2D)</span>
+	predicted: <span class="hljs-type">bool</span>, <span class="hljs-comment">// the shooter&#x27;s screen drew this at cast time; skip its echo.</span>
+	                 <span class="hljs-comment">// false = present on every screen, including the causer&#x27;s</span>
 }
 fire_write :: <span class="hljs-keyword">proc</span>(w: ^knet.Writer, f: Fire)
-fire_read :: <span class="hljs-keyword">proc</span>(r: ^knet.Reader) -&gt; (f: Fire, ok: <span class="hljs-type">bool</span>)</code></pre></div><p>The plumbing is packaged. The fire lane defaults to <code>FIRE_TAG :: 1</code> (its tag siblings are
-comms 0, xfer 2, sim 3). Give the listener a home: a struct field, so parallel sessions
-never collide (no package globals):</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">fire_announce :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, f: Fire, tag: <span class="hljs-type">u8</span> = FIRE_TAG)   <span class="hljs-comment">// HOST-ONLY (asserts)</span>
+fire_read :: <span class="hljs-keyword">proc</span>(r: ^knet.Reader) -&gt; (f: Fire, ok: <span class="hljs-type">bool</span>)</code></pre></div><p>Fire announcements default to <code>FIRE_TAG :: 1</code>; the other app tags are comms 0,
+xfer 2, and sim 3. Store a listener in a struct field so each session has its
+own route rather than sharing package globals:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">fire_announce :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, f: Fire, tag: <span class="hljs-type">u8</span> = FIRE_TAG)   <span class="hljs-comment">// authority only; asserts on a client</span>
 fire_announce_to :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, peer: ksess.Peer_Id, f: Fire, tag: <span class="hljs-type">u8</span> = FIRE_TAG) <span class="hljs-comment">// addressed</span>
 fire_listen :: <span class="hljs-keyword">proc</span>(fr: ^Fire_Route, s: ^ksess.Session, tag: <span class="hljs-type">u8</span> = FIRE_TAG)
 fire_poll :: <span class="hljs-keyword">proc</span>(fr: ^Fire_Route) -&gt; (f: Fire, ok: <span class="hljs-type">bool</span>)
-fire_route_destroy :: <span class="hljs-keyword">proc</span>(fr: ^Fire_Route)</code></pre></div><p><strong><code>fire_announce_to</code>: one peer, not the room.</strong> To catch a just-joined player up on a
-recent event, address the replay to <em>their</em> <code>Peer_Id</code> (from the roster on
-<code>Ev_Player_Joined</code>) instead of re-broadcasting to everyone and making every other screen
-dedupe the echo. One caution: <code>fire_poll</code> <strong>drops a <code>predicted</code> fire whose shooter is the
-receiver</strong> (they drew it at cast time), so an addressed replay of one to the <em>original
-caster</em> (a reconnect reclaiming their id) is dropped too. That is correct for a <em>transient</em> one-shot, and it
-is the sign that <strong>a persistent effect does not belong on this lane</strong>. A standing zone, a
-lingering glow, anything with a ttl that outlives its frame should be an <strong>entity</strong>:
-entities replicate to a joiner through the world snapshot by construction, so there is no
-replay, no dedupe, no shooter spoof, no reclaim hole. Use <code>fire_announce_to</code> for the tail of a
-<em>transient</em> a specific peer should still catch; use an entity for anything that stands.</p>
-<p><code>fire_announce</code> is the AUTHORITY&#39;s half: it asserts on a client, since a client calling
-it would broadcast frames every receiver discards. The listener files events rather than
-invoking callbacks: the handler only <em>files</em> into
-<a href="session.html#the-riders-queue-appq"><code>ksess.App_Queue</code></a> (the same queue
-comms, xfer, and the album use), and the game drains with <code>fire_poll</code> each frame on its
-own stack. The lane reaches <strong>every screen, the host&#39;s included</strong>: <code>fire_announce</code> loops
-the announcement back into the host&#39;s own route, using the same drain as clients.
-The queue receives fires this screen has not drawn yet: a <code>predicted</code> fire skips
-its own shooter&#39;s echo, while a host-authored instant (<code>predicted = false</code>, such
-as a nova or reaction) draws everywhere with its actual causer. Announcements
-from non-host authors are dropped.</p>
+fire_route_destroy :: <span class="hljs-keyword">proc</span>(fr: ^Fire_Route)</code></pre></div><p>Use <code>fire_announce_to</code> to send a recent transient event to one newly joined
+player. Take that player&#39;s <code>Peer_Id</code> from the roster on <code>Ev_Player_Joined</code>;
+rebroadcasting would make existing peers process the event again.</p>
+<p><code>fire_poll</code> drops a <code>predicted</code> fire when its shooter is the receiver, because
+that screen already presented it at cast time. This also drops an addressed
+replay to the original caster after reconnecting with the same identity.
+That is appropriate for transient one-shots, but makes fire announcements
+unsuitable for persistent effects. Represent a standing zone or lingering glow
+as an entity so new and returning players receive its current state in the
+world snapshot. Use <code>fire_announce_to</code> only for the remaining part of a
+transient effect a particular peer should see.</p>
+<p>Only the authority may call <code>fire_announce</code>; it asserts on a client, and
+receivers discard announcements from non-host authors. The listener stores
+events in <a href="session.html#the-riders-queue-appq"><code>ksess.App_Queue</code></a>, also used by
+comms, xfer, and albums. It does not invoke game callbacks. Drain the route with
+<code>fire_poll</code> each frame on the game&#39;s stack.</p>
+<p>The authority loops its own announcement into its local route, so the same
+polling code presents events on the host and clients. A <code>predicted</code> fire skips
+the shooter&#39;s echo. A host-produced event with <code>predicted = false</code>, such as a
+nova or reaction, appears on every screen, including the actual causer&#39;s.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, when the command hook confirms a cast:</span>
 kcombat.fire_announce(&amp;self.ses, f)
 
@@ -191,37 +198,42 @@ kcombat.fire_announce(&amp;self.ses, f)
 fires: kcombat.Fire_Route   <span class="hljs-comment">// a field on your game struct</span>
 kcombat.fire_listen(&amp;self.fires, &amp;self.ses)
 
-<span class="hljs-comment">// every frame, drain and draw (fire_route_destroy on exit) — EVERY screen,</span>
-<span class="hljs-comment">// the host&#x27;s included; a predicted fire never echoes to its own shooter:</span>
+<span class="hljs-comment">// Each frame, poll and draw on every peer, including the host.</span>
+<span class="hljs-comment">// A predicted fire skips its shooter; call fire_route_destroy on exit.</span>
 <span class="hljs-keyword">for</span> {
 	f, ok := kcombat.fire_poll(&amp;self.fires)
 	<span class="hljs-keyword">if</span> !ok {<span class="hljs-keyword">break</span>}
 	<span class="hljs-comment">// draw the rock</span>
 }</code></pre></div><p>Raw <code>fire_write</code>/<code>fire_read</code> stay public for games that need a different envelope.</p>
-<p>Tick-paced code (cooldown decay loops, <a href="ai.html">kit/ai&#39;s director</a>) should read the
-session&#39;s own clock, <code>ksess.session_tick_no(s)</code>, rather than accumulate a counter, because a
-hand-rolled count drifts across resume and host-migration. The exception is a <strong>campaign
-clock</strong> a game persists in its save blob (cavecrawl&#39;s <code>host_ticks</code> gates respawns across
-saves): that one must be the game&#39;s own, because the session&#39;s tick is local to the
-session&#39;s lifetime.</p>
+<p>For tick-based cooldowns and <a href="ai.html">kit/ai&#39;s director</a>, read
+<code>ksess.session_tick_no(s)</code> instead of maintaining a parallel counter that can
+drift across resume and host migration. A campaign clock is different: the
+game must persist it in its save blob because session ticks cover only the
+session&#39;s lifetime. Cavecrawl uses its saved <code>host_ticks</code> to schedule respawns
+across saves.</p>
 <h2 id="predicted-hp">Predicted hp<a class="heading-anchor" href="#predicted-hp" aria-label="Link to this section">#</a></h2>
 <p>When your local rock visually contacts a body, the health you <em>display</em> may dip
 immediately. The dip lives in a presentation overlay and cannot change
 authoritative health:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Predicted_Hp :: <span class="hljs-keyword">struct</span> {
 	pending: <span class="hljs-type">i32</span>, <span class="hljs-comment">// damage shown locally but not yet confirmed by a delta</span>
-	basis:   <span class="hljs-type">i32</span>, <span class="hljs-comment">// the authoritative hp when the overlay was last squared</span>
-	expires: <span class="hljs-type">f64</span>, <span class="hljs-comment">// heal-back deadline (seconds, caller&#x27;s clock)</span>
+	basis:   <span class="hljs-type">i32</span>, <span class="hljs-comment">// authoritative hp at the last overlay update</span>
+	expires: <span class="hljs-type">f64</span>, <span class="hljs-comment">// overlay expiry time (seconds, caller&#x27;s clock)</span>
 }
-PHP_TTL :: <span class="hljs-number">0.6</span> <span class="hljs-comment">// seconds a dip may outrun truth (a generous round trip)</span>
+PHP_TTL :: <span class="hljs-number">0.6</span> <span class="hljs-comment">// seconds allowed for an authoritative hp update to arrive</span>
 
 php_note_hit :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (ph: ^Predicted_Hp, hp_now: <span class="hljs-type">i32</span>, amount: <span class="hljs-type">i32</span>, now: <span class="hljs-type">f64</span>)
-php_display :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (ph: ^Predicted_Hp, hp_now: <span class="hljs-type">i32</span>, now: <span class="hljs-type">f64</span>) -&gt; <span class="hljs-type">i32</span></code></pre></div><p>Call <code>php_note_hit</code> at visual contact and <code>php_display</code> wherever hp renders (<code>rocks.odin</code>,
-<code>rock_impact</code>). When the authoritative drop lands, the overlay is consumed, so there is no
-double dip. If the host saw a miss, the overlay expires and the bar heals back: briefly wrong,
-then correct. Dips never kill: <code>php_display</code> clamps to 1 while real hp is positive, so
-corpses appear only on truth.</p>
-<h2 id="auto-published-combat-stats">Auto-published combat stats<a class="heading-anchor" href="#auto-published-combat-stats" aria-label="Link to this section">#</a></h2>
+php_display :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (ph: ^Predicted_Hp, hp_now: <span class="hljs-type">i32</span>, now: <span class="hljs-type">f64</span>) -&gt; <span class="hljs-type">i32</span></code></pre></div><p>Call <code>php_note_hit</code> at visual contact and <code>php_display</code> when drawing health,
+as <code>rock_impact</code> in <code>rocks.odin</code> does. When the authoritative hp drop arrives,
+it consumes the overlay so the display does not subtract damage twice. If the
+host judges a miss, the overlay expires and the displayed bar returns to the
+authoritative value. <code>php_display</code> clamps to 1 while authoritative hp is
+positive, so speculative damage cannot display a death.</p>
+<p><span id="auto-published-combat-stats"></span></p>
+<h2 id="publishing-combat-stats">Publishing combat stats<a class="heading-anchor" href="#publishing-combat-stats" aria-label="Link to this section">#</a></h2>
+<p>Call <code>combat_columns</code> once on the host to register the three stat columns.
+At impact, call <code>credit_hit</code>; on a killing blow, call <code>credit_kill</code>. The session
+then replicates and displays those recorded values.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Combat_Cols :: <span class="hljs-keyword">struct</span> {
 	damage: ksess.Stat_Col,
 	kills:  ksess.Stat_Col,
@@ -229,20 +241,21 @@ corpses appear only on truth.</p>
 }
 <span class="hljs-comment">// Host, once at start: declare the standard combat columns (idempotent).</span>
 combat_columns :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session) -&gt; Combat_Cols
-<span class="hljs-comment">// Host, at the point of impact. Self-damage tallies nothing but the pain.</span>
+<span class="hljs-comment">// Host, at impact: record damage credit for a valid attacker.</span>
 credit_hit :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, cols: Combat_Cols, attacker: knet.Player_Id, amount: <span class="hljs-type">i32</span>)
 <span class="hljs-comment">// Host, on a killing blow.</span>
 credit_kill :: <span class="hljs-keyword">proc</span>(s: ^ksess.Session, cols: Combat_Cols, attacker, victim: knet.Player_Id)</code></pre></div><h2 id="pools">Pools<a class="heading-anchor" href="#pools" aria-label="Link to this section">#</a></h2>
-<p>Every game that host-sims projectiles ends up with the same loop: sweep the tick&#39;s segment
-before stepping, remove on hit or expiry, and don&#39;t corrupt the index while removing. <code>pool_tick</code>
-owns those mechanics; your callbacks own the meaning:</p>
+<p><code>pool_tick</code> maintains a dynamic projectile array. It sweeps each tick&#39;s segment
+before stepping, removes a projectile on hit or expiry, and updates iteration
+correctly after removal. The game supplies target, hit, and expiry callbacks:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Slug :: <span class="hljs-keyword">struct</span> { p: kcombat.Projectile, dmg: <span class="hljs-type">u8</span>, shooter: knet.Player_Id }
 flying: [<span class="hljs-keyword">dynamic</span>]Slug                 <span class="hljs-comment">// a wrapper pool (or a bare [dynamic]kcombat.Projectile)</span>
 
 kcombat.pool_tick(&amp;self.flying, self, slug_targets, slug_hit, <span class="hljs-literal">nil</span>)   <span class="hljs-comment">// hit-testing pool</span>
-kcombat.pool_tick(&amp;self.lobs, self, <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>, lob_splash)            <span class="hljs-comment">// fly-out-and-splash pool</span></code></pre></div><p><code>targets</code> is called <strong>per projectile</strong>, not snapshotted: an <code>on_hit</code> that kills changes the
-census for the next projectile in the same pool. A hit always removes (no pool in the examples
-pierces); <code>on_expire</code> is the fizzle&#39;s last word: a lob&#39;s splash <em>is</em> its expiry.</p>
+kcombat.pool_tick(&amp;self.lobs, self, <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>, lob_splash)            <span class="hljs-comment">// fly-out-and-splash pool</span></code></pre></div><p><code>targets</code> runs separately for each projectile. If <code>on_hit</code> kills a target,
+the next projectile queries the updated target list. A hit always removes the
+projectile; the example pools do not support piercing. <code>on_expire</code> handles the
+end of its lifetime, such as applying a lob&#39;s splash damage.</p>
 <h2 id="worked-example">Worked example<a class="heading-anchor" href="#worked-example" aria-label="Link to this section">#</a></h2>
 <p>From <code>examples/cavecrawl/scripts/host.odin</code> (<code>cave_host_tick</code>); the full pattern (launch
 on the command hook, announce the <code>Fire</code>, draw visuals per frame) is in <code>rocks.odin</code>:</p>
@@ -254,17 +267,20 @@ alive := kcombat.projectile_step(&amp;fl.p)
 <span class="hljs-keyword">if</span> hit, hit_ok := kcombat.projectile_hit(from, fl.p.vel, targets[:]); hit_ok {
 	kcombat.credit_hit(&amp;self.ses, self.cols, fl.shooter, ROCK_DMG)
 	<span class="hljs-keyword">if</span> kcombat.hit(&amp;dw.hp, ROCK_DMG) { cave_slay_dweller(self, victim_id, fl.shooter) }
-}</code></pre></div><h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+}</code></pre></div><p><span id="gotchas"></span></p>
+<h2 id="timing-and-validation-constraints">Timing and validation constraints<a class="heading-anchor" href="#timing-and-validation-constraints" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Cooldowns and effect clocks count NET TICKS</strong>, not seconds, so they are rate-agnostic. Only the
-authority decays them; clients see the countdown through replication.</li>
-<li>A cast raced against the last ticks of a cooldown may mispredict locally, but the command
-still ships, and the host&#39;s answer stands.</li>
-<li><code>Projectile.vel</code> is <strong>per tick</strong>. Hit-test with the position <em>before</em> <code>projectile_step</code>,
-and test the segment even when it returns false, since that tick still happened.</li>
-<li>Carry the owner-true cast origin and <code>leash</code> it; the lagged host copy makes witnessed
-hits miss.</li>
+<li>Cooldowns and effect durations count network ticks. Convert a duration in
+seconds to ticks for the chosen rate. Only the authority decrements these
+values; clients receive the countdown through replication.</li>
+<li>A cast near the end of a cooldown may be predicted differently on a client.
+The command is still sent, and the host decides acceptance.</li>
+<li><code>Projectile.vel</code> is per tick. Use the position before <code>projectile_step</code> for
+hit testing, and test that segment even if the step returns false: the last
+tick still occurred.</li>
+<li>Carry the shooter&#39;s local cast origin and apply <code>leash</code>. The host&#39;s delayed
+position can otherwise launch the projectile along a different path.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/combat.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#health-and-abilities" class="">Health and abilities</a><a href="#blocks-or-low-level-helpers" class="">Blocks or low-level helpers</a><a href="#status-effects" class="">Status effects</a><a href="#projectiles" class="">Projectiles</a><a href="#cast-origin-and-leash" class="">Cast origin and leash</a><a href="#fire-announcements" class="">Fire announcements</a><a href="#predicted-hp" class="">Predicted hp</a><a href="#auto-published-combat-stats" class="">Auto-published combat stats</a><a href="#pools" class="">Pools</a><a href="#worked-example" class="">Worked example</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/combat.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/combat.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#replicated-combat-state-and-local-projectiles" class="">Replicated combat state and local projectiles</a><a href="#health-and-abilities" class="">Health and abilities</a><a href="#blocks-or-low-level-helpers" class="">Blocks or low-level helpers</a><a href="#status-effects" class="">Status effects</a><a href="#projectiles" class="">Projectiles</a><a href="#cast-origin-and-leash" class="">Cast origin and leash</a><a href="#fire-announcements" class="">Fire announcements</a><a href="#predicted-hp" class="">Predicted hp</a><a href="#publishing-combat-stats" class="">Publishing combat stats</a><a href="#pools" class="">Pools</a><a href="#worked-example" class="">Worked example</a><a href="#timing-and-validation-constraints" class="">Timing and validation constraints</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/combat.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

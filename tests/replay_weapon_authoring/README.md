@@ -39,7 +39,7 @@ This is content-authoring evidence in an existing family, not a timed human stud
 new weapon-family implementation, new art production, browser/Steam acceptance,
 save/migration acceptance or a runtime performance comparison. The new catalog is
 transmitted as existing host-authored data; no protocol/schema version changes
-are needed. Broader authoring and gameplay envelopes remain requirements.
+are needed. Broader authoring and gameplay configurations still require validation.
 
 `native_stock/main.odin` also executes the generated catalog without Godot. Build
 it with `-collection:subject=PREPARED_PROJECT` and `-define:EXPECTED_GUNS=8` for the

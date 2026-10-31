@@ -1,8 +1,9 @@
 # Recorded authority observations
 
 Use `Model.authority` when gameplay must react to a change in the authorized
-runner's local player seat, such as a host's carried item changing hands. It opts
-the game into a pure simulation policy driven by recorded observations:
+runner's local player seat, such as transferring an item carried by a departed
+host. The runner records its local seat as simulation input, and the game's
+policy applies that observation during a step:
 
 ```odin
 authority = {id = 1, apply = observe_authority}
@@ -15,15 +16,16 @@ the same commit gate and rollback transaction. It may change state and emit game
 events, or abort the entire tick. The policy's nonzero identifier participates in
 the negotiated model/checkpoint contract; change it when its semantics change.
 
-The callback receives a recorded fact, not live process-role access. Keep the
-previous observed authority in the game state when you need a transition. That
-makes repeated observations idempotent and restores the previous identity with
-the rest of the world during correction. Cavecrawl uses this to adopt a departed
-host's carried relic while leaving avatars with their returning player identities.
+Store the previous observed authority in game state when the rule depends on
+a transition. The callback can then compare recorded observations without
+querying the process's live role. Repeated observations leave the result
+unchanged, and correction restores the prior identity with the rest of the
+world. Cavecrawl uses this to adopt a departed host's carried relic while
+preserving avatars' returning player identities.
 
 Clients record an unknown observation and do not predict authority-policy calls.
-They receive the resulting world/effects through normal authoritative snapshots
-and facts. Gameplay packets expose no client-supplied authority observation. An
+They receive the resulting world through authority snapshots and gameplay
+occurrences through facts. Gameplay packets expose no client-supplied authority observation. An
 unknown observation must have seat zero; known observations require an enabled
 policy and an in-range seat. Recording preflight checks these rules before any
 simulation. Other simulation inputs continue predicting normally.

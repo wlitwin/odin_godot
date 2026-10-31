@@ -8,7 +8,8 @@ and browser fixtures below exercise different parts of that contract.
 REPLAY_CAVE_CARRIER_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_carrier/run.sh
 ```
 
-Runs 33 Cave tests and WASM checking, an isolated Godot game build and coordinator,
+The native gate runs 33 Cave tests and WASM checking, builds an isolated Godot
+game and coordinator, then exercises
 fifteen C1–C7 conversion/resume cases, native retained-frame carrier checks,
 four carrier migration scenarios and full normal/faulted campaigns. The aggregate
 gate is registered in `tests/run_all.sh`.

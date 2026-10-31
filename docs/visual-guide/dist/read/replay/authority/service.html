@@ -5,8 +5,9 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authenticated authority service and durable storage</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/authority/service.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#trust-and-message-contract">Trust and message contract</a><a href="#atomic-replay-protection">Atomic replay protection</a><a href="#sqlite-adapter">SQLite adapter</a><a href="#evidence">Evidence</a></nav></details>
 <article class="reading-body "><p>Use <code>Service</code> to expose a room&#39;s authority coordinator over Replay&#39;s transport
-interface. <code>Rpc_Client</code> correlates replies with a time-limited <code>Lease</code>; the SQLite
-adapter durably commits each coordinator decision with compare-and-swap.
+interface. <code>Rpc_Client</code> correlates replies with a time-limited <code>Lease</code>. The
+SQLite adapter durably commits each decision with compare-and-swap: it accepts
+the replacement record only when the stored revision matches the expected one.
 <a href="registration.html">Process registration</a> supplies fresh incarnations for known
 members, and the <a href="../godot/room.html">Room driver</a> connects these decisions to live
 gameplay.</p>
@@ -37,11 +38,12 @@ have request token buckets. The receive buffer can drain the transport&#39;s ful
 64 KiB packet limit, then rejects oversize RPCs, so an oversized packet cannot
 remain at the queue head and block all later requests.</p>
 <h2 id="atomic-replay-protection">Atomic replay protection<a class="heading-anchor" href="#atomic-replay-protection" aria-label="Link to this section">#</a></h2>
-<p>Decision record version 3 includes a per-member request sequence, request hash,
-result, and bound client nonce. The service evaluates a command on a private coordinator copy, then
-commits its decision and replay frontier together through one real CAS operation.
-This includes reads and rejected commands: an older delayed mutation cannot run
-after a newer Query, including after service restart.</p>
+<p>Decision record version 3 stores each member&#39;s request sequence, request hash,
+result, and bound client nonce. The service evaluates a command on a private
+coordinator copy, then atomically commits both the decision and the request
+frontier through compare-and-swap (CAS). Reads and rejected commands update
+that frontier too. An older delayed mutation therefore cannot execute after a
+newer Query, even after service restart.</p>
 <p>An identical retry of the latest request returns its recorded result and a fresh
 view of current remaining lease time; it does not renew again or repeat the
 decision. Older sequences, or different payloads at the same sequence, are stale.
@@ -101,11 +103,11 @@ and a live projectile), retires the old owner, prepares/releases/claims through
 authenticated RPCs, and restores the successor&#39;s simulation at epoch 2. The gate
 then kills the coordinator, reopens its SQLite record as generation 2, keeps the
 successor alive, waits through quarantine, and resumes its retained world at epoch 3.</p>
-<p>This proves the decision service, durability, and simulation transfer components.
-The fixture uses explicit test provisioning and a separate checkpoint connection.
-This fixture does not prove migration of live Cavecrawl clients, gameplay
-rendezvous or every M5 crash/partition scenario. Consult the
+<p>These results validate the fixture&#39;s decision service, durable decisions, and
+simulation transfer. It uses explicit test provisioning and a separate checkpoint
+connection, so it does not establish migration of live Cavecrawl clients,
+gameplay rendezvous, or every M5 crash/partition scenario. Consult the
 <a href="../godot/room.html">Room driver</a> and its acceptance cases for those integrations.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/service.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="registration.html"><span>Process registration and gameplay identity</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/framework-audit.html"><span>Replay implementation and test scope</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/service.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#trust-and-message-contract" class="">Trust and message contract</a><a href="#atomic-replay-protection" class="">Atomic replay protection</a><a href="#sqlite-adapter" class="">SQLite adapter</a><a href="#evidence" class="">Evidence</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/service.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

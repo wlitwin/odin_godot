@@ -25,8 +25,9 @@ the old epoch fenced and enters the existing recovery policy.</p>
 RSY_SLOW_BACKUP=1 REPLAY_MIGRATION_PHASE=planned nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/migration_run.sh</code></pre></div><p>The migration fixture deliberately adjusts initial positions, target health and
 ability duration/speed to keep observable combat state active. Slow mode reduces
 final-transfer bandwidth after the ordinary backup is prepared and requires the
-source to stay frozen for longer than one lease duration. These are acceptance scenarios; complete game recovery coverage,
-deployment and full original-act parity remain work.</p>
+source to stay frozen for longer than one lease duration. These acceptance
+scenarios do not establish complete game recovery coverage, deployment, or
+full original-act parity.</p>
 <h2 id="lobby-recovery">Lobby recovery<a class="heading-anchor" href="#lobby-recovery" aria-label="Link to this section">#</a></h2>
 <p><code>lobby_migration_run.sh</code> runs planned and crash handoffs before starting the yard.
 It compares the complete installed staging frame, preserves names/loadouts and
@@ -44,7 +45,7 @@ connected lobby leader. Dedicated worlds keep <code>host == 0</code> and automat
 <p>Content <code>0x5253435241503049</code> records the last observed authority epoch in <code>World</code>.
 Its versioned <code>Model.authority</code> policy applies the original <code>succ_fixups</code> rule
 on the first committed tick after a takeover: director rest and every existing
-mob&#39;s attack/reinforcement deadline become <strong>restored tick + 150</strong>. An Over-stage
+mob&#39;s attack/reinforcement deadline become restored tick + 150. An Over-stage
 world also receives a fresh 150-tick dwell. Initial startup does not apply grace;
 repeated ticks in the same epoch do not extend it. Dedicated authorities work the
 same way even though both have playable seat zero.</p>
@@ -62,5 +63,5 @@ and two players, forty enemies, 120 ms receive delay, and a maximum known rollba
 of 120 ticks. It does not establish a public-network, arbitrary-load or loss-rate
 guarantee. Original games remain separately runnable.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/recovery.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/recovery.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#lobby-recovery" class="">Lobby recovery</a><a href="#takeover-timers" class="">Takeover timers</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/recovery.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

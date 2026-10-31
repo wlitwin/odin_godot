@@ -2,7 +2,7 @@
 
 Run `nix develop --command python3 tests/replay_bridge_bench/run.py /absolute/fresh/output`.
 The script builds with `-o:speed` and records three processes, five timed trials
-per operation after warmup. It pins input/output hashes, shape sizes, compiler,
+per operation after warmup. It pins input/output hashes, type sizes, compiler,
 platform and binary digest. Timings are descriptive, not acceptance thresholds.
 
 The profile uses actual Hello and Scrapyard World/reducer types. Scrapyard starts
@@ -13,9 +13,10 @@ a bounded offline cost fixture, not game parity, network traffic or rendered FPS
 Operations measure ordinary read-then-project, detached `replay.project`, schema
 encoding/hashing for complete authority and public projections, committed advance,
 16-tick input suffix replay, and reads whose entire frame is retained in a 64-slot
-consumer buffer. Compiler elimination of unused fields/copies is allowed; no
-no-inline or forced-copy handicap is applied to the ordinary read baseline. The
-full retained buffer is canonicalized afterward, making all its fields observable.
+consumer buffer. The ordinary read baseline permits inlining and compiler
+elimination of unused fields or copies. The fixture does not force copies or
+disable inlining to make that baseline slower. Afterward, it canonicalizes the
+full retained buffer so all of its fields remain observable.
 The display contains 32 bytes; the timing sink consumes count/tick, so unused
 position work can be removed. This is a narrow display query, not full rendering.
 

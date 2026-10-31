@@ -5,7 +5,7 @@ REPLAY_NETWORK_FAULT_OUT=/private/tmp/replay-udp-new \
   nix develop --command bash tests/replay_network_faults/run.sh
 ```
 
-The gate prepares separate scratch games and runs Replay's real native ENet host
+The test prepares separate scratch games and runs Replay's real native ENet host
 and client through a loopback UDP proxy. App-level delay/loss decorators are disabled.
 The proxy delays and drops actual datagrams, including ENet's reliable traffic;
 ENet handles acknowledgments/retransmissions/congestion in the real processes.

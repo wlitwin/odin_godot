@@ -2,9 +2,9 @@
 
 Use this protocol to create rooms and issue, consume or revoke invitations
 through the admission backend. It provides canonical request/reply messages, a
-bounded room hub and a Godot client connection requiring verified TLS by default. Native
-processes create rooms, issue/use invites, authenticate authority RPCs, reconnect,
-and recover the same credentials after a server kill/restart. The
+bounded room hub and a Godot client connection requiring verified TLS by default.
+Native tests create rooms, issue/use invites, authenticate authority RPCs,
+reconnect, and recover the same credentials after a server kill/restart. The
 [recorded gate](../../docs/replay/results/provision-tls-2026-09-07/README.md) separates
 this local TLS acceptance from public deployment and browser enrollment.
 
@@ -15,8 +15,8 @@ room limit (1–32, default 16). `hub_open` receives the complete existing bundl
 before accepting traffic. `sqlite.load_all` reads that inventory transactionally
 into a caller-bounded destination; excessive, corrupt or wrong-content rows fail
 without returning a partial inventory. One service owns this room set. Multiple
-instances sharing the database fence each other's writes; this is not an available
-multi-node coordinator cluster.
+instances sharing the database reject stale writes from one another. This does
+not provide a highly available coordinator cluster.
 
 New cooperative rooms use a client-supplied nonzero room ID and fresh 32-byte
 creator claim. Retain both before sending. A collision with another creator's room
@@ -32,7 +32,7 @@ trusted-player invites remain denied. A previously provisioned dedicated creator
 claim is an explicit infrastructure capability.
 
 Creation persists before publishing a room or grant. An uncertain create commit
-poisons the whole hub until startup reloads its inventory. An uncertain join follows
+stops the whole hub from serving until startup reloads its inventory. An uncertain join follows
 the room owner's existing fail-closed rule. Unknown-room requests neither load
 storage nor trigger coordinator generation changes.
 
@@ -66,8 +66,8 @@ invalid enums and wrong sizes are rejected before admission mutation.
 
 Unused fields must be zero. Replies contain the SHA-256 hash of the exact request
 and matching room/content, plus a grant, ticket or error with empty result values.
-Clients reject unrelated or malformed replies. Durable idempotency survives fresh
-request wrappers and transport connections.
+Clients reject unrelated or malformed replies. Retrying the same committed
+request through a new client or transport connection returns its saved result.
 
 The generic `Client` borrows a transport and clock. It keeps one request pending,
 retries identical bytes every 250 ms, and returns `Not_Ready` after 10 seconds

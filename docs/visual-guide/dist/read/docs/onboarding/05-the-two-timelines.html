@@ -3,19 +3,18 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>5 · The two timelines</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/05-the-two-timelines.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#why-remote-motion-renders-behind">Why remote motion renders behind</a><a href="#the-rule">The rule</a><a href="#what-delays-and-what-doesnt">What delays and what doesn't</a><a href="#edges-must-outlive-the-slowest-observer">Edges must outlive the slowest observer</a><a href="#put-effects-in-the-presentation-proc-not-the-command">Put effects in the presentation proc, not the command</a></nav></details>
-<article class="reading-body "><p>Picture a co-op game with a powerup gem on the course. When the host&#39;s ball
-rolls over it, the gem disappears too early for clients. When a client&#39;s ball
-rolls over it, the gem disappears too late.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#why-remote-motion-renders-behind">Why remote motion renders behind</a><a href="#scheduling-spatial-effects">Scheduling spatial effects</a><a href="#presentation-timing-by-cause">Presentation timing by cause</a><a href="#holding-state-for-delayed-observers">Holding state for delayed observers</a><a href="#presentation-callbacks">Presentation callbacks</a></nav></details>
+<article class="reading-body "><p>In a cooperative game, a gem can disappear before a remote ball visibly
+reaches it, or remain visible after the local player&#39;s ball has passed it.</p>
 <p>Replicated state can be correct while presentation looks wrong to observers: the gem vanishes
 while the rolling ball is still visibly half a meter away, or lingers after
 the ball has visibly rolled through it.</p>
-<p><strong>Local prediction and remote interpolation display different moments.</strong>
-Schedule a spatial effect on the same timeline as its visible cause.</p>
+<p>Local prediction and remote interpolation display different moments. Schedule
+a spatial effect on the same timeline as its visible cause.</p>
 <h2 id="why-remote-motion-renders-behind">Why remote motion renders behind<a class="heading-anchor" href="#why-remote-motion-renders-behind" aria-label="Link to this section">#</a></h2>
 <p>Owner-streamed motion (post 3) is rendered by everyone else through a short
-interpolation buffer (a few ticks of samples), so jitter and dropped packets
-smooth out instead of stuttering. A remote ball you&#39;re watching is rendered
+interpolation buffer containing a few ticks of samples. This absorbs some
+jitter and packet loss. A remote ball you&#39;re watching is rendered
 ~100ms behind where its owner&#39;s machine says it is. Call these the two
 timelines:</p>
 <ul>
@@ -28,29 +27,29 @@ past. The ball <em>reaches</em> the gem on your screen 100ms from now.</li>
 the cause you can <em>see</em> (the ball rolling into it) plays out in render
 time. Reacting immediately to the state delta makes the effect precede its
 visible cause. Changing packet delivery alone does not align those clocks.</p>
-<p>The picker-upper&#39;s own screen is different again: their prediction ran the
-pickup <em>this frame</em>, in local time, and it stays that way. That instant
-local response is the point of prediction (post 4).</p>
-<h2 id="the-rule">The rule<a class="heading-anchor" href="#the-rule" aria-label="Link to this section">#</a></h2>
-<p>One rule covers it: <strong>present a consequence on the timeline of its visible
-cause.</strong></p>
-<p>The toolkit gives this a primitive. Instead of showing an effect where you
-detect the state change, pass a callback to the session and indicate whether
-the cause came from the local simulation:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The taken-edge, ONE place, identical on every peer:</span>
+<p>The collecting player&#39;s screen uses local prediction. It can show the pickup
+in the frame when the command runs, before the authority result arrives,
+as described in post 4.</p>
+<p><span id="the-rule"></span></p>
+<h2 id="scheduling-spatial-effects">Scheduling spatial effects<a class="heading-anchor" href="#scheduling-spatial-effects" aria-label="Link to this section">#</a></h2>
+<p>When a state change has a moving visible cause, schedule its effect on that
+cause&#39;s presentation clock. Pass a callback to the session and indicate
+whether the cause came from local simulation:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Schedule from the taken-edge on each peer:</span>
 ksess.session_present(&amp;self.ses,
-	p.net_id == self.my_claim,   <span class="hljs-comment">// mine? show it NOW (my sim touched it)</span>
-	self, present_gem_gone, p.net_id, <span class="hljs-type">u64</span>(p.kind))</code></pre></div><p>If it&#39;s mine, the callback runs this frame. If not, the session queues it for
-<code>interp_delay</code> from now, the moment <em>your screen&#39;s</em> rendition of the cause
-catches up. Transit time cancels out; the gem vanishes as the rolled ball
-touches it, on every screen, and <code>present_gem_gone</code> neither knows nor cares
-which timing path it took. The same presentation proc handles every peer and
-every case.</p>
+	p.net_id == self.my_claim,   <span class="hljs-comment">// local simulation caused the pickup</span>
+	self, present_gem_gone, p.net_id, <span class="hljs-type">u64</span>(p.kind))</code></pre></div><p>For a local cause, the callback runs this frame. Otherwise, the session queues
+it for <code>interp_delay</code> from now to align with the delayed owner stream. Both
+paths call <code>present_gem_gone</code>, so the presentation procedure can show the same
+effect without choosing the clock itself. This helper assumes the remote
+cause is rendered through Kit&#39;s interpolated stream; a game-rendered cause
+must use its own clock, as explained in <a href="../kit/net.html">kit/net</a>.</p>
 <p>Hiding the gem in a field setter ties presentation to packet arrival. Keep
 the state update immediate and schedule the visible disappearance separately.</p>
-<h2 id="what-delays-and-what-doesnt">What delays and what doesn&#39;t<a class="heading-anchor" href="#what-delays-and-what-doesnt" aria-label="Link to this section">#</a></h2>
-<p>The rule is &quot;timeline of the visible cause,&quot; not &quot;delay everything.&quot; The full
-catalog lives in <a href="../kit/net.html">kit/net</a>:</p>
+<p><span id="what-delays-and-what-doesnt"></span></p>
+<h2 id="presentation-timing-by-cause">Presentation timing by cause<a class="heading-anchor" href="#presentation-timing-by-cause" aria-label="Link to this section">#</a></h2>
+<p>Use the cause to choose which effects need delayed presentation. The full
+reference is in <a href="../kit/net.html">kit/net</a>:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -82,32 +81,35 @@ catalog lives in <a href="../kit/net.html">kit/net</a>:</p>
 </div><p>A scoreboard has no spatial cause to align with a moving object, so update
 it when state arrives. Reserve the render delay for effects that need that
 spatial alignment.</p>
-<h2 id="edges-must-outlive-the-slowest-observer">Edges must outlive the slowest observer<a class="heading-anchor" href="#edges-must-outlive-the-slowest-observer" aria-label="Link to this section">#</a></h2>
+<p><span id="edges-must-outlive-the-slowest-observer"></span></p>
+<h2 id="holding-state-for-delayed-observers">Holding state for delayed observers<a class="heading-anchor" href="#holding-state-for-delayed-observers" aria-label="Link to this section">#</a></h2>
 <p>When the ball drops in the cup, puttputt holds the sunk ball there for a
 couple of seconds before building the next hole:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">SINK_DWELL :: <span class="hljs-number">2.5</span></code></pre></div><p>This dwell is for the observers. Every remote screen is watching the roll up
-to interp-delay late; if the host advanced the hole the instant <em>its</em> copy
-sank, half the room would see the world change while their rendition of the
-ball was still rolling toward the cup. A shared moment must stay on screen
-long enough for the <em>slowest</em> view of it to arrive and be seen.</p>
-<p>One corollary: <strong>deltas carry state, not events.</strong> A flag you flip on and off
-within one tick may never ship at all (the diff sees no change). If something
-is genuinely momentary, either let the edge live long enough to be seen, or
-send it as an explicit message: don&#39;t pulse a field.</p>
-<h2 id="put-effects-in-the-presentation-proc-not-the-command">Put effects in the presentation proc, not the command<a class="heading-anchor" href="#put-effects-in-the-presentation-proc-not-the-command" aria-label="Link to this section">#</a></h2>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">SINK_DWELL :: <span class="hljs-number">2.5</span></code></pre></div><p>Remote screens display the roll up to interp-delay late. If the host advanced
+the hole as soon as its ball sank, an observer could see the world change
+while the displayed ball was still approaching the cup. Hold the completed
+state long enough for the most delayed observer to display it before moving
+to the next hole.</p>
+<p>Deltas send the value present at a network tick. A flag turned on and off
+within that tick may equal its shadow when compared, so no change is sent.
+Retain the changed value long enough for replication and presentation, or
+send a momentary occurrence as an explicit message.</p>
+<p><span id="put-effects-in-the-presentation-proc-not-the-command"></span></p>
+<h2 id="presentation-callbacks">Presentation callbacks<a class="heading-anchor" href="#presentation-callbacks" aria-label="Link to this section">#</a></h2>
 <p>Presentation code belongs in the presentation proc, never in a command proc.
 Commands run on the claimer and the host (post 4), so an effect spawned inside
 a command proc (say, a pickup particle burst inside the <code>powerup_claim</code>
 command proc) never reaches observers at all, and reconciliation re-runs can
 spawn it twice.</p>
-<p>Spawn the burst inside <code>present_gem_gone</code> instead: post 4&#39;s hook and this
-post&#39;s scheduling deliver it to every peer, exactly once, at each screen&#39;s
-correct moment. Keep particles, sounds, and other visible consequences beside
-the presentation callback for the state change.</p>
+<p>Spawn the burst inside <code>present_gem_gone</code>. React to the replicated pickup
+state and schedule that callback for the appropriate display time. Field
+edges report the net change per frame; if individual occurrences or their
+counts matter, use a declared presentation event. Keep particles, sounds, and
+other visible consequences in the presentation callback.</p>
 <p>The first three pieces now fit together: replicated state (post 3), predicted
 commands (post 4), and effects scheduled for each screen&#39;s presentation clock.
 The next post adds persistent identity, recovery, and deployment checks.</p>
-<p><em>Next: <a href="06-the-shape-of-a-shippable-game.html">The shape of a shippable game →</a></em></p>
+<p><em>Next: <a href="06-the-shape-of-a-shippable-game.html">Identity, recovery, and transport testing →</a></em></p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="06-the-shape-of-a-shippable-game.html"><span>6 · The shape of a shippable game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/05-the-two-timelines.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#why-remote-motion-renders-behind" class="">Why remote motion renders behind</a><a href="#the-rule" class="">The rule</a><a href="#what-delays-and-what-doesnt" class="">What delays and what doesn't</a><a href="#edges-must-outlive-the-slowest-observer" class="">Edges must outlive the slowest observer</a><a href="#put-effects-in-the-presentation-proc-not-the-command" class="">Put effects in the presentation proc, not the command</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/05-the-two-timelines.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../kit/net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="06-the-shape-of-a-shippable-game.html"><span>6 · Identity, recovery, and transport testing</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/05-the-two-timelines.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#why-remote-motion-renders-behind" class="">Why remote motion renders behind</a><a href="#scheduling-spatial-effects" class="">Scheduling spatial effects</a><a href="#presentation-timing-by-cause" class="">Presentation timing by cause</a><a href="#holding-state-for-delayed-observers" class="">Holding state for delayed observers</a><a href="#presentation-callbacks" class="">Presentation callbacks</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/05-the-two-timelines.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

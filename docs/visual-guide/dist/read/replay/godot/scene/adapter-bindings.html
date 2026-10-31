@@ -6,9 +6,10 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#script-descriptors">Script descriptors</a><a href="#iteration-and-scope">Iteration and scope</a><a href="#diagnostics-and-data-ownership">Diagnostics and data ownership</a><a href="#optional-generation">Optional generation</a><a href="#authoring-previews">Authoring previews</a></nav></details>
 <article class="reading-body "><p>Use typed scene adapters to pass detached gameplay display values into ordinary
 Godot scripts. The game chooses those values and their lifetime boundaries; shared
-runtime owners handle script resolution, borrowed pointers, asset retention, callback configuration,
-entity membership and diagnostics. Scrapyard uses the same binding declarations
-for authored enemy scenes and permanent runner scenes.</p>
+runtime owners handle script resolution, borrowed pointers, asset retention,
+callback configuration, entity membership, and diagnostics. Scrapyard uses these
+bindings for authored enemy scenes and permanent runner scenes, where runner
+means the game&#39;s character rather than the runtime advancing simulation.</p>
 <h2 id="script-descriptors">Script descriptors<a class="heading-anchor" href="#script-descriptors" aria-label="Link to this section">#</a></h2>
 <p><code>Script_View(Value, Script)</code> has one optional <code>validate</code> callback returning a
 <code>definitions.Report</code> identifying the exact failed component. The display type must
@@ -17,11 +18,11 @@ belong to the view script, not its display value.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">descriptor := scenegd.Script_View(Runner_Display, Runner_View){
     present  = runner_present,
     validate = runner_validate,
-}</code></pre></div><p>When migrating an older descriptor, replace <code>valid = check</code> with
-<code>validate = validate_view</code>. Return <code>{}</code> on success or
-<code>definitions.problem(.Invalid, field, message)</code> on failure; retain every check
-from the old predicate. <code>valid</code> is no longer a descriptor field and old
-initializers fail compilation. In an archetype binding, validation checks scene
+}</code></pre></div><p>Return <code>{}</code> on success or <code>definitions.problem(.Invalid, field, message)</code> on
+failure. Older descriptors using <code>valid = check</code> must replace it with
+<code>validate = validate_view</code> and retain every check from the predicate. <code>valid</code>
+is no longer a descriptor field, so old initializers fail compilation.
+In an archetype binding, validation checks scene
 components before <code>configure</code> supplies the appearance. A directly bound scene
 that requires an authored appearance must validate that appearance as well.</p>
 <p><code>Script_Binding(Value, Script)</code> stores that descriptor by value and borrows a
@@ -74,8 +75,8 @@ prediction, use correction counts as reset events, or know what a floor means.</
 existing low-level presentation functions still return their original error enum.
 Script-based owners return the diagnostic directly. Errors identify archetype,
 scene path, entity key and the component/field supplied by the typed validator.
-Input validation precedes membership changes; arbitrary scene <code>_ready</code> code and
-instantiation side effects do not become transactional.</p>
+Input validation runs before membership changes. Scene instantiation and
+<code>_ready</code> code can still have side effects that these checks cannot roll back.</p>
 <p><code>Resource_Batch</code> loads a bounded directory of <code>.tres</code>/<code>.res</code> resources, retaining the
 whole candidate set until <code>resource_batch_destroy</code>. Loading failure publishes no
 partial batch. It rejects reinitializing a live batch, preserving the existing one.
@@ -86,7 +87,7 @@ representation bounds before narrowing. Supported targets are fixed 8/16/32-bit
 signed/unsigned integers. Inspector ranges are editing hints, not inferred game
 validation. Complex mappings, nested dependencies and cross-field rules remain
 explicit functions. Scrapyard shares one <code>defs.bake_mob</code> among live admission,
-artifact export and previews; no second generated extractor is introduced.</p>
+artifact export, and previews, so each path uses the same validation function.</p>
 <h2 id="optional-generation">Optional generation<a class="heading-anchor" href="#optional-generation" aria-label="Link to this section">#</a></h2>
 <p>Place this declaration above the script&#39;s <code>package</code> line:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:replay_view value=value,present=enemy_present,validate=enemy_validate,retired=enemy_retire,appearance=skin,configure=enemy_configure</span></code></pre></div><p><code>value</code> names a direct display field; <code>appearance</code> names a direct typed Resource
@@ -107,9 +108,11 @@ alone cannot prove that every PackedScene has the expected hierarchy.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">charge: ^ScrapChargeView <span class="hljs-string">`gd:&quot;onready=Charge&quot;`</span>,</code></pre></div><p>Scrapyard&#39;s <code>ScrapEnemyPreview</code> Resource references a MobDef and supplies sample
 attack/warning/charge state. The same mob extractor validates the definition, and
 a detached display is baked on scene startup. A pulse radius comes from the
-selected definition; there is no switch over known enemy IDs. The <a href="../../editor/README.html">authoring tools</a> provide explicit refresh of isolated
-preview data; live-bound views reject refresh. Appearance and normal scene-local animations remain
-independent of Session/World, with the same display interface as live play.</p>
+selected definition without a switch over known enemy IDs. The
+<a href="../../editor/README.html">authoring tools</a> provide explicit refresh of isolated
+preview data; live-bound views reject refresh. Appearance and scene-local
+animation use the live-play display interface while remaining independent of
+Session/World.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../editor/README.html"><span>Replay authoring tools</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/adapter-bindings.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../editor/README.html"><span>Replay authoring tools</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/adapter-bindings.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#script-descriptors" class="">Script descriptors</a><a href="#iteration-and-scope" class="">Iteration and scope</a><a href="#diagnostics-and-data-ownership" class="">Diagnostics and data ownership</a><a href="#optional-generation" class="">Optional generation</a><a href="#authoring-previews" class="">Authoring previews</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/adapter-bindings.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

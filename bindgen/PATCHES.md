@@ -2,9 +2,10 @@
 
 The vendored generator under `bindgen/upstream/` (a copy of
 `dresswithpockets/odin-godot`, Apache-2.0) was written against an older Odin
-stdlib. This file records every edit needed to make it build with the current
-compiler and to generate a valid `godot` binding package from our
-`extension_api.json` (Godot 4.6.2). All edits are surgical and in-place.
+stdlib. This record begins with the edits needed for Odin `dev-2026-04` and
+`extension_api.json` from Godot 4.6.2, followed by later binding fixes. Each
+section retains its original API scope, failures, and verification results.
+The generator changes were made in place.
 
 ## Reproduce
 
@@ -113,7 +114,8 @@ No template (`*.temple.twig`) changes were required — the emitted Odin is vali
 - The comma-separated **property hint** type strings (e.g.
   `"Texture2D,-AnimatedTexture,…"`) still warn and map to `rawptr`, but they are
   only ever a *property's declared type*; property accessors are typed from the
-  underlying getter/setter method signatures (see below), so these never leak.
+  underlying getter/setter method signatures (see below). The hint strings do
+  not determine the accessor's generated type.
 - `void*` / `const void*` are handled correctly as `rawptr` (built-in primitive
   mapping), not via the fallback.
 
@@ -121,7 +123,7 @@ No template (`*.temple.twig`) changes were required — the emitted Odin is vali
 
 # Follow-up: typed property accessors + typed dictionaries
 
-Two ergonomics additions. Files touched:
+This follow-up added typed property accessors and typed dictionaries. Files touched:
 `bindgen/graph/{api,graph}.odin`, `bindgen/views/{views,engine_class,package}.odin`,
 `templates/bindgen_view_engine.temple.twig`, and the hand-written
 `upstream/godot/Variant.odin`. Regenerate + verify exactly as above
@@ -206,7 +208,7 @@ modelled exactly like typed arrays:
   `_any_to_odin_name`) and in the `ensure_imports` / `resolve_qualified_type`
   branches, where it renders as `Typed_Dictionary(K, V)`.
 
-Consumer-facing shape: a `typeddictionary::Color;Color` value is rendered as
+Generated type: a `typeddictionary::Color;Color` value is rendered as
 `Typed_Dictionary(Color, Color)` — a distinct, type-checking wrapper that shares
 `Dictionary`'s layout (via `using untyped`), so it can be passed wherever a
 `Dictionary` is expected and documents its key/value types.
@@ -217,7 +219,7 @@ getter methods Godot itself types as plain (untyped) `Dictionary`. Because
 property accessors are typed from the getter/setter method signatures, those two
 accessors return `Dictionary`, and `Typed_Dictionary(...)` therefore does not
 appear in the current generated output — but the type, the resolver, and all view
-plumbing are in place, so any method return/argument that uses a typed dictionary
+generation logic are in place, so any method return/argument that uses a typed dictionary
 in a future API will render `Typed_Dictionary(K, V)` automatically (verified:
 the `typeddictionary::…` entries no longer appear in the generator's
 `WARN: unresolved` output).
@@ -226,10 +228,11 @@ the `typeddictionary::…` entries no longer appear in the generator's
 
 # Binding correctness fixes (runtime crashes found while building Phase 1)
 
-Three systemic defects that produced null method-binds / wrong object pointers at
-runtime. All fixed at the generator source and re-generated via `bindgen/Makefile`;
-`odin check godot/` stays clean (exit 0). Each is verified at **runtime** by
-`bindgen/verify/` (a throwaway GDExtension run headless — `bindgen/verify/run.sh`):
+The initial three fixes addressed null method binds and wrong object pointers
+at runtime. They were made in generator source and regenerated through
+`bindgen/Makefile`; `odin check godot/` returned exit 0. `bindgen/verify/`
+checked each at runtime through a temporary headless GDExtension
+(`bindgen/verify/run.sh`). Later defects are recorded below:
 
 ```
 VERIFY: A push_back/size/get -> size=2 e0="hello" e1="world"  PASS
@@ -275,8 +278,9 @@ __Project_Settings_name  = new_string_name_cstring("ProjectSettings", true)    /
 ```
 
 ## Bug C — engine instance methods passed `&self` instead of the object pointer
-`object_method_bind_ptrcall(method, p_instance: ObjectPtr, …)` wants the object
-pointer value. An engine-class `self` already *is* that pointer (non-refcounted
+`object_method_bind_ptrcall(method, p_instance: ObjectPtr, …)` takes the object
+pointer value. Here `self` is the generated binding's engine handle, distinct
+from a node script's data pointer. An engine-class `self` already holds that pointer (non-refcounted
 classes alias to `Object :: rawptr`; RefCounted classes are `^Object` whose value
 holds the object-pointer bits). The template passed `&self` — the address of the
 stack local (`^rawptr`) — so the engine dereferenced a stack address. Static
@@ -304,14 +308,14 @@ The generator resolved the meta-type `"float"` to Odin `f32` (4 bytes) everywher
   so the binding returned exactly `0.0f`. This is why `Input.get_axis(...)`,
   `get_action_strength(...)`, `Vector2.length()`, etc. all returned `0`.
 - A `float` **argument** passed `&f32` (4 bytes); the engine read 8 bytes, taking
-  4 bytes of adjacent garbage as the high half of the double — e.g.
-  `Input.action_press(action, strength)` sent a garbage strength.
+  4 bytes from adjacent storage as the high half of the double. For example,
+  `Input.action_press(action, strength)` sent an invalid strength.
 
 Scope: this hit **every** engine method, builtin method, operator, constructor,
 and utility function that takes or returns a scalar `float` — single-arg and
 multi-arg alike. It was *not* specific to `StringName` or to multi-arg calls (the
 `get_axis` symptom that surfaced it just happened to be a float-returning method);
-`StringName`/object/int args marshal correctly. `is_action_pressed` "worked" only
+`StringName`/object/int args marshal correctly. `is_action_pressed` returned correct values
 because it returns `bool` (`MAKE_PTRARGCONV(bool, uint8_t)`, 1 byte, no
 truncation). `Vector2`-returning methods worked because `Vector2` is
 `real_t`-componented (`[2]f32` in single precision) and passed whole via
@@ -338,7 +342,9 @@ singletons (B), and opens a temp file via `FileAccess` then calls the instance
 method `get_as_text` on the returned Ref (C). Run with
 `nix develop --command bash bindgen/verify/run.sh`.
 
-### Out-of-scope observation (NOT one of the three bugs)
+<a id="out-of-scope-observation-not-one-of-the-three-bugs"></a>
+
+### Separate method-bind warning observed at this stage
 During Godot's `--import` GDExtension verification, `file_access_init()` (which
 eagerly fetches all 68 FileAccess method binds) emits `Parameter "mb" is null`
 warnings for some methods across the multi-pass scan. The methods exercised by the
@@ -350,9 +356,12 @@ running build), which is independent of the three name/pointer fixes above.
 ## Bug E — eager method-bind resolution at init flooded ~16,807 `mb is null` errors
 Every run printed ~16,807 `ERROR: Parameter "mb" is null at
 gdextension_classdb_get_method_bind` lines (identical in Phase 2 & 3 → tied to
-init). Harmless to functionality but buried real errors.
+init). The exercised methods still passed, but the repeated output obscured
+other errors.
 
-### Root cause (NOT a wrong hash/name)
+<a id="root-cause-not-a-wrong-hashname"></a>
+
+### Root cause: method binds fetched before class registration
 The engine-class template resolved **every** method bind eagerly in each class's
 `*_init()` proc, all driven by `godot.init()` — which `core/main.odin` calls at
 the GDExtension **entry point** (Core initialization level). But most engine
@@ -369,8 +378,8 @@ registration timing, not hash/name:
   each (`RenderingServer` 526, `DisplayServer` 269, …), purely because they
   weren't registered yet when `godot.init()` ran.
 
-So the hashes and interned names were already correct; the binds were just
-fetched too early.
+The hashes and interned names were correct; lookup happened before the classes
+were registered.
 
 ### Fix (generator: `templates/bindgen_view_engine.temple.twig`)
 Resolve engine-class method binds **lazily on first call**, exactly like the
@@ -426,7 +435,7 @@ rendering_server.gen.odin(670:35) Error: Cannot convert numeric value
 '34359738368' ... to 'Rendering_Server_Array_Format' from 'untyped integer'
 ```
 
-On 64-bit native it only compiled by luck (`int` = 64-bit).
+It compiled on 64-bit native because `int` = 64-bit.
 
 ### Rule
 Emit an explicit enum backing type:
@@ -505,7 +514,7 @@ variadic `extra: ..Variant`:
 
 ### Generator change (`templates/bindgen_view_engine.temple.twig` + view)
 Added an `{% if method.vararg %}` branch in both method loops. The bind is fetched
-the same way (`classdb_get_method_bind` + the method hash, lazy); only the CALL
+the same way (`classdb_get_method_bind` + the method hash, lazy); only the call
 and marshalling differ — it now matches the hand-written `Object::emit_signal`
 varcall in `godot/Ergonomics_Signals.odin`:
 - marshal each fixed declared arg to a `Variant` (`variant_from(&arg)`), append

@@ -27,7 +27,7 @@ RQ_ROLE=client nix develop --command bash examples/replay_quickdraw/play.sh
 
 `RQ_ROLE` also accepts `server` (no local avatar) and `observer`. `RQ_PORT` defaults
 to 49460. Direct native launchers use the configured address. The [party interface](online.md)
-now provides service-backed creation/invites/rejoin, native ENet and browser WebRTC;
+provides service-backed creation/invites/rejoin, native ENet and browser WebRTC;
 public deployment remains unverified. The [Room driver](../../replay/godot/room.md) is enabled by `RQ_COORD_PORT`
 with explicitly provisioned `RQ_MEMBER`, `RQ_INCARNATION`, `RQ_COORD_KEY` and
 `RQ_TOKEN`. These credentials retain the existing automatic Room launch when
@@ -55,7 +55,7 @@ original eight-bit storage. Death freezes body/weapon cooldowns and respawn reta
 equipment and those cooldowns. Dedicated seats are numbered differently: a spawn
 offset gives the first two clients the original dedicated duel's bottom lane.
 
-The world now owns HP, gold, score, respawn schedules, entity lifetime and collision
+The world owns HP, gold, score, respawn schedules, entity lifetime and collision
 history in the same replayable state. The original mixes simulation and discrete
 replication fields. Historical target life IDs deliberately reject hits against a
 previous incarnation after respawn. The port defines a stable system order:
@@ -63,17 +63,19 @@ movement, proxy recording, existing lobs, then new fire/lobs in seat order.
 
 Scene geometry and view assets come from the original; see [provenance](assets.md).
 The HUD and session interface are a separate implementation. The [session UI](session-ui.md)
-now has named chat, a scoreboard, manual start, leave/rejoin and local identity/name
-preferences. [Combat feedback](feedback.md) now restores sampled hurt flashes and
+has named chat, a scoreboard, manual start, leave/rejoin and local identity/name
+preferences. [Combat feedback](feedback.md) restores sampled hurt flashes and
 independent material colors, and adds event-driven landing rings. [Native saves](saves.md)
-now support F5/Save, exact solo/host resume and fresh-process rejoin. Browser parties
-now pass combat, planned/crash migration, observer rejoin and durable Room publication.
-[Browser-local slots](browser-saves.md) now support durable solo save/resume,
+support F5/Save, exact solo/host resume and fresh-process rejoin. Browser parties
+pass combat, planned/crash migration, observer rejoin and durable Room publication.
+[Browser-local slots](browser-saves.md) support durable solo save/resume,
 stale-tab refusal and corruption preservation. Public/Steam deployment, human
 visual/play-feel review and
 a paired old/new benchmark remain pending. This is not full Quickdraw or M6 completion.
 
-## What the gates establish
+<a id="what-the-gates-establish"></a>
+
+## Validation scope
 
 - Native simulation: interpolated historical hit versus live miss, cover/history
   misses, respawn identity, dash/drone/cooldown/shop rules, stable predicted spawn

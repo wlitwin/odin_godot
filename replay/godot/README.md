@@ -1,9 +1,10 @@
 # Replay Godot integration
 
 Use `Session(State, Control, Action, Event, Seats)` to drive a local or networked
-game from Godot. It owns the lifecycle around the engine-free runner, which
-schedules simulation steps and manages input and history. The application supplies a typed model,
-initial frame, options, sampled controls/actions, and presentation.
+game from Godot. It opens, advances, and closes the engine-free runner, which
+schedules simulation steps and manages input and history. The application
+supplies a typed model, initial frame, options, sampled controls/actions, and
+presentation.
 
 ## Choose an import
 
@@ -18,7 +19,7 @@ initial frame, options, sampled controls/actions, and presentation.
 
 Start with the root import for a Session or Room. Its selected transport is
 managed internally; using Session does not require driving a transport adapter.
-Add a feature import when the game uses that feature's owners directly.
+Add a feature import when the game directly creates or manages its types.
 Scene, input and debug packages extend the lifecycle package. Storage and
 transport are independent foundations. The internal wire helpers are implementation
 details shared by the lifecycle and transport packages.
@@ -37,7 +38,9 @@ stay at root. Session-specific `Browser_Checkpoint` also stays at root because
 it checks the live Session's authority, identity and recovery policy; it uses
 the storage package for I/O.
 
-## The lifecycle
+<a id="the-lifecycle"></a>
+
+## Session lifecycle and ownership
 
 Start with a zero-initialized owner and copy `SESSION_OPTIONS` for its settings;
 an empty `Session_Options{}` does not contain the network defaults. Keep the live
@@ -58,7 +61,7 @@ do not call `session_frame` separately on `room.session`. Party remains alive
 while Room borrows its authorization. Close Room before Party and its storage.
 
 [Editor-first authoring](scene/editor-first.md) connects ordinary scene-local scripts to
-typed display values. Replay Scrapyard is the canonical composition example, with
+typed display values. Replay Scrapyard demonstrates this integration with
 standalone actor/HUD previews and validated Resource baking.
 
 [Typed view pools](scene/view-pools.md) bind generation-safe entity projections to cached
@@ -71,9 +74,10 @@ Further boundary work is tracked in the [bridge plan](../../docs/replay/godot-br
 [Local diagnostic overlay](debug/debug.md) adds optional runtime counters and explicit
 recent-history audits without game-specific reporting code.
 
-[Local history inspection](debug/scrubber.md) adds a retained-frame slider with explicit
-resume/branch commands and validated scalar edits to a copied preview. Replay Hello demonstrates pause, historical views, input
-guards and a new presentation epoch for an alternate local future.
+[Local history inspection](debug/scrubber.md) adds a slider for retained frames,
+explicit resume/branch commands, and validated scalar edits to a copied preview.
+Replay Hello demonstrates pausing, historical views, suppression of gameplay
+input while inspecting, and a new presentation epoch for an alternate local future.
 
 [Portable local recordings](../diagnostic/recording.md) export replayable gameplay
 windows from the history dock and verify them in a separate headless process.
@@ -133,11 +137,11 @@ if valid {
 ```
 
 `session_issue` routes a local player's action to the authority or predicting
-client. Consume `session_changes` before the next frame. It carries gameplay
-effects and action verdicts; an authoritative verdict is a `Confirm`, or a change
-whose `confirmed` flag is set. Simulation never renders or accesses device state.
-The facade drains the lower-level duplicate outcome convenience queue so normal
-games consume outcomes through `session_changes`.
+client. Drain `session_changes` before the next frame to receive gameplay
+effects and action verdicts. An authority verdict is a `Confirm`, or a change
+whose `confirmed` flag is set. Simulation code must not render or read devices.
+The facade drains the lower-level duplicate outcome queue so games using
+Session consume results through `session_changes`.
 
 The caller supplies the `changes` scratch array. Drain until zero even when that
 array is smaller than the pending batch; leaving changes queued makes the next
@@ -150,7 +154,7 @@ pause/focus/menu gates and capture copied UI actions.
 
 [Copied action intents](input/intents.md) retain a pending payload through submission
 failure and track epoch-scoped tickets through confirmation and recovery. They
-provide the common latch/result bookkeeping without changing gameplay policy.
+retain one pending payload and track submitted results without changing gameplay policy.
 
 For mixed local/remote presentation, supply `Model.event_owner` and set
 `options.remote_observed=true`. Local effects remain speculative; remote effects
@@ -160,9 +164,9 @@ old-host rejoin. Bind aiming input to the displayed remote frames using
 the default runner predicts the complete public world. `Model.group` can opt into
 an authored closed group; see [prediction groups](../net/groups.md).
 
-`scenegd.Nodes2` maintains bounded scene instances by presentation identity, with
-retained scene ownership. `scenegd.nodes_get` supports game-specific dressing of
-child nodes. `scenegd.scene_instance` loads/instances an authored stage and
+`scenegd.Nodes2` maintains bounded scene instances by presentation identity,
+retaining ownership of their scenes. `scenegd.nodes_get` lets the game customize
+child nodes. `scenegd.scene_instance` loads and instantiates an authored stage, then
 releases the temporary resource reference. `inputgd.bind_key`/`inputgd.bind_mouse`
 release constructor references after InputMap retains the events.
 `storagegd.session_token` uses random credentials normally; deterministic labels
@@ -194,8 +198,8 @@ is one simulation second. `session_backup_receipt` reports a validated receipt;
 
 This authorization discloses authority-only state. It does not make the recipient
 an elected host. Connection replacement requires explicit authorization of the new
-live binding. The Room driver adds coordinator fencing and tested surviving-client
-takeover; broader M5 cases remain open.
+live binding. The Room driver adds coordinator fencing and tested takeover with surviving
+clients. Broader milestone M5 cases remain open.
 
 The authority model and permit enforcement are available in `replay/authority`.
 For a leased session, set `options.network.require_permit=true` and supply
@@ -206,13 +210,13 @@ are available, along with the Room takeover driver. See the
 [service contract](../authority/service.md).
 
 The facade is experimental. It supports full-public and authored group prediction with
-the existing ENet/fault adapters. [Room](room.md) now adds coordinator-driven planned
+the existing ENet/fault adapters. [Room](room.md) adds coordinator-driven planned
 and crash migration with surviving-client reconnection in tested Cavecrawl and
 Quickdraw combat scenarios.
 [Session communications](../comms/README.md) adds optional bounded chat and markers
 through an independent application lane. Owner-streamed physics has separate
 [2D](scene/body2.md) and [3D](scene/body3.md) adapters. Matchmaking and a complete lobby UI remain
-roadmap work rather than implicit guarantees of the convenience wrapper.
+roadmap work; Session does not supply them.
 
 
 For direct sessions, `Session_Options.discover_epoch=true` enables a small pre-join
@@ -227,17 +231,17 @@ obtain authority epochs from its coordinator.
 correction-reuse path. It defaults off and requires stable deterministic step
 semantics. `client.stats.reused_correction_ticks` reports retained records while
 `replayed_ticks` counts simulated correction steps. It changes local work only,
-not snapshot cadence, packet contracts or authoritative validation. Mixed Scrapyard
-initially exposes few matching records, so this is not enabled by default as a
-universal performance improvement.
+not snapshot cadence, packet contracts or authoritative validation. Mixed
+Scrapyard workloads initially expose few matching records, so the option is
+disabled by default. Measure the workload before enabling it.
 
 `Session.control_consumed` reports whether the supplied control was used by an
 actual local/authority input step during the last `session_frame` call. It is false
 when there was no prepared tick, prediction is blocked, a snapshot merely moves
 or bootstraps the timeline, or the role does not consume local controls. Use this
 receipt to clear pending device edges; a larger timeline head alone does not prove
-input was sampled. The field resets at each Session or Room frame call, including early returns. It is not an authority acceptance
-or delivery acknowledgment.
+input was sampled. The field resets at each Session or Room frame call, including early returns.
+It does not report authority acceptance or delivery acknowledgment.
 
 ```odin
 error = replaygd.session_frame(&session, dt, control)

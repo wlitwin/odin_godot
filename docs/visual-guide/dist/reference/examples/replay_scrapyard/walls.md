@@ -1,6 +1,6 @@
 # Wall contacts
 
-Ballistic and enemy-spit sweeps now record the exact cover endpoint and outward
+Ballistic and enemy-spit sweeps record the exact cover endpoint and outward
 normal before removing the projectile. A body intercepted first suppresses the
 wall event. TTL expiry and arena-boundary removal produce no cover impact.
 `arena.contact` preserves Replay's existing clipping order, inclusive endpoints
@@ -25,9 +25,11 @@ cosmetic contacts. Scratch `wall_dropped` reports that omission to model callers
 it is not a replicated statistic. Gameplay damage and later actions retain their
 capacity. Future action event kinds must update this explicit reservation.
 
-Scrapyard content advances to `0x5253435241503045`. World, control and action
-schemas, gameplay protocol 7 and checkpoint layout 4 stay unchanged. The explicit
-[run converter](saves.md#converting-older-replay-runs) now accepts content 42/43/44/45.
+The Wall-event addition introduced Scrapyard content `0x5253435241503045`.
+World, control, and action schemas, gameplay protocol 7, and checkpoint layout 4
+were unchanged by that transition. The explicit
+[run converter](saves.md#converting-older-replay-runs) includes content
+42/43/44/45 paths; the save guide records the current content identity.
 The content-44 fixture was captured with the actual old converter before adding
 Wall; its state and assets survive conversion and fresh-process resume.
 

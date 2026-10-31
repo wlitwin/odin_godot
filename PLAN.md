@@ -1,10 +1,12 @@
-# odin_godot — Odin as a first-class Godot scripting language
+<a id="odin_godot--odin-as-a-first-class-godot-scripting-language"></a>
 
-A **Godot 4.x GDExtension** that implements the full `ScriptLanguageExtension`
-API so that `.odin` files are first-class Godot scripts — attach a `.odin` file to
-a Node, and its lifecycle (`_ready`, `_process`, signals, exported vars…) runs in
-compiled Odin. The goal is to **fully replace GDScript**, with **native + WASM**
-compilation, made reproducible with **Nix flakes**.
+# odin_godot — original scripting-language implementation plan
+
+The original goal was a Godot 4.x GDExtension implementing the full
+`ScriptLanguageExtension` API. Attaching an `.odin` file to a Node would run its
+lifecycle (`_ready`, `_process`, signals, exported vars…) in compiled Odin. The
+plan aimed to replace GDScript within the compiled-language limits below, with
+native + WASM compilation and a reproducible Nix-flake toolchain.
 
 This is the original implementation plan, with decisions recorded on 2026-06-22.
 It preserves the intended architecture and milestones rather than describing the
@@ -26,34 +28,37 @@ project, a `ScriptLanguageExtension` that embeds the MiniML interpreter.
 
 ---
 
-## 1. The core insight: Odin ≠ MiniML
+<a id="1-the-core-insight-odin--miniml"></a>
 
-`miniml_godot` had it easy in one respect: MiniML ships an **interpreter**, so the
-dev loop could *interpret* `.mml` source per-node (fast iteration, hot reload, `eval`),
-and only *optionally* compile for export. **Odin has no interpreter** — it is a
-statically-typed, ahead-of-time, LLVM-backed native language. That single fact drives
-the whole architecture:
+## 1. Compilation and iteration model
+
+MiniML's interpreter let `miniml_godot` interpret `.mml` source per node during
+development, supporting reload and `eval`, with optional compilation for export.
+Odin is statically typed and compiles ahead of time through LLVM. The plan
+therefore required compilation during development as well as export:
 
 | Concern | miniml_godot | odin_godot |
 |---|---|---|
 | Dev iteration | interpret source per node | **compile** scripts → shared lib, `dlopen` |
 | Hot reload | re-eval into live env | **recompile** scripts lib, swap via `dlclose`/`dlopen`, re-instantiate |
-| `eval`/REPL | yes (interpreter) | **no** — not possible; honest gap vs GDScript |
+| `eval`/REPL | yes (interpreter) | no; Odin requires compiled code |
 | Engine→script dispatch | stringly-typed `mml_embed_call_*` | **typed proc pointers** in a registry |
 | Script→engine calls | `Godot.*` string wrappers | **typed `godot` binding** generated from `extension_api.json` |
 | Export | compile mode (optional) | compile mode (the *only* mode) |
 
-So odin_godot is essentially **"miniml_godot's compiled-mode, everywhere"** — but with
-a *typed* API on both sides of the boundary, because Odin speaks the GDExtension C ABI
-natively (`foreign import` to call in, `@(export) -build-mode:dll` to be called).
+The planned SDK used typed calls in both directions across the GDExtension C
+ABI: `foreign import` for engine calls and `@(export) -build-mode:dll` for entry
+points the engine could call.
 
-### Honest scope note — what "fully replace GDScript" can and can't mean
+<a id="honest-scope-note--what-fully-replace-gdscript-can-and-cant-mean"></a>
+
+### Scope limits of ahead-of-time compilation
 Achievable: `extends <any class>`, lifecycle hooks, custom methods (callable from
 GDScript and cross-script), `@export` vars in the Inspector, signals (declare/connect/emit
 with typed multi-arg payloads), tool scripts, the full engine API surface. **Not**
 achievable with AOT Odin: runtime `eval`/`expression` evaluation, and *instant* in-editor
 hot-reload (we get *fast recompile-and-swap* reload instead, on the order of an Odin build).
-These gaps are inherent to a compiled language and will be documented, not hidden.
+These compiled-language limits were part of the planned documentation scope.
 
 ---
 
@@ -86,10 +91,9 @@ These gaps are inherent to a compiled language and will be documented, not hidde
 ```
 
 Two dlls on desktop: a **stable core** and a **swappable scripts** lib. Keeping them
-separate is what makes hot reload tractable — the core stays loaded and holds engine
-handles while the scripts lib is swapped underneath it. On **web**, hot reload is
-irrelevant, so core+scripts are linked together (or declared as two Emscripten
-`SIDE_MODULE`s at link time) and shipped AOT.
+separate lets the core retain engine handles while the scripts library is
+reloaded. The web proposal linked core+scripts together, or declared two
+Emscripten `SIDE_MODULE`s at link time, for ahead-of-time delivery without hot reload.
 
 ### Components (map to subdirectories)
 - **`flake.nix`** — pins Odin, LLVM (Odin's backend), Emscripten (emsdk, version matched
@@ -114,12 +118,14 @@ irrelevant, so core+scripts are linked together (or declared as two Emscripten
 
 ---
 
-## 3. How an `.odin` script declares a "class" (the key ergonomic decision)
+<a id="3-how-an-odin-script-declares-a-class-the-key-ergonomic-decision"></a>
 
-Odin has no classes and no macro-style compile-time reflection, so we need a convention
-to express `extends`, `@export`, `signal`, and lifecycle. **Chosen approach: a codegen
-preprocessor** (Godin-style) reads struct tags + attributes and emits the registration
-boilerplate. The author writes:
+## 3. Script declarations and generated registration
+
+The plan selected a code-generation preprocessor to express `extends`,
+`@export`, `signal`, and lifecycle in Odin structs and procedures. It would read
+struct tags and attributes and emit registration code. The following examples
+are the original proposed syntax, not current authoring instructions:
 
 ```odin
 package player
@@ -137,9 +143,8 @@ Player :: struct {
 // signals declared via a struct tag or a `@(gd_signal)` marker; codegen collects them.
 ```
 
-…and the preprocessor generates the `@(init) register()` shown below. The codegen is a
-thin layer over the underlying mechanism, which is **`@(init)` self-registration** — what
-the generator emits and what the core consumes:
+The preprocessor would generate the `@(init) register()` below. This proposal
+used `@(init)` self-registration as the underlying mechanism consumed by the core:
 
 ```odin
 package player
@@ -174,19 +179,18 @@ register :: proc() {
 }
 ```
 
-The core's registry maps `"Player"` → a `ClassDesc` with typed proc pointers; engine
-lifecycle/method/signal calls are dispatched through it with the node pointer + typed
-args — **no per-call string marshalling**. `@(init)` procs run automatically on dll load,
-so loading the scripts library populates the registry.
-
-The core's registry maps `"Player"` → a `ClassDesc` with typed proc pointers; engine
-lifecycle/method/signal calls are dispatched through it. The codegen preprocessor lives in
-`bindgen/` (or a sibling `scriptgen/`), runs as a pre-build step over `res://**/*.odin`,
-and emits one generated `*_gen.odin` per script plus the composed registration unit.
+The proposed registry mapped `"Player"` to a `ClassDesc` containing typed
+procedure pointers. Engine lifecycle/method/signal calls would dispatch with a
+node pointer and typed arguments without per-call string marshalling. `@(init)`
+procedures would populate the registry when the scripts library loaded. The
+pre-build generator was planned for `bindgen/` or a sibling `scriptgen/`, reading
+`res://**/*.odin` and emitting one `*_gen.odin` per script plus a registration unit.
 
 ---
 
-## 4. The boundary, concretely
+<a id="4-the-boundary-concretely"></a>
+
+## 4. Engine/script calls and properties
 
 **Engine → script** (in the script-instance `call`): the engine hands us a method name +
 `Variant*` args. The registry resolves the name to a typed proc pointer; we convert each
@@ -231,18 +235,22 @@ miniml's headless `make test-*` targets.
 
 ---
 
-## 6. Phased delivery (risk-front-loaded)
+<a id="6-phased-delivery-risk-front-loaded"></a>
 
-Each phase ends in a **headless-verifiable milestone**, like miniml's tracks.
+## 6. Phased implementation and validation
 
-### Phase 0 — Foundations & spikes (de-risk before building)
+Each planned phase required a milestone verifiable through a headless test.
+
+<a id="phase-0--foundations--spikes-de-risk-before-building"></a>
+
+### Phase 0 — Toolchain, ABI, web, and reload validation
 - `flake.nix` pinning Odin + LLVM + emscripten + Godot; `nix develop` works.
 - Dump `gdextension_interface.h` + `extension_api.json` from the pinned Godot.
 - Vendor/fork the `odin-godot` bindgen; generate the `godot` package; build a trivial
   **Odin-authored GDExtension class** registered & callable from GDScript (proves the
   Odin→GDExtension ABI end-to-end). *Milestone: GDScript calls an Odin method, headless.*
 - **Spike W (WASM):** compile a trivial Odin proc to a Godot-loadable `SIDE_MODULE` and
-  call it from an actual web export. *This is the single biggest risk — prove it early.*
+  call it from an actual web export. *Verify this compatibility before building the rest of the web path.*
 - **Spike R (reload):** `dlopen`/`dlclose` an Odin scripts dll, swap it, re-resolve the
   registry — confirm Odin global/`context` init survives a reload cycle.
 
@@ -253,13 +261,17 @@ Each phase ends in a **headless-verifiable milestone**, like miniml's tracks.
   `_has_method` wired; `_ready` is a stub. *Milestone: a `.odin` script attaches and the
   editor/scene-tree recognizes it.*
 
-### Phase 2 — Compiled dispatch (the heart)
+<a id="phase-2--compiled-dispatch-the-heart"></a>
+
+### Phase 2 — Compiled dispatch
 - The `runtime` registry + `@(init)` convention (§3); compose+compile the scripts dll.
 - Script-instance `call` routes `_ready`/`_process(delta)`/`_physics_process` into Odin
   procs with `self` + `delta`; scripts drive their node via the typed `godot` API.
   *Milestone: the showcase player **moves** under keyboard input, pure Odin, headless-verified.*
 
-### Phase 3 — Full GDScript-parity surface
+<a id="phase-3--full-gdscript-parity-surface"></a>
+
+### Phase 3 — Properties, signals, and methods
 - `@export` vars: property list + Inspector get/set + scene serialization.
 - Signals: declare + connect (multi-arg typed payloads forwarded) + emit.
 - Custom methods callable from GDScript and cross-script; `extends` any base; tool scripts.
@@ -281,7 +293,7 @@ Each phase ends in a **headless-verifiable milestone**, like miniml's tracks.
 ### Phase 6 — Polish & showcase
 - Pure-Odin coin-collector `showcase.tscn`; full `tests/` headless E2E suite (script,
   signal, reload, autoload, export, web-smoke); editor diagnostics via `odin check` in
-  `_validate`; README + authoring guide. *Milestone: `make test-*` green; web demo plays.*
+  `_validate`; README + authoring guide. *Milestone: `make test-*` passes and the web demo runs.*
 
 ---
 
@@ -290,14 +302,16 @@ Each phase ends in a **headless-verifiable milestone**, like miniml's tracks.
    `context` init, version match, possibly a 2nd `SIDE_MODULE` for scripts). → Phase-0 Spike W.
 2. **Native hot reload safety** (`dlclose` of live code, preserving node state, Odin global
    re-init). → Phase-0 Spike R; keep core/scripts as separate dlls.
-3. **Script-class ergonomics without reflection** (the `@(init)`/`ClassDesc` convention is
-   pleasant or it isn't). → validate in Phase 2; optional codegen sugar later.
+3. **Script-class ergonomics without reflection** (the `@(init)`/`ClassDesc` convention needs practical
+   authoring validation). → validate in Phase 2; optional generated syntax later.
 4. **Off-main-thread resource loading** (Odin `context` per thread; don't call scripts off
    the loader thread — miniml's constraint). → loader builds the resource only; instantiate
    on main thread.
 5. **`bindgen` coverage/upkeep** vs writing our own. → start from `odin-godot`, own the fork.
 
-## 8. Decisions to confirm
+<a id="8-decisions-to-confirm"></a>
+
+## 8. Original decision checklist
 - **Script declaration:** `@(init)` self-registration (recommended) vs codegen preprocessor.
 - **Binding layer:** fork `dresswithpockets/odin-godot`'s bindgen (faster) vs slim in-house.
 - **dll split:** stable core + swappable scripts dll (recommended, enables reload) vs one dll.

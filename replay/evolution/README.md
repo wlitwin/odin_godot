@@ -1,7 +1,9 @@
 # Revision contracts and explicit conversion
 
-Use these cold-path tools before changing a saved or networked value type. They
-freeze representation contracts; they do not infer compatible gameplay behavior.
+Run these tools during authoring or offline upgrades before changing a saved
+or networked value type. They generate frozen type definitions, schema
+manifests, and conversion scaffolds. The author must still decide whether the
+old and new gameplay rules are compatible.
 
 ```odin
 source, report := evolution.freeze(Old_World, "game_revision_12", "World_12")
@@ -29,11 +31,11 @@ enum meaning and bit masks. Check it into source control beside the frozen type.
 Compare regenerated manifests in CI. It does not freeze reducer code, authorize
 an old recording for a new reducer, or replace a signed build manifest.
 
-`scaffold` handles additive schema changes. Its generated procedure deliberately
-returns failure until the author supplies target defaults and changes the review
-flag. Every added leaf is listed by full path, including every array element.
-Removed fields, changed widths/kinds, enum meanings/signedness, privacy changes and
-unions/enumerated arrays require custom authored conversion code instead of an automatic scaffold.
+`scaffold` generates a starting procedure for additive schema changes. It
+returns failure until the author supplies target defaults and changes its review
+flag. The generated list names every added leaf by full path, including each
+array element. Removed fields, changed widths/kinds, enum meanings/signedness,
+privacy changes, and unions/enumerated arrays require a custom conversion.
 
 ```odin
 defaults := New_Catalog{} // Deliberate decision: old enemies gain no pulse attack.
@@ -50,9 +52,9 @@ publishing a checkpoint. `verify_preserved` checks every old leaf; separately
 assert the chosen new defaults. `remove_added` provides an explicit inverse
 projection for fixture builders, acknowledging each discarded leaf.
 
-These helpers compile schemas, allocate scratch and use linear path lookup within
-field loops. They are intended for authoring, offline upgrades and tests, not the
-simulation tick or a per-frame presentation path.
+These helpers compile schemas and allocate scratch. They search paths linearly
+inside field loops, so keep them in authoring tools, offline upgrades, and tests.
+Do not call them from a simulation tick or each presentation frame.
 
 Scrapyard demonstrates this with a fully frozen
 [`content49`](../../examples/replay_scrapyard/shared/revisions/content49/catalog.odin),

@@ -33,10 +33,10 @@ The lobby class spans several files; each entity has its own file:
 
 | file | owns |
 | --- | --- |
-| `cavecrawl.odin` | the vocabulary, the CaveLobby state, ready/process |
-| `net.odin` | identity + the Host/Join/Steam doors (the transport forwards are generated) |
+| `cavecrawl.odin` | shared declarations, CaveLobby state, ready/process |
+| `net.odin` | identity and Host/Join/Steam handlers; transport forwarders are generated |
 | `world.odin` | census hooks, spawns, the interact prompt |
-| `input.odin` | keys/mouse and the player verbs they drive |
+| `input.odin` | keyboard/mouse sampling and the commands it issues |
 | `rocks.odin` | projectile visuals spawned locally by the firing peer |
 | `host.odin` | the authority: game tick, dweller brains |
 | `save.odin` | the run on disk (session snapshot + game blob) |
@@ -52,8 +52,8 @@ bash examples/cavecrawl/run.sh            # integration test: multiple real ENet
 ```
 
 The integration test (`run.sh` + `cave_test.gd`) is a reusable pattern for
-testing a game: real processes over real sockets drive the `@(gd_method)`
-surface and assert against log lines. Loot
+testing a game: processes communicate over sockets, call its `@(gd_method)`
+procedures, and check log lines. Loot
 races, predicted combat under latency, a kill mid-flight, quit-and-resume,
 and a host handover all run headless from `tests/run_all.sh`.
 

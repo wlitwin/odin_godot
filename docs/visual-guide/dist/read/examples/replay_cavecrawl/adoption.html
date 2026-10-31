@@ -10,7 +10,7 @@ known seat independently of lobby leadership. On a change from one player-host
 to another, a relic carried by the former host transfers to the successor and
 advances its version once. Other carriers and all avatars retain their identities.
 A dedicated successor has no avatar, so that transition releases the relic.</p>
-<p>This follows Kit&#39;s host-takeover orphan sweep for non-avatar entities. The new
+<p>This follows Kit&#39;s host-takeover orphan sweep for non-avatar entities. This
 policy runs on the first committed simulation tick after restore. The checkpoint
 frame itself remains exact; gameplay and the Carry event are recorded together,
 can be audited/replayed, and roll back together on failure. Repeated observations
@@ -38,10 +38,10 @@ native planned/crash takeovers check adoption in the first committed frame and
 continued movement/release. A three-browser planned takeover checks the same
 ownership transfer alongside the existing party/social recovery story. The four
 successor/guest carrier cases remain regression gates.</p>
-<p>This closes the old-host relic ownership gap. Original owner-streamed motion,
-disconnected-avatar floor gating and broader visual/human comparisons remain
-separate work. This policy is specific to Cavecrawl&#39;s non-avatar relic; other
+<p>The policy covers relic possession after a player-host change. Original
+owner-streamed motion, disconnected-avatar floor gating, and broader
+visual/human comparisons require separate work. This policy is specific to Cavecrawl&#39;s non-avatar relic; other
 games choose their own response to the recorded observation.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/net/authority.html"><span>Recorded authority observations</span><span aria-hidden="true">→</span></a><a href="authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/adoption.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/net/authority.html"><span>Recorded authority observations</span><span aria-hidden="true">→</span></a><a href="authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/adoption.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#compatibility" class="">Compatibility</a><a href="#evidence-and-boundaries" class="">Evidence and boundaries</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/adoption.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

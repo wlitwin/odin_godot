@@ -4,7 +4,8 @@
 REPLAY_SLOPBALL_UI_OUT=/absolute/fresh/output nix develop --command bash tests/replay_slopball_ui/run.sh
 ```
 
-The fixture prepares an isolated project, builds/imports/waits/builds, and drives
+The fixture prepares an isolated project, builds it, imports it in Godot,
+waits for outstanding builds to finish, and rebuilds before driving
 host/client/observer through the actual scene controls. It checks manual leader
 start, named roster/team/ping rows, movement and kick capture while typing, literal
 chat, negotiated observer names, a real goal, departed rows, leave/rejoin with the

@@ -112,8 +112,7 @@ The `entity=Player:1` tag associates wire type `1` with `Player` and generates:
 
 - `hello_net_entities`, which installs the entity factory;
 - `player_spawn`, `player_of`, `player_owned_by`, and `player_mine`;
-- typed `player_ref` handles plus one-pass `player_all` iteration
-  with `player_all` as the sole enumeration view;
+- typed `player_ref` handles and `player_all` iteration over live players;
 - spawn/free bookkeeping hooks; and
 - scalar probes used by the integration-test harness.
 
@@ -346,7 +345,7 @@ hello_net_exit_tree :: proc(self: ^HelloNet) {
 
 The generated detach stops the network stack in dependency order and resets
 the Session's run. `session_destroy` also releases its retained wiring. Use
-detach alone when the same game owner will attach again; use both calls for
+detach alone when the same game script will attach again; use both calls for
 final scene removal. Both operations are safe after an earlier detach.
 
 ## Test with latency and packet loss

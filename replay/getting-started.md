@@ -1,10 +1,11 @@
 # Starting a Replay game
 
-Replay keeps gameplay in a typed Odin world and puts devices, networking, scenes
-and persistence around it. The world contains all mutable simulation state.
-The same gameplay rules run offline and under a chosen
-multiplayer policy. The framework handles history, delivery, correction and
-recovery; the game still chooses authority/trust, prediction scope and game rules.
+Store all mutable simulation state in an Odin `World` value. Replay retains its
+history and runs the game's rules offline or under a selected multiplayer
+policy. Device input, networking, Godot scenes, and persistence connect to that
+simulation through separate runtime owners. The game chooses authority and
+trust, prediction scope, and gameplay rules; Replay manages history, delivery,
+correction, and recovery under those choices.
 
 Start with the [Session starter](../build/template/replay/README.md) for a small
 Godot project that runs offline or as a native host/client. Use
@@ -13,7 +14,9 @@ Godot project that runs offline or as a native host/client. Use
 lifecycles. The [Scrapyard authoring guide](../examples/replay_scrapyard/editor-first.md)
 shows how those ideas grow into a complete editor-authored game.
 
-## The everyday surface
+<a id="the-everyday-surface"></a>
+
+## Lifecycle calls
 
 | Owner | Setup | Per frame or tick | Read / submit | Teardown |
 | --- | --- | --- | --- | --- |
@@ -21,10 +24,11 @@ shows how those ideas grow into a complete editor-authored game.
 | Godot `Session` | `session_open` | `session_frame` | Drain `session_changes`, read `session_state`; `session_issue` for actions | `session_close` |
 | Recoverable `Room` | `room_open` | `room_frame` | Use `room.session` changes/state; submit with `room_issue` | `room_close` |
 
-Session owns its clock, transport and runner. Room owns and drives its Session.
-Pump only the owner you chose. Party is the separate enrollment owner: drive it
-with `party_frame` and open Room from `party_room_options` after admission. Add
-it when invitations/rejoin are needed; a local or direct Session does not need it.
+Session owns its clock, transport, and simulation runner. Room owns and drives
+its Session, so call the frame function of the outer owner rather than pumping
+both. Party manages enrollment separately: call `party_frame`, then use
+`party_room_options` to open Room after admission. Add Party for invitations and
+rejoin; local or direct Sessions can open without it.
 
 Zero-initialize runtime owners, copy `SESSION_OPTIONS` for Session settings,
 and check setup errors before starting the frame loop. Keep an owner at a stable
@@ -95,7 +99,9 @@ as `"godot:replay"`, `"godot:replay/net"` and `"godot:replay/godot"`. Godot scri
 also use this repository's normal scriptgen/extension build pipeline. Core gameplay
 packages do not require Godot or generated scene bindings.
 
-## Write gameplay once
+<a id="write-gameplay-once"></a>
+
+## Define replayable gameplay
 
 Put mutable gameplay state in `World`: entity pools, RNG, inventories, cooldowns,
 ownership revisions and scheduled work. Use bounded value types and handles rather
@@ -121,9 +127,9 @@ Keep Session/Room and their models at stable addresses. Sample devices before th
 frame call; use the fixed-tick input helpers to retain short presses. For a direct
 Session, call `session_frame`, drain `session_changes`, then present a copied
 `session_state`. Check errors and drain all pending changes, not only one small
-buffer. `session.control_consumed` distinguishes a
-captured input from a frame that merely polled the network; follow the example's
-button-edge handling.
+buffer. `session.control_consumed` reports whether a simulation input step used
+the supplied control during that frame call. Clear pending button edges only
+when it is true; a frame that merely polls the network has not consumed them.
 
 For Room, call `room_frame` and consume changes/state from `room.session`.
 `room_issue` submits actions and `room_handoff` requests a planned transfer. A

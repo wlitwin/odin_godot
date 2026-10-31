@@ -7,8 +7,9 @@
 <article class="reading-body "><p>Create or join a Replay Cavecrawl party through the
 <a href="../replay_room_service/README.html">room service</a>, which enrolls trusted members
 and coordinates which process may host. This flow supplies member IDs and control
-keys instead of requiring players to configure them. With <code>REPLAY_CAVE_ROOM_SERVICE</code> configured, the menu
-shows <strong>Create party</strong>, <strong>Join party</strong>, <strong>Rejoin recent party</strong>, and <strong>Copy party
+keys instead of requiring players to configure them. With
+<code>REPLAY_CAVE_ROOM_SERVICE</code> configured, the menu shows <strong>Create party</strong>,
+<strong>Join party</strong>, <strong>Rejoin recent party</strong>, and <strong>Copy party
 invite</strong>. Without it, the existing solo/LAN menu and preconfigured fixtures remain.</p>
 <p>Creating or joining first persists the exact enrollment request. A successful
 credential becomes usable only after its storage receipt. Native macOS/Linux uses
@@ -39,17 +40,16 @@ hosting/trust permission and infrastructure requirement where applicable. Revoki
 an active target&#39;s eligibility stops further backup publication. Disconnected
 targets retain their last inspectable receipt until replacement. Existing explicit
 successor configuration remains available.</p>
-<p>The setup/storage loop now lives in the shared <a href="../../replay/godot/party.html">Party API</a>,
+<p>The shared <a href="../../replay/godot/party.html">Party API</a> manages setup and storage,
 also used by Scrapyard. Existing Cavecrawl enrollment and recent-room keys are
 preserved. An unavailable invite no longer prevents an already authorized creator
 from using its stored credential; the UI reports the invitation separately.</p>
 <p>The menu flow uses the normal checkpoint/lease machinery. Tests exercise planned
 handoff with zero lost ticks, preserved guest loot, and a departed host reopening
-its profile with a fresh incarnation and the same invite. The ordinary Leave
-button still closes the Room; a surviving prepared successor follows the abrupt
-recovery policy. This does not claim that a party whose every participant exits
-can resurrect gameplay from coordinator credentials alone. The service stores
-authority decisions, not game checkpoints.</p>
+its profile with a fresh incarnation and the same invite. Leave closes the Room;
+a surviving prepared successor follows the abrupt recovery policy. If every
+participant exits, credentials alone cannot restore gameplay. The service can
+restore only progress explicitly published through the checkpoint flow below.</p>
 <h2 id="configuration-and-profiles">Configuration and profiles<a class="heading-anchor" href="#configuration-and-profiles" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -92,7 +92,7 @@ authority decisions, not game checkpoints.</p>
 </tr>
 </tbody></table>
 </div><p>Browser hosts can supply <code>globalThis.replayIceConfig</code> before Godot starts. It is
-not a query parameter. Actual relay-only UDP/TCP tests now cover this party flow;
+not a query parameter. Actual relay-only UDP/TCP tests cover this party flow;
 see <a href="../../replay/godot/transport/ice-deployment.html">ICE deployment settings</a> for scope and limits.</p>
 <p>Native clients on the same machine need different gameplay ports and different
 credential databases when representing different players. For different machines,
@@ -112,7 +112,7 @@ separately runnable.</p>
 <p>See <span class="local-reference" title="docs/replay/results/cave-online-menu-2026-09-07/README.md · available in the repository">native/browser evidence</span>
 and the <a href="../../replay/provision/enrollment.html">library enrollment contract</a>.</p>
 <h2 id="party-checkpoint-publication">Party checkpoint publication<a class="heading-anchor" href="#party-checkpoint-publication" aria-label="Link to this section">#</a></h2>
-<p>An online host can now request a durable service checkpoint through F5/the save
+<p>An online host can request a durable service checkpoint through F5/the save
 action or <strong>Store party checkpoint</strong>. Set <code>REPLAY_CAVE_ROOM_CHECKPOINT_MS=10000</code>
 (browser parameter <code>room_checkpoint_ms=10000</code>) for automatic publication. The
 default is manual; valid automatic intervals are 1–120 seconds. The configured
@@ -121,7 +121,7 @@ service must support Cavecrawl checkpoints. Solo/local saves stay separate.</p>
 lost-reply recovery while leases and live backups continue. The stored tick is a
 durable snapshot boundary; work after it is not claimed as saved. An interruption
 may leave the outcome uncertain until a fresh status check.</p>
-<p><strong>Rejoin recent party</strong> can now recover that stored progress after everyone leaves.
+<p><strong>Rejoin recent party</strong> can recover that stored progress after everyone leaves.
 It joins a live host when one exists; otherwise a trusted returning player downloads
 the saved world and obtains a newer authority epoch before play resumes. Missing,
 invalid or too-old saves show a recovery error and retry option instead of starting
@@ -131,5 +131,5 @@ actions and store the continued game. See <a href="../../replay/godot/room_resto
 and the remaining <a href="../../replay/provision/checkpoints.html">M5 plan</a>.
 See the <a href="../../replay/godot/room_save.html">Room API</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/transport/ice-deployment.html"><span>ICE settings for party and Room connections</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/online.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/party.html"><span>Party setup shared by games</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/transport/ice-deployment.html"><span>ICE settings for party and Room connections</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/online.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#invites-and-host-migration" class="">Invites and host migration</a><a href="#configuration-and-profiles" class="">Configuration and profiles</a><a href="#party-checkpoint-publication" class="">Party checkpoint publication</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

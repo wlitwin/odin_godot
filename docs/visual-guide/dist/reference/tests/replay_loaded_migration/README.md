@@ -11,7 +11,7 @@ REPLAY_LOADED_MODE=crash nix develop --command bash \
   tests/replay_loaded_migration/execute.sh /absolute/fresh/planned /absolute/fresh/crash
 ```
 
-Builds an isolated Scrapyard Replay copy and runs the existing twenty-second,
+The fixture builds an isolated Scrapyard Replay copy and runs the existing twenty-second,
 forty-mob jam workload in two Chrome processes. The report reuses the native
 workload's gameplay/observation gates unchanged. Controlled RTC message faults
 apply 40±10 ms delay and 5% unreliable loss/duplication with bounded queues and
@@ -39,7 +39,8 @@ Godot release exports omit assertions. The handoff call must execute outside
 harness evidence. `execute.sh` reuses a built fixture and writes a fresh runtime
 directory. Original Kit and original Scrapyard projects remain separately runnable.
 
-The trigger now records a fresh population census and shots spent by both players;
+At the trigger, the fixture records a fresh population census and shots spent
+by both players;
 32–44 mobs must be alive and both players must have fired during the resumed load.
 Browser startup is bounded to 120 seconds and the browser is tracked before page
 creation, so a stalled startup can be cleaned up without leaking an owned process.
@@ -71,7 +72,7 @@ Current migration reports also require schema-grouped checkpoints to have been
 selected by the sender and fully validated by the receiver before the trigger.
 The capture observer recognizes both ordinary compressed and schema-grouped
 checkpoint offers, retaining the layout fingerprint for the latter. The analyzer's
-input remains an ordinary compressed capture; it now also sends that decoded
+input remains an ordinary compressed capture; the analyzer also sends that decoded
 checkpoint through the real typed schema-aware transfer and compares the restored
 canonical bytes. The separate `tests/replay_transfer/layout_corpus/run.sh` executes
 layout transfer, fallback and plan rejection in native and WASM builds.
@@ -106,7 +107,7 @@ transparent unreliable traffic, one-shot/late arming and rejected configurations
 
 ## Real UDP TURN traffic
 
-`build.sh OUTPUT` now prepares both an isolated game export and an isolated
+`build.sh OUTPUT` prepares both an isolated game export and an isolated
 coordinator. `run.sh` builds in `REPLAY_LOADED_OUT` and executes into its `run/`
 subdirectory; `execute.sh BUILD FRESH_RUN` reuses the recorded artifacts. Native
 and Web binary hashes are verified before execution. Original Kit and Scrapyard

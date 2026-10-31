@@ -4,8 +4,8 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Actor presentation</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/actors.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Downed runners now freeze their idle frame, tilt 1.4 radians, dim, hide their gun
-and reload/muzzle cues, and display a pulsing beacon. Revival and respawn restore
+<article class="reading-body "><p>Downed player characters, called runners, freeze their idle frame, tilt 1.4
+radians, dim, hide their gun and reload/muzzle cues, and display a pulsing beacon. Revival and respawn restore
 the upright pose. Disconnected living runners use the original gray ghost tint.
 The logical rig and nameplate stay upright so camera tracking and names remain
 stable; the body sprite carries the tilt and the beacon stays above it.</p>
@@ -15,21 +15,22 @@ does not restart a cue, cancellation only clears its current identity, and old
 epoch/tick events cannot replace a newer cue. Generation/warp/epoch boundaries
 reset transient state. The reload flag and downed pose derive from the displayed
 player state, including local prediction and remote presentation.</p>
-<p>Enemies now use attack rows when stopped near living prey or winding a boss slam,
-face nearby prey, and use the original row frame counts and 12-FPS death playback.
-Observed health loss produces a short hit flash and wobble. Initial observations,
-rewinds and epoch/body replacements seed silently. The typed view adapter manages scene lifetime and gives a reused simulation slot
-a fresh scene instance,
-including when a zombie slot becomes a barrel; rotation/facing/cue state cannot
-leak from the previous entity. Status
-washes follow the original last-visible-status rule and damaging-status flicker.</p>
+<p>Enemies use attack animation rows while stopped near a living target or
+preparing a boss slam. They face nearby targets and use the original frame
+counts and 12-FPS death playback. Observed health loss triggers a short hit
+flash and wobble. Initial observations, rewinds, and epoch/body replacements
+establish a baseline without those effects.</p>
+<p>The typed view adapter creates a new scene when a simulation slot receives a
+new entity, including when a zombie slot becomes a barrel. Rotation, facing,
+and transient cues from the prior entity therefore cannot carry over. Status
+tint follows the original last-visible-status rule and damaging-status flicker.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/actors_run.sh
 RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
   RSY_ACTOR_CAPTURE=/absolute/existing/output/directory \
   nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/actors_run.sh</code></pre></div><p>The gate uses the actual workbench/game and ordinary firing, damage, reset and
 enemy lifecycles. It checks cue decay, hidden equipment while down, frozen body
-animation, respawn, attack facing, death and fresh prop binding after slot reuse. Revival and
-watched-host-crash fixtures also inspect downed/revived/ghost poses.</p>
+animation, respawn, attack facing, death, and a fresh binding after slot reuse.
+Revival and watched-host-crash fixtures also inspect downed/revived/ghost poses.</p>
 <p>See <span class="local-reference" title="docs/replay/results/scrapyard-actors-2026-09-07/README.md · available in the repository">evidence</span>.
 Native captures use Dummy audio, and this slice has a WASM compile check.
 <a href="feedback.html">Combat feedback</a> now supplies bursts, debris and damage numbers.
@@ -42,5 +43,5 @@ No gameplay schema or checkpoint fields changed.</p>
 actor evidence predates this ownership change; current focused receipts are linked
 from the bridge assessment.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="feedback.html"><span>Combat feedback</span><span aria-hidden="true">→</span></a><a href="walls.html"><span>Wall contacts</span><span aria-hidden="true">→</span></a><a href="ordnance_view.html"><span>Rail and grenade presentation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/actors.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="feedback.html"><span>Combat feedback</span><span aria-hidden="true">→</span></a><a href="walls.html"><span>Wall contacts</span><span aria-hidden="true">→</span></a><a href="ordnance_view.html"><span>Rail and grenade presentation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/actors.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/actors.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

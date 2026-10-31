@@ -1,10 +1,10 @@
 # RTC continuation during a gameplay reconnect
 
 Use RTC continuation to preserve an authenticated signaling reservation when
-replacing a gameplay transport within the same authority term. `Rtc_Continuation`
-contains
-the existing logical peer ID, opaque room code, resume token and host/client role.
-It is in-memory transport state, not a membership credential, checkpoint or save.
+replacing a gameplay transport within the same authority term.
+`Rtc_Continuation` stores the existing logical peer ID, opaque room code,
+resume token, and host/client role in memory. It is not a membership
+credential, checkpoint, or save.
 
 `rtc_continuation` exports it only from a registered context without a terminal error,
 with authenticated resumption enabled. `Rtc_Config.continuation` accepts it only
@@ -44,8 +44,8 @@ contribute to interruption.
 
 See [recorded outage results](../../../docs/replay/results/relay-outage-2026-09-07/README.md)
 and [TURN fixture commands](../../../tests/replay_turn/README.md). Credential refresh,
-ICE restart, combined coordinator/relay outages, public deployment and other
-platform/browser envelopes remain separate work.
+ICE restart, combined coordinator/relay outages, public deployment, and other
+platform/browser configurations remain separate work.
 
 ## Replacing a peer connection under the same ID
 

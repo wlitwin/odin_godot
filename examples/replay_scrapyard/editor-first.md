@@ -1,4 +1,6 @@
-# Canonical editor-first Replay example
+<a id="canonical-editor-first-replay-example"></a>
+
+# Author scenes and replayable gameplay in Scrapyard
 
 Scrapyard shows the recommended separation between authored Godot composition and
 replayable Odin gameplay. The original sibling Scrapyard remains independently
@@ -15,8 +17,10 @@ nix develop --command bash build/build_scripts.sh examples/replay_scrapyard
 nix develop --command bash examples/replay_scrapyard/play.sh
 ```
 
-The following scenes run independently with F6. The enemy, runner and HUD view
-previews create no Session or World; the gameplay workbench runs a real game session:
+The following scenes run independently with F6. Here, runner means the player
+character; the Replay runner is the runtime advancing simulation. The enemy,
+runner, and HUD view previews create no Session or World. The gameplay
+workbench runs a real game session:
 
 | Scene | Try changing | What owns the change |
 | --- | --- | --- |
@@ -60,13 +64,15 @@ These contain bounded values without scene or mutable Resource pointers.
 `scripts/mob_bridge.odin` uses an owned typed script/archetype binding and forwards
 local impact notices through a typed visitor. Generated view descriptors select
 the explicit hooks; a shared scope tracker compares the explicit run/floor key.
-`drawing.odin` selects the timelines, applies existing smoothing and feeds runner/HUD
-values. It no longer contains actor frame-selection/equipment animation loops.
+`drawing.odin` selects the timelines, applies smoothing, and supplies runner/HUD
+values. View components select actor frames and animate equipment.
 
 The [Stormcaller walkthrough](stormcaller.md) records adding a new enemy through this
 path, including the actual authoring glue and save-version work it required.
 
-## Gameplay is also composed
+<a id="gameplay-is-also-composed"></a>
+
+## Composed gameplay state and rules
 
 `shared/game/game.odin` defines the snapshot boundary and Player's composed state:
 Gun_State, revive Channel, effect slots, cooldowns, progression and motion values.
@@ -80,12 +86,15 @@ Keep visual timers, cached child references and particle resources in view scrip
 The framework handles replay/history/transport; the game continues to choose its
 prediction, authority, admission and recovery policies.
 
-## Edit appearance or gameplay deliberately
+<a id="edit-appearance-or-gameplay-deliberately"></a>
+
+## Change appearance, definitions, or gameplay rules
 
 For a new look for an existing enemy, duplicate a Resource in `visuals/enemies`,
 edit its texture/frame counts/tint/fps, and assign it to an enemy archetype
-registration. Standalone scenes expose one `appearance` for F6 preview. This changes presentation only. Required
-styles/components are validated when binding; incomplete scenes are rejected.
+registration. Standalone scenes expose one `appearance` for F6 preview. This
+changes presentation only. Binding validates required styles/components and
+rejects incomplete scenes.
 
 For different health, speed, radius or weapon mechanics, edit the corresponding
 Resource under `data`. `scripts/content.odin` uses Replay's definition baker to
@@ -93,8 +102,9 @@ validate a complete catalog and rejects duplicate IDs or invalid fields with sou
 paths. The baked catalog is a value in World and recovery checkpoints. Editing a
 Resource afterward cannot mutate a running simulation. Reopen a run to admit a new
 catalog. Export the same typed bake with `tools/stock.py --project PATH` for
-headless stock/tests; `--check` detects stale content. The host's catalog travels in snapshots; semantic code/schema changes still
-follow the game's version/conversion policy.
+headless stock/tests; `--check` detects stale content. Snapshots carry the host's
+catalog. Semantic code/schema changes still follow the game's version/conversion
+policy.
 
 For new behavior, add explicit owned component state if necessary, implement its
 pure tick/action rule, validate it, and expose any authoring configuration through
@@ -107,10 +117,11 @@ attaching a script to a Node does not automatically register multiplayer gamepla
 ## Identities, input, and recovery
 
 Enemies and loot follow entity generations. New generations and epoch/reset/floor
-boundaries get new view lifetimes. Initial observations seed silently. Runners are
+boundaries start new view lifetimes. Initial observations establish comparison
+values without emitting effects. Runners are
 four permanent seat views; generation/warp/epoch changes reset local body cues while
-preserving seat/node identity for camera and UI references. This distinction is
-intentional, rather than forcing every view to have the same lifetime.
+preserving seat/node identity for camera and UI references. Their lifetimes
+therefore differ from the entity-generation lifetimes used by enemies and loot.
 
 Movement/held controls and discrete actions retain their existing admission paths.
 Scene/UI signals can request actions; they do not mutate World. Local player poses
@@ -123,19 +134,22 @@ snapshots omit the server's hit_history. Such frames may contain corrected or lo
 predicted poses; they are cosmetic placement, not hit evidence. Missing ticks or a
 mismatched generation refuse placement. Authority hit judgment/history remain intact.
 
-## Deliberately specialized paths
+<a id="deliberately-specialized-paths"></a>
+
+## Procedural rendering and specialized paths
 
 Seeded arena dressing, projectile/beam/glob batches, particles/trails and some
 presentation-service orchestration remain procedural. Their geometry or membership
-is generated/high-churn, and the previous migration already measured a cost to
-replacing preallocated slots with per-lifetime scenes. Audio routing, lobby/shop
+is generated or changes frequently. Earlier performance comparisons measured a
+cost when replacing preallocated slots with per-lifetime scenes. Audio routing, lobby/shop
 signals and existing authored menu/HUD scenes retain their appropriate APIs.
-They are documented examples of specialized rendering, not hidden gameplay state.
-This migration does not require every line of rendering to become an inspector knob.
+These paths own rendering state separately from gameplay. Scene properties
+remain appropriate for authored appearance; procedural batches remain appropriate
+for generated geometry.
 
-The example still contains older features and a historical parity ledger. The
-canonical recommendation is the ownership/composition workflow described here;
-it is not a claim that every subsystem is the only correct implementation.
+This page describes the example's ownership and composition workflow. Older
+features and the historical parity ledger remain in the project, and specialized
+rendering paths can have different requirements.
 
 ## Validation
 

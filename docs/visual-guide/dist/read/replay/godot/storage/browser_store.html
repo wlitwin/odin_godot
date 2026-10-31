@@ -5,10 +5,11 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Browser blob storage</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/storage/browser_store.md" download>Page source ↓</a></div></div>
 
 <article class="reading-body "><p>Use the browser store to persist bounded opaque bytes in IndexedDB, such as a
-profile or encoded save. <code>browser_store.odin</code> provides asynchronous operations. Keep I/O outside simulation steps. An operation has one owner and three
-phases: Idle, Pending, Complete. Submission returning <code>true</code> means work started;
-only Complete with error None is a success receipt. Close each operation after
-consuming its result.</p>
+profile or encoded save. <code>browser_store.odin</code> provides asynchronous operations
+that run outside simulation steps. Each operation has one owner and moves
+through Idle, Pending, and Complete. A submission returning <code>true</code> reports that
+work started. Only Complete with error None confirms success. Consume the
+result, then close the operation.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">write: storagegd.Browser_Store_Op
 <span class="hljs-keyword">if</span> storagegd.browser_store_write(&amp;write, <span class="hljs-string">&quot;my-game&quot;</span>, <span class="hljs-string">&quot;profile&quot;</span>, bytes, revision, <span class="hljs-number">4096</span>) {
     <span class="hljs-comment">// Continue rendering/pumping. Poll on later frames.</span>
@@ -26,8 +27,9 @@ read/write transaction. Revision zero creates an absent key. Success increments
 the revision; a mismatch returns Conflict without replacing another writer&#39;s
 value. The revision range is 1 through 2^53−1. After a conflict, load the current
 record and decide how to proceed. The API does not merge profiles or inventories.</p>
-<p>Records hold a revision and a Blob. Reads validate shape and Blob size before
-materializing bytes, then check the copy again on the Godot side. Limits are
+<p>Records hold a revision and a Blob. Reads validate the record structure and
+Blob size before copying bytes into memory, then check the copy again on the
+Godot side. Limits are
 1 byte–16 MiB per operation, 16 retained operations and 64 MiB of reserved operation
 capacity per page. Namespace/key strings use 1–128 ASCII letters, digits, dots,
 underscores, hyphens and slashes. Each namespace maps to an origin-local database
@@ -47,8 +49,9 @@ portable power-loss durability is not claimed. Storage errors are surfaced
 without an automatic volatile fallback.</p>
 <p>Closing a pending operation discards its receipt and attempts to abort an active
 transaction. A write may already have committed. Read its record to determine the
-result; closing is not proof of rollback. A pending operation does not become successful merely because time has elapsed. A blocked database open reports Open, and a caller may close an operation
-it no longer wants to await.</p>
+result; closing is not proof of rollback. Elapsed time does not turn a pending
+operation into a success. A blocked database open reports Open; the caller may
+close an operation it no longer wants to await.</p>
 <p><code>tests/replay_browser_store/run.sh</code> exercises the real Godot/WASM bridge and
 IndexedDB: 1 MiB and 16 MiB exact-content round trips, fresh browser recovery,
 two tabs writing from the same observed revision, size/corruption rejection,
@@ -70,5 +73,5 @@ for persistent Session identities and token-scoped self-contained archives. It
 validates ownership and content before resume and retains the initially observed
 slot revision to reject stale-page replacement.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../examples/replay_scrapyard/profiles.html"><span>Local co-op profiles</span><span aria-hidden="true">→</span></a><a href="../../../examples/replay_scrapyard/saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../browser_checkpoint.html"><span>Browser identities and local checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/storage/browser_store.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../examples/replay_scrapyard/profiles.html"><span>Local co-op profiles</span><span aria-hidden="true">→</span></a><a href="../../../examples/replay_scrapyard/saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../browser_checkpoint.html"><span>Browser identities and local checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/storage/browser_store.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/storage/browser_store.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

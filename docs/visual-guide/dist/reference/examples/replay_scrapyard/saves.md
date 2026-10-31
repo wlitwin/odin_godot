@@ -6,7 +6,9 @@ gameplay checkpoint and required spray images. The sections below describe each
 store and the explicit conversion path for older Replay archives.
 
 Current content 51 adds shared turrets; content 50 added authored pulse attacks and
-content 49 records takeover timer resets in the simulation. Content 48 made rewind history authority-only in ordinary replication; complete saves retain it. Content 47 added receipt-time dash actions. The explicit offline converter
+content 49 records takeover timer resets in the simulation. Content 48 made
+rewind history authority-only in ordinary replication; complete saves retain it.
+Content 47 added receipt-time dash actions. The explicit offline converter
 accepts content 42–50 and retains their pending action IDs/ticks, recorded controls
 and assets. Frozen old action enums prevent the new Dash member from changing the
 source schema. The [control contract](controls.md) explains why the legacy dash
@@ -135,8 +137,8 @@ local archives are not a secure competitive progression ledger.
 
 The tool validates the old contract, the full archive and bundle, matching
 container metadata, complete current-frame image dependencies and bounded PNG
-header information. It updates schema/content/protocol/contract stamps, maps any
-pending original actions into the new shape, and rebuilds container checksums.
+header information. It updates schema/content/protocol/contract stamps, maps
+pending original actions into the new representation, and rebuilds container checksums.
 Godot performs the full PNG decode during normal resume. The world, roster, action
 sequences/refusal reasons, image bytes, tick and old epoch remain intact. Raw
 checkpoints are supported only when their worlds have no external image dependencies.

@@ -1,11 +1,11 @@
 # Scrapyard in the browser
 
-The separate Replay project exports to Godot Web and uses authenticated raw
+Replay Scrapyard exports to Godot Web and uses authenticated raw
 WebRTC data channels for gameplay. Room's WebSocket control connection handles
 authority leases and rendezvous. The value simulation, asset cache, action
 admission, checkpoint barrier and migration reducer are shared with native play.
 
-Run the local acceptance gate from the repository root:
+Run the local integration test from the repository root:
 
 ```sh
 nix develop --command bash examples/replay_scrapyard/web_run.sh
@@ -13,12 +13,12 @@ nix develop --command bash examples/replay_scrapyard/web_run.sh
 
 It requires the Godot web export template, Chrome, and the same `puppeteer-core`
 installation used by `tests/web`. Missing prerequisites and failed assertions
-fail the gate. `RSB_LOGS=/absolute/path` retains results at a chosen location;
+fail the test. `RSB_LOGS=/absolute/path` retains results at a chosen location;
 otherwise the script prints its temporary directory. `RSB_MODES=planned` or
 `RSB_MODES=crash` selects one scenario. `REPLAY_PREBUILT=1` reuses native libraries
 and the initial WASM build; the export plugin still builds its release module.
 
-The gate starts a local SQLite authority service and three independent Chrome
+The test starts a local SQLite authority service and three independent Chrome
 processes. It exercises staging, ability selection, readiness, arena entry,
 an actual file-input PNG upload, and spray placement. The selected successor's
 asset consumer pauses deliberately: a checkpoint referencing an unavailable PNG
@@ -35,9 +35,9 @@ hashes. The collector retains at most 1,024 hashes per browser for 20 seconds;
 it never hashes predicted state as authoritative truth. Screenshots, raw logs,
 startup counters, hash maps, driver events and `summary.json` remain available.
 
-Normal browser play now persists its identity, confirmed loadout and upgrades
+Browser play persists its identity, confirmed loadout, and upgrades
 through [IndexedDB profiles](profiles.md). Run `web_profile_run.sh` for the killed-
-browser reload, conflict and corruption gate. This is separate from full run saves.
+browser reload, conflict, and corruption test. This is separate from full run saves.
 
 `web_save_run.sh` tests [complete solo run saves](saves.md) and persistent sprays:
 two uploads, active combat, a killed browser, exact resume, continued gameplay,
@@ -50,7 +50,7 @@ With persistence enabled it stores the upload after validation and waits for the
 commit before adopting it. Native environment options
 have lowercase query equivalents (`RSY_NAME` becomes `name`, for example).
 Coordinated browser play additionally needs `coord_url`, `coord_key`, `member`,
-`incarnation` and the provisioned game token. The gate supplies public fixture
+`incarnation` and the provisioned game token. The test supplies public fixture
 credentials; it is not an account or credential provisioning service.
 
 Current evidence is local Chrome on arm64 macOS with 120 ms receive delay per

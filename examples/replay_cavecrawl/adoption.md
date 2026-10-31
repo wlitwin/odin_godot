@@ -7,7 +7,7 @@ to another, a relic carried by the former host transfers to the successor and
 advances its version once. Other carriers and all avatars retain their identities.
 A dedicated successor has no avatar, so that transition releases the relic.
 
-This follows Kit's host-takeover orphan sweep for non-avatar entities. The new
+This follows Kit's host-takeover orphan sweep for non-avatar entities. This
 policy runs on the first committed simulation tick after restore. The checkpoint
 frame itself remains exact; gameplay and the Carry event are recorded together,
 can be audited/replayed, and roll back together on failure. Repeated observations
@@ -42,7 +42,7 @@ continued movement/release. A three-browser planned takeover checks the same
 ownership transfer alongside the existing party/social recovery story. The four
 successor/guest carrier cases remain regression gates.
 
-This closes the old-host relic ownership gap. Original owner-streamed motion,
-disconnected-avatar floor gating and broader visual/human comparisons remain
-separate work. This policy is specific to Cavecrawl's non-avatar relic; other
+The policy covers relic possession after a player-host change. Original
+owner-streamed motion, disconnected-avatar floor gating, and broader
+visual/human comparisons require separate work. This policy is specific to Cavecrawl's non-avatar relic; other
 games choose their own response to the recorded observation.

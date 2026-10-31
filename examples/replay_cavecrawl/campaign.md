@@ -1,4 +1,6 @@
-# Full co-op campaign acceptance
+<a id="full-co-op-campaign-acceptance"></a>
+
+# Two-floor cooperative campaign test
 
 Run this harness to check Replay Cavecrawl's scripted two-floor campaign. It
 compares gameplay state across a host, client and observer; its result does not
@@ -15,7 +17,7 @@ with 120 ms receive delay per process. It drives ordinary movement/actions and
 reads authority observations; it does not teleport players, edit HP/inventories,
 spawn test-only enemies or assign director/victory state.
 
-The story covers:
+The scenario covers:
 
 1. Loot the first chest, drop its gems and transfer the pickup to the other player.
 2. Carry the relic, move with it and set it down.
@@ -50,5 +52,7 @@ The output directory retains logs, phase receipts, fault configuration and summa
 
 The [campaign evidence](../../docs/replay/results/cave-campaign-2026-09-07/README.md)
 records the verified normal/faulted runs. Original Cavecrawl remains separate.
-Resource-driven definitions, navigation/visual equivalence, UI/chat/pings, broader
-campaign recovery and paired human comparison remain requirements of full parity.
+This campaign fixture does not establish Resource-driven definition behavior,
+navigation/visual equivalence, UI/chat/pings, broader campaign recovery, or
+paired human comparison. Those require separate checks before claiming full
+parity.

@@ -41,11 +41,13 @@ released, the old lease cannot be reactivated by a delayed reply. Abrupt claims
 wait for expiry. Each successful claim increments the epoch and records the
 recovery point and kind. Competing/old-owner claims and stale incarnations fail.</p>
 <h2 id="durable-store-and-coordinator-restart">Durable store and coordinator restart<a class="heading-anchor" href="#durable-store-and-coordinator-restart" aria-label="Link to this section">#</a></h2>
-<p>Every mutation calls <code>Commit(user, expected_revision, next_record)</code> before changing
-the active record or exposing a grant. The backend must atomically compare the
-revision and durably store the complete next record. A failure poisons that
-coordinator instance and suppresses further grants/views. Model tests use an
-in-memory CAS ledger; the separate SQLite adapter has transaction/restart gates.</p>
+<p>Before changing the active record or exposing a grant, every mutation calls
+<code>Commit(user, expected_revision, next_record)</code>. The backend must atomically
+compare the expected revision and durably store the complete next record.
+This compare-and-swap (CAS) prevents a stale coordinator from replacing newer
+decisions. A failed commit permanently disables grants and views from that
+coordinator instance. Model tests use an in-memory CAS ledger; separate SQLite
+adapter tests check transactions and restart behavior.</p>
 <p>Initialization also commits a new coordinator generation/revision, invalidating
 an earlier instance&#39;s subsequent CAS writes. When reopening a record that has
 issued an epoch, the new coordinator does not reuse its predecessor&#39;s absolute
@@ -56,12 +58,12 @@ opposite clock-rate errors. The persisted epoch floor is preserved. This require
 one authoritative, linearizable durable store; independent writable copies of a
 room&#39;s store are not a supported coordination topology. Do not reset the record
 or reuse a room ID to bypass unavailable storage or the quarantine.</p>
-<p>Coordinator loss therefore stops authority after existing leases expire. A
-partition cannot independently elect a host through this profile. The coordinator
-reachable side may recover after the old lease expires; isolated participants
-freeze and later replace their state from the approved authority. Divergent
-inventories are never merged. A quorum-based decentralized profile remains separate
-work for deployments that cannot use a decision service.</p>
+<p>If the coordinator becomes unavailable, authority stops when existing leases
+expire. Participants cannot elect a host independently under this profile.
+Those that can reach the coordinator may recover after the old lease expires.
+Isolated participants freeze, then replace their state with the approved
+authority&#39;s state when they reconnect; divergent inventories are never merged.
+Deployments without a decision service would need a separate quorum-based policy.</p>
 <h2 id="clock-and-reply-contract">Clock and reply contract<a class="heading-anchor" href="#clock-and-reply-contract" aria-label="Link to this section">#</a></h2>
 <p><code>Lease</code> records the local time and sequence <strong>before</strong> sending a request. Only one
 request is outstanding; retransmission uses that original sequence/time. A valid,
@@ -89,11 +91,11 @@ not been exercised by this repository&#39;s gate.</p>
 <code>lease_permit</code> supplies it from a live <code>Lease</code>; an authority lease additionally
 requires that the view&#39;s owner match this process&#39;s identity. An observer/client
 lease tracks the currently approved epoch without granting itself authority.</p>
-<p>The runner checks before accepting local gameplay, pumping gameplay packets,
-predicting/advancing ticks, and issuing gameplay sends. <code>Timeline.advance</code> also
-checks an optional <code>Commit_Gate</code> after simulation but <strong>before</strong> publishing the
-candidate. Rejection preserves the entire history ring, including its oldest slot,
-and the action frontier. Client prediction also restores its action&#39;s pending flag.
+<p>The runner checks its permit before accepting local gameplay, pumping packets,
+advancing or predicting ticks, and sending gameplay data. <code>Timeline.advance</code>
+also checks an optional <code>Commit_Gate</code> after simulating a candidate and before
+publishing it. Rejection preserves the entire history ring, including its oldest
+slot, and the action frontier. Client prediction also restores its action&#39;s pending flag.
 Checking before publication preserves the oldest frame even when the ring is
 full; rewinding after publication would be too late to recover it.</p>
 <p><code>net.Error.Fenced</code> is an expected pause. Godot <code>Session</code> exposes <code>session.fenced</code>,
@@ -134,5 +136,5 @@ planned/crash takeover. Those initial gates do not complete the full M5 matrix.<
 for the current live authority. It atomically disables the member and invalidates
 its prepared succession right without changing existing RPC schemas.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="service.html"><span>Authenticated authority service and durable storage</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="service.html"><span>Authenticated authority service and durable storage</span><span aria-hidden="true">→</span></a><a href="../godot/room.html"><span>Coordinator-driven game rooms</span><span aria-hidden="true">→</span></a><a href="../provision/README.html"><span>Room admission and private coordinator storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/authority/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#decision-model" class="">Decision model</a><a href="#durable-store-and-coordinator-restart" class="">Durable store and coordinator restart</a><a href="#clock-and-reply-contract" class="">Clock and reply contract</a><a href="#runner-enforcement" class="">Runner enforcement</a><a href="#validation-and-remaining-integration" class="">Validation and remaining integration</a></nav><div class="outline-actions"><a href="../../../reference/replay/authority/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -10,8 +10,8 @@ admission hub persists credentials; its authority coordinator grants and checks
 time-bounded hosting leases. It supports one game content ID
 and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
 browser clients use RTC. The service stores and transfers durable checkpoints
-for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball and Slopball3D models. It does not run gameplay;
-checkpoint download does not grant authority or automatically resume a game.</p>
+for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball,
+and Slopball3D models. It does not run gameplay; checkpoint download does not grant authority or automatically resume a game.</p>
 <p>The bundled SQLite service currently runs on macOS/Linux. Both frameworks and all
 original games remain separate. This is an experimental deployment example, not
 a hosted service or a completed Internet operational profile.</p>
@@ -157,8 +157,8 @@ selects a different compatibility contract. Current compiled models are:</p>
 </div><p>Each admitted room receives one bounded checkpoint endpoint. Unknown-room traffic
 does not create endpoints, load storage or restart coordinators. Metadata and
 checkpoint bytes commit atomically with publication and a compare-and-swap
-(CAS) against the full coordinator Record. A final authorization guard rejects a lease that expires during validation or
-storage work. A normal player cannot read authority-only checkpoints; reads require
+(CAS) against the full coordinator Record. A final authorization guard rejects
+a lease that expires during validation or storage work. A normal player cannot read authority-only checkpoints; reads require
 trusted hosting permission, and dedicated rooms additionally require infrastructure.</p>
 <p>Use the <a href="../../replay/provision/checkpoint/README.html">checkpoint client API</a> on the
 same connection as the registered authority RPC. Upload/download/status packets
@@ -171,16 +171,15 @@ and its declared external asset bytes. Scrapyard&#39;s current and executable pe
 spray dependencies use a <a href="../../replay/provision/checkpoint/assets.html">complete atomic package</a>,
 validated by the service and installed before restoration. Personal profiles remain
 separate. <a href="../../replay/godot/room_save.html">Room/Party</a> handles manual/automatic
-publication and Cavecrawl exposes its save status; other games still need UI and
-asset preparation, and
-all-members-gone gameplay needs the complete Room/Party restore flow. The service
-now supports an explicit <a href="../../replay/provision/checkpoint/restore.html">published restore grant</a>:
+publication; game integrations must supply UI and asset preparation.
+Recovery after all members leave requires the complete Room/Party restore flow.
+The service supports an explicit <a href="../../replay/provision/checkpoint/restore.html">published restore grant</a>:
 expired-owner registration remains lease/quarantine fenced, then a separate CAS
 authorizes an exact saved publication under a newer epoch. Native model fixtures
-exercise this. Room/Party now drives it through Cavecrawl&#39;s native/browser rejoin
-menu, with callback-gated asset preparation. Scrapyard now also passes native/browser
+exercise this. Room/Party drives it through Cavecrawl&#39;s native/browser rejoin
+menu, with callback-gated asset preparation. Scrapyard also passes native/browser
 restoration after deleting its local spray copy. Broader asset profiles and game
-acceptance remain open. Slopball now has native WSS and browser RTC acceptance
+acceptance remain open. Slopball has native WSS and browser RTC acceptance
 for restoring its published owner-streamed world and first actual solver momentum
 after all game processes and the service stop; see <a href="../replay_slopball/online.html#reopening-a-saved-party">its restore flow</a>.
 Slopball3D also has native/browser acceptance for quaternion and angular-momentum
@@ -204,8 +203,8 @@ CHECKPOINT_RESTORE=1 nix develop --<span class="hljs-built_in">command</span> ba
 handoff, loot conservation and fresh-process rejoin. Browser acceptance includes
 two simultaneous isolated rooms. Native uses verified fixture TLS; browser uses
 explicit loopback WS and real RTC. See <span class="local-reference" title="docs/replay/results/cave-online-menu-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
-<p>The checkpoint gate uses the actual standalone service and each of the three game
-models over verified TLS. It publishes and downloads a tick-1 checkpoint, kills
+<p>The original checkpoint gate used the standalone service and three game models
+over verified TLS. The fixture publishes and downloads a tick-1 checkpoint, kills
 the service, reopens the same database, and verifies the identical archive from a
 fresh trusted incarnation 2 with zero authority lease. It also rejects mismatched
 deployment models before database creation. This is native seeded-state persistence
@@ -214,5 +213,5 @@ play and after migration. Its <code>party_restore_run.sh</code> and <code>party_
 gates resume actual saved cave play after every original process has exited, then
 admit a new guest and publish the continued game.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="../../replay/provision/checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_room_service/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/relay/README.html"><span>Authenticated short-lived relay credentials</span><span aria-hidden="true">→</span></a><a href="../../replay/provision/checkpoint/README.html"><span>Authenticated checkpoint transfer</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_room_service/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#local-cavecrawl" class="">Local Cavecrawl</a><a href="#configuration" class="">Configuration</a><a href="#durable-checkpoints" class="">Durable checkpoints</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_room_service/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

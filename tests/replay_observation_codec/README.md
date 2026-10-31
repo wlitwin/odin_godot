@@ -11,7 +11,7 @@ nix develop --command bash tests/replay_cave_comparison/build.sh /absolute/fresh
 nix develop --command python3 tests/replay_observation_codec/cohort.py /absolute/fresh/prepared /absolute/fresh/cohort
 ```
 
-The output preserves all process traces and a six-pair report. It checks quiet
+The output preserves all process traces and a six-run report for the three pairs. It checks quiet
 gameplay, inventory, two confirmed client actions, completed backups and bounded
 measurement windows. Network tests cover malformed encoding, independent decode,
 reordering/loss, signed zero and dense fallback. `tests/replay_observation_compat`

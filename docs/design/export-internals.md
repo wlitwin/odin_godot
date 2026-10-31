@@ -5,9 +5,9 @@ describe that milestone, including its incomplete browser path. The subsequent
 [web implementation record](web-internals.md) records browser execution; use
 [Exporting](../exporting.md) for current build instructions.
 
-Turns the working extension into a shippable game: `.odin` scripts are compiled
-**ahead of time, at export**, into the exported build (an exported game has no Odin
-compiler). Native desktop (macOS) is the **firm** milestone; web/WASM is secondary.
+Phase 5 compiled `.odin` scripts ahead of time during export and bundled them
+with the game, so the exported game needed no Odin compiler. Native macOS
+export was the required milestone; web/WASM was secondary.
 
 ## Verdict
 
@@ -28,7 +28,7 @@ Two GDExtension classes, in `core/export_plugin.odin`, registered **only at the
 `.Editor` initialization level** (`core/main.odin`). An exported game never reaches
 `.Editor`, so neither exists at runtime — the same `core` dll plays both roles.
 
-- **`OdinExportPlugin`** (extends `EditorExportPlugin`) — the work. In `_export_begin`:
+- **`OdinExportPlugin`** extends `EditorExportPlugin`. Its `_export_begin`:
   1. reads the export feature set to determine the target OS (`macos`/`linux`/`windows`/`web`);
   2. runs `build/build_export_scripts.sh <proj> <target> <out.dll>` via `libc.system`
      (inherits the editor process's nix PATH, so `odin` resolves) — this is the
@@ -37,7 +37,7 @@ Two GDExtension classes, in `core/export_plugin.odin`, registered **only at the
   3. `add_shared_object`s that dll so the exporter copies it **beside the executable**
      (macOS → `Contents/Frameworks/`, alongside the auto-exported core dll).
 
-- **`OdinEditorPlugin`** (extends `EditorPlugin`) — a thin host. GDExtension can only
+- **`OdinEditorPlugin`** extends `EditorPlugin` and installs the export plugin. GDExtension can only
   register an *editor* plugin by class name (`editor_add_plugin`); the binding exposes
   no `EditorExport` singleton. So this plugin, in its `_enter_tree`, constructs the
   `OdinExportPlugin` and `add_export_plugin`s it. Registered with
@@ -48,24 +48,30 @@ handling (it is listed in `[libraries]` of the `.gdextension`), so the plugin do
 **not** re-add it; it only bundles the dynamically-loaded scripts dll, which Godot
 does not otherwise know about.
 
-### Runtime dll resolution (the load-bearing change)
+<a id="runtime-dll-resolution-the-load-bearing-change"></a>
+
+### Resolving the scripts library at runtime
 
 In an exported game `res://` is packed and cannot be `dlopen`ed, so the old
 `globalize("res://bin/libodinscripts.<ext>")` resolution breaks. `core/scripts.odin`
-now finds the scripts dll as a **sibling of the core dll**, via `dladdr` on one of the
+finds the scripts dll beside the core dll, using `dladdr` on one of the
 core's own procs → directory → `libodinscripts.<ext>`. Resolution order:
 `ODIN_SCRIPTS_DLL` env (test harness) → sibling-of-core → `res://` globalize (dev
-fallback). Works unchanged in both dev and exported builds; no test regressions.
+fallback). The tested development and exported builds used this resolution without
+regressions in the existing tests.
 
-## 2. Run it (firm milestone)
+<a id="2-run-it-firm-milestone"></a>
+
+## 2. Verify the native export
 
 ```sh
 nix develop --command bash -c 'bash tests/phase5/run.sh'      # prints PHASE5_OK
 ```
 
-Which does: build the core dll → headless `--export-release "macOS"` (the plugin
-compiles + bundles the scripts dll) → run the exported `.app` headless and assert the
-Odin `_ready` sentinels `EXPORT_RAN` + `EXPORT_ASSERT_OK`.
+The test builds the core dll, runs headless `--export-release "macOS"` so the
+plugin compiles and bundles the scripts dll, then launches the exported `.app`
+headlessly. It requires the Odin `_ready` sentinels `EXPORT_RAN` and
+`EXPORT_ASSERT_OK`.
 
 Verified output bundle:
 
@@ -76,7 +82,9 @@ out/OdinGamePhase5.app/Contents/Frameworks/libodin_godot.dylib (core — auto-ex
 out/OdinGamePhase5.app/Contents/Frameworks/libodinscripts.dylib(scripts — add_shared_object'd by us)
 ```
 
-### Gotchas encountered (macOS export)
+<a id="gotchas-encountered-macos-export"></a>
+
+### Observed macOS export requirements and errors
 
 - The installed `macos.zip` template ships only `godot_macos_*.universal`, so the
   preset must use `binary_format/architecture="universal"` (not `"arm64"`), else
@@ -96,7 +104,7 @@ the matching cross **linker** on PATH (lld is in the dev shell; a full target sy
 may still be required for the system libs the core links: `core:os`/`core:dynlib`/
 `libc`). The bundling half is platform-agnostic (`add_shared_object` + sibling-of-core
 resolution). Not exercised on this macOS host; no auto-download of templates was done.
-Linux/Windows 4.6.2 templates ARE installed, so only the cross-toolchain is missing.
+Linux/Windows 4.6.2 templates were installed, so only the cross-toolchain is missing.
 
 ## 4. Web / WASM — RED for in-browser load (precise blockers)
 
@@ -120,25 +128,25 @@ binding** surfaces two independent, specific blockers:
    32-bit, so generated enums backed by `int` that carry a `>2^31` flag value fail to
    compile, e.g. `godot/rendering_server.gen.odin`:
    `Cannot convert numeric value '34359738368' … to 'Rendering_Server_Array_Format'`
-   (`= 0x8_0000_0000`). A few `*.gen.odin` files contain such constants. The real fix
+   (`= 0x8_0000_0000`). A few `*.gen.odin` files contain such constants. The required generator change
    is in **`bindgen`** (emit `enum i64` / a 64-bit backing type for flag enums) and a
    regeneration of `godot/` — `bindgen`/`extension_api.json` are out of scope to edit
    here, so this is flagged, not patched.
 
 Because (1) is a core rearchitecture and (2) needs a bindgen change, no new full-stack
 wasm was produced; the leaf-proc → SIDE_MODULE → Godot-web-export-bundles-it path from
-Spike W is the current high-water mark (🟡). The web export *wiring* (`.gdextension`
+Spike W was the furthest verified web result at this milestone (🟡). The web export *wiring* (`.gdextension`
 `web.{debug,release}.wasm32` → wasm, headless `--export-release "Web"`, COOP/COEP
 serve) is documented in `docs/wasm-spike.md` §5 and unchanged.
 
 ### Emscripten 4.0.20 pin — outcome
 
-Unchanged from Spike W: time-boxed out. nixpkgs couples `emscripten` to a bundled
+Pinning remained unfinished after Spike W's time-limited experiment. nixpkgs
+couples `emscripten` to a bundled
 LLVM/binaryen, so a bare version override doesn't work; the dev shell ships 5.0.6.
 Recommended (see `flake.nix`): pin **4.0.20** via an emsdk-based derivation (emsdk
 fetches the matching prebuilt LLVM) or a second `nixpkgs` input at a rev that shipped
-4.0.20. Moot until blockers (1)+(2) above are resolved — there is no full-binding wasm
-to re-link yet.
+4.0.20. This remained blocked on (1)+(2): no full-binding wasm was available to re-link.
 
 ## Files added / changed
 

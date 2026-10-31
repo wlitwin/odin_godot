@@ -2,11 +2,12 @@
 
 Use an explicit checkpoint converter when a saved archive's protocol or game
 schema differs from the current model. `checkpoint_decode` and `server_restore`
-require the current protocol,
-archive layout, schemas, model and application-supplied content ID. A failed load
-never guesses a conversion or changes the source bytes.
+require the current protocol, archive layout, schemas, model and
+application-supplied content ID. If these do not match, loading fails without
+inferring a conversion or changing the source bytes.
 
-The first bridge is `checkpoint_upgrade_v6(bytes, model, content, allocator)`.
+`checkpoint_upgrade_v6(bytes, model, content, allocator)` converts protocol 6
+archives to the current protocol.
 It accepts gameplay protocol 6 / checkpoint layout 4 and returns owned protocol-7
 archive bytes, or an error and no output. Free a successful result with the same
 allocator. The input is borrowed, remains unchanged and can be released after
@@ -32,7 +33,7 @@ The authority frame, tick, epoch, roster, held/future controls, queued actions,
 settled outcomes, bans and opaque admission-policy bytes are preserved. Scheduled
 and latest-observation models retain distinct contracts. Passing the wrong control
 timing fails. Passing an already-current archive also fails; this is a specific
-bridge rather than an idempotent generic loader.
+converter for protocol 6, not a generic loader that accepts repeated conversion.
 
 The bridge only applies while the current protocol is 7. It does not convert older
 archive layouts, different state schemas, removed fields, changed gameplay content
@@ -99,8 +100,8 @@ shape when importing into content 44.
 `checkpoint_convert_state(bytes, source_model, source_content, target_model,
 target_content, convert)` maps a complete source world into a target world. The
 source must use the current protocol; controls, actions, events, seat count and
-control timing remain shared. Keep explicit source-version world types instead of
-making normal decode guess older layouts.
+control timing remain shared. Define explicit world types for each supported
+source version; normal decode does not infer older layouts.
 
 The mapper returns `(target_world, ok)`. A refused mapping, invalid target world or
 insufficient restored egress budget fails without output. Full source validation
@@ -110,7 +111,7 @@ bytes remain intact. Output is owned; the borrowed source is unchanged. This
 conversion has the same authority and external-asset limitations described above.
 
 [Cavecrawl's explicit importer](../../examples/replay_cavecrawl/authoring.md)
-uses this boundary to add two captured floor definitions to an older Replay world.
+uses this converter to add two captured floor definitions to an older Replay world.
 Its fixture is a real save produced by the earlier game binary, then converted and
 resumed by the current game in a fresh process.
 

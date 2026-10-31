@@ -10,7 +10,8 @@ held across resume, and one new shot after release and a fresh press.
 
 A test-only method feeds explicit frame durations into the production process
 function, after disabling automatic processing once the node is ready. Its device
-sampler, fixed clock, shared reducer, journal and renderer remain the real code.
+sampler, fixed clock, shared simulation step, journal, and renderer use the
+production code.
 One second at each rate produces exactly 60 ticks, five held-fire shots and the
 same movement. A press/release before any tick survives until one tick consumes it;
 a ten-second stall produces only eight steps, and pause/resume leaves no backlog.

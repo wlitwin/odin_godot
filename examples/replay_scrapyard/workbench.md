@@ -60,20 +60,21 @@ nix develop --command bash examples/replay_scrapyard/workbench_run.sh
 nix develop --command bash tests/replay_scrapyard/development_run.sh
 ```
 
-The first gate exercises the panels/status/jam preview, a boss that prevents clear,
+The first test exercises the panels/status/jam preview, a boss that prevents clear,
 and a normal wipe. It checks action confirmation, UI content, key transitions,
 continued simulation with blocked movement, status refresh, environment restoration
 and clean shutdown. A rendered capture is retained in the
 [workbench evidence](../../docs/replay/results/workbench-2026-09-07/README.md).
-The second gate rejects all six edits from a real client, accepts the host's grants
+The second test rejects all six edits from a real client, accepts the host's grants
 to that client and compares both complete world hashes afterward.
 
-These additions advance editor/UI parity. The [audio/settings layer](audio.md) now supplies volume, shake, fullscreen and
+The [audio/settings layer](audio.md) supplies volume, shake, fullscreen, and
 spray-preview controls. Full visual/listening parity and paired human review remain
 required work. This is not a claim of full Scrapyard feature parity.
 
-The action extension introduced content `...3043`; audio event details advance the
-version to `...3044`; [cast paths](cast_paths.md) advanced it to `...3046`, followed by [dash actions](controls.md) at `...3047`. Gameplay protocol 7 and checkpoint layout 4 are
-unchanged. The explicit [save importer](saves.md#converting-a-protocol-6-run) maps
+The action extension introduced content `...3043`; audio event details
+introduced `...3044`; [cast paths](cast_paths.md) introduced `...3046`, followed
+by [dash actions](controls.md) at `...3047`. Gameplay protocol 7 and checkpoint
+layout 4 were unchanged by these transitions. The explicit [save importer](saves.md#converting-a-protocol-6-run) maps
 content-42/43/44/45 archives, including pending accepted/refused requests, while preserving
 the complete world and image payloads.

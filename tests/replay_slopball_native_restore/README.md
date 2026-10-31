@@ -27,7 +27,7 @@ This tests local trusted WSS recovery; public deployment and broader failure/phy
 coverage remain separate requirements.
 
 
-The runner now executes both original-creator and trusted-seat-two restoration.
+The runner executes both original-creator and trusted-seat-two restoration.
 Use `RSL_RESTORE_OWNER=host` or `striker` with the execute helper to select one case.
 In the latter, the creator remains absent until seat two restores the published
 world and solver momentum, then rejoins seat one. Continued publication is checked

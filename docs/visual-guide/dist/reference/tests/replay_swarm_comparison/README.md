@@ -22,8 +22,8 @@ The host fills forty stock scrapbots, then replenishes toward forty every six
 ticks, with at most four spawn requests per batch. Spawn requests and nearest-enemy
 aim selection run through existing game development paths inside the timed game
 callback. Enemy AI, collisions, projectiles, damage, death/reaping and pickups run
-through ordinary gameplay. Both peers arm after a two-second warmup with settled receive progress and fire for
-twenty seconds. A shared stop barrier and two-second settle precede final receipts.
+through ordinary gameplay. Both peers arm after a two-second warmup with
+settled receive progress and fire for twenty seconds. A shared stop barrier and two-second settle precede final receipts.
 
 Acceptance requires 32–44 living enemies in every captured frame, a time-weighted
 mean of at least 36, at least twenty kills, sixty observed enemy identities, twenty
@@ -45,14 +45,14 @@ its different networking/simulation/presentation work and the spawn/aim adapter.
 Census and GDScript observation work are outside that timer but consume process
 time and memory. The reported census subtotal ends after enemy enumeration and
 authority conservation checks; subsequent counter reads and trace construction
-are outside both timers. It is not total instrumentation CPU cost. RSS includes instrumentation
-and is sampled only while the measurement marker is active. Application output
+are outside both timers. It is not total instrumentation CPU cost. RSS includes
+instrumentation and is sampled only while the measurement marker is active. Application output
 counts accepted protocol bytes, including Replay's other router lanes and Kit's
 one-byte tag, excluding ENet framing/retransmission. Delay settings are not measured
 RTT. Nearest-rank percentiles and median/range across three pairs are descriptive,
 not confidence intervals or a framework-only ratio.
 
-The same intent and population envelope do not imply identical transient worlds.
+The same intent and population bounds do not imply identical transient worlds.
 Authority models, spawn scheduling, targets, shots, attribution and presentation
 differ. Clients observe different prediction/authority scopes. This is a sustained
 offensive workload: movement, player damage, status/ability combinations, changing

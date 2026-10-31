@@ -2,28 +2,29 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/ui — stock-theme widgets · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/ui — stock-theme widgets</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/ui.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#api-by-task">API by task</a><a href="#adopting-your-own-scenes">Adopting your own scenes</a><a href="#worked-example-cavecrawl">Worked example (cavecrawl)</a><a href="#gotchas">Gotchas</a><a href="#netgraph">Netgraph</a></nav></details>
-<article class="reading-body "><p>The toolkit provides stock widgets built programmatically, so no scene assets need to be
-installed and any script can summon them. You get a lobby, a chat box, a scoreboard, and the
-HUD set (interact prompt, inventory grid/hotbar, hp bar, abilities bar). Styling is stock
-Godot theme. Theme the returned nodes if your game wants its own look, or replace a widget&#39;s
-chrome wholesale with <a href="#adopting-your-own-scenes">the adopt contract</a>.</p>
-<p><strong>Lane compatibility: lane-agnostic.</strong> Widgets read session-level state (roster, stats,
-chat) and whatever values the game hands them; both lanes use them as-is (the netgraph
-overlay draws coop and sim rows alike). The HUD set&#39;s <em>feeders</em> in the examples are
-coop-shaped (e.g. the ability bar reads kit/combat cooldowns); a sim game feeds the same
-widgets from its own fields.</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> kui <span class="hljs-string">&quot;godot:kit/ui&quot;</span></code></pre></div><h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
-<p><strong>kit/ui builds controls, it never owns flow.</strong> Every widget follows the same contract: a
-<code>*_make</code> builds nodes under a parent you supply and hands back the handles; the GAME wires
-the buttons/input and decides when to repaint (<code>*_refresh</code> on events, not per frame, except
-for the HUD, which the owner repaints live); <code>*_destroy</code> frees only the tracking arrays, and
-the node tree belongs to the scene and is freed with the owner.</p>
-<p>Refresh procs reuse their row Labels across repaints and hide extras; nothing reallocates
-per frame.</p>
-<p>The package&#39;s <strong>public API takes <code>string</code>, not <code>cstring</code></strong>. Callers can pass
-<code>fmt.tprintf</code> results; the widget implementation handles engine string conversion.</p>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/ui — stock-theme widgets</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/ui.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#widget-creation-refresh-and-ownership">Widget creation, refresh, and ownership</a><a href="#api-by-task">API by task</a><a href="#adopting-your-own-scenes">Adopting your own scenes</a><a href="#worked-example-cavecrawl">Worked example (cavecrawl)</a><a href="#layout-and-lifecycle-constraints">Layout and lifecycle constraints</a><a href="#netgraph">Netgraph</a></nav></details>
+<article class="reading-body "><p><code>kit/ui</code> builds a lobby, chat box, scoreboard, interaction prompt, inventory
+and hotbar, hp bar, and abilities bar from Godot controls. It uses the stock
+Godot theme and requires no scene assets. Theme the returned nodes or supply
+custom scenes through <a href="#adopting-your-own-scenes">scene adoption</a>.</p>
+<p>Widgets read session state such as roster, stats, and chat, plus values the
+game supplies. They work with either replication lane; the netgraph displays
+both coop and simulation statistics. HUD examples use coop fields such as
+kit/combat cooldowns. A simulation game passes its corresponding fields to the
+same widgets.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> kui <span class="hljs-string">&quot;godot:kit/ui&quot;</span></code></pre></div><p><span id="mental-model"></span></p>
+<h2 id="widget-creation-refresh-and-ownership">Widget creation, refresh, and ownership<a class="heading-anchor" href="#widget-creation-refresh-and-ownership" aria-label="Link to this section">#</a></h2>
+<p>Call <code>*_make</code> with a parent node to build controls and receive their handles.
+The game connects buttons and input, then calls <code>*_refresh</code> when displayed
+state changes. Lobby, chat, and scoreboard refresh on events; the local HUD
+refreshes during frames to show live values. <code>*_destroy</code> releases tracking
+arrays only. The scene owns the nodes and frees them with their parent.</p>
+<p>Refresh procedures reuse row Labels and hide unused rows rather than rebuilding
+them on each update.</p>
+<p>The public API accepts <code>string</code>, so callers can pass <code>fmt.tprintf</code> results
+without converting to <code>cstring</code>. Widget implementations perform the engine
+string conversion.</p>
 <h2 id="api-by-task">API by task<a class="heading-anchor" href="#api-by-task" aria-label="Link to this section">#</a></h2>
 <p><strong>Lobby</strong> provides a title, status line, live roster, and three buttons:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">lobby_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node, title: <span class="hljs-type">string</span>) -&gt; Lobby
@@ -31,14 +32,16 @@ lobby_destroy :: <span class="hljs-keyword">proc</span>(l: ^Lobby)
 lobby_set_status :: <span class="hljs-keyword">proc</span>(l: ^Lobby, text: <span class="hljs-type">string</span>)
 lobby_show_menu :: <span class="hljs-keyword">proc</span>(l: ^Lobby, menu: <span class="hljs-type">bool</span>, start: <span class="hljs-type">bool</span>)
 lobby_show_code :: <span class="hljs-keyword">proc</span>(l: ^Lobby, show: <span class="hljs-type">bool</span>)   <span class="hljs-comment">// reveal the join-code field</span>
-lobby_code :: <span class="hljs-keyword">proc</span>(l: ^Lobby) -&gt; <span class="hljs-type">string</span>          <span class="hljs-comment">// what the human typed — trimmed, UPPERCASED, temp-allocated</span>
-lobby_refresh :: <span class="hljs-keyword">proc</span>(l: ^Lobby, s: ^ksess.Session)</code></pre></div><p><code>Lobby</code> exposes <code>host_btn</code>, <code>join_btn</code>, <code>start_btn</code> (<code>gd.Button</code>) for the game to connect;
-<code>start_btn</code> starts hidden until the host likes the roster (<code>lobby_show_menu</code>).
-<code>lobby_refresh</code> repaints the roster from the <a href="session.html">session</a>: sorted by <code>Player_Id</code>
-(join order, which stays stable), the host crowned, yourself marked <code>(you)</code>, departed players
-dimmed to <code>(away)</code>, and the stat registry&#39;s auto-fed ping when measured. Games with a relay
-call <code>lobby_show_code</code> once in <code>ready()</code> (the field sits above Join, and the menu toggles
-honor it). Join then reads <code>lobby_code</code>, where <code>&quot;&quot;</code> means join by address.</p>
+lobby_code :: <span class="hljs-keyword">proc</span>(l: ^Lobby) -&gt; <span class="hljs-type">string</span>          <span class="hljs-comment">// entered code, trimmed and uppercased; temporary allocation</span>
+lobby_refresh :: <span class="hljs-keyword">proc</span>(l: ^Lobby, s: ^ksess.Session)</code></pre></div><p>Connect handlers to <code>Lobby</code>&#39;s <code>host_btn</code>, <code>join_btn</code>, and <code>start_btn</code>, each a
+<code>gd.Button</code>. <code>start_btn</code> is initially hidden; the game shows it through
+<code>lobby_show_menu</code> when its start conditions are met.</p>
+<p><code>lobby_refresh</code> reads the <a href="session.html">session</a> roster in stable <code>Player_Id</code>
+join order. It marks the host with a crown, the local player with <code>(you)</code>,
+and departed players with dimmed <code>(away)</code> text. Measured ping comes from the
+session stat registry. Relay games call <code>lobby_show_code</code> in <code>ready()</code> to
+reveal the code field above Join. The Join handler reads <code>lobby_code</code>;
+<code>&quot;&quot;</code> selects address-based joining.</p>
 <p><strong>Chat box</strong> provides a bounded scrollback of <a href="comms.html">kit/comms</a> lines plus a <code>Line_Edit</code>
 (<code>CHAT_SHOW :: 8</code> rows painted; the comms log keeps more):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">chat_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node) -&gt; Chat
@@ -46,24 +49,23 @@ chat_destroy :: <span class="hljs-keyword">proc</span>(ch: ^Chat)
 chat_show :: <span class="hljs-keyword">proc</span>(ch: ^Chat, visible: <span class="hljs-type">bool</span>)
 chat_clear_input :: <span class="hljs-keyword">proc</span>(ch: ^Chat)
 chat_refresh :: <span class="hljs-keyword">proc</span>(ch: ^Chat, c: ^kcomms.Comms)
-chat_submit :: <span class="hljs-keyword">proc</span>(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^<span class="hljs-type">bool</span> = <span class="hljs-literal">nil</span>)</code></pre></div><p>It paints <code>name: text</code> for speech and <code>* text</code> for system lines. The game connects
-<code>chat.input</code>&#39;s <code>text_submitted</code> and calls <code>chat_submit</code> from it. The handler extracts
-(clamped), says, clears, and releases input focus. Without the focus release, a keyboard
-player&#39;s movement keys (WASD) stay trapped in the chat box after every message. <code>sent</code> (the
-game&#39;s latch) stops the submitting Enter from immediately re-opening chat when the game binds
-Enter to &quot;talk&quot;.</p>
-<p><strong>Scoreboard</strong> shows players against whatever stat columns the game registered (ping
-auto-fed, damage/kills/deaths from <a href="combat.html">kit/combat</a>, the game&#39;s own counters), straight
-from the session&#39;s stat registry. kit/ui renders what the registry holds; it declares
-nothing:</p>
+chat_submit :: <span class="hljs-keyword">proc</span>(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^<span class="hljs-type">bool</span> = <span class="hljs-literal">nil</span>)</code></pre></div><p>Chat displays speech as <code>name: text</code> and system lines as <code>* text</code>. Connect
+<code>chat.input</code>&#39;s <code>text_submitted</code> signal to a handler that calls <code>chat_submit</code>.
+It extracts and clamps the text, sends it, clears the input, and releases focus
+so movement keys such as WASD return to gameplay. The optional <code>sent</code> latch
+prevents the submitting Enter key from immediately reopening chat when Enter
+is also bound to &quot;talk&quot;.</p>
+<p><strong>Scoreboard</strong> displays the session stat columns the game registered, including
+measured ping, damage/kills/deaths recorded through <a href="combat.html">kit/combat</a>,
+and game-specific counters. <code>kit/ui</code> reads those columns without declaring them:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">score_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node) -&gt; Score
 score_destroy :: <span class="hljs-keyword">proc</span>(sb: ^Score)
-score_show :: <span class="hljs-keyword">proc</span>(sb: ^Score, visible: <span class="hljs-type">bool</span>)          <span class="hljs-comment">// classically: while Tab is held</span>
+score_show :: <span class="hljs-keyword">proc</span>(sb: ^Score, visible: <span class="hljs-type">bool</span>)          <span class="hljs-comment">// show while Tab is held</span>
 score_hide :: <span class="hljs-keyword">proc</span>(sb: ^Score, name: <span class="hljs-type">string</span>)           <span class="hljs-comment">// hide a column by name</span>
-score_refresh :: <span class="hljs-keyword">proc</span>(sb: ^Score, s: ^ksess.Session)</code></pre></div><p>Departed players stay listed; their tallies survive disconnects. Some stat columns are
-PLUMBING, not score: a loadout choice replicated through the registry (scrapyard&#39;s look/iron,
-the muster&#39;s ready bit) has no business on the board. <code>score_hide</code> keeps it off (call it once,
-after the columns are declared; unknown names are a harmless no-op).</p>
+score_refresh :: <span class="hljs-keyword">proc</span>(sb: ^Score, s: ^ksess.Session)</code></pre></div><p>Departed players remain listed with their accumulated stats. Some registered
+columns carry game state that should stay off the scoreboard, such as
+Scrapyard&#39;s look/iron loadout choices or the muster&#39;s ready bit. Call
+<code>score_hide</code> once after declaring those columns. Unknown names are ignored.</p>
 <p><strong>HUD</strong> provides a prompt, inventory/hotbar, hp, and abilities:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">prompt_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node) -&gt; Prompt
 prompt_set :: <span class="hljs-keyword">proc</span>(p: ^Prompt, text: <span class="hljs-type">string</span>)           <span class="hljs-comment">// &quot;&quot; hides the prompt</span>
@@ -78,41 +80,43 @@ hp_refresh :: <span class="hljs-keyword">proc</span>(hb: ^Hp_Bar, current, max_h
 
 abilities_make :: <span class="hljs-keyword">proc</span>(parent: gd.Node, capacity: <span class="hljs-type">int</span>) -&gt; Abilities_Bar
 abilities_refresh :: <span class="hljs-keyword">proc</span>(bar: ^Abilities_Bar, defs: []kcombat.Ability_Def, cds: []<span class="hljs-type">u16</span>, resource: <span class="hljs-type">i32</span>, tick_hz: <span class="hljs-type">int</span>)
-abilities_destroy :: <span class="hljs-keyword">proc</span>(bar: ^Abilities_Bar)</code></pre></div><p>All widgets are text blocks over stock theme: the hp bar renders <code>hp ▓▓▓▓▓▓▓░░░ 70/100</code> (zero
-art to install, and a test can read the exact fill back out of the tree), and abilities
-render <code>[rock]</code> ready, <code>[rock 1.2s]</code> cooling, or <code>[rock $]</code> ready-but-unaffordable. Cooldowns
-count TICKS of whichever loop decays them, so <code>tick_hz</code> is required. Pass
-<code>session_tick_hz(&amp;ses)</code> (or the lane&#39;s rate on a sim game), and the seconds shown are true at
-any configured rate. BOTH ability models feed the one widget: <code>kcombat.Ability_Def</code> is the
-def vocabulary at every layer. A slot-array game passes its <code>Cooldowns</code> bundle (<code>c.cds[:]</code>);
-a play-block game gathers its blocks&#39; countdowns into a local array beside the same def rows
-(<code>[]u16{r.slime.cd, r.ignite.cd}</code>). With <code>selected</code>, the inventory row doubles as a hotbar.</p>
+abilities_destroy :: <span class="hljs-keyword">proc</span>(bar: ^Abilities_Bar)</code></pre></div><p>HUD widgets render text using the stock theme. The hp bar displays
+<code>hp ▓▓▓▓▓▓▓░░░ 70/100</code>, which a test can read from the node tree. Abilities
+display <code>[rock]</code> when ready, <code>[rock 1.2s]</code> while cooling down, or <code>[rock $]</code>
+when ready but unaffordable.</p>
+<p>Cooldown values count ticks, so pass the rate of the loop that decrements them
+as <code>tick_hz</code>. Use <code>session_tick_hz(&amp;ses)</code> for coop cooldowns or the simulation
+lane&#39;s rate for simulated cooldowns. This converts the displayed duration to
+seconds at the configured rate.</p>
+<p>Both ability storage models use <code>kcombat.Ability_Def</code> rows. A slot-array game
+passes its <code>Cooldowns</code> array as <code>c.cds[:]</code>; a play-block game gathers its
+countdowns beside the same definitions, such as <code>[]u16{r.slime.cd, r.ignite.cd}</code>.
+Pass <code>selected</code> to display the inventory row as a hotbar.</p>
 <h2 id="adopting-your-own-scenes">Adopting your own scenes<a class="heading-anchor" href="#adopting-your-own-scenes" aria-label="Link to this section">#</a></h2>
-<p>The stock implementation can also drive authored scenes. A game that wants its own
-lobby/chat/scoreboard authors a scene in the editor and hands it to boot
-(<code>Options.lobby_scene</code> / <code>chat_scene</code> / <code>score_scene</code>, see <a href="boot.html">boot.md</a>); the kit
-ADOPTS it: instances the scene, resolves the nodes it drives <strong>by NAME, at any depth</strong>
-(nest your chrome however you like), and pours the stock behavior into them. Everything
-else in the scene is the game&#39;s own; the kit never touches what it didn&#39;t name. A
-missing contract node is reported LOUDLY (once, at boot, greppable) and degrades to a
-dead widget, not a crash.</p>
+<p>To use an authored lobby, chat, or scoreboard, build its scene in the editor
+and pass it through Boot&#39;s <code>Options.lobby_scene</code> / <code>chat_scene</code> / <code>score_scene</code>;
+see <a href="boot.html">boot.md</a>. Kit instantiates the scene and finds its required
+controls by name at any depth. Those controls receive the standard behavior,
+while the game controls additional nodes and appearance. A missing required
+node produces a log message once during boot and leaves the widget inactive
+without crashing.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">lobby_adopt :: <span class="hljs-keyword">proc</span>(parent: gd.Node, scene: gd.Packed_Scene, title: <span class="hljs-type">string</span>) -&gt; Lobby
 chat_adopt :: <span class="hljs-keyword">proc</span>(parent: gd.Node, scene: gd.Packed_Scene) -&gt; Chat
-score_adopt :: <span class="hljs-keyword">proc</span>(parent: gd.Node, scene: gd.Packed_Scene) -&gt; Score</code></pre></div><p>The contracts are defined by node name:</p>
+score_adopt :: <span class="hljs-keyword">proc</span>(parent: gd.Node, scene: gd.Packed_Scene) -&gt; Score</code></pre></div><p>Each widget requires these node names:</p>
 <ul>
-<li><strong>Lobby</strong>: <code>Title</code> (Label) · <code>Status</code> (Label) · <code>Players</code> (any container; rows land
-here) · <code>Host</code> (Button) · <code>Join</code> (Button) · <code>Start</code> (Button; ships hidden), plus an
-OPTIONAL <code>Code</code> (LineEdit) for join-code games; it stays quiet when absent
-(<code>lobby_show_code</code> turns it on).</li>
-<li><strong>Chat</strong>: <code>Lines</code> (any container; the scrollback rows land here) · <code>Input</code> (LineEdit).</li>
-<li><strong>Scoreboard</strong>: <code>Grid</code> (GridContainer; the kit sets its column count and pours the
-cells).</li>
+<li><strong>Lobby</strong>: <code>Title</code> (Label), <code>Status</code> (Label), <code>Players</code> (a container for
+roster rows), <code>Host</code> (Button), <code>Join</code> (Button), and <code>Start</code> (Button,
+initially hidden). Join-code games can add an optional <code>Code</code> (LineEdit)
+revealed by <code>lobby_show_code</code>; omitting it is supported.</li>
+<li><strong>Chat</strong>: <code>Lines</code> (a container for scrollback rows) and <code>Input</code> (LineEdit).</li>
+<li><strong>Scoreboard</strong>: <code>Grid</code> (GridContainer). Kit sets its column count and adds
+the cells.</li>
 </ul>
-<p>The scene owns its OWN layout (anchors under the boot layer bind to the viewport), so none
-of the stock builders&#39; sizing hacks apply, and the scoreboard&#39;s hand-centering is skipped.
-Row/cell Labels are kit-created; theme them from the scene root. Extra nodes, such as a
-Single Player key, an address field, or the plate, are the game&#39;s to wire after
-<code>boot_attach</code>, through the widget&#39;s <code>root</code>.</p>
+<p>Authored scenes control their layout. Anchors under Boot&#39;s layer bind to the
+viewport; stock sizing and scoreboard centering are skipped. Kit creates row
+and cell Labels, which inherit themes from the scene root. After <code>boot_attach</code>,
+use the widget&#39;s <code>root</code> to connect extra controls such as a Single Player
+button or address field.</p>
 <h2 id="worked-example-cavecrawl">Worked example (cavecrawl)<a class="heading-anchor" href="#worked-example-cavecrawl" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">self.ui = kui.lobby_make(self.owner, <span class="hljs-string">&quot;C A V E C R A W L&quot;</span>)
 kui.lobby_set_status(&amp;self.ui, <span class="hljs-string">&quot;Host a cave, or join one at localhost&quot;</span>)
@@ -121,93 +125,93 @@ gd.connect_to(<span class="hljs-keyword">cast</span>(gd.Object)self.ui.join_btn,
 gd.connect_to(<span class="hljs-keyword">cast</span>(gd.Object)self.ui.start_btn, <span class="hljs-string">&quot;pressed&quot;</span>, self.owner, <span class="hljs-string">&quot;on_start&quot;</span>)
 
 self.chat = kui.chat_make(self.owner)
-kui.chat_show(&amp;self.chat, <span class="hljs-literal">false</span>)   <span class="hljs-comment">// chat with nobody wired is just a text box</span>
+kui.chat_show(&amp;self.chat, <span class="hljs-literal">false</span>)   <span class="hljs-comment">// hide chat before connecting its input handler</span>
 gd.connect_to(<span class="hljs-keyword">cast</span>(gd.Object)self.chat.input, <span class="hljs-string">&quot;text_submitted&quot;</span>, self.owner, <span class="hljs-string">&quot;on_chat&quot;</span>)
 
-<span class="hljs-comment">// The LAYOUT is the game&#x27;s call, not the kit&#x27;s: status cluster stacked</span>
-<span class="hljs-comment">// in the top-left (kit widgets spawn at the anchor origin by default).</span>
+<span class="hljs-comment">// Position the status controls at the top-left.</span>
+<span class="hljs-comment">// Widget creation places them at the anchor origin by default.</span>
 gd.control_set_position(<span class="hljs-keyword">cast</span>(gd.Control)self.hud_hp.label, {<span class="hljs-number">8</span>, <span class="hljs-number">4</span>}, <span class="hljs-literal">false</span>)
 gd.control_set_position(self.hud_ab.root, {<span class="hljs-number">8</span>, <span class="hljs-number">22</span>}, <span class="hljs-literal">false</span>)
-gd.control_set_position(self.inv.root, {<span class="hljs-number">8</span>, <span class="hljs-number">40</span>}, <span class="hljs-literal">false</span>)</code></pre></div><p>And the owner&#39;s live repaint (hosts get no state events, so the HUD repaints in process):</p>
+gd.control_set_position(self.inv.root, {<span class="hljs-number">8</span>, <span class="hljs-number">40</span>}, <span class="hljs-literal">false</span>)</code></pre></div><p>Refresh the local player&#39;s HUD during frame processing. Host mutations do not
+produce received-state events, so an event-only refresh would miss them:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">kui.hp_refresh(&amp;self.hud_hp, hp_view(self.me_spel), MAX_HP)
 defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
-kui.abilities_refresh(&amp;self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina, ksess.session_tick_hz(&amp;self.ses))</code></pre></div><h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+kui.abilities_refresh(&amp;self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina, ksess.session_tick_hz(&amp;self.ses))</code></pre></div><p><span id="gotchas"></span></p>
+<h2 id="layout-and-lifecycle-constraints">Layout and lifecycle constraints<a class="heading-anchor" href="#layout-and-lifecycle-constraints" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><p><strong>Anchor presets set ANCHORS only, not grow directions.</strong> An auto-sizing label placed at
-the exact bottom edge grows DOWN, off screen. Pair <code>control_set_anchors_preset</code> with grow
-directions and anchor-relative offsets, the way the prompt does:</p>
+<li><p><strong>Set grow directions alongside anchors.</strong> An auto-sizing label at the
+bottom edge can grow downward off-screen. Pair <code>control_set_anchors_preset</code>
+with grow directions and anchor-relative offsets, as the prompt does:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">gd.control_set_anchors_preset(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Preset_Center_Bottom, <span class="hljs-literal">false</span>)
-gd.control_set_v_grow_direction(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Grow_Direction_Begin)  <span class="hljs-comment">// grow UP</span>
+gd.control_set_v_grow_direction(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Grow_Direction_Begin)  <span class="hljs-comment">// grow upward</span>
 gd.control_set_h_grow_direction(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Grow_Direction_Both)   <span class="hljs-comment">// keep centered</span>
 gd.control_set_offset(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Top, <span class="hljs-number">-34</span>)                        <span class="hljs-comment">// lifted baseline,</span>
 gd.control_set_offset(<span class="hljs-keyword">cast</span>(gd.Control)p.label, .Bottom, <span class="hljs-number">-34</span>)                     <span class="hljs-comment">// tracks resizes</span></code></pre></div></li>
-<li><p><strong>The crown follows the transport SEAT, not player id 1.</strong> <code>lobby_refresh</code> crowns
-<code>session_host(s)</code>. A resumed host returns under its old id (see <a href="save.html">save.md</a>), so
-&quot;host&quot; is a seat, never an id you hardcode.</p>
+<li><p><strong>Look up the host id.</strong> <code>lobby_refresh</code> crowns <code>session_host(s)</code>. A resumed
+host keeps its old id (see <a href="save.html">save.md</a>), so do not hardcode player
+id 1 as the host.</p>
 </li>
-<li><p><strong>Refresh on events, not every frame</strong>: <code>lobby_refresh</code> refreshes on session events,
-<code>chat_refresh</code> on <code>Ev_Line</code>, <code>score_refresh</code> on <code>Ev_Stats_Updated</code>. The exception is the
-owner&#39;s own HUD (live cooldown text, and hosts get no state events).</p>
+<li><p><strong>Refresh lists on events.</strong> Call <code>lobby_refresh</code> on session events,
+<code>chat_refresh</code> on <code>Ev_Line</code>, and <code>score_refresh</code> on <code>Ev_Stats_Updated</code>.
+Refresh the local HUD each frame for live cooldowns and host-written state.</p>
 </li>
-<li><p><strong><code>*_destroy</code> does not free nodes.</strong> The tree belongs to the scene; destroy only drops the
-Odin-side tracking arrays (<code>lobby</code>/<code>chat</code>/<code>score</code>/<code>inv</code>/<code>abilities</code>, the widgets that keep
-a <code>[dynamic]</code> of reused rows). <a href="boot.html"><code>kboot.boot_detach</code></a> is their caller: it destroys
-the widget arrays, then queue-frees the container node they lived under (the nodes ride that
-subtree down). Freeing the game&#39;s node instead frees the same nodes, but the tracking arrays
-then leak until the process exits, so use <code>boot_detach</code> to tear down while the game keeps
-running.</p>
+<li><p><strong>Release tracking arrays separately from nodes.</strong> <code>*_destroy</code> frees the
+Odin arrays used by <code>lobby</code>/<code>chat</code>/<code>score</code>/<code>inv</code>/<code>abilities</code> to reuse rows
+stored in a <code>[dynamic]</code>. The scene owns their nodes.
+<a href="boot.html"><code>kboot.boot_detach</code></a> destroys those arrays before queuing their
+container subtree for deletion. Freeing only the game node releases the
+nodes but leaks tracking arrays until process exit. Call <code>boot_detach</code> while
+the game process remains alive.</p>
 </li>
-<li><p><strong><code>prompt</code>/<code>hp</code> have no <code>*_destroy</code>.</strong> Their whole state is one Label node, which frees with
-its parent; there is nothing else to release. The <code>netgraph</code> is the same shape (a Label plus
-a fixed sparkline array); <code>netgraph_destroy</code> exists for call-site symmetry but only zeroes.
-A game that builds its own netgraph owns it, and boot does not (<code>boot_net_stats</code> fills a
-value the game feeds to its own overlay).</p>
+<li><p><strong><code>prompt</code>/<code>hp</code> need no <code>*_destroy</code>.</strong> Each holds only a Label node freed
+with its parent. A <code>netgraph</code> holds a Label and a fixed sparkline array;
+<code>netgraph_destroy</code> zeroes it for consistent teardown calls. The game owns
+its custom netgraph, while Boot supplies its data through <code>boot_net_stats</code>.</p>
 </li>
-<li><p>Widgets spawn at the anchor origin, so position them yourself; layout is the game&#39;s call.</p>
+<li><p>Position widgets after creation; their initial position is the anchor origin.</p>
 </li>
 </ul>
 <h2 id="netgraph">Netgraph<a class="heading-anchor" href="#netgraph" aria-label="Link to this section">#</a></h2>
-<p>A drop-in text overlay (<code>netgraph_make</code> / <code>netgraph_show</code> /
-<code>netgraph_refresh(ng, Net_Stats{...})</code>) that draws the numbers that move when
-the link goes bad:</p>
+<p>Create a network overlay with <code>netgraph_make</code>, control its visibility with
+<code>netgraph_show</code>, and update it with <code>netgraph_refresh(ng, Net_Stats{...})</code>:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">net  42ms  jit 6ms  loss 1.2%  ok
 rate rx 120p/s 3.2k/s · tx 48p/s 0.4k/s
 rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3
 sim  lead 4t  resim ▁▁▂▁▇▁▁…  rec 128  gap 2  ack 3t  rw 12t  cpu 0.42ms  cq 0
 snap full 2% delta 98% rows 428 quiet 2100 defer 3 aoi 900 18.2k
-warn  rclamp 3▲</code></pre></div><p>Row 1 is the link: rtt off the replicated ping stat (<code>net_ping_ms</code>), jitter
-and loss off <a href="netgd.html#traffic-and-link-stats">ENet&#39;s own per-peer statistics</a>
-(<code>netgd.wire_link_quality</code>; clients fill it about the host), and a quality
-word that rates loss first, then jitter, then raw rtt. The rate row is the
-completed one-second packet/byte window. The next row is the wire&#39;s
-bytes-by-kind (<code>Net_Stats.traffic = netgd.wire_traffic(&amp;boot.wire)</code> stays
-opaque, so this package never imports the transport). The sim row includes
-input lead/gaps, fully-applied snapshot ack age, the authority&#39;s rewind
-envelope, replay cost since the previous refresh, and command queue pressure. The snapshot row
-shows full/delta mix, zero-byte unchanged suppression, budget deferral, AOI
-culling, and bytes. The RESIM SPARKLINE remains the point: a steady sim
-draws a flat baseline; a lost input or a contested mispredict makes the
-client rewind, and that burst (invisible in a headless log) is exactly
-what you can SEE here. Every field is optional (coop games leave <code>sim</code>
-false). Booted games skip the hand-fill entirely:
-<a href="boot.html"><code>kboot.boot_net_stats(&amp;boot)</code></a> returns the complete co-op view and,
-when <code>boot_lane</code> is installed, automatically projects the simulation view too.</p>
-<p>The <code>warn</code> row (last, and only when something has fired) surfaces the
-<strong>silent-failure counters</strong>, the tallies for failures that leave no other
-trace: <code>guard_hits</code> (a client wrote a host-lane field), <code>input_drops</code> /
-<code>cmd_capped</code> (host: sim inputs dropped, verbs refused by the per-player cap),
-<code>rewind_clamped</code> (lag comp pinned by its observed-link, render-hint, or absolute
-configuration envelope).
-<code>boot_net_stats</code> fills malformed, access/predicate, traffic-budget, and guard
-counters for every game; an installed lane adds the simulation counters. Each
-draws its number only when non-zero, and a <strong>▲</strong> flags one that
-<em>moved this refresh</em>. A lone cold-start clamp is normal, but a count still
-climbing a minute in is the bug, and the raw number alone can&#39;t tell them
-apart.</p>
+warn  rclamp 3▲</code></pre></div><p>The first row shows RTT from the replicated ping stat (<code>net_ping_ms</code>) plus
+jitter and loss from <a href="netgd.html#traffic-and-link-stats">ENet&#39;s per-peer statistics</a>.
+Clients obtain the host connection&#39;s values through <code>netgd.wire_link_quality</code>.
+The quality label prioritizes loss, then jitter, then RTT. The rate row reports
+the last completed one-second packet and byte window.</p>
+<p>The traffic row groups bytes by message kind. Supply
+<code>Net_Stats.traffic = netgd.wire_traffic(&amp;boot.wire)</code> as an opaque value so
+<code>kit/ui</code> remains independent of the transport package. The simulation row
+shows input lead and gaps, age of the last fully applied snapshot acknowledgement,
+the authority&#39;s rewind envelope, replay cost since refresh, and command queue
+pressure. The snapshot row shows full/delta proportions, unchanged-row
+suppression, budget deferrals, AOI culling, and bytes.</p>
+<p>The resimulation sparkline shows bursts of client replay work. A flat baseline
+means no recent replay; lost inputs and contested prediction errors can produce
+spikes even when correction smoothing hides their visible effect. Every field
+is optional; coop games leave <code>sim</code> false. Use
+<a href="boot.html"><code>kboot.boot_net_stats(&amp;boot)</code></a> for Boot&#39;s coop statistics and the
+simulation projection when <code>boot_lane</code> is installed.</p>
+<p>The <code>warn</code> row appears when diagnostic counters are nonzero. It includes
+<code>guard_hits</code> for client writes to authority-owned fields, <code>input_drops</code> for
+dropped simulation inputs, <code>cmd_capped</code> for commands refused by the per-player
+cap, and <code>rewind_clamped</code> for queries limited by measured-link bounds,
+render-hint limits, or the absolute rewind configuration.</p>
+<p><code>boot_net_stats</code> fills malformed-message, access/predicate, traffic-budget,
+and write-guard counters for every game. An installed lane adds simulation
+counters. The overlay prints each nonzero count and marks increases since the
+previous refresh with ▲. A single clamp before timing settles can be normal;
+a count still rising a minute into play needs investigation. The change marker
+distinguishes current failures from accumulated startup counts.</p>
 <p>Siblings: <a href="session.html">session.md</a> (roster, stats, <code>session_tick_hz</code>) ·
 <a href="comms.html">comms.md</a> (the chat log) · <a href="combat.html">combat.md</a> (<code>Ability_Def</code>, cooldowns) ·
 <a href="items.html">items.md</a> (<code>Slot</code>, <code>Table</code>) · <a href="netgd.html">netgd.md</a> (the shim + gauge the
 netgraph draws).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="comms.html"><span>kit/comms — chat, pings, system lines</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ui.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api-by-task" class="">API by task</a><a href="#adopting-your-own-scenes" class="">Adopting your own scenes</a><a href="#worked-example-cavecrawl" class="">Worked example (cavecrawl)</a><a href="#gotchas" class="">Gotchas</a><a href="#netgraph" class="">Netgraph</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/ui.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="comms.html"><span>kit/comms — chat, pings, system lines</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/ui.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#widget-creation-refresh-and-ownership" class="">Widget creation, refresh, and ownership</a><a href="#api-by-task" class="">API by task</a><a href="#adopting-your-own-scenes" class="">Adopting your own scenes</a><a href="#worked-example-cavecrawl" class="">Worked example (cavecrawl)</a><a href="#layout-and-lifecycle-constraints" class="">Layout and lifecycle constraints</a><a href="#netgraph" class="">Netgraph</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/ui.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

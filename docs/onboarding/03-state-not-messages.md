@@ -1,4 +1,6 @@
-# 3 · State, not messages
+<a id="3--state-not-messages"></a>
+
+# 3 · Field replication
 
 Adding multiplayer requires a rule for each shared value: who may write it,
 and how other peers receive it. Hand-written RPCs can scatter those rules
@@ -6,15 +8,17 @@ across scripts. Kit puts them on fields and lets the session synchronize the
 registered state. This post sets up that arrangement, including entity creation
 and player identity.
 
-## The model
+<a id="the-model"></a>
+
+## Authority-written state
 
 One machine, the **host**, runs the authority that decides shared state. Every
 registered entity has replicated fields on each peer. At network ticks, the
 session sends changes from the authority to those copies.
 
-You know why this works from post 2: your state is a struct with a fixed
-layout. The toolkit keeps a shadow copy, diffs it after each tick, and ships
-only the bytes that changed. So the entire replication API is a tag:
+The struct layout lets Kit keep a shadow copy of selected fields and compare
+their bytes at each network tick. It sends changed fields to peers. Tag a
+field to include it in reliable replication:
 
 ```odin
 Hole :: struct {
@@ -32,7 +36,9 @@ to clients. A player who joins later receives the current value in a snapshot.
 The field retains the result, so a late joiner does not need the original call
 that changed it.
 
-## Entities: the world as a table of structs
+<a id="entities-the-world-as-a-table-of-structs"></a>
+
+## Registered entities and owners
 
 Replicated structs are **entities** in a registry. Each has a type, a numeric
 `net_id`, and a network owner: the player allowed to write its owner-streamed
@@ -54,13 +60,11 @@ hole_spawned :: proc(game: ^Golf, self: ^Hole, id: knet.Net_Id, owner: knet.Play
 }
 ```
 
-scriptgen turns those tags into a factory table, and the same factory runs on
-every machine, host included. There is no separate "server spawns, then sends a
-spawn message you handle differently" path. The host asks the session to spawn;
-the session builds the scene *locally* and tells everyone else to build *the
-same scene*. You write the declaration once, and there is no per-role creation
-code to write. When a player joins mid-game, the session recreates the registry
-through the same table. A resumed save uses that table too.
+Scriptgen turns these tags into a factory table used on the host and remote
+peers. When the host requests a spawn, the session creates the scene locally
+and sends peers the information needed to create the same entity. The
+generated factory handles each role. Mid-game joins and resumed saves use
+the table to recreate the entities included in their state.
 
 ## Setup
 
@@ -86,20 +90,20 @@ golf_process :: proc(self: ^Golf, delta: f64) {
 }
 ```
 
-That is a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
-(`kboot.boot_host` / `boot_join`), connection lifecycle, and the pump that
-drives it all. Your game reacts by declaring **event halves**: plain procs
-named for the event (`golf_player_joined`, `golf_entity_spawned`, an
-authority-only `golf_player_joined_then` for consequences) that the generated
-`golf_net_frame` dispatches to synchronously. There are no callbacks into a
-half-initialized script. The component
-calls remain available when a game needs custom dispatch ordering.
+With the declared scenes, containers, and handlers in place, these generated
+procedures drive the lobby UI, chat, scoreboard, host/join controls
+(`kboot.boot_host` / `boot_join`), and connection lifecycle. The game receives
+events through name-paired procedures called event halves, marked
+`@(gd_half)`. Examples include `golf_player_joined`, `golf_entity_spawned`, and
+the authority-only `golf_player_joined_then` for consequences.
+`golf_net_frame` dispatches these synchronously after attachment, once the
+script is initialized. Lower-level component calls remain available for
+custom dispatch ordering.
 
-One concept in the join call pays off for the rest of the series: a player
-joins with a **reconnect token** (`ksave.token`, an env var, or a small file
-under `user://`). The token *is* their identity. Crash, restart, rejoin with
-the same token, and you get the same seat, the same stats, the same entities.
-There is no separate reconnect system; identity is state too.
+A player joins with a reconnect token obtained through `ksave.token`, an
+environment variable, or a small file under `user://`. The session uses that
+token to recognize a returning identity. Rejoining with the same token after
+a crash reclaims the seat, stats, and entities retained for that identity.
 
 ## Movement: owner-written fields
 
@@ -111,29 +115,31 @@ write movement fields instead:
 x, y: f32 `gd:"owner"`, // continuous owner fields interpolate by default
 ```
 
-streamed unreliably at tick rate, and rendered by everyone else through a short
-interpolation buffer that stays smooth through jitter and packet loss. Your
-machine moves your avatar with local, zero-latency code; remote screens watch
-a slightly delayed, smoothed version. (That "slightly delayed" becomes post 5.)
+The session streams these fields unreliably at tick rate. Remote peers render
+them through a short interpolation buffer to absorb jitter and packet loss.
+The owner moves locally without waiting for a network round trip; remote
+screens display a delayed, smoothed version. Post 5 explains that timing.
 
 Authority-written fields use state deltas; owner-written fields use motion
 streams. Each field selects one policy.
 
-## What the model gives you
+<a id="what-the-model-gives-you"></a>
+
+## Session operations
 
 The same registry and snapshot mechanism supports these session operations:
 
 - **Drop-in joins**: the registry replays through your factory.
 - **Reconnect after a crash**: the token reclaims the seat, and the snapshot
   restores the world.
-- **Saves**: a save file is the snapshot machinery pointed at disk
-  (`ksave.save_write` / `ksave.resume`, post 6).
-- **Host migration**: a backup snapshot plus "everyone rejoins the new host";
-  the toolkit automates the handoff (post 6).
+- **Saves**: `ksave.save_write` / `ksave.resume` write and restore an authority
+  session snapshot with the game's additional saved state (post 6).
+- **Host migration**: cooperative sessions can restore a backup and reconnect
+  peers to the new host after the game's migration setup (post 6).
 - **Single-player**: a session with one seat, using the same gameplay code.
 
 Each operation needs its documented setup, but uses the same entity identities
 and field declarations. The next post adds actions on shared state: two players
 taking the same item need an authority verdict as well as local feedback.
 
-*Next: [Verbs, not RPCs →](04-verbs-not-rpcs.md)*
+*Next: [Predicted commands →](04-verbs-not-rpcs.md)*

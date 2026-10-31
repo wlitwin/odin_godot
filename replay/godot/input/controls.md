@@ -2,9 +2,9 @@
 
 Use `Input_Binding(Control)` to preserve button edges between Godot frames and
 simulation ticks. It interns InputMap names once and maps buffered button values
-to your ordinary game Control type. It stays outside World. A mapper can
-also read presentation-owned aim/device data through its borrowed user pointer;
-it must return a detached value and must not mutate the simulation.
+to the game's Control type. Keep the binding outside World. A mapper can also
+read presentation-owned aim/device data through its borrowed user pointer.
+It must return a copied value without mutating the simulation.
 
 ```odin
 bindings := [2]inputgd.Input_Action{{"ui_left", 0}, {"ui_right", 1}}
@@ -24,15 +24,16 @@ inputgd.input_binding_consume(&controls)
 Up to 64 unique actions map to unique bits. Capture coalesces repeated presses of
 the same button within one simulation tick, while preserving simultaneous press
 and release. Reading does not consume; failed simulation steps keep their edges.
-Held state remains after consuming edges. For a Session, consume when `session.control_consumed` reports that an actual
-simulation step used the control. A successful frame call alone does not establish
-that. This helper does not change the runner's scheduling.
+Held state remains after consuming edges. For a Session, consume when
+`session.control_consumed` reports that a simulation step used the control.
+A successful frame call alone does not establish that. This helper does not
+change the runner's scheduling.
 
 `Paused`, `Unfocused`, `Menu` and `Inspecting` gates return the supplied neutral
 Control and discard buffered edges. A button held across a gate transition must
 be released before reuse. Supply gates before sampling each frame; application
-code decides focus/menu eligibility rather than the library guessing from an
-arbitrary Control node. Analog axes can be sampled in the mapper; applications
+code supplies focus/menu eligibility explicitly; the library does not infer it
+from an arbitrary Control node. Analog axes can be sampled in the mapper; applications
 with analog hold/rearm requirements must apply their own dead-zone policy.
 The engine-free `replay.Control_Capture` exposes the same bit/edge/gate behavior.
 

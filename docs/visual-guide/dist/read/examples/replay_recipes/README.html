@@ -7,15 +7,17 @@
 <article class="reading-body "><p><code>recipes.odin</code> instantiates three documented flows with the existing Hello/Duel
 models. Session runs a direct network simulation; Party stores enrollment before
 opening a Room for coordinated authority recovery; admitted P2P binds authenticated
-peers to a runtime that exchanges inputs and retains simulation history. It is a compile-checked
-reference, not another game or a claim that compilation validates networking.
+peers to a runtime that exchanges inputs and retains simulation history. It is
+a compile-checked reference, not another game or a claim that compilation validates networking.
 The actual runnable counterparts are linked in <a href="../../replay/getting-started.html">getting started</a>.</p>
-<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_recipes/run.sh</code></pre></div><p>The structs that own these runtimes must remain at stable memory addresses. Pump Party before using its grant and
-keep it alive while RTC/Direct borrows authorization. Consume all presentation
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_recipes/run.sh</code></pre></div><p>Keep runtime-owning structs at stable memory addresses. Pump Party before
+using its grant and keep it alive while RTC/Direct borrows authorization. Consume all presentation
 changes before the next frame. Use Room for elected authority recovery; a direct
 Session save/resume does not elect or fence hosts. The examples return errors;
 the embedding chooses UI/retry behavior and supplies its own content IDs.</p>
-<p><code>bridge.odin</code> also checks detached actor display, typed scene baking and Room signal-action submission/results. Actual node, input, effect and body lifecycle checks live in <code>tests/replay_nodes</code>.</p>
+<p><code>bridge.odin</code> also checks detached actor display, typed scene baking, and Room
+signal-action submission/results. <code>tests/replay_nodes</code> checks actual node, input,
+effect, and body lifecycles.</p>
 <p>The recipe gate checks native and WASM builds with Odin&#39;s unused/shadowing, style,
 semicolon and tab checks scoped to <code>replay_recipes</code>, with warnings treated as
 errors. Imported generated bindings have their own style; global <code>-strict-style</code>
@@ -25,5 +27,5 @@ local and expires when the Store is destroyed.</p>
 <p><code>components.odin</code> demonstrates an owned actor composed from health, movement and
 the shared gun mechanism. It introduces no engine state or component registry.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/getting-started.html"><span>Starting a Replay game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_recipes/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/getting-started.html"><span>Starting a Replay game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_recipes/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_recipes/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

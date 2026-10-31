@@ -46,7 +46,7 @@ stop solely because the enrollment control connection fails.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_P2P_PARTY_OUT=/absolute/fresh/build nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_party/run.sh
 REPLAY_PREBUILT=1 REPLAY_P2P_PARTY_OUT=/absolute/fresh/build \
 REPLAY_P2P_PARTY_RUN=/absolute/fresh/creator-return REPLAY_P2P_PARTY_MODE=creator \
-nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_party/run.sh</code></pre></div><p>This browser path uses WebRTC. Native two-player provisioning now uses encrypted
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_party/run.sh</code></pre></div><p>This browser path uses WebRTC. Native two-player provisioning uses encrypted
 ENet through <a href="../../replay/godot/p2p_direct.html">P2P Direct</a>. Public accounts/deployment
 and authenticated spectator enrollment remain open.
 The direct demo, manually issued credential fixtures and native ENet scenarios
@@ -75,8 +75,8 @@ REPLAY_P2P_NATIVE_RUN=/absolute/fresh/guest REPLAY_P2P_NATIVE_MODE=guest \
 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_native/run.sh</code></pre></div><p>The model in <code>shared/duel</code> uses Q24.8 coordinates, checked updates, stable projectile
 slots and frame-owned RNG. Three hits kill a fighter; respawn happens after a
 deterministic randomized delay. All bullets resolve before damage is applied so
-same-tick trades are symmetric. Presentation draws copied state and uses an event journal to reconcile displayed
-effects after replay.</p>
+same-tick trades are symmetric. Presentation draws copied state and uses an
+event journal to reconcile displayed effects after replay.</p>
 <p>The real-process gate uses 120 ms receive delay per side, 0–20 ms jitter, 10%
 unreliable loss and 10% duplication. It simulates 600 ticks, waits for both confirmed
 checksums, verifies the whole final world against a reference run and checks shot
@@ -86,8 +86,7 @@ steps that waited, not distinct simulation ticks or elapsed stall duration.</p>
 <p><code>tests/replay_deterministic</code> executes a 2,400-tick corpus with four seeds on native
 arm64 and freestanding WASM, comparing canonical state/event hashes and gameplay
 counters. The WASM module imports no host simulation functions. This is execution
-evidence, not merely a type-check. P2P browser gameplay and coordinated file recovery now have separate real-browser
-gates. Other native targets and polished lobby/recovery UX remain pending.</p>
+evidence, not merely a type-check. Separate browser tests exercise P2P gameplay and coordinated file recovery. Other native targets and polished lobby/recovery UX remain pending.</p>
 <p><code>resume_run.sh</code> saves each participant&#39;s full protocol archive at tick 240 while
 the final ticks are still speculative. It kills both processes, creates new ENet
 connections, restores their different durable frontiers and continues to tick 600.
@@ -113,7 +112,7 @@ behavior. The browser lobby enables it; direct launch defaults remain off.</p>
 admission. Old ENet identities are excluded by the replacement mapping. The saved
 participant stops sampling before it is killed: an arbitrary older archive can
 fail if survivors have inputs it forgot or required retransmission history was
-evicted. The runner refuses both cases. The same behavior now has a browser gate
+evicted. The runner refuses both cases. The same behavior has a browser test
 described below. Authenticated browser creator recovery also has a separate gate.</p>
 <p><code>creator_rejoin_run.sh</code> covers the native listening participant returning. The
 creator saves and pauses at tick 240, then is killed. The dialing process retains
@@ -142,10 +141,10 @@ independent of the player roster; losing their connection cannot stall players.
 then reconnects the viewer to the second participant on game port + 2. A retained
 anchor proves continuity, so the viewer keeps its world and event journal and
 reaches tick 900 without another presentation reset. Both players keep simulating.
-The native fixture uses configured loopback peers and a private anchor file;
-public authenticated spectator provisioning, browser source-switch integration,
-automatic restoration of a restarted spectator and delayed disclosure remain
-pending. See the <a href="../../replay/p2p/spectators.html">spectator contract</a>.</p>
+The native fixture uses configured loopback peers and a private anchor file.
+It does not establish public authenticated spectator provisioning, browser
+source-switch integration, automatic restoration of a restarted spectator, or
+delayed disclosure; those still need implementation or integration. See the <a href="../../replay/p2p/spectators.html">spectator contract</a>.</p>
 <p>View geometry was copied from Replay Quickdraw&#39;s script-free gunner/bullet scenes;
 see its <a href="../replay_quickdraw/assets.html">original asset provenance</a>. The copied
 fighter scene SHA-256 is <code>7ccb2b812b16da493fb2157206da86b18b9d21e28b95f0d39df87055bbf7fb24</code>;
@@ -155,7 +154,7 @@ These are provisional views; human visual/play-feel review remains open.</p>
 timings and capture-to-first-simulation latency. <code>profile_run.sh</code> compares two/eight
 delay ticks with the same gameplay inputs; <code>tests/replay_p2p/bench.sh</code> separately
 measures optimized native process CPU over two peers and Memory transport.
-<code>tests/replay_deterministic/run.sh</code> now checks default and speed optimization on
+<code>tests/replay_deterministic/run.sh</code> checks default and speed optimization on
 the host and WASM, plus macOS x86-64 under Rosetta when available. Rosetta validates
 an alternate ISA binary on this Mac, not independent x86 hardware or other OSes.
 Set <code>REPLAY_REQUIRE_ROSETTA=1</code> to make an unavailable Rosetta check fail explicitly.</p>
@@ -204,7 +203,7 @@ WebRTC; this does not emulate internet NAT, packet-level SCTP congestion or TURN
 The lobby finishes an IndexedDB upload transaction before entering the game;
 the game waits for the bounded buffer and performs normal archive decoding and
 reexecution validation. Initiating a browser download does not prove it was saved:
-the browser/user owns completion. This gate verifies actual files and restores
+the browser/user owns completion. This test verifies actual files and restores
 in new browser processes. It does not claim implicit Godot virtual-filesystem
 flush durability.</p>
 <p>To leave and return as the joining player, click <strong>Save &amp; pause</strong>, keep the completed
@@ -227,7 +226,7 @@ records the killed process, survivor identity, archive and state checks.</p>
 <h2 id="authenticated-p2p-admission">Authenticated P2P admission<a class="heading-anchor" href="#authenticated-p2p-admission" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_admission/run.sh
 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_admission/service_run.sh
-nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_admission/web_run.sh</code></pre></div><p>The browser gate starts a native Godot signaling provider with a fixed two-member
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_p2p_admission/web_run.sh</code></pre></div><p>The browser test starts a native Godot signaling provider with a fixed two-member
 registry. Each Chrome process imports its personal JSON credential using the lobby&#39;s
 credential input; the file contains <code>member</code>, <code>incarnation</code> and a 64-character
 lowercase hexadecimal <code>key</code>. The lobby stores only that participant&#39;s credential
@@ -247,5 +246,5 @@ has the separate loopback gate above. The browser gate covers either participant
 creator whose numeric RTC ID remains 1 while its connection generation changes. See <a href="../../replay/p2p/admission/README.html">the provider contract</a> and
 <span class="local-reference" title="docs/replay/results/p2p-admission-2026-09-08/README.md · available in the repository">recorded evidence</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_duel_service/README.html"><span>Replay Duel provisioning and signaling service</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/p2p_party.html"><span>P2P party setup</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_duel/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_duel_service/README.html"><span>Replay Duel provisioning and signaling service</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/p2p_party.html"><span>P2P party setup</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/p2p_direct.html"><span>Native authenticated two-player P2P</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_duel/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#browser-match-invitations" class="">Browser match invitations</a><a href="#native-provisioned-matches" class="">Native provisioned matches</a><a href="#browser-play-and-acceptance" class="">Browser play and acceptance</a><a href="#authenticated-p2p-admission" class="">Authenticated P2P admission</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_duel/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

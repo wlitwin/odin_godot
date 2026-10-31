@@ -40,13 +40,13 @@ whole-framework verdict. Generated code, content, test adapters, copied assets
 and baseline ownership cleanup are excluded from feature counts but preserved in
 source/build manifests or separate evidence.
 
-Important boundaries: Kit uses owner-time channels, host consequences and a
-replicated stat registry; Replay uses scheduled controls and a value reducer for
-prediction and authority. Wallet/health updates can arrive separately on Kit
-clients; convergence is required, while conservation is enforced on the host.
-The u32 receiver-capacity checks are present in both patches; this process matrix
-uses small wallets. Save/migration acceptance for this experimental rule, broader
-faults, other authoring changes and human/timed studies remain work.
+The variants use different state and timing models. Kit uses owner-time channels,
+host consequences, and a replicated stat registry. Replay uses scheduled controls
+and a value reducer for prediction and authority. Kit clients can receive wallet
+and health updates separately, so the gate requires eventual client convergence
+and checks conservation on the host. Both patches include u32 receiver-capacity
+checks, while this process matrix exercises small wallets. Save/migration
+acceptance for this experimental rule, broader faults, other authoring changes and human/timed studies remain work.
 
 After all successful receipts, peers stop application and engine networking at a
 shared barrier before freeing their scenes. An earlier simultaneous-close run
@@ -54,9 +54,9 @@ hit an ENet send error after its results were written; that partial run is retai
 separately and does not count as a completed matrix. This teardown is test-only
 and is not a graceful-disconnect or migration acceptance claim.
 
-The report recomputes line counts and net added library API occurrences (subtracting retained calls on changed lines) from actual
-before/after files, verifies the displayed patch, checks source/binary hashes,
-and requires every planned receipt plus the teardown barrier. Run
+The report recomputes line counts and net added library API occurrences from
+before/after files, subtracting retained calls on changed lines. It verifies the
+displayed patch, checks source/binary hashes, and requires every planned receipt plus the teardown barrier. Run
 `python3 tests/replay_authoring/verify_report.py OUTPUT_DIRECTORY` to exercise
 its rejection cases. The original and primary Replay game files are never test
 mutation targets.

@@ -1,6 +1,6 @@
 # Rail and grenade presentation
 
-Lance and mender beams now emit the existing confirmed Wall fact when their
+Lance and mender beams emit the existing confirmed Wall occurrence when their
 cover sweep clips the beam. The same resolved endpoint and normal drive the
 warm spark fan and spatial Hit cue. A distinct rail event key separates player
 lifetimes from projectile-pool lifetimes, including when both hit the same cover
@@ -9,8 +9,7 @@ are unchanged; an unavailable body query still has a valid visible beam against
 current static cover.
 
 These cues use the existing content-45 Wall payload and wire contract. No world,
-action, event or checkpoint schema changes. The extra wall facts do not change
-simulation state. The existing conservative cosmetic capacity reservation also
+action, event or checkpoint schema changes. The extra Wall occurrences do not change simulation state. The existing conservative cosmetic capacity reservation also
 covers rails. Unlike the original delayed cosmetic booking, rail sparks accompany
 the confirmed hitscan result; timing/feel needs paired playtesting.
 

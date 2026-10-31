@@ -2,8 +2,8 @@
 
 Use a checkpoint package when restoring gameplay requires external assets as
 well as state. A room publication can include its complete external asset set in
-the same transaction as its checkpoint. The authority Point continues to name the raw typed
-checkpoint. A separate signed payload descriptor names the transferred package;
+the same transaction as its checkpoint. The authority Point identifies the raw typed checkpoint. A separate signed
+payload descriptor identifies the transferred package;
 the package verifies its root against that Point and checks every asset's content
 hash. Restore grants still select the exact checkpoint publication.
 
@@ -42,8 +42,8 @@ require an asset that will never be installed.
 
 The service requires an exact asset set: missing, extra, corrupt and semantically
 invalid entries are refused before publication. A game without declared external
-dependencies continues to use raw checkpoints. Undeclared extra uploads are not
-accepted as a general-purpose storage bucket.
+dependencies continues to use raw checkpoints. The endpoint rejects uploads containing undeclared assets; it does not provide
+general-purpose asset storage.
 
 ## Package and persistence
 
@@ -90,8 +90,8 @@ Checkpoint-transfer protocol **3** adds the payload descriptors and v3 HMAC doma
 Clients and services must upgrade together. Publication metadata, authority Record,
 private Bundle, gameplay protocol and raw checkpoint formats remain unchanged.
 
-Bundled transfer deliberately starts with one complete durable snapshot. It does
-not implement cross-publication deduplication, independent asset uploads or saves
-beyond this transfer bound. Save age, transfer duration and the room's existing
+Each transfer contains one complete durable package. There is no
+cross-publication deduplication, independent asset upload, or save larger
+than this transfer bound. Save age, transfer duration and the room's existing
 rollback policy remain separate: a durable checkpoint can still be too old for a
 restore grant. No recovery-policy limit is relaxed by asset publication.

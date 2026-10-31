@@ -18,8 +18,8 @@ runtime is installed from the stale permit.</li>
 <li>The native checkpoint fixture publishes/downloads/restores actual Cave,
 Speedball and Scrapyard models after service restart. Its delayed grant is
 expired, its renewal is live, and the saved tick-1 world advances to tick 11
-in epoch 2. The low-level fixture now follows Room&#39;s renewal-before-install
-protocol instead of consuming the expensive Restore reply directly.</li>
+in epoch 2. The low-level fixture renews the permit before installation,
+matching Room&#39;s protocol.</li>
 <li>An isolated Claimball build injects backpressure only on the Restore request.
 All other control/transfer traffic uses the underlying transport unchanged.
 Full native and browser party tests kill all game processes and restart the
@@ -36,5 +36,5 @@ profiles, invitations and private TLS keys when collecting receipts.</p>
 its exact cause remains unproven. This gate proves and fixes a specific delayed-
 grant path; it does not retrospectively identify that historical failure.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_restore_renewal/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_restore_renewal/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_restore_renewal/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

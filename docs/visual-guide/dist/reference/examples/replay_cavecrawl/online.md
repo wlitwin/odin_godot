@@ -3,8 +3,9 @@
 Create or join a Replay Cavecrawl party through the
 [room service](../replay_room_service/README.md), which enrolls trusted members
 and coordinates which process may host. This flow supplies member IDs and control
-keys instead of requiring players to configure them. With `REPLAY_CAVE_ROOM_SERVICE` configured, the menu
-shows **Create party**, **Join party**, **Rejoin recent party**, and **Copy party
+keys instead of requiring players to configure them. With
+`REPLAY_CAVE_ROOM_SERVICE` configured, the menu shows **Create party**,
+**Join party**, **Rejoin recent party**, and **Copy party
 invite**. Without it, the existing solo/LAN menu and preconfigured fixtures remain.
 
 Creating or joining first persists the exact enrollment request. A successful
@@ -42,18 +43,17 @@ an active target's eligibility stops further backup publication. Disconnected
 targets retain their last inspectable receipt until replacement. Existing explicit
 successor configuration remains available.
 
-The setup/storage loop now lives in the shared [Party API](../../replay/godot/party.md),
+The shared [Party API](../../replay/godot/party.md) manages setup and storage,
 also used by Scrapyard. Existing Cavecrawl enrollment and recent-room keys are
 preserved. An unavailable invite no longer prevents an already authorized creator
 from using its stored credential; the UI reports the invitation separately.
 
 The menu flow uses the normal checkpoint/lease machinery. Tests exercise planned
 handoff with zero lost ticks, preserved guest loot, and a departed host reopening
-its profile with a fresh incarnation and the same invite. The ordinary Leave
-button still closes the Room; a surviving prepared successor follows the abrupt
-recovery policy. This does not claim that a party whose every participant exits
-can resurrect gameplay from coordinator credentials alone. The service stores
-authority decisions, not game checkpoints.
+its profile with a fresh incarnation and the same invite. Leave closes the Room;
+a surviving prepared successor follows the abrupt recovery policy. If every
+participant exits, credentials alone cannot restore gameplay. The service can
+restore only progress explicitly published through the checkpoint flow below.
 
 ## Configuration and profiles
 
@@ -69,7 +69,7 @@ authority decisions, not game checkpoints.
 | `REPLAY_CAVE_ROOM_RELAY=1` / `room_relay=1` | Obtain and refresh credentials from the room service |
 
 Browser hosts can supply `globalThis.replayIceConfig` before Godot starts. It is
-not a query parameter. Actual relay-only UDP/TCP tests now cover this party flow;
+not a query parameter. Actual relay-only UDP/TCP tests cover this party flow;
 see [ICE deployment settings](../../replay/godot/transport/ice-deployment.md) for scope and limits.
 
 Native clients on the same machine need different gameplay ports and different
@@ -95,7 +95,7 @@ and the [library enrollment contract](../../replay/provision/enrollment.md).
 
 ## Party checkpoint publication
 
-An online host can now request a durable service checkpoint through F5/the save
+An online host can request a durable service checkpoint through F5/the save
 action or **Store party checkpoint**. Set `REPLAY_CAVE_ROOM_CHECKPOINT_MS=10000`
 (browser parameter `room_checkpoint_ms=10000`) for automatic publication. The
 default is manual; valid automatic intervals are 1–120 seconds. The configured
@@ -106,7 +106,7 @@ lost-reply recovery while leases and live backups continue. The stored tick is a
 durable snapshot boundary; work after it is not claimed as saved. An interruption
 may leave the outcome uncertain until a fresh status check.
 
-**Rejoin recent party** can now recover that stored progress after everyone leaves.
+**Rejoin recent party** can recover that stored progress after everyone leaves.
 It joins a live host when one exists; otherwise a trusted returning player downloads
 the saved world and obtains a newer authority epoch before play resumes. Missing,
 invalid or too-old saves show a recovery error and retry option instead of starting

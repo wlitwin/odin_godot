@@ -23,9 +23,9 @@ Presentation is freshly seeded so historical shots/hurt flashes/rings do not rep
 A local file is not a host-election credential. Quickdraw refuses file resume for
 configured Room sessions and for permit/custom-policy archives; those require their
 recovery service. File resume deliberately creates a new direct session. Stop the
-old direct game before replacing it. Configured online authorities now publish through [Room](online.md); public
-deployment remains separate work. [Abandoned-party restoration](online.md) now has
-its own service-backed acceptance path.
+old direct game before replacing it. Configured online authorities publish through
+[Room](online.md); public deployment remains separate work.
+[Abandoned-party restoration](online.md) has its own service-backed acceptance path.
 
 Writes use the existing bounded staged-file/rename helper. A failed write leaves the
 previous committed file intact. Missing, damaged, incompatible or wrong-owner files
@@ -35,8 +35,8 @@ Native identity and display-name preferences remain separate; do not share an id
 file as a game-save export.
 
 The game content/schema remains D2; this feature does not add gameplay fields. D1
-archives still have no implicit conversion. Browser IndexedDB slots and identity persistence now have their own
-[browser-local flow](browser-saves.md); they do not use native file paths.
+archives still have no implicit conversion. Browser IndexedDB slots and identity
+persistence have their own [browser-local flow](browser-saves.md); they do not use native file paths.
 
 Run `tests/replay_quickdraw_save/run.sh` from the Nix development environment for a
 fresh-process combat save/resume fixture. It uses isolated paths and identities,

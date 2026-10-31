@@ -21,11 +21,11 @@ client tick. Sender identity, connection generation, epoch, serial, bounds and
 monotonic input-frontier validation still apply. A separate bounded single-observation
 packet avoids transmitting a padded multi-tick command window. Scheduled contracts
 and archive/wire layouts remain compatible with the existing default profile.
-One-shot gameplay actions keep
-their existing sequenced acceptance/outcome semantics.
+One-shot gameplay actions keep their existing sequenced acceptance/outcome
+semantics.
 
-The owner protocol is value-owned and independent of Godot/transport. Each body
-stores its current owner, epoch/revision, last accepted sample sequence/source tick,
+The owner protocol stores its state as values independently of Godot and the
+transport. Each body stores its current owner, epoch/revision, last accepted sample sequence/source tick,
 authority acceptance tick, complete value, and an optional pending handoff. An
 authenticated sender's seat is supplied separately from the sample. Samples cannot
 name another owner. Finite-value, world-bound and motion predicates are application

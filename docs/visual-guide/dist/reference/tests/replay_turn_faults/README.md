@@ -62,12 +62,12 @@ record loss for nonzero-loss runs, and checks native `getStats` relay pairs and
 Coturn allocation/channel-bind activity alongside the game receipt. Forward delay
 statistics measure time inside the proxy; they are not gameplay latency percentiles.
 
-Each direction has at most 1,024 queued packets / 1 MiB in this runner. The proxy
+Each direction has at most 1,024 queued packets / 1 MiB in this fixture. The proxy
 supports at most 32 source tuples, refuses excess tuples, and never evicts an
 existing mapping. Each mapping has two directions; the total bound is therefore
 64 MiB of queued payload. A successful gate requires zero cap drops, refused flows
 and socket errors. Shutdown explicitly accounts for queued packets it discards.
-The runner has a 420-second game deadline and cleans up its process groups. The
+The harness has a 420-second game deadline and cleans up its process groups. The
 JSONL event log is streamed to disk; diagnostic reconstruction uses memory
 proportional to this bounded-duration recording.
 

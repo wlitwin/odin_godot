@@ -9,8 +9,8 @@ provides client/server endpoints and a typed SQLite adapter.
 A separate [published restore API](checkpoint/restore.md) grants fresh-process
 authority. Room/Party drives that lifecycle, with native and browser Cavecrawl
 rejoin UI acceptance. Scrapyard includes declared external assets in atomic room
-packages; its cold-cache native/browser restoration is validated. Broader profiles
-and game paths remain open.
+packages. Native/browser tests verify restoration with an empty asset cache.
+Broader asset profiles and game paths require separate integration.
 
 Live host migration uses replicated recovery checkpoints. The standalone service
 connects durable storage through a bounded room hub for three compiled game models,
@@ -85,7 +85,12 @@ checkpoint version remain unchanged. Existing databases gain an empty table when
 opened. Corrupt rows fail closed; they are not interpreted as absent saves or
 silently overwritten. File privacy and backup requirements match the room store.
 
-## Remaining all-members-gone recovery work
+<a id="remaining-all-members-gone-recovery-work"></a>
+
+## Recovery coverage and remaining integration
+
+The following list records implemented service and game coverage, required
+recovery invariants, and the cases still needing acceptance.
 
 1. The standalone room service integrates authenticated upload/download/status
    with deployment-selected Cavecrawl, Speedball and Scrapyard models and bounded
@@ -93,8 +98,8 @@ silently overwritten. File privacy and backup requirements match the room store.
    content/contracts and revisions to registered identity/nonce/connection
    generations, reusing bounded blob transfer. It never exposes a private Bundle
    or trusts a client-supplied authority Record.
-2. Extend Room publication acceptance across the game ports.
-   The library rechecks live ownership during transfer and at final commit,
+2. Room publication is tested with the game models and scenarios below;
+   additional game ports need their own acceptance. The library rechecks live ownership during transfer and at final commit,
    rejects revocation/expiry/competing durable CAS, and resolves exact committed
    retries. Native TLS verifies the three actual game models' tick-1 archives
    followed by service restart and a fresh trusted incarnation's identical download.
@@ -121,8 +126,8 @@ silently overwritten. File privacy and backup requirements match the room store.
    tick plus service-known rollback. Complete asset packages commit atomically
    with the checkpoint; typed collectors and content validators reject missing or
    extra dependencies. Restore compares the package descriptor again at commit.
-6. Cavecrawl's Room/Party resume/retry UX passes native and fresh-browser
-   service-kill/rejoin gates with continued play, new guests and a new publication.
+6. Cavecrawl's Room/Party resume/retry UI passes native and fresh-browser
+   service-kill/rejoin tests with continued play, new guests and a new publication.
    Continue broader native and browser
    service/client restarts with every participant absent, competing resumes,
    partial uploads, lost replies, stale credentials, changed assets/content,

@@ -5,10 +5,10 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Combat feedback</h1><div class="reader-meta"><span>1 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/feedback.md" download>Page source ↓</a></div></div>
 
 <article class="reading-body "><p>Hit/dash/pickup bursts, layered death/blast bursts, debris, enemy damage numbers
-and pickup/healing text now live in bounded presentation pools. Journal effects
+and pickup/healing text use bounded presentation pools. Journal effects
 use Replay&#39;s one-shot ledger; enemy numbers use each target&#39;s observed HP loss
 and generation/tick identity. No simulation or checkpoint fields are added.</p>
-<p>Confirmation/update does not restart an effect. Cancellation removes only the
+<p>Confirmation or an update does not restart an effect. Cancellation removes only the
 matching identity; epoch/resync and floor/run changes clear old views. Initial or
 restored enemy observations seed silently. Damage numbers can combine changes
 between observations; pickup/heal totals follow the existing aggregated events.</p>
@@ -20,17 +20,15 @@ gameplay damage or drops.</p>
 RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
   RSY_FEEDBACK_CAPTURE=/absolute/existing/output/directory \
   nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/feedback_run.sh</code></pre></div><p><span class="local-reference" title="docs/replay/results/scrapyard-feedback-2026-09-07/README.md · available in the repository">Evidence</span> covers
-live damage/pickup, expiry, floor changes, faulted stress and recovery. The frame
-timer now includes deferred feedback/audio/social upkeep; older measurements used
-a narrower scope. Native captures use Dummy audio, and WASM is compile-checked.
-Broader browser
-visuals, hardware listening, playtests and full comparison remain requirements.</p>
-<p><a href="screen.html">Screen effects</a> now restore lens kicks, vignette and transition veil.</p>
-<p><a href="wounds.html">Directional wounds</a> now use recorded geometry and correct the hurt
+live damage/pickup, expiry, floor changes, faulted stress and recovery. The frame timer includes deferred feedback/audio/social upkeep. Earlier
+measurements used a narrower scope. Native captures use Dummy audio, and WASM is compile-checked.
+Broader browser visuals, hardware listening, playtests and full comparison remain requirements.</p>
+<p><a href="screen.html">Screen effects</a> restore lens kicks, vignette and transition veil.</p>
+<p><a href="wounds.html">Directional wounds</a> use recorded geometry and correct the hurt
 burst&#39;s placement at the victim rather than the origin.</p>
-<p><a href="walls.html">Wall contacts</a> now add confirmed ballistic/spit sparks from exact
+<p><a href="walls.html">Wall contacts</a> add confirmed ballistic/spit sparks from exact
 collision endpoints and normals; terminal expiry and body hits do not invent
 wall effects.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="screen.html"><span>Screen effects</span><span aria-hidden="true">→</span></a><a href="wounds.html"><span>Directional wounds</span><span aria-hidden="true">→</span></a><a href="walls.html"><span>Wall contacts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/feedback.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="screen.html"><span>Screen effects</span><span aria-hidden="true">→</span></a><a href="wounds.html"><span>Directional wounds</span><span aria-hidden="true">→</span></a><a href="walls.html"><span>Wall contacts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/feedback.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/feedback.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

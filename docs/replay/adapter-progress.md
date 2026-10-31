@@ -1,6 +1,7 @@
 # Adapter ergonomics completion
 
-All six gates in [the plan](adapter-plan.md) are complete.
+All six criteria in [the plan](adapter-plan.md) were completed for the recorded
+adapter milestone.
 
 | Gate | Result |
 | --- | --- |
@@ -19,7 +20,7 @@ validation, limitations and diagnosed failures. Working logs are retained in
 `/private/tmp/replay-adapter-20260920`.
 
 Typed Resource and bake mapping convenience is implemented through reusable checked
-helpers and one shared extractor. A second mapping generator was unnecessary and
-would duplicate game validation. No gameplay policy was inferred from Inspector
+helpers and one shared extractor. A second mapping generator would duplicate the game validation already
+performed by that extractor. No gameplay policy was inferred from Inspector
 hints. No World schema/rule changes, Kit implementation changes or original-game
 changes; stock provenance was rebaked with identical canonical data.

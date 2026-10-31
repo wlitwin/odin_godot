@@ -1,8 +1,9 @@
 # Coordinator-backed RTC signaling
 
-Use `Rendezvous` to admit authenticated room members to RTC signaling. It is a
-bounded JSON frontend alongside the native authority Service.
-It borrows that Service and a raw Websocket listener. Poll the listener once,
+Use `Rendezvous` to admit authenticated room members to RTC signaling, the
+exchange of connection information used to establish WebRTC. It handles JSON
+messages alongside the native authority Service and borrows that Service and
+a raw Websocket listener. Poll the listener once,
 route binary messages to `auth.service_receive`, route text to
 `rendezvous_receive`, and call `rendezvous_pump` every frame. Close the frontend
 before closing its borrowed owners.
@@ -17,8 +18,9 @@ retain its ID through authenticated continuation; a fresh instance does not gain
 that reservation merely by presenting the member key. A second live connection
 for an already admitted identity is rejected.
 
-The relay introduces an authority star and overwrites the sender ID itself.
-Only admitted peers can relay SDP/ICE, and clients can signal only the authority.
+The relay connects each client to the authority and supplies the sender ID
+itself. Only admitted peers can relay SDP/ICE connection information, and
+clients can signal only the authority.
 It never carries gameplay packets. New authority terms remove old signaling
 memberships. Expired grants, disabled/rebound members, disconnected sockets and
 expired challenges are pruned. Existing direct data channels remain subject to
@@ -64,11 +66,11 @@ introductions to both endpoints. A rejected or expired continuation surfaces an
 error for the enclosing session to handle; it never silently adopts a new ID.
 Legacy relays remain opt-in and need not implement continuation.
 
-Real-browser gates cover host/client recovery with unchanged connection
+Browser integration tests cover host/client recovery with unchanged connection
 serials, packets received during the outage, wrong-token rejection and late join
 after recovery. Cavecrawl also continues in the same epoch with no migration.
-Its planned/crash and broader migration gates remain available. Public provisioning,
-TLS/TURN deployment and other browser engines still need acceptance. The local
+Separate tests cover planned, crash, and other migration scenarios. Public
+provisioning, TLS/TURN deployment, and other browser engines still need acceptance. The local
 fixture contains test keys and is not a production account/admission service.
 
 ## Explicit providers and P2P rosters

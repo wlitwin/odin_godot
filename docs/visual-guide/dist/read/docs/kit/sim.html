@@ -3,20 +3,20 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/sim: server-authoritative fixed-tick simulation</h1><div class="reader-meta"><span>31 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/sim.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-mental-model">The mental model</a><a href="#defining-a-sim-entity">Defining a sim entity</a><a href="#simulation-blocks-in-godotplaysim">Simulation blocks in godot:play/sim</a><a href="#what-the-lane-does-underneath">What the lane does underneath</a><a href="#the-contested-object">The contested object</a><a href="#lag-compensation">Lag compensation</a><a href="#discrete-verbs-on-the-lane">Discrete verbs on the lane</a><a href="#predicted-spawns--a-fired-projectile">Predicted spawns — a fired projectile</a><a href="#two-entity-kinds-two-inputs">Two entity kinds, two inputs</a><a href="#promoting-a-coop-game">Promoting a coop game</a><a href="#tuning">Tuning</a><a href="#gotchas">Gotchas</a><a href="#implementation-and-test-coverage">Implementation and test coverage</a></nav></details>
-<article class="reading-body "><p><code>kit/sim</code> adds an authority-run simulation lane to the normal Kit session. A
-client sends tick-stamped input windows; the authority advances final state and
-sends snapshots; the owning client predicts the same ticks and reconciles when
-its result differs.</p>
-<p>Use the simulation lane for movement, aiming, projectiles, or shared objects
-whose state should be computed by a trusted authority. A simulation lane is the
-fixed-tick pipeline that retains input and state history for prediction and correction. Reliable session state
-such as inventory, score, chat, entity lifetime, and saves remains on
-<code>kit/session</code> and <code>kit/net</code>.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#replication-lanes-and-replay">Replication lanes and replay</a><a href="#defining-a-sim-entity">Defining a sim entity</a><a href="#simulation-blocks-in-godotplaysim">Simulation blocks in godot:play/sim</a><a href="#lane-timing-snapshots-and-presentation">Lane timing, snapshots, and presentation</a><a href="#predicting-contested-objects">Predicting contested objects</a><a href="#lag-compensation">Lag compensation</a><a href="#scheduling-and-replaying-commands">Scheduling and replaying commands</a><a href="#predicted-spawns--a-fired-projectile">Predicted spawns — a fired projectile</a><a href="#two-entity-kinds-two-inputs">Two entity kinds, two inputs</a><a href="#promoting-a-coop-game">Promoting a coop game</a><a href="#tuning">Tuning</a><a href="#simulation-constraints">Simulation constraints</a><a href="#implementation-and-test-coverage">Implementation and test coverage</a></nav></details>
+<article class="reading-body "><p>Use <code>kit/sim</code> for movement, aiming, projectiles, or shared objects whose state
+must be computed by a trusted authority. Its simulation lane advances gameplay
+at a fixed tick rate and retains input and state history for prediction and
+correction. Clients send windows of tick-stamped inputs. The authority computes
+the accepted state and sends snapshots; each owning client predicts its entities
+locally and corrects its prediction when a snapshot differs.</p>
+<p>Reliable session state such as inventory, score, chat, entity lifetime, and
+saves remains on <code>kit/session</code> and <code>kit/net</code>.</p>
 <p>The package does not import Godot. Its input, snapshot, history,
 reconciliation, and lag-compensation paths run in headless tests under
 <code>tests/kitsim</code>.</p>
-<h2 id="the-mental-model">The mental model<a class="heading-anchor" href="#the-mental-model" aria-label="Link to this section">#</a></h2>
+<p><span id="the-mental-model"></span></p>
+<h2 id="replication-lanes-and-replay">Replication lanes and replay<a class="heading-anchor" href="#replication-lanes-and-replay" aria-label="Link to this section">#</a></h2>
 <p>A field tag selects one of three disjoint replication lanes:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -47,13 +47,12 @@ reconciliation, and lag-compensation paths run in headless tests under
 </tr>
 </tbody></table>
 </div><p>Identity, roster, reconnects, spawns, blobs, stats, chat, and reliable commands
-remain session features. The
-<a href="quickstart.html">quickstart</a> is the fast route into the coop model, and the
-<a href="quickstart-sim.html">sim quickstart</a> is the fast route here (a coop hello
-promoted in a small set of changes). Only contested fast state (movement,
-projectiles) opts into the sim lane, per field. A field&#39;s lane is the tag&#39;s
-first token, so a field lives on exactly one lane: <code>owner</code> and <code>predict</code>
-are alternatives, not flags you combine.</p>
+remain session features. The <a href="quickstart.html">quickstart</a> introduces the coop
+model; the <a href="quickstart-sim.html">sim quickstart</a> shows how to add simulation to
+that setup. Select the simulation lane per field for fast state such as
+movement and projectiles that the authority must compute. A field&#39;s lane is
+the tag&#39;s first token, so each field uses exactly one lane. Choose either
+<code>owner</code> or <code>predict</code>; they cannot be combined.</p>
 <p>Simulation-lane gameplay runs in a fixed-rate step proc (60 Hz by default).
 The proc derives predicted fields from their previous values, the current
 input, and replayable tick data. The authority runs it for final state. The
@@ -71,16 +70,22 @@ snapshot batches supersede older ones. If a loss burst exceeds the redundancy
 window, the authority temporarily holds the player&#39;s last accepted input. The
 client later reconciles to the resulting authority state.</p>
 <h2 id="defining-a-sim-entity">Defining a sim entity<a class="heading-anchor" href="#defining-a-sim-entity" aria-label="Link to this section">#</a></h2>
-<p>Tag the state, declare the input struct by using it, mark the step, and
-return tick payloads. The name-paired halves consume those payloads, and the generated
-thunk holds every role gate:</p>
+<p>Tag the entity&#39;s simulated fields with <code>predict</code> and mark its tick procedure
+with <code>@(gd_tick)</code>. Script generation discovers the input struct from that
+procedure&#39;s signature. Return values carry tick events to two optional
+procedures paired by name: <code>&lt;tick&gt;_then</code> handles authority consequences and
+<code>&lt;tick&gt;_fx</code> handles presentation. The generated thunk, which adapts the typed
+procedure to the lane&#39;s raw-pointer callback, checks which role and simulation
+pass may call each half.</p>
+<p>Here <code>Runner</code> is the game&#39;s character type. Its <code>owner</code> field holds the Godot
+node; the network entity owner is the player whose input drives it.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Runner :: <span class="hljs-keyword">struct</span> {
 	owner:   gd.Node2d,
 	net_id:  knet.Net_Id,
 	x, y:    <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;predict,interp&quot;`</span>,
 	vx, vy:  <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;predict&quot;`</span>,
-	fire_cd: <span class="hljs-type">u16</span> <span class="hljs-string">`gd:&quot;predict&quot;`</span>, <span class="hljs-comment">// even the trigger is predicted state</span>
-	hp:      <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// delta lane: never resimmed, wire-fresh</span>
+	fire_cd: <span class="hljs-type">u16</span> <span class="hljs-string">`gd:&quot;predict&quot;`</span>, <span class="hljs-comment">// cooldown state participates in prediction</span>
+	hp:      <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// reliable state updated independently of simulation replay</span>
 }
 
 Runner_Input :: <span class="hljs-keyword">struct</span> { <span class="hljs-comment">// no tag — discovered from the tick proc&#x27;s signature</span>
@@ -90,7 +95,7 @@ Runner_Input :: <span class="hljs-keyword">struct</span> { <span class="hljs-com
 
 <span class="hljs-meta">@(gd_tick)</span>
 runner_tick :: <span class="hljs-keyword">proc</span>(self: ^Runner, input: Runner_Input) -&gt; (fired: <span class="hljs-type">bool</span>) {
-	self.vx = <span class="hljs-type">f32</span>(input.move[<span class="hljs-number">0</span>]) * SPEED <span class="hljs-comment">// single-player-looking, fixed dt implicit</span>
+	self.vx = <span class="hljs-type">f32</span>(input.move[<span class="hljs-number">0</span>]) * SPEED <span class="hljs-comment">// advance using the fixed tick interval</span>
 	self.x += self.vx
 	<span class="hljs-keyword">if</span> self.fire_cd &gt; <span class="hljs-number">0</span> {self.fire_cd -= <span class="hljs-number">1</span>}
 	<span class="hljs-keyword">if</span> input.buttons &amp; FIRE != <span class="hljs-number">0</span> &amp;&amp; self.fire_cd == <span class="hljs-number">0</span> {
@@ -109,14 +114,16 @@ runner_tick_then :: <span class="hljs-keyword">proc</span>(g: ^Game, self: ^Runn
 <span class="hljs-comment">// The owning player&#x27;s live pass only; not called during resimulation.</span>
 <span class="hljs-meta">@(gd_half)</span>
 runner_tick_fx :: <span class="hljs-keyword">proc</span>(g: ^Game, self: ^Runner, fired: <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">if</span> fired { muzzle_flash(self) } <span class="hljs-comment">// answers the click NOW, at any latency</span>
+	<span class="hljs-keyword">if</span> fired { muzzle_flash(self) } <span class="hljs-comment">// local feedback before the authority reply</span>
 }</code></pre></div><p>Script generation emits the raw-pointer thunk, role and resimulation checks,
-<code>runner_sim_set</code>, and recursive canonical-ABI plus target-layout checks for the
-input struct. It rejects invalid halves, platform-sensitive or padded inputs,
-and a tick proc whose entity has no <code>predict</code> fields.
-Tick shapes are <code>(self)</code>, <code>(self, input)</code>, <code>(self, lane)</code>, and
-<code>(self, input, lane)</code>: a pointer param is the lane, and a value param is
-the input. Both halves also accept game-less (self-first) shapes.</p>
+<code>runner_sim_set</code>, and recursive input-layout checks. Those checks compare the
+canonical ABI with the target layout and reject platform-sensitive or padded
+inputs. Generation also rejects invalid halves and a tick procedure whose
+entity has no <code>predict</code> fields.</p>
+<p>Supported tick signatures are <code>(self)</code>, <code>(self, input)</code>, <code>(self, lane)</code>, and
+<code>(self, input, lane)</code>: a pointer parameter is the lane, and a value parameter
+is the input. Both halves also accept signatures that omit the game parameter
+and start with <code>self</code>.</p>
 <h3 id="presenting-a-tick-payload-on-every-screen">Presenting a tick payload on every screen<a class="heading-anchor" href="#presenting-a-tick-payload-on-every-screen" aria-label="Link to this section">#</a></h3>
 <p>The <code>_fx</code> above runs only for the acting player&#39;s live pass. To present the
 same occurrence on every screen, add <code>mine: bool</code> immediately after <code>self</code> (the
@@ -125,7 +132,7 @@ parameter name is significant):</p>
 runner_tick_fx :: <span class="hljs-keyword">proc</span>(g: ^Game, self: ^Runner, mine: <span class="hljs-type">bool</span>, fired: <span class="hljs-type">bool</span>) {
 	<span class="hljs-keyword">if</span> fired {
 		muzzle_flash(self)        <span class="hljs-comment">// every screen</span>
-		<span class="hljs-keyword">if</span> mine {kick_camera(g)}  <span class="hljs-comment">// flavor, not a role branch</span>
+		<span class="hljs-keyword">if</span> mine {kick_camera(g)}  <span class="hljs-comment">// feedback for the local player</span>
 	}
 }</code></pre></div><ul>
 <li>The actor presents it immediately with <code>mine = true</code>. Resimulation
@@ -137,35 +144,36 @@ when their watch clock reaches the event&#39;s tick. This keeps an effect aligne
 with the delayed entity that caused it. Occurrences are counted individually, so a batch cannot
 collapse two occurrences into one.</li>
 </ul>
-<p>The <code>mine = true</code> skip <strong>assumes the actor&#39;s own live pass fired the same event
-from the same input</strong>, which holds true unless the actor&#39;s input for that
-tick was lost: the authority then held their last input, its everywhere pass
-fired the event from the extrapolation, and the actor, running its own fresh
-input, may not have. Skipped, they miss that one-shot. Tick payload events are
-cosmetic one-shots, and loss is allowed to drop them. If the actor <strong>must</strong> see it
-regardless of loss, fire it from an <strong>authority</strong> world pass
-(<code>@(gd_step=&quot;authority&quot;)</code>) instead of the entity tick: an authority-minted
-event includes the owner by construction.</p>
+<p>The actor skips the returned event because its own live pass is expected to
+have presented it already. Packet loss can break that assumption: the authority
+may hold the actor&#39;s previous input and produce an event that the actor&#39;s fresh
+input did not produce. The actor then misses that effect. Tick payload events
+are cosmetic one-shots and may be lost this way. If the actor must receive the
+event even when its input is lost, produce it in an authority world pass
+(<code>@(gd_step=&quot;authority&quot;)</code>). Events produced there include the entity owner
+among their recipients.</p>
 <h3 id="events-produced-by-a-world-pass">Events produced by a world pass<a class="heading-anchor" href="#events-produced-by-a-world-pass" aria-label="Link to this section">#</a></h3>
 <p>Use <code>@(gd_event)</code> for a presentation event discovered outside a single
-entity&#39;s tick, such as contact between a player and a ball. A sim-tracked
-anchor lowers the declaration onto this lane&#39;s existing watch clock:</p>
+entity&#39;s tick, such as contact between a player and a ball. An anchor is an
+entity parameter that selects the event&#39;s presentation timeline and owner.
+When that entity is tracked by the simulation lane, the event uses the lane&#39;s
+watch clock, which follows received state at a delay:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The presentation proc you write. `k` is the only entity, so it is the anchor.</span>
 <span class="hljs-meta">@(gd_event = &quot;audience=everyone,timing=auto&quot;)</span>
 ball_kicked_fx :: <span class="hljs-keyword">proc</span>(g: ^Game, k: ^Kicker, mine: <span class="hljs-type">bool</span>, bvx, bvy: <span class="hljs-type">f32</span>) {
-	kick_sound(bvx, bvy)            <span class="hljs-comment">// every screen, at its right time</span>
-	<span class="hljs-keyword">if</span> mine {kick_camera(g)}        <span class="hljs-comment">// flavor, not a role branch</span>
+	kick_sound(bvx, bvy)            <span class="hljs-comment">// scheduled on the event&#x27;s display clock</span>
+	<span class="hljs-keyword">if</span> mine {kick_camera(g)}        <span class="hljs-comment">// feedback for the local player</span>
 }
 
 <span class="hljs-comment">// Scriptgen generates this helper. Call it where the sim discovers the event:</span>
 <span class="hljs-keyword">if</span> kicked {
 	ball_kicked(&amp;g.boot, k, b.roll.vx, b.roll.vy)
 }</code></pre></div><p>The generated helper applies the same live-pass, authority, watcher, and
-resimulation rules as a tick payload event. The anchor chooses the entity timeline used
-for presentation and the owner used to derive <code>mine</code>; it is a particular proc
-parameter, not a class or category. If a game has hundreds of <code>Enemy</code>
-instances, <code>anchor=enemy</code> means &quot;use the <code>enemy</code> pointer passed to this call.&quot;</p>
-<p>Anchor selection is intentionally small:</p>
+resimulation rules as a tick payload event. The anchor&#39;s network entity owner
+determines <code>mine</code>. The anchor names a particular procedure parameter: if a game
+has hundreds of <code>Enemy</code> instances, <code>anchor=enemy</code> selects the <code>enemy</code> pointer
+passed to this call.</p>
+<p>Select an anchor according to the event&#39;s parameters:</p>
 <ul>
 <li>No entity parameters means a world event. In a lane-owning game, <code>timing=auto</code>
 selects the watch clock and the authority is its local producer.</li>
@@ -181,24 +189,25 @@ entity reference travels as a <code>Net_Id</code> and is resolved to that peer&#
 pointer before presentation. Arguments after <code>mine</code> must be wire primitives.
 Scriptgen rejects ambiguous anchors, names that are not entity parameters, and
 untracked entity types at build time.</p>
-<p>Announce an anchored event before untracking or despawning its anchor; otherwise
-the generated corpse gate rejects it and no peer presents it. A predicted event
-that the authority never confirms may still appear locally. Speedball&#39;s kick is
-the worked example. <code>@(gd_event)</code> and its generated <code>^Boot</code> door are the sole
-declared presentation-event surface for both session and simulation clocks.</p>
-<p>For the rare inline probe that should not be a network event at all (a debug print in
-a tick body), gate on <code>ksim.lane_live(&amp;lane)</code>: it reflects the live pass, not
-a resim replay. Never read <code>lane.resimming</code> raw.</p>
+<p>Announce an anchored event before untracking or despawning its anchor. The
+generated helper rejects events whose anchor no longer exists, so no peer
+presents them. A predicted event that the authority never confirms may still
+appear locally. Speedball&#39;s kick is the worked example. Declare presentation
+events for either session or simulation clocks with <code>@(gd_event)</code> and call
+them through the generated helper that accepts <code>^Boot</code>.</p>
+<p>For a local diagnostic such as a debug print in a tick body, gate on
+<code>ksim.lane_live(&amp;lane)</code> to skip resimulation. Do not read <code>lane.resimming</code>
+directly.</p>
 <p>For a <code>mine</code>-form tick event, at least one returned value must be <code>bool</code>; the
 half runs on ticks where any boolean payload is true. All returned payloads
 must be wire primitives. Scriptgen reports either violation at build time. Use a plain
 owner-only <code>_fx</code> (without <code>mine</code>) for continuous local presentation such as an
 engine hum, or for an effect that should not appear on every screen.</p>
-<p>The game&#39;s own halves (the device read and the world pass) are typed and
-attributed the same way. <code>@(gd_sample)</code> marks the one place that touches
-hardware (never called during a resim); scriptgen pins its input struct to the
-ticks&#39; at build time, so sampling into the wrong struct cannot compile.</p>
-<p>Put the ordinary admission rules on the input itself:</p>
+<p>The game declares input sampling and world passes with typed procedures and
+attributes too. <code>@(gd_sample)</code> marks the procedure that reads hardware; it is
+never called during resimulation. Scriptgen checks its input struct against
+the tick&#39;s input type at build time and rejects a mismatch.</p>
+<p>Declare field-level input validation on the input struct:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Move_Mode :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {On_Foot, Driving}
 
 <span class="hljs-meta">@(gd_input)</span>
@@ -213,10 +222,10 @@ components and scales only magnitudes above one, preserving analog strength.
 <code>finite</code>, <code>enum</code>, and <code>mask</code> reject values that have no legal authored meaning.
 The generated sanitizer runs after local sampling and transactionally over
 every received window before any authority buffer changes.</p>
-<p>Admission is bounded at both levels: each window keeps its size/redundancy
-limits, and a seat may send at most 16 input classes in a 32 KiB <code>SIM_INPUT</code>
-payload. Generated and hand-built lanes assert the same aggregate envelope at
-registration, and the authority rejects an oversized packet before creating
+<p>Each received input window must fit its size and redundancy limits. Across
+windows, a seat may send at most 16 input classes in a 32 KiB <code>SIM_INPUT</code>
+payload. Generated and hand-built lanes assert these aggregate limits at
+registration. The authority rejects an oversized packet before creating
 per-class buffers.</p>
 <p>For cross-field or game-state rules, add <code>@(gd_sample=&quot;validate&quot;)</code> and the typed
 <code>&lt;sample&gt;_validate(self, input) -&gt; bool</code> hook (or name one with
@@ -249,65 +258,60 @@ game_step :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span cla
 }</code></pre></div><p>(The <code>tick: u64</code> param is optional in both slots; a pass that doesn&#39;t read
 the clock declares <code>proc(self: ^Game)</code>.)</p>
 <h3 id="using-an-authority-step-without-a-simulation-lane">Using an authority step without a simulation lane<a class="heading-anchor" href="#using-an-authority-step-without-a-simulation-lane" aria-label="Link to this section">#</a></h3>
-<p>In a package with no
-<code>@(gd_tick)</code> classes there is no lane, so <code>@(gd_step = &quot;authority&quot;)</code> routes
-through the boot accumulator instead: scriptgen generates
-<code>&lt;snake&gt;_step(self, ticks)</code>: the role gate, the fixed-step loop, and the
-<a href="net.html#field-change-edges">same-frame edge pass</a>
-inside the normal <code>&lt;game&gt;_net_frame</code> call
-(cavecrawl&#39;s <code>cave_host_tick</code> is the worked example; there is no absolute
-tick in the coop loop, so this form is <code>proc(self)</code>; count ticks in your
-own <code>gd:&quot;backup&quot;</code> field). One declaration, two routings: promoting the game
-to the sim lane re-routes it without touching the attribute.</p>
-<p>For a conventional shell with one Boot, Session, Comms, and Lane field, the
-generated game-network facade owns this wiring too. Pass a named complete-stack
-profile while attaching, then override its lane fields when measurements call
-for it:</p>
+<p>A package with no <code>@(gd_tick)</code> classes has no simulation lane. In that case,
+<code>@(gd_step = &quot;authority&quot;)</code> uses the boot accumulator: scriptgen generates
+<code>&lt;snake&gt;_step(self, ticks)</code> with the authority check, fixed-step loop, and
+<a href="net.html#field-change-edges">same-frame edge pass</a>, called from
+<code>&lt;game&gt;_net_frame</code>. Cavecrawl&#39;s <code>cave_host_tick</code> demonstrates this setup.
+The coop loop has no absolute tick, so declare <code>proc(self)</code> and count ticks
+in a <code>gd:&quot;backup&quot;</code> field if needed. Adding a simulation lane changes the
+generated routing without changing the attribute.</p>
+<p>For a game root with one Boot, Session, Comms, and Lane field, the generated
+game-network facade connects these components. Pass a named network profile
+when attaching, then override lane settings when measurements call for it:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// ready(): Boot + entities + lane in one generated call</span>
 cfg := kboot.network_profile(.Listen_Server_Action)
 cfg.lane.smooth_cut = <span class="hljs-number">48</span>
-game_net_attach(self, kboot.Options{<span class="hljs-comment">/* ... */</span>}, cfg)</code></pre></div><p>Underneath, <code>&lt;class&gt;_lane_init</code> carries the input size, typed procs, and each
-pass wired to its slot; <code>boot_lane</code> makes Boot drive everything. Both remain
-public for a custom shell. The generated entity table
-carries each ticking class&#39;s <code>Sim_Set</code>, so the factory tracks and untracks
-entities on the lane itself; <code>&lt;game&gt;_net_frame</code> drives the underlying
-<code>boot_pump</code>, which runs <code>lane_frame</code> + <code>lane_present</code> every frame and forwards
-<code>Ev_Owner_Changed</code>.</p>
-<p>Entity thunks run every simulated tick, live and replay identically, in
-track order, each fed its owner&#39;s input (<code>nil</code> coasts: an inputless entity
-type, or a remote player on a client whose truth is already inbound). The two
-optional world passes run after entity ticks: the everywhere pass for pure-sim
-cross-entity work (contact), the authority pass for world-level
-authority work (respawn queues, wave directors). One input <strong>class</strong> exists
-per distinct <code>@(gd_tick)</code> input TYPE: <code>lane_init</code> registers the primary
-(class 0) and <code>lane_add_input_class</code> registers each extra, and the wire ships
-one window per class per packet (see <a href="#two-entity-kinds-two-inputs">Two entity kinds, two inputs</a>
-below). Two driven entities of the SAME kind still share a window; compose that
-intent into the one struct. Quantize by declaring the quantized type: what the
-struct holds is what crosses the wire (quickdraw&#39;s aim is a <code>u16</code> turn
-fraction, ~0.005° resolution, with a two-line codec pair at the sample/tick
-boundary; there is no per-field wire machinery on inputs; the blob memcpys).
-A world pass that reads inputs takes the typed view:</p>
+game_net_attach(self, kboot.Options{<span class="hljs-comment">/* ... */</span>}, cfg)</code></pre></div><p>The generated <code>&lt;class&gt;_lane_init</code> supplies the input size, typed procedures,
+and world-pass callbacks; <code>boot_lane</code> connects the lane to Boot. Both are
+public for custom game roots. The generated entity table includes each ticking
+class&#39;s <code>Sim_Set</code>, allowing the factory to track and untrack its entities on
+the lane. <code>&lt;game&gt;_net_frame</code> calls <code>boot_pump</code>, which runs <code>lane_frame</code> and
+<code>lane_present</code> every frame and forwards <code>Ev_Owner_Changed</code>.</p>
+<p>Entity thunks run in track order on every simulated tick, including replay,
+using each entity owner&#39;s input. A <code>nil</code> input leaves the entity coasting;
+this applies to inputless types and to remote entities whose state a client
+receives from the authority. After entity ticks, the optional everywhere world
+pass handles replayable cross-entity work such as contact. The authority world
+pass handles accepted world outcomes such as respawns and wave scheduling.</p>
+<p>An input class groups entities by the distinct input struct in their
+<code>@(gd_tick)</code> signatures. <code>lane_init</code> registers the primary class (class 0),
+and <code>lane_add_input_class</code> registers each additional class. Each packet carries
+one window per class; see <a href="#two-entity-kinds-two-inputs">Two entity kinds, two inputs</a>.
+Two entities of the same kind driven by one player share a window, so compose
+their intent into one struct.</p>
+<p>Inputs cross the wire as a memory copy of the struct, with no per-field wire
+encoding. To quantize an input, declare its quantized type. Quickdraw&#39;s aim
+uses a <code>u16</code> turn fraction with ~0.005° resolution, encoded when sampling and
+decoded in the tick. A world pass that reads inputs uses the typed view:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">input, drives := ksim.lane_input_of(&amp;g.lane, owner, Kicker_Input)
-<span class="hljs-keyword">if</span> !drives {<span class="hljs-keyword">continue</span>} <span class="hljs-comment">// a pair this peer doesn&#x27;t simulate</span></code></pre></div><p>For hand-driven setups (tests, generated-code-free games) <code>lane_init</code> +
-<code>lane_set_sim</code> (rawptr sample + the two <code>Step_Proc</code>s, everywhere then
-authority) + <code>lane_track</code> / <code>lane_track_set</code> + explicit
-<code>lane_frame</code>/<code>lane_present</code> calls remain fully supported; the generated
-wiring and generated thunks call those same procedures. <code>lane_present</code> is
-optional there: until the first call, the <code>presented</code> latch keeps
-ingest painting watched truth directly (a hand-driven client that never
-presents never freezes its watched entities); after it, watched fields
-belong to the presenter.</p>
-<p>One lifecycle rule either way: lane state does not reset with a session
-re-init. The app route survives, but the anchor and ledgers do not follow a
-fresh authority. To reset, call <code>lane_destroy</code> then <code>lane_init</code> (destroy
-zeroes the lane); <code>lane_init</code> on a live lane asserts.</p>
+<span class="hljs-keyword">if</span> !drives {<span class="hljs-keyword">continue</span>} <span class="hljs-comment">// a pair this peer doesn&#x27;t simulate</span></code></pre></div><p>Tests and games without generated code can call the same procedures directly:
+<code>lane_init</code>, <code>lane_set_sim</code> with a rawptr sample callback and two <code>Step_Proc</code>s
+(everywhere, then authority), <code>lane_track</code> / <code>lane_track_set</code>, and explicit
+<code>lane_frame</code>/<code>lane_present</code> calls. In this setup, <code>lane_present</code> is optional.
+Until its first call, the <code>presented</code> latch allows received snapshots to update
+watched fields directly. After that call, presentation updates those fields.
+A client that omits <code>lane_present</code> therefore continues to show received state.</p>
+<p>Reinitializing a session does not reset lane state. The app route survives,
+but the tick anchor and state ledgers remain tied to the previous authority.
+Call <code>lane_destroy</code> then <code>lane_init</code> to reset them. Destruction zeroes the lane;
+calling <code>lane_init</code> on a live lane asserts.</p>
 <h2 id="simulation-blocks-in-godotplaysim">Simulation blocks in <code>godot:play/sim</code><a class="heading-anchor" href="#simulation-blocks-in-godotplaysim" aria-label="Link to this section">#</a></h2>
-<p>Blocks compose on this lane the way <code>godot:play</code>&#39;s compose on the coop one:
-embed a field and the entity gains the block&#39;s predicted state (its
-<code>gd:&quot;predict&quot;</code> fields flatten into the descriptor) AND its
-<code>@(gd_tick)</code> step, hoisted to run after the entity&#39;s own tick: the entity
-writes intent, and blocks integrate. The alias is <code>psim</code>:</p>
+<p>Embed a <code>godot:play/sim</code> block to add reusable simulated behavior to an entity.
+Scriptgen includes the block&#39;s <code>gd:&quot;predict&quot;</code> fields in the entity&#39;s replication
+descriptor and calls the block&#39;s <code>@(gd_tick)</code> after the entity&#39;s own tick.
+The entity can therefore write movement intent before the block integrates it.
+The import alias is <code>psim</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> psim <span class="hljs-string">&quot;godot:play/sim&quot;</span>
 
 Kicker :: <span class="hljs-keyword">struct</span> {
@@ -315,199 +319,192 @@ Kicker :: <span class="hljs-keyword">struct</span> {
 	run:  psim.Mover, <span class="hljs-comment">// momentum movement: the tick writes run.tx/ty, the block integrates</span>
 	kick: psim.Cool,  <span class="hljs-comment">// predicted cooldown: psim.ready(&amp;k.kick, KICK_CD) gates and re-arms</span>
 }</code></pre></div><ul>
-<li><strong><code>psim.Cool</code></strong>: the predicted cooldown, the sim-lane counterpart to
-<code>play.Pace</code>, with the same three verbs (<code>due</code> / <code>arm</code> / <code>ready</code>) on the other
-timeline. Pace holds a deadline against a clock you pass in (host scratch,
-never on the wire); Cool counts itself down inside the sim, so a revolver&#39;s
-cadence or a kick&#39;s recovery answers the click at any latency and replays
-exactly.</li>
-<li><strong><code>psim.Mover</code></strong>: momentum 2D movement. Intent-through-fields: the entity&#39;s
-tick writes the velocity it wants every tick and the block approaches it;
-<code>accel = 1</code> collapses the approach to an exact snap for twitch games. Config
-(accel, bounds) is fixed, not replicated state: plain untagged fields,
-stamped at spawn on every peer, never on the wire.</li>
-<li><strong><code>psim.Roller</code></strong>: the contested rolling body, with self-simulating
-friction, a hard speed ceiling, and energy-eating wall bounce. The game
-keeps the consequences: speedball&#39;s ball detects goals off the roller&#39;s
-clamp (a crossing lands exactly on the line for one tick) and predicts its
-own reset.</li>
+<li><code>psim.Cool</code> implements a predicted cooldown with <code>due</code> / <code>arm</code> / <code>ready</code>,
+the same operations as <code>play.Pace</code>. Pace stores a deadline against a clock
+supplied by the caller; it is host-local state and is never sent. Cool counts
+down within the simulation, so the client can predict a revolver&#39;s firing
+cadence or a kick&#39;s recovery and reproduce it during replay.</li>
+<li><code>psim.Mover</code> implements momentum-based 2D movement. The entity&#39;s tick writes
+its target velocity, and the block approaches that velocity. Set <code>accel = 1</code>
+to reach it immediately. Configuration such as acceleration and bounds uses
+plain, untagged fields. Set it at spawn on every peer; it is not replicated.</li>
+<li><code>psim.Roller</code> integrates a shared rolling body&#39;s motion with friction, a hard
+speed ceiling, and wall bounces that reduce speed. The game implements
+gameplay outcomes. Speedball detects goals from the roller&#39;s position clamp:
+a crossing places the ball exactly on the line for one tick, allowing the
+ball&#39;s tick to detect the goal and predict its reset.</li>
 </ul>
-<p><strong>Driving a block yourself: <code>gd:&quot;manual&quot;</code>.</strong> Auto-hoist runs a block&#39;s tick
-after the wielder&#39;s (intent, then integrate); this is the right default until
-the wielder must act on the integrated result (a crate pushout after the move) or
-skip the step entirely (a dead avatar that must not count its cooldown down).
-Tag the embed <code>gd:&quot;manual&quot;</code> and scriptgen stops auto-calling that block&#39;s
-tick; the wielder drives it, wherever and however often it likes:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">fire: psim.Cool <span class="hljs-string">`gd:&quot;manual&quot;`</span>, <span class="hljs-comment">// I&#x27;ll tick it myself</span>
+<p><strong>Driving a block yourself: <code>gd:&quot;manual&quot;</code>.</strong> By default, a block&#39;s tick runs
+after its containing entity&#39;s tick. Call it manually when the entity must use
+the integrated result immediately, such as resolving a crate overlap after
+movement, or must skip integration, such as freezing a dead avatar&#39;s cooldown.
+Tag the embedded field <code>gd:&quot;manual&quot;</code> to suppress the generated tick call,
+then call the block&#39;s tick at the required point:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">fire: psim.Cool <span class="hljs-string">`gd:&quot;manual&quot;`</span>, <span class="hljs-comment">// tick explicitly in the parent procedure</span>
 
 <span class="hljs-meta">@(gd_tick)</span>
 gunner_tick :: <span class="hljs-keyword">proc</span>(self: ^Gunner, <span class="hljs-keyword">in</span>: Gunner_Input) -&gt; (fired: <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">if</span> self.hp &lt;= <span class="hljs-number">0</span> {<span class="hljs-keyword">return</span>} <span class="hljs-comment">// dead: never tick it — the cooldown just freezes</span>
+	<span class="hljs-keyword">if</span> self.hp &lt;= <span class="hljs-number">0</span> {<span class="hljs-keyword">return</span>} <span class="hljs-comment">// leave the cooldown unchanged while dead</span>
 	<span class="hljs-keyword">if</span> <span class="hljs-keyword">in</span>.buttons &amp; FIRE != <span class="hljs-number">0</span> &amp;&amp; psim.ready(&amp;self.fire, FIRE_CD) {fired = <span class="hljs-literal">true</span>}
 	psim.cool_tick(&amp;self.fire) <span class="hljs-comment">// driven here, on the alive path</span>
-}</code></pre></div><p>The predict fields still flatten into the descriptor; <code>manual</code> suppresses only
-the auto-CALL, never the wire. It is the escape hatch for bespoke ordering (any
-order, conditional, or not at all); an untagged embed stays auto-hoisted, so
-the plain embed-and-integrate case is untouched. quickdraw&#39;s revolver is the
-worked example: its dead-man freeze is one skipped call.</p>
-<p>The namespaces police themselves: embed a predict-tagged block from the
-root <code>godot:play</code> shelf and scriptgen errors it toward <code>play/sim</code>; embed a
-<code>play/sim</code> block that carries no predict fields and it errors back.
-Game-local blocks compose however they like; the lint is the shelf&#39;s
-contract, so <code>psim.</code> at a call site always means this state resims.</p>
-<h2 id="what-the-lane-does-underneath">What the lane does underneath<a class="heading-anchor" href="#what-the-lane-does-underneath" aria-label="Link to this section">#</a></h2>
+}</code></pre></div><p>The block&#39;s predicted fields remain in the descriptor and on the wire;
+<code>manual</code> suppresses only the generated call. The entity can call the block
+conditionally, change its ordering, or skip it. An untagged embedded field
+retains the default ordering. Quickdraw&#39;s revolver freezes its cooldown while
+dead by skipping that call.</p>
+<p>Scriptgen checks blocks in the SDK&#39;s two packages. A block in <code>godot:play</code>
+with predicted fields produces an error directing it to <code>play/sim</code>; a
+<code>play/sim</code> block with no predicted fields produces the reverse error. These
+checks do not restrict game-local blocks. They ensure that SDK blocks imported
+with the <code>psim.</code> prefix contain state that participates in resimulation.</p>
+<p><span id="what-the-lane-does-underneath"></span></p>
+<h2 id="lane-timing-snapshots-and-presentation">Lane timing, snapshots, and presentation<a class="heading-anchor" href="#lane-timing-snapshots-and-presentation" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Anchoring.</strong> A client neither ticks nor sends until the first batch
-names the server&#39;s tick, then adopts the truth outright and starts a
-couple of ticks ahead. From there the clock only BENDS: a ±2% timescale
-nudge (beneath perception) grows or shrinks the lead toward the target
-headroom, fed by the batch header&#39;s input-ack echo. There is no clock sync
-dependency, no tick jumps, and no pops.</li>
-<li><strong>Snapshots delta against an ACK, not a guess.</strong> The server deltas every
-entity&#39;s predict set against the newest batch the client confirmed
-applying in full; a client only acks a batch when every row landed. An
-unknown id (spawn in flight) skips by length and stalls the ack; a missing
-baseline falls back to a per-entity full row. This is self-healing in both
-directions, with no keyframe-request message.</li>
-<li><strong>Predict-self.</strong> Your own entities are ledgered and reconciled; everyone
-else&#39;s are <em>watched</em>: truth applies as it arrives, and <code>lane_present</code>
-renders them on a delayed watch clock, blending bracketing batches per field
-(<code>Lerp_Kind</code>, the same as streams, and the same clamp-and-hold rule: never
-extrapolate).</li>
-<li><strong>Authority snaps, the eye glides.</strong> When a reconcile corrects your
-avatar, the sim state snaps to truth (the ledger records it), but
-<code>lane_present</code> draws sim plus a decaying error (63 ms half-life, the puppet
-constant) on float <code>interp</code> fields, so a correction is a lean, not a
-teleport. Past <code>smooth_cut</code> the error zeroes and the snap shows, because
-smoothing a cut looks worse than the cut. This is free for the game:
-fields hold sim truth during <code>lane_frame</code> and presentation truth after
-<code>lane_present</code>; the lane re-seeds sim state from the ledger before
-ticking, so dressing nodes from fields keeps working unchanged.</li>
-<li><strong>Events, not callbacks.</strong> Packet handlers only file bytes; every call
-into game code happens inside <code>lane_frame</code> on your stack.</li>
-<li><strong>Possession is one call.</strong> <code>lane_set_owner(l, id, player)</code> on every peer
-(forward the session&#39;s <code>Ev_Owner_Changed</code>): the authority flips whose
-input buffer drives the entity (and whom rewound queries spare); a client
-swaps the entity between predicted and watched, seeding the new ledger
-from the freshest received truth.</li>
+<li><strong>Anchoring.</strong> A client waits to tick or send input until its first snapshot
+batch establishes the server&#39;s tick. It adopts that state and starts a couple
+of ticks ahead. Afterward, a ±2% timescale adjustment grows or shrinks the
+lead toward the target input headroom, using the batch header&#39;s input-ack
+echo. This needs no separate clock synchronization or tick jumps.</li>
+<li><strong>Snapshots use an acknowledged baseline.</strong> The server computes deltas for
+each entity&#39;s predicted fields against the newest batch the client confirmed
+applying in full. A client acknowledges a batch only after every row applies.
+An unknown entity id, such as a spawn still in transit, is skipped by row
+length and prevents the acknowledgement from advancing. A missing baseline
+causes a per-entity full row, without a keyframe-request message.</li>
+<li><strong>Predict-self.</strong> The client records its own entities in state-history
+ledgers and reconciles them. It watches other entities: received state updates
+them, and <code>lane_present</code> renders them on a delayed watch clock by blending
+between batches per field. This uses <code>Lerp_Kind</code>, as streams do, with the same
+clamp-and-hold rule: it never extrapolates.</li>
+<li><strong>Correction smoothing.</strong> Reconciliation immediately sets simulation state
+to authority state and records it in the ledger. For float <code>interp</code> fields,
+<code>lane_present</code> adds a decaying render error with a 63 ms half-life, the same
+constant used by the puppet. This smooths the displayed correction. If the
+error exceeds a nonzero <code>smooth_cut</code>, it is cleared and the corrected pose appears
+immediately. Fields contain simulation values during <code>lane_frame</code> and
+presentation values after <code>lane_present</code>. Before ticking again, the lane
+restores simulation values from the ledger, so the game can continue copying
+fields to nodes after presentation.</li>
+<li><strong>Game callbacks run in the frame call.</strong> Packet handlers store received
+bytes. The lane calls game code from <code>lane_frame</code> on the caller&#39;s stack.</li>
+<li><strong>Possession.</strong> Forward the session&#39;s <code>Ev_Owner_Changed</code> to
+<code>lane_set_owner(l, id, player)</code> on every peer. The authority changes which
+player&#39;s input buffer drives the entity and which player&#39;s rewound queries
+exclude it. A client changes the entity between predicted and watched state,
+seeding a new prediction ledger from the freshest received state.</li>
 </ul>
-<h2 id="the-contested-object">The contested object<a class="heading-anchor" href="#the-contested-object" aria-label="Link to this section">#</a></h2>
-<p>Predict-self leaves shared fast objects (the ball, the crown, the flag)
-watched, which means rendered in the past and touchable only after a round
-trip. <code>@(gd_tick = &quot;contested&quot;)</code> is the middle path (the Rocket League
-model): <strong>every peer predicts this entity</strong>, so contact with it resolves on
-each screen&#39;s own timeline instantly. The server&#39;s simulation stays the only
-truth; a wrong guess (the opponent you render in the past touched it first)
-reconciles and glides like any other mispredict. You opt into the costs per
-entity: resim CPU on every peer, and exactly that mispredict class. Design the
-tick so consequences that must not double-fire stay in <code>_then</code> (authority),
-but keep RESETS in the tick itself where they predict: speedball&#39;s goal
-detection and kickoff freeze live in the ball&#39;s own tick, so every screen
-snaps the ball home the instant its simulation crosses the line, while the
-score lands authority-side. Contact belongs in the world pass, applied only to
-the pairs this peer HAS INPUTS for: yours on your screen, everyone&#39;s on the
-server; a remote touch reaches you as the server&#39;s word, never as a local
-guess.</p>
+<p><span id="the-contested-object"></span></p>
+<h2 id="predicting-contested-objects">Predicting contested objects<a class="heading-anchor" href="#predicting-contested-objects" aria-label="Link to this section">#</a></h2>
+<p>With predict-self, a client watches shared fast objects such as a ball, crown,
+or flag. They render in the past, and a local interaction waits for the round
+trip to the authority. Mark an entity <code>@(gd_tick = &quot;contested&quot;)</code> to have every
+peer predict it. Local contact can then take effect on the client&#39;s predicted
+timeline. The server still decides the accepted state. If an opponent touched
+the object first on the server, the client reconciles its prediction and
+smooths the displayed correction.</p>
+<p>Contested prediction adds resimulation work on every peer and can produce
+corrections when peers disagree about contact. Keep authority consequences in
+<code>_then</code> so replay cannot apply them twice. Put predicted resets in the tick
+itself: Speedball&#39;s ball detects a goal and handles the kickoff freeze in its
+own tick, allowing each screen to reset the ball as soon as its simulation
+crosses the line. The authority updates the score. Handle contact in the world
+pass only for pairs whose inputs this peer has: the local player&#39;s pairs on a
+client and every player&#39;s pairs on the server. A remote touch then arrives as
+an authority result.</p>
 <p>Constraints for contested prediction:</p>
 <ul>
-<li><strong>Contested entities must be SELF-SIMULATING.</strong> A ball integrates its own
-motion, which is what makes every peer&#39;s between-batch prediction good. An
-input-driven avatar would coast frozen client-side and fight corrections
-forever.</li>
-<li><strong>Presentation follows the CLAIM.</strong> A contested entity&#39;s sim runs on your
-predicted timeline, but its PRESENTATION is claim-weighted: call
-<code>lane_claim(l, id)</code> every tick YOUR sim influences it (the world pass&#39;s
-contact block), and the entity draws from your predicted pose, instantly
-and legitimately front-running the server. Unclaimed, it draws the WATCHED
-view, so a remote touch moves it beside the remote avatar that made it
-instead of a whole lead early (the mixed-timelines artifact you will
-otherwise ship: predicted ball, past-rendered players, one screen). The
-claim rises instantly and decays over ~a quarter second, matching net.md&#39;s
-&quot;did MY simulation cause this?&quot; boolean, asked continuously.</li>
-<li><strong>Or go all the way: PREDICT-WORLD</strong> (<code>Lane_Config.echo_inputs</code>, the
-Rocket League model: what speedball ships). Batches echo every player&#39;s
-held input; mark the AVATARS <code>contested</code> too, and every peer ticks every
-entity (remote ones extrapolated with held inputs), so the whole scene
-lives on ONE predicted timeline. No claim dance at all (contested
-presentation uses the predicted pose), remote touches play out beside
-the avatars making them, immediately. The price is resim on nearly every
-batch (held inputs drift: small, constant, glided corrections on remote
-avatars instead of delayed-but-accurate ones) and a few echo bytes per
-player per batch. Pick per game: predict-world for contact-driven games,
-predict-self + lag comp where accurate rendered targets matter (quickdraw
-keeps hitscan honest by NOT extrapolating its targets). The claim-mode
-rules below serve games that predict only the object.</li>
-<li><strong>The claim follows the CAUSE, and releases when the cause ends.</strong> Your
-kick&#39;s whole FLIGHT is your simulation&#39;s consequence: keep claiming while
-the ball is fast from your touch, and release when it SLOWS (the two
-timelines nearly coincide, so the handback is invisible) or when an
-opponent contests it. Releasing on mere distance pulls your own kick
-backward mid-flight: the fade target is the watched view, sitting
-speed × timeline-skew behind a fast ball, and blending across that gap
-cancels its forward motion on your screen. <code>examples/claimball</code>&#39;s <code>sp_step</code>
-claim block (hold while fast, release on slow) is the reference.</li>
+<li><strong>Contested entities must simulate their own motion.</strong> A ball can integrate
+velocity between snapshots on every peer. An input-driven avatar without
+remote input would instead remain stationary on a client and repeatedly
+require correction.</li>
+<li><strong>Presentation follows a claim.</strong> A claim selects the displayed pose; it
+does not grant authority over gameplay. Call <code>lane_claim(l, id)</code> each tick
+that local simulation influences the contested entity, such as during contact
+in the world pass. The entity then displays its predicted pose. Without a
+claim, it displays the watched pose, aligning a remote touch with the delayed
+avatar that caused it. Otherwise the screen would show a predicted ball
+reacting before the remote avatar reached it. Claim weight rises immediately
+and decays over ~a quarter second. This is the continuous form of net.md&#39;s
+test for whether local simulation caused the change.</li>
+<li><strong>Predict-world also predicts remote avatars.</strong> Enable
+<code>Lane_Config.echo_inputs</code> and mark the avatars <code>contested</code> too. Batches echo
+every player&#39;s held input, allowing every peer to tick every entity and
+extrapolate remote inputs from the held values. Speedball uses this model.
+The scene shares one predicted timeline, and contested entities display their
+predicted poses without claims. Remote contacts appear beside the avatars
+making them immediately. Held inputs often differ from the next received
+inputs, so this model adds resimulation on nearly every batch, frequent small
+smoothed corrections on remote avatars, and a few echo bytes per player per
+batch. Choose it for contact-driven games. Predict-self with lag compensation
+suits games that need accurate rendered targets: Quickdraw watches targets
+without extrapolating them. The remaining claim rules apply when clients
+predict only the shared object.</li>
+<li><strong>Keep a claim while its cause persists.</strong> After a kick, continue claiming
+while the ball moves quickly because of that touch. Release when it slows,
+when the predicted and watched timelines nearly coincide, or when an opponent
+contests it. Releasing merely because the ball is far away blends toward the
+watched pose, which trails a fast ball by speed × timeline skew. That blend
+can pull the ball backward during its flight. The <code>sp_step</code> claim block in
+<code>examples/claimball</code> demonstrates holding while fast and releasing when slow.</li>
 </ul>
-<p>The soccer game ships three times, one per model, so read them against each
-other to choose: <code>examples/slopball</code> (coop, peer-authoritative),
-<code>examples/speedball</code> (predict-world: every avatar echoed, no claim), and
-<code>examples/claimball</code>
-(predict-self + the claim dance above). <code>claimball</code> is the worked claim-mode
-example: a contested ball predicted on every screen, presented from whoever&#39;s sim
-is driving it. The onboarding&#39;s
-<a href="../onboarding/07-the-competitive-turn.html">competitive turn</a> walks the same three.</p>
+<p>Compare the three soccer examples when choosing a model:
+<code>examples/slopball</code> uses coop peer authority, <code>examples/speedball</code> uses
+predict-world with echoed avatar inputs and no claims, and <code>examples/claimball</code>
+uses predict-self with presentation claims on the contested ball. In <code>claimball</code>,
+every screen predicts the ball; a local claim selects its predicted pose for
+display. The onboarding&#39;s
+<a href="../onboarding/07-the-competitive-turn.html">competitive turn</a> compares the same
+three models.</p>
 <h2 id="lag-compensation">Lag compensation<a class="heading-anchor" href="#lag-compensation" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// HOST, judging a hitscan from `shooter` (inside a _then or the world pass):</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Judge the shooter&#x27;s hitscan on the authority, in _then or a world pass.</span>
 judged_at := ksim.lane_rewound_begin(&amp;g.lane, shooter)
-g.hit = trace_shot(g) <span class="hljs-comment">// every OTHER entity is wound back to what the</span>
-                      <span class="hljs-comment">// shooter&#x27;s screen showed; the shooter&#x27;s own stay live</span>
-ksim.lane_rewound_end(&amp;g.lane)</code></pre></div><p>Write the hit test inline between begin and end, with no context struct across a
-rawptr. The pair must not nest, and nothing may track/untrack entities in
-between. <code>lane_rewound(l, shooter, user, query)</code> is the same judgment as a
-callback, for the places a proc value reads better (tests, table-driven
-weapons).</p>
-<p><strong>Scope, precisely:</strong> the rewind winds back the PREDICT-SET fields of every
-tracked entity except the shooter&#39;s own, and nothing else. Delta-lane fields
-(hp, scores, gear), untracked entities, and any game-side maps read LIVE
-inside the block. That is usually what you want (quickdraw judges a rewound
-pose but applies damage to live hp, since a dead man&#39;s past body shouldn&#39;t
-eat a new bullet), but it means a predicate like &quot;was the target shielded when
-the shooter saw them&quot; must keep its shield in the predict set, or it reads
-today&#39;s shield against yesterday&#39;s pose.</p>
-<p>The rewind view is <strong>issued-snapshot-anchored and interpolated</strong>: every input arrives
-in a packet that also carries the sender&#39;s snapshot ack and its render
-offset, and the buffer tags each input with both, so when the server
-executes the input that pulled the trigger, it first verifies that the ack
-names a recent, non-regressing batch actually issued to that seat. Applying
-the batch remains a client claim, so validity as a replication baseline does
-not automatically make it visibility evidence. The authority caps credible
-ack age at
-<code>ceil((observed RTT + 2·jitter) / tick_dt) + margin + snap_every</code> and caps the
-reported render offset at its own configured <code>watch_delay + snap_every</code>. That
-extra cadence admits the normal interpolation phase around the watch target,
-not a client-reported stall. Their sum, capped again by <code>rewind_max</code>, is the
-seat&#39;s current competitive rewind envelope.
-<code>lane_rewind_envelope(l, shooter)</code> exposes that derived limit in ticks. Before
-the authority has a pong sample for the seat the envelope is zero and queries
-judge live.</p>
-<p>Within that envelope the rewound scope BLENDS the claimed bracket pair
-the shooter&#39;s screen blended (<code>predict_blend</code> over the truth ledger), not
-the shooter&#39;s freshest ack (which advances a whole lead-plus-transit
-between sampling and adjudication), and not a quantized single tick (which
-costs near-tangent shots against the watch clock&#39;s interpolation).
-quickdraw&#39;s duel acceptance test measures the result: most aimable shots
-land at 240 ms RTT. <code>rewind_max</code> (default ~250 ms) is still the absolute
-favor-the-shooter ceiling. The client cannot earn that whole window merely by
-replaying an older issued ack, reporting a stalled render clock, or inflating a
-field: the observed-link envelope pins the reconstructed view to the newest
-credible floor. The cost of any favor remains the classic one: occasionally
-you are hit just after reaching cover. No ordinary snapshot acknowledgement
-can prove which frame a player actually looked at; the render offset is a
-bounded hint, not proof.</p>
-<h2 id="discrete-verbs-on-the-lane">Discrete verbs on the lane<a class="heading-anchor" href="#discrete-verbs-on-the-lane" aria-label="Link to this section">#</a></h2>
-<p>A verb is everything an input bit is not: it carries arguments, it can be
-REJECTED, and it fires once. On a ticking class, <code>@(gd_command)</code> keeps the
-exact coop authoring shape (predicate-then-mutate, name-paired <code>_then</code> on
-the authority) but executes INSIDE the tick pipeline:</p>
+g.hit = trace_shot(g) <span class="hljs-comment">// Other entities use the shooter’s historical view;</span>
+                      <span class="hljs-comment">// the shooter’s own state remains live.</span>
+ksim.lane_rewound_end(&amp;g.lane)</code></pre></div><p>Write the hit test between the begin and end calls. This avoids passing a
+context struct through a rawptr callback. The calls must not nest, and no code
+may track or untrack entities between them. For tests or table-driven weapons,
+<code>lane_rewound(l, shooter, user, query)</code> provides the same query through a
+callback.</p>
+<p>Rewind changes only the predicted fields of tracked entities other than the
+shooter&#39;s own. Delta-lane fields such as hp, scores, and gear, untracked
+entities, and game-side maps retain their current values. Quickdraw tests a
+rewound pose but applies damage to current hp, so a player already dead cannot
+absorb a new bullet. If a hit predicate needs the target&#39;s shield state at the
+time the shooter saw it, that state must be in the predicted fields too.
+Otherwise the predicate combines a past pose with the current shield state.</p>
+<p>Each input packet carries the sender&#39;s snapshot acknowledgement and render
+offset; the input buffer records both alongside each input. Before judging a
+shot, the server verifies that its acknowledgement names a recent batch issued
+to that seat and has not regressed. The client still only claims to have applied
+the batch: a valid replication baseline does not prove what it displayed.</p>
+<p>The authority limits credible acknowledgement age to
+<code>ceil((observed RTT + 2·jitter) / tick_dt) + margin + snap_every</code> and limits the
+reported render offset to its configured <code>watch_delay + snap_every</code>. The extra
+snapshot cadence allows normal interpolation around the watch target without
+accepting a client-reported stall. The sum, capped again by <code>rewind_max</code>, is
+the seat&#39;s current competitive rewind envelope: the maximum credible rewind
+age in ticks. <code>lane_rewind_envelope(l, shooter)</code> exposes it. Until the authority
+has a pong sample for the seat, this limit is zero and queries use current state.</p>
+<p>Within that limit, rewind uses <code>predict_blend</code> over the state ledger to
+reconstruct the pair of snapshots the shooter reports blending. Using the
+freshest acknowledgement instead would advance the view by the client&#39;s lead
+plus transit time between sampling and adjudication. Using a single tick would
+lose the interpolation needed for near-tangent shots. Quickdraw&#39;s duel
+acceptance test measures this behavior: most aimable shots land at 240 ms RTT.</p>
+<p><code>rewind_max</code> (default ~250 ms) remains the absolute limit on how far the
+server favors the shooter&#39;s past view. An older issued acknowledgement, a
+reported render-clock stall, or an inflated field cannot grant the full window;
+the measured connection and configured limits bound the reconstructed view.
+Rewind can still let a shot hit someone just after they reach cover. A snapshot
+acknowledgement cannot prove which frame the player actually saw, so the render
+offset remains a bounded hint.</p>
+<p><span id="discrete-verbs-on-the-lane"></span></p>
+<h2 id="scheduling-and-replaying-commands">Scheduling and replaying commands<a class="heading-anchor" href="#scheduling-and-replaying-commands" aria-label="Link to this section">#</a></h2>
+<p>A Kit command requests a discrete action with arguments. Its predicate may
+reject the request; an accepted request executes once. On a ticking class,
+<code>@(gd_command)</code> uses the same declaration as the coop model: validate and mutate
+the target, then handle accepted authority consequences in the paired <code>_then</code>
+procedure. The simulation lane schedules the command within its tick pipeline:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_OWNER_PREDICTED)</span>
 gunner_buy :: <span class="hljs-keyword">proc</span>(self: ^Gunner, item: <span class="hljs-type">u8</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">if</span> self.gold &lt; price_of(item) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
@@ -516,20 +513,19 @@ gunner_buy :: <span class="hljs-keyword">proc</span>(self: ^Gunner, item: <span 
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
 }
 
-<span class="hljs-comment">// anywhere with the boot in reach (a key edge, a bot) — the same handle and</span>
-<span class="hljs-comment">// the same knet.Action_Outcome as a coop verb, so promoting a class never</span>
-<span class="hljs-comment">// touches an issue site:</span>
+<span class="hljs-comment">// Issue through the Boot wrapper from an input handler or bot.</span>
+<span class="hljs-comment">// The wrapper returns the same knet.Action_Outcome type as a cooperative command.</span>
 outcome := gunner_buy_cmd(&amp;g.boot, g.me_gun, ITEM_BOOTS)
-<span class="hljs-keyword">if</span> outcome.reason == .Rate {show_slow_down_feedback()}</code></pre></div><p>The generated wrapper schedules the verb at your next tick and ships it
-tick-stamped on the reliable channel; the client&#39;s lead exists precisely
-so it arrives before the server simulates that tick (a lag spike executes
-at the server&#39;s next tick instead; history is never rewritten). Your screen
-runs the verb ONCE at that tick; resims re-apply its predicted-field
-footprint rather than re-running it (a replayed predicate would read the
-gold it already spent). The server executes at the stamped tick (verbs run
-after entity thunks, before the world pass) and answers with a verdict: a
-rejection unwinds the delta-lane writes on the spot and the next reconcile
-scrubs the predicted ones, the same glide as any mispredict.</p>
+<span class="hljs-keyword">if</span> outcome.reason == .Rate {show_slow_down_feedback()}</code></pre></div><p>The generated wrapper schedules the command at the client&#39;s next tick and
+sends it reliably with that tick stamp. The client&#39;s simulation lead gives it
+time to arrive before the server reaches the tick. If it arrives late, the
+server executes it at its next tick without rewriting history.</p>
+<p>The client executes the command once at its scheduled tick. Resimulation
+reapplies its recorded predicted-field writes, avoiding a second predicate
+check against gold the command already spent. On the server, commands run after
+entity thunks and before the world pass. A rejection immediately unwinds the
+speculative delta-lane writes; the next reconciliation removes speculative
+predicted-field changes and smooths the displayed correction.</p>
 <p>Every verb declares the same typed policy as the co-op lane. Bare
 <code>@(gd_command)</code> is owner-only and non-predicted;
 <code>knet.ACTION_OWNER_PREDICTED</code> opts into owner speculation,
@@ -537,14 +533,14 @@ scrubs the predicted ones, the same glide as any mispredict.</p>
 <code>knet.ACTION_AUTHORITY</code> never crosses client ingress. Prediction requires both
 an optimistic action policy and a prediction ledger: marking an entity
 contested does not silently predict every verb, and choosing a predicted policy
-does not make a watched entity predictable. Two same-tick verbs run in
-execution order with the predicate arbitrating (a spike on the ball is the
-shape). Bursts are
-fine: verbs QUEUE per entity, and a rejection unwinds the delta-lane
-speculation chain in order without disturbing the survivors. The wrapper
-returns the same <code>Action_Outcome</code> as co-op: <code>.state</code> says whether it scheduled,
-<code>.reason</code> names a local access/rate/malformed/stale refusal, <code>.seq</code> correlates
-the final callback, and <code>.model</code> is <code>.Scheduled</code>.</p>
+does not make a watched entity predictable. Two commands scheduled for the
+same tick run in execution order; each predicate decides whether its request
+still applies, as when two players try to spike the same ball. Commands queue
+per entity. A rejection unwinds delta-lane speculation in order while preserving
+the effects of surviving commands. The wrapper returns the same <code>Action_Outcome</code>
+as co-op: <code>.state</code> says whether the request was scheduled, <code>.reason</code> names a
+local access/rate/malformed/stale refusal, <code>.seq</code> correlates the final callback,
+and <code>.model</code> is <code>.Scheduled</code>.</p>
 <p>The authority verdict reaches the ordinary generated session callbacks. A
 client&#39;s <code>&lt;game&gt;_command_rejected</code> half receives the addressed command and an
 <code>Action_Reject_Reason</code>; the host&#39;s <code>&lt;game&gt;_command_executed</code> half receives the
@@ -552,37 +548,39 @@ same reason for diagnostics. Predicate failure and timeout are therefore
 distinct without a lane-specific event API. Scheduled timeouts use an
 independent lane-frame clock, so authority loss still expires actions when the
 simulation clock itself has stopped waiting for snapshots.</p>
-<p>When the predicate needs WHO, declare the issuer: <code>by: knet.Player_Id</code>
-right after the receiver, and the lane fills it with the seat that issued
-it: you speculating, the ledgered seat on the authority, the same value the
-<code>_then</code> gets. It never rides the wire, so on a contested entity a verb can
-arbitrate on whose touch it is without a claimable argument (the name is
-reserved: a wire arg called <code>by</code> is a build error).</p>
-<p>Replays re-apply what a verb WROTE (recorded bytes), not what it meant, so
-prefer absolute mutations (<code>gear = item</code>) in the verb itself. When the
-effect is genuinely relative (an impulse, a knockback), give the verb an
-<strong><code>_apply</code> half</strong>: <code>&lt;verb&gt;_apply(self, &lt;wire args&gt;)</code> holds the
-predicted-field effect, and resims RE-RUN it with the ledgered args against
-corrected state, exact where the byte patch can&#39;t be. With an apply half,
-the verb keeps its hands off predicted fields: the predicate and the
-delta-lane writes stay execute-once.</p>
+<p>If the predicate needs the issuer&#39;s identity, declare <code>by: knet.Player_Id</code>
+immediately after the receiver. During client speculation, the lane supplies
+the local seat; on the authority it supplies the recorded issuer, the same
+value passed to <code>_then</code>. This value is never sent as a command argument, so a
+client cannot choose another issuer when interacting with a contested entity.
+The name is reserved: a wire argument called <code>by</code> is a build error.</p>
+<p>Replay normally reapplies a command&#39;s recorded bytes, so prefer absolute
+mutations such as <code>gear = item</code>. For relative effects such as an impulse or
+knockback, declare <code>&lt;verb&gt;_apply(self, &lt;wire args&gt;)</code> to implement the
+predicted-field mutation. Resimulation reruns this <code>_apply</code> half with the
+recorded arguments against corrected state. An additive impulse then applies
+to the corrected velocity rather than restoring the old resulting velocity.
+When an <code>_apply</code> half exists, the main command must not write predicted fields;
+its predicate and delta-lane writes still execute once.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
 ball_spike :: <span class="hljs-keyword">proc</span>(self: ^Ball, px, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">return</span> self.hold == <span class="hljs-number">0</span> &amp;&amp; in_reach(self, px, py) <span class="hljs-comment">// verdict + (any) delta writes</span>
 }
 <span class="hljs-meta">@(gd_half)</span>
 ball_spike_apply :: <span class="hljs-keyword">proc</span>(self: ^Ball, px, py: <span class="hljs-type">f32</span>) {
-	self.vx += ... <span class="hljs-comment">// RELATIVE — re-run by every resim, never re-pinned</span>
+	self.vx += ... <span class="hljs-comment">// relative mutation, recomputed on each resimulation</span>
 }</code></pre></div><h2 id="predicted-spawns--a-fired-projectile">Predicted spawns — a fired projectile<a class="heading-anchor" href="#predicted-spawns--a-fired-projectile" aria-label="Link to this section">#</a></h2>
-<p>A verb mutates an entity that already exists; a <strong>projectile</strong> is a NEW one,
-and it has to leave your muzzle the instant you fire, before the authority&#39;s
-real bullet is even on the wire. That&#39;s a client-PREDICTED spawn: a local
-entity, flying its own arc, born-gated and reconciled like your avatar, that
-the authority&#39;s spawn REKEYS a round trip later (never a second bullet).</p>
-<p>The projectile is an ordinary <code>@(gd_tick)</code> entity (inputless: it self-
-integrates, like the ball) with an <code>entity=Bullet:id</code> scene. The fire is one
-call in the tick&#39;s name-paired halves, with no role branch needed, because
-<code>_then</code> is always the authority and <code>_fx</code> always the owner&#39;s client:</p>
+<p>To show a projectile immediately when the player fires, create a local
+predicted entity before the authority&#39;s spawn arrives. It simulates its flight
+locally and records history for correction. When the authority announces the
+projectile, the factory assigns its authoritative id to the existing local
+entity instead of creating a second bullet.</p>
+<p>Declare the projectile as an inputless <code>@(gd_tick)</code> entity that integrates its
+own motion, with an <code>entity=Bullet:id</code> scene. The authority spawns it in the
+firing tick&#39;s <code>_then</code> half. The <code>_fx</code> half creates the local prediction only
+when <code>mine</code> is true and this peer is not the authority. This check prevents a
+hosting player, whose <code>_then</code> already created the bullet, from spawning it twice.
+Both halves call the same helper:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_tick)</span> <span class="hljs-comment">// the flight: pure predicted state, `landed` routes to the splash</span>
 bullet_tick :: <span class="hljs-keyword">proc</span>(self: ^Bullet) -&gt; (landed: <span class="hljs-type">bool</span>) { ...self.x += self.vx... }
 
@@ -592,74 +590,76 @@ gunner_tick_then :: <span class="hljs-keyword">proc</span>(g: ^Game, self: ^Gunn
 }
 <span class="hljs-meta">@(gd_half)</span>
 gunner_tick_fx :: <span class="hljs-keyword">proc</span>(g: ^Game, self: ^Gunner, mine: <span class="hljs-type">bool</span>, lobbed: <span class="hljs-type">bool</span>) {
-	<span class="hljs-comment">// A HOSTING player is authority AND owner — the _then above already</span>
-	<span class="hljs-comment">// spawned their real bullet; only a pure client predicts one.</span>
+	<span class="hljs-comment">// The hosting player&#x27;s authority callback already spawned the bullet.</span>
+	<span class="hljs-comment">// Predict a local bullet only on a non-authority owner client.</span>
 	<span class="hljs-keyword">if</span> lobbed &amp;&amp; mine &amp;&amp; !ksim.lane_is_authority(&amp;g.lane) {
 		lob_bullet(g, self, g.ses.me)
 	}
 }
 
 lob_bullet :: <span class="hljs-keyword">proc</span>(g: ^Game, gun: ^Gunner, owner: knet.Player_Id) {
-	b, bid := bullet_spawn(&amp;g.boot, owner) <span class="hljs-comment">// typed, role-routed — no const, no cast</span>
+	b, bid := bullet_spawn(&amp;g.boot, owner) <span class="hljs-comment">// allocate through the shared authority/prediction helper</span>
 	b.x, b.y, b.vx, b.vy, b.life = ... <span class="hljs-comment">// the muzzle and the arc</span>
 	kboot.boot_spawn_send(&amp;g.boot, bid) <span class="hljs-comment">// host announces; client no-ops</span>
-}</code></pre></div><p>The generated <code>bullet_spawn</code> (every <code>entity=</code> tag gets one) rides
-<code>kboot.boot_fire_spawn</code> underneath, which routes: the authority gets a real
-net id (<code>session_spawn_make</code>), this client a local predicted node under a
-provisional id. <strong>Born-tick gating</strong> keeps the reconciles that land before the
-spawn (the whole first round trip, the server running a transit behind) from
-re-flying it from stale state; when the authority&#39;s <code>Ev_Spawned</code> arrives the
-factory <strong>matches</strong> it to the projectile you predicted and rekeys it: the
-same node, its flight ledger intact, reconciled from there. A refused fire
-(or one the authority never spawns) is culled and its node freed. Splash
-adjudicates server-side on truth, not a rewind, because a slow shot is meant
-to be dodged.
-<code>examples/quickdraw</code>&#39;s lob (right-click) is the worked example; its native
-acceptance test lands the predicted bullet on the client&#39;s own tick, no round
-trip.</p>
+}</code></pre></div><p>Scriptgen generates <code>bullet_spawn</code> for the <code>entity=</code> declaration. For a ticking
+entity it calls <code>kboot.boot_fire_spawn</code>, which creates an authoritative network
+id through <code>session_spawn_make</code> on the authority and a local predicted node
+under a provisional id on the client.</p>
+<p>Born-tick gating prevents a correction for a tick before the local spawn from
+restarting its flight from stale state. Such corrections can arrive throughout
+the first round trip while the server runs behind the client&#39;s prediction.
+When the authority&#39;s <code>Ev_Spawned</code> arrives, the factory matches it to the local
+projectile and replaces its provisional id. The node and flight ledger remain
+intact for later reconciliation. If the authority refuses the fire or never
+spawns the projectile, the local prediction is culled and its node freed.
+Splash damage is judged against current server state without rewind, because
+a slow projectile is intended to be dodged.</p>
+<p>The right-click lob in <code>examples/quickdraw</code> demonstrates this behavior. Its
+native acceptance test creates the predicted bullet on the client&#39;s own tick
+without waiting for a round trip.</p>
 <h2 id="two-entity-kinds-two-inputs">Two entity kinds, two inputs<a class="heading-anchor" href="#two-entity-kinds-two-inputs" aria-label="Link to this section">#</a></h2>
-<p>One player can drive two DIFFERENT entity kinds on the same tick: a walker and
-a turret, an avatar and a vehicle, a duelist and a companion drone. Each kind
-declares its own <code>@(gd_tick)</code> input struct, and each is an input <strong>class</strong>: the
-client samples one per tick, ships one window per class on the single upstream
-packet, and the host de-jitters each into its own per-player buffer. An entity&#39;s
-tick reads only its own class, so the two timelines never cross, and a reconcile
-of one leaves the other untouched.</p>
+<p>One player can drive two entity kinds on the same tick, such as an avatar and
+a vehicle or a duelist and a companion drone. Each kind declares its own
+<code>@(gd_tick)</code> input struct, forming a separate input class. The client samples
+each class once per tick and sends one window per class in a single upstream
+packet. The host buffers each player&#39;s classes separately to absorb arrival
+jitter. Each entity tick reads its own class, and reconciliation of one entity
+leaves the other entity&#39;s state intact.</p>
 <p>Declare a second <code>@(gd_sample)</code>, one per input type:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// two ticking kinds, two input structs</span>
 <span class="hljs-meta">@(gd_tick)</span> gunner_tick :: <span class="hljs-keyword">proc</span>(self: ^Gunner, <span class="hljs-keyword">in</span>: Gunner_Input) { ... }
 <span class="hljs-meta">@(gd_tick)</span> drone_tick  :: <span class="hljs-keyword">proc</span>(self: ^Drone,  <span class="hljs-keyword">in</span>: Drone_Input)  { ... }
 
 <span class="hljs-comment">// two device reads on the game root — scriptgen matches each to its class by</span>
-<span class="hljs-comment">// the struct it writes (one sample per input TYPE; a second on the same type</span>
+<span class="hljs-comment">// the struct it writes (one sample per input type; a second on the same type</span>
 <span class="hljs-comment">// is a build error)</span>
 <span class="hljs-meta">@(gd_sample)</span> qd_sample    :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span class="hljs-type">u64</span>, <span class="hljs-keyword">in</span>: ^Gunner_Input) { ... }
-<span class="hljs-meta">@(gd_sample)</span> drone_sample :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span class="hljs-type">u64</span>, <span class="hljs-keyword">in</span>: ^Drone_Input)  { ... }</code></pre></div><p>scriptgen assigns each distinct input type a stable wire id (sorted by name; the
-primary is 0), stamps each <code>Sim_Set</code> with its class, and grows <code>&lt;game&gt;_lane_init</code>
-to register them all: <code>lane_init</code> carries the primary, <code>lane_add_input_class</code>
-the rest. Nothing else changes: track each entity with its generated <code>Sim_Set</code>
-as before, and the right input reaches the right tick everywhere (live, predict,
-resim). A single-input game registers exactly one class and is byte-for-byte the
-single-class wire.</p>
-<p>Underneath: a <code>Lane</code> holds one ring per class the seat drives and the host holds
-one buffer per (player, class); the batch&#39;s input ack is the MIN newest across a
-player&#39;s classes, so the client leads enough for its most-starved input and
-trims every ring by that floor. There is one limit: <strong>one driven entity
-per class per player</strong>. Two entities of the <em>same</em> kind driven by one player
-would share a window (give them distinct input structs, or compose their intent
-into one). <code>examples/quickdraw</code>&#39;s drone (a companion each duelist steers beside
-their gunner) is the worked example; its native acceptance test predicts the
-drone on the client&#39;s own tick and shows it sweeping its own steer while the
-gunner strafes the other way, demonstrating the two input classes running
-orthogonally from one seat.</p>
+<span class="hljs-meta">@(gd_sample)</span> drone_sample :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span class="hljs-type">u64</span>, <span class="hljs-keyword">in</span>: ^Drone_Input)  { ... }</code></pre></div><p>Scriptgen assigns each distinct input type a stable wire id, sorted by name
+with the primary class at 0. It records the class in each <code>Sim_Set</code> and
+registers all classes in <code>&lt;game&gt;_lane_init</code>: <code>lane_init</code> registers the primary
+and <code>lane_add_input_class</code> registers the rest. Track entities with their
+generated <code>Sim_Set</code> to route input during live simulation, prediction, and
+resimulation. A single-input game registers one class and retains the same
+single-class wire representation.</p>
+<p>A <code>Lane</code> keeps one history ring per class the local seat drives; the host keeps
+one buffer per (player, class). A batch acknowledges the oldest of the newest
+input ticks across a player&#39;s classes. This lets the client maintain enough
+lead for the class furthest behind and trim every ring to that common floor.
+The limit is one driven entity per class per player. Two same-kind entities
+driven by one player share a window; use distinct input structs or combine
+their intent in one struct.</p>
+<p>Quickdraw&#39;s companion drone in <code>examples/quickdraw</code> demonstrates multiple
+classes. Its native acceptance test predicts the drone on the client&#39;s own
+tick while steering it in a different direction from the gunner, verifying
+independent input routing from one seat.</p>
 <h2 id="promoting-a-coop-game">Promoting a coop game<a class="heading-anchor" href="#promoting-a-coop-game" aria-label="Link to this section">#</a></h2>
 <p>Because the lane is selected per field, a session-replication game can migrate
 one contested entity at a time. The worked comparison is
 <code>examples/slopball</code> → <code>examples/speedball</code>:</p>
 <ol>
-<li><strong>Touch nothing session-shaped.</strong> Identity, roster, chat, stats, spawns,
-saves, the doors, the factory: all of it rides both models unchanged.
-Chests, inventories, scores stay on the delta lane with their verbs.</li>
+<li><strong>Keep session features in place.</strong> Identity, roster, chat, stats, spawns,
+saves, generated helpers, and the entity factory support both models.
+Chests, inventories, and scores stay on the delta lane with their commands.</li>
 <li><strong>Retag the contested fast state.</strong> <code>owner</code> (movement the peer
 owned) becomes <code>predict</code>: the field&#39;s writer changes from &quot;its
 owner&#39;s stream&quot; to &quot;the server&#39;s simulation, predicted locally&quot;. Keep
@@ -668,7 +668,7 @@ owner&#39;s stream&quot; to &quot;the server&#39;s simulation, predicted locally
 fixed-rate pure step: (predicted fields, input) → predicted fields. This
 is the main simulation rewrite, and it is where engine physics must become
 query-based kinematics (slopball&#39;s <code>play.Puppet</code> ball becomes speedball&#39;s
-forty lines of bounce arithmetic; see Gotchas).</li>
+forty lines of bounce arithmetic; see Simulation constraints).</li>
 <li><strong>Declare and sample the input struct.</strong> Mark it <code>@(gd_input)</code>, put field
 ranges/finite/unit/enum/mask rules beside the fields, and sample it in
 <code>@(gd_sample)</code>, the one place that still touches hardware.</li>
@@ -680,15 +680,15 @@ generated field sanitizer already runs locally and at authority admission.</li>
 verbs on delta-lane state keep their <code>@(gd_command)</code>s.</li>
 <li><strong>Remove obsolete ownership arbitration.</strong> Logic that chose which peer
 simulates owner-streamed state may no longer apply after the authority takes
-over. Keep presentation claims only where they are still needed for feel.</li>
-<li><strong>Wire once:</strong> let <code>&lt;game&gt;_net_attach(self, options, cfg)</code> validate a
-<a href="profiles.html">named network profile</a>, install the
+over. Keep presentation claims where local contact needs an immediate
+displayed response.</li>
+<li><strong>Attach the network components:</strong> let <code>&lt;game&gt;_net_attach(self, options, cfg)</code>
+validate a <a href="profiles.html">named network profile</a>, install the
 generated lane, and migrate entities one at a time. A hybrid game is a
 supported end state. A custom shell can call <code>&lt;game&gt;_lane_init</code> +
 <code>boot_lane</code> directly. Command and spawn call sites
-retain their shape: <code>&lt;verb&gt;_cmd(&amp;boot, …)</code>
-and <code>&lt;entity&gt;_spawn(&amp;boot, …)</code> keep their exact shape on both models;
-the generated bodies re-route.</li>
+continue using <code>&lt;verb&gt;_cmd(&amp;boot, …)</code> and <code>&lt;entity&gt;_spawn(&amp;boot, …)</code> in both
+models; the generated bodies choose the appropriate execution path.</li>
 </ol>
 <p>After promotion, the authority derives the selected fields from admitted input
 instead of accepting client-written positions. This adds fixed-tick authoring,
@@ -705,19 +705,18 @@ client-stamped input/verb tick accepted ahead of authority time) ·
 <code>watch_delay</code> 2×snap_every ·
 <code>smooth_halflife</code> 0.063 s · <code>smooth_cut</code> 0 (never cut; set it in world
 units for teleport-heavy games) · <code>tolerance</code> 0 (exact reconcile; set it in
-world units so continuous held-input drift under the line rides uncorrected,
-predict-world&#39;s anti-churn) · <code>snapshot_budget</code> 0 (unlimited at the low-level;
-named profiles install a measured per-recipient ceiling). <code>lane_init</code> validates the configuration as one
-set: negative values are invalid; cadence, margin, rewind, lead, and watch
-delay must fit the ring; redundancy cannot exceed the receiver cap; and
+world units to leave smaller continuous held-input drift uncorrected in
+predict-world) · <code>snapshot_budget</code> 0 (unlimited at the low-level;
+named profiles install a measured per-recipient ceiling).</p>
+<p><code>lane_init</code> validates the configuration as one set: negative values are invalid;
+cadence, margin, rewind, lead, and watch delay must fit the ring; redundancy cannot exceed the receiver cap; and
 <code>watch_delay</code> cannot exceed 31 (the render offset rides the wire in eighths
 of a tick, in one byte). <code>echo_inputs</code> with <code>tolerance</code> 0 warns once, since
 that pairing resims on nearly every batch; set the tolerance in world units.
-Running tallies for a netgraph:
-<code>lane.stat_reconciles</code>, <code>lane.stat_resims</code> (a resim burst is a latency
-event worth drawing), and the host-side skew/abuse counters:
-<code>stat_input_drops</code> (input windows dropped for an unknown class id: the
-version-skew shape), <code>stat_input_rejected</code> (malformed or future windows),
+For a netgraph, use <code>lane.stat_reconciles</code> and <code>lane.stat_resims</code> to show
+corrections and bursts of replay work. Host-side counters for version skew and
+invalid traffic include <code>stat_input_drops</code> (input windows dropped for an
+unknown class id), <code>stat_input_rejected</code> (malformed or future windows),
 <code>stat_ack_rejected</code> (unissued, regressing, misaligned, or stale snapshot
 claims), <code>stat_cmd_capped</code> (verbs refused by the per-player cap),
 <code>stat_cmd_rate_dropped</code> (verbs refused by the shared action token bucket),
@@ -726,12 +725,13 @@ claims), <code>stat_cmd_capped</code> (verbs refused by the per-player cap),
 telemetry is <code>stat_snap_full</code>, <code>stat_snap_delta</code>, <code>stat_snap_suppressed</code>,
 <code>stat_snap_deferred</code>, <code>stat_snap_aoi_culled</code>, and <code>stat_snap_bytes</code>.
 <code>lane_net_stats</code> collects these with input gaps, ack age, current command queue,
-rewind depth, resimulated ticks, and measured replay seconds. Normal booted
-games do not copy any of them: <code>kboot.boot_net_stats</code> reads the installed lane.</p>
+rewind depth, resimulated ticks, and measured replay seconds. Games using Boot
+can read the installed lane&#39;s statistics through <code>kboot.boot_net_stats</code>.</p>
 <h3 id="snapshot-aoi-budgets-and-sparse-recovery">Snapshot AOI, budgets, and sparse recovery<a class="heading-anchor" href="#snapshot-aoi-budgets-and-sparse-recovery" aria-label="Link to this section">#</a></h3>
-<p>Simulation snapshots reuse <code>session_set_interest</code> and <code>session_set_focus</code>.
-An entity owned by the recipient is always eligible; other predicted entities
-must be in that recipient&#39;s session AOI. When <code>snapshot_budget</code> is nonzero, the
+<p>Simulation snapshots reuse <code>session_set_interest</code> and <code>session_set_focus</code> to
+select an area of interest (AOI) for each recipient. An entity owned by the
+recipient is always eligible; other predicted entities must be in that
+recipient&#39;s session AOI. When <code>snapshot_budget</code> is nonzero, the
 authority sends owned entities first, then the stalest eligible rows, with
 distance as the tie-break. Work that does not fit is deferred rather than
 growing the packet.</p>
@@ -742,65 +742,66 @@ not marked represented. If one later re-enters after the global acknowledgement
 advanced, its first row is full, so a global batch ack can never authorize a
 delta against state that recipient did not receive. This is why sparse batches
 do not need a keyframe-request protocol.</p>
-<p><code>stat_rewind_clamped</code> is the one to watch if you run lag comp: it counts
-rewound queries adjusted by the authority&#39;s observed-link envelope, configured
-render-hint cap, or absolute <code>rewind_max</code>. A clamp or two while the clock is
-cold is normal; a count that keeps moving means the client keeps claiming an
-older view than its measured link and lane configuration substantiate, its
-lead is mispaced, or the configured ceiling is too small for the link served.
-quickdraw&#39;s duel acceptance test asserts on exactly this number, because the
-hit count alone does not catch a client silently judging its shots at the
-floor.</p>
-<p><strong>Per-field reconcile + glide knobs.</strong> The lane values are defaults; a single
-float field can override each on its tag, so a fast contested object and a
-precise avatar share ONE lane with different behavior:</p>
+<p>For lag compensation, monitor <code>stat_rewind_clamped</code>. It counts rewound queries
+limited by the authority&#39;s measured-connection bounds, configured render-hint
+cap, or absolute <code>rewind_max</code>. A clamp or two before timing measurements settle
+is normal. A persistently increasing count can mean that the client reports an
+older view than its measured connection and lane settings allow, its simulation
+lead needs adjustment, or the configured ceiling is too small for the link.
+Quickdraw&#39;s duel acceptance test checks this counter because a hit count alone
+does not reveal shots consistently judged at the permitted rewind limit.</p>
+<p><strong>Per-field reconciliation and smoothing.</strong> Float fields can override lane
+defaults through their tags, allowing a fast contested object and a precise
+avatar to use different correction behavior within the same lane:</p>
 <ul>
-<li><code>slack=N</code> (world units) overrides <code>tolerance</code>: the drift this field rides
-before a reconcile (float-only: discrete predicted state always reconciles
-exactly, a differing byte is a real event).</li>
-<li><code>glide=N</code> (seconds) overrides <code>smooth_halflife</code>: how slowly a correction on
-this field glides back (a slower glide reads smoother).</li>
-<li><code>cut=N</code> (world units) overrides <code>smooth_cut</code>: the error past which this
-field is a teleport and SNAPS. The snap stays entity-coherent: any field over
-its own cut snaps the whole pose (smoothing a cut looks worse than the cut).</li>
+<li><code>slack=N</code> (world units) overrides <code>tolerance</code>: the allowed drift before
+reconciliation. This applies only to floats. Discrete predicted state always
+reconciles exactly when any byte differs.</li>
+<li><code>glide=N</code> (seconds) overrides <code>smooth_halflife</code>: the half-life of the displayed
+correction error. A larger value makes the displayed correction more gradual.</li>
+<li><code>cut=N</code> (world units) overrides <code>smooth_cut</code>: the error beyond which correction
+immediately snaps the displayed pose. If any field exceeds its own cut, the
+whole pose snaps together.</li>
 </ul>
-<p><code>glide=</code>/<code>cut=</code> are render-error knobs and need a <code>predict,interp</code> float field
-(a non-interp predicted field snaps on reconcile, nothing to glide); <code>slack=</code>
-needs a <code>predict</code> float. scriptgen rejects each on the wrong field, spelled out.</p>
-<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<p><code>glide=</code>/<code>cut=</code> require a <code>predict,interp</code> float field because they control
+render error; a predicted field without interpolation snaps on reconciliation.
+<code>slack=</code> requires a <code>predict</code> float. Scriptgen reports an error if a tag is
+used on an incompatible field.</p>
+<p><span id="gotchas"></span></p>
+<h2 id="simulation-constraints">Simulation constraints<a class="heading-anchor" href="#simulation-constraints" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Step procs re-run.</strong> Anything a step reads must be ledgered or derived
-from the tick; <code>knet.now_s()</code> in a step proc is a mispredict source.
-Sample devices in <code>game_sample</code> only.</li>
-<li><strong>Predicted fields are the resim&#39;s property.</strong> Don&#39;t mutate them outside
-the tick pipeline on a client: the next reconcile will erase your write
-(that is its job). Discrete mutations go through <code>@(gd_command)</code> verbs,
-which on a ticking class are tick-scheduled and replayed by construction
-(see &quot;Discrete verbs on the lane&quot;).</li>
-<li><strong>Engine physics can&#39;t re-step.</strong> Predicted movement must be query-based
-kinematics; a rigid body can be sim-lane state only if you own its
-integration in the step proc. This is the same line every Godot rollback
-system draws. And be precise about what a cast may TOUCH: an engine
-ray/shape cast is re-runnable only against STATIC geometry (walls, the
-arena), because a replay queries the physics server&#39;s CURRENT node poses:
-a cast that can hit another entity&#39;s collider reads the latest frame,
-not the replayed tick, and mispredicts every time bodies move. Entity-vs-
-entity tests belong in Odin against the tracked structs&#39; own fields (the
-examples&#39; overlap checks are all field math for exactly this reason).</li>
-<li><strong>Reading delta-lane fields in a tick is legal, and a mispredict source
-at their change edges.</strong> A replay sees the field&#39;s CURRENT value, not the
-value it held at the replayed tick, and a client learns the change a
-transit late (quickdraw&#39;s <code>if self.hp &lt;= 0</code> gate predicts a step the
-server refused around every death; the glide eats the pop). Fine when
-the edge is rare; mirror that state into a predicted field when it&#39;s hot.</li>
-<li><strong>Watched entities render in the past</strong> (<code>watch_delay</code>), just like owner
-streams: the two-timelines discipline changes shape, but it doesn&#39;t vanish.
-Your own avatar is the one thing that never waits.</li>
-<li><strong>Present after frame, dress after present.</strong> <code>lane_present</code> writes
-PRESENTATION values into the fields (watched interp, own-avatar glide);
-anything that reads sim truth from fields must run inside the tick procs
-or the Step_Proc, not after <code>lane_present</code>. The ledger is always the sim
-truth if you need it out-of-band.</li>
+<li><strong>Step procedures rerun.</strong> Anything a step reads must be recorded in history
+or derived from the tick. Reading <code>knet.now_s()</code> introduces a value that
+changes during replay and can cause misprediction. Sample devices only in
+<code>game_sample</code>.</li>
+<li><strong>Mutate predicted fields within the tick pipeline.</strong> A client write outside
+that pipeline is absent from replay history and will be erased by the next
+reconciliation. Use <code>@(gd_command)</code> for discrete mutations; on a ticking
+class, these commands are scheduled and replayed within the pipeline. See
+&quot;Scheduling and replaying commands&quot;.</li>
+<li><strong>Engine physics cannot be replayed.</strong> Predicted movement must use
+query-based kinematics. A rigid body can use the simulation lane only if its
+step procedure implements integration. Engine ray and shape casts are
+replayable only against static geometry such as walls or the arena. During
+replay, the physics server still holds current node poses. A cast against
+another moving entity&#39;s collider would therefore query the latest frame
+rather than the replayed tick. Test entity-to-entity contact in Odin using
+the tracked structs&#39; fields, as the examples&#39; overlap checks do.</li>
+<li><strong>Delta-lane reads can cause corrections when the value changes.</strong> A tick may
+read delta-lane fields, but replay sees their current values and clients
+receive their changes after network transit. Around a death, Quickdraw&#39;s
+<code>if self.hp &lt;= 0</code> gate lets the client predict a step the server refuses;
+presentation smoothing reduces the visible correction. This may be
+acceptable for rare changes. Mirror frequently changing state into a
+predicted field when it must replay with the tick.</li>
+<li><strong>Watched entities render in the past.</strong> Their <code>watch_delay</code> works like the
+delay on owner streams. Account for the difference between their displayed
+time and the local avatar&#39;s predicted time when handling interactions.</li>
+<li><strong>Present before updating nodes.</strong> <code>lane_present</code> writes displayed values
+into fields: interpolation for watched entities and smoothed corrections for
+predicted entities. Code that needs simulation state must run inside tick
+procedures or the Step_Proc, before <code>lane_present</code>. The ledger retains
+simulation state for access outside that pipeline.</li>
 </ul>
 <h2 id="implementation-and-test-coverage">Implementation and test coverage<a class="heading-anchor" href="#implementation-and-test-coverage" aria-label="Link to this section">#</a></h2>
 <p>The repository currently implements the input pipeline, ledgers, snapshots,
@@ -811,19 +812,20 @@ multiple input classes, generated authoring, and the <code>play/sim</code> block
 glide versus snap behavior, and event timing. <code>tests/repgen</code> covers generated
 contracts. Quickdraw and Speedball add multi-process acceptance tests for the
 main competitive paths.</p>
-<p>This is not a claim of arbitrary scale. Declarative input constraints, unified
-traffic budgets and authority ingress, protocol-wide payload ceilings,
-decoder/property corpora, per-recipient snapshot budgets, AOI, and ack-safe
-sparse snapshots are implemented. Simulation event tuples are capped at
-4 KiB, command arguments at the action-policy bound, input packets at 32 KiB,
-and every sim rider remains inside the session&#39;s 256 KiB app-message / 1 MiB
-packet envelope. The benchmark-backed supported starting points are published
+<p>Implemented limits include declarative input constraints, shared traffic
+budgets and authority admission checks, protocol-wide payload ceilings,
+per-recipient snapshot budgets, AOI, and sparse snapshots that preserve
+acknowledgement safety. Decoder and property-test corpora check protocol
+handling. These mechanisms do not establish support for arbitrary scale.
+Simulation event tuples are capped at 4 KiB, command arguments at the action-policy bound, input packets at 32 KiB,
+and every simulation message remains inside the session&#39;s 256 KiB app-message /
+1 MiB packet envelope. The benchmark-backed supported starting points are published
 by <code>network_profile_envelope</code> and documented in <a href="profiles.html">profiles</a>; measure
 your game logic and engine work before raising them.</p>
-<p>See also: <a href="net.html">net</a> (whose shared substrate layer of wire, descriptors,
-blend math, and tick this lane is built on), <a href="session.html">session</a>
-(identity and everything reliable), <a href="play.html">play</a> (the coop shelf:
-Puppet is that model&#39;s physics answer, <code>play/sim</code> is this one&#39;s).</p>
+<p>See <a href="net.html">net</a> for the wire format, descriptors, blend math, and tick
+support used by this lane; <a href="session.html">session</a> for identity and reliable
+state; and <a href="play.html">play</a> for coop components, including Puppet for
+engine-driven physics and <code>play/sim</code> for replayable integration.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/sim.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#defining-a-sim-entity" class="">Defining a sim entity</a><a href="#simulation-blocks-in-godotplaysim" class="">Simulation blocks in godot:play/sim</a><a href="#what-the-lane-does-underneath" class="">What the lane does underneath</a><a href="#the-contested-object" class="">The contested object</a><a href="#lag-compensation" class="">Lag compensation</a><a href="#discrete-verbs-on-the-lane" class="">Discrete verbs on the lane</a><a href="#predicted-spawns--a-fired-projectile" class="">Predicted spawns — a fired projectile</a><a href="#two-entity-kinds-two-inputs" class="">Two entity kinds, two inputs</a><a href="#promoting-a-coop-game" class="">Promoting a coop game</a><a href="#tuning" class="">Tuning</a><a href="#gotchas" class="">Gotchas</a><a href="#implementation-and-test-coverage" class="">Implementation and test coverage</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/sim.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/sim.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#replication-lanes-and-replay" class="">Replication lanes and replay</a><a href="#defining-a-sim-entity" class="">Defining a sim entity</a><a href="#simulation-blocks-in-godotplaysim" class="">Simulation blocks in godot:play/sim</a><a href="#lane-timing-snapshots-and-presentation" class="">Lane timing, snapshots, and presentation</a><a href="#predicting-contested-objects" class="">Predicting contested objects</a><a href="#lag-compensation" class="">Lag compensation</a><a href="#scheduling-and-replaying-commands" class="">Scheduling and replaying commands</a><a href="#predicted-spawns--a-fired-projectile" class="">Predicted spawns — a fired projectile</a><a href="#two-entity-kinds-two-inputs" class="">Two entity kinds, two inputs</a><a href="#promoting-a-coop-game" class="">Promoting a coop game</a><a href="#tuning" class="">Tuning</a><a href="#simulation-constraints" class="">Simulation constraints</a><a href="#implementation-and-test-coverage" class="">Implementation and test coverage</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/sim.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

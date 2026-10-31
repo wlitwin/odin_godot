@@ -36,7 +36,7 @@ not silently substitute the latest revision.</p>
 <li>Embed baked values in World/checkpoints. Replay owns their lifetime naturally;
 no external lookup or store pin is needed after copying. Cavecrawl uses this.</li>
 <li>Store only portable definition references in World and keep a frozen catalog
-available to the reducer. Pin every version its retained history may read, and
+available to the simulation step. Pin every version its retained history may read, and
 serialize/transfer those dependencies with checkpoints before allowing restore.
 Never hide mutable Resource data behind a reference to reduce history size.</li>
 </ul>
@@ -46,8 +46,9 @@ operations allocate nothing internally. Schema and diagnostics retain their
 usual compiled-module lifetime. Access and callbacks must be serialized; callbacks
 must not mutate/reenter the same store.</p>
 <h1 id="godot-baking">Godot baking<a class="heading-anchor" href="#godot-baking" aria-label="Link to this section">#</a></h1>
-<p><code>scenegd.bake</code> runs a typed extractor against an authored source and publishes
-only after complete success. Source can be a Resource pointer, typed script value,
+<p>Baking converts authored Resource or scene data into immutable simulation values.
+<code>scenegd.bake</code> runs a typed extractor and publishes only after complete success.
+The source can be a Resource pointer, typed script value,
 or a fixed batch. The source is borrowed synchronously; it must stay alive during
 extraction. The output has the store&#39;s pointer-free canonical value type.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ref, report := scenegd.bake(&amp;store, source, GAME_CONTENT_VERSION,
@@ -56,7 +57,8 @@ extraction. The output has the store&#39;s pointer-free canonical value type.</p
         spawn, ok := scenegd.bake_marker2(ctx, root, <span class="hljs-string">&quot;Markers/Spawn&quot;</span>)
         count := scenegd.bake_int(ctx, source.count, <span class="hljs-number">0</span>, <span class="hljs-number">32</span>, <span class="hljs-string">&quot;$.count&quot;</span>)
         <span class="hljs-keyword">return</span> Definition{spawn=spawn, count=<span class="hljs-type">u16</span>(count)}
-    })</code></pre></div><p>The first <code>bake_fail</code> wins. Numeric narrowing follows validation. Schema checks
+    })</code></pre></div><p>The context retains the first error reported through <code>bake_fail</code>. Validate
+numbers before narrowing their types. Schema checks
 and an optional typed validator run before publication. Application rules such as
 collision geometry, wave limits and cross-field constraints remain explicit.</p>
 <p><code>bake_scene2</code> owns temporary detached scene instances, destroying them on success
@@ -93,5 +95,5 @@ See the <a href="../../examples/replay_scrapyard/authoring-tools.html">complete 
 contracts with separately owned local scenes. <a href="../evolution/README.html">Evolution tools</a>
 freeze revision dependencies and scaffold explicit conversions.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/authoring-tools.html"><span>Adding and evolving a Replay feature</span><span aria-hidden="true">→</span></a><a href="../godot/scene/archetypes.html"><span>Typed authored archetypes</span><span aria-hidden="true">→</span></a><a href="../evolution/README.html"><span>Revision contracts and explicit conversion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/definitions/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/authoring-tools.html"><span>Adding and evolving a Replay feature</span><span aria-hidden="true">→</span></a><a href="../godot/scene/archetypes.html"><span>Typed authored archetypes</span><span aria-hidden="true">→</span></a><a href="../evolution/README.html"><span>Revision contracts and explicit conversion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/definitions/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/definitions/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

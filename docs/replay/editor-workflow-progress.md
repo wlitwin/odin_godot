@@ -1,6 +1,7 @@
 # Editor workflow completion
 
-The first milestone and all six [planned gates](editor-workflow-plan.md) are complete.
+This record covers completion of the first milestone and all six
+[planned gates](editor-workflow-plan.md).
 
 | Gate | Result |
 | --- | --- |

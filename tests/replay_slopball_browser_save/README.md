@@ -14,7 +14,8 @@ checkpoint before Chrome is SIGKILLed.
 A fresh browser must retain identity/name, restore the exact saved world in a new
 epoch and seed its actual solver from the independently decoded pose/momentum.
 New kicks and a goal, Play again, another save and automatic URL resume follow.
-The 3D source additionally requires nontrivial quaternion orientation and spin.
+The related [3D fixture](../replay_slopball3d_browser_save/README.md) additionally
+requires nontrivial quaternion orientation and spin in its source checkpoint.
 
 Two tabs load the same revision: one commits, the stale writer must fail and keep
 the committed bytes/revision. Corrupt slots and identity records are preserved;

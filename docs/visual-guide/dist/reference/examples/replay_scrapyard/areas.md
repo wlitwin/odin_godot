@@ -1,6 +1,6 @@
 # Area effects and buff bursts
 
-Novas, reaction/lob-impact flashes and grenade blasts now use filled 24-point
+Novas, reaction/lob-impact flashes and grenade blasts use filled 24-point
 discs at depth 8, with their existing radius and payload RGB. Nova base alpha is
 0.5; reaction/blast base alpha is 0.45. Over the displayed flash lifetime they
 expand from 0.92 to 1.06 times the radius while fading to zero. Late observations
@@ -10,8 +10,8 @@ The original uses a 0.28-second local announcement clock. Replay retains its
 existing 17-tick flash lifetime (about 0.283 seconds at 60 Hz), deriving progress
 from displayed state. Nova and reaction discs use observed state; grenade blasts
 retain predicted local / observed remote selection. Separate bounded banks keep
-those worlds' lifetimes independent. This is presentation metadata only: the
-simulation's flash, action/event, content and checkpoint formats are unchanged.
+predicted and observed effect lifetimes independent. This is presentation
+metadata only: the simulation's flash, action/event, content and checkpoint formats are unchanged.
 
 Standing zones are filled 24-point discs, radius from their catalog row and alpha
 0.22. Payload RGB is used when its tint is visible; otherwise the original ember
@@ -24,8 +24,8 @@ Buffs emit the original warm 12-particle, 0.4-second burst at the wearer recorde
 in the cast flash. A forward-observation tracker produces it once per new cast;
 initial observations, epoch/run/floor replacement and rewind/replay stay silent.
 It retains its highest observed tick so rewinding cannot replay an old burst.
-Existing view-reset/floor/epoch cleanup retires the particles. A flash entirely
-missed between displayed observations produces no invented historical burst.
+Existing view-reset/floor/epoch cleanup retires the particles. If a flash begins
+and expires between displayed observations, no burst is emitted afterward.
 The existing bounded feedback pool owns and retires the emitter.
 
 ```sh
@@ -47,7 +47,7 @@ audio listening and paired timing/feel evaluation remain work. See [evidence](..
 and the [port ledger](roadmap.md).
 
 
-The renderer now uses immutable ArrayMesh instances for procedural polygons.
+The renderer uses immutable ArrayMesh instances for procedural polygons.
 Color/alpha use instance self modulation; arcs reuse one unit polygon and an affine
 basis that preserves the existing kink, width and recorded endpoints. Node pools,
 visibility, lifetimes and simulation formats remain unchanged. This avoids the

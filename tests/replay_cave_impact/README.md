@@ -4,7 +4,7 @@
 REPLAY_CAVE_IMPACT_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_impact/run.sh
 ```
 
-The pure cases check projectile/target identity, nonlethal/lethal ordering,
+The model tests check projectile/target identity, nonlethal/lethal ordering,
 detached positions, slot reuse, correction and atomic event-capacity failure.
 Genuine C8/O2 checkpoints and recordings were captured before changing the reducer;
 their producer and hashes are in `fixtures`. They contain a flying rock about to

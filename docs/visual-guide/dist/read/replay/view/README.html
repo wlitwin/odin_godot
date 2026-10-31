@@ -16,7 +16,8 @@ through <code>pose_blend</code>; a teleport explicitly selects the destination p
 <p><code>Smoother2</code> and <code>Smoother3</code> carry position and angular correction error. Use
 <code>smooth_correct_pose</code> / <code>smooth3_correct_pose</code> for same-tick corrections, then
 present each render frame; ordinary motion continues while the error decays.
-Large discontinuities cut. <a href="rotation.html">Angular smoothing</a> documents shortest
+Large discontinuities clear the smoothing error, snapping the displayed pose to
+the corrected state. <a href="rotation.html">Angular smoothing</a> documents shortest
 arcs, quaternion composition, finite-input handling and Godot integration.</p>
 <h2 id="event-journal">Event journal<a class="heading-anchor" href="#event-journal" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">journal: view.Journal(Event)
@@ -42,7 +43,7 @@ Existing IDs keep their policy:</p>
 </tr>
 <tr>
 <td><code>Confirmed</code></td>
-<td>When authority confirms its tick</td>
+<td>When the authority or peer-commit protocol settles its tick</td>
 </tr>
 <tr>
 <td><code>Watched</code></td>
@@ -97,5 +98,5 @@ them for its event-backed combat bursts and hit flashes.</p>
 <p><a href="phase.html">Bounded tick phases and linear previews</a> support render-frame motion
 without stepping simulation or wrapping backward during prediction stalls.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="rotation.html"><span>Angular correction smoothing</span><span aria-hidden="true">→</span></a><a href="../godot/scene/audio.html"><span>Bounded event audio</span><span aria-hidden="true">→</span></a><a href="cues.html"><span>Visual cues</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/view/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="rotation.html"><span>Angular correction smoothing</span><span aria-hidden="true">→</span></a><a href="../godot/scene/audio.html"><span>Bounded event audio</span><span aria-hidden="true">→</span></a><a href="cues.html"><span>Visual cues</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/view/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#frames-and-poses" class="">Frames and poses</a><a href="#event-journal" class="">Event journal</a></nav><div class="outline-actions"><a href="../../../reference/replay/view/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

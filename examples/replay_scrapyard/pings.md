@@ -1,6 +1,8 @@
-# Look here
+<a id="look-here"></a>
 
-Middle mouse now sends a positional ping through Replay communications. The
+# Positional pings
+
+Middle mouse sends a positional ping through Replay communications. The
 original gold diamond pulses and fades over 2.6 seconds; the sender's stamped name
 floats upward for 0.9 seconds, and the existing ping sound plays on receipt.
 Players can ping while downed. Menu/chat input and pointer use over those panels

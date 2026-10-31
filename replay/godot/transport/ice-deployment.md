@@ -1,7 +1,8 @@
 # ICE settings for party and Room connections
 
-Use `Party_Config.ice_json` to configure STUN discovery and TURN relay services
-for RTC connections. ICE is WebRTC's process for selecting a reachable connection
+Use `Party_Config.ice_json` to configure STUN and TURN services for RTC
+connections. STUN discovers a public address; TURN relays traffic when peers
+cannot connect directly. ICE is WebRTC's process for selecting a reachable connection
 path. The field supplies a bounded RTC configuration, copied when Party
 opens and carried into `Room_Options.session.rtc.ice_json`. Room keeps that copy
 through authority changes and reconnects. Direct `Rtc_Config` / `Session_Options`

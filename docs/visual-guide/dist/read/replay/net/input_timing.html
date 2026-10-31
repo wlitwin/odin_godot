@@ -4,40 +4,43 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Scheduled-input timing feedback</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/input_timing.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Scheduled clients use timing feedback to keep inputs ahead of the authority
-without retaining an unnecessarily large prediction lead. The welcome exchange
-supplies a conservative initial prediction lead: the number of ticks the client
-simulates ahead of accepted authority state. It includes
-initial connection, application and checkpoint work, so it is not a permanent
-estimate of steady traffic. After admission, clients calibrate using the existing
-<code>input_newest</code> value in accepted snapshots. No protocol or checkpoint change is
-needed.</p>
+<article class="reading-body "><p>Scheduled clients submit inputs before the authority reaches their assigned
+ticks. Timing feedback adjusts their prediction lead, the number of ticks they
+simulate ahead of accepted authority state. The welcome exchange sets a
+conservative initial lead, but its duration includes connection setup,
+application work, and checkpoint handling. It can therefore overestimate the
+lead needed during ordinary traffic. After admission, accepted snapshots&#39;
+existing <code>input_newest</code> value lets the client calibrate without changing the
+protocol or checkpoint format.</p>
 <p>For each scheduled input tick, the client records the first successful transport
-submission time in a history-sized ring. A newer acknowledged input must match a
-retained entry from the current welcome/connection. Its elapsed time includes
-outbound queueing, server processing/snapshot cadence and return delivery: the
-metric is <strong>input turnaround</strong>, not pure transport RTT. Backpressured submissions
-are not timed, repeated windows retain the first successful time, and stale or
-missing entries do not produce estimates.</p>
+submission time in a ring sized to its history. A newly acknowledged input must
+match a retained entry from the current welcome/connection. The elapsed time
+includes outbound queueing, server processing and snapshot cadence, and return
+delivery. This measures input turnaround rather than transport RTT alone.
+Backpressured submissions have no send-time sample. Repeated windows keep the
+first successful submission time; stale or missing entries produce no estimate.</p>
 <p>After three valid samples, the bootstrap lead becomes the recent turnaround peak
 converted to ticks plus four reserve ticks, clamped by configured <code>lead</code>,
-<code>max_future - 2</code> and <code>max_prediction - 2</code>. A current one-second peak bucket and the
-preceding bucket retain short bursts while aging old peaks. <code>lead_ticks</code> remains
-the bound used to rebuild prediction after a complete ahead snapshot; it does not
-rewrite existing history or queued action/input ticks.</p>
+<code>max_future - 2</code> and <code>max_prediction - 2</code>. The client retains peaks from the
+current and previous one-second buckets, allowing short bursts to affect the
+lead until their buckets age out. <code>lead_ticks</code> bounds prediction rebuilt after
+a complete snapshot ahead of the client&#39;s prediction. It does not rewrite
+existing history or change queued action/input ticks.</p>
 <p>Clock discipline separately uses the server-observed arrival margin:
 <code>input_newest - snapshot_tick</code>. The target is three future input ticks. Around that
 target the existing ±2% correction is retained. Above seven ticks the clock runs
 at 0.9× until the excess drains; a negative margin uses 1.1× to recover. This changes
 future local stepping through the existing <code>clock_scale</code> API. It does not rewind
-or skip the authority, retime accepted requests, or bypass admission/fencing.
+or skip authority ticks, retime accepted requests, or bypass admission or
+authority fencing.
 Applications driving <code>Client</code> directly must apply <code>clock_scale</code>; the Godot Session
 adapter already does so. Spectators and latest-observation models keep scale 1.</p>
 <p>Long local pump gaps invalidate outstanding samples, avoiding calibration from
 local suspension. The gap threshold is the larger of 250 ms and
 <code>(snapshot_every + 2) / hz</code> seconds. Reconnect, a new authority and every accepted
-Welcome reset timing history. Configured minimum lead still applies; it remains
-an application envelope choice rather than a universal latency recommendation.</p>
+Welcome reset timing history. The configured minimum lead still applies.
+Choose that minimum for the application&#39;s expected conditions; the calibration
+policy does not establish a universal latency setting.</p>
 <p>Inspect <code>input_timing.turnaround_ms</code>, <code>input_timing.arrival_lead</code>, <code>lead_ticks</code>,
 <code>clock_scale</code>, and the cumulative <code>Stats.timing_samples</code>, <code>timing_rejected</code> and
 <code>lead_updates</code>. None is simulation state. The send-time ring adds one bounded
@@ -47,5 +50,5 @@ and jitter, unchanged queued action due ticks, convergence, backpressure, local
 stalls, reconnect and non-scheduled clients. This policy does not promise zero
 corrections or hide link failure; ordinary history/capacity/recovery bounds remain.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/input_timing.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/input_timing.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/input_timing.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

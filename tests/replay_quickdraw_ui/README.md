@@ -4,7 +4,7 @@
 REPLAY_QUICKDRAW_UI_OUT=/absolute/fresh/output nix develop --command bash tests/replay_quickdraw_ui/run.sh
 ```
 
-The runner builds an isolated copy, waits for editor-triggered builds and builds
+The test harness builds an isolated copy, waits for editor-triggered builds and builds
 again before launching three real Godot processes. It preserves prepared/source
 hashes, native binary hashes, the executed driver and failed outputs. Explicit
 fixture tokens disable ordinary profile storage.

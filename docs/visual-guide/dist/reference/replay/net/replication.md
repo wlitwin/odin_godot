@@ -1,9 +1,9 @@
 # Recipient views and interest management
 
 Use `Model.replication` to control which state, held inputs and occurrences each
-recipient receives. It is an optional server-side transmission policy. It changes what
-a recipient receives, independently of the client's `Prediction_Group`. The
-server still simulates and archives the complete World.
+recipient receives. This optional server-side policy filters transmitted data;
+the client's `Prediction_Group` separately selects what the client predicts.
+The server continues to simulate and archive the complete World.
 
 ```mermaid
 flowchart LR
@@ -34,12 +34,14 @@ state if they affect historical decisions.
 
 `valid(replica, recipient)` checks the received representation. It replaces the
 complete-world state validator for incoming Welcome/snapshot values. The authority
-continues using `Model.state_valid` for its initial world and archives. All controls
-still pass `control_valid`. Authority-only schema fields in both state and held controls are zeroed through
-the public replica codec before the server calls this validator, matching the client decoder.
+continues using `Model.state_valid` for its initial world and archives, and all
+controls still pass `control_valid`. Before calling `valid`, the server runs
+state and held controls through the public replica codec, which zeroes
+authority-only schema fields. The validator therefore sees the same
+representation as the client decoder.
 A rejected projection sends no fallback full state and increments
-`Stats.rejected_replica_views`; fix the authored policy rather than hiding the
-failure. The affected client may stall/resync while no valid view is available.
+`Stats.rejected_replica_views`. The affected client may stall or resynchronize
+until the authored policy produces a valid view.
 
 `event(frame, recipient, occurrence)` returns `(redacted_event, include)`. It sees
 the exact complete authority frame at the event's tick, including when facts are
@@ -54,7 +56,8 @@ Callbacks must be pure functions of their supplied values and fixed model policy
 They do not query current scene nodes or mutable side services. Decisions describe
 the supplied frame/event tick; they do not retroactively revoke already transmitted
 knowledge, hide traffic timing, or prevent inference from intentionally public data.
-The framework validates the authored invariant, not arbitrary Odin information flow.
+The framework checks the invariants implemented by the game's validator; it
+cannot prove that arbitrary Odin code preserves information-flow restrictions.
 
 ## Prediction and presentation
 

@@ -5,9 +5,9 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Confirmed P2P spectators</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/p2p/spectators.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#delivery-and-validation">Delivery and validation</a><a href="#history-gaps-and-presentation">History gaps and presentation</a><a href="#trust-and-scope">Trust and scope</a><a href="#changing-the-source-without-discarding-the-world">Changing the source without discarding the world</a></nav></details>
 <article class="reading-body "><p>Use <code>Watch(State, Input, Event, Seats)</code> to show a P2P match without joining its
-player roster. It consumes confirmed history from an admitted
-source participant. It never occupies a player slot, samples an input, or contributes
-to the players&#39; confirmation frontier. One <code>Watch_Source</code> serves one spectator;
+player roster. It consumes history already confirmed by the player protocol, sent by an
+admitted source participant. The watcher occupies no player slot, samples no
+input, and does not advance the players&#39; confirmation frontier. One <code>Watch_Source</code> serves one spectator;
 applications can provision several bounded source streams. The source borrows its
 participant Runner and a separate transport lane or connection.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Source participant; binding identifies this admitted spectator connection.</span>
@@ -60,7 +60,7 @@ The Duel verifies its new shot occurrences against the new baseline&#39;s shot c
 <code>watch.transfer.latest.at_ms</code> exposes the last validated receipt time for a stale
 view indicator. <code>watch_current</code> retains the last valid world when transport is lost.</p>
 <h2 id="trust-and-scope">Trust and scope<a class="heading-anchor" href="#trust-and-scope" aria-label="Link to this section">#</a></h2>
-<p>The initial contract gates configuration, ordered roster, content and schemas;
+<p>The watcher validates configuration, ordered roster, content, and schemas;
 the transport/admission layer must authenticate the selected source and binding.
 A late spectator accepts a rolling anchor for history it never executed. It trusts
 that source for the initial world: these hashes do not prove agreement of all
@@ -69,13 +69,13 @@ world values are disclosed to spectators; games needing delayed disclosure or
 recipient filtering need an explicit viewing policy.</p>
 <p>Spectators can change admitted sources within a fixed-epoch match using the
 continuity API below. Automatic spectator restoration after process restart,
-match recording playback UX and delayed anti-coaching feeds remain follow-through
-work. Browser viewing exists; its provider integration for source failover remains
-separate from the native gate.
-The current whole-frame base and two staged value runtimes prioritize correctness;
-input-only incremental records and memory/codec reuse should follow measured costs.</p>
+match-recording playback UI and delayed anti-coaching feeds remain application
+work. Browser viewing is implemented; browser provider integration for source
+failover still needs work beyond the native test. The implementation uses
+a whole-frame base and two staged value runtimes. Measure their memory and
+codec costs before changing to input-only incremental records or storage reuse.</p>
 <p>See <a href="../../examples/replay_duel/README.html">Replay Duel</a> for the separate three-process
-late-join/blackout gate. The spectator fixture uses the same deterministic model
+late-join/blackout test. The spectator fixture uses the same deterministic model
 and Godot views as the participating players.</p>
 <h2 id="changing-the-source-without-discarding-the-world">Changing the source without discarding the world<a class="heading-anchor" href="#changing-the-source-without-discarding-the-world" aria-label="Link to this section">#</a></h2>
 <p>After the provider authenticates a replacement participant and fences the old
@@ -110,5 +110,5 @@ all participants are honest. The native Duel fixture uses two configured loopbac
 participants and a private control file to exercise replacement; public spectator
 admission and automatic selection remain application/provider work.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/spectators.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_duel/README.html"><span>Replay Duel</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/p2p/spectators.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#delivery-and-validation" class="">Delivery and validation</a><a href="#history-gaps-and-presentation" class="">History gaps and presentation</a><a href="#trust-and-scope" class="">Trust and scope</a><a href="#changing-the-source-without-discarding-the-world" class="">Changing the source without discarding the world</a></nav><div class="outline-actions"><a href="../../../reference/replay/p2p/spectators.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

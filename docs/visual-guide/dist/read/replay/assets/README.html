@@ -6,9 +6,9 @@
 
 <article class="reading-body "><p>Use <code>assets.Ref</code> to refer to immutable payload bytes from gameplay state without
 copying those bytes into every frame. It contains a SHA-256 ID and byte count,
-and is suitable for a frame, canonical schema or checkpoint. Payload bytes live in an independently owned
-<code>Cache</code>. A new payload gets a new ID; receiving an asset never changes simulation
-state.</p>
+and is suitable for a frame, canonical schema or checkpoint. Payload bytes live
+in a separately owned <code>Cache</code>. A new payload gets a new ID; receiving an asset
+does not change simulation state.</p>
 <p><code>cache_put</code> owns a copy and validates an expected reference when supplied.
 <code>cache_read</code> / <code>cache_copy</code> return copies so ordinary reads cannot mutate content
 under an existing hash. Cache capacity and invalid data leave previous entries
@@ -22,11 +22,13 @@ a surviving cached copy can serve after a new authority/binding is installed.</p
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">assets.mesh_init(&amp;mesh, &amp;cache, application_wire)
 assets.mesh_bind(&amp;mesh, admitted_peer, scope)
 assets.mesh_watch(&amp;mesh, needed_references[:])
-assets.mesh_frame(&amp;mesh, monotonic_ms)</code></pre></div><p>The watched working set is requested and public to bound peers. <code>mesh_publish</code>
-keeps earlier cached revisions available without pinning or requesting them. An optional per-peer authorizer further restricts serving
-and is rechecked during a transfer; revocation cancels remaining output. An optional
-content validator runs before installation. The frame reference is the expected
-content identity, not a file path supplied by a sender.</p>
+assets.mesh_frame(&amp;mesh, monotonic_ms)</code></pre></div><p>Mesh requests missing references in its watched working set and makes that set
+public to bound peers. <code>mesh_publish</code> keeps earlier cached revisions available
+without pinning or requesting them. An optional per-peer authorizer can further
+restrict serving. It is checked again during a transfer, and revocation cancels
+the remaining output. An optional content validator runs before installation.
+The frame reference identifies expected content, independently of any file path
+supplied by a sender.</p>
 <p>The default profile has 32 cached entries, 128 KiB per asset, a 4 MiB cache and 32
 watched references. Up to 16 bound peers share 64 KiB/s output, 16 KiB per update,
 a 32 KiB burst, at most four requests per update and one new payload encoding per
@@ -61,8 +63,9 @@ change. Use a separate cache or a per-peer authorizer for private content.</p>
 bytes before accepting a reference-setting action. Its decision enters the action
 ledger; prediction/replay do not consult mutable caches. Scrapyard uses that hook,
 then gates coordinator preparation on the checkpoint&#39;s image dependencies.</p>
-<p>These are transport/cache guarantees; each game must supply complete save dependencies and prove its recovery/browser
-behavior with integration gates.</p>
+<p>These guarantees cover transport and cache behavior. Each game must supply
+complete save dependencies and test its recovery/browser behavior through
+integration gates.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/assets/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/assets/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/assets/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

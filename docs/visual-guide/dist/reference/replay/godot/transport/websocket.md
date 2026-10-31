@@ -22,9 +22,10 @@ messages with a bounded loop.
 
 Services that multiplex JSON signaling and binary control messages can use
 `websocket_receive` (including its `text` flag) and `websocket_send_text` directly.
-Packet identities come from the socket, never a field in received JSON. This is
-transport plumbing, not authentication: authority traffic still uses its MAC,
-request correlation, identity checks and durable coordinator decisions.
+Packet identities come from the socket, never a field in received JSON. This
+identifies the connection without authenticating its participant. Authority
+traffic still requires its MAC, request correlation, identity checks, and
+durable coordinator decisions.
 
 `Room_Options.control_backend = .Websocket` interprets `coordinator` as a WebSocket
 URL. Its default remains Enet. Control reconnection preserves the RPC client and

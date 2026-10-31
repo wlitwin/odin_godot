@@ -1,38 +1,37 @@
 # Script modules — splitting a project into per-module dlls
 
-By default all of a project's Odin scripts belong to **one script module**, `res://scripts/`,
-compiled into **one scripts dll**. When rebuilding that library becomes expensive,
-**script modules** let you split scripts into
-`res://modules/<name>/` directories, each its own Odin package compiled into its **own dll**
-(`libodinscripts_<name>.dylib` / `.so` / `.dll`), loaded beside the main dll and
-**hot-swapped independently**: a save recompiles only the module you edited, so
-an ordinary save avoids rebuilding unrelated modules.
+By default, a project's Odin scripts compile into one library from
+`res://scripts/`. If rebuilding it becomes too slow, split subsystems into
+`res://modules/<name>/` directories. Each module compiles into a separate
+`libodinscripts_<name>.dylib` / `.so` / `.dll`, loaded beside the main scripts
+dll. Saving a script recompiles and hot-swaps its module independently.
 
-Modules trade smaller scoped rebuilds for slower full builds and a hard isolation rule. Read
-the cost model first. **Most projects should not start with modules.**
+Modules reduce scoped rebuild time but add full-build work and prohibit direct
+imports between modules. Keep one scripts dll until measured save latency
+justifies that tradeoff. The cost model below explains when splitting helps.
 
-Two things on this page are not about splitting into dlls and apply to every project,
-including one that never creates a module: [script subpackages](#script-subpackages)
-(organizing one module's scripts into subfolders, still one dll) and
-[`res://shared/`](#shared) (read-only packages every module may import).
+For organization within one dll, use [script subpackages](#script-subpackages).
+For types, constants, and pure procedures several modules can import, use
+[`res://shared/`](#shared). Both are available without creating extra modules.
 
 ## When to use modules
 
-Every scripts dll pays a fixed compile floor of roughly **0.85 s**, because the Odin front-end
-type-checks the full `godot` binding once *per dll*, no matter how few scripts the
-dll holds. That floor shapes the trade:
+The measured minimum compile time is roughly 0.85 s per scripts dll. Odin
+checks the full `godot` binding separately for each dll even when it contains
+few scripts. Additional modules therefore add work to full builds:
 
 | Project size | Modules? | Why |
 |---|---|---|
-| < ~50–100 scripts | **No**: pure overhead | A single-dll save is already near the floor; each module you add puts another ~0.85 s floor on every *full* build (≈2× slower at 10 modules) and buys nothing on save. |
-| ~50–100+ scripts, save latency starting to hurt | Maybe | Split along real seams (enemies, UI, world-gen…) only when the single-dll save time actually bothers you. |
-| Hundreds of scripts | **Yes**: this is what modules are for | Measured at 300 method-heavy scripts: a save went **4.5 s → 0.79 s (5.7×)** after splitting, and the per-save cost stays flat as the project keeps growing (you only ever rebuild the module you touched). |
+| < ~50–100 scripts | Usually keep one dll | A single-dll save is already near the minimum. Each extra module adds ~0.85 s to a full build (≈2× slower at 10 modules in the measured case), with little save-time benefit. |
+| ~50–100+ scripts, save latency starting to hurt | Measure before splitting | Group related scripts, such as enemies, UI, or world generation, when single-dll save latency becomes a problem. |
+| Hundreds of scripts | A split can reduce save latency | With 300 method-heavy scripts, measured save time fell from 4.5 s → 0.79 s (5.7×) after splitting. A scoped save rebuilds the edited module, so its cost depends on that module rather than the rest of the project. |
 
-(Numbers measured on the Apple-silicon macOS dev machine with the editor's `-o:none` dev
-builds; your absolute times will differ, the shape won't.)
+These measurements used the Apple-silicon macOS development machine and the
+editor's `-o:none` builds. Measure your project and machine before choosing
+module boundaries.
 
-A project without a `modules/` dir loads, builds, and exports exactly as a single-dll
-project. Nothing about modules is loaded, built, or exported until you create one.
+A project without a `modules/` directory retains single-dll loading, builds,
+and export. Additional module work begins only after a module is created.
 
 ## Layout and naming rules
 
@@ -46,10 +45,10 @@ your_project/
   shared/                  -> (read-only packages every module may import; no dll of its own)
 ```
 
-- **`res://scripts/` is the main module and always exists.** Modules are additions, not a
-  replacement: a good default is gameplay glue + autoloads in `scripts/`, big subsystems in
-  modules.
-- **Each module is its own Odin package** with its **own package name** (`package
+- **Keep `res://scripts/` as the main module.** Additional modules supplement it.
+  Keep game coordination and autoloads in `scripts/` and move large subsystems
+  into their own modules when needed.
+- **Each module has a root Odin package** with its own package name (`package
   game_enemies`, not a copy of the main package's name). Package names must be unique across
   the project: the web export links every module into one wasm, where two packages with the
   same name won't compile.
@@ -65,7 +64,7 @@ your_project/
   declarations stay in the module root. See [Script subpackages](#script-subpackages) for
   the full rules. An edit anywhere under `res://modules/<name>/` counts as an edit to that
   module for rebuild-on-save.
-- A module dir with no `.odin` sources is skipped at build time, loudly:
+- An empty module directory is skipped during the build with this message:
   `build_scripts: skipping module '<name>' (no .odin sources)`.
 
 ### Generated files
@@ -85,10 +84,9 @@ filename pattern.
 
 ### Creating a module
 
-There is no template machinery for modules. **Project → Tools → Set Up Odin Scripts**
-creates only the main `res://scripts/`. A module is a directory with a script in it, about
-five lines of boilerplate, so a starter dir would be overkill. Make the directory and drop
-in a script:
+**Project → Tools → Set Up Odin Scripts** creates the main `res://scripts/`
+directory. To add a module, create its directory and write a script with its
+own package name:
 
 ```sh
 mkdir -p modules/enemies
@@ -98,7 +96,7 @@ mkdir -p modules/enemies
 // modules/enemies/enemy.odin
 //gd:extends Node
 //gd:class Enemy
-package game_enemies      // the module's OWN package name — unique in the project
+package game_enemies      // package name must be unique within the project
 
 import gd "godot:godot"
 
@@ -112,16 +110,16 @@ enemy_ready :: proc(self: ^Enemy) {
 }
 ```
 
-Then build (`build/build_scripts.sh <project>` builds the main module *and* every module,
-or just save in the editor). `scriptgen` generates the module's own boot shim and staleness
-guard, like the main module's; there is no extra boilerplate. Attach
-`res://modules/enemies/enemy.odin` to a node exactly like any other Odin script.
+Run `build/build_scripts.sh <project>` to build the main module and additional
+modules, or save in the editor. `scriptgen` generates each module's boot shim
+and staleness guard. Attach `res://modules/enemies/enemy.odin` to a node as you
+would any other Odin script.
 
 ## Script subpackages
 
-A module's scripts do not have to sit in one flat directory. **Every subdirectory of a module
-that holds authored `.odin` sources is its own Odin package**, at any depth, and an
-engine-native script class may live there:
+Organize a module into subpackages by placing authored `.odin` files in
+subdirectories. Each source directory is an Odin package at any depth, and may
+declare engine-native script classes:
 
 ```
 scripts/                    package game_main       (the module root)
@@ -132,29 +130,31 @@ scripts/                    package game_main       (the module root)
     util.odin
 ```
 
-This is organization, not splitting: **one dll per module, unchanged.** The root's generated
-guard file carries an `import _ "ui"` manifest line per script subpackage, which is what
-links each subpackage's generated registration into the module's dll. Build commands, the
-`.gdextension`, and export are all untouched. It does not move the wire contract either:
-`NET_FINGERPRINT` folds in the class names of the whole tree, root and subpackages alike, so
-moving a class between the root and a subfolder leaves the hash — and therefore the join
-door — exactly where it was.
+Subpackages still compile into their module's single dll. The root's generated
+guard file contains an import manifest, with entries such as `import _ "ui"`,
+that links each script subpackage's generated registration. Build commands,
+the `.gdextension`, and export remain the same.
 
-**What a subpackage class gets.** The whole engine-native surface: `//gd:extends` /
+`NET_FINGERPRINT` includes class names from the whole tree. Moving a class
+between the root and a subfolder therefore leaves its contribution to the
+fingerprint unchanged, preserving network compatibility for that move.
+
+**Supported subpackage declarations.** Engine-native classes can use: `//gd:extends` /
 `//gd:class` / `//gd:tool` / `//gd:icon`, lifecycle procs, `@(gd_method)`, `@(gd_connect)`,
 `@(gd_rpc)`, typed signal fields with their generated emitters, `gd:"export"` fields and
 their hints, and `gd:"onready=…"` references. A subdirectory with no annotated scripts is
-just a helper package as before, and gets no generated file at all.
+a helper package and receives no generated registration file.
 
 **What must stay in the module root.** Every **kit** declaration: `gd:"replicate"`,
 `gd:"owner"`, `gd:"predict"`, `gd:"backup"` and `gd:"profile="` field tags, `entity=` scene
 fields, a `net_id` field, `@(gd_command)`, `@(gd_tick)`, `@(gd_input)`, `@(gd_sample)`, `@(gd_step)`,
 `@(gd_message)`, `@(gd_event)`, session and succession halves, the sim lane's input class, and
-a `kboot.Boot` field. The reason is the wire contract: a module's kit surface (replicated
-field order, verb ids, entity type ids, the one tick input struct, the fact tuples) folds
-into `NET_FINGERPRINT`, which two peers compare at the join door, and it is resolved
-package-wide in the module root. A lane or a verb hiding in a subfolder would leave the
-fingerprint silently short of it, so `scriptgen` refuses it by name:
+a `kboot.Boot` field. Scriptgen resolves Kit declarations in the module root
+to construct `NET_FINGERPRINT`, including replicated field order, command ids,
+entity type ids, tick input structs, and event tuples. Peers compare that
+fingerprint during admission. A Kit declaration in a subfolder would fall
+outside that resolution, so `scriptgen` rejects it with the class and field
+or attribute name:
 
 ```
 scriptgen: error: scripts/ui/hud.odin: Hud declares a gd:"replicate" field tag in the script
@@ -163,9 +163,10 @@ struct) and is game-coupled; move this file to the module root (…). Subfolders
 engine-native script classes: extends/class, methods, signals, exports, onready, rpc
 ```
 
-**A subpackage may not import the module root.** The root already imports every script
-subpackage through its manifest, so an import back up is always a cycle. Rather than let Odin
-report the cycle from inside generated code, `scriptgen` names it and the ways out:
+**A subpackage may not import the module root.** The root's generated manifest
+already imports every script subpackage, so a reverse import creates a cycle.
+`scriptgen` reports the authored import and suggests moving shared code to a
+sibling subpackage or passing data as an argument:
 
 ```
 scriptgen: error: scripts/ui/hud.odin:6: a subfolder script package cannot import the module
@@ -200,28 +201,29 @@ so the root can `import "ui"` and read a subpackage's script struct directly:
 the *module* boundary, not the package boundary (see
 [`rt.script_of` across modules](#rtscript_of-across-modules)).
 
-Note what the import binds. Odin names a relative import after the **last element of its
-path**, not after the package's declared name: `import "ui"` binds `ui` even though the
-package above declares itself `package game_ui`, and `import "defs"` binds `defs`. Give it
-whatever name you want with an alias — `import d "defs"`.
+Odin binds a relative import using the last path element. `import "ui"`
+therefore binds `ui` even when the imported package declares `package game_ui`;
+`import "defs"` binds `defs`. Choose another binding with an explicit alias,
+such as `import d "defs"`.
 
-**When to reach for a subpackage.** Use one when a group of classes is self-contained and the
-module root does not need to name their types: HUD widgets, menus, editor tools, effects.
-Keep everything else flat. A subpackage is not a scaling tool (the save still rebuilds the
-whole module dll); the scaling tool is a module.
+**When to use a subpackage.** Group related engine-native classes such as HUD
+widgets, menus, editor tools, and effects. A save still rebuilds the whole
+module dll. Use a separate module when the goal is to reduce the amount of
+code rebuilt on save.
 
 `tests/subpkg_spike/` is the worked example, including the four refusals above.
 
 ## No imports between script modules
 
-A script module must not import another script module (or `scripts/`). A package linked into
-two dlls gets **its package globals duplicated per dll**: each dll carries its own copy, so
-writes from one module never reach the other and "shared" state forks silently. The build
-rejects cross-module imports two ways: `scriptgen` checks every file's import declarations
-structurally (an absolute-path import, or any relative import that resolves outside the
-module's directory, is a hard error), and a fast grep for `..`-relative imports backstops it
-(`check_module_isolation` in `build/common.sh`, shared by `build_scripts.sh` and
-`build_export_scripts.sh`, ported in `build_scripts.ps1`):
+A script module must not import another script module or `scripts/`. Linking
+a package into two dlls duplicates its package globals, so a write through one
+dll is invisible through the other.
+
+The build checks imports in two places. `scriptgen` examines declarations and
+rejects absolute or relative imports resolving outside the module's allowed
+directories. A `..`-relative import scan provides an additional check through
+`check_module_isolation` in `build/common.sh`, used by `build_scripts.sh` and
+`build_export_scripts.sh` and ported to `build_scripts.ps1`:
 
 ```
 build_scripts: ILLEGAL cross-module import in '<dir>':
@@ -235,11 +237,9 @@ build_scripts: ILLEGAL cross-module import in '<dir>':
   scriptgen verifies that tree stays state-free.
 ```
 
-Odin itself would compile a cross-module `import "../enemies"` without objection. The
-isolation is a build-tooling rule (scriptgen plus `build_scripts`), not a language one, so
-the check is explicit and loud rather than a compiler error.
-
-The consequences, stated plainly:
+Odin permits imports such as `import "../enemies"`. The SDK's `scriptgen`
+and `build_scripts` enforce module isolation to prevent duplicated state.
+Follow these rules:
 
 - Modules cannot share Odin types, procs, or package globals with each other, except through
   the [`res://shared/`](#shared) tree, which is verified to hold no state.
@@ -256,7 +256,7 @@ Modules communicate through the engine. The following pair mirrors `tests/module
 enemies module.
 
 ```odin
-// scripts/player.odin — the MAIN module
+// scripts/player.odin — the main module
 //gd:extends Node
 //gd:class Player
 package game_main
@@ -267,8 +267,8 @@ Player :: struct {
 	owner: gd.Node,
 }
 
-// Enemy's type lives in res://modules/enemies — this module CANNOT import it.
-// Call it by NAME through the engine instead (dynamic, no shared types):
+// Enemy's type lives in res://modules/enemies and cannot be imported here.
+// Use a dynamic engine call by method name without importing its type:
 @(gd_method)
 player_attack :: proc(self: ^Player, target: gd.Node, amount: gd.Int) {
 	amt := amount
@@ -297,39 +297,42 @@ enemy_take_hit :: proc(self: ^Enemy, amount: gd.Int) {
 }
 ```
 
-Pick the tool by what you need:
+Choose a communication mechanism according to the data being exchanged:
 
 | Need | Tool |
 |---|---|
-| Notify whoever cares, decoupled | **Signals**: declare in one module, `gd.connect_to(emitter, "sig", target, "method")` from anywhere; connections are engine-side and cross modules freely |
+| Notify subscribed receivers | **Signals**: declare in one module, `gd.connect_to(emitter, "sig", target, "method")` from anywhere; connections are engine-side and cross modules freely |
 | Call a specific node's method | **Name-based call**: `gd.object_call(obj, gd.sname("take_hit"), args…)` (the `Object::call` path GDScript uses) |
-| Shared game state / services | **An autoload** (see the [Authoring Guide](authoring-guide.md#autoload-singletons)): one real node at `/root/Name` every module reaches by path, or package globals in exactly ONE module fronted by its `@(gd_method)`s |
+| Shared game state / services | **An autoload** (see the [Authoring Guide](authoring-guide.md#autoload-singletons)): one real node at `/root/Name` every module reaches by path, or package globals in exactly one module fronted by its `@(gd_method)`s |
 | Shared types, constants, pure procs | **A [`res://shared/`](#shared) package**: imported directly by every module, verified state-free |
 | Typed struct access | **`rt.script_of`: module-local only** (below) |
 
 ### `rt.script_of` across modules
 
-Within a module, `rt.script_of(obj, T)` is a zero-overhead typed path, and that includes the
-module's [subpackages](#script-subpackages), which share its dll: the root can
-`import "ui"` and call `rt.script_of(node, ui.Hud)`. Across modules it returns `nil`: with no
-cross-module imports you cannot name another module's struct type, and the core's class check
-returns nil for a same-name type from another module (a node carrying the enemies module's
-`Enemy` is never a non-nil `^YourEnemy`). Treat `script_of` as "typed access to *my* module's
-scripts"; everything else goes through the engine. (Verified from both sides in
-`tests/modules_spike/`.)
+Use `rt.script_of(obj, T)` for typed access without dispatch overhead within
+one module, including its [subpackages](#script-subpackages). The root can `import "ui"` and call
+`rt.script_of(node, ui.Hud)` because both packages share the dll.
+
+Across modules, `script_of` returns `nil` when the core's class check finds a
+same-name type from another module. A node with the enemies module's `Enemy` cannot resolve as
+`^YourEnemy` from another module, and import isolation prevents directly naming
+the original type. Use engine calls across that boundary. `tests/modules_spike/`
+verifies the refusal from both modules.
 
 <a name="shared"></a>
-## `res://shared/` — vocabulary every module can import
+<a id="resshared--vocabulary-every-module-can-import"></a>
 
-The isolation rule exists for one hazard: a package linked into two dlls gets its own copy of
-every **mutable package global**, so a write through one module's copy is invisible to the
-other. Duplicated types, constants and pure procs carry no such hazard. Two copies of an enum,
-a payload struct or a `clamp01` proc are indistinguishable.
+## `res://shared/` — types, constants, and pure procedures
 
-So one tree is exempt. **Any package under `<project>/shared/` may be imported by any script
-module**, the main one or a `modules/<name>` one, from the module root or from a subpackage,
-at any depth. It is an ordinary relative import; what matters is where it resolves, not how
-many `..` segments it takes:
+Several modules can safely compile separate copies of types, constants, and
+pure procedures because those declarations contain no mutable package state.
+For example, copies of an enum, payload struct, or `clamp01` procedure do not
+need to exchange runtime writes.
+
+Put those declarations under `<project>/shared/`. The main module and any
+`modules/<name>` module may import shared packages, including from nested
+subpackages. Use an ordinary relative import; scriptgen checks its resolved
+path regardless of the number of `..` segments:
 
 ```
 your_project/
@@ -343,7 +346,7 @@ your_project/
 ```
 
 ```odin
-// shared/ids/ids.odin — read-only vocabulary: types, constants, pure procs.
+// shared/ids/ids.odin — shared types, constants, and pure procs.
 package shared_ids
 
 Kind :: enum u8 {None = 0, Player = 1, Enemy = 2}
@@ -361,19 +364,21 @@ brand :: proc(k: Kind) -> int {return int(k) * 100 + STEP}
 There is no dll for `shared/`. Each module that imports a shared package compiles its own copy
 into its own dll, which is exactly why the tree must stay state-free.
 
-### The rules, and what refuses them
+<a id="the-rules-and-what-refuses-them"></a>
 
-`scriptgen` parses every shared package a module actually imports (following shared-to-shared
-imports transitively, so a package nothing imports is nobody's business) and refuses these,
-naming the file, the line, and the reason:
+### Shared-package restrictions and diagnostics
+
+`scriptgen` validates shared packages imported by a module, following imports
+between shared packages transitively. Unimported packages are not checked.
+Each prohibited declaration produces a file, line, and reason:
 
 | Not allowed in `shared/` | Why | The refusal (abridged) |
 |---|---|---|
-| a file-scope mutable variable (`x := …`, `x: T`, including `@(thread_local)`) | it is the per-dll copy the isolation rule exists for | `declares the file-scope variable "counter" — every module that links this package gets its OWN copy of it, so writes from one module never reach the other and the state silently forks. Constants (counter :: …), types and pure procs are fine here` |
-| an `@(static)` local | package state with a proc-local spelling | `declares an @(static) local — that is package STATE with a proc-local spelling, and every module that links this package gets its own copy` |
+| a file-scope mutable variable (`x := …`, `x: T`, including `@(thread_local)`) | each dll would receive a separate mutable variable | `declares the file-scope variable "counter" — every module that links this package gets its OWN copy of it, so writes from one module never reach the other and the state silently forks. Constants (counter :: …), types and pure procs are fine here` |
+| an `@(static)` local | a persistent local is mutable package state | `declares an @(static) local — that is package STATE with a proc-local spelling, and every module that links this package gets its own copy` |
 | `@(init)` / `@(fini)` | it would run once **per dll** | `declares the @(init) proc "setup" — it would run ONCE PER DLL (every module that links this package runs it again, over that dll's own copy of the package)` |
 | a `//gd:` marker or an `@(gd_*)` proc | an attachable class belongs to a module; `shared/` is engine-agnostic | `carries the script marker "//gd:class Sneaky" — an attachable script class belongs to a MODULE (res://scripts or res://modules/<name>), never to res://shared/` |
-| importing anything but a collection (`godot:` / `core:` / `base:` / `vendor:`) or another `shared/` package | importing a module from here IS the forked-globals hazard: that module's package would link into every dll | `imports "../../modules/other", which resolves to "…/modules/other" OUTSIDE the shared tree (…)` |
+| importing anything but a collection (`godot:` / `core:` / `base:` / `vendor:`) or another `shared/` package | an outside module package would be linked into every importing dll | `imports "../../modules/other", which resolves to "…/modules/other" OUTSIDE the shared tree (…)` |
 
 Every one of them ends with the same explanation:
 
@@ -385,10 +390,10 @@ Every one of them ends with the same explanation:
   engine); keep the vocabulary they agree on here.
 ```
 
-One more limitation, refused loudly rather than silently: a struct carrying `gd:"…"` tags
-cannot be embedded from `shared/`. `scriptgen` resolves tagged bundles inside the module's own
-package tree and in `godot:` collection packages only, so tags on a shared struct's fields
-would never register. An untagged plain-data struct from `shared/` is fine.
+A struct with `gd:"…"` field tags cannot be embedded from `shared/`.
+`scriptgen` resolves tagged bundles only within the module's package tree and
+`godot:` collection packages. Tags from a shared struct would not register,
+so the generator rejects them. Untagged plain-data structs are supported.
 
 Plain shared types may also be aliases, including generic runtime owners such as
 `Timeline :: replay.Timeline(World, Input, Event)`. Scriptgen follows the named
@@ -410,41 +415,40 @@ rules. See [focused and application acceptance](../tests/replay_shared_alias/REA
 
 ### Reload: one shared edit rebuilds every module
 
-The shared tree belongs to no module, so its content hash is folded into **every** module's:
-saving a file under `res://shared/` rebuilds and hot-swaps **every** module dll, each firing
-its own `reload` hooks and resetting its own package globals. That is correct (any module may
-be compiled against what you changed) and it is the cost of putting something there: the flat
-per-save latency modules buy you does not apply to a shared edit. A project with no `shared/`
-directory behaves exactly as before.
+Every module's content hash includes the shared tree. Saving a file under
+`res://shared/` therefore rebuilds and hot-swaps every module dll, calls each
+module's `reload` hooks, and resets each module's package globals. A shared
+edit pays the full rebuild cost because any module may depend on the changed
+declarations. Projects without a `shared/` directory retain ordinary scoped
+reload behavior.
 
 ### Choosing between `shared/`, an autoload, and one module's globals
 
 | You need | Use |
 |---|---|
-| types, enums, constants, pure functions that several modules must agree on | **a `shared/` package**: a direct import, no engine round trip, no runtime cost |
+| types, enums, constants, pure functions that several modules must agree on | **a `shared/` package**: declarations compile directly into each importing dll |
 | mutable state several modules read and write | **an autoload** (a real node at `/root/Name`, reached by name through the engine), or **package globals in exactly one module** fronted by its `@(gd_method)`s |
 | state, types and helpers only one module uses | **that module's own package**, or a plain helper subpackage inside it |
 
-The dividing line is state. If it can be written at runtime, it does not belong in `shared/`,
-and `scriptgen` will say so at build time rather than let two dlls disagree at play time.
-`tests/shared_spike/` is the worked example: two dlls, one vocabulary, plus each refusal above.
+Keep mutable package state outside `shared/`; `scriptgen` rejects it during
+the build. `tests/shared_spike/` demonstrates two dlls using shared declarations
+and exercises each refusal above.
 
 ## Reload: per-module rebuild and swap
 
-Saving a script in the editor rebuilds **only the module containing the saved file**: the
-reload coordinator maps the resource path directly to its module root, hashes that root (not
-every module), and kicks one scoped build per *changed* module before hot-swapping just that
-dll. A first background probe establishes all hash baselines, and a slower full reconciliation
-catches out-of-editor content edits/deletions. The other dlls are not rebuilt, not reloaded,
-or touched during an ordinary save. The ~0.85 s floor is paid once per save, for one module,
-no matter how big the rest of the project is.
+On an editor save, the reload coordinator maps the resource path to its module
+root, hashes that root, and starts a scoped build if its content changed. It
+then hot-swaps that dll while other modules continue running. A background
+probe establishes initial hashes; less frequent full checks detect edits and
+deletions made outside the editor. An ordinary save pays the ~0.85 s minimum
+compile cost for one module, plus the cost of that module's scripts.
 
 Semantics of a module swap (all asserted by `tests/modules_spike/`):
 
 - **The swapped module:** live instances keep their state (same-layout fast path, or exported
   values preserved by name otherwise, per the normal [reload rules](workflow.md#live-editing-show-on-save)),
   and its `reload` hook fires on each instance with the new code. But the module's
-  **package globals RESET**: it is a fresh dll, so its globals reinitialize.
+  package globals reset because loading a fresh dll reinitializes them.
 - **Every other module:** instances keep state *and* package globals, keep running, and
   never see a reload hook. The main module's blackboard survives an enemies-module swap
   untouched.
@@ -471,7 +475,8 @@ anything else → the main module).
 
 Script attachment, typed access, and reload key on canonical `res://` paths, so ordinary
 scripts do not need globally unique names. An explicit `//gd:class` opts into Godot's
-project-wide global type namespace and therefore must be unique. Collisions are never silent:
+project-wide global type namespace and therefore must be unique. Collision
+handling depends on where it is detected:
 
 - **Within one module (build time):** `scriptgen` refuses two identical `//gd:class` names
   anywhere in a module's tree, root and subpackages together, naming both files:
@@ -502,14 +507,14 @@ project-wide global type namespace and therefore must be unique. Collisions are 
 
 ## Exporting with modules
 
-Nothing extra to do: at export the plugin builds **one optimized dll per module** (same
-`odin_godot/export_optimization` level as the main dll) and bundles each beside the main
-scripts dll (`add_shared_object`: macOS `Contents/Frameworks`, sibling of the executable
-elsewhere), which is exactly where the exported game's runtime scans for
-`libodinscripts_<name>.<ext>` siblings. The export log shows one line per module:
+During export, the plugin builds one optimized dll per module using the main
+dll's `odin_godot/export_optimization` setting. It bundles each with
+`add_shared_object` beside the main scripts dll: in macOS `Contents/Frameworks`
+or beside the executable on other platforms. The runtime scans that location
+for `libodinscripts_<name>.<ext>`. Each bundled module produces a log line:
 `odin export: bundled module 'enemies' (…)`.
 
-Failures are loud, never silent:
+The plugin rejects incomplete module exports:
 
 - A module whose dll didn't get built **fails the export with an error naming it**, since an
   exported game must never silently ship without a module's classes:
@@ -521,14 +526,14 @@ Failures are loud, never silent:
 **Web** export composes the main module *and* every script module into the single
 Emscripten SIDE_MODULE wasm, subpackages and imported `shared/` packages included (this is
 why package names must be unique across the whole project, not just per module). Cross-module
-behavior is the same (engine-mediated calls, keep-first collisions), verified in a real
-browser by `tests/modules_web/`.
+behavior is the same (engine-mediated calls, keep-first collisions), verified
+in a browser by `tests/modules_web/`.
 
 ### `BUILD_MODULES=0` — building without modules
 
 Setting the `BUILD_MODULES=0` environment variable skips modules in `build_scripts.sh` /
-`build_export_scripts.sh` **and** in the export plugin's bundling, loudly, since the result
-lacks the module classes:
+`build_export_scripts.sh` and disables module bundling in the export plugin.
+The log warns that module classes are absent:
 
 ```
 odin export: BUILD_MODULES=0 — script modules NOT built or bundled; the exported game will
@@ -551,7 +556,7 @@ Verified means the code path has actually been run on that platform:
 
 ## Troubleshooting
 
-The messages you'll actually see, and what they mean:
+Use the diagnostic text to identify the source declaration or build setting:
 
 | Message (abridged) | Meaning / fix |
 |---|---|

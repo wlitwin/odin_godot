@@ -8,8 +8,9 @@
 launches. It reads or creates a persistent 16-byte Session token through
 IndexedDB. Keep it at a stable address, poll it before opening a runner, and obtain
 the token through <code>browser_identity_token</code>. A token is published only in Ready.
-Missing records are created with CAS(0); a competing creator reads the winning
-record. Malformed data and storage failures never produce a volatile replacement.
+Missing records use a compare-and-swap write against revision zero, CAS(0),
+so competing creators read the winning record. Malformed data or storage
+failure does not create a temporary replacement identity.
 Explicit test tokens can bypass this helper; they are not account authentication.</p>
 <p><code>Browser_Checkpoint(S,C,A,E,N)</code> owns a local self-contained authority archive and
 its observed storage revision. It uses the same canonical checkpoint codec as
@@ -28,8 +29,8 @@ approval. External asset dependencies need an application bundle, as Scrapyard
 already uses; they are not inferred from World.</p>
 <p>During play, call <code>browser_checkpoint_save(&amp;slot, &amp;session)</code> on a local authority.
 The function captures the complete frame and session ledgers once and submits an
-asynchronous write. A true return means submitted, not saved. Keep pumping the game
-and <code>browser_checkpoint_frame</code>. <code>receipt_serial</code> advances after a completed write
+asynchronous write. A true return reports submission; the write is still pending.
+Keep pumping the game and <code>browser_checkpoint_frame</code>. <code>receipt_serial</code> advances after a completed write
 attempt; <code>last_success</code>, <code>saved_tick</code>, <code>saved_hash</code> and <code>revision</code> report the result.
 The saved hash includes the frame tick. Storage and codec failures are reported
 separately. At most one write is outstanding in a slot.</p>
@@ -54,5 +55,5 @@ precedes session creation, so a completed save does not refer to an uncommitted
 new credential. Browser deletion/eviction and same-origin access still apply.
 There is no claim of portable power-loss durability or public identity provisioning.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/browser_checkpoint.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/browser_checkpoint.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/browser_checkpoint.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

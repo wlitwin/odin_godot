@@ -1,9 +1,11 @@
 # Native authenticated two-player P2P
 
-`P2P_Direct` is a reusable two-participant ENet owner over `P2P_Party`. It discovers
+`P2P_Direct` manages an ENet connection between two participants enrolled through
+`P2P_Party`. It discovers
 the peer's registered endpoint, requests a scoped pair key, authenticates the
 physical connection and exposes stable member IDs through `transport.Transport`.
-It owns transport replacement; it does not own or rewind the gameplay runner.
+It replaces failed transports without owning or rewinding the gameplay runner.
+The application retains and rebinds that runner as described below.
 
 1. Open/pump `P2P_Party` with native `Party_Storage`, verified service TLS and a
    native endpoint. The endpoint is re-registered each process, while the original

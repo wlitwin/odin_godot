@@ -1,12 +1,12 @@
 # MultiplayerPeer connection generations
 
 Connection generations distinguish successive connections when a backend reuses
-a numeric peer ID. The shared Godot MultiplayerPeer adapter assigns a nonzero,
-increasing generation
-to each accepted connection within one open adapter lifetime. A reused numeric
-peer ID receives a new generation. Duplicate connect notifications for an active
-ID are idempotent. Unknown/disconnected peers report zero; exhaustion refuses a
-new connection instead of wrapping the counter.
+a numeric peer ID. During one open lifetime, the shared Godot MultiplayerPeer
+adapter assigns each accepted connection a nonzero, increasing generation.
+A reused numeric peer ID receives a new generation. Duplicate connect
+notifications for an active ID preserve its generation. Unknown/disconnected
+peers report zero. When the counter is exhausted, the adapter refuses new
+connections instead of wrapping it.
 
 `Transport.generation` and `Received.generation` expose this local metadata. ENet
 uses it directly; the Steam wrapper forwards it. Delay, Router, Fragments and
@@ -25,8 +25,9 @@ Backends must expose a FIFO packet queue and notify connection transitions befor
 queueing that connection's packets. The adapter owns polling and reading while
 attached; external consumers must not remove or reorder its backend packets.
 Godot's upstream [ENet implementation](https://raw.githubusercontent.com/godotengine/godot/master/modules/enet/enet_multiplayer_peer.cpp)
-queues received packets separately from its peer registry, which is why the
-queued-prefix boundary is necessary rather than assuming disconnect purges them.
+queues received packets separately from its peer registry. The adapter must
+therefore identify and discard packets queued before the new connection;
+disconnect does not imply that queue was purged.
 
 Closing the adapter ends all borrowed handles and resets its generation namespace.
 Close outer wrappers as well before reopening an owner; an old borrowed handle

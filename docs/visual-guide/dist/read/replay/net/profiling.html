@@ -5,10 +5,12 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Runner timing diagnostics</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/profiling.md" download>Page source ↓</a></div></div>
 
 <article class="reading-body "><p>Use runner timing diagnostics to measure simulation, snapshot and correction
-costs separately. Set a runner&#39;s <code>profile_clock</code> to a monotonic microsecond clock. <code>profile_metrics</code>
-records bounded histograms and optional <code>profile_sample(user, metric, elapsed_us)</code>
-receives raw durations. The sample callback should write to preallocated storage;
-it must not affect gameplay or block on I/O. Nothing is serialized or transmitted.</p>
+costs separately. A runner advances simulation and manages its history policy.
+Set its <code>profile_clock</code> to a monotonic microsecond clock. <code>profile_metrics</code>
+records bounded histograms; an optional
+<code>profile_sample(user, metric, elapsed_us)</code> callback receives raw durations.
+The sample callback should write to preallocated storage; it must not affect
+gameplay or block on I/O. Nothing is serialized or transmitted.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -75,10 +77,12 @@ writes a bounded CSV only after measurement, and reports protocol bytes and time
 allocation sizes. Presentation measures command submission even in headless mode;
 it is not GPU render time. Its final report computes exact nearest-rank percentiles
 from raw samples rather than calling histogram bounds exact percentiles.</p>
-<p>Large value copies should avoid unnecessary aggregate intermediates. In the
-Scrapyard specialization, independent assignments and pointer selection over local
-owned presentation copies preserve behavior while avoiding a pathological SLP
-compile. See the <span class="local-reference" title="docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md · available in the repository">recorded IR/build evidence</span>.</p>
+<p>Avoid unnecessary intermediate copies of large values. Scrapyard splits
+independent assignments and selects pointers to local owned presentation values.
+This preserves the public value-ownership rules while avoiding the costly large
+aggregate stores observed in LLVM&#39;s SLP vectorizer. The
+<span class="local-reference" title="docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md · available in the repository">recorded IR/build evidence</span>
+documents that specific compile-time mitigation.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/profiling.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/profiling.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/profiling.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

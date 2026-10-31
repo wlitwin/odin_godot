@@ -2,9 +2,9 @@
 
 Use `assets.Ref` to refer to immutable payload bytes from gameplay state without
 copying those bytes into every frame. It contains a SHA-256 ID and byte count,
-and is suitable for a frame, canonical schema or checkpoint. Payload bytes live in an independently owned
-`Cache`. A new payload gets a new ID; receiving an asset never changes simulation
-state.
+and is suitable for a frame, canonical schema or checkpoint. Payload bytes live
+in a separately owned `Cache`. A new payload gets a new ID; receiving an asset
+does not change simulation state.
 
 `cache_put` owns a copy and validates an expected reference when supplied.
 `cache_read` / `cache_copy` return copies so ordinary reads cannot mutate content
@@ -25,11 +25,13 @@ assets.mesh_watch(&mesh, needed_references[:])
 assets.mesh_frame(&mesh, monotonic_ms)
 ```
 
-The watched working set is requested and public to bound peers. `mesh_publish`
-keeps earlier cached revisions available without pinning or requesting them. An optional per-peer authorizer further restricts serving
-and is rechecked during a transfer; revocation cancels remaining output. An optional
-content validator runs before installation. The frame reference is the expected
-content identity, not a file path supplied by a sender.
+Mesh requests missing references in its watched working set and makes that set
+public to bound peers. `mesh_publish` keeps earlier cached revisions available
+without pinning or requesting them. An optional per-peer authorizer can further
+restrict serving. It is checked again during a transfer, and revocation cancels
+the remaining output. An optional content validator runs before installation.
+The frame reference identifies expected content, independently of any file path
+supplied by a sender.
 
 The default profile has 32 cached entries, 128 KiB per asset, a 4 MiB cache and 32
 watched references. Up to 16 bound peers share 64 KiB/s output, 16 KiB per update,
@@ -71,5 +73,6 @@ bytes before accepting a reference-setting action. Its decision enters the actio
 ledger; prediction/replay do not consult mutable caches. Scrapyard uses that hook,
 then gates coordinator preparation on the checkpoint's image dependencies.
 
-These are transport/cache guarantees; each game must supply complete save dependencies and prove its recovery/browser
-behavior with integration gates.
+These guarantees cover transport and cache behavior. Each game must supply
+complete save dependencies and test its recovery/browser behavior through
+integration gates.

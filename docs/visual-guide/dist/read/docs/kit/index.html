@@ -3,7 +3,7 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Kit multiplayer toolkit</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/index.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-a-replication-model">Choose a replication model</a><a href="#the-canonical-author-surface">The canonical author surface</a><a href="#start-here">Start here</a><a href="#architecture">Architecture</a><a href="#package-reference">Package reference</a><a href="#scope-and-current-limitations">Scope and current limitations</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-a-replication-model">Choose a replication model</a><a href="#generated-apis-for-common-game-tasks">Generated APIs for common game tasks</a><a href="#start-here">Start here</a><a href="#architecture">Architecture</a><a href="#package-reference">Package reference</a><a href="#scope-and-current-limitations">Scope and current limitations</a></nav></details>
 <article class="reading-body "><p>Kit is a set of Odin packages for building multiplayer Godot games. It provides
 session management, replicated entities, reconnectable player identities,
 transport adapters, common gameplay systems, and integration-test support.</p>
@@ -37,7 +37,8 @@ field by field.</p>
 spawning, saves, and transports do not change when an entity moves to the
 simulation lane. See <a href="timelines.html">Choosing a timeline model</a> for the tradeoffs
 and <a href="quickstart-sim.html">the simulation quickstart</a> for a small conversion.</p>
-<h2 id="the-canonical-author-surface">The canonical author surface<a class="heading-anchor" href="#the-canonical-author-surface" aria-label="Link to this section">#</a></h2>
+<p><span id="the-canonical-author-surface"></span></p>
+<h2 id="generated-apis-for-common-game-tasks">Generated APIs for common game tasks<a class="heading-anchor" href="#generated-apis-for-common-game-tasks" aria-label="Link to this section">#</a></h2>
 <p>Start with the generated, typed operation for each ordinary game task:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -63,8 +64,8 @@ and <a href="quickstart-sim.html">the simulation quickstart</a> for a small conv
 <td><code>session_action_receipt</code>, then <code>session_action_poll</code> from frame code</td>
 </tr>
 <tr>
-<td>Present a non-durable occurrence</td>
-<td>One <code>@(gd_event)</code> <code>_fx</code> body and its generated suffix-free announce door</td>
+<td>Present a one-shot event</td>
+<td>One <code>@(gd_event)</code> <code>_fx</code> body and its generated suffix-free announce procedure</td>
 </tr>
 <tr>
 <td>Find entities</td>
@@ -75,21 +76,20 @@ and <a href="quickstart-sim.html">the simulation quickstart</a> for a small conv
 <td><code>&lt;type&gt;_spawn</code>, <code>boot_spawn_send</code>/<code>boot_spawn_cancel</code>, <code>&lt;type&gt;_despawn</code>, and <code>&lt;type&gt;_teleport</code></td>
 </tr>
 </tbody></table>
-</div><p>The component and raw session procedures remain available for a custom frame
-graph, custom factory, or deliberately mixed-kind batch. Reference pages mark
-those primitives as <strong>Advanced</strong>; they are implementation layers, not competing
-spellings of the normal path.</p>
-<p>Both models share one generated canonical wire ABI. scriptgen recursively
-checks every raw network value for fixed widths, explicit enum storage, bounded
+</div><p>The component and raw session procedures remain available when a game needs
+custom frame ordering, a custom factory, or a batch containing multiple entity
+kinds. Reference pages mark those lower-level procedures as <strong>Advanced</strong>.</p>
+<p>Both models share one generated wire ABI, the representation of values sent
+between peers. scriptgen recursively checks every raw network value for fixed
+widths, explicit enum storage, bounded
 containers, and padding-free layout, then hashes the readable schema into the
 session fingerprint. Incompatible builds are refused during JOIN instead of
 discovering the mismatch by corrupting state.</p>
-<p>The root scripts package also receives <code>NET_SCHEMA</code>, an allocation-free
-<code>knet.Net_Schema</code> projection of that same ABI walk. It exposes entity fields,
-inputs and constraints, immediate/tick actions and policies, presentation
-events and anchors,
-profiles, messages, recursive type nodes, and both fingerprints for tooling and
-diagnostics.</p>
+<p>The root scripts package also receives <code>NET_SCHEMA</code>, a <code>knet.Net_Schema</code> value
+that exposes the same ABI metadata without runtime allocation. Tools and
+diagnostics can inspect entity fields, inputs and constraints, immediate/tick
+actions and policies, presentation events and their scheduling entities
+(anchors), profiles, messages, recursive type nodes, and both fingerprints.</p>
 <h3 id="trust-and-security">Trust and security<a class="heading-anchor" href="#trust-and-security" aria-label="Link to this section">#</a></h3>
 <p>The session-replication model trusts an entity owner to provide its streamed
 fields. The host still validates command access and relays owner streams only
@@ -101,13 +101,13 @@ any game-specific predicates in the sample validator hook, and run the authority
 on a trusted machine. Kit bounds input classes, aggregate input packet bytes,
 and per-seat reliable/stream/action rates and bytes; games should tune the
 named profile defaults against legitimate peaks and install a moderation hook.
-ENet traffic is not
-encrypted. WebRTC and Steam provide encrypted transports. The detailed boundary
-is documented under <a href="session.html#trust-and-admission">Session: trust and admission</a>.
-<a href="profiles.html">Named network profiles</a> turn the three common trust models into
-coherent, validated defaults plus benchmark-backed starting envelopes. The
-test suites described in <a href="testing.html">Testing multiplayer</a> cover the hardening
-and operations gates.</p>
+ENet traffic is not encrypted. WebRTC and Steam provide encrypted transports.
+These trust requirements are documented under
+<a href="session.html#trust-and-admission">Session: trust and admission</a>.
+<a href="profiles.html">Named network profiles</a> provide validated defaults for three
+common trust models, with benchmarks that give starting points for capacity
+planning. The test suites described in <a href="testing.html">Testing multiplayer</a> cover
+protocol defenses and operational behavior.</p>
 <h2 id="start-here">Start here<a class="heading-anchor" href="#start-here" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>Complete the main <a href="../getting-started.html">Getting Started</a> guide so you can
@@ -279,5 +279,5 @@ invariants. Treat invited co-op, a listen server, and a public dedicated server
 as different <a href="profiles.html">network profiles</a>.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/index.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-a-replication-model" class="">Choose a replication model</a><a href="#the-canonical-author-surface" class="">The canonical author surface</a><a href="#trust-and-security" class="subsection">Trust and security</a><a href="#start-here" class="">Start here</a><a href="#architecture" class="">Architecture</a><a href="#package-reference" class="">Package reference</a><a href="#scope-and-current-limitations" class="">Scope and current limitations</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="quickstart-sim.html"><span>Server authority and prediction</span><span aria-hidden="true">→</span></a><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/index.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-a-replication-model" class="">Choose a replication model</a><a href="#generated-apis-for-common-game-tasks" class="">Generated APIs for common game tasks</a><a href="#trust-and-security" class="subsection">Trust and security</a><a href="#start-here" class="">Start here</a><a href="#architecture" class="">Architecture</a><a href="#package-reference" class="">Package reference</a><a href="#scope-and-current-limitations" class="">Scope and current limitations</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

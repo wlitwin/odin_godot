@@ -37,7 +37,7 @@ must exactly match the authority's damage and kill counters. This is a diagnosti
 of the bolter workload, not a way to bypass the comparison's minimum kill count.
 Build reuse also checks whether shot instrumentation was requested.
 
-The pre-fix aligned run reproduced a lost press: it remained latched through a
+The recorded pre-fix run reproduced a lost press: it remained latched through a
 450 ms prediction stall, was captured for tick 869, and arrived after authority
 tick 904. A small old correction had freed one input step immediately before a
 newer snapshot advanced the client. Fresh input must wait while validated

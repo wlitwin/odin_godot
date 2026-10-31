@@ -3,10 +3,11 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Distribution — shipping odin_godot as a drop-in addon</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../reference/docs/distribution.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-two-dll-model">The two-dll model</a><a href="#build-the-distributable">Build the distributable</a><a href="#cross-compiling-directly-without-nix-build">Cross-compiling directly (without nix build)</a><a href="#install-into-a-godot-project">Install into a Godot project</a><a href="#export-your-game">Export your game</a><a href="#runtime-confirming-linux--windows">Runtime-confirming Linux / Windows</a><a href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found">Troubleshooting: failed to load scripts dll / No loader found</a><a href="#verify-in-repo">Verify (in-repo)</a></nav></details>
-<article class="reading-body "><p>This page covers <strong>building the distributable addon</strong> (<code>nix build</code>), <strong>what&#39;s in it</strong>, and
-<strong>how a user installs it</strong> into a Godot project, compiles their scripts, and exports for
-all platforms. For the export pipeline internals see <a href="exporting.html">exporting.md</a>.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-two-dll-model">The two-dll model</a><a href="#build-the-distributable">Build the distributable</a><a href="#cross-compiling-directly-without-nix-build">Cross-compiling directly (without nix build)</a><a href="#install-into-a-godot-project">Install into a Godot project</a><a href="#export-your-game">Export your game</a><a href="#verify-runtime-behavior-on-linux--windows">Verify runtime behavior on Linux / Windows</a><a href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found">Troubleshooting: failed to load scripts dll / No loader found</a><a href="#verify-in-repo">Verify (in-repo)</a></nav></details>
+<article class="reading-body "><p>Build the distributable addon with <code>nix build</code>, install it in a Godot project,
+and compile that project&#39;s scripts using the bundled sources and build tools.
+This page describes the addon layout and the verification available for each
+export target. See <a href="exporting.html">exporting.md</a> for the export procedure.</p>
 <blockquote>
 <p><strong>Platform verification status</strong> (this repo is developed on macOS):</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
@@ -45,17 +46,18 @@ shared across platforms. This build check does not establish that Linux or Windo
 Godot can load and run the binaries; those runs need a target host. See <strong>Runtime-confirming</strong> below.</p>
 </blockquote>
 <h2 id="the-two-dll-model">The two-dll model<a class="heading-anchor" href="#the-two-dll-model" aria-label="Link to this section">#</a></h2>
-<p>odin_godot is a <strong>stable CORE dll</strong> (<code>libodin_godot.&lt;ext&gt;</code>, a pure-C-ABI
-<code>ScriptLanguageExtension</code>, entry <code>odin_godot_init</code>) that at runtime loads a <strong>SCRIPTS dll</strong>
-(<code>libodinscripts.&lt;ext&gt;</code>) containing your <code>.odin</code> files compiled against the odin_godot Odin
-collection. The core is shipped prebuilt in the addon; <strong>you compile the scripts dll</strong> for
-each project, because they are your code. (On web, core + binding + scripts are AOT-linked
-into one Emscripten <code>SIDE_MODULE</code> instead.)</p>
-<p>So the addon must contain both the prebuilt core <strong>and</strong> everything needed to compile a
-scripts dll: the <code>godot:</code> Odin collection, the <code>scriptgen</code> codegen preprocessor, and the
-build scripts.</p>
+<p>On native platforms, odin_godot uses two libraries. The addon supplies a
+prebuilt core, <code>libodin_godot.&lt;ext&gt;</code>, which implements
+<code>ScriptLanguageExtension</code> through a C ABI with entry <code>odin_godot_init</code>. At
+runtime it loads <code>libodinscripts.&lt;ext&gt;</code>, containing the project&#39;s <code>.odin</code>
+files compiled against the odin_godot Odin collection. Compile this scripts
+library for each project. On web, core, binding, and scripts are linked ahead
+of time into one Emscripten <code>SIDE_MODULE</code> instead.</p>
+<p>The addon therefore includes the prebuilt core and the inputs needed to compile
+a scripts library: the <code>godot:</code> Odin collection, the <code>scriptgen</code> code
+generator, and build scripts.</p>
 <h2 id="build-the-distributable">Build the distributable<a class="heading-anchor" href="#build-the-distributable" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># macOS core only (always works with the nixpkgs `odin`):</span>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># macOS core only (uses the nixpkgs `odin`):</span>
 nix build                 <span class="hljs-comment"># -&gt; ./result/addons/odin_godot/</span>
 
 <span class="hljs-comment"># macOS + Linux + Windows cores (pulls the pinned cross gcc wrappers from cache.nixos.org):</span>
@@ -76,7 +78,8 @@ nix build .#dist-cross    <span class="hljs-comment"># -&gt; ./result/addons/odi
 <p>Replay ships as an experimental source collection beside Kit, with a separate
 <code>template/replay/</code> project and a download-oriented <code>docs/replay.md</code> guide. Source
 collections are hidden from Godot&#39;s scene scanner using <code>.gdignore</code>; the Odin
-compiler still resolves imports from them. The default Hello starter is unchanged.</p>
+compiler still resolves imports from them. The default Hello starter does not
+use Replay.</p>
 <p>The <a href="../tests/replay_distribution/README.html">Replay distribution gate</a> builds an
 isolated source snapshot, installs the Nix-produced addon into an external project,
 compiles with only that addon&#39;s collection path and runs native solo/network and
@@ -85,20 +88,22 @@ the snapshot without modifying the shared Git index. Normal Git-flake release
 builds still require all intended files to be committed; this test does not publish,
 tag or bypass the release runbook.</p>
 <h2 id="cross-compiling-directly-without-nix-build">Cross-compiling directly (without nix build)<a class="heading-anchor" href="#cross-compiling-directly-without-nix-build" aria-label="Link to this section">#</a></h2>
-<p><code>build/build_cross.sh</code> is the engine <code>nix build .#dist-cross</code> uses. It works standalone:</p>
+<p><code>nix build .#dist-cross</code> calls <code>build/build_cross.sh</code>. You can also run it
+directly:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># core + scripts for a project, into &lt;project&gt;/bin/&lt;target&gt;/:</span>
 nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_cross.sh linux   tests/phase35&#x27;</span>
 nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_cross.sh windows tests/phase35&#x27;</span>
 
 <span class="hljs-comment"># core only (CORE_ONLY=1), into an explicit dir:</span>
-nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;CORE_ONLY=1 bash build/build_cross.sh linux &quot;&quot; out/bin/linux&#x27;</span></code></pre></div><p><strong>How it works.</strong> Odin&#39;s own linker driver refuses to <em>cross-link</em> a dll
+nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;CORE_ONLY=1 bash build/build_cross.sh linux &quot;&quot; out/bin/linux&#x27;</span></code></pre></div><p>Odin&#39;s linker driver refuses to cross-link a library
 (<code>Linking for cross compilation … not yet supported</code>). So <code>build_cross.sh</code> emits a single
 relocatable object with Odin (<code>-build-mode:obj -use-single-module -target:&lt;t&gt;</code>) and links it
 with a Nix cross <strong>gcc wrapper</strong> (<code>pkgsCross.gnu64</code> / <code>pkgsCross.mingwW64</code>), which supplies
 the target glibc / mingw sysroot. The cross compilers are exposed by the <code>.#cross</code> dev shell
 as <code>ODIN_CROSS_LINUX_CC</code> / <code>ODIN_CROSS_WINDOWS_CC</code> (triple-prefixed, kept <strong>off</strong> <code>PATH</code> so
 the native <code>cc</code>/<code>clang</code> is never shadowed). If a toolchain is absent the script exits <strong>3</strong>
-(a SKIP sentinel), so callers gate on it like the browser-gated web tests.</p>
+(a SKIP sentinel), allowing callers to distinguish an unavailable toolchain
+from a failed build, as the browser-gated web tests do.</p>
 <h3 id="build-verification-evidence">Build-verification evidence<a class="heading-anchor" href="#build-verification-evidence" aria-label="Link to this section">#</a></h3>
 <p><code>nix develop .#cross --command bash tests/cross/run.sh</code> builds and inspects all four
 binaries. Captured evidence (cross-built on this macOS/arm64 host):</p>
@@ -136,38 +141,42 @@ for <code>res://bin/libodinscripts.&lt;ext&gt;</code> (and, in exports, beside t
 whenever you change a script (the editor&#39;s reload-on-save does it automatically in-repo).</p>
 </li>
 </ol>
-<p>You need an <code>odin</code> compiler on <code>PATH</code> to compile scripts. That is the one host tool a
-consumer project needs. The bundled release is recommended, not required by string identity:
-the native loader admits another compiler release only when its semantic ABI generation and
-complete layout fingerprint match. See <a href="design/native-boundary.html">Native core ↔ scripts boundary</a>.</p>
-<p>This <strong>split layout</strong> (core dll inside <code>addons/odin_godot/bin/&lt;platform&gt;/</code>, scripts dll at
-<code>res://bin/</code>) is exactly what the suite&#39;s <code>splitaddon</code> test pins (macOS, where dlopen
-semantics are strictest: the scripts dll is self-contained, so the core&#39;s location doesn&#39;t
-matter). If a scripts-dll load fails, the core prints the OS loader&#39;s own
-reason (<code>odin: loader error: …</code>) next to the path.</p>
+<p>Compiling scripts requires an <code>odin</code> compiler on <code>PATH</code>. Use the bundled
+release by default. The native loader can accept a different compiler release
+when both its semantic ABI generation and complete layout fingerprint match;
+it does not decide compatibility from the release-name string alone. See
+<a href="design/native-boundary.html">Native core ↔ scripts boundary</a>.</p>
+<p>The suite&#39;s <code>splitaddon</code> test on macOS verifies the split layout: the core is
+in <code>addons/odin_godot/bin/&lt;platform&gt;/</code> and scripts are in <code>res://bin/</code>.
+The scripts library is self-contained and can load independently of the core&#39;s
+directory. If loading fails, the core prints the OS loader&#39;s reason
+(<code>odin: loader error: …</code>) next to the path.</p>
 <blockquote>
-<p><strong>Known engine quirk (Godot 4.6–4.7, still on master):</strong> a headless <code>godot --import</code> of a
-project containing <em>any</em> GDExtension can crash <strong>at exit, after the import succeeded</strong>
+<p><strong>Engine issue observed with Godot 4.6–4.7:</strong> a headless <code>godot --import</code> of a
+project containing a GDExtension can crash at exit after the import succeeded
 (<code>EditorHelp::_gen_extensions_docs</code> is queued as a deferred call; when the quit wins the
 race it flushes during <code>Main::cleanup</code>, after <code>~EditorNode</code> nulled EditorHelp&#39;s <code>doc</code>).
-Harmless but scary: the <code>.godot/</code> artifacts are complete. In CI, don&#39;t gate on
-<code>--import</code>&#39;s exit code. Check for the artifacts, or use <code>--editor --quit-after 30</code>
-instead (frames flush the deferred while everything is alive).</p>
+For this failure, the <code>.godot/</code> artifacts are complete despite the exit
+error. In CI, verify the artifacts rather than using only <code>--import</code>&#39;s exit
+code, or use <code>--editor --quit-after 30</code> so frames flush the deferred call
+before editor cleanup.</p>
 </blockquote>
 <h2 id="export-your-game">Export your game<a class="heading-anchor" href="#export-your-game" aria-label="Link to this section">#</a></h2>
-<p>Exporting is unchanged from <a href="exporting.html">exporting.md</a>: the editor&#39;s <code>OdinExportPlugin</code>
-compiles the scripts dll for the <strong>target</strong> platform at export and bundles it beside the
-core. For <strong>cross-target desktop exports</strong> (e.g. a Windows build from macOS) the export host
-needs the matching cross toolchain on <code>PATH</code> (the same <code>ODIN_CROSS_*_CC</code> the <code>.#cross</code>
-shell provides); otherwise prebuild with <code>build/build_cross.sh</code> and bundle manually.</p>
+<p>As described in <a href="exporting.html">exporting.md</a>, the editor&#39;s <code>OdinExportPlugin</code>
+compiles scripts for the target platform and bundles them beside the core.
+Cross-target desktop exports, such as a Windows build from macOS, require the
+matching cross compiler configured through <code>ODIN_CROSS_*_CC</code>, as provided by
+the <code>.#cross</code> shell. Otherwise, prebuild with <code>build/build_cross.sh</code> and bundle
+manually.</p>
 <ul>
 <li><strong>macOS / Web</strong>: fully automated + verified (see exporting.md).</li>
 <li><strong>Linux / Windows</strong>: the scripts dll cross-compiles (verified); run the export from a host
 with the cross toolchain, or prebuild the scripts dll with <code>build_cross.sh</code>.</li>
 </ul>
-<h2 id="runtime-confirming-linux--windows">Runtime-confirming Linux / Windows<a class="heading-anchor" href="#runtime-confirming-linux--windows" aria-label="Link to this section">#</a></h2>
-<p>The binaries are build-verified here but <strong>not run</strong> on Linux/Windows. To close the gap on a
-real host or in CI:</p>
+<p><span id="runtime-confirming-linux--windows"></span></p>
+<h2 id="verify-runtime-behavior-on-linux--windows">Verify runtime behavior on Linux / Windows<a class="heading-anchor" href="#verify-runtime-behavior-on-linux--windows" aria-label="Link to this section">#</a></h2>
+<p>Build verification does not establish runtime behavior on Linux/Windows.
+Run the following checks on a target host or in CI:</p>
 <p><strong>Linux</strong> (e.g. GitHub Actions <code>ubuntu-latest</code>):</p>
 <ol>
 <li>Install the matching Godot 4.7.1 <strong>Linux</strong> export templates + editor.</li>
@@ -179,13 +188,14 @@ assertion <code>tests/phase35/run.sh</code> makes on macOS.</li>
 <li>For an exported game: <code>godot --headless --export-release &quot;Linux/X11&quot; out/game</code> then run
 <code>out/game --headless</code> and assert the sentinel.</li>
 </ol>
-<p><strong>Windows</strong> (e.g. GitHub Actions <code>windows-latest</code>) follows the same shape: install Godot 4.7.1
+<p><strong>Windows</strong> (e.g. GitHub Actions <code>windows-latest</code>) uses the same procedure: install Godot 4.7.1
 and the Windows templates, build the scripts dll (natively with <code>odin -target:windows_amd64</code>,
 or use the prebuilt cross dll), drop in the addon, and run <code>godot.exe --headless --path …</code>.</p>
-<p>Because the gdext C-ABI boundary and the loader logic (<code>dladdr</code>/sibling-dll lookup, with the
-<code>LoadLibrary</code> path already present for Windows in <code>core:dynlib</code>) are platform-generic and the
-macOS + web runtimes are verified, the residual risk is platform-specific link/loader detail,
-not the extension design.</p>
+<p>These checks exercise target-specific linking and library loading in addition
+to the shared GDExtension C ABI. The loader uses <code>dladdr</code>/sibling-library
+lookup on supported native systems and the <code>LoadLibrary</code> path in
+<code>core:dynlib</code> on Windows. Successful macOS and web runs do not replace testing
+those target-specific paths.</p>
 <h2 id="troubleshooting-failed-to-load-scripts-dll--no-loader-found">Troubleshooting: <code>failed to load scripts dll</code> / <code>No loader found</code><a class="heading-anchor" href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found" aria-label="Link to this section">#</a></h2>
 <p>Opening or importing a project triggers the editor&#39;s reload-on-save coordinator, which
 rebuilds the scripts dll. <code>build/build_scripts.sh</code> (and <code>.ps1</code>) build to a temp file and <code>mv</code>
@@ -199,5 +209,5 @@ nix develop .#build-parity --<span class="hljs-built_in">command</span> bash tes
                                                             <span class="hljs-comment"># Bash + PowerShell helper contract</span>
 nix build                                                   <span class="hljs-comment"># macOS addon</span>
 nix build .#dist-cross                                      <span class="hljs-comment"># + Linux/Windows cores</span></code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../tests/replay_distribution/README.html"><span>Replay consumer distribution gate</span><span aria-hidden="true">→</span></a><a href="design/native-boundary.html"><span>Native core ↔ scripts boundary</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/distribution.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-two-dll-model" class="">The two-dll model</a><a href="#build-the-distributable" class="">Build the distributable</a><a href="#cross-compiling-directly-without-nix-build" class="">Cross-compiling directly (without nix build)</a><a href="#build-verification-evidence" class="subsection">Build-verification evidence</a><a href="#install-into-a-godot-project" class="">Install into a Godot project</a><a href="#export-your-game" class="">Export your game</a><a href="#runtime-confirming-linux--windows" class="">Runtime-confirming Linux / Windows</a><a href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found" class="">Troubleshooting: failed to load scripts dll / No loader found</a><a href="#verify-in-repo" class="">Verify (in-repo)</a></nav><div class="outline-actions"><a href="../../reference/docs/distribution.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../tests/replay_distribution/README.html"><span>Replay consumer distribution gate</span><span aria-hidden="true">→</span></a><a href="design/native-boundary.html"><span>Native core ↔ scripts boundary</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/distribution.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-two-dll-model" class="">The two-dll model</a><a href="#build-the-distributable" class="">Build the distributable</a><a href="#cross-compiling-directly-without-nix-build" class="">Cross-compiling directly (without nix build)</a><a href="#build-verification-evidence" class="subsection">Build-verification evidence</a><a href="#install-into-a-godot-project" class="">Install into a Godot project</a><a href="#export-your-game" class="">Export your game</a><a href="#verify-runtime-behavior-on-linux--windows" class="">Verify runtime behavior on Linux / Windows</a><a href="#troubleshooting-failed-to-load-scripts-dll--no-loader-found" class="">Troubleshooting: failed to load scripts dll / No loader found</a><a href="#verify-in-repo" class="">Verify (in-repo)</a></nav><div class="outline-actions"><a href="../../reference/docs/distribution.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

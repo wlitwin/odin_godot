@@ -1,10 +1,11 @@
 # Replaying recorded network simulation
 
 Use `net.recording_model(&model)` to verify recorded network simulation without
-opening a session or replaying its transport. It adapts a network `Model(State, Control, Action,
-Event, Seats)` to the engine-free recording verifier. Use `Batch(Control, Action,
-Seats)` as the recorded input and `Net_Event(Event)` as the event type. This is
-the same simulation contract used by server and client timelines.
+opening a session or replaying transport traffic. The adapter supplies the
+engine-free recording verifier with a network
+`Model(State, Control, Action, Event, Seats)`. The recorded input type is
+`Batch(Control, Action, Seats)` and the event type is `Net_Event(Event)`, matching
+the simulation run by server and client timelines.
 
 ```odin
 archive: d.Recording(World, net.Batch(Control, Action, SEATS), net.Net_Event(Event))
@@ -36,9 +37,10 @@ game's action predicate. Rejected view hints likewise remain diagnostic data.
 
 Client recordings preserve the replayable prediction suffix after the latest
 correction. They may therefore be much shorter than the authority recording.
-The captured complete local value can contain public-projection defaults in
-private fields. Use the matching model/prediction policy; a recording does not
-recover information that the client never received.
+A captured client value may contain projection defaults in private fields
+because the authority never sent their contents. Verify it with the matching
+model and prediction policy. The recording cannot recover data absent from
+that client's received view.
 
 An archive can be verified after destroying every transport/session object. It
 contains simulation evidence, not a restorable network session: credentials,
@@ -57,9 +59,10 @@ overridden by `RSY_RECORDING_PATH`; Chrome requests a file download.
 
 The operation is synchronous and does not pause the network game. Complete world
 and batch copies make it useful for deliberate debugging, not every-frame capture.
-The unchanged codec limits are 16 MiB per file, 1 MiB per chunk and 64 MiB of owned
+The codec limits remain 16 MiB per file, 1 MiB per chunk and 64 MiB of owned
 record values. Export logs include the range, bytes, storage result and elapsed
-microseconds. Continuation/no-resync evidence is separate from these timings.
+microseconds. Those timings do not by themselves show that the network game
+continued without resynchronization; that behavior needs separate evidence.
 
 ```sh
 nix develop --command odin run examples/replay_scrapyard/tools/verify_recording \
@@ -110,9 +113,10 @@ nix develop --command odin run examples/replay_scrapyard/tools/verify_recording 
   -collection:godot="$PWD" -- converted.rplrec
 ```
 
-It preserves the source and refuses existing files/symlinks. Publication uses a
-same-directory temporary file and hard link. Three earlier native/browser
-recordings have been converted and verified against their complete recorded
+The converter leaves its source intact and refuses to replace existing files
+or symlinks. It publishes the destination through a temporary file in the same
+directory and a hard link. Three earlier native/browser recordings have been
+converted and verified against their complete recorded
 state/event sequences.
 
 ### Scrapyard content 48 recordings

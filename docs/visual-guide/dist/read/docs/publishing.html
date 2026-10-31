@@ -4,15 +4,15 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Publishing to the Godot Asset Library</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../reference/docs/publishing.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#one-time-setup">One-time setup</a><a href="#the-submission-form">The submission form</a><a href="#releasing-an-update">Releasing an update</a><a href="#consumer-facing-notes">Consumer-facing notes</a></nav></details>
-<article class="reading-body "><p>The Asset Library serves a <strong>zip of a git commit</strong> from a public GitHub/GitLab repo. Reach
-for this page when you want to publish <code>odin_godot</code> there or ship an update.</p>
-<p>Releases live on an orphan <code>release</code> branch whose tree is only the installable addon
-(<code>addons/odin_godot/**</code> + README/LICENSE/NOTICE), so a user&#39;s install dialog shows exactly
-the addon and not the dev tree. <code>build/release.sh</code> assembles that branch from the nix-built
-zip. The rest of this page is the end-to-end runbook.</p>
+<article class="reading-body "><p>Use this procedure to publish <code>odin_godot</code> to the Godot Asset Library or submit
+an update. The library downloads a zip of a git commit from the public
+GitHub/GitLab repository.</p>
+<p><code>build/release.sh</code> assembles an orphan <code>release</code> branch from the Nix-built zip.
+Its tree contains the installable addon (<code>addons/odin_godot/**</code>) plus
+README/LICENSE/NOTICE, keeping development files out of the installation dialog.</p>
 <h2 id="one-time-setup">One-time setup<a class="heading-anchor" href="#one-time-setup" aria-label="Link to this section">#</a></h2>
 <ol>
-<li><p>Create the public GitHub repo and push (already done):</p>
+<li><p>Configure and push the public GitHub repository if it is not set up yet:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">git remote add origin git@github.com:wlitwin/odin_godot.git
 git push -u origin main</code></pre></div></li>
 <li><p>Cut the first release branch + tag and push it:</p>
@@ -72,15 +72,15 @@ process typically takes days to a couple of weeks.</p>
 <td>match <code>version</code> in <code>build/dist.nix</code> (e.g. <code>0.1.0</code>)</td>
 </tr>
 </tbody></table>
-</div><p>Suggested description (edit to taste):</p>
+</div><p>Suggested asset description:</p>
 <blockquote>
-<p>Write Godot scripts in Odin. It is a full ScriptLanguageExtension: attach a .odin file to
-any node, and its lifecycle, @exports, signals, methods, RPCs, and hot reload work like
-GDScript, but the code is compiled, AOT-native code. It ships prebuilt core libraries
-(macOS / Windows / Linux), an in-editor build pipeline (save-to-reload), native + HTML5/WASM
-export, typed access to the whole engine API, and a starter template. It requires the Odin
-compiler (the bundled README names the tested release). macOS is fully verified;
-Windows/Linux are early, and reports are welcome.</p>
+<p>Attach compiled .odin scripts to Godot nodes through ScriptLanguageExtension.
+Scripts support lifecycle procedures, @exports, signals, methods, RPCs, and
+hot reload. The addon includes prebuilt core libraries for macOS, Windows,
+and Linux, an editor build pipeline that reloads after compilation, native
+and HTML5/WASM export, typed engine API access, and a starter template.
+Install the Odin compiler release named in the bundled README. macOS has
+been fully verified; Windows/Linux support is early, and reports are welcome.</p>
 </blockquote>
 <h2 id="releasing-an-update">Releasing an update<a class="heading-anchor" href="#releasing-an-update" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># 1. bump `version` in build/dist.nix, commit everything</span>
@@ -90,11 +90,12 @@ git push origin main release --tags
 <span class="hljs-comment"># 3. Asset Library -&gt; your asset -&gt; &quot;Edit&quot; -&gt; bump version + new download commit.</span>
 <span class="hljs-comment">#    Updates to an accepted asset are reviewed much faster than first submissions.</span></code></pre></div><h2 id="consumer-facing-notes">Consumer-facing notes<a class="heading-anchor" href="#consumer-facing-notes" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>In-editor AssetLib installs are clean on macOS.</strong> But a user who downloads the zip in a
-<em>browser</em> gets <code>com.apple.quarantine</code> on the prebuilt dylibs, and Gatekeeper will refuse
-to load them into the (notarized) Godot editor. Workaround for those users:
-<code>xattr -dr com.apple.quarantine addons/odin_godot</code>. (Long-term: codesign/notarize the
-dylibs.)</li>
+<li><strong>Browser downloads can trigger macOS quarantine.</strong> In-editor AssetLib
+installs avoid this issue. A browser download can mark prebuilt dylibs with
+<code>com.apple.quarantine</code>, causing Gatekeeper to refuse loading them into the
+notarized Godot editor. Users can remove that attribute with
+<code>xattr -dr com.apple.quarantine addons/odin_godot</code>. Signing and notarizing
+the dylibs would address distribution directly.</li>
 <li><strong><code>godot --import</code> exit code</strong>: with any GDExtension, headless <code>--import</code> can crash <em>at
 exit, after a successful import</em> (an engine bug; see the known-quirk note in
 <a href="distribution.html">distribution.md</a>). If a user&#39;s CI gates on it, point them at that note.</li>
@@ -103,5 +104,5 @@ admitted by the pre-boot core↔scripts ABI fingerprint rather than exact versio
 lockstep. Recommend the tested release when helping users, especially before Odin 1.0.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="distribution.html"><span>Distribution — shipping odin_godot as a drop-in addon</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/publishing.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="distribution.html"><span>Distribution — shipping odin_godot as a drop-in addon</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/publishing.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#one-time-setup" class="">One-time setup</a><a href="#the-submission-form" class="">The submission form</a><a href="#releasing-an-update" class="">Releasing an update</a><a href="#consumer-facing-notes" class="">Consumer-facing notes</a></nav><div class="outline-actions"><a href="../../reference/docs/publishing.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

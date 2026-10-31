@@ -5,9 +5,9 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Restoring a published checkpoint</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/provision/checkpoint/restore.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#client-sequence">Client sequence</a><a href="#authority-and-storage-contract">Authority and storage contract</a><a href="#validation-and-integration-status">Validation and integration status</a></nav></details>
 <article class="reading-body "><p>Use a Restore decision when no live authority remains and a trusted member
-needs to resume a published checkpoint. Checkpoint protocol <strong>3</strong> retains the explicit <code>Restore</code> decision introduced in
-version 2 and adds complete asset-package transfer. Upload/download do
-not grant authority. A restore selects one exact durable publication and obtains a
+needs to resume a published checkpoint. Checkpoint protocol <strong>3</strong> retains
+version 2&#39;s explicit <code>Restore</code> decision and adds complete asset-package
+transfer. Upload and download do not grant authority. A restore selects one exact durable publication and obtains a
 new authority epoch only after current membership, policy, lease and storage checks.
 The private Bundle/Record and gameplay/checkpoint formats remain unchanged.</p>
 <h2 id="client-sequence">Client sequence<a class="heading-anchor" href="#client-sequence" aria-label="Link to this section">#</a></h2>
@@ -96,12 +96,12 @@ previous setting. Services without recovery support retain the former blanket
 owner-rebind refusal. The opt-in does not itself check or grant a saved-world claim.</p>
 <h2 id="validation-and-integration-status">Validation and integration status<a class="heading-anchor" href="#validation-and-integration-status" aria-label="Link to this section">#</a></h2>
 <p>Low-level callers should refresh a successful Restore grant with a new correlated
-authority <code>Renew</code> before paying runtime setup costs. The Restore request may
+authority <code>Renew</code> before beginning runtime setup. The Restore request may
 spend much of its lifetime in transfer/validation, and its local lease deadline
 is anchored to request start. Even an already expired local permit can request
 renewal; only the coordinator decides whether the reservation still exists.
 Installation and simulation still require a live permit. <code>Room</code> handles this
-exchange automatically. The <a href="../../../tests/replay_restore_renewal/README.html">delayed-grant gate</a>
+exchange automatically. The <a href="../../../tests/replay_restore_renewal/README.html">delayed-grant test</a>
 covers both a successful same-epoch renewal and an expired-reservation refusal.</p>
 <p>Native TLS fixtures restore the three actual Cavecrawl, Speedball and Scrapyard
 models after all original client processes and the service have exited: incarnation
@@ -112,7 +112,7 @@ dedicated infrastructure/final-release rules. Real processes killed before/after
 the restore commit recover respectively epoch 1/request 2 or epoch 2/request 3,
 while publication 1 remains intact; fresh coordinator startup is inactive.</p>
 <p>Godot Room/Party drives the complete download/preparation/restore lifecycle and
-Cavecrawl exposes resume/retry UI. Separate native and browser gates resume actual
+Cavecrawl exposes resume/retry UI. Separate native and browser tests resume actual
 saved cave play and accept new guests after all original processes have exited.
 Room distinguishes service-known rollback from local confirmation history.
 Atomic asset packages cover declared dependencies including Scrapyard sprays.
@@ -120,5 +120,5 @@ Broader asset profiles, other game acceptance and broader loss reporting remain
 integration work. See <a href="../../godot/room_restore.html">Room restoration</a> and the
 <a href="../checkpoints.html">M5 plan</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_restore_renewal/README.html"><span>Delayed restore grant renewal</span><span aria-hidden="true">→</span></a><a href="../../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/restore.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_restore_renewal/README.html"><span>Delayed restore grant renewal</span><span aria-hidden="true">→</span></a><a href="../../godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/checkpoint/restore.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#client-sequence" class="">Client sequence</a><a href="#authority-and-storage-contract" class="">Authority and storage contract</a><a href="#validation-and-integration-status" class="">Validation and integration status</a></nav><div class="outline-actions"><a href="../../../../reference/replay/provision/checkpoint/restore.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -2,20 +2,16 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Thinking in structs · odin_godot</title><meta name="description" content="Keep script state, free procedures, and engine nodes separate."><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html" aria-current="page">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>Thinking in structs</h1><p class="reader-dek">Keep script state, free procedures, and engine nodes separate.</p><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/02-thinking-in-structs.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-reflex-map">The reflex map</a><a href="#self-is-not-the-node">self is not the node</a><a href="#replacing-inheritance">Replacing inheritance</a><a href="#replacing-autoloads">Replacing autoloads</a><a href="#what-the-compiler-checks">What the compiler checks</a></nav></details>
-<article class="reading-body "><p>Godot scripting assumes a class: you inherit a node, override its methods, and
-<code>self</code> is everything. Odin scripts have no classes. A script is three separate
-things instead, and this page maps each GDScript reflex to its Odin form.</p>
-<p>The script has three parts:</p>
-<blockquote>
-<p><strong>A script is a struct (your state) plus free procs (your behavior), riding
-on an engine node (<code>self.owner</code>).</strong></p>
-</blockquote>
-<p>GDScript fuses those three into one <code>self</code>. Keeping them apart means your state
-has a fixed layout that generated code can inspect. Kit, the multiplayer
-framework in posts 3–6, uses field descriptors to replicate and snapshot it.</p>
-<h2 id="the-reflex-map">The reflex map<a class="heading-anchor" href="#the-reflex-map" aria-label="Link to this section">#</a></h2>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>Thinking in structs</h1><p class="reader-dek">Keep script state, free procedures, and engine nodes separate.</p><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/02-thinking-in-structs.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#gdscript-to-odin-equivalents">GDScript-to-Odin equivalents</a><a href="#self-is-not-the-node">self is not the node</a><a href="#replacing-inheritance">Replacing inheritance</a><a href="#shared-state-and-autoloads">Shared state and autoloads</a><a href="#what-the-compiler-checks">What the compiler checks</a></nav></details>
+<article class="reading-body "><p>An Odin node script stores state in a struct and implements behavior in free
+procedures. Its <code>self.owner</code> field holds the Godot node. This page maps
+GDScript features to those three parts.</p>
+<p>The struct&#39;s fixed layout lets generated code locate its fields. Kit, the
+multiplayer framework in posts 3–6, uses field descriptors to replicate and
+snapshot selected state.</p>
+<p><span id="the-reflex-map"></span></p>
+<h2 id="gdscript-to-odin-equivalents">GDScript-to-Odin equivalents<a class="heading-anchor" href="#gdscript-to-odin-equivalents" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -80,7 +76,7 @@ framework in posts 3–6, uses field descriptors to replicate and snapshot it.</
 <td><code>gd.node2d_set_position(self.owner, ...)</code></td>
 </tr>
 </tbody></table>
-</div><p>Two naming rules carry the whole scheme: every proc is prefixed with its
+</div><p>Two naming rules distinguish scripts in a package: prefix each procedure with its
 struct&#39;s snake_case name (<code>enemy_ready</code>; all scripts share one package, so
 prefixes prevent collisions), and the prefix is <em>stripped</em> for the
 Godot-facing name (<code>enemy_take_damage</code> is <code>take_damage</code> to a signal, an
@@ -89,17 +85,18 @@ animation track, or GDScript).</p>
 <p>In GDScript, <code>self</code> <em>is</em> the node. In Odin, <code>self</code> is your struct, and the
 node is <code>self.owner</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">gd.add_child(self.owner, node)     <span class="hljs-comment">// ✓ the engine node</span>
-gd.add_child(self, node)           <span class="hljs-comment">// ✗ hands the engine your struct — segfault</span></code></pre></div><p>Both compile, because engine handles are raw pointers. The build refuses the
-second form outright:</p>
+gd.add_child(self, node)           <span class="hljs-comment">// ✗ rejected: this is script data, not a node handle</span></code></pre></div><p>Engine handles are distinct types, so the compiler rejects the second form.
+Scriptgen also reports the script/node mix-up at build time:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scriptgen: error: scripts/powerup.odin:31: gd.add_child: `self` is the
 ^Powerup script struct, not an engine object — pass self.owner</code></pre></div><p>When an engine API wants an object (<code>add_child</code>, <code>connect_to</code>, <code>queue_free</code>,
 a Callable target), pass <code>self.owner</code>. When your own code wants your state,
 pass <code>self</code>.</p>
 <h2 id="replacing-inheritance">Replacing inheritance<a class="heading-anchor" href="#replacing-inheritance" aria-label="Link to this section">#</a></h2>
-<p>You keep extending <em>engine</em> classes: <code>//gd:extends CharacterBody2D</code> gives you
-everything the node is. What Odin has no equivalent for is
-script-extends-script: there is no <code>class_name Enemy extends Actor</code> with
-overridden methods. The replacements, in the order you&#39;ll reach for them:</p>
+<p>The Godot base still determines the node&#39;s engine behavior:
+<code>//gd:extends CharacterBody2D</code> attaches the script to that engine class.
+Odin has no script-to-script inheritance such as
+<code>class_name Enemy extends Actor</code> with overridden methods. Share data and
+behavior through structs and procedures:</p>
 <p><strong>Shared data → a shared struct field.</strong> The GDScript base class holding
 <code>hp</code>, <code>speed</code>, <code>faction</code> becomes a plain struct embedded in each script:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Vitals :: <span class="hljs-keyword">struct</span> { hp, hp_max: <span class="hljs-type">f32</span>, faction: <span class="hljs-type">u8</span> }
@@ -107,7 +104,7 @@ overridden methods. The replacements, in the order you&#39;ll reach for them:</p
 Enemy  :: <span class="hljs-keyword">struct</span> { owner: gd.Node2d, vitals: Vitals, <span class="hljs-comment">/* ... */</span> }
 Player :: <span class="hljs-keyword">struct</span> { owner: gd.Node2d, vitals: Vitals, <span class="hljs-comment">/* ... */</span> }</code></pre></div><p><strong>Shared behavior → a proc taking the shared struct.</strong> <code>damage(v: ^Vitals, amount: f32)</code> works on anything with vitals. There is no virtual dispatch: you
 pass the piece it needs.</p>
-<p><strong>&quot;Is this thing an X?&quot; → <code>rt.script_of</code>.</strong> This is the typed cross-script lookup:</p>
+<p>Use <code>rt.script_of</code> to resolve a Godot object to a particular script type:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">player := rt.script_of(body, Player)   <span class="hljs-comment">// ^Player, or nil if body isn&#x27;t one</span>
 <span class="hljs-keyword">if</span> player != <span class="hljs-literal">nil</span> {
 	player_take_damage(player, CONTACT_DAMAGE)
@@ -116,18 +113,18 @@ same type in every file: cross-script calls are direct, typed calls, not
 <code>get(&quot;hp&quot;)</code> string lookups.</p>
 <p>This is composition: embed shared data and pass it to shared procedures.
 Changing that data does not require a script inheritance hierarchy.</p>
-<h2 id="replacing-autoloads">Replacing autoloads<a class="heading-anchor" href="#replacing-autoloads" aria-label="Link to this section">#</a></h2>
-<p>An autoload is two things in one: a <em>node</em> that&#39;s always in the tree, and a
-<em>global</em> everyone can reach. Odin splits them:</p>
+<p><span id="replacing-autoloads"></span></p>
+<h2 id="shared-state-and-autoloads">Shared state and autoloads<a class="heading-anchor" href="#shared-state-and-autoloads" aria-label="Link to this section">#</a></h2>
+<p>Use an autoload when shared state needs a persistent Godot node. Package-level
+state can serve scripts that need no engine node:</p>
 <ul>
-<li>Need the node (timers, <code>_process</code>, signals)? Make an autoload as usual:
-an Odin script on an autoloaded node works fine, and <code>rt.script_of</code> reaches
-its struct from anywhere.</li>
-<li>Need only the global? Package-level state in a plain <code>.odin</code> file is
-visible to every script in the package, and no node is required. For typed
-one-to-many &quot;somebody should react to this&quot; without engine signals, the
-extension ships a pure-Odin event system (<a href="../events.html">Events</a>) at
-direct-call cost.</li>
+<li>For timers, <code>_process</code>, or signals, attach an Odin script to an autoloaded
+node. Resolve its node through the scene tree and use <code>rt.script_of</code> to
+access the script data.</li>
+<li>For shared data alone, package-level state in a plain <code>.odin</code> file is
+visible to every script in the package. The pure-Odin event system supports
+typed one-to-many notifications through direct procedure calls;
+see <a href="../events.html">Events</a>.</li>
 </ul>
 <h2 id="what-the-compiler-checks">What the compiler checks<a class="heading-anchor" href="#what-the-compiler-checks" aria-label="Link to this section">#</a></h2>
 <p>The compiler and scriptgen check different parts of this arrangement:</p>
@@ -142,7 +139,7 @@ every use site.</li>
 </ul>
 <p>In the next post, a field tag makes state <em>network-synchronized</em>. The
 compiler-checked struct layout is what makes that possible.</p>
-<p><em>Next: <a href="03-state-not-messages.html">State, not messages →</a></em></p>
+<p><em>Next: <a href="03-state-not-messages.html">Field replication →</a></em></p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../events.html"><span>Pure-Odin events — events.Event(T)</span><span aria-hidden="true">→</span></a><a href="03-state-not-messages.html"><span>3 · State, not messages</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/02-thinking-in-structs.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-reflex-map" class="">The reflex map</a><a href="#self-is-not-the-node" class="">self is not the node</a><a href="#replacing-inheritance" class="">Replacing inheritance</a><a href="#replacing-autoloads" class="">Replacing autoloads</a><a href="#what-the-compiler-checks" class="">What the compiler checks</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/02-thinking-in-structs.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../events.html"><span>Pure-Odin events — events.Event(T)</span><span aria-hidden="true">→</span></a><a href="03-state-not-messages.html"><span>3 · Field replication</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/02-thinking-in-structs.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#gdscript-to-odin-equivalents" class="">GDScript-to-Odin equivalents</a><a href="#self-is-not-the-node" class="">self is not the node</a><a href="#replacing-inheritance" class="">Replacing inheritance</a><a href="#shared-state-and-autoloads" class="">Shared state and autoloads</a><a href="#what-the-compiler-checks" class="">What the compiler checks</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/02-thinking-in-structs.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

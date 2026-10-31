@@ -2,10 +2,10 @@
 
 Use owner streams when an authenticated participant produces observations, such
 as a Godot solver pose, that the authority accepts into replayable state.
-`State(Value)` stores entity ownership, current value, sample frontiers and
-pending handoff in ordinary replayable world state. `Sample(Value)` is an external observation;
-the library never invokes a physics solver during replay. `Rules(Value)` supplies
-immutable validation policy outside the saved state.
+`State(Value)` stores entity ownership, its current value, accepted-sample
+frontiers, and pending handoff in replayable world state. `Sample(Value)` carries
+an external observation; replay applies that value without invoking a physics
+solver. `Rules(Value)` supplies immutable validation policy outside saved state.
 
 ```odin
 owned.init(&body, object_key, epoch, tick, initial_owner, initial_pose, rules)
@@ -23,10 +23,11 @@ sequences or decreasing producer ticks are rejected.
 
 An offer reserves a new revision and a complete preparation baseline. The old owner
 remains accepted until the first valid sample for the proposed revision commits at
-an authority tick. Cancel/expiry burn the reserved revision. `cut` explicitly changes
-the complete value/owner and advances its discontinuity marker; `bind_epoch` preserves
-value and owner while invalidating prior scopes and pending offers. Overflow never
-wraps a revision. These primitives do not elect/fence a legitimate session authority.
+an authority tick. Cancellation or expiry permanently retires the reserved
+revision. `cut` changes the complete value/owner and advances its discontinuity
+marker. `bind_epoch` preserves value and owner while invalidating prior scopes
+and pending offers. Revision overflow is rejected without wrapping. The session
+must establish legitimate authority and fencing separately from these primitives.
 
 `valid` checks structural state and value constraints. `sample_valid` additionally
 accepts a canonical zero sample as an empty upstream control slot. Values containing
@@ -39,8 +40,9 @@ may impose additional game constraints; it cannot prove an untrusted solver was 
 authority-observed state, local identity, live epoch and connection eligibility.
 It reports reseeds separately from cuts. Preparing → Owner retains the same revision
 and local solver; a fresh producer rebases sequence/tick counters from accepted state.
-`capture` cannot publish from an observer. Producer ticks order that producer's
-lineage; `accepted_at` is the authority's history timestamp.
+`capture` cannot publish from an observer. Producer ticks order observations
+within that producer's stream; `accepted_at` records the authority tick at which
+an observation was accepted.
 
 The Godot [Body2](../godot/scene/body2.md) and [Body3](../godot/scene/body3.md) adapters supply
 actual rigid/character handling.

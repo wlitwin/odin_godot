@@ -1,8 +1,9 @@
 # P2P party setup
 
-`P2P_Party` composes durable `Party` enrollment with the fixed-roster P2P
-registration client. It supplies an authenticated match descriptor and WebRTC
-configuration without creating an authority `Room` or owning the gameplay runner.
+`P2P_Party` stores enrollment through `Party`, then registers the process for a
+P2P match whose player roster is fixed. It returns an authenticated match
+descriptor and WebRTC configuration. The game owns the runner that advances
+simulation; this helper neither creates an authority `Room` nor drives gameplay.
 
 1. Open `P2P_Party` with a `Party_Config` and the game's required player count.
    Use Player invites with `invite_uses = players - 1`. Checkpoint publication is
@@ -70,6 +71,6 @@ registration and pair provisioning on separate Router lanes of one socket;
 is registered from the current configuration, allowing a returning process to
 change ports without rewriting the durable enrollment request.
 
-Account/device transfer, public deployment and broader outage recovery remain
-work. ENet and browser WebRTC are separate gameplay backends; a native RTC
-extension must not be assumed available.
+Account/device transfer, public deployment, and broader outage recovery are
+outside the tested scope described here. ENet and browser WebRTC are separate
+gameplay backends; native RTC requires an appropriate extension.

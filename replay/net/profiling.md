@@ -1,10 +1,12 @@
 # Runner timing diagnostics
 
 Use runner timing diagnostics to measure simulation, snapshot and correction
-costs separately. Set a runner's `profile_clock` to a monotonic microsecond clock. `profile_metrics`
-records bounded histograms and optional `profile_sample(user, metric, elapsed_us)`
-receives raw durations. The sample callback should write to preallocated storage;
-it must not affect gameplay or block on I/O. Nothing is serialized or transmitted.
+costs separately. A runner advances simulation and manages its history policy.
+Set its `profile_clock` to a monotonic microsecond clock. `profile_metrics`
+records bounded histograms; an optional
+`profile_sample(user, metric, elapsed_us)` callback receives raw durations.
+The sample callback should write to preallocated storage; it must not affect
+gameplay or block on I/O. Nothing is serialized or transmitted.
 
 | Metric | Measured work |
 | --- | --- |
@@ -41,7 +43,9 @@ allocation sizes. Presentation measures command submission even in headless mode
 it is not GPU render time. Its final report computes exact nearest-rank percentiles
 from raw samples rather than calling histogram bounds exact percentiles.
 
-Large value copies should avoid unnecessary aggregate intermediates. In the
-Scrapyard specialization, independent assignments and pointer selection over local
-owned presentation copies preserve behavior while avoiding a pathological SLP
-compile. See the [recorded IR/build evidence](../../docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md).
+Avoid unnecessary intermediate copies of large values. Scrapyard splits
+independent assignments and selects pointers to local owned presentation values.
+This preserves the public value-ownership rules while avoiding the costly large
+aggregate stores observed in LLVM's SLP vectorizer. The
+[recorded IR/build evidence](../../docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md)
+documents that specific compile-time mitigation.

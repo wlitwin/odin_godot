@@ -47,11 +47,12 @@ not provide forward secrecy against later enrollment-key/service compromise.
 - Every encryption consumes a sequence, even if the base reports backpressure.
   A retry cannot encrypt different plaintext with a previously used key/nonce.
 
-The grant represents the provider's identity snapshot. It is not an offline
-revocation oracle. The embedding must refresh admission before binding a new
-connection and retire links on newer authenticated incarnation/revocation notices.
-Peers sharing a pair secret can authenticate that pair; this is not anti-cheat
-authority between participants who simulate the complete match.
+The grant records the identities approved by the provider when it was issued;
+it does not detect later revocation while offline. Before binding a new
+connection, the embedding must refresh admission. It must retire existing links
+when authenticated notices report a newer incarnation or revocation. A shared
+pair secret authenticates the connection between those participants, but does
+not let either participant judge the other's simulation as a trusted referee.
 
 `tests/replay_p2p_link/run.sh` currently passes seven native tests and WASM checking:
 scope/identity key separation, handshake faults, encrypted bidirectional traffic,

@@ -12,8 +12,8 @@ and Leave cleanup. The browser repeats that lifecycle with real Chrome/WebGL.
 
 Full host/client/observer campaigns use ordinary movement and actions, retaining
 the complete existing inventory/combat/revive/respawn/floor/victory assertions.
-Each also requires both player deaths, all 12 dweller deaths, 24 dweller hits, player hits and zero cue
-overflow; host/observer counts must be exact. The server-motion campaign also runs
+Each also requires both player deaths, all 12 dweller deaths, 24 dweller hits,
+player hits, and zero cue overflow; host/observer counts must be exact. The server-motion campaign also runs
 with 120 ms receive delay, 20 ms jitter, 10% loss and 10% duplication. The world
 hash comparison and actual injected-fault counts remain checked.
 

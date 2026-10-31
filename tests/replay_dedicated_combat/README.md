@@ -4,9 +4,9 @@
 REPLAY_DEDICATED_COMBAT_OUT=/absolute/fresh/output nix develop --command bash tests/replay_dedicated_combat/run.sh
 ```
 
-Two avatarless infrastructure identities and two real players run the actual
-Scrapyard model. A forty-enemy wave uses stock damage, health, movement, cooldowns
-and cover. The initial catalog uses the original stress harness's 255-magazine /
+Two processes with avatarless infrastructure identities and two player
+processes run the Scrapyard model with a forty-enemy wave. It uses stock damage, health, movement,
+cooldowns, and cover. The initial catalog uses the original stress harness's 255-magazine /
 no-jam overrides; barrels are disabled and one wave is selected. Clients choose
 riveters and slime/igniter abilities through ordinary Profile and Ready actions.
 They aim from their predicted body at the authority-observed enemy census, move
@@ -19,7 +19,7 @@ living enemies, a live projectile/lob/zone, at least eight shots, two casts and 
 active cooldown. Exact restored-frame equality remains required. After that
 baseline is established, the new authority must observe at least ten more shots,
 two more casts and another kill in the same run. Completion also requires the
-returned/demoted server to receive a new prepared backup and both real seats to
+returned/demoted server to receive a new prepared backup while both player seats
 remain intact. The test does not require the bots to win or survive indefinitely;
 normal injuries, deaths and eventual wipes remain game behavior.
 

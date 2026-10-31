@@ -38,7 +38,7 @@ private CA; plain WS requires the explicit loopback development setting.
 
 The service needs reachable gameplay endpoints for native ENet. Local tests do not
 prove Internet/NAT traversal. The shared helper also accepts ICE/relay configuration,
-and the browser gate now verifies local RTC gameplay. Public deployment and
+and the browser test verifies local RTC gameplay. Public deployment and
 TURN-only routing remain separate Speedball acceptance work.
 
 Create Party durably enrolls a creator and produces a repeatable invite. Join Party
@@ -91,7 +91,7 @@ Gameplay uses WebRTC while the configured service provides enrollment, control a
 signaling. The local gate exercises planned handoff, browser-host loss, true
 observers, rejoin, new actions/chat and matching worlds. See
 [browser evidence](../../docs/replay/results/speedball-browser-2026-09-08/README.md)
-for measured limits. Browser solo checkpoints now use the separate
+for measured limits. Browser solo checkpoints use the separate
 [save-slot flow](README.md#browser-solo-save-slots); public relay deployment remains open.
 
 ## Saved party recovery

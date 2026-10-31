@@ -20,7 +20,7 @@ Current content IDs are **C9 `0x4341564552504c39`** for server motion and
 admitted under the new content. Session/checkpoint schemas and gameplay world
 layout remain unchanged.
 
-The native save converters now accept C1–C8 and O1–O2, respectively. C8 and O2
+The native save converters accept C1–C8 and O1–O2, respectively. C8 and O2
 conversion preserves the exact frame, controls, membership, action frontiers and
 pending payloads, then selects current content for future execution. C8's existing
 authority observation is preserved rather than reseeded. O1 actions retain their
@@ -35,5 +35,5 @@ disabled. Use their old content ID and recorded build identity with
 verify natively and in WASM; substituting today's model produces an event mismatch.
 This is explicit historical execution, not conversion of a recording to new rules.
 
-[Projectile views](projectiles.md) now preview bounded motion between ticks. This
+[Projectile views](projectiles.md) preview bounded motion between ticks. This
 presentation path never generates these Hit occurrences or changes their timing.

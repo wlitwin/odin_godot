@@ -1,6 +1,6 @@
 # Stormcaller: a Replay-only feature exercise
 
-The Stormcaller is a new enemy archetype (kind 6). It closes on a living target,
+The Stormcaller is an enemy archetype (kind 6). It closes on a living target,
 plants its feet, shows its complete danger radius, charges an electrical core and
 pulses damage around itself. Step outside the ring or kill it during the wind-up.
 The ordinary no-living-target pause behavior remains shared with the other brains.
@@ -27,7 +27,8 @@ RSY_ROLE=solo RSY_RUN=0 RSY_ENCOUNTER=stormcaller \
 
 Choose Ready/Start in the lobby. This training setup fixes starting positions and
 holds enemy movement at zero; ordinary waves/workbench use its authored movement.
-All network participants need the matching content-50/J build.
+All network participants need matching builds. The recorded feature tests used
+content-50/J.
 
 ## Where the feature lives
 
@@ -54,32 +55,36 @@ change. No Kit or original-game implementation was changed.
 
 ## Compatibility
 
-This changes the catalog schema: each mob definition gains a bounded Pulse_Def.
-The semantic content ID advances from 49/I to **50/J** (`0x525343524150304a`);
-network protocol 7 is unchanged. Old peers cannot silently share the new contract.
+The Stormcaller addition changed the catalog schema by adding a bounded
+Pulse_Def to each mob definition. It advanced semantic content from 49/I to
+**50/J** (`0x525343524150304a`), with network protocol 7 unchanged. Old peers cannot silently share the new contract.
 
-The offline converter now accepts content 49 as well as older supported saves.
+The offline converter accepts content 49 as well as older supported saves.
 Historical Mob/Catalog shapes are frozen rather than aliasing today's live structs.
 Conversion fills the new component with zeros, preserving the prior catalog and
 behavior. It does not add enemies or retrofit new balance settings into an old run.
-The source-49 checkpoint fixture was captured with the old code before this edit.
+The source-49 checkpoint fixture was captured with the code from before the
+Stormcaller addition.
 See [save conversion](saves.md) for the existing offline command and identity
 requirements; write to a new destination. The recording verifier also exposes `--content49` for the retained historical model.
 
-## What this authoring exercise revealed
+<a id="what-this-authoring-exercise-revealed"></a>
+
+## Recorded implementation constraints
 
 The replay/network behavior required ordinary game code and data, with no custom
 correction or recovery hook. Scene composition worked: an authored child handles
 charge animation and the existing binding handles entity lifetime.
 
-The largest friction was compatibility: old archive types referenced the live
-catalog, and tests assumed that adding an epoch was the only schema change. Those
-were made explicit/frozen, keeping byte-preservation checks for every old field.
+The recorded compatibility problems came from old archive types referencing
+the live catalog and tests assuming that adding an epoch was the only schema
+change. Freezing the historical types and making those assumptions explicit
+retained byte-preservation checks for every old field.
 
 That exercise led to the [authoring tools workflow](authoring-tools.md). Visual
-registration now lives in a typed `ScrapEnemyArchetype` Resource, and the enemy view
+registration lives in a typed `ScrapEnemyArchetype` Resource, and the enemy view
 has one appearance input. Godot and headless code share a canonical bake instead
-of separate nested-Resource parsing. The actual historical catalog now has fully
+of separate nested-Resource parsing. The historical catalog has fully
 frozen type dependencies, and the feature tests use shared correction/takeover and
 native/WASM/peer helpers. The linked feature receipt below remains the historical
 record of the original feature implementation.

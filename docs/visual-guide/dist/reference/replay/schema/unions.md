@@ -18,8 +18,8 @@ apply :: proc(action: Action) {
 }
 ```
 
-There is no second handwritten enum or a set of unrelated argument fields to keep
-in sync. Reference-bearing variants, raw unions, shared-nil unions, unsupported
+The union type declares its alternatives and carries the active variant's
+value. Reference-bearing variants, raw unions, shared-nil unions, unsupported
 scalar types and platform-width wire integers remain rejected. Validation examines
 all possible variants, including hidden fields and zero-length arrays. Merely
 leaving a forbidden variant inactive does not make its type safe.
@@ -96,6 +96,6 @@ same final world. The in-memory network suite additionally covers checkpoint
 capture/decode/restore and local audit of that model.
 
 These tests establish the stated type/codec/runner behavior on the recorded targets.
-They do not establish every OS, every user union layout, an unbounded dynamic-state
-model or full roadmap completion. See the
+Their results do not extend to untested operating systems or user union
+layouts, an unbounded dynamic-state model, or the full roadmap. See the
 [recorded union evidence](../../docs/replay/results/tagged-unions-2026-09-07/README.md).

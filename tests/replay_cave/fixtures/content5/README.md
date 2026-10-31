@@ -2,7 +2,7 @@
 
 These three real authority checkpoints were produced before the C6 relic rule
 change using the sources in `source.tar.gz`. `producer.log` records tick 100 and
-the relic values. `SHA256.json` seals the original fixture artifacts. The producer
+the relic values. `SHA256.json` records hashes of the original fixture artifacts. The producer
 is `tests/replay_cave_relic/legacy_fixture/main.odin` and requires content C5.
 
 - `resting.replay`: unowned relic at `(200, 150)`, version 7; party at the stairs.

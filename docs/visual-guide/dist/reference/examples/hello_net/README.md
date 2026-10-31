@@ -1,8 +1,11 @@
-# hello_net — the co-op quickstart's living copy
+<a id="hello_net--the-co-op-quickstarts-living-copy"></a>
+
+# hello_net — session replication example
 
 This small Kit game opens two windows with one colored square per player; both
 screens display both players' movement. `scripts/hello.odin` handles the session
-and `scripts/player.odin` defines the moving player entity, with two 15-line scenes. The walkthrough is
+and `scripts/player.odin` defines the moving player entity. Two 15-line scenes
+provide their Godot nodes. The walkthrough is
 [docs/kit/quickstart.md](../../docs/kit/quickstart.md); the server-authority
 promotion of this exact game is `examples/hello_sim`.
 

@@ -2,7 +2,8 @@
 
 `REPLAY_WORKFLOW_OUT=/absolute/fresh/output nix develop --command bash tests/replay_editor_workflow/run.sh`
 
-Builds an isolated project; tests enemy/ability refresh and rejected edits, real
+The gate builds an isolated project and tests enemy/ability refresh and rejected
+edits, real
 ability admission/casting/recording, existing editor scenes, and the actual editor
 plugin's validate/clickable issue/fix/bake workflow. Commands then create/build/
 preview actor and ability drafts, refuse overwrite, run a draft correction and

@@ -1,21 +1,20 @@
 # 5 · The two timelines
 
-Picture a co-op game with a powerup gem on the course. When the host's ball
-rolls over it, the gem disappears too early for clients. When a client's ball
-rolls over it, the gem disappears too late.
+In a cooperative game, a gem can disappear before a remote ball visibly
+reaches it, or remain visible after the local player's ball has passed it.
 
 Replicated state can be correct while presentation looks wrong to observers: the gem vanishes
 while the rolling ball is still visibly half a meter away, or lingers after
 the ball has visibly rolled through it.
 
-**Local prediction and remote interpolation display different moments.**
-Schedule a spatial effect on the same timeline as its visible cause.
+Local prediction and remote interpolation display different moments. Schedule
+a spatial effect on the same timeline as its visible cause.
 
 ## Why remote motion renders behind
 
 Owner-streamed motion (post 3) is rendered by everyone else through a short
-interpolation buffer (a few ticks of samples), so jitter and dropped packets
-smooth out instead of stuttering. A remote ball you're watching is rendered
+interpolation buffer containing a few ticks of samples. This absorbs some
+jitter and packet loss. A remote ball you're watching is rendered
 ~100ms behind where its owner's machine says it is. Call these the two
 timelines:
 
@@ -29,40 +28,41 @@ the cause you can *see* (the ball rolling into it) plays out in render
 time. Reacting immediately to the state delta makes the effect precede its
 visible cause. Changing packet delivery alone does not align those clocks.
 
-The picker-upper's own screen is different again: their prediction ran the
-pickup *this frame*, in local time, and it stays that way. That instant
-local response is the point of prediction (post 4).
+The collecting player's screen uses local prediction. It can show the pickup
+in the frame when the command runs, before the authority result arrives,
+as described in post 4.
 
-## The rule
+<a id="the-rule"></a>
 
-One rule covers it: **present a consequence on the timeline of its visible
-cause.**
+## Scheduling spatial effects
 
-The toolkit gives this a primitive. Instead of showing an effect where you
-detect the state change, pass a callback to the session and indicate whether
-the cause came from the local simulation:
+When a state change has a moving visible cause, schedule its effect on that
+cause's presentation clock. Pass a callback to the session and indicate
+whether the cause came from local simulation:
 
 ```odin
-// The taken-edge, ONE place, identical on every peer:
+// Schedule from the taken-edge on each peer:
 ksess.session_present(&self.ses,
-	p.net_id == self.my_claim,   // mine? show it NOW (my sim touched it)
+	p.net_id == self.my_claim,   // local simulation caused the pickup
 	self, present_gem_gone, p.net_id, u64(p.kind))
 ```
 
-If it's mine, the callback runs this frame. If not, the session queues it for
-`interp_delay` from now, the moment *your screen's* rendition of the cause
-catches up. Transit time cancels out; the gem vanishes as the rolled ball
-touches it, on every screen, and `present_gem_gone` neither knows nor cares
-which timing path it took. The same presentation proc handles every peer and
-every case.
+For a local cause, the callback runs this frame. Otherwise, the session queues
+it for `interp_delay` from now to align with the delayed owner stream. Both
+paths call `present_gem_gone`, so the presentation procedure can show the same
+effect without choosing the clock itself. This helper assumes the remote
+cause is rendered through Kit's interpolated stream; a game-rendered cause
+must use its own clock, as explained in [kit/net](../kit/net.md).
 
 Hiding the gem in a field setter ties presentation to packet arrival. Keep
 the state update immediate and schedule the visible disappearance separately.
 
-## What delays and what doesn't
+<a id="what-delays-and-what-doesnt"></a>
 
-The rule is "timeline of the visible cause," not "delay everything." The full
-catalog lives in [kit/net](../kit/net.md):
+## Presentation timing by cause
+
+Use the cause to choose which effects need delayed presentation. The full
+reference is in [kit/net](../kit/net.md):
 
 | The consequence of… | …presents |
 | --- | --- |
@@ -76,7 +76,9 @@ A scoreboard has no spatial cause to align with a moving object, so update
 it when state arrives. Reserve the render delay for effects that need that
 spatial alignment.
 
-## Edges must outlive the slowest observer
+<a id="edges-must-outlive-the-slowest-observer"></a>
+
+## Holding state for delayed observers
 
 When the ball drops in the cup, puttputt holds the sunk ball there for a
 couple of seconds before building the next hole:
@@ -85,18 +87,20 @@ couple of seconds before building the next hole:
 SINK_DWELL :: 2.5
 ```
 
-This dwell is for the observers. Every remote screen is watching the roll up
-to interp-delay late; if the host advanced the hole the instant *its* copy
-sank, half the room would see the world change while their rendition of the
-ball was still rolling toward the cup. A shared moment must stay on screen
-long enough for the *slowest* view of it to arrive and be seen.
+Remote screens display the roll up to interp-delay late. If the host advanced
+the hole as soon as its ball sank, an observer could see the world change
+while the displayed ball was still approaching the cup. Hold the completed
+state long enough for the most delayed observer to display it before moving
+to the next hole.
 
-One corollary: **deltas carry state, not events.** A flag you flip on and off
-within one tick may never ship at all (the diff sees no change). If something
-is genuinely momentary, either let the edge live long enough to be seen, or
-send it as an explicit message: don't pulse a field.
+Deltas send the value present at a network tick. A flag turned on and off
+within that tick may equal its shadow when compared, so no change is sent.
+Retain the changed value long enough for replication and presentation, or
+send a momentary occurrence as an explicit message.
 
-## Put effects in the presentation proc, not the command
+<a id="put-effects-in-the-presentation-proc-not-the-command"></a>
+
+## Presentation callbacks
 
 Presentation code belongs in the presentation proc, never in a command proc.
 Commands run on the claimer and the host (post 4), so an effect spawned inside
@@ -104,13 +108,14 @@ a command proc (say, a pickup particle burst inside the `powerup_claim`
 command proc) never reaches observers at all, and reconciliation re-runs can
 spawn it twice.
 
-Spawn the burst inside `present_gem_gone` instead: post 4's hook and this
-post's scheduling deliver it to every peer, exactly once, at each screen's
-correct moment. Keep particles, sounds, and other visible consequences beside
-the presentation callback for the state change.
+Spawn the burst inside `present_gem_gone`. React to the replicated pickup
+state and schedule that callback for the appropriate display time. Field
+edges report the net change per frame; if individual occurrences or their
+counts matter, use a declared presentation event. Keep particles, sounds, and
+other visible consequences in the presentation callback.
 
 The first three pieces now fit together: replicated state (post 3), predicted
 commands (post 4), and effects scheduled for each screen's presentation clock.
 The next post adds persistent identity, recovery, and deployment checks.
 
-*Next: [The shape of a shippable game →](06-the-shape-of-a-shippable-game.md)*
+*Next: [Identity, recovery, and transport testing →](06-the-shape-of-a-shippable-game.md)*

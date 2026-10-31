@@ -18,9 +18,8 @@ a common authoritative world after those commands must agree. The lobby cannot
 cover the game during the recovery interval. The rendered case additionally checks
 that coordinated play rejects direct file saving without creating an output file.
 
-The shared migration coordinator gained an isolated Claimball room/content selector.
-Claimball's shared package was renamed to `claimball_pitch` because Odin rejects two
-imported packages named `pitch`. `contract/` records state/control/action/event and
+The migration coordinator selects an isolated Claimball room/content for this
+fixture. The compatibility record covers a shared-package rename to `claimball_pitch`: Odin rejects two imported packages named `pitch`. `contract/` records state/control/action/event and
 packet fingerprints plus the network contract; the before/after records are equal.
 It can also decode an existing C3 checkpoint supplied as its argument. No C3 schema
 or content change accompanies the package rename.

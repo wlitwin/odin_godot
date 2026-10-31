@@ -4,11 +4,11 @@
 REPLAY_DEDICATED_BROWSER_OUT=/absolute/fresh/output nix develop --command bash tests/replay_dedicated_browser/run.sh
 ```
 
-A native coordinator with authenticated WebSocket signaling serves four separate
-Chrome processes: two infrastructure identities and two real players. The game
-is the actual Scrapyard model in a quiet arena. Infrastructure requests Server,
-follows as Observer, opts into complete checkpoints, and must always have seat
-zero. The players must retain seats 1/2.
+A native coordinator with authenticated WebSocket signaling serves four
+separate Chrome processes running the Scrapyard model in a quiet arena. Two
+processes use infrastructure identities: they request Server, follow as
+Observer, opt into complete checkpoints, and must always have seat zero. The
+two player processes must retain seats 1/2.
 
 The isolated fixture derives from `tests/replay_dedicated_room`. It replaces native
 file barriers with browser-controller barriers and ENet with authenticated RTC.

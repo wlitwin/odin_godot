@@ -37,11 +37,11 @@ measured RTT. No token, bearer credential or hidden peer-state exchange is invol
 `audit_window` locates the latest bounded replayable suffix and stops at an initial
 or authority-corrected checkpoint. The checkpoint's generating input is unknown
 locally, so auditing across it would be a false reproducibility test. `audit_recent`
-uses that window with the owned capture API. A checkpoint without a replayed suffix
+uses that window to capture independent state/event copies. A checkpoint without a replayed suffix
 reports `Initial_Frame`; missing input/history is not approximated.
 
-The overlay formats the first captured state/event failure through the canonical
-field schema. It reports the failing tick, preceding frame tick, expected/replayed
+The overlay uses the canonical field schema to format the first captured
+state/event mismatch. It reports the failing tick, preceding frame tick, expected/replayed
 values and event counts. Display limits are explicit. Unsupported schema types
 remain a diagnostic message rather than being coerced into an approximate format.
 The captured values are independent copies and are released after formatting; the
@@ -57,8 +57,9 @@ permission system.
 
 Replay Hello's local scene and Replay Cavecrawl expose `debug_enabled` in the
 inspector. They also accept `REPLAY_DEBUG=1` (or `?debug=1` in a browser launch).
-The regular scene defaults leave the overlay unallocated. Original examples and
-Kit remain separately available.
+The regular scene defaults leave the overlay unallocated. These opt-in tools
+apply to the Replay versions of the examples; the original examples and Kit
+remain separately available.
 
 ```sh
 nix develop --command bash tests/replay_debug/run.sh

@@ -26,7 +26,7 @@ for {
 for {
     receipt, found := co.poll_result(&chat)
     if !found {break}
-    // receipt.submission identifies the local submission; value is owned by value.
+    // receipt.submission identifies the local submission; the payload is copied.
     // Present failures, and retain/repopulate the original text if desired.
 }
 // Render chat.lines[:chat.line_count] when chat.history_serial changes.
@@ -36,8 +36,11 @@ for {
 The caller's text and marker positions are copied into value payloads. Text is
 clipped at a UTF-8 rune boundary to 240 bytes. Empty/malformed text and control or
 line-separator characters fail validation. The UI should render plain text; the
-Cavecrawl view explicitly disables BBCode. Each line stores the admitted seat, token hash and optional approved display name
-separately from text. There is no client-supplied speaker field. Display names, permissions and game-specific position checks remain application policy.
+Cavecrawl view explicitly disables BBCode.
+
+Each line stores the admitted seat, token hash, and optional approved display
+name separately from text. The client cannot supply a speaker identity.
+The application defines display-name, permission, and position-validation rules.
 Pass authority-observed `[]lobby.Name` values to `session_comms_frame` to stamp
 names at delivery creation. Existing lines keep their original name after a rename;
 changing display metadata does not reset connection retry/acknowledgement state.
@@ -75,8 +78,9 @@ cryptographic authentication. The authority is trusted to order and stamp messag
 
 Comms gets an independent application lane through `recovery.link_add_application`.
 It can coexist with the original application lane used by Session assets. The
-router's total budget and gameplay reserve still apply. Version 2 adds stamped names and does not accept version-1 communications packets.
-Enable the same service on participating builds; optional service protocols are not negotiated with older
+router's total budget and gameplay reserve still apply. Version 2 adds stamped
+names and rejects version-1 communications packets. Enable the same service on
+participating builds; optional service protocols are not negotiated with older
 builds. Do not attach two consumers to the same route.
 
 The pure `configure`/`frame` API accepts an explicitly authenticated roster. The

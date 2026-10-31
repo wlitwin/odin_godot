@@ -33,15 +33,15 @@ at `examples/cavecrawl`; this project is `examples/replay_cavecrawl`.
 | Steam/web | Browser Room path implemented | Real browser migration matrix; Steam and public deployment still pending |
 | Old/new comparison report | Matched quiet Kit/server-motion/owner-motion cohort and encoding follow-ups | Recorded response, traffic and callback costs; full combat/stress, human authoring and play-feel comparison remain open |
 
-The [owner-motion companion](../replay_cavecrawl_owned/README.md) now supplies a
-separate latest-observation profile using the same gameplay reducer. Native
+The [owner-motion companion](../replay_cavecrawl_owned/README.md) supplies a
+separate latest-observation profile using the same simulation rules. Native
 movement, relic handoff, carrier recovery and service checkpoints have acceptance
 cases. O2 adds scoped command origins, Chrome migration/saves, and a matched quiet
 comparison. C8 introduced authority adoption to the server-simulated profile
 above; [the impact contract](impacts.md) records its current content identity. Broader original rules,
 remote presentation, combat/stress and human ergonomic comparison remain open.
 
-The original Act 3 removal/ban path now has a [host moderation control](moderation.md).
+The original Act 3 removal/ban path has a [host moderation control](moderation.md).
 Direct sessions retain checkpointed token bans; Room disables the enrolled member
 and successor rights durably. Native/Chrome prepared-successor removal and
 planned/crash continuation pass. Wider moderation UX and deployment remain open.

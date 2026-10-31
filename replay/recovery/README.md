@@ -3,11 +3,12 @@
 `replay/recovery` transfers complete authority checkpoints to an explicitly trusted
 successor. It builds on `replay/net` archives and the borrowed transport interface.
 Use it to keep an eligible backup ready before a host stops. It provides
-transfer, validation and retention; it does not select a legitimate leader,
-fence a partitioned authority, discover a new host, or reconnect game clients.
+transfer, validation and retention. It does not select a legitimate leader,
+prevent an isolated old authority from committing, discover a new host, or
+reconnect game clients.
 
 The reusable [transfer package](../transfer/README.md) also supports bounded canonical
-records. Recovery retains compatible `Sender` / `Blob_Receiver` facade names.
+records, exposed through recovery's `Sender` / `Blob_Receiver` facade types.
 Supply the expected envelope kind and an `accept(user, archive, bytes) -> bool`
 callback to `blob_init`; opt the Sender into the same kind with `archive_kind`.
 The core verifies source/scope, chunks, SHA-256 and envelope integrity before the
@@ -16,8 +17,8 @@ its duration, and return false on failure. Receipts are retained for retry handl
 the generic core does not retain decoded application values. The typed checkpoint
 Receiver wraps this core and still retains the two validated authority checkpoints
 required by the sender/coordinator contract. Both receiver owners must stay at
-stable addresses. Existing checkpoint callers keep their APIs and canonical archive
-format. Optional transfer representations require negotiated peer support.
+stable addresses. These types use the existing checkpoint APIs and canonical
+archive format. Optional transfer representations require negotiated peer support.
 
 The [P2P spectator](../p2p/spectators.md) uses the generic core for confirmed history;
 its separate envelope kind cannot be installed as an authority checkpoint.
@@ -56,7 +57,8 @@ validated receipt; sequences continue increasing within the binding.
 
 The low-level protocol does not independently drain the wire. `Link` integrates
 it with the gameplay runner using `transport.Router`, separate queues, and a combined
-output budget. `handles` is only untrusted routing inspection. The standalone ENet
+output budget. `handles` inspects packet framing for routing without validating
+or trusting the payload. The standalone ENet
 acceptance fixture uses a dedicated wire; the cave replication gate uses the same
 connection for actual gameplay and checkpoints.
 
@@ -119,8 +121,8 @@ Protocol v1 uses canonical `RPLY` envelopes with kinds `0x5101`–`0x5105`:
 | Failed | Explicit integrity/archive/policy/retention/timeout failure |
 
 Transfers use 1,024-byte chunks. The largest packet is 1,102 bytes, within the
-configured test datagram envelope. A bounded selective-repeat window repairs lost
-chunks and progress messages over the unreliable transport channel. Repeated
+configured test datagram limit. On the unreliable transport channel, a bounded
+selective-repeat window repairs lost chunks and progress messages. Repeated
 offers repair lost Ready packets. ACKs cannot claim chunks that were never sent.
 Packet checksums protect framing; the final SHA-256 identifies the complete
 archive. Neither provides peer authentication.
@@ -180,8 +182,9 @@ private data and conserved loot, and continues simulation. These are single-run
 instrumentation receipts, not percentile benchmarks or old/new game comparisons.
 The fixture adds private data specifically to exceed the 64 KiB packet limit;
 ordinary Cavecrawl archives are smaller. Those measurements motivated reusable
-`net.Checkpoint_Codec` metadata. Receivers warm it at initialization; `Link` warms
-its publishing codec when a target is selected. The same fixture with warm metadata
+`net.Checkpoint_Codec` metadata. Receivers initialize and cache it at startup;
+`Link` prepares its publishing codec when a target is selected. The same fixture
+with cached metadata
 recorded 1,574 us capture/encode and 7,304 us accumulated receiver processing, with
 identical archive bytes. One-time fresh server restore still builds its runtime
 schemas (139,521 us in that run). These remain individual debug measurements.

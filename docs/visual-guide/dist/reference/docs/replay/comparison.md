@@ -13,23 +13,25 @@ retaining substantially higher application traffic and callback cost. The measur
 scope, isolated Kit reference-release overlay and superseded first contract are
 explicit; source counts are not a human usability score.
 
-The [current public-history cohort](results/public-history-comparison-2026-09-14/README.md)
+The [public-history cohort](results/public-history-comparison-2026-09-14/README.md)
 passes the full 24-window native comparison and 64 report checks. It records lower
-Replay host traffic with continued client CPU cost, and distinguishes the isolated
-Kit control, content/prediction differences and separate browser TURN conditions.
-It is the latest loaded Scrapyard native cost baseline, not a declaration of full library readiness.
+Replay host traffic with continued client callback cost. Its report separates the
+isolated Kit control, content/prediction differences, and browser TURN conditions.
+This record uses it as the loaded Scrapyard native cost baseline; it does not
+establish full library readiness.
 
 The [observation encoding A/B](results/compact-observations-2026-09-20/README.md)
-then measures a targeted optimization on one owner-profile binary: raw and compact
-modes keep the same accepted workload, cadence and recovery settings. Median client
-application traffic drops 41.7%; no downstream or total-CPU improvement is claimed.
+compares raw and compact encoding on one owner-profile binary, keeping the accepted
+workload, cadence, and recovery settings fixed. Median client application traffic
+drops 41.7%. The result does not establish downstream or total-CPU improvement.
 
 The [recent-fact encoding A/B](results/compact-recent-facts-2026-09-20/README.md)
-then shares repeated bundle headers on the downstream path. Six same-binary cases
-retain the workload, cadence, full occurrences and backups; median host application
-traffic drops 30.6%, from 9.869 to 6.849 KiB/s. Client traffic is essentially unchanged,
-and callback measurements do not establish a CPU improvement. The quiet-world
-cost gap, broader comparisons and adoption decision remain open.
+measures shared bundle headers on the downstream path. Six same-binary cases keep
+the workload, cadence, complete occurrences, and backups unchanged. Median host
+application traffic drops 30.6%, from 9.869 to 6.849 KiB/s, while client traffic
+is essentially unchanged. Callback measurements do not establish a CPU
+improvement. The quiet-world cost gap, broader comparisons, and adoption decision
+remain open.
 
 See [roadmap](roadmap.md) for dependencies and [architecture](architecture.md)
 for the frame contract.
@@ -272,7 +274,9 @@ and whether the next port is justified. Keep the raw scenarios usable even if
 the experiment's final outcome is to retain both frameworks for different games.
 
 
-## Active range comparison
+<a id="active-range-comparison"></a>
+
+## Stationary firing and reload comparison
 
 The [paired harness](../../tests/replay_comparison/README.md) now includes a
 stationary firing/reload scenario alongside the idle arena. Each game uses the
@@ -307,7 +311,9 @@ retained fragmented-input regression. Host callback cost falls in the new cohort
 client median changes little and the overall Kit/Replay cost gap remains. Wider
 stress/latency and authoring comparisons remain required for an adoption decision.
 
-## Compatibility authoring example
+<a id="compatibility-authoring-example"></a>
+
+## Adding a field while preserving saves
 
 The [recorded spread-hop change](results/scrapyard-cast-paths-2026-09-08/README.md)
 adds one explicit Flash discriminator without widening world bytes. Preserving

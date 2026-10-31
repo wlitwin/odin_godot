@@ -40,8 +40,7 @@ baseline evidence too. Combat, movement, director rules and harness gameplay
 assertions are unchanged. The overlay does not claim to repair every original
 application path, such as repeated user-spray replacement.
 
-`baseline_stress.sh` runs the original two-peer stress act against an isolated
+`baseline_stress.sh` runs the original two-peer stress workload against an isolated
 project. It rejects runtime and cleanup errors as well as failed gameplay checks.
-Neither baseline runner makes
-the old and new workloads equivalent: player count, gun overrides, input traces,
+Neither baseline runner makes the old and new workloads equivalent: player count, gun overrides, input traces,
 optimization flags and authority models must still be matched or disclosed.

@@ -15,7 +15,8 @@ through `pose_blend`; a teleport explicitly selects the destination pose.
 `Smoother2` and `Smoother3` carry position and angular correction error. Use
 `smooth_correct_pose` / `smooth3_correct_pose` for same-tick corrections, then
 present each render frame; ordinary motion continues while the error decays.
-Large discontinuities cut. [Angular smoothing](rotation.md) documents shortest
+Large discontinuities clear the smoothing error, snapping the displayed pose to
+the corrected state. [Angular smoothing](rotation.md) documents shortest
 arcs, quaternion composition, finite-input handling and Godot integration.
 
 ## Event journal
@@ -38,7 +39,7 @@ Existing IDs keep their policy:
 | Policy | When it begins |
 | --- | --- |
 | `Speculative` (default) | On first observation; later changes may update/cancel it |
-| `Confirmed` | When authority confirms its tick |
+| `Confirmed` | When the authority or peer-commit protocol settles its tick |
 | `Watched` | When confirmed and the visible cause's watch clock reaches its tick |
 
 Drain notifications outside simulation:

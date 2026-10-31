@@ -1,27 +1,28 @@
 # kit/steamgd — Steam transport and invite flow
 
-This module provides Steam lobbies, overlay invites, and a Steam `MultiplayerPeer`. Reach for this when you
-want players to host and join over Steam (friends clicking "Join Game" in the Steam
-overlay) instead of typing IP addresses. It runs on the **GodotSteam** GDExtension (the
-"MultiplayerPeer" build, which registers both the `Steam` singleton and the
-`SteamMultiplayerPeer` class) and plugs in under [kit/netgd](netgd.md)'s `Session_Wire`. The
-wire is the same wire ENet uses; only the transport underneath changes.
+Use `kit/steamgd` to host and join through Steam lobbies and overlay invites.
+Friends can select "Join Game" in the overlay without entering an IP address.
+The package requires the GodotSteam GDExtension's MultiplayerPeer build,
+which registers both the `Steam` singleton and `SteamMultiplayerPeer` class.
+It supplies a transport beneath [kit/netgd](netgd.md)'s `Session_Wire`, sharing
+the session integration used by ENet.
 
 ## Talking to GodotSteam by name
 
-Everything here reaches GodotSteam **by name** (engine singleton lookup, dynamic
-`object_call`s, ClassDB instantiation), never a compile-time link, since the toolkit cannot
-link against classes another extension may or may not register. The results:
+The package looks up GodotSteam at runtime through the engine singleton,
+dynamic `object_call`s, and ClassDB instantiation. It cannot link at compile
+time to classes that another extension may not register. This lets the game
+compile and ship without GodotSteam installed. `available()` checks for it at
+runtime, and package procedures safely skip unavailable operations. The same
+`Session_Wire` handles either transport.
 
-- this package compiles and ships with **no GodotSteam installed**;
-- `available()` answers at runtime, and every proc no-ops safely without it;
-- your game keeps **one** code path: its `Session_Wire` never changes.
+GodotSteam names are centralized in this module: `SINGLETON`, `PEER_CLASS`,
+and the `gd.sname(...)` method names. Update those lookups if a supported
+GodotSteam build changes its API names.
 
-The GodotSteam name surface lives in this one file (the `SINGLETON` / `PEER_CLASS`
-constants and the `gd.sname(...)` method names), so version drift across GodotSteam builds
-lands in a single place.
+<a id="the-flow"></a>
 
-## The flow
+## Overlay invite sequence
 
 The invite-via-overlay flow is:
 
@@ -38,15 +39,16 @@ guest:  friend hits "Join Game" in the Steam overlay ->
 
 ## The wire is transport-agnostic
 
-SceneMultiplayer's signals (`peer_packet`, `peer_disconnected`, `connected_to_server`,
-`connection_failed`, `server_disconnected`) fire identically over **any** `MultiplayerPeer`.
-The wire binds to SceneMultiplayer, not to a transport, so swapping ENet for Steam is
-swapping `gd.host` / `gd.join` for `host_peer` / `client_peer`. Nothing else moves: not the
-four forwards, not the channel plan, not the session.
+`Session_Wire` listens to SceneMultiplayer's `peer_packet`, `peer_disconnected`,
+`connected_to_server`, `connection_failed`, and `server_disconnected` signals.
+Replacing ENet's `gd.host` / `gd.join` calls with `host_peer` / `client_peer`
+changes the installed `MultiplayerPeer` while retaining those signals, the
+four forwarders, the channel plan, and the session.
 
 ## API
 
-- `available() -> bool`: is GodotSteam in this process at all? (Never changes mid-run.)
+- `available() -> bool`: reports whether GodotSteam is registered in this
+  process. The result does not change during the run.
 - `init(app_id := TEST_APP_ID) -> bool`: brings Steamworks up (`steamInitEx`, callbacks
   embedded in the engine loop). False means Steam is not running, there is no appid, or there is no
   extension, so show your non-Steam lobby instead. Call once, before any lobby work. `TEST_APP_ID` is 480
@@ -63,9 +65,9 @@ four forwards, not the channel plan, not the session.
   `Friends_Only` (the default), `Public`, or `Invisible`.
 - `join_lobby(lobby_id: u64)`: the answer arrives on `lobby_joined`.
 - `leave_lobby(lobby_id: u64)`: releases the one piece of Steam state that outlives the multiplayer
-  peer. A replaced peer drops the connection; Steam keeps you *seated* in the lobby, still
-  listed to your friends, until you say this. Say it on the way back to the menu and before
-  joining a different lobby; harmless if you are not in it.
+  peer. Replacing the peer drops its connection but leaves Steam lobby
+  membership active and visible to friends. Call this when returning to the
+  menu or before joining another lobby; it is harmless when not a member.
 - `lobby_owner(lobby_id: u64) -> u64`: identifies the host of the lobby, the steam id the client peer
   connects to.
 - `my_steam_id() -> u64`, `persona_name(allocator := context.temp_allocator) -> string`:
@@ -84,8 +86,9 @@ registered (i.e. you installed a non-MultiplayerPeer build of GodotSteam).
 
 ## The Transport record
 
-`ksteam.TRANSPORT` is a [`netgd.Transport`](netgd.md#swapping-transports) record, so the
-generic kit/boot doors work with Steam:
+`ksteam.TRANSPORT` implements the
+[`netgd.Transport`](netgd.md#swapping-transports) record used by Kit's generic
+connection helpers:
 
 ```odin
 // on_lobby_created(result, lobby_id):   host
@@ -96,25 +99,24 @@ ksteam.invite_overlay(u64(lobby_id))
 kboot.boot_open_join(&self.boot, &ksteam.TRANSPORT, ksteam.endpoint_of(u64(lobby_id)), name, token)
 ```
 
-The lobby half stays in your signal handlers: asking for a lobby and getting the answer
-back on a signal is a Steam conversation, not a transport verb. What the doors take is the
-`Endpoint` that conversation produces: `endpoint_of(lobby_id)` is
-`{peer_id = lobby_owner(lobby_id)}`, because Steam addresses peers by steam id and the
-lobby is only the phonebook.
+The game still creates and joins lobbies in its Steam signal handlers. Once
+that lookup completes, pass the resulting `Endpoint` to the connection helper.
+`endpoint_of(lobby_id)` returns `{peer_id = lobby_owner(lobby_id)}`: Steam
+connects to the host's Steam id, using the lobby to find it.
 
-**Three slots are nil.** Each names a capability Steam does not offer through the generic
-door:
+Three `Transport` callbacks are nil in the current Steam integration:
 
 - `pump`: the engine polls the peer, like ENet, so there is nothing to pump.
 - `close`: the peer is replaced by the next install; lobby membership is the part that
   outlives it, and the lobby id is yours (call `leave_lobby`).
 - `address`: there is no verified way to ask which steam id is behind a multiplayer peer.
-  Without it the host-migration handoff cannot name an heir, so `rendezvous` is `.None` and
-  **host migration is off on Steam**; `succession_torch` reports this once, naming the
-  transport. GodotSteam exposes the peer-to-steam-id mapping on builds that have it, but it
-  cannot be verified from this repo (there is no Steam client, no linked extension, and
-  every call is by name). To turn migration on, fill the `address` slot against a real build,
-  add the `Rendezvous_Kind` arm, and Steam migrates.
+  Without a verified mapping, host migration cannot identify a successor.
+  `rendezvous` is therefore `.None`, and host migration is disabled on Steam;
+  `succession_torch` reports this once with the transport name. Some GodotSteam
+  builds expose peer-to-Steam-id mapping, but this repository has not verified
+  it against a running Steam client and extension. Enabling migration requires
+  implementing `address` against a real build, adding the `Rendezvous_Kind`
+  branch, and verifying the handoff.
 
 ## Worked example: cavecrawl
 
@@ -130,9 +132,9 @@ if steamgd.available() && env_int("CAVE_STEAM", 1) != 0 {
 }
 ```
 
-The Host button branches on the transport, then both paths converge on `begin_hosting`,
-shared **verbatim** by ENet (`gd.host`) and Steam (`lobby_created`): the session cannot tell
-the transports apart. The shape is the same for `begin_joining`.
+The Host handler selects the transport. ENet calls `gd.host`; Steam waits for
+`lobby_created`. Both then call the shared `begin_hosting` session setup.
+Joining uses the corresponding shared `begin_joining` procedure.
 
 ```odin
 @(gd_method)
@@ -145,8 +147,8 @@ cave_lobby_on_lobby_created :: proc(self: ^CaveLobby, result: gd.Int, lobby_id: 
 }
 ```
 
-The guest side has one guard to remember: **`lobby_joined` fires for the host's own lobby
-too** (hosts join what they create), so check the owner before making a client peer:
+`lobby_joined` also fires when the host joins the lobby it created. Check the
+lobby owner before creating a client peer so the host does not connect to itself:
 
 ```odin
 @(gd_method)
@@ -157,13 +159,13 @@ cave_lobby_on_lobby_joined :: proc(self: ^CaveLobby, lobby_id: gd.Int, _perms: g
 	}
 	self.steam_lobby = u64(lobby_id)
 	if !steamgd.client_peer(self.owner, owner) { ... return }
-	// connected_to_server will fire -> the wire's on_net_up seats us.
+	// connected_to_server triggers the wire's on_net_up session join.
 	begin_joining(self)
 }
 
 @(gd_method)
 cave_lobby_on_join_requested :: proc(self: ^CaveLobby, lobby_id: gd.Int, _friend: gd.Int) {
-	steamgd.join_lobby(u64(lobby_id)) // the overlay's "Join Game" lands here
+	steamgd.join_lobby(u64(lobby_id)) // handles the overlay's "Join Game" request
 }
 ```
 
@@ -172,7 +174,8 @@ to the ENet path; see [netgd.md](netgd.md).
 
 ## Live verification
 
-This cannot run headless; it needs the Steam client. The checklist:
+The Steam connection path requires a running Steam client and cannot be
+verified by the headless test. To check it live:
 
 1. Drop the **GodotSteam MultiplayerPeer** GDExtension into the project (the build that
    registers `SteamMultiplayerPeer`, not just the `Steam` singleton).
@@ -180,7 +183,7 @@ This cannot run headless; it needs the Steam client. The checklist:
 3. Use two logged-in Steam accounts that are friends; run host on one, and accept the overlay
    invite on the other.
 
-Until you've done that, `available()` false-ing into your non-Steam lobby is the correct,
-tested behavior: cavecrawl's `run.sh` asserts the headless runs log `CAVE_STEAM off`
-(graceful absence), and the `CAVE_STEAM=0` env knob switches the paths off even with
-GodotSteam installed.
+Cavecrawl's headless `run.sh` checks the fallback path: when `available()` is
+false, the game uses its non-Steam lobby and logs `CAVE_STEAM off`. That test
+does not verify a live Steam connection. Set `CAVE_STEAM=0` to disable the Steam
+path even when GodotSteam is installed.

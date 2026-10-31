@@ -5,11 +5,12 @@ diagnostics. It builds a bounded scalar-field program from Odin compiler type
 information and encodes logical values independently of struct padding, native
 offsets and endian-qualified scalar storage. No scriptgen attributes are required.
 
-Initialization also compiles validation indices and contiguous copy spans. The
-codec still validates constrained values before writing; adjacent canonical bytes
-then copy in bulk. Padding, excluded fields and endian-qualified values split spans
-as needed. This local program does not change fingerprints or wire bytes. Schema
-options are fixed at initialization; rebuild a schema to change them.
+Initialization prepares validation indices and contiguous copy spans. The
+codec validates constrained values before writing, then copies adjacent
+canonical bytes in bulk. Padding, excluded fields, and endian-qualified
+values split spans where separate handling is needed. These local indices
+preserve the canonical fingerprints and wire bytes. Schema options remain
+fixed until the schema is rebuilt.
 
 ```odin
 State :: struct {
@@ -100,8 +101,8 @@ nix develop --command bash tests/replay_schema/run.sh
 
 Native tests pin bytes, padding/endian equivalence, projections, enum/bit-set
 validation, field diagnostics, transactional failure, allocation ownership, and
-envelope mutation/truncation rejection. The gate also type-checks the instantiated
-schema/correction/transport/adapter surface for WASM. That type-check alone does
+envelope mutation/truncation rejection. The test also type-checks instantiated
+schema, correction, transport, and adapter code for WASM. That type-check alone does
 not establish cross-platform replay or execution parity; see the separate
 [tagged-union execution evidence](unions.md#acceptance) for its tested corpus.
 
@@ -127,10 +128,10 @@ Native qualified-endian and packed/unaligned fields still use byte-safe reads.
 
 The program preserves field order and returns the same first invalid field path.
 Validation completes before encoding writes output or decoding commits a candidate.
-Tagged unions retain the general guard-aware validator. Only local compiled metadata
-changes: canonical fields, fingerprints, envelope checksums and bytes do not.
-No runtime code generation, platform-specific vector instruction or relaxed float
-validation is introduced. `Schema` owns and releases the program with its other
+Tagged unions retain the general guard-aware validator. The validation program is local metadata; canonical fields, fingerprints,
+envelope checksums, and bytes stay unchanged. It uses no runtime code
+generation or platform-specific vector instructions, and preserves float
+validation rules. `Schema` owns and releases the program with its other
 metadata; do not mutate compiled schema metadata after initialization.
 
 [The codec benchmark](../../tests/replay_schema_bench/README.md) compares exact bytes
@@ -158,9 +159,9 @@ The decision is not cached and changes no schema state, so dense and sparse valu
 can alternate safely. Nonzero blocks fall back in original field order, preserving
 first-error paths. Encode/decode still validate fully before writing output.
 
-This adds local metadata and retains a small dense-input overhead in the measured
-microbenchmark. It changes no canonical bytes, fingerprints, public projection or
-wire/save version. [Oracle checks](../../tests/replay_schema_blocks/README.md) and
+The measured microbenchmark records a small dense-input overhead for this
+local metadata and probe. Canonical bytes, fingerprints, public projection,
+and wire/save versions are unchanged. [Oracle checks](../../tests/replay_schema_blocks/README.md) and
 [measurement evidence](../../docs/replay/results/codec-blocks-2026-09-08/README.md)
 record the supported cases and tradeoffs.
 

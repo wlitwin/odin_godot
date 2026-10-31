@@ -2,26 +2,31 @@
 
 Use `replay/net` to run a game with an authority that accepts shared gameplay
 results and clients that predict local state. The runner schedules simulation
-steps and manages input, history, network delivery and correction. It connects a
-complete-world simulation to canonical codecs, transport-owned peer identities
-and an identity-aware presentation journal.
+steps and manages input, history, network delivery and correction. The game
+supplies its mutable world and simulation rules; the runner encodes values,
+associates connections with players, and tracks gameplay occurrences in a
+presentation journal. The journal matches predicted and authority occurrences
+so effects can be confirmed or cancelled after correction.
 
-The API remains experimental. The sections below describe implemented contracts
-and their tests; the [framework audit](../../docs/replay/framework-audit.md) tracks
+The API remains experimental. The sections below describe implemented behavior
+and its tests; the [framework audit](../../docs/replay/framework-audit.md) tracks
 broader admission, recovery and release acceptance.
 
-`Model.control_timing` defaults to `Scheduled`. The explicit `Latest_Observation`
-profile sends one current control sample, coalesces newer producer ticks into the
-next authority tick, and preserves the accepted value in replay history. It has a
-distinct negotiated contract; the default scheduled wire/archive contract remains
-unchanged. Use it for external outputs such as [owner-streamed physics](../../docs/replay/owner-streams.md),
-with game-level object/owner/sample validation. One-shot actions retain their
-sequenced command/outcome path.
+`Model.control_timing` defaults to `Scheduled`. The `Latest_Observation` mode
+sends one current control sample and coalesces newer producer ticks into the
+next authority tick, preserving the accepted value in replay history. It has a
+distinct negotiated contract; Scheduled retains its existing wire/archive
+encoding. Use latest-observation timing for external outputs such as
+[owner-streamed physics](../../docs/replay/owner-streams.md), with game-level
+object/owner/sample validation. One-shot actions retain their sequenced
+command/outcome path.
 
-`Model.event_policy(event) -> view.Policy` configures gameplay-effect timing and
-survives Welcome, resync and recovery journal reconstruction. Spectators remain
-watched; mixed presentation can delay otherwise speculative remote events. A policy
-set directly on a transient journal must otherwise be reinstalled after reset.
+`Model.event_policy(event) -> view.Policy` configures when gameplay effects are
+presented. The runner reinstalls it when reconstructing the journal after
+Welcome, resync, or recovery. Spectators use watched presentation, which follows
+authority state on a delayed display clock. Mixed presentation can delay remote
+events that would otherwise be speculative. If the game sets a policy directly
+on a temporary journal, it must reinstall that policy after reset.
 
 ## Gameplay model
 
@@ -33,9 +38,9 @@ Instantiate `Model(State, Control, Action, Event, Seats)` and supply:
 - `action(state, seat, action, ctx) -> bool`: a discrete mutation over the complete
   world. Returning false restores all state and gameplay events produced by that
   action, while the rest of the tick continues.
-- `control_valid`, `action_valid`, and `state_valid`: the authored input/state
-  language and invariants. The schema adds structural, finite, enum, and bit-mask
-  validation before these callbacks.
+- `control_valid`, `action_valid`, and `state_valid`: game-defined rules for
+  acceptable controls, actions, and state. Before these callbacks, schema
+  validation checks structure, finite values, enums, and bit masks.
 - `hold`: derive a legal held control from the previous sample. Clear transient
   fields here; continuous movement may remain held. Discrete commands belong in
   `Action`, not a repeated control bit.
@@ -46,42 +51,46 @@ Simulation uses the same code on authority and predicting clients. Events still
 carry game-defined payloads. Source zero is reserved by the network runner for
 action verdicts; gameplay emits from nonzero semantic sources.
 
-The runner supports one complete public or [authored partial prediction group](groups.md), one control
-and action type, one to eight player seats, and up to sixteen connections including
-observers. It refuses unscoped player prediction when the public projection omits authority-only
-state. [Recipient views](replication.md) can filter snapshots, controls and events
-for players with validated prediction groups, or for observers.
-Authored group projection, footprint validation and timestamped boundary values
-have initial native and Claimball gates. Broader group policies remain M6 work.
+The runner supports one complete public or [authored partial prediction group](groups.md),
+one control and action type, one to eight player seats, and up to sixteen
+connections including observers. It refuses unscoped player prediction when
+the public projection omits authority-only state. [Recipient views](replication.md)
+can filter snapshots, controls and events for players with validated prediction
+groups, or for observers. Native and Claimball tests cover group projection,
+validation of the group's included dependencies, and timestamped values from
+outside the group. Broader group policies remain planned work in milestone M6.
 
-On authority correction, the current full-world runner replaces older remote
-held-input guesses in the replayed suffix using the snapshot's held-input boundary.
+On authority correction, the full-world runner replaces older guesses of remote
+held input in the replayed suffix using the snapshot's held-input boundary.
 It applies `hold` once per prediction tick, including bootstrap and continuation,
 while preserving this client's recorded controls, aiming stamps and action IDs.
-For a scoped group, remote control slots are neutral and outside simulation members
-are removed by the authored projection. Boundary coupling is explicit.
+For a scoped group, remote control slots are neutral and the game's projection
+removes simulation members outside the group. The game must explicitly supply
+any values needed from outside that group.
 
 `client.correction` reports the latest successful correction with before/after
-frames at the same prediction tick, a serial, authority tick and replayed-tick count.
-Read it after each pump (after `session_frame` in the Godot facade); copies are
-detached values. It resets on Welcome. A view can pass matching positions to
-`view.smooth_correct` without treating ordinary forward motion as correction.
-Storing the report costs two additional world values per client; large runtime
-owners should use stable heap addresses. Further storage/copy optimization remains
-subject to the roadmap's workload measurements.
+frames at the same prediction tick, a serial, authority tick and replayed-tick
+count. Read it after each pump (after `session_frame` in the Godot facade).
+Copies retain their values independently of the runner, and Welcome resets the
+report. Pass matching positions to `view.smooth_correct` to smooth correction
+without treating ordinary forward motion as an error. The report stores two
+additional world values per client; keep large runtime owners at stable heap
+addresses. Further storage and copying changes depend on the workload
+measurements planned in the roadmap.
 
 An optional [profiling clock](profiling.md) records replay wall time/depth and
 histogram bounds without entering simulation or the network contract. Godot
 Sessions install it automatically.
 
-A complete snapshot ahead of a briefly stalled client can be adopted directly
-when all intervening authoritative facts remain available. The runner preserves
-the journal and action queues, reprojects the group and rebuilds bounded prediction
-lead. `Stats.snapshot_catchups` records this path; it does not require a full
-Welcome/resync round trip. Godot drops the already-accounted-for frame backlog.
-Actual history/fact exhaustion still resyncs. `client.resync_notice` records the
-reason and relevant tick frontiers for diagnosis; `view_reset` also changes on a
-snapshot catch-up so consumers can cut obsolete smoothing.
+A complete snapshot newer than a briefly stalled client's prediction can be
+adopted directly when all intervening authority facts remain available. The
+runner preserves the journal and action queues, reprojects the group, and
+rebuilds bounded prediction lead. `Stats.snapshot_catchups` records this path,
+which avoids a full Welcome/resync round trip. Godot discards the frame backlog
+already covered by the snapshot. If required history or facts have expired, the
+client still resyncs. `client.resync_notice` records the reason and relevant
+tick frontiers for diagnosis. `view_reset` changes on snapshot catch-up so
+consumers can discard smoothing based on obsolete state.
 
 ## Runtime ownership and loop
 
@@ -111,8 +120,8 @@ On a client:
 4. `client_issue(action)` returns a sequence ID for an action predicted at an
    upcoming tick and delivered reliably. Drain authoritative results through
    `client_outcomes` and presentation changes through the client's `journal`.
-5. Use `client_observed` for authoritative sparse frame pairs on the watch clock;
-   predicted old frames are not remote observed truth.
+5. Use `client_observed` for sparse authority frame pairs on the delayed watch
+   clock. Older predicted frames are not observations of remote authority state.
 
 ## Admission, delivery, and recovery
 
@@ -151,15 +160,16 @@ their existing reliability policy.
   ordinary game rejection reports `Predicate`. Recent results and both received
   and settled frontiers survive reconnection so new actions cannot reuse an
   unresolved sequence.
-- Complete occurrence batches use the reliable channel. State snapshots use the
-  unreliable channel and supersede older pending snapshots. Correction waits for
+- Complete occurrence batches, called facts, use the reliable channel. State
+  snapshots normally use the unreliable channel and supersede older pending
+  snapshots; large snapshots have the reliable fallback described below. Correction waits for
   matching occurrence history, settles the authoritative prefix, and reconciles
   the speculative suffix.
 - Prediction stops at a bounded horizon. Missing history or a long blackout enters
   explicit resync and requests a fresh checkpoint. Connection generations and
-  checkpoint serials fence delayed input/snapshot traffic. Outstanding action IDs
+  checkpoint serials reject delayed input/snapshot traffic from older bindings. Outstanding action IDs
   are preserved or settled explicitly.
-- Per-pump byte/packet caps and per-seated-peer token buckets bound ingress work.
+- Per-pump byte/packet caps and per-seated-peer token buckets bound incoming processing work.
   Fixed queue/history limits return backpressure or recovery states. Consumers
   must drain presentation and action results regularly.
 
@@ -183,11 +193,11 @@ the format, policies, verified guarantees, and remaining migration work.
 
 For repeated archives, initialize a `Checkpoint_Codec` with the state/control/
 action/event types and seat count, then pass it as `codec` to encode/decode.
-Destroy it once with `checkpoint_codec_destroy`. It retains schema programs, not
-game state. Every call still validates content, policy, values, and runtime contract;
-using a cache for a different type set is rejected. The uncached convenience path
-remains available and emits identical bytes. Recovery receivers and `Link`
-keep these programs warm automatically.
+Destroy it once with `checkpoint_codec_destroy`. It retains schema programs,
+not game state. Every call still validates content, policy, values, and the
+runtime contract; a cache for a different type set is rejected. The uncached
+path remains available and emits identical bytes. Recovery receivers and `Link`
+retain and reuse these schema programs automatically.
 
 `client_authority` transitions a surviving client to an approved newer epoch.
 Its Welcome resolves pending old IDs against the recovered frontiers, restarts
@@ -216,7 +226,7 @@ players, and an observer. Every process has 120 ms injected receive delay by
 default (about 240 ms round trip). Players move immediately, reliable firing
 actions settle once, and every participant observes the authoritative shots.
 
-Snapshots now use acknowledged canonical baselines and sparse XOR deltas, with
+Snapshots use acknowledged canonical baselines and sparse XOR deltas, with
 full fallback for dense changes or missing baselines. `snapshot_history` bounds
 the cache; `delta_snapshots=false` selects a full-snapshot reference mode. ACKs must
 match actual sent IDs/hashes within the current connection/checkpoint context.
@@ -228,7 +238,7 @@ credit is capped at a quarter-second of the configured rate or one complete
 protocol packet, whichever is larger; see [delivery under transport loss](#delivery-under-transport-loss).
 Deferral retains reliable work and lets newer state supersede unsent snapshots. Stats expose
 full/delta counts, saved bytes, baseline misses, rejected ACKs, and egress deferral.
-The protocol contract is now version 7, including compact scheduled-input windows,
+The protocol contract is version 7, including compact scheduled-input windows,
 removal, fresh-seat semantics,
 required permits, process incarnation in Hello, and [input-bound aiming context](view_time.md).
 Archive format 4 preserves validated held/future view contexts, incarnation metadata
@@ -371,10 +381,10 @@ unchanged. Set `client.fact_repair_enabled=false` before its first pump to disab
 this extension. `Stats.fact_repair_requests`, `fact_repairs`, `fact_repair_bytes`
 and `fact_repair_oversize` expose requests, accepted reply traffic and size fallback.
 
-Before any scheduled input has been acknowledged, clock feedback gently increases
-prediction lead within the configured bounds. Otherwise a client whose initial
-inputs all arrive stale has no echo from which to calibrate and can remain stuck.
-Once an echo arrives, normal arrival-margin discipline resumes. No queued action
+Before any scheduled input is acknowledged, clock feedback gradually increases
+prediction lead within the configured bounds. If all initial inputs arrive
+stale, the client otherwise has no echoed input to use for calibration. Once
+an echo arrives, normal arrival-margin adjustment resumes. No queued action
 or input is retimed.
 
 Per-peer rate admission reserves 32 additional bytes per logical packet as modest
@@ -474,14 +484,15 @@ target model's contract explicitly; already-admitted pending actions retain thei
 recorded authority schedule. The isolated endurance comparison opts into Receipt;
 existing game projects keep their configured policy.
 
-Scheduled input sampling also waits when its next tick is at or behind validated
-authority progress. `client.authority_tick_seen` tracks accepted snapshot, scoped snapshot-part and fact
-progress even while missing facts prevent installing that snapshot. A small old
-correction must not free one obsolete input step and consume a new press just
-before a complete newer snapshot catches the client up. This retains pending
-input at the caller; it does not retime an already-captured sample or make an
-unreliable input stream infallible. Latest-observation controls retain their
-separate receipt-time semantics. Welcome resets the frontier to its new scope.
+Scheduled input sampling waits when its next tick is at or behind validated
+authority progress. `client.authority_tick_seen` tracks accepted snapshot,
+scoped snapshot-part, and fact progress even when missing facts prevent snapshot
+installation. This prevents an older correction from releasing an obsolete
+input step that consumes a new press just before a newer snapshot catches up.
+The caller retains pending input. Already-captured samples are not retimed,
+and unreliable input still has no delivery guarantee. Latest-observation
+controls retain their separate receipt-time semantics. Welcome resets the
+frontier to its new scope.
 
 Receipt-time clients may enqueue validated actions during a same-epoch Resyncing
 phase when their player identity and prior binding are already established. The

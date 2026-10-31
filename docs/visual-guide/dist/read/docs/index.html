@@ -3,7 +3,7 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>odin_godot documentation</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../reference/docs/index.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#start-here">Start here</a><a href="#reference">Reference</a><a href="#use-it-day-to-day">Use it day-to-day</a><a href="#build-multiplayer-with-kit">Build multiplayer with Kit</a><a href="#learn-from-the-examples">Learn from the examples</a><a href="#ship-it">Ship it</a><a href="#design-history--internals">Design history &amp; internals</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#start-here">Start here</a><a href="#reference">Reference</a><a href="#development-workflow">Development workflow</a><a href="#build-multiplayer-with-kit">Build multiplayer with Kit</a><a href="#learn-from-the-examples">Learn from the examples</a><a href="#export-and-distribution">Export and distribution</a><a href="#design-history--internals">Design history &amp; internals</a></nav></details>
 <article class="reading-body "><p>Use these guides to install odin_godot, write compiled Odin scripts, choose a
 multiplayer framework, and export a game.</p>
 <h2 id="start-here">Start here<a class="heading-anchor" href="#start-here" aria-label="Link to this section">#</a></h2>
@@ -29,36 +29,37 @@ scripts:<ul>
 <li>lifecycle procs, custom methods (<code>@(gd_method)</code>), signals, <code>@(gd_connect)</code>, <code>@onready</code></li>
 <li>multiplayer RPCs (<code>@(gd_rpc)</code>)</li>
 <li>custom resources, global class names, typed cross-script references, autoloads</li>
-<li>the full <code>gd.*</code> ergonomic-helper catalog (a task → one-liner table)</li>
+<li><code>gd.*</code> helpers grouped by task</li>
 <li>editor tooling: <code>@tool</code>, <code>gd.is_editor()</code>, custom icons, EditorPlugin</li>
 </ul>
 </li>
 <li><strong><a href="authoring-guide.html#api-conventions-shared-by-kit-and-replay">Shared API conventions</a></strong>:
 Odin names, generated prefixes, owner lifetimes, and the normal Kit/Replay frame loops.</li>
 </ul>
-<h2 id="use-it-day-to-day">Use it day-to-day<a class="heading-anchor" href="#use-it-day-to-day" aria-label="Link to this section">#</a></h2>
+<p><span id="use-it-day-to-day"></span></p>
+<h2 id="development-workflow">Development workflow<a class="heading-anchor" href="#development-workflow" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong><a href="workflow.html">Workflow</a></strong>: the dev loop and editor experience:<ul>
+<li><strong><a href="workflow.html">Workflow</a></strong> covers building, editing, and debugging scripts:<ul>
 <li>building (<code>build/build_scripts.sh</code>) and the project layout it expects</li>
 <li>live editing: recompile-and-reload on save, plus the manual <code>script.reload(true)</code> fallback</li>
-<li>editor DX: live error squiggles (<code>_validate</code>), autocomplete (<code>ols</code>), syntax highlighting</li>
+<li>editor support: inline errors (<code>_validate</code>), autocomplete (<code>ols</code>), syntax highlighting</li>
 <li>debugging: <code>gd.print</code> / <code>gd.error</code>, <code>lldb</code>, reading crash backtraces</li>
 <li><strong>AOT limitations</strong> (no in-editor breakpoints, recompile-on-save latency, …)</li>
 </ul>
 </li>
-<li><strong><a href="debugging.html">Debugging</a></strong>: the deep <code>lldb</code> + crash-backtrace reference (what Workflow
-summarizes).</li>
-<li><strong><a href="events.html">Pure-Odin Events</a></strong>: <code>events.Event(T)</code> provides typed one-to-many dispatch at
-direct-call cost for scripts in the same dll (the C#-events-vs-Godot-signals split). It
-covers when to use it vs an engine signal vs batching, the module-boundary rule, and the
-hot-reload resubscribe pattern.</li>
-<li><strong><a href="modules.html">Script Modules</a></strong>: the opt-in scaling tool for large projects. It splits
-scripts into <code>res://modules/&lt;name&gt;/</code> packages, one dll each, rebuilt + hot-swapped
-independently on save. It covers the cost model (when NOT to use them), the no-cross-imports
-rule and why, cross-module communication patterns, reload/collision semantics, and export.
-The same page also covers two things every project can use without splitting anything:
-<strong>script subpackages</strong> (annotated classes in subfolders of one module) and <strong><code>res://shared/</code></strong>
-(read-only packages of types, constants and pure procs that every module may import).</li>
+<li><strong><a href="debugging.html">Debugging</a></strong> expands on Workflow&#39;s <code>lldb</code> and crash-backtrace
+guidance.</li>
+<li><strong><a href="events.html">Pure-Odin Events</a></strong> explains typed one-to-many dispatch through
+<code>events.Event(T)</code> for scripts in the same dll. It covers direct-call cost,
+comparison with engine signals and batching, module boundaries, and
+resubscribing after hot reload.</li>
+<li><strong><a href="modules.html">Script Modules</a></strong> describes splitting a large project into
+<code>res://modules/&lt;name&gt;/</code> directories, each compiled to its own dll and rebuilt
+independently on save. It explains full-build and save-time costs, import
+isolation, communication between modules, reload, collisions, and export.
+It also covers organization within a single dll through script subpackages,
+and <strong><code>res://shared/</code></strong> for types, constants, and pure procedures that several
+modules may import.</li>
 </ul>
 <h2 id="build-multiplayer-with-kit">Build multiplayer with Kit<a class="heading-anchor" href="#build-multiplayer-with-kit" aria-label="Link to this section">#</a></h2>
 <ul>
@@ -72,19 +73,18 @@ items, combat, NPC helpers, save/resume, moderation, and transport adapters.</li
 <li><strong><a href="kit/sim.html">kit/sim</a></strong> provides fixed-tick, server-authoritative prediction
 and reconciliation for contested state. It composes with ordinary session
 replication on a per-field basis and includes bounded lag-compensation tools.</li>
-<li><strong><a href="kit/timelines.html">Timelines: choosing a model</a></strong> explains whose timeline each thing
-presents from and who arbitrates disagreement: the four shipped answers (coop,
-predict-self, contested-object, predict-world) with their worked games, and the
-choose-by-what-is-contested guide. Read this when picking between the two kits.</li>
-<li><strong><a href="kit/build-a-game-in-a-day.html">Build a game in a day</a></strong> is the tutorial: a co-op cave
-crawler from empty scene to Steam invite, the same arc <code>examples/cavecrawl</code> proves.</li>
-<li><strong><a href="recipes.html">Gameplay recipes: the kit + play recipe</a></strong> is the compositional <em>pattern</em>
-the tutorial uses without naming: an entity is a struct of <code>play</code> primitives, and each
-networked behavior is sliced into seven authority/time slots (State, Cadence, Intent,
-Authority, Prediction, Reconcile, Presentation). It includes one worked example (a gun) and five
-real items set against the skeleton. Read this when &quot;how do I structure <em>this</em> gameplay
-item?&quot; is the question. It&#39;s the multiplayer answer to Godot&#39;s component-composition
-articles.</li>
+<li><strong><a href="kit/timelines.html">Timelines: choosing a model</a></strong> compares authority and
+display timing for coop, predict-self, contested-object, and predict-world.
+Use its worked games and interaction-based selection guide to choose a Kit
+model.</li>
+<li><strong><a href="kit/build-a-game-in-a-day.html">Build a game in a day</a></strong> follows a coop cave
+crawler from scene setup through Steam invites, using <code>examples/cavecrawl</code>
+as the reference implementation.</li>
+<li><strong><a href="recipes.html">Gameplay recipes: the kit + play recipe</a></strong> shows how to compose
+an entity from <code>play</code> structs and divide a networked behavior into seven
+responsibilities: State, Cadence, Intent, Authority, Prediction, Reconcile,
+and Presentation. A worked gun example and five gameplay items show where
+their fields, commands, and hooks belong.</li>
 </ul>
 <h2 id="learn-from-the-examples">Learn from the examples<a class="heading-anchor" href="#learn-from-the-examples" aria-label="Link to this section">#</a></h2>
 <p>The experimental <a href="../replay/getting-started.html">Replay library</a> provides a
@@ -102,24 +102,25 @@ independently runnable.</p>
 <li><code>examples/cavecrawl</code> is the <strong>co-op reference</strong> (see <a href="kit/index.html">kit/</a>):
 the main Kit packages in one game, covered by a latency-injected,
 multi-process integration test (<code>run.sh</code>).</li>
-<li><code>examples/slopball</code> / <code>examples/slopball3d</code> are the <strong>smallest complete kit games</strong>: a
-physics co-op pitch (engine physics via <code>play.Puppet</code>), in 2D and 3D.</li>
+<li><code>examples/slopball</code> / <code>examples/slopball3d</code> are small complete Kit games:
+coop soccer with engine physics through <code>play.Puppet</code>, in 2D and 3D.</li>
 <li><code>examples/quickdraw</code> is the <strong>server-authority reference</strong> (kit/sim): a western duel
 that exercises lag-compensated hitscan with an A/B acceptance test at
 240 ms RTT.</li>
-<li><code>examples/speedball</code> is <strong>the contested object</strong> (kit/sim): slopball&#39;s soccer premise
-on the other netcode, where every peer predicts the ball and touches resolve locally.
-Read the two side by side to pick a model.</li>
-<li><strong><a href="../examples/survivors/README.html">examples/survivors</a></strong> is the headline single-player
-example: a complete survivors-like in pure Odin, with a per-file feature map. Its co-op
-layer is the ENGINE-NATIVE (host-authoritative) variant, retained for the interop tests.</li>
+<li><code>examples/speedball</code> uses kit/sim for the same soccer game, with every peer
+predicting the ball so local touches respond immediately. Compare it with
+Slopball to see the effect of changing simulation models.</li>
+<li><strong><a href="../examples/survivors/README.html">examples/survivors</a></strong> is a complete
+single-player survivors-like in pure Odin with a per-file feature map.
+Its engine-native host-authoritative coop layer is retained for interop tests.</li>
 <li><strong><a href="../examples/coop_arena/README.html">examples/coop_arena</a></strong> is the engine-native
 <strong>peer-authoritative</strong> path end-to-end: one codebase, three modes (single-player, native
 ENet, browser WebRTC with a room-code lobby). It predates the toolkit and shows the raw
-surface the kit absorbs.</li>
-<li><code>tests/showcase/</code>: the smallest &quot;everything wired&quot; pure-Odin scene (coin collector).</li>
+networking calls that Kit&#39;s helpers now coordinate.</li>
+<li><code>tests/showcase/</code> is a minimal pure-Odin coin-collector scene.</li>
 </ul>
-<h2 id="ship-it">Ship it<a class="heading-anchor" href="#ship-it" aria-label="Link to this section">#</a></h2>
+<p><span id="ship-it"></span></p>
+<h2 id="export-and-distribution">Export and distribution<a class="heading-anchor" href="#export-and-distribution" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><strong><a href="exporting.html">Exporting</a></strong>: native desktop export (the <code>OdinExportPlugin</code>) and web/WASM
 export (the Emscripten SIDE_MODULE + COOP/COEP serving).</li>
@@ -130,8 +131,8 @@ per-platform build and runtime verification status.</li>
 (<code>build/release.sh</code>), the submission form values, and consumer-facing quirks.</li>
 </ul>
 <h2 id="design-history--internals">Design history &amp; internals<a class="heading-anchor" href="#design-history--internals" aria-label="Link to this section">#</a></h2>
-<p>These are <em>not</em> on the learning path. They record how the engine is built and what was
-verified, for contributors:</p>
+<p>These contributor records describe implementation decisions, earlier development,
+and the behavior verified at the time:</p>
 <ul>
 <li><p><a href="../PLAN.html">PLAN.md</a>: the original architecture and phased delivery plan.</p>
 </li>
@@ -154,5 +155,5 @@ proof-of-concept.</p>
 </li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="kit/quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="onboarding/index.html"><span>The onboarding series</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/index.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#start-here" class="">Start here</a><a href="#reference" class="">Reference</a><a href="#use-it-day-to-day" class="">Use it day-to-day</a><a href="#build-multiplayer-with-kit" class="">Build multiplayer with Kit</a><a href="#learn-from-the-examples" class="">Learn from the examples</a><a href="#ship-it" class="">Ship it</a><a href="#design-history--internals" class="">Design history &amp; internals</a></nav><div class="outline-actions"><a href="../../reference/docs/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="kit/quickstart.html"><span>The first two-peer game</span><span aria-hidden="true">→</span></a><a href="onboarding/index.html"><span>The onboarding series</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/index.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#start-here" class="">Start here</a><a href="#reference" class="">Reference</a><a href="#development-workflow" class="">Development workflow</a><a href="#build-multiplayer-with-kit" class="">Build multiplayer with Kit</a><a href="#learn-from-the-examples" class="">Learn from the examples</a><a href="#export-and-distribution" class="">Export and distribution</a><a href="#design-history--internals" class="">Design history &amp; internals</a></nav><div class="outline-actions"><a href="../../reference/docs/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

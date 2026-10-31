@@ -1,26 +1,29 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Choosing a body contract · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Selecting simulation or solver motion · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../getting-started.html">Replay sessions and rooms</a><a href="../../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Choosing a body contract</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/body-bindings.md" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Selecting simulation or solver motion</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/scene/body-bindings.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p><code>Simulation_Body2</code> / <code>Simulation_Body3</code> are for replayable World-owned motion.
-<code>Body2</code> / <code>Body3</code> plus <code>session_body*_frame/sample</code> are for cooperative Godot solver
-motion accepted through the entity-ownership protocol. Keep one motion adapter
-per node;
-do not use both contracts concurrently or let an unrelated controller write its
-transform. Authored collision geometry/scale remains separate from the pose.</p>
+<article class="reading-body "><p><span id="choosing-a-body-contract"></span></p>
+<p>Choose the body adapter according to which system computes motion.
+<code>Simulation_Body2</code> / <code>Simulation_Body3</code> display poses from replayable World state.
+<code>Body2</code> / <code>Body3</code>, driven through <code>session_body*_frame/sample</code>, use cooperative
+Godot solver motion accepted by the entity-ownership protocol.</p>
+<p>Give each node one motion adapter. Using both at once, or letting another
+controller write its transform, creates conflicting writers. Authored collision
+geometry and scale remain separate from the selected pose.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">body: scenegd.Simulation_Body2
 ok := scenegd.simulation_body2_attach(&amp;body, rigid_body, .Rigid, visual_child)
 error := scenegd.simulation_body2_present(&amp;body, {epoch, view_revision},
-    view.Pose2{position=display.position, angle=display.angle}, display.teleport_cut)</code></pre></div><p>The simulation-driven binding freezes rigid bodies, applies the selected pose to
-node and PhysicsServer, and resets engine interpolation on scope/cut changes.
+    view.Pose2{position=display.position, angle=display.angle}, display.teleport_cut)</code></pre></div><p>The simulation-driven binding freezes rigid bodies and applies the selected
+pose to both the node and PhysicsServer. It resets engine interpolation when
+the presentation scope or teleport cut changes.
 It preserves authored child offsets and rejects invalid poses or older epochs.
 The 3D variant requires a finite unit quaternion. It offers no observation/sample
 publication API. Character bodies are supported as passive scene representations;
-application controllers must not call move_and_slide on them. Gameplay collision
-and movement remain in the replayable model. A passive body is not a substitute
-for implementing gameplay collisions there.</p>
+application controllers must not call move_and_slide on them. Implement movement
+and gameplay collision in the replayable model; the passive Godot body only
+represents its result.</p>
 <p>The cooperative facade centralizes authority selection and suspension:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">result := scenegd.session_body2_frame(&amp;session, &amp;body, render_delta,
     <span class="hljs-keyword">proc</span>(_: <span class="hljs-type">rawptr</span>, world: World) -&gt; (owned.State(owned.Pose2), <span class="hljs-type">bool</span>) {
@@ -30,18 +33,22 @@ for implementing gameplay collisions there.</p>
     <span class="hljs-comment">// Apply this frame&#x27;s authorized/local solver controls.</span>
 }
 sample, error := scenegd.session_body2_sample(&amp;session, &amp;body, physics_frame)
-<span class="hljs-comment">// Feed nonempty samples to the existing authenticated observation/admission path.</span></code></pre></div><p>Selection reads the latest authority frame, never local prediction. Missing/fenced
-state or an absent entity suspends solving/publication. <code>eligible=false</code> disables
-local solving for game rules such as kickoff or menus while still presenting the
-authority pose. Optional presentation state changes observer interpolation only
-within the matching owned scope; it grants no publication permission.</p>
+<span class="hljs-comment">// Feed nonempty samples to the existing authenticated observation/admission path.</span></code></pre></div><p>Frame selection reads the latest authority frame to decide who may operate
+the solver; it never takes that permission from local prediction. Missing or
+fenced authority state, or an absent entity, suspends solving and publication.
+Set <code>eligible=false</code> to disable local solving during kickoff or menus while
+continuing to display the authority pose. Optional presentation state changes
+observer interpolation only within the matching ownership scope and grants no
+permission to publish observations.</p>
 <p>Sample rechecks readiness, fencing, pause, client phase and authority epoch, so a
 transition between frame selection and sampling cannot publish a stale observation
 under a new epoch. Call frame selection before operating the local solver and
 sampling. A Room caller passes its Session and includes Room/handoff eligibility
 in <code>eligible</code>; these helpers do not override Room admission or game permissions.</p>
-<p>Existing Body2/Body3 drivers retain the offer/preparing/owner/observer protocol,
-full pose/velocity reseeding, revision/epoch rejection and visual correction.
+<p>Body2/Body3 retain their existing ownership-transfer stages: an authority offer,
+preparation, and selection as owner or observer. The drivers reseed complete
+poses and velocities, reject invalid revisions/epochs, and smooth visual
+corrections.
 A prepared sample can commit an authority-issued transfer through <code>owned.accept</code>;
 the helper does not bypass authenticated sender checks or game transition rules.
 Absent samples use sequence zero. The adapter remains a presentation/producer owner,
@@ -55,5 +62,5 @@ invalid poses/old epochs, observer freeze, preparing transfer, accepted samples,
 cuts, fencing, recovered epochs and pause. Existing owned-protocol tests remain
 unchanged and pass. All binding fixtures compile for WASM.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/body-bindings.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/scene/body-bindings.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/scene/body-bindings.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

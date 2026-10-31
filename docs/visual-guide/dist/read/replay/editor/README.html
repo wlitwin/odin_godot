@@ -29,12 +29,12 @@ selection/name/kind/latency arguments. It publishes an atomic JSON result with
 <code>ok</code>, <code>running</code>, <code>message</code>, <code>issues</code>, optional <code>stale</code> and retained log paths.
 Issues contain <code>source</code>, <code>path</code>, <code>message</code> and optionally a source line. Source
 links open Resources, scenes or scripts through the editor&#39;s normal interfaces.</p>
-<p>Save &amp; Validate/Bake saves open scenes and the selected saved Resource. Save other
-independently edited Resources before running a project-wide action. The worker
-builds current Odin code and runs typed checks in a separate bounded process.
-Checks that instantiate authored views run in that isolated process; they are not
-performed against a live game&#39;s World. Actual scene scripts may run their normal
-construction/ready code, so choose appropriate leaf view scenes for validation.</p>
+<p>Save &amp; Validate/Bake saves open scenes and the selected saved Resource. Save
+other edited Resources before running a project-wide action. The worker builds
+current Odin code and runs typed checks in a separate bounded process. View
+validation instantiates authored scenes there, outside the live game&#39;s World.
+Their scripts can still run construction/ready code, so use view scenes whose
+initialization is appropriate for isolated validation.</p>
 <p><code>jobs.py</code> supplies bounded process-group ownership, per-stage logs, cancellation
 files and atomic result publication. UI waits are nonblocking. Cancellation and
 failure retain logs and prevent incomplete content publication. The existing
@@ -57,9 +57,9 @@ isolated encounter and scenario runner.</p>
 <h2 id="canonical-scrapyard-example">Canonical Scrapyard example<a class="heading-anchor" href="#canonical-scrapyard-example" aria-label="Link to this section">#</a></h2>
 <p>See <a href="../../examples/replay_scrapyard/editor-workflow.html">the walkthrough</a>. It covers
 Resource-based status references, shared checked extraction, a complete Salvefield
-workflow, authored runner appearances, non-overwriting stable-ID draft scaffolding,
-recording verification and real local peers. Actor drafts preserve the game&#39;s
-existing root binding and compose a generated visual child; rules and feature
+workflow, authored player-character appearances, draft scaffolding with stable IDs
+that does not replace existing files, recording verification, and local peers.
+Actor drafts preserve the game&#39;s existing root binding and compose a generated visual child; rules and feature
 assertions remain explicit TODOs. Drafts do not enter the stock catalog automatically.</p>
 <p>The UI uses the same commands as CI, including the existing recording verifier and
 <code>replay/testing</code> correction/takeover helpers. In-memory checkpoint comparison does
@@ -67,5 +67,5 @@ not claim to test transport/security/lease failure. The network command runs rea
 local peers under the chosen latency profile; the framework&#39;s separate host-crash
 fixture remains available for full migration testing.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/editor-workflow.html"><span>Authoring a feature in Godot</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/editor/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_scrapyard/editor-workflow.html"><span>Authoring a feature in Godot</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/editor/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#installation-and-project-contract" class="">Installation and project contract</a><a href="#isolated-previews" class="">Isolated previews</a><a href="#canonical-scrapyard-example" class="">Canonical Scrapyard example</a></nav><div class="outline-actions"><a href="../../../reference/replay/editor/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

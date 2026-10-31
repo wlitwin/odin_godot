@@ -3,30 +3,31 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/interact</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/interact.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#api">API</a><a href="#worked-example-prompt-and-gate-share-the-reach-constant">Worked example: prompt and gate share the reach constant</a><a href="#gotchas">Gotchas</a></nav></details>
-<article class="reading-body "><p>Reach for <code>kit/interact</code> when a player should get a <em>use</em> prompt near chests, doors, and
-pickups, and the host must validate that use from the same geometry. It is three procs and
-one struct, with no engine types and no dispatch.</p>
-<p>The three procs are pure geometry, legal anywhere, including inside a sim tick. The
-prompt-then-validate pattern around them is written for coop verbs; a sim game runs the same
-geometry inside its own verbs and the authority pass.</p>
-<h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
-<p>Interaction is two questions:</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#target-discovery-and-command-validation">Target discovery and command validation</a><a href="#api">API</a><a href="#worked-example-prompt-and-gate-share-the-reach-constant">Worked example: prompt and gate share the reach constant</a><a href="#validation-limits-and-target-selection">Validation limits and target selection</a></nav></details>
+<article class="reading-body "><p><code>kit/interact</code> helps select nearby chests, doors, or pickups for a use prompt
+and check interaction geometry when a command executes. It provides three
+procedures and one struct, with no engine types or action dispatch.</p>
+<p>The procedures perform pure geometric checks and may run inside a simulation
+tick. The example below uses cooperative commands; simulation games can use
+the same checks in their commands and authority steps.</p>
+<p><span id="mental-model"></span></p>
+<h2 id="target-discovery-and-command-validation">Target discovery and command validation<a class="heading-anchor" href="#target-discovery-and-command-validation" aria-label="Link to this section">#</a></h2>
+<p>Discovery selects the target to offer in the UI. Command validation decides
+whether an attempted interaction passes its geometric requirements:</p>
 <ul>
-<li><strong>Discovery</strong> (client, every frame) asks which nearby interactable the prompt should
-point at. <code>pick</code> answers this over candidates the game collects from its registry walk.</li>
-<li><strong>Gating</strong> (host, inside the command) asks whether this player is actually allowed to use
-that entity from where they stand. The command proc answers by calling
-<code>in_range</code>/<code>facing_ok</code> with the <em>same</em> numbers.</li>
+<li><strong>Discovery</strong> runs on the client each frame. <code>pick</code> selects a nearby target
+from candidates the game collects from its registry.</li>
+<li><strong>Validation</strong> runs inside the command on the host. Call
+<code>in_range</code>/<code>facing_ok</code> with the same constants used for discovery.</li>
 </ul>
 <p>Using the same procedures and constants keeps the client prompt and authority
 validation geometrically consistent. They can still evaluate different
 snapshots of a moving world; the authority&#39;s result is final.</p>
-<p>The <em>use</em> itself is just a command on the target entity (open the door, loot slot 2);
-kit/interact never dispatches anything. See <a href="items.html">items.md</a> for what a loot command
-does once the gate passes.</p>
-<p>Positions are dimension-agnostic <code>[3]f32</code> everywhere: 2D games leave <code>z</code> at zero, 3D games
-fill it. No engine type appears anywhere in the API.</p>
+<p>Implement the action as a command on the target entity, such as opening a door
+or looting slot 2. <code>kit/interact</code> does not dispatch the command. See
+<a href="items.html">items.md</a> for a loot command that applies these checks.</p>
+<p>Positions use <code>[3]f32</code>: 2D games leave <code>z</code> at zero, while 3D games supply it.
+The API uses no engine types.</p>
 <h2 id="api">API<a class="heading-anchor" href="#api" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Candidate :: <span class="hljs-keyword">struct</span> {
 	id:     <span class="hljs-type">u32</span>, <span class="hljs-comment">// knet.Net_Id-sized; kept engine- and package-free</span>
@@ -34,20 +35,20 @@ fill it. No engine type appears anywhere in the API.</p>
 	radius: <span class="hljs-type">f32</span>, <span class="hljs-comment">// per-target extra reach (a chest is easier to touch than a lever)</span>
 }
 
-<span class="hljs-comment">// Within `reach` of the target (plus the target&#x27;s own radius)? Squared math,</span>
-<span class="hljs-comment">// no sqrt — call it in commands as freely as in frame code.</span>
+<span class="hljs-comment">// Check distance against `reach` plus the target&#x27;s radius. Uses squared</span>
+<span class="hljs-comment">// distance without sqrt; suitable for commands and frame code.</span>
 in_range :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (origin, target: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, reach: <span class="hljs-type">f32</span>, radius: <span class="hljs-type">f32</span> = <span class="hljs-number">0</span>) -&gt; <span class="hljs-type">bool</span>
 
-<span class="hljs-comment">// Is the target inside the facing cone? `min_dot` is the cone half-angle as a</span>
+<span class="hljs-comment">// Check the facing cone. `min_dot` expresses the cone half-angle as a</span>
 <span class="hljs-comment">// dot-product threshold (0 = 180° cone, 0.5 = 120°, 0.7071 = 90°). A zero</span>
-<span class="hljs-comment">// `facing` vector means omnidirectional; standing ON the target always passes.</span>
+<span class="hljs-comment">// `facing` vector means omnidirectional; standing on the target always passes.</span>
 facing_ok :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (origin, target, facing: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, min_dot: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span>
 
 <span class="hljs-comment">// The nearest candidate within reach and facing — what the prompt points at.</span>
 pick :: <span class="hljs-keyword">proc</span>(cands: []Candidate, origin: [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>, reach: <span class="hljs-type">f32</span>, facing := [<span class="hljs-number">3</span>]<span class="hljs-type">f32</span>{}, min_dot: <span class="hljs-type">f32</span> = <span class="hljs-number">0</span>) -&gt; (best: Candidate, ok: <span class="hljs-type">bool</span>)</code></pre></div><h2 id="worked-example-prompt-and-gate-share-the-reach-constant">Worked example: prompt and gate share the reach constant<a class="heading-anchor" href="#worked-example-prompt-and-gate-share-the-reach-constant" aria-label="Link to this section">#</a></h2>
 <p>Declare one constant (<code>examples/cavecrawl/scripts/cavecrawl.odin</code>):</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">REACH :: <span class="hljs-type">f32</span>(<span class="hljs-number">40</span>) <span class="hljs-comment">// interaction reach in pixels — prompt AND host gate use it</span></code></pre></div><p>Discovery runs every frame (<code>world.odin</code>, <code>update_prompt</code>). The game collects candidates
-from its own entity maps and picks:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">REACH :: <span class="hljs-type">f32</span>(<span class="hljs-number">40</span>) <span class="hljs-comment">// interaction reach in pixels, shared by the prompt and host check</span></code></pre></div><p>Discovery runs every frame in <code>world.odin</code>&#39;s <code>update_prompt</code>. The game
+collects candidates from its entity maps, then selects a target:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cands := make([<span class="hljs-keyword">dynamic</span>]kinter.Candidate, <span class="hljs-keyword">context</span>.temp_allocator)
 <span class="hljs-keyword">for</span> id, c <span class="hljs-keyword">in</span> self.chests {
 	append(&amp;cands, kinter.Candidate{id = <span class="hljs-type">u32</span>(id), pos = {c.x, c.y, <span class="hljs-number">0</span>}})
@@ -55,35 +56,37 @@ from its own entity maps and picks:</p>
 <span class="hljs-keyword">for</span> id, d <span class="hljs-keyword">in</span> self.doors {
 	append(&amp;cands, kinter.Candidate{id = <span class="hljs-type">u32</span>(id), pos = {d.x, d.y, <span class="hljs-number">0</span>}})
 }
-best, ok := kinter.pick(cands[:], {me.x, me.y, <span class="hljs-number">0</span>}, REACH)</code></pre></div><p><code>ok</code> drives the <a href="ui.html">kit/ui</a> prompt text (&quot;E — loot chest&quot;, &quot;E — open door&quot;); <code>best.id</code>
-is remembered as the interact target.</p>
-<p>Gating runs inside the predicted command (<code>door.odin</code>), using the same math and the same
-constant, and it runs identically in the client&#39;s prediction and the host&#39;s authoritative
-re-run:</p>
+best, ok := kinter.pick(cands[:], {me.x, me.y, <span class="hljs-number">0</span>}, REACH)</code></pre></div><p>When <code>ok</code> is true, the game displays <a href="ui.html">kit/ui</a> prompt text such as
+&quot;E — loot chest&quot; or &quot;E — open door&quot; and retains <code>best.id</code> as the interaction
+target.</p>
+<p>The predicted command in <code>door.odin</code> uses the same geometry and constant. Both
+the predicting client and the host execute the check:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
 door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
 	self.open = !self.open
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
-}</code></pre></div><p>The command carries the issuer&#39;s claimed position <code>(px, py)</code> as args; <code>chest_take</code> and
-<code>pickup_grab</code> gate identically. The host reuses the gate for non-interaction logic too: the
-&quot;is the whole party at the open door?&quot; check in <code>host.odin</code> is the same <code>kinter.in_range</code>
-call with the same <code>REACH</code>.</p>
-<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+}</code></pre></div><p>The command carries the issuer&#39;s claimed position <code>(px, py)</code> as arguments;
+<code>chest_take</code> and <code>pickup_grab</code> use the same check. This validates distance from
+the supplied position; the geometry helper does not establish that the
+position is trustworthy. In <code>host.odin</code>, the host also uses
+<code>kinter.in_range</code> with <code>REACH</code> to check that the whole party is at an open door.</p>
+<p><span id="gotchas"></span></p>
+<h2 id="validation-limits-and-target-selection">Validation limits and target selection<a class="heading-anchor" href="#validation-limits-and-target-selection" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><strong>Share the reach constant.</strong> The prompt and the host gate must use the <em>same</em> <code>REACH</code>
-and the same <code>in_range</code> math, or the UI will promise uses the host refuses (or hide uses
-it would allow). Don&#39;t fork the numbers.</li>
-<li>Positions can still differ <em>in time</em> (the issuer&#39;s claimed spot vs. the host&#39;s replicated
-copy); the host&#39;s view is the truth. Keep <code>REACH</code> generous enough to absorb a stream of
-lag, or leash claims like <a href="combat.html">combat</a> does for cast origins.</li>
+and the same <code>in_range</code> check, or the UI may offer an interaction the host
+refuses, or hide one it would allow.</li>
+<li>Position samples can represent different times. Choose <code>REACH</code> with expected
+movement delay in mind. When accepting client-supplied positions, validate
+them against host state, as <a href="combat.html">combat</a> does for cast origins.</li>
 <li><code>facing = {}</code> (the default) means omnidirectional; <code>min_dot = 0</code> is a 180° cone, not &quot;no
 cone&quot;. Standing exactly on the target always passes the facing check.</li>
-<li><code>pick</code> returns the <em>nearest</em> passing candidate; per-target <code>radius</code> widens the touch,
-not the tiebreak (distance is measured center-to-center).</li>
+<li><code>pick</code> returns the nearest passing candidate. Per-target <code>radius</code> extends
+interaction range; selection still measures center-to-center distance.</li>
 <li>Candidate collection is the game&#39;s job: walk your own entity maps into a
 <code>temp_allocator</code> array each frame, as <code>update_prompt</code> does.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="items.html"><span>kit/items — item definitions and stack-aware inventories</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/interact.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#api" class="">API</a><a href="#worked-example-prompt-and-gate-share-the-reach-constant" class="">Worked example: prompt and gate share the reach constant</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/interact.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="items.html"><span>kit/items — item definitions and stack-aware inventories</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="combat.html"><span>kit/combat — health, abilities, effects, projectiles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/interact.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#target-discovery-and-command-validation" class="">Target discovery and command validation</a><a href="#api" class="">API</a><a href="#worked-example-prompt-and-gate-share-the-reach-constant" class="">Worked example: prompt and gate share the reach constant</a><a href="#validation-limits-and-target-selection" class="">Validation limits and target selection</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/interact.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

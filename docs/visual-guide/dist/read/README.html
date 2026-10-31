@@ -3,7 +3,7 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../docs.html" aria-current="page">Docs</a><a href="../guide.html">Field guide</a><a href="../examples.html">Examples</a><a href="../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../docs.html">Overview</a><a href="../docs/install.html">Installation</a><a href="../docs/first-script.html">Your first script</a><a href="../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="docs/authoring-guide.html">Script API</a><a href="docs/events.html">Signals and events</a><a href="docs/workflow.html">Editor workflow</a><a href="docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../docs/multiplayer.html">Choose a model</a><a href="../docs/kit.html">Build with Kit</a><a href="../docs/replay.html">Build with Replay</a><a href="docs/kit/timelines.html">Prediction and timelines</a><a href="docs/kit/profiles.html">Authority profiles</a><a href="replay/getting-started.html">Replay sessions and rooms</a><a href="replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../docs/exporting.html">Build and export</a><a href="docs/exporting.html">Export reference</a><a href="docs/debugging.html">Debugging</a><a href="../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="examples/replay_scrapyard/code-guide.html">Code guide</a><a href="examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../docs.html">Docs</a><span>/</span><a href="../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>odin_godot</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../reference/README.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#what-you-can-do-the-60-second-tour">What you can do (the 60-second tour)</a><a href="#quickstart">Quickstart</a><a href="#documentation">Documentation</a><a href="#examples">Examples</a><a href="#repository-layout">Repository layout</a><a href="#installing-without-cloning-this-repo">Installing (without cloning this repo)</a><a href="#platform-status">Platform status</a><a href="#license--attribution">License / attribution</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#script-example-and-sdk-features">Script example and SDK features</a><a href="#quickstart">Quickstart</a><a href="#documentation">Documentation</a><a href="#examples">Examples</a><a href="#repository-layout">Repository layout</a><a href="#installing-without-cloning-this-repo">Installing (without cloning this repo)</a><a href="#platform-status">Platform status</a><a href="#license--attribution">License / attribution</a></nav></details>
 <article class="reading-body "><p><strong>Write Godot scripts in <a href="https://odin-lang.org/" rel="noreferrer">Odin</a>.</strong> odin_godot is a Godot 4.7
 GDExtension implementing the <code>ScriptLanguageExtension</code> API. Attach a <code>.odin</code> file
 to a Godot node; generated registration connects its lifecycle procedures,
@@ -12,17 +12,19 @@ of time to native code and dispatch through a typed registry. The SDK supports
 custom resources, autoloads, editor tools, multiplayer RPCs, hot reload, and
 native and WebAssembly exports. A Nix flake pins the development toolchain.</p>
 <blockquote>
-<p><strong>Status: working engine.</strong> <code>nix develop --command bash tests/run_all.sh</code> is green across a
-39-test end-to-end suite (every feature below, plus the showcase, the examples&#39; co-op runs,
-and the Asset-Library drop-in layout), plus 7 browser-gated web tests that verify the WASM
-export in a real headless Chrome when one is available. The headline examples are a pure-Odin coin-collector
+<p>The recorded verification summary covers a 39-test end-to-end suite, including
+the showcase, example co-op runs, and Asset-Library drop-in layout, through
+<code>nix develop --command bash tests/run_all.sh</code>. It also includes 7 browser-gated
+web tests that verify WASM exports in headless Chrome when available. Examples
+include a pure-Odin coin-collector
 (<code>tests/showcase/</code>), a complete top-down arena shooter (<code>examples/survivors/</code>), a
 drop-in co-op cave crawler built with the Kit multiplayer toolkit
 (<code>examples/cavecrawl/</code>), and a server-authoritative western duel with lag-compensated
 hitscan on the kit/sim lane (<code>examples/quickdraw/</code>, tested at 240 ms RTT). All of
-them are built with <strong>zero GDScript gameplay code</strong>.</p>
+them use zero GDScript gameplay code.</p>
 </blockquote>
-<h2 id="what-you-can-do-the-60-second-tour">What you can do (the 60-second tour)<a class="heading-anchor" href="#what-you-can-do-the-60-second-tour" aria-label="Link to this section">#</a></h2>
+<p><span id="what-you-can-do-the-60-second-tour"></span></p>
+<h2 id="script-example-and-sdk-features">Script example and SDK features<a class="heading-anchor" href="#script-example-and-sdk-features" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Area2D            // base Godot class</span>
 <span class="hljs-comment">//gd:class Coin                // global class_name</span>
 <span class="hljs-keyword">package</span> game_scripts
@@ -30,7 +32,7 @@ them are built with <strong>zero GDScript gameplay code</strong>.</p>
 <span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 
 Coin :: <span class="hljs-keyword">struct</span> {
-	owner:     gd.Area2d,                        <span class="hljs-comment">// first field = the node, always</span>
+	owner:     gd.Area2d,                        <span class="hljs-comment">// first field stores the engine node handle</span>
 	collected: gd.Signal1(<span class="hljs-type">int</span>) <span class="hljs-string">`gd:&quot;args=value&quot;`</span>, <span class="hljs-comment">// typed signal field -&gt; collected(value: int)</span>
 	value:     gd.Int <span class="hljs-string">`gd:&quot;export,range=1:100&quot;`</span>, <span class="hljs-comment">// @export var with an Inspector slider</span>
 	taken:     <span class="hljs-type">bool</span>,                             <span class="hljs-comment">// untagged = private per-instance state</span>
@@ -46,8 +48,9 @@ coin_collect :: <span class="hljs-keyword">proc</span>(self: ^Coin, body: gd.Nod
 	<span class="hljs-keyword">if</span> self.taken { <span class="hljs-keyword">return</span> }
 	self.taken = <span class="hljs-literal">true</span>
 	coin_emit_collected(self, <span class="hljs-type">i64</span>(self.value))   <span class="hljs-comment">// typed emitter generated from the signal field</span>
-	gd.node_queue_free(self.owner)               <span class="hljs-comment">// gd.* ergonomic helper</span>
-}</code></pre></div><p>The generated <code>godot</code> binding exposes the engine API as typed Odin. The <code>gd.*</code>
+	gd.node_queue_free(self.owner)               <span class="hljs-comment">// gd.* helper queues node deletion</span>
+}</code></pre></div><p>In the example, <code>self</code> points to script data and <code>self.owner</code> is the Godot node
+handle. The generated <code>godot</code> binding exposes the engine API as typed Odin. The <code>gd.*</code>
 helpers wrap common engine calls and their argument conversions:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -85,17 +88,17 @@ helpers wrap common engine calls and their argument conversions:</p>
 <td>Kit provides session replication with <code>gd:&quot;replicate&quot;</code> and <code>gd:&quot;owner&quot;</code> fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its <a href="docs/kit/sim.html">simulation lane</a> adds <code>gd:&quot;predict&quot;</code>, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field (<a href="docs/kit/timelines.html">choosing a model</a>); <a href="docs/kit/profiles.html">named profiles</a> validate coherent co-op, listen-server, or dedicated settings. <code>@(gd_rpc)</code> remains available for Godot&#39;s engine-native path.</td>
 </tr>
 <tr>
-<td><strong>Ship it</strong></td>
+<td><strong>Build and export</strong></td>
 <td>hot reload on save, native desktop export, WebAssembly export</td>
 </tr>
 <tr>
-<td><strong>Scale it</strong></td>
+<td><strong>Script modules</strong></td>
 <td>opt-in <a href="docs/modules.html">script modules</a>: one dll per <code>res://modules/&lt;name&gt;</code>, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules</td>
 </tr>
 </tbody></table>
-</div><p>Because Odin is <strong>ahead-of-time compiled</strong>, it differs from interpreted GDScript in a few
-ways: no <code>eval</code>/REPL, no in-editor breakpoints (use <code>lldb</code>), and <code>@export</code> changes need a
-recompile (the editor does it for you on save). See <a href="docs/workflow.html">Workflow</a>.</p>
+</div><p>Odin compiles ahead of time, so scripts have no <code>eval</code>/REPL or Godot script-line
+breakpoints; use <code>lldb</code> for native debugging. Changing <code>@export</code> declarations
+requires recompilation, which the editor starts on save. See <a href="docs/workflow.html">Workflow</a>.</p>
 <h2 id="quickstart">Quickstart<a class="heading-anchor" href="#quickstart" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop                  <span class="hljs-comment"># toolchain shell: odin, ols, emcc, llvm/lld, + $GODOT (4.7.1)</span>
 
@@ -103,16 +106,16 @@ recompile (the editor does it for you on save). See <a href="docs/workflow.html"
 bash build/build_scripts.sh examples/survivors
 <span class="hljs-variable">$GODOT</span> --path examples/survivors          <span class="hljs-comment"># arrow keys move; auto-fire; survive</span>
 
-<span class="hljs-comment"># Or verify everything headless (reproducible from one command):</span>
+<span class="hljs-comment"># Run the repository&#x27;s headless suite:</span>
 nix develop --<span class="hljs-built_in">command</span> bash tests/run_all.sh</code></pre></div><div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">==&gt; phase1  PASS   ==&gt; resources    PASS   ==&gt; editortools  PASS
 ==&gt; phase2  PASS   ==&gt; crossscript  PASS   ==&gt; debug        PASS
    ...                  ...                    ...
-==&gt; survivors PASS ==&gt; web          PASS browser-verified   ALL GREEN</code></pre></div><p>New here? Start with <strong><a href="docs/getting-started.html">Getting Started</a></strong>: it installs the
-toolchain, wires the extension into a Godot project, and walks you through your first Odin
-script from empty file to a moving node. Here for multiplayer? The
-<strong><a href="docs/kit/quickstart.html">quickstart</a></strong> goes zero-to-two-windows in two small files, and
-its <strong><a href="docs/kit/quickstart-sim.html">simulation version</a></strong> moves motion to server authority.
-Choose its trust and timing baseline from the <strong><a href="docs/kit/profiles.html">network profiles</a></strong>.</p>
+==&gt; survivors PASS ==&gt; web          PASS browser-verified   ALL GREEN</code></pre></div><p>Start with <a href="docs/getting-started.html">Getting Started</a> to install the toolchain,
+load the extension in a Godot project, and write a script that moves a node.
+For multiplayer, the <a href="docs/kit/quickstart.html">quickstart</a> builds a two-window
+example in two files. Its <a href="docs/kit/quickstart-sim.html">simulation version</a> moves
+motion to server authority. Choose trust and timing settings through
+<a href="docs/kit/profiles.html">network profiles</a>.</p>
 <h2 id="documentation">Documentation<a class="heading-anchor" href="#documentation" aria-label="Link to this section">#</a></h2>
 <p>The <strong><a href="https://wlitwin.github.io/odin_godot/" rel="noreferrer">SDK documentation site</a></strong> has guides for setup,
 Odin scripting, Kit, Replay, and export, plus an illustrated multiplayer guide and
@@ -168,16 +171,16 @@ to browse every published guide, reference page, example, and source listing by 
 Godot arena shooter in the browser. The repository also includes the
 <a href="examples/replay_scrapyard/contributor-guide.html">Replay Scrapyard port</a>, with a visual
 guide to its authored scenes, replayable World, input, and presentation.</p>
-<p><strong>Building multiplayer? Start with the <a href="docs/kit/index.html">Kit overview</a>.</strong> These
-three are its references:</p>
+<p>The <a href="docs/kit/index.html">Kit overview</a> introduces the multiplayer packages.
+These three projects demonstrate their use:</p>
 <ul>
 <li><strong><code>examples/cavecrawl/</code></strong> is the co-op reference: a drop-in-join cave crawler exercising
 every toolkit package (replicated fields, predicted commands + <code>_then</code> consequences,
 generated entity factory, reconnect, save/resume, host migration, Steam), covered by a
 latency-injected integration test.</li>
 <li><strong><code>examples/slopball/</code></strong> is the smallest complete kit game: a physics co-op ball pitch
-(~850 lines), engine physics replicated through <code>play.Puppet</code>. Start here to see the
-whole multiplayer surface in one sitting.</li>
+(~850 lines), with engine physics replicated through <code>play.Puppet</code>. It shows
+session setup, entity replication, and gameplay in one project.</li>
 <li><strong><code>examples/slopball3d/</code></strong> uses the same replication model with 3D bodies
 (<code>play.Puppet3</code>, Node3D containers).</li>
 </ul>
@@ -185,15 +188,15 @@ whole multiplayer surface in one sitting.</li>
 <ul>
 <li><strong><code>examples/survivors/</code></strong> is a complete top-down arena shooter in pure Odin; each script is
 commented to teach one slice of the binding (<a href="examples/survivors/README.html">README</a>). Its
-net layer uses the ENGINE-NATIVE path (<code>MultiplayerSpawner</code>/<code>@(gd_rpc)</code>), a
-GDScript-parity demonstration, not the recommended way to build co-op (that&#39;s the kit).</li>
-<li><strong><code>examples/coop_arena/</code></strong> is the engine-native multiplayer path end-to-end: ONE
-peer-authoritative codebase over <code>MultiplayerSynchronizer</code> + <code>@(gd_rpc)</code> that runs
+network layer uses Godot&#39;s engine-native path (<code>MultiplayerSpawner</code>/<code>@(gd_rpc)</code>)
+to demonstrate those APIs. The Kit examples above provide the higher-level
+session and replication workflow for co-op.</li>
+<li><strong><code>examples/coop_arena/</code></strong> uses one peer-authoritative codebase for engine-native multiplayer over <code>MultiplayerSynchronizer</code> + <code>@(gd_rpc)</code> that runs
 single-player, over native ENet, and in the browser over WebRTC (room-code lobby)
-(<a href="examples/coop_arena/README.html">README</a>). It shows the raw engine surface the kit
-absorbs.</li>
-<li><strong><code>tests/showcase/</code></strong> is a minimal pure-Odin coin-collector, the smallest &quot;everything wired&quot;
-scene. Run it: <code>$GODOT --path tests/showcase</code>.</li>
+(<a href="examples/coop_arena/README.html">README</a>). It configures the engine APIs that
+Kit wraps for session-based games.</li>
+<li><strong><code>tests/showcase/</code></strong> is a minimal pure-Odin coin-collector combining script
+registration, input, signals, and scene behavior. Run it: <code>$GODOT --path tests/showcase</code>.</li>
 <li><strong><code>examples/hello/</code></strong> is the lowest-level path: a hand-registered GDExtension class (not a
 script) proving the Odin↔GDExtension ABI.</li>
 </ul>
@@ -231,7 +234,7 @@ script) proving the Odin↔GDExtension ABI.</li>
 </tr>
 <tr>
 <td><code>scriptgen/</code></td>
-<td>the codegen preprocessor (nice authoring form → registration boilerplate)</td>
+<td>reads script tags/attributes and generates registration code</td>
 </tr>
 <tr>
 <td><code>build/</code></td>
@@ -266,5 +269,5 @@ C-ABI runtime were vendored from
 <a href="https://github.com/dresswithpockets/odin-godot" rel="noreferrer"><code>dresswithpockets/odin-godot</code></a> (Apache-2.0);
 attribution and provenance are kept in <a href="bindgen/ATTRIBUTION.html"><code>bindgen/ATTRIBUTION.md</code></a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="docs/kit/profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../reading.html">Index</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#what-you-can-do-the-60-second-tour" class="">What you can do (the 60-second tour)</a><a href="#quickstart" class="">Quickstart</a><a href="#documentation" class="">Documentation</a><a href="#examples" class="">Examples</a><a href="#repository-layout" class="">Repository layout</a><a href="#installing-without-cloning-this-repo" class="">Installing (without cloning this repo)</a><a href="#platform-status" class="">Platform status</a><a href="#license--attribution" class="">License / attribution</a></nav><div class="outline-actions"><a href="../reference/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="docs/kit/profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../reading.html">Index</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#script-example-and-sdk-features" class="">Script example and SDK features</a><a href="#quickstart" class="">Quickstart</a><a href="#documentation" class="">Documentation</a><a href="#examples" class="">Examples</a><a href="#repository-layout" class="">Repository layout</a><a href="#installing-without-cloning-this-repo" class="">Installing (without cloning this repo)</a><a href="#platform-status" class="">Platform status</a><a href="#license--attribution" class="">License / attribution</a></nav><div class="outline-actions"><a href="../reference/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,15 +1,15 @@
 # Run transitions
 
-The authored [transition scene](ui/transitions.tscn) restores the original large
-departure countdown, wipe summary and recovery note plate. It also supplies a
-compact current wave/rest display. A pure `shared/flow` projection derives the
+The authored [transition scene](ui/transitions.tscn) displays the large
+departure countdown, wipe summary, and recovery note from the original game,
+plus a compact current wave/rest display. A pure `shared/flow` projection derives the
 display from confirmed world state and its tick. There is no local countdown
 deadline or remembered stage edge to recover.
 
 The wave panel reports incoming/alive enemies, the next wave's saved rest deadline,
 the final securing interval and floor clear. The original announced wave changes
 through system chat; this current-state panel does not replace that historical
-feed. [Chat and yard history](chat.md) now implement that separate retained feed.
+feed. [Chat and yard history](chat.md) implement that separate retained feed.
 
 While the crew gathers, the large countdown reads the same saved departure ticks
 as the gate and status line. Cancellation hides it, and its tint uses the original
@@ -38,5 +38,5 @@ includes real checkpoint reconstruction at a new epoch, countdown audio boundari
 three-peer wave/rest and run tests, and planned/crash recovery narration. Native
 captures use Dummy audio; WASM has a compile check for this slice. Browser/platform
 interaction, hardware listening, broader UI parity and the full
-comparison remain requirements. The [downed-player camera](camera.md) now has
+comparison remain requirements. The [downed-player camera](camera.md) has
 separate revival, warp and host-loss checks.

@@ -14,6 +14,6 @@ size. Both binaries must be finished before running it. Default helper builds us
 `-debug`; no release-speed claim is implied. Results exclude scene construction
 and GPU rendering. Keep both source snapshots when making comparisons.
 
-The ordinary example never imports the benchmark probe. Tests inspect the new
+The ordinary example never imports the benchmark probe. Tests inspect the
 mob-root/Body hierarchy and require a fresh engine instance on a new entity lifetime.
 Shared frame-hook/contextual-audio coverage also lives in `tests/replay_nodes`.

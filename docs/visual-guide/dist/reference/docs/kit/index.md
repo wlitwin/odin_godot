@@ -24,7 +24,9 @@ spawning, saves, and transports do not change when an entity moves to the
 simulation lane. See [Choosing a timeline model](timelines.md) for the tradeoffs
 and [the simulation quickstart](quickstart-sim.md) for a small conversion.
 
-## The canonical author surface
+<a id="the-canonical-author-surface"></a>
+
+## Generated APIs for common game tasks
 
 Start with the generated, typed operation for each ordinary game task:
 
@@ -34,27 +36,26 @@ Start with the generated, typed operation for each ordinary game task:
 | Replicated state | `gd:"replicate"`, `gd:"owner"`, or `gd:"predict"` on the field |
 | Request an authoritative mutation | `@(gd_command)` plus the generated `<verb>_cmd` wrapper; choose a typed `knet.ACTION_*` policy only when changing the secure owner-only default |
 | Wait for one command verdict | `session_action_receipt`, then `session_action_poll` from frame code |
-| Present a non-durable occurrence | One `@(gd_event)` `_fx` body and its generated suffix-free announce door |
+| Present a one-shot event | One `@(gd_event)` `_fx` body and its generated suffix-free announce procedure |
 | Find entities | `<type>_mine`, `<type>_owned_by`, `<type>_of`, and `<type>_all`; retain a typed `<type>_ref` across frames |
 | Change entity lifetime | `<type>_spawn`, `boot_spawn_send`/`boot_spawn_cancel`, `<type>_despawn`, and `<type>_teleport` |
 
-The component and raw session procedures remain available for a custom frame
-graph, custom factory, or deliberately mixed-kind batch. Reference pages mark
-those primitives as **Advanced**; they are implementation layers, not competing
-spellings of the normal path.
+The component and raw session procedures remain available when a game needs
+custom frame ordering, a custom factory, or a batch containing multiple entity
+kinds. Reference pages mark those lower-level procedures as **Advanced**.
 
-Both models share one generated canonical wire ABI. scriptgen recursively
-checks every raw network value for fixed widths, explicit enum storage, bounded
+Both models share one generated wire ABI, the representation of values sent
+between peers. scriptgen recursively checks every raw network value for fixed
+widths, explicit enum storage, bounded
 containers, and padding-free layout, then hashes the readable schema into the
 session fingerprint. Incompatible builds are refused during JOIN instead of
 discovering the mismatch by corrupting state.
 
-The root scripts package also receives `NET_SCHEMA`, an allocation-free
-`knet.Net_Schema` projection of that same ABI walk. It exposes entity fields,
-inputs and constraints, immediate/tick actions and policies, presentation
-events and anchors,
-profiles, messages, recursive type nodes, and both fingerprints for tooling and
-diagnostics.
+The root scripts package also receives `NET_SCHEMA`, a `knet.Net_Schema` value
+that exposes the same ABI metadata without runtime allocation. Tools and
+diagnostics can inspect entity fields, inputs and constraints, immediate/tick
+actions and policies, presentation events and their scheduling entities
+(anchors), profiles, messages, recursive type nodes, and both fingerprints.
 
 ### Trust and security
 
@@ -69,13 +70,13 @@ any game-specific predicates in the sample validator hook, and run the authority
 on a trusted machine. Kit bounds input classes, aggregate input packet bytes,
 and per-seat reliable/stream/action rates and bytes; games should tune the
 named profile defaults against legitimate peaks and install a moderation hook.
-ENet traffic is not
-encrypted. WebRTC and Steam provide encrypted transports. The detailed boundary
-is documented under [Session: trust and admission](session.md#trust-and-admission).
-[Named network profiles](profiles.md) turn the three common trust models into
-coherent, validated defaults plus benchmark-backed starting envelopes. The
-test suites described in [Testing multiplayer](testing.md) cover the hardening
-and operations gates.
+ENet traffic is not encrypted. WebRTC and Steam provide encrypted transports.
+These trust requirements are documented under
+[Session: trust and admission](session.md#trust-and-admission).
+[Named network profiles](profiles.md) provide validated defaults for three
+common trust models, with benchmarks that give starting points for capacity
+planning. The test suites described in [Testing multiplayer](testing.md) cover
+protocol defenses and operational behavior.
 
 ## Start here
 

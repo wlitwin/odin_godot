@@ -5,8 +5,11 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Replaying recorded network simulation</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/recording.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#scrapyard-integration">Scrapyard integration</a><a href="#large-model-wasm-verification">Large-model WASM verification</a><a href="#older-network-recordings">Older network recordings</a></nav></details>
 <article class="reading-body "><p>Use <code>net.recording_model(&amp;model)</code> to verify recorded network simulation without
-opening a session or replaying its transport. It adapts a network <code>Model(State, Control, Action, Event, Seats)</code> to the engine-free recording verifier. Use <code>Batch(Control, Action, Seats)</code> as the recorded input and <code>Net_Event(Event)</code> as the event type. This is
-the same simulation contract used by server and client timelines.</p>
+opening a session or replaying transport traffic. The adapter supplies the
+engine-free recording verifier with a network
+<code>Model(State, Control, Action, Event, Seats)</code>. The recorded input type is
+<code>Batch(Control, Action, Seats)</code> and the event type is <code>Net_Event(Event)</code>, matching
+the simulation run by server and client timelines.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">archive: d.Recording(World, net.Batch(Control, Action, SEATS), net.Net_Event(Event))
 <span class="hljs-keyword">defer</span> d.recording_destroy(&amp;archive)
 identity := d.Recording_Context{content = CONTENT, build = MODEL_REVISION, tick_hz = <span class="hljs-number">60</span>}
@@ -31,9 +34,10 @@ requests remain rejected; their semantically invalid payloads never reach the
 game&#39;s action predicate. Rejected view hints likewise remain diagnostic data.</p>
 <p>Client recordings preserve the replayable prediction suffix after the latest
 correction. They may therefore be much shorter than the authority recording.
-The captured complete local value can contain public-projection defaults in
-private fields. Use the matching model/prediction policy; a recording does not
-recover information that the client never received.</p>
+A captured client value may contain projection defaults in private fields
+because the authority never sent their contents. Verify it with the matching
+model and prediction policy. The recording cannot recover data absent from
+that client&#39;s received view.</p>
 <p>An archive can be verified after destroying every transport/session object. It
 contains simulation evidence, not a restorable network session: credentials,
 transport queues, replay authorization, durable admission and coordinator leases
@@ -48,9 +52,10 @@ recording control. Native output defaults to <code>user://scrapyard.rplrec</code
 overridden by <code>RSY_RECORDING_PATH</code>; Chrome requests a file download.</p>
 <p>The operation is synchronous and does not pause the network game. Complete world
 and batch copies make it useful for deliberate debugging, not every-frame capture.
-The unchanged codec limits are 16 MiB per file, 1 MiB per chunk and 64 MiB of owned
+The codec limits remain 16 MiB per file, 1 MiB per chunk and 64 MiB of owned
 record values. Export logs include the range, bytes, storage result and elapsed
-microseconds. Continuation/no-resync evidence is separate from these timings.</p>
+microseconds. Those timings do not by themselves show that the network game
+continued without resynchronization; that behavior needs separate evidence.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin run examples/replay_scrapyard/tools/verify_recording \
   -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -- /absolute/path/scrapyard.rplrec</code></pre></div><p>The tool uses the same Scrapyard model, carried catalog/rules and explicit manual
 recording revision. It reports complete replay agreement, action verdict counts,
@@ -84,9 +89,10 @@ agreement; run the verifier on the resulting file.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> odin run examples/replay_scrapyard/tools/upgrade_recording \
   -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -- old.rplrec converted.rplrec
 nix develop --<span class="hljs-built_in">command</span> odin run examples/replay_scrapyard/tools/verify_recording \
-  -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -- converted.rplrec</code></pre></div><p>It preserves the source and refuses existing files/symlinks. Publication uses a
-same-directory temporary file and hard link. Three earlier native/browser
-recordings have been converted and verified against their complete recorded
+  -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -- converted.rplrec</code></pre></div><p>The converter leaves its source intact and refuses to replace existing files
+or symlinks. It publishes the destination through a temporary file in the same
+directory and a hard link. Three earlier native/browser recordings have been
+converted and verified against their complete recorded
 state/event sequences.</p>
 <h3 id="scrapyard-content-48-recordings">Scrapyard content 48 recordings<a class="heading-anchor" href="#scrapyard-content-48-recordings" aria-label="Link to this section">#</a></h3>
 <p>The Scrapyard format-only <code>upgrade_recording</code> tool remains specific to content 48.
@@ -99,5 +105,5 @@ Current content-49 recordings use the verifier without this flag. Checkpoint
 conversion is a different operation: it seeds the prior authority epoch so future
 recovery can apply the new timer policy.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/recording.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/recording.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#scrapyard-integration" class="">Scrapyard integration</a><a href="#large-model-wasm-verification" class="">Large-model WASM verification</a><a href="#older-network-recordings" class="">Older network recordings</a><a href="#scrapyard-content-48-recordings" class="subsection">Scrapyard content 48 recordings</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/recording.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

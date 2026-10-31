@@ -28,7 +28,8 @@ REPLAY_ROLE=client nix develop --<span class="hljs-built_in">command</span> bash
 <code>REPLAY_ADDRESS</code>, and receive-delay <code>REPLAY_LATENCY</code> (milliseconds). <code>server</code> is an
 avatarless authority; <code>host</code> has a local player. <code>REPLAY_TOKEN</code> provides a
 deterministic identity label for tests; normal clients generate random credentials.
-Persistence across app restarts and host migration remain future work.</p>
+This Network example does not persist identity across app restarts or perform
+host migration.</p>
 <p>The fault decorator also accepts <code>REPLAY_JITTER</code> in milliseconds and
 <code>REPLAY_LOSS</code>/<code>REPLAY_DUPLICATE</code> in packets per 10,000. Loss/duplication affect
 unreliable traffic; reliable ordering/delivery is preserved. For example:</p>
@@ -72,8 +73,8 @@ leaves that interaction unconfirmed and advances by commands for inspection.</p>
 <p><code>run.sh</code> requires <code>REPLAY_HELLO_OK</code> and <code>REPLAY_LOOT_VIEW_OK</code> and rejects script
 errors, engine errors, and scenario failures. It builds on the engine-free
 <code>tests/replay</code> and <code>tests/replay_view</code> suites, including a WASM type-check of the
-instantiated view/clock/adapter/game surface. The broader <a href="../../tests/replay_hello_input/README.html">input/history/recording acceptance</a>
-now also runs real Chrome workflows. These are technical behavior checks, not a
+instantiated view, clock, adapter, and game code. The broader <a href="../../tests/replay_hello_input/README.html">input/history/recording tests</a>
+also run Chrome workflows. These are technical behavior checks, not a
 network comparison or a claim of human play-feel parity.</p>
 <p>Set the scene’s <code>debug_enabled</code> inspector property or launch with <code>REPLAY_DEBUG=1</code>
 for the <a href="../../replay/godot/debug/debug.html">local diagnostic overlay</a>. F8 toggles the panel
@@ -100,5 +101,5 @@ to game restores the original pause, while Continue from recording starts a new
 local branch. Rejected replacements keep the previous loaded recording. See the
 <a href="../../replay/diagnostic/playback.html">playback ownership and limits</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_hello_input/README.html"><span>Hello input acceptance</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/debug.html"><span>Local diagnostic overlay</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/scrubber.html"><span>Inspecting and branching local history</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_hello/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_hello_input/README.html"><span>Hello input acceptance</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/debug.html"><span>Local diagnostic overlay</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/debug/scrubber.html"><span>Inspecting and branching local history</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_hello/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#hello" class="">Hello</a><a href="#loot" class="">Loot</a><a href="#validation" class="">Validation</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_hello/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

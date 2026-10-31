@@ -7,8 +7,8 @@ M0–M9 port/deployment checkbox complete.
 
 **Decision: retain and deliver Replay as an experimental library alongside Kit.**
 The requested multiplayer styles have implemented primitives and representative
-acceptance. The current framework closure queue is satisfied within the explicit
-[support envelope](../../replay/support.md). Neither human productivity superiority
+acceptance. At this assessment, the framework completion requirements were satisfied within
+the explicit [supported configurations](../../replay/support.md). Neither human productivity superiority
 nor universal production/platform readiness is claimed. No release was published.
 
 ## Final requirement audit
@@ -23,7 +23,7 @@ nor universal production/platform readiness is claimed. No release was published
 | Practical authoring/debugging | Input capture and detached presentation; diagnostics/recordings/playback; checked API recipes; paid-revive/weapon authoring comparisons | Implemented with structural and runtime evidence. Human authoring speed/play-feel superiority remains unproven. |
 | Preserve both implementations and separately runnable games, including sibling Scrapyard | Kit baseline hashes, clean original game paths, clean sibling revision; distinct Replay projects and isolated test profiles | Preserved. Remaining full-game parity is deferred by user direction, not claimed complete. |
 | Comparison and stabilization | Current 13-gate framework smoke (400 unit tests plus recipe/target/archive checks), observer trace, protocol/fixture fixes and prior representative cost measurements | Verified selection passes. The historical C2 failure's cause remains unestablished; no failing current trace or invented fix is claimed. |
-| Deliver usable library entry points | Getting-started guide, compatibility policy, checked lifecycle recipes, supported-envelope assessment and existing addon packaging | Delivered in the workspace. Actual package installs/builds/runs outside the source checkout; no deployment or publication performed. |
+| Deliver usable library entry points | Getting-started guide, compatibility policy, checked lifecycle recipes, supported-configuration assessment and existing addon packaging | Delivered in the workspace. Actual package installs/builds/runs outside the source checkout; no deployment or publication performed. |
 
 The [implementation audit](framework-audit.md) provides source/test mappings.
 [Framework delivery receipts](results/framework-delivery-2026-09-20/README.md)
@@ -38,12 +38,12 @@ readiness fails after about 10.46 seconds, and neither party claims readiness fo
 new admissions. Existing authenticated links remain at generation 1 and both
 games continue to the full-reference tick-1200 hash **9004447930841423017**.
 
-Thus current behavior is explicit: existing P2P gameplay can survive background
+The observed behavior is explicit: existing P2P gameplay can survive background
 control loss, but new admission cannot. Automatic control reconnection is not
 implemented by the current Party owner. The application may close/reopen and
 restore/rejoin after service recovery. Signed denial/invalidity has a different
-policy and clears native link keys. This boundary is documented, not hidden behind
-an unbounded retry or a claim of seamless recovery from every outage.
+policy and clears native link keys. The documented policy requires an application decision after control loss; it
+does not retry indefinitely or promise recovery from every outage.
 
 ## Adoption rationale
 
@@ -57,8 +57,7 @@ replacing Kit automatically. Both game versions remain useful for that evaluatio
 
 ## Follow-up boundaries
 
-These remain visible follow-ups, outside the completed framework-first closure
-queue: exhaustive game content/visual/audio parity; human comparative playtests;
+The following work remains outside the completed framework-first scope: exhaustive game content/visual/audio parity; human comparative playtests;
 broader independent OS/hardware/browser validation; live Steam/GameServer and public
 account/deployment operations; arbitrary NAT and outage combinations; independent
 cryptographic review; automatic failed-control reconnection; and storage/prediction

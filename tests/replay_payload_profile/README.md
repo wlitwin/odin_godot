@@ -22,15 +22,16 @@ against full-snapshot size; transport/part overhead is not included.
 It also compares a negotiated LZ4 candidate, reconstructs every target byte, and
 retains the final world hash and gameplay totals. Encoder timings include their
 required preflight passes but exclude model stepping, schema encoding and decoder
-verification. These are descriptive CPU-side elapsed costs from one process, not
-network traffic, a matched runtime benchmark or confidence intervals.
+verification. These are elapsed encoding times from one process, not process
+CPU accounting, network traffic, a matched runtime benchmark, or confidence
+intervals.
 
 The selection comparison additionally times the prior network selection order and
 `encode_smallest` at a payload budget that must beat a full snapshot. Method order
 alternates each tick to avoid always warming the same input cache. Each pair must
 choose the identical encoding kind, size and bytes, including sparse ties. The
-`SELECTION` rows report elapsed CPU time and winner counts; neither timing is an
-acceptance threshold. This comparison does not change gameplay or canonical data.
+`SELECTION` rows report elapsed selection time and winner counts; neither timing
+is an acceptance threshold. This comparison does not change gameplay or canonical data.
 
 `SHUFFLE` rows describe the optional schema-derived candidate with the exact
 network heuristic and its eight-byte transform signature. Every selected payload

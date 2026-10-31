@@ -1,4 +1,6 @@
-# Replay loot: the first local-world experiment
+<a id="replay-loot-the-first-local-world-experiment"></a>
+
+# Replay Loot: correcting an inventory transfer
 
 Run from the repository root:
 
@@ -7,7 +9,7 @@ nix develop --command bash examples/replay_loot/run.sh
 ```
 
 This is a standalone Odin executable; Godot, sockets, and generated scripts are
-not involved. It exercises the new [Replay library](../../replay/README.md).
+not involved. It exercises the [Replay library](../../replay/README.md).
 Existing games remain available in their original directories.
 
 Two players stand beside a chest with five items. The initial input says player
@@ -36,6 +38,6 @@ REPLAY_LOOT_OK
   atomicity, history limits, event replacement, handle lifetime, type constraints,
   and reproducibility tests.
 
-The [Godot loot view](../replay_hello/README.md) now uses this same model and tests
+The [Godot loot view](../replay_hello/README.md) uses this same model and tests
 effect cancellation while correcting the winner.
 The complete port and comparison sequence is in the [roadmap](../../docs/replay/roadmap.md).

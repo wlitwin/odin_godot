@@ -1,19 +1,16 @@
 # 2 · Thinking in structs
 
-Godot scripting assumes a class: you inherit a node, override its methods, and
-`self` is everything. Odin scripts have no classes. A script is three separate
-things instead, and this page maps each GDScript reflex to its Odin form.
+An Odin node script stores state in a struct and implements behavior in free
+procedures. Its `self.owner` field holds the Godot node. This page maps
+GDScript features to those three parts.
 
-The script has three parts:
+The struct's fixed layout lets generated code locate its fields. Kit, the
+multiplayer framework in posts 3–6, uses field descriptors to replicate and
+snapshot selected state.
 
-> **A script is a struct (your state) plus free procs (your behavior), riding
-> on an engine node (`self.owner`).**
+<a id="the-reflex-map"></a>
 
-GDScript fuses those three into one `self`. Keeping them apart means your state
-has a fixed layout that generated code can inspect. Kit, the multiplayer
-framework in posts 3–6, uses field descriptors to replicate and snapshot it.
-
-## The reflex map
+## GDScript-to-Odin equivalents
 
 | The GDScript reflex | The Odin form |
 | --- | --- |
@@ -32,7 +29,7 @@ framework in posts 3–6, uses field descriptors to replicate and snapshot it.
 | `var scratch = {}` (private state) | an untagged struct field |
 | `position.x += 1` | `gd.node2d_set_position(self.owner, ...)` |
 
-Two naming rules carry the whole scheme: every proc is prefixed with its
+Two naming rules distinguish scripts in a package: prefix each procedure with its
 struct's snake_case name (`enemy_ready`; all scripts share one package, so
 prefixes prevent collisions), and the prefix is *stripped* for the
 Godot-facing name (`enemy_take_damage` is `take_damage` to a signal, an
@@ -45,11 +42,11 @@ node is `self.owner`:
 
 ```odin
 gd.add_child(self.owner, node)     // ✓ the engine node
-gd.add_child(self, node)           // ✗ hands the engine your struct — segfault
+gd.add_child(self, node)           // ✗ rejected: this is script data, not a node handle
 ```
 
-Both compile, because engine handles are raw pointers. The build refuses the
-second form outright:
+Engine handles are distinct types, so the compiler rejects the second form.
+Scriptgen also reports the script/node mix-up at build time:
 
 ```
 scriptgen: error: scripts/powerup.odin:31: gd.add_child: `self` is the
@@ -62,10 +59,11 @@ pass `self`.
 
 ## Replacing inheritance
 
-You keep extending *engine* classes: `//gd:extends CharacterBody2D` gives you
-everything the node is. What Odin has no equivalent for is
-script-extends-script: there is no `class_name Enemy extends Actor` with
-overridden methods. The replacements, in the order you'll reach for them:
+The Godot base still determines the node's engine behavior:
+`//gd:extends CharacterBody2D` attaches the script to that engine class.
+Odin has no script-to-script inheritance such as
+`class_name Enemy extends Actor` with overridden methods. Share data and
+behavior through structs and procedures:
 
 **Shared data → a shared struct field.** The GDScript base class holding
 `hp`, `speed`, `faction` becomes a plain struct embedded in each script:
@@ -81,7 +79,7 @@ Player :: struct { owner: gd.Node2d, vitals: Vitals, /* ... */ }
 amount: f32)` works on anything with vitals. There is no virtual dispatch: you
 pass the piece it needs.
 
-**"Is this thing an X?" → `rt.script_of`.** This is the typed cross-script lookup:
+Use `rt.script_of` to resolve a Godot object to a particular script type:
 
 ```odin
 player := rt.script_of(body, Player)   // ^Player, or nil if body isn't one
@@ -97,19 +95,20 @@ same type in every file: cross-script calls are direct, typed calls, not
 This is composition: embed shared data and pass it to shared procedures.
 Changing that data does not require a script inheritance hierarchy.
 
-## Replacing autoloads
+<a id="replacing-autoloads"></a>
 
-An autoload is two things in one: a *node* that's always in the tree, and a
-*global* everyone can reach. Odin splits them:
+## Shared state and autoloads
 
-- Need the node (timers, `_process`, signals)? Make an autoload as usual:
-  an Odin script on an autoloaded node works fine, and `rt.script_of` reaches
-  its struct from anywhere.
-- Need only the global? Package-level state in a plain `.odin` file is
-  visible to every script in the package, and no node is required. For typed
-  one-to-many "somebody should react to this" without engine signals, the
-  extension ships a pure-Odin event system ([Events](../events.md)) at
-  direct-call cost.
+Use an autoload when shared state needs a persistent Godot node. Package-level
+state can serve scripts that need no engine node:
+
+- For timers, `_process`, or signals, attach an Odin script to an autoloaded
+  node. Resolve its node through the scene tree and use `rt.script_of` to
+  access the script data.
+- For shared data alone, package-level state in a plain `.odin` file is
+  visible to every script in the package. The pure-Odin event system supports
+  typed one-to-many notifications through direct procedure calls;
+  see [Events](../events.md).
 
 ## What the compiler checks
 
@@ -126,4 +125,4 @@ The compiler and scriptgen check different parts of this arrangement:
 In the next post, a field tag makes state *network-synchronized*. The
 compiler-checked struct layout is what makes that possible.
 
-*Next: [State, not messages →](03-state-not-messages.md)*
+*Next: [Field replication →](03-state-not-messages.md)*

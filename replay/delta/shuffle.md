@@ -15,7 +15,7 @@ The network runner negotiates this candidate separately and retains full, sparse
 and ordinary LZ4 fallback. It tries the transform only when the existing candidate
 is at least `max(2048, canonical_size / 16)` bytes, or no old candidate fits. A
 transformed candidate must be strictly smaller including its eight-byte transform
-signature. This heuristic avoids repeatedly testing young, already compact deltas.
+signature. This heuristic avoids repeatedly testing small, already compact deltas.
 It does not promise the globally smallest encoding for every possible value.
 
 Scratch is allocated lazily once per server and receiving client, then reused and

@@ -4,8 +4,9 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Browser authority migration work</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/replay/browser-migration.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>The native Room&#39;s migration and fencing rules remain the reference. WebRTC packet
-exchange and a P2P duel do not by themselves make browser authority migration safe.</p>
+<article class="reading-body "><p>Browser authority migration must preserve the native Room&#39;s lease, recovery,
+and fencing rules. WebRTC packet exchange or a working P2P duel alone does not
+validate those requirements.</p>
 <p>Implemented and tested prerequisites:</p>
 <ol>
 <li>Raw WebSocket control transport, including binary/text separation, bounded
@@ -32,8 +33,8 @@ actions. Planned mode also rejoins the old host. The gate additionally covers
 two handoffs, control partition/fencing, successor loss during handoff and a killed
 host returning with a fresh incarnation. Monotonic driver receipts distinguish
 fault-to-action time from the narrower Room timer.</p>
-<p>Remaining acceptance and integration:</p>
-<p>Actual Coturn relay gates now pass Cavecrawl over UDP/TCP and Scrapyard&#39;s asset-aware
+<p>Additional verified integration:</p>
+<p>Coturn relay gates pass Cavecrawl over UDP/TCP and Scrapyard&#39;s asset-aware
 combat flow over UDP. Selected browser candidate pairs and Coturn logs prove relayed
 traffic at join, handoff and rejoin. Incorrect relay credentials do not fall back to
 direct gameplay in relay-only mode. See <span class="local-reference" title="docs/replay/results/turn-relay-2026-09-07/README.md · available in the repository">relay evidence</span>.</p>
@@ -42,13 +43,15 @@ joins and durably rejoins parties through the standalone room service. A real
 Chrome gate covers automatic successor selection, a zero-loss handoff and concurrent
 isolated rooms. This uses explicit loopback WS with RTC gameplay; public WSS/TURN
 deployment is still separate work.</p>
+<p>Remaining acceptance and integration:</p>
 <ul>
 <li>Public account/room provisioning and trust boundaries. Authenticated
 signaling-only reconnect now preserves healthy channels and peer IDs; broader
 network/provider-outage envelopes still need measurement.</li>
 <li>External asset dependencies and gameplay recovery in richer browser game ports;
 broader workloads and repeated timing measurements for the existing failure matrix.</li>
-<li>Actual browser sleep/clock anomalies, TLS/TURN and additional browser engines.</li>
+<li>Browser sleep/clock anomalies, deployed TLS/TURN configurations, and
+additional browser engines.</li>
 <li>Broader interruption measurements, including time before local fencing, and
 checkpoint age/lost ticks/transfer size under representative gameplay.</li>
 </ul>
@@ -57,8 +60,8 @@ remaining failure matrix or public deployment envelope.</p>
 <p>See <a href="../../replay/godot/transport/websocket.html">WebSocket</a>,
 <a href="../../replay/authority/paired_clock.html">paired clock</a> and
 <a href="../../replay/authority/rendezvous.html">rendezvous</a> for current APIs and limits.
-This completes no additional milestone by declaration; all remaining gates are
-part of the active M0–M9 objective.</p>
+These local results do not complete another milestone. The remaining gates
+still belong to the active M0–M9 objective.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/transport/websocket.html"><span>Raw WebSocket transport</span><span aria-hidden="true">→</span></a><a href="../../replay/authority/paired_clock.html"><span>Paired elapsed clock</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/browser-migration.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../examples/replay_cavecrawl/online.html"><span>Party menus and durable enrollment</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/transport/websocket.html"><span>Raw WebSocket transport</span><span aria-hidden="true">→</span></a><a href="../../replay/authority/paired_clock.html"><span>Paired elapsed clock</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/browser-migration.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/browser-migration.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

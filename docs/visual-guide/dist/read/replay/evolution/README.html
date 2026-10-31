@@ -4,8 +4,10 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Revision contracts and explicit conversion</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/evolution/README.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Use these cold-path tools before changing a saved or networked value type. They
-freeze representation contracts; they do not infer compatible gameplay behavior.</p>
+<article class="reading-body "><p>Run these tools during authoring or offline upgrades before changing a saved
+or networked value type. They generate frozen type definitions, schema
+manifests, and conversion scaffolds. The author must still decide whether the
+old and new gameplay rules are compatible.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">source, report := evolution.freeze(Old_World, <span class="hljs-string">&quot;game_revision_12&quot;</span>, <span class="hljs-string">&quot;World_12&quot;</span>)
 <span class="hljs-comment">// source is owned; write only after report.error == .None, then delete(source).</span>
 manifest, report := evolution.contract(Old_World, CONTENT_12)
@@ -25,11 +27,11 @@ canonical schema text and leaf field paths/kinds/widths/wire offsets, privacy,
 enum meaning and bit masks. Check it into source control beside the frozen type.
 Compare regenerated manifests in CI. It does not freeze reducer code, authorize
 an old recording for a new reducer, or replace a signed build manifest.</p>
-<p><code>scaffold</code> handles additive schema changes. Its generated procedure deliberately
-returns failure until the author supplies target defaults and changes the review
-flag. Every added leaf is listed by full path, including every array element.
-Removed fields, changed widths/kinds, enum meanings/signedness, privacy changes and
-unions/enumerated arrays require custom authored conversion code instead of an automatic scaffold.</p>
+<p><code>scaffold</code> generates a starting procedure for additive schema changes. It
+returns failure until the author supplies target defaults and changes its review
+flag. The generated list names every added leaf by full path, including each
+array element. Removed fields, changed widths/kinds, enum meanings/signedness,
+privacy changes, and unions/enumerated arrays require a custom conversion.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">defaults := New_Catalog{} <span class="hljs-comment">// Deliberate decision: old enemies gain no pulse attack.</span>
 paths := []<span class="hljs-type">string</span>{<span class="hljs-string">&quot;$.enemy.pulse.windup&quot;</span>, <span class="hljs-string">&quot;$.enemy.pulse.damage&quot;</span>}
 value, report := evolution.copy_preserved(old, defaults, paths)
@@ -40,9 +42,9 @@ It does not validate game invariants: call the target model&#39;s validator befo
 publishing a checkpoint. <code>verify_preserved</code> checks every old leaf; separately
 assert the chosen new defaults. <code>remove_added</code> provides an explicit inverse
 projection for fixture builders, acknowledging each discarded leaf.</p>
-<p>These helpers compile schemas, allocate scratch and use linear path lookup within
-field loops. They are intended for authoring, offline upgrades and tests, not the
-simulation tick or a per-frame presentation path.</p>
+<p>These helpers compile schemas and allocate scratch. They search paths linearly
+inside field loops, so keep them in authoring tools, offline upgrades, and tests.
+Do not call them from a simulation tick or each presentation frame.</p>
 <p>Scrapyard demonstrates this with a fully frozen
 <a href="../../examples/replay_scrapyard/shared/revisions/content49/catalog.odin.html"><code>content49</code></a>,
 its committed contract, and the actual content49→50 checkpoint converter. Run:</p>
@@ -53,5 +55,5 @@ nix develop --<span class="hljs-built_in">command</span> odin <span class="hljs-
 and a disabled conversion scaffold into the staging directory. Review before
 adopting them; retain the historical reducer and real old-file fixtures.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/evolution/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/evolution/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/evolution/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

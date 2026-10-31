@@ -1,48 +1,51 @@
 # kit/xfer — chunked large payloads
 
-Reach for a **transfer** when you need to ship one big thing (a user-drawn
-spray, a custom skin, a shared level file) to every peer once. A transfer
-chunks the payload, paces it, and reassembles it on the far side, so gameplay
-traffic never stalls behind one giant packet and the payload fits transports
-that cap message size (WebRTC data channels cap a message around 16KB).
+Use a transfer to send a large payload, such as a user-drawn spray, custom
+skin, or shared level file. `kit/xfer` splits it into chunks, limits the number
+sent per tick, and reassembles it at each receiver. This bounds transfer work
+per tick and avoids submitting the entire payload as one transport message.
+For WebRTC without SCTP message interleaving,
+[RFC 8831](https://www.rfc-editor.org/rfc/rfc8831.html#section-6.6) recommends
+limiting messages to 16KB to avoid monopolizing the association; this is not
+a universal WebRTC message-size cap.
 
-A transfer is not an [entity blob](session.md): a blob rides whole on every
-version bump and carries state a joiner must see; a transfer is a one-shot
-shipment of something big.
+An [entity blob](session.md) sends its complete contents on each version
+change and is included in snapshots for joiners. A transfer sends a payload
+once. Use the Album described below when late joiners also need that payload.
 
-**Lane compatibility: lane-agnostic.** Transfers ride the session's app channel;
-neither lane's tick machinery is involved. Never *consume* a payload inside a
-sim tick, because arrival timing is wall-clock, not sim-deterministic. Land it
-in frame code and let events or fields carry the consequences.
+Transfers use the session's app channel independently of either simulation
+model. Consume arrivals in frame code, then use events or fields to represent
+their consequences. Do not consume them inside a simulation tick: network
+arrival timing is not deterministic simulation input.
 
 ## How it routes
 
-Everything routes through the host. A client sends paced 8KB frames up; the host
-assembles its own copy AND relays each frame to everyone, stamped with the
-sender. Every peer receives every payload exactly once, on any transport, and a
-spoofed cast from a non-host peer drops on the floor.
+All transfers route through the host. A client sends paced 8KB frames; the
+host assembles its own copy and relays each frame with the sender identity.
+Other peers accept these broadcasts only from the host. The sender already
+holds the original bytes and does not receive a completion event for its own
+transfer.
 
-xfer is a payload codec (chunking, assembly, supersede) layered over
-[`ksess.Host_Relay`](session.md#host-relay),
-which supplies the stamp, spoof-drop, echo policy, and addressed replay. xfer
-runs the relay with `echo = false`: you already hold the bytes you sent, so your
-own upload coming back around is dropped on both roles.
+[`ksess.Host_Relay`](session.md#host-relay) handles sender identity, source
+checks, echo policy, and delivery to individual peers. Xfer adds chunk
+encoding, assembly, and replacement of superseded payloads. It sets
+`echo = false`, suppressing returned copies of client uploads and local
+delivery of the host's own broadcasts.
 
 ## Sending and receiving
 
 ```odin
 import kxfer "godot:kit/xfer"
 
-kxfer.xfer_init(&self.xfer, &self.ses, MY_TAG) // once — PICK YOUR TAG: the
+kxfer.xfer_init(&self.xfer, &self.ses, MY_TAG) // once; choose a unique tag: the
                                                // default (2) collides if the
                                                // game already claimed it
 kxfer.xfer_send(&self.xfer, PAYLOAD_ID, bytes) // anyone; ≤512KB; copies
-kxfer.xfer_pump(&self.xfer)                    // once per NET TICK — the pacing
-                                               // is the point (2 x 8KB chunks/tick
+kxfer.xfer_pump(&self.xfer)                    // once per net tick; sends at most
+                                               // 2 x 8KB chunks/tick
                                                // ≈ 320KB/s at the default 20Hz;
                                                // the cap scales with tick_hz, and
-                                               // gameplay traffic never queues
-                                               // behind a spray)
+                                               // transfer work per tick is bounded.
 for {                                          // every frame
     ev, ok := kxfer.xfer_poll(&self.xfer)
     if !ok { break }
@@ -52,45 +55,47 @@ for {                                          // every frame
 }
 ```
 
-Payloads key by `(sender, id byte)`. Re-sending an id supersedes the queued copy
-and restarts every receiver's assembly. The reliable channel is ordered per
-sender, so a sequence gap means RESTART, never loss. Hostile totals past
-`MAX_PAYLOAD` (512KB) or lying chunk counts drop the whole assembly. A sender
-never receives its own `Ev_Done`; you already hold the bytes you sent, and the
-[album](#the-album--kept-payloads-late-joiners-included)'s own-copy shelf covers
-the case where you want them back.
+Payloads are keyed by `(sender, id byte)`. Sending the same ID again replaces
+the queued copy and restarts assembly at receivers. Because the reliable
+channel preserves per-sender order, sequence gaps indicate a restart rather
+than packet loss. Receivers discard an assembly if its total exceeds
+`MAX_PAYLOAD` (512KB) or its chunk count is inconsistent. Senders do not
+receive their own `Ev_Done`; the
+[album](#the-album--kept-payloads-late-joiners-included) can retain a local copy
+and report it through the same polling API as received payloads.
 
-**Worked example.** scrapyard's spray wall (integration test act 12): drop a PNG
-at `user://spray.png`, it ships to every friend at start, and `G` stamps your
-tag on the floor. The stamp itself is a 13-byte kcomms marker, because the image
-already lives on every screen. The byte counts printed on each side of the
-120ms-latency test must match exactly.
+**Worked example.** In scrapyard's spray-wall integration test, act 12 reads a
+PNG from `user://spray.png` and transfers it to peers at startup. Pressing `G`
+then places the spray on the floor. Placement uses a 13-byte kcomms marker
+because peers already hold the image. The test injects 120ms latency and
+requires the byte counts printed on both sides to match exactly.
 
-## The album — kept payloads, late joiners included
+<a id="the-album--kept-payloads-late-joiners-included"></a>
 
-A raw transfer is one-shot: whoever joins after it shipped never sees it.
-`Album` keeps payloads and replays them to late joiners, owning the own-copy
-short circuit, the per-(player, kind) cache, and the arrived-repaint hook. It
-closes the late-joiner hole a one-shot transfer can't:
+## Retain payloads for late joiners with Album
+
+A raw transfer is not retained for later joiners. `Album` caches payloads by
+player and kind, stores local submissions immediately, and reports arrivals
+for the game to decode and display. The host can replay its cached payloads
+to late joiners through the same paced transfer mechanism:
 
 ```odin
 kxfer.album_init(&self.album, &self.ses, MY_TAG)  // instead of xfer_init
-kxfer.album_put(&self.album, SPRAY_ID, png)       // mine: on my shelf NOW, shipped over the pumps
+kxfer.album_put(&self.album, SPRAY_ID, png)       // cache locally now; send through album_pump
 kxfer.album_pump(&self.album)                     // once per net tick
-for {                                             // every frame: the repaint hook
+for {                                             // poll each frame for changed payloads
 	from, id, ok := kxfer.album_poll(&self.album)
 	if !ok {break}
 	bytes, _ := kxfer.album_get(&self.album, from, id) // owned by the album; decode, don't retain
 }
 
-// HOST, on Ev_Player_Joined (rejoins included — their cache died with
-// their process): replay every kept payload to the newcomer, addressed,
-// paced by the same chunk budget as live sends.
+// Host, on Ev_Player_Joined, including rejoins that may have lost their cache:
+// replay retained payloads to this player using the live-send chunk budget.
 kxfer.album_welcome(&self.album, e.id)
 ```
 
-A re-put supersedes everywhere and cancels any in-flight catch-up of the stale
-copy, because two chunk streams for one key would tear the assembly. Decoded artifacts
-stay the game's cache; the album keeps BYTES and
-`album_poll` marks exactly when to re-decode. Covered by the headless tests in
-`tests/kitxfer` (chunked convergence, supersede, the addressed catch-up).
+Putting the same key again replaces the payload and cancels in-flight catch-up
+of the older copy, preventing two chunk streams from competing for one
+assembly. Album stores bytes; the game owns decoded images or other artifacts
+and uses `album_poll` to decide when to decode again. Headless tests in
+`tests/kitxfer` cover chunked convergence, replacement, and addressed catch-up.

@@ -56,7 +56,7 @@ REPLAY_P2P_PARTY_RUN=/absolute/fresh/creator-return REPLAY_P2P_PARTY_MODE=creato
 nix develop --command bash tests/replay_p2p_party/run.sh
 ```
 
-This browser path uses WebRTC. Native two-player provisioning now uses encrypted
+This browser path uses WebRTC. Native two-player provisioning uses encrypted
 ENet through [P2P Direct](../../replay/godot/p2p_direct.md). Public accounts/deployment
 and authenticated spectator enrollment remain open.
 The direct demo, manually issued credential fixtures and native ENet scenarios
@@ -94,8 +94,8 @@ nix develop --command bash tests/replay_p2p_native/run.sh
 The model in `shared/duel` uses Q24.8 coordinates, checked updates, stable projectile
 slots and frame-owned RNG. Three hits kill a fighter; respawn happens after a
 deterministic randomized delay. All bullets resolve before damage is applied so
-same-tick trades are symmetric. Presentation draws copied state and uses an event journal to reconcile displayed
-effects after replay.
+same-tick trades are symmetric. Presentation draws copied state and uses an
+event journal to reconcile displayed effects after replay.
 
 The real-process gate uses 120 ms receive delay per side, 0–20 ms jitter, 10%
 unreliable loss and 10% duplication. It simulates 600 ticks, waits for both confirmed
@@ -107,8 +107,7 @@ steps that waited, not distinct simulation ticks or elapsed stall duration.
 `tests/replay_deterministic` executes a 2,400-tick corpus with four seeds on native
 arm64 and freestanding WASM, comparing canonical state/event hashes and gameplay
 counters. The WASM module imports no host simulation functions. This is execution
-evidence, not merely a type-check. P2P browser gameplay and coordinated file recovery now have separate real-browser
-gates. Other native targets and polished lobby/recovery UX remain pending.
+evidence, not merely a type-check. Separate browser tests exercise P2P gameplay and coordinated file recovery. Other native targets and polished lobby/recovery UX remain pending.
 
 `resume_run.sh` saves each participant's full protocol archive at tick 240 while
 the final ticks are still speculative. It kills both processes, creates new ENet
@@ -142,7 +141,7 @@ The fixed loopback role mapping is a trusted test provider, not authenticated
 admission. Old ENet identities are excluded by the replacement mapping. The saved
 participant stops sampling before it is killed: an arbitrary older archive can
 fail if survivors have inputs it forgot or required retransmission history was
-evicted. The runner refuses both cases. The same behavior now has a browser gate
+evicted. The runner refuses both cases. The same behavior has a browser test
 described below. Authenticated browser creator recovery also has a separate gate.
 
 `creator_rejoin_run.sh` covers the native listening participant returning. The
@@ -174,10 +173,10 @@ independent of the player roster; losing their connection cannot stall players.
 then reconnects the viewer to the second participant on game port + 2. A retained
 anchor proves continuity, so the viewer keeps its world and event journal and
 reaches tick 900 without another presentation reset. Both players keep simulating.
-The native fixture uses configured loopback peers and a private anchor file;
-public authenticated spectator provisioning, browser source-switch integration,
-automatic restoration of a restarted spectator and delayed disclosure remain
-pending. See the [spectator contract](../../replay/p2p/spectators.md).
+The native fixture uses configured loopback peers and a private anchor file.
+It does not establish public authenticated spectator provisioning, browser
+source-switch integration, automatic restoration of a restarted spectator, or
+delayed disclosure; those still need implementation or integration. See the [spectator contract](../../replay/p2p/spectators.md).
 
 View geometry was copied from Replay Quickdraw's script-free gunner/bullet scenes;
 see its [original asset provenance](../replay_quickdraw/assets.md). The copied
@@ -189,7 +188,7 @@ The [profiling contract](../../replay/p2p/profiling.md) explains operation wall
 timings and capture-to-first-simulation latency. `profile_run.sh` compares two/eight
 delay ticks with the same gameplay inputs; `tests/replay_p2p/bench.sh` separately
 measures optimized native process CPU over two peers and Memory transport.
-`tests/replay_deterministic/run.sh` now checks default and speed optimization on
+`tests/replay_deterministic/run.sh` checks default and speed optimization on
 the host and WASM, plus macOS x86-64 under Rosetta when available. Rosetta validates
 an alternate ISA binary on this Mac, not independent x86 hardware or other OSes.
 Set `REPLAY_REQUIRE_ROSETTA=1` to make an unavailable Rosetta check fail explicitly.
@@ -247,7 +246,7 @@ Browser recovery uses explicit participant files, with a 16 MiB import bound.
 The lobby finishes an IndexedDB upload transaction before entering the game;
 the game waits for the bounded buffer and performs normal archive decoding and
 reexecution validation. Initiating a browser download does not prove it was saved:
-the browser/user owns completion. This gate verifies actual files and restores
+the browser/user owns completion. This test verifies actual files and restores
 in new browser processes. It does not claim implicit Godot virtual-filesystem
 flush durability.
 
@@ -278,7 +277,7 @@ nix develop --command bash tests/replay_p2p_admission/service_run.sh
 nix develop --command bash tests/replay_p2p_admission/web_run.sh
 ```
 
-The browser gate starts a native Godot signaling provider with a fixed two-member
+The browser test starts a native Godot signaling provider with a fixed two-member
 registry. Each Chrome process imports its personal JSON credential using the lobby's
 credential input; the file contains `member`, `incarnation` and a 64-character
 lowercase hexadecimal `key`. The lobby stores only that participant's credential

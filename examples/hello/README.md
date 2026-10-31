@@ -1,11 +1,13 @@
 # examples/hello — Odin → GDExtension registration ABI proof
 
-A minimal Odin-authored GDExtension class, `OdinHello` (extends `RefCounted`),
-that GDScript can construct, call a custom method on, read/write a property,
-and receive a signal from — verified headless against **Godot 4.6.2**.
+This early registration experiment defines `OdinHello`, an Odin-authored
+GDExtension class extending `RefCounted`. GDScript constructs it, calls a custom
+method, reads and writes a property, and receives its signal. The recorded
+headless validation used Godot 4.6.2.
 
-This exists to validate the low-level registration primitives that the real
-`ScriptLanguageExtension` core (`core/`) will reuse.
+The experiment tested low-level registration primitives for the
+`ScriptLanguageExtension` core in `core/`. Its build output and warnings below
+record that test configuration.
 
 ## Files
 
@@ -37,8 +39,8 @@ odin build examples/hello/src \
     -build-mode:dll -out:examples/hello/bin/hello.dylib -debug
 ```
 
-(The linker emits `could not find symbol ... _method_ptr` warnings for stripped
-core method binds — benign; the dll links and loads fine.)
+The recorded linker output included `could not find symbol ... _method_ptr`
+warnings for stripped core method binds. The fixture's dll still linked and loaded.
 
 ## Run (headless)
 
@@ -49,9 +51,8 @@ load the extension:
 nix develop --command bash -c '$GODOT --headless --path examples/hello --import'
 ```
 
-(That import pass also prints a Godot-internal `EditorHelp` doc-gen crash at
-cleanup — unrelated to this extension; the `extension_list.cfg` is written
-before it.) Then run the test:
+The recorded import pass also reported a Godot-internal `EditorHelp` doc-gen
+crash during cleanup, after writing `extension_list.cfg`. Then run the test:
 
 ```
 nix develop --command bash -c '$GODOT --headless --path examples/hello --script test_hello.gd'
@@ -81,5 +82,5 @@ core method binds whose symbols were stripped at link time — they do not affec
 | Signal bind + emit (`classdb_register_extension_class_signal`, `Object::emit_signal` method bind) — `value_changed` fires | `bind_signal` / `emit_value_changed` | proven |
 | Virtual dispatch (`get_virtual_call_data_func` / `call_virtual_with_data_func`) | slots present in `ExtensionClassCreationInfo2`; not exercised here (RefCounted needs no `_process`) — see `examples/hello-gdextension` for a working `_process` example | not exercised |
 
-The custom method bind is the new capability vs. the upstream
-`hello-gdextension` reference (which only bound properties + virtuals).
+This experiment added custom method binding to the upstream `hello-gdextension`
+reference, which exercised properties and virtuals.

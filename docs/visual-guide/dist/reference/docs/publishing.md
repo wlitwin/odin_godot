@@ -1,16 +1,16 @@
 # Publishing to the Godot Asset Library
 
-The Asset Library serves a **zip of a git commit** from a public GitHub/GitLab repo. Reach
-for this page when you want to publish `odin_godot` there or ship an update.
+Use this procedure to publish `odin_godot` to the Godot Asset Library or submit
+an update. The library downloads a zip of a git commit from the public
+GitHub/GitLab repository.
 
-Releases live on an orphan `release` branch whose tree is only the installable addon
-(`addons/odin_godot/**` + README/LICENSE/NOTICE), so a user's install dialog shows exactly
-the addon and not the dev tree. `build/release.sh` assembles that branch from the nix-built
-zip. The rest of this page is the end-to-end runbook.
+`build/release.sh` assembles an orphan `release` branch from the Nix-built zip.
+Its tree contains the installable addon (`addons/odin_godot/**`) plus
+README/LICENSE/NOTICE, keeping development files out of the installation dialog.
 
 ## One-time setup
 
-1. Create the public GitHub repo and push (already done):
+1. Configure and push the public GitHub repository if it is not set up yet:
 
    ```sh
    git remote add origin git@github.com:wlitwin/odin_godot.git
@@ -43,15 +43,15 @@ zip. The rest of this page is the end-to-end runbook.
 | Godot version | `4.7` |
 | Asset version | match `version` in `build/dist.nix` (e.g. `0.1.0`) |
 
-Suggested description (edit to taste):
+Suggested asset description:
 
-> Write Godot scripts in Odin. It is a full ScriptLanguageExtension: attach a .odin file to
-> any node, and its lifecycle, @exports, signals, methods, RPCs, and hot reload work like
-> GDScript, but the code is compiled, AOT-native code. It ships prebuilt core libraries
-> (macOS / Windows / Linux), an in-editor build pipeline (save-to-reload), native + HTML5/WASM
-> export, typed access to the whole engine API, and a starter template. It requires the Odin
-> compiler (the bundled README names the tested release). macOS is fully verified;
-> Windows/Linux are early, and reports are welcome.
+> Attach compiled .odin scripts to Godot nodes through ScriptLanguageExtension.
+> Scripts support lifecycle procedures, @exports, signals, methods, RPCs, and
+> hot reload. The addon includes prebuilt core libraries for macOS, Windows,
+> and Linux, an editor build pipeline that reloads after compilation, native
+> and HTML5/WASM export, typed engine API access, and a starter template.
+> Install the Odin compiler release named in the bundled README. macOS has
+> been fully verified; Windows/Linux support is early, and reports are welcome.
 
 ## Releasing an update
 
@@ -66,11 +66,12 @@ git push origin main release --tags
 
 ## Consumer-facing notes
 
-- **In-editor AssetLib installs are clean on macOS.** But a user who downloads the zip in a
-  *browser* gets `com.apple.quarantine` on the prebuilt dylibs, and Gatekeeper will refuse
-  to load them into the (notarized) Godot editor. Workaround for those users:
-  `xattr -dr com.apple.quarantine addons/odin_godot`. (Long-term: codesign/notarize the
-  dylibs.)
+- **Browser downloads can trigger macOS quarantine.** In-editor AssetLib
+  installs avoid this issue. A browser download can mark prebuilt dylibs with
+  `com.apple.quarantine`, causing Gatekeeper to refuse loading them into the
+  notarized Godot editor. Users can remove that attribute with
+  `xattr -dr com.apple.quarantine addons/odin_godot`. Signing and notarizing
+  the dylibs would address distribution directly.
 - **`godot --import` exit code**: with any GDExtension, headless `--import` can crash *at
   exit, after a successful import* (an engine bug; see the known-quirk note in
   [distribution.md](distribution.md)). If a user's CI gates on it, point them at that note.

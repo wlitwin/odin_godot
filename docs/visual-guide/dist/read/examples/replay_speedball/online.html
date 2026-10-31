@@ -61,7 +61,7 @@ private CA; plain WS requires the explicit loopback development setting.</p>
 </tbody></table>
 </div><p>The service needs reachable gameplay endpoints for native ENet. Local tests do not
 prove Internet/NAT traversal. The shared helper also accepts ICE/relay configuration,
-and the browser gate now verifies local RTC gameplay. Public deployment and
+and the browser test verifies local RTC gameplay. Public deployment and
 TURN-only routing remain separate Speedball acceptance work.</p>
 <p>Create Party durably enrolls a creator and produces a repeatable invite. Join Party
 validates the pasted invite, enrolls the member and durably stores its credential
@@ -102,7 +102,7 @@ Gameplay uses WebRTC while the configured service provides enrollment, control a
 signaling. The local gate exercises planned handoff, browser-host loss, true
 observers, rejoin, new actions/chat and matching worlds. See
 <span class="local-reference" title="docs/replay/results/speedball-browser-2026-09-08/README.md · available in the repository">browser evidence</span>
-for measured limits. Browser solo checkpoints now use the separate
+for measured limits. Browser solo checkpoints use the separate
 <a href="README.html#browser-solo-save-slots">save-slot flow</a>; public relay deployment remains open.</p>
 <h2 id="saved-party-recovery">Saved party recovery<a class="heading-anchor" href="#saved-party-recovery" aria-label="Link to this section">#</a></h2>
 <p>The online host can use <strong>Save</strong> or F5 to publish the match to the room service.
@@ -128,5 +128,5 @@ browser solo slots. See <a href="../../replay/godot/room_restore.html">Room rest
 It distinguishes an approved backup from preparation, stale progress or uncertain
 control; a prior host change does not imply the next backup is ready.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="README.html"><span>Replay Speedball</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/online.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="README.html"><span>Replay Speedball</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/online.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#saved-party-recovery" class="">Saved party recovery</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_speedball/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,33 +1,35 @@
 # kit/interact
 
-Reach for `kit/interact` when a player should get a *use* prompt near chests, doors, and
-pickups, and the host must validate that use from the same geometry. It is three procs and
-one struct, with no engine types and no dispatch.
+`kit/interact` helps select nearby chests, doors, or pickups for a use prompt
+and check interaction geometry when a command executes. It provides three
+procedures and one struct, with no engine types or action dispatch.
 
-The three procs are pure geometry, legal anywhere, including inside a sim tick. The
-prompt-then-validate pattern around them is written for coop verbs; a sim game runs the same
-geometry inside its own verbs and the authority pass.
+The procedures perform pure geometric checks and may run inside a simulation
+tick. The example below uses cooperative commands; simulation games can use
+the same checks in their commands and authority steps.
 
-## Mental model
+<a id="mental-model"></a>
 
-Interaction is two questions:
+## Target discovery and command validation
 
-- **Discovery** (client, every frame) asks which nearby interactable the prompt should
-  point at. `pick` answers this over candidates the game collects from its registry walk.
-- **Gating** (host, inside the command) asks whether this player is actually allowed to use
-  that entity from where they stand. The command proc answers by calling
-  `in_range`/`facing_ok` with the *same* numbers.
+Discovery selects the target to offer in the UI. Command validation decides
+whether an attempted interaction passes its geometric requirements:
+
+- **Discovery** runs on the client each frame. `pick` selects a nearby target
+  from candidates the game collects from its registry.
+- **Validation** runs inside the command on the host. Call
+  `in_range`/`facing_ok` with the same constants used for discovery.
 
 Using the same procedures and constants keeps the client prompt and authority
 validation geometrically consistent. They can still evaluate different
 snapshots of a moving world; the authority's result is final.
 
-The *use* itself is just a command on the target entity (open the door, loot slot 2);
-kit/interact never dispatches anything. See [items.md](items.md) for what a loot command
-does once the gate passes.
+Implement the action as a command on the target entity, such as opening a door
+or looting slot 2. `kit/interact` does not dispatch the command. See
+[items.md](items.md) for a loot command that applies these checks.
 
-Positions are dimension-agnostic `[3]f32` everywhere: 2D games leave `z` at zero, 3D games
-fill it. No engine type appears anywhere in the API.
+Positions use `[3]f32`: 2D games leave `z` at zero, while 3D games supply it.
+The API uses no engine types.
 
 ## API
 
@@ -38,13 +40,13 @@ Candidate :: struct {
 	radius: f32, // per-target extra reach (a chest is easier to touch than a lever)
 }
 
-// Within `reach` of the target (plus the target's own radius)? Squared math,
-// no sqrt — call it in commands as freely as in frame code.
+// Check distance against `reach` plus the target's radius. Uses squared
+// distance without sqrt; suitable for commands and frame code.
 in_range :: proc "contextless" (origin, target: [3]f32, reach: f32, radius: f32 = 0) -> bool
 
-// Is the target inside the facing cone? `min_dot` is the cone half-angle as a
+// Check the facing cone. `min_dot` expresses the cone half-angle as a
 // dot-product threshold (0 = 180° cone, 0.5 = 120°, 0.7071 = 90°). A zero
-// `facing` vector means omnidirectional; standing ON the target always passes.
+// `facing` vector means omnidirectional; standing on the target always passes.
 facing_ok :: proc "contextless" (origin, target, facing: [3]f32, min_dot: f32) -> bool
 
 // The nearest candidate within reach and facing — what the prompt points at.
@@ -56,11 +58,11 @@ pick :: proc(cands: []Candidate, origin: [3]f32, reach: f32, facing := [3]f32{},
 Declare one constant (`examples/cavecrawl/scripts/cavecrawl.odin`):
 
 ```odin
-REACH :: f32(40) // interaction reach in pixels — prompt AND host gate use it
+REACH :: f32(40) // interaction reach in pixels, shared by the prompt and host check
 ```
 
-Discovery runs every frame (`world.odin`, `update_prompt`). The game collects candidates
-from its own entity maps and picks:
+Discovery runs every frame in `world.odin`'s `update_prompt`. The game
+collects candidates from its entity maps, then selects a target:
 
 ```odin
 cands := make([dynamic]kinter.Candidate, context.temp_allocator)
@@ -73,12 +75,12 @@ for id, d in self.doors {
 best, ok := kinter.pick(cands[:], {me.x, me.y, 0}, REACH)
 ```
 
-`ok` drives the [kit/ui](ui.md) prompt text ("E — loot chest", "E — open door"); `best.id`
-is remembered as the interact target.
+When `ok` is true, the game displays [kit/ui](ui.md) prompt text such as
+"E — loot chest" or "E — open door" and retains `best.id` as the interaction
+target.
 
-Gating runs inside the predicted command (`door.odin`), using the same math and the same
-constant, and it runs identically in the client's prediction and the host's authoritative
-re-run:
+The predicted command in `door.odin` uses the same geometry and constant. Both
+the predicting client and the host execute the check:
 
 ```odin
 @(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
@@ -89,22 +91,25 @@ door_toggle :: proc(self: ^Door, px: f32, py: f32) -> bool {
 }
 ```
 
-The command carries the issuer's claimed position `(px, py)` as args; `chest_take` and
-`pickup_grab` gate identically. The host reuses the gate for non-interaction logic too: the
-"is the whole party at the open door?" check in `host.odin` is the same `kinter.in_range`
-call with the same `REACH`.
+The command carries the issuer's claimed position `(px, py)` as arguments;
+`chest_take` and `pickup_grab` use the same check. This validates distance from
+the supplied position; the geometry helper does not establish that the
+position is trustworthy. In `host.odin`, the host also uses
+`kinter.in_range` with `REACH` to check that the whole party is at an open door.
 
-## Gotchas
+<a id="gotchas"></a>
+
+## Validation limits and target selection
 
 - **Share the reach constant.** The prompt and the host gate must use the *same* `REACH`
-  and the same `in_range` math, or the UI will promise uses the host refuses (or hide uses
-  it would allow). Don't fork the numbers.
-- Positions can still differ *in time* (the issuer's claimed spot vs. the host's replicated
-  copy); the host's view is the truth. Keep `REACH` generous enough to absorb a stream of
-  lag, or leash claims like [combat](combat.md) does for cast origins.
+  and the same `in_range` check, or the UI may offer an interaction the host
+  refuses, or hide one it would allow.
+- Position samples can represent different times. Choose `REACH` with expected
+  movement delay in mind. When accepting client-supplied positions, validate
+  them against host state, as [combat](combat.md) does for cast origins.
 - `facing = {}` (the default) means omnidirectional; `min_dot = 0` is a 180° cone, not "no
   cone". Standing exactly on the target always passes the facing check.
-- `pick` returns the *nearest* passing candidate; per-target `radius` widens the touch,
-  not the tiebreak (distance is measured center-to-center).
+- `pick` returns the nearest passing candidate. Per-target `radius` extends
+  interaction range; selection still measures center-to-center distance.
 - Candidate collection is the game's job: walk your own entity maps into a
   `temp_allocator` array each frame, as `update_prompt` does.

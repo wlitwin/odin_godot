@@ -66,7 +66,7 @@ automatic attempts follow the same interval.</p>
 capturing/packaging a new checkpoint. The expensive work therefore starts with a
 refreshed lease rather than the remainder of the status round trip. Existing lease
 duration and fencing rules remain unchanged.</p>
-<p>Room now has one bounded control receiver that dispatches checkpoint and authority
+<p>Room uses one bounded control receiver to dispatch checkpoint and authority
 RPC packets before pumping outgoing RPC work. The borrowed RPC transport copy has
 reads/polling temporarily disabled during that outgoing pump, then restored. It
 cannot drain checkpoint traffic accidentally. Existing control pause behavior is
@@ -81,17 +81,17 @@ button. <code>REPLAY_CAVE_ROOM_CHECKPOINT_MS</code> opts into automatic publicat
 default); browser launch parameters use <code>room_checkpoint_ms</code>. Solo/local save slots
 remain separate. The native party test verifies both the original host&#39;s publication
 and the successor&#39;s newer-epoch publication, then decodes the actual stored inventory.</p>
-<p>The browser party gate also exercises both publications through Room during real
-RTC play, alongside a second isolated room, migration and durable rejoin. It uses
+<p>The browser party test exercises both publications through Room during
+RTC play, alongside a second isolated room, migration, and durable rejoin. It uses
 explicit loopback development WS. A fresh native reader validates the saved
 successor inventory; this is not production browser TLS/deployment evidence.</p>
 <p>These operations save simulation checkpoints and their declared packaged asset
-bytes. Personal profiles remain separate. Publication does not supply a restore grant or guarantee
-preservation after the reported saved tick. Room now separately drives
+bytes. Personal profiles remain separate. Publication does not supply a restore
+grant or guarantee preservation after the reported saved tick. Room separately drives
 <a href="room_restore.html">fresh-process party restoration</a>, with native/browser Cavecrawl
-acceptance. Broader asset profiles and other game acceptance remain part of M5. See the
+acceptance. Broader asset profiles and other games require separate acceptance. See the
 <a href="../provision/checkpoints.html">service contract</a> and
 <a href="../provision/checkpoint/README.html">checkpoint transport</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/checkpoint/assets.html"><span>Durable checkpoint assets</span><span aria-hidden="true">→</span></a><a href="room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../provision/checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room_save.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/checkpoint/assets.html"><span>Durable checkpoint assets</span><span aria-hidden="true">→</span></a><a href="room_restore.html"><span>Resuming a saved party</span><span aria-hidden="true">→</span></a><a href="../provision/checkpoints.html"><span>Durable room checkpoints</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room_save.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#state-and-lifetime" class="">State and lifetime</a><a href="#shared-control-io" class="">Shared control I/O</a><a href="#integration-and-bounds" class="">Integration and bounds</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/room_save.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -45,7 +45,7 @@ The adapter has 16 remote slots, 32 KiB signaling messages, nesting depth 16,
 45-second handshake deadline. Signaling uses a bounded 128 KiB socket buffer and
 64-message poll budget. It preserves healthy direct channels when signaling is
 lost and reports `signaling_lost`. Authenticated grant configuration enables
-bounded-identity signaling continuation; plain relays retain explicit failure
+signaling continuation with bounded identity reservations; plain relays retain explicit failure
 handling. It does not silently create another room.
 
 `ice_json` supplies the WebRTC configuration, including deployment-specific
@@ -111,7 +111,7 @@ closing the public `Rtc` transport also closes its owned Godot objects.
 
 Run `nix develop --command bash tests/replay_rtc/run.sh` with the Godot web templates,
 Chrome and the existing `tests/web/node_modules` dependencies installed. Failures
-retain logs; missing browser dependencies fail rather than report a green gate.
+retain logs; missing browser dependencies also fail the gate.
 The fixture uses separate Chrome processes and real data channels, without public
 STUN/TURN. It exchanges 64 KiB reliable messages followed by smaller messages,
 unreliable data, direct client-to-client traffic, departure, replacement and

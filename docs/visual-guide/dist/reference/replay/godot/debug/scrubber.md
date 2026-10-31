@@ -45,7 +45,8 @@ Tick zero, wrapped retention, nonzero checkpoints and the `u64` boundary are val
 
 ## Ownership and limits
 
-The owner must exclusively pause its local timeline while inspecting. Epoch/head
+The application must pause its local timeline and prevent other code from
+advancing it while inspecting. Epoch/head
 changes invalidate the selection; the widget does not detect arbitrary same-head,
 same-epoch replacement or concurrent mutation. Session, Room and P2P runners are
 not paused, corrected or migrated by these controls. No network or administrative
@@ -73,14 +74,14 @@ the resumed or branched simulation. Inspection creates no catch-up backlog.
 
 Run `nix develop --command bash tests/replay_scrubber/run.sh` for the core-backed
 native scene workflow, existing Hello/Loot regressions, rendered capture and WASM
-check. The dedicated fixture preserves prepared inputs, binaries' hashes and driver
+check. The dedicated fixture preserves prepared inputs, binary hashes and driver
 revisions. Broader editor workflows remain roadmap work.
 
 The [recorded native/Chrome gate](../../../docs/replay/results/history-inspection-2026-09-13/README.md)
 also covers real browser keyboard, slider and button input with zero buffer-target
 conflicts. Focused slider arrow keys intentionally change the selected tick; they
 are not gameplay movement while inspecting. Browser acceptance checks held fire,
-and native acceptance checks both held movement and fire. Hello's muzzle flash now
+and native acceptance checks both held movement and fire. Hello's muzzle flash
 uses an immutable mesh to avoid the Polygon2D redraw issue exposed by this gate.
 
 ## Editing a preview
@@ -122,8 +123,9 @@ model-invalid candidates are rejected without changing the preview. Union tags
 are inspectable but read-only: changing variants needs a complete valid value.
 Single-field validation cannot perform a coordinated multi-field transaction.
 
-The menu shows at most the first 2048 schema leaves and explicitly reports
-truncation. Its search is supplied by Godot's ordinary dropdown. Large models can
+The menu shows at most the first 2048 scalar schema fields, including array
+elements, and explicitly reports truncation. Its search is supplied by Godot's
+ordinary dropdown. Large models can
 build their own searchable editor on `schema.field_index`, `schema.scalar_text`
 and `schema.edit_scalar`. These helpers do not alter schema fingerprints or wire
 formats. The widget requires a complete authority schema and retains two frame

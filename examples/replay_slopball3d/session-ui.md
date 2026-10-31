@@ -1,6 +1,6 @@
 # Slopball3D session UI
 
-`play.sh` now opens Solo, Host, Join and Watch controls with name/address/port.
+`play.sh` opens Solo, Host, Join and Watch controls with name/address/port.
 The default port remains 49580. Host waits for the first connected player to Start;
 Solo starts automatically. `RS3_PLAYERS` and `RS3_GOALS` set the minimum roster and
 winning score. Explicit `RS3_ROLE` launches retain the automatic fixture path.
@@ -48,7 +48,8 @@ coordinated migration.
 
 Missing, malformed/incompatible, wrong-owner, protected-policy and exhausted-epoch
 saves are refused without replacing existing data. Native chat history is not part
-of the game checkpoint, and solver contacts/joints are not serialized. Public deployment remains further port work. This adds no new model schema.
+of the game checkpoint, and solver contacts/joints are not serialized. Public deployment requires separate integration. This save UI uses the existing
+model schema.
 
 ## Play again
 

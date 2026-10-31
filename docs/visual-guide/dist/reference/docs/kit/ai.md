@@ -1,24 +1,28 @@
 # kit/ai — NPC verbs and the wave director
 
-Reach for `kit/ai` when the host needs NPCs that perceive, chase, flee, and patrol, as well
-as a director that paces enemy waves. It supplies the *verbs*; you write the brain.
+Use `kit/ai` to find targets, steer NPCs, and schedule enemy waves. The game
+implements the decisions about when an NPC should chase, flee, or patrol; the
+package provides perception, movement, and wave-scheduling helpers.
 
-**Lane compatibility: COOP model, sim-safe math.** The patterns here assume the coop
-NPC shape: host-brained, owner-streamed poses. On the [sim lane](sim.md) an NPC is a
-server-ticked entity with `predict` fields, and its brain runs in the AUTHORITY pass. The
-perception/steering math is pure and safe in either; the wave director is
-authority-side logic and ports as-is. See [nav](nav.md) for the restriction on live NavigationServer queries.
+The examples here use coop replication: the host makes NPC decisions and
+streams their positions as the entity owner. On the [sim lane](sim.md), an NPC
+instead has `predict` fields, advances in server ticks, and makes decisions in
+the authority pass. The pure perception and steering math works in either
+model. The wave director also remains authority-side logic. See [nav](nav.md)
+for restrictions on live NavigationServer queries during replay.
 
-## Mental model
+<a id="mental-model"></a>
 
-**Patterns, not a framework**: kit/ai has no Brain type, no behavior tree, no update loop.
-The game writes an ordinary `switch` over a replicated `state: u8` in its **host** tick,
-built from these verbs. Cavecrawl's dweller is the documented example.
+## Host decisions and replicated NPC state
 
-An NPC is an entity **owned by the host player**: the host's brain tick writes `x/y` like
-any network owner writes streamed fields, and clients interpolate the motion. Its
-state byte and hp are plain replicated fields. The whole network presence of cavecrawl's
-dweller is this struct (`examples/cavecrawl/scripts/dweller.odin`):
+The game owns the NPC update loop. `kit/ai` provides no Brain type or behavior
+tree. Cavecrawl's dweller uses a `switch` in its host tick to choose behavior
+and writes the result to a replicated `state: u8`.
+
+In this coop setup, the host player owns the NPC entity. The host's decision
+procedure writes `x/y`, and clients interpolate those owner-streamed positions.
+The NPC's state byte and hp use ordinary replication. Cavecrawl declares that
+state in `examples/cavecrawl/scripts/dweller.odin`:
 
 ```odin
 Dweller :: struct {
@@ -27,17 +31,17 @@ Dweller :: struct {
 	net_id: knet.Net_Id,
 	x, y:   f32 `gd:"owner"`, // continuous owner fields interpolate by default
 	hp:     i32 `gd:"replicate"`,
-	state:  u8 `gd:"replicate"`, // its mood, on every screen
+	state:  u8 `gd:"replicate"`, // behavior state displayed by every peer
 	...
 }
 ```
 
-Clients render the mood from `state` and interpolate the streamed position.
-The host runs the brain; the clients need presentation code, with no separate
-AI decision loop or NPC packet format.
+Clients use `state` to display the NPC's behavior and interpolate its streamed
+position. Only the host runs the decision loop, so clients need presentation
+code without a separate AI loop or NPC packet format.
 
-Everything here is deterministic, allocation-free, dimension-agnostic (`[3]f32`; 2D leaves
-z zero) and engine-free.
+The package's math is deterministic, allocation-free, and independent of Godot.
+Positions use `[3]f32`; 2D games leave z at zero.
 
 ## Perception
 
@@ -47,8 +51,8 @@ Target :: struct {
 	pos: [3]f32,
 }
 
-// Is the straight line from `from` to `to` blocked (a wall between)? The
-// GAME owns geometry — kit/ai only asks. nil = open world, everything seen.
+// Return whether geometry blocks the line from `from` to `to`.
+// The game supplies geometry queries; nil treats the world as unobstructed.
 Blocker_Proc :: proc(user: rawptr, from, to: [3]f32) -> bool
 
 // The nearest target within `max_range` that line-of-sight reaches.
@@ -60,12 +64,12 @@ in_reach :: proc "contextless" (from, to: [3]f32, reach: f32) -> bool
 ## Steering (per tick; returns the new position)
 
 ```odin
-// One tick of walking toward `goal`. `arrived` = we are ON it now (never
-// overshoots — the last step lands exactly).
+// Move toward `goal` for one tick. `arrived` reports reaching it.
+// The final step lands exactly on the goal without overshooting.
 step_toward :: proc "contextless" (pos, goal: [3]f32, speed: f32) -> (next: [3]f32, arrived: bool)
 
-// One tick of running AWAY from `threat` (flee). Standing exactly on the
-// threat picks +x arbitrarily — any direction beats none.
+// Move away from `threat` for one tick. When position equals the
+// threat position, use +x as the fallback direction.
 step_away :: proc "contextless" (pos, threat: [3]f32, speed: f32) -> [3]f32
 
 // Patrol bookkeeping: advance (and wrap) the waypoint index once the current
@@ -78,30 +82,31 @@ goal from [kit/nav](nav.md)'s `next_point`.
 
 ## The wave director
 
-The director decides *when* and *how many*; the game decides what and where (its spawn code
-runs per emitted spawn). Only one wave runs at a time, and the next one starts after the
-field is clear and a breather passes.
+The wave director schedules spawns from a list of wave counts and rest times.
+The game chooses each NPC type and spawn position when the director emits a
+spawn. Only one wave runs at a time. The next starts after all NPCs in the
+current wave die and its rest interval has elapsed.
 
 ```odin
 Wave :: struct {
 	count: u16, // how many this wave
-	rest:  u16, // ticks of calm AFTER this wave clears, before the next
+	rest:  u16, // rest ticks after this wave clears and before the next
 }
 
 Director :: struct {
 	wave:       int, // waves fully started so far (1-based once running)
 	pending:    u16, // still to spawn in the current wave
 	alive:      int, // living spawns (the game reports deaths)
-	rest_until: u64, // calm gate before the next wave starts
+	rest_until: u64, // tick when the next wave may start
 	done:       bool, // all waves started and cleared
 }
 
-// Once per host tick. Returns how many to spawn NOW (the director paces one
-// per tick — spawn bursts read badly and spike the delta batch).
+// Call once per host tick. Returns the number of NPCs to spawn this tick.
+// The director limits spawning to one per tick to spread replication work.
 director_tick :: proc(d: ^Director, tick: u64, waves: []Wave) -> (spawn: int)
 
 // The game reports each director-spawned NPC's death. When the wave clears,
-// the calm before the next one starts counting.
+// the rest interval before the next wave begins.
 director_note_death :: proc(d: ^Director, tick: u64, waves: []Wave)
 
 // The current wave number for HUDs ("wave 2/3"); 0 before the first.
@@ -110,9 +115,10 @@ director_wave :: proc "contextless" (d: ^Director) -> int
 
 ## Worked example: the dweller's brain
 
-Each dweller gets one think-tick per host tick, running host-only: it perceives, then runs a
-plain switch. State and position are replicated fields; writing them *is* the AI's entire
-network presence (`examples/cavecrawl/scripts/host.odin`, `cave_dwellers_think`):
+The host updates each dweller once per tick. It finds a visible target, selects
+a behavior with a `switch`, and writes the resulting position and state. Those
+fields carry the result to clients. The procedure is `cave_dwellers_think` in
+`examples/cavecrawl/scripts/host.odin`:
 
 ```odin
 pos := [3]f32{dw.x, dw.y, 0}
@@ -151,22 +157,25 @@ for _ in 0 ..< to_spawn {
 }
 ```
 
-Damage on hit goes through [kit/combat](combat.md)'s `hit`/`credit_*`; entity
-lifetime uses the generated typed doors (`dweller_spawn`, `boot_spawn_send`,
-and `dweller_despawn`). See the [Boot entity factory](boot.md#the-entity-factory).
+Apply damage and record combat stats through [kit/combat](combat.md)'s
+`hit`/`credit_*`. Create and remove entities through the generated typed helpers
+`dweller_spawn`, `boot_spawn_send`, and `dweller_despawn`. See the
+[Boot entity factory](boot.md#the-entity-factory).
 
-## Gotchas
+<a id="gotchas"></a>
 
-- **Hoist `director_tick` out of the range expression.** An Odin range bound is
-  re-evaluated per iteration, and `director_tick` has side effects, so inlining it in the
-  range silently drains the wave.
-- The director paces **one spawn per tick**. Don't loop it.
-- Per-NPC state that no one else needs (bite cooldowns, home dens) lives in a host-side
-  map (`self.brains[id]`), not in replicated fields; only the *consequences* (`x/y`,
-  `state`, `hp`) ship.
-- The host's own screen is only as smooth as the writer: the brain writes `x/y` in tick
-  steps. `dweller_process` glides the node toward the sim with `kai.step_toward` at frame
-  rate (+50% slack), on every role: clients shadow the already-smooth stream, and the host
-  smooths the tick steps.
-- `step_away` at distance zero picks +x arbitrarily; `nearest` with a nil blocker sees
-  everything (open world).
+## Director and presentation constraints
+
+- **Call `director_tick` before the range expression.** Odin reevaluates a
+  range bound on each iteration. Calling `director_tick` there repeatedly
+  changes director state and can drain the wave, so store its result first.
+- Call the director once per tick. It schedules one spawn per tick.
+- Keep private NPC state such as bite cooldowns and home positions in a
+  host-side map (`self.brains[id]`). Replicate the results other peers need:
+  `x/y`, `state`, and `hp`.
+- The host writes positions in tick-sized steps, so its node still needs
+  frame-rate smoothing. `dweller_process` uses `kai.step_toward` with +50% slack
+  on every role. On clients it follows the interpolated stream; on the host it
+  smooths the discrete tick updates.
+- `step_away` picks +x when the position equals the threat position.
+  `nearest` with a nil blocker treats the world as unobstructed.

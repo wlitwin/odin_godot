@@ -14,32 +14,35 @@ assert(trace.init(&amp;log))
 capture: trace.Capture
 wire := trace.capture(&amp;capture, &amp;log, existing_transport)
 <span class="hljs-comment">// Use wire with the normal caller. Caller marks can record clock/configuration.</span>
-trace.mark(&amp;log, <span class="hljs-number">1</span>, now_ms)</code></pre></div><p>Limits bound retained event count and payload storage (default one million events
-and 64 MiB). Capacity or allocation failure stops recording; it does not change
-underlying sends, receives or return values. Such logs cannot encode or replay as
-complete records. The wrapper adds allocations/copying and is not performance-neutral.
-Destroying the log frees only its storage; a close through the wrapper forwards to
-the endpoint. The caller owns the capture/log lifetime and must stop using borrowed
-handles before destroying them.</p>
+trace.mark(&amp;log, <span class="hljs-number">1</span>, now_ms)</code></pre></div><p>The default limits retain up to one million events and 64 MiB of payloads.
+Reaching capacity or failing an allocation stops recording without changing
+underlying sends, receives, or return values. The resulting incomplete log
+cannot be encoded or replayed as a complete record. Recording adds allocation
+and copy work, so account for that cost when measuring the wrapped system.</p>
+<p>Destroying the log releases its storage only; closing through the wrapper
+forwards to the endpoint. The caller controls capture/log lifetime and must
+stop using borrowed handles before destroying them.</p>
 <p><code>encode</code> writes a versioned canonical representation, independent of native padding
 and endianness. <code>decode</code> checks limits before allocation, validates entry/payload
 bounds and preserves the destination on failure. Its digest detects corruption; it
 is not authentication. Packet payloads can contain credentials or private game data.
 Treat recordings accordingly and share only authorized test data.</p>
 <p><code>replay</code> exposes the same callback presence and returns recorded observations.
-It checks operation order, destinations/channels, outbound bytes and receive buffer
-capacity. The first mismatch is sticky and identifies the cursor/error; <code>finished</code>
-requires full consumption without error. User marks can describe pump times and
-configuration; <code>next_mark</code> looks ahead and <code>read_mark</code> consumes one. Do not mutate
-or destroy a log while replay borrows it.</p>
-<p>A transport recording alone does not reproduce its caller. The caller must restore
-its configuration, model, clocks, local inputs and other external decisions. Strict
-replay verifies the captured call sequence; it is not a counterfactual server that
-reacts to changed outbound traffic. Broader replay can deliberately use a different
-input-only harness, but must state that distinction.</p>
+It checks operation order, destinations/channels, outbound bytes, and receive
+buffer capacity. On a mismatch, it retains the first error and its cursor
+position. <code>finished</code> requires the entire record to be consumed without error.
+User marks can describe pump times and configuration; <code>next_mark</code> looks ahead
+and <code>read_mark</code> consumes one. Do not mutate or destroy a log while replay
+borrows it.</p>
+<p>To reproduce a caller, restore its configuration, model, clocks, local inputs,
+and other external decisions alongside the transport log. Strict replay returns
+recorded observations and checks that the caller makes the same calls; it does
+not compute new server responses when outbound traffic changes. A different
+harness can replay only incoming data, but that does not establish the same
+call-sequence agreement.</p>
 <p>The Claimball observer fixture uses marks for client configuration and each actual
 pump time, then checks state/effect hashes against a standalone replay. This keeps
 Godot rendering and live ENet scheduling out of receiver reproduction.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/transport/trace/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/transport/trace/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/transport/trace/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

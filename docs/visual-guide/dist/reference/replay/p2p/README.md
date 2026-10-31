@@ -1,4 +1,6 @@
-# Deterministic peer rollback — initial runner
+<a id="deterministic-peer-rollback--initial-runner"></a>
+
+# Deterministic peer rollback
 
 Use `Runner(State, Input, Event, Seats)` for a fixed-roster match whose peers
 replay the same deterministic simulation. The runner schedules steps and manages
@@ -35,17 +37,19 @@ transport abstraction. Native tests exercise two- and three-peer meshes.
   `advance` captures one immutable local sample for `head + delay + 1`. A repeated
   call while stalled does not replace that sample. `Result.captured` identifies
   the capture boundary for short presses; it is separate from successful stepping.
-- Peers resend bounded windows from their oldest unacknowledged input. ACKs describe
-  received input, not simulated or globally committed gameplay. Out-of-order
-  receipt advances a contiguous frontier only when all earlier samples exist.
+- Peers resend bounded windows starting at their oldest unacknowledged input.
+  An ACK confirms receipt only; it does not confirm simulation or global
+  settlement of gameplay. Inputs arriving out of order advance the contiguous
+  receipt frontier only after all earlier samples are present.
 - Missing remote input is derived with `hold(previous)`. A changed late input
   replays the complete affected suffix, refreshing guesses from actual received
   samples. `replay.revise_inputs` commits that suffix transactionally without
   incorrectly confirming still-guessed earlier ticks.
-- Confirmation advances only through ticks whose inputs from every participant
-  are known. The prediction horizon bounds how far simulation can run ahead.
-  Blackout exhaustion returns Waiting; it does not approximate a resync from one
-  peer's world. Local input history is also retained until peers acknowledge it.
+- A tick is confirmed only when inputs from every participant are known.
+  The prediction horizon limits how far simulation can run ahead. If a blackout
+  exhausts that horizon, the runner returns Waiting and stops advancing instead
+  of selecting one peer's world for resynchronization. Local input history is
+  retained until peers acknowledge it.
 - A rolling checksum chains every confirmed canonical state and occurrence batch.
   Disagreement produces a Diverged phase and mismatch tick/peer/hash diagnostics.
   Conflicting values for an already received input fail the match. The runner
@@ -98,9 +102,10 @@ The version-1 archive envelope is canonical, content/schema gated and limited to
 Restore validates frontiers and reexecutes the retained input sequence before
 installing the runtime. A changed model produces `Replay_Mismatch` with the first
 retained failing tick and expected/actual digest; failure releases staged storage.
-The rolling hash at a wrapped base is an anchor for earlier history, not a replay
-of that discarded history. Archives contain complete private world data, and CRC/
-hash checks provide integrity diagnostics, not authenticity.
+When the history ring wraps, the rolling hash retained at its oldest frame
+summarizes the discarded prefix. Restore verifies the retained suffix; it cannot
+reexecute frames no longer in the archive. Archives contain complete private
+world data, and CRC/hash checks provide integrity diagnostics, not authenticity.
 
 Participants may restore together on fresh transport bindings, or one participant
 may restore while survivors retain their live runners and explicitly reconnect.
@@ -130,11 +135,11 @@ error = p2p.reconnect(&survivor, replacement_transport, monotonic_ms)
 // Continue pumping and advancing normally once phase is Running.
 ```
 
-The native Duel exercises either participant returning. When the original
-listener returns, the surviving dialing process closes/reopens its ENet transport,
-rebuilds logical mappings and reconnects the retained runner even though the
-remote physical server ID is again 1. Closing the transport owner retires the old
-receive/delay buffers. This configured loopback provider is not authentication or
+The native Duel tests either participant returning. If the original listener
+returns, the surviving dialing process closes and reopens its ENet transport,
+rebuilds the logical mappings, and reconnects its retained runner. The remote
+physical server ID is again 1, but the connection is new. Closing the transport
+owner retires the old receive/delay buffers. This configured loopback provider is not authentication or
 source election; see the example's native creator-rejoin gate.
 
 This requires a compatible durable archive. If a crashed player continued sampling
@@ -142,8 +147,8 @@ after its last save, survivors may have inputs that the archive no longer contai
 that recovery fails with `History`. A retained input log or another compatible save
 boundary is needed to cover that crash window. Reconnect does not choose another
 peer's world, change the roster, elect an authority or recover forgotten inputs.
-Caller verification and old-traffic exclusion are requirements, not services
-implemented by this function.
+The caller must verify the replacement identity and exclude old traffic;
+`reconnect` does not perform those provider responsibilities.
 
 Capture a settled `Diverged` runner to retain its mismatch metadata and local
 execution. Replaying with its original deterministic callback reproduces that
@@ -170,7 +175,9 @@ slot. The authenticated provider also supports the creator returning at the same
 ID 1 with a new connection generation. Delay/fragment/router buffers fence retired
 work; either survivor retains its runner. Both reach the tick-600 reference world.
 
-## Implemented envelope and remaining M7 work
+<a id="implemented-envelope-and-remaining-m7-work"></a>
+
+## Implemented behavior and remaining M7 work
 
 The initial runner, integer duel, loss/reordering/duplication tests, timeout,
 divergence checks and native two-process ENet gate exist. A lost input burst
@@ -210,5 +217,6 @@ for arbitrarily long matches. Broader recording tools and field-level diffs rema
 debugger work.
 
 See [Replay Duel](../../examples/replay_duel/README.md) and the full
-[roadmap](../../docs/replay/roadmap.md). These tests cover the implemented fixed-roster contract; the remaining P2P
-capabilities and Replay roadmap work need separate acceptance.
+[roadmap](../../docs/replay/roadmap.md). These tests cover the implemented
+fixed-roster behavior; remaining P2P capabilities and roadmap work need separate
+acceptance.

@@ -1,37 +1,38 @@
 # odin_godot — write Godot scripts in Odin
 
-This addon makes [Odin](https://odin-lang.org) a first-class scripting language in Godot
-4.7+. You attach `.odin` files to nodes exactly like GDScript — with `_ready`, `_process`,
-signals, `@export`, and methods — but they compile to fast native code.
+Attach [Odin](https://odin-lang.org) `.odin` scripts to nodes in Godot 4.7+.
+The addon registers `_ready`, `_process`, signals, `@export`, and methods
+with the engine. The scripts compile into a native library.
 
-**You are reading this inside an installed addon** (`res://addons/odin_godot/`). Godot has
-already discovered `odin_godot.gdextension`; you just need the Odin toolchain and your first
-script. This page gets you there. The full reference lives in [`docs/`](docs/index.md).
+This guide is for an installed addon at `res://addons/odin_godot/`. Godot
+discovers `odin_godot.gdextension`; install the Odin toolchain and build a
+scripts library using the steps below. The full reference is in
+[`docs/`](docs/index.md).
 
-Building a co-op game? The addon includes the **friendslop toolkit** (`godot:kit/*`) —
-multiplayer sessions, replication with prediction, items/combat/NPCs, save/resume, live
-host migration, and ENet + Steam + WebRTC (browser) transports. Start at
+Kit (`godot:kit/*`) provides multiplayer sessions, replication with prediction,
+items/combat/NPCs, save/resume, live host migration, and ENet + Steam + WebRTC
+(browser) transports. Start at
 [docs/kit/](docs/kit/index.md).
 
 The addon also includes **Replay**, an experimental simulation-first multiplayer
 library beside Kit, and `template/replay/` as a separate starter project. See the
-[Replay guide](docs/replay.md) for its API model and supported envelopes.
+[Replay guide](docs/replay.md) for its API model, supported configurations,
+and limitations.
 
 ---
 
-## How it works (read this first)
+<a id="how-it-works-read-this-first"></a>
 
-odin_godot ships a **prebuilt engine core** (the `.dylib`/`.so`/`.dll` under `bin/`). Your
-**gameplay code is yours** — your `.odin` scripts compile into a *separate* scripts library
-(`res://bin/libodinscripts.*`) that the core loads at runtime.
+## Core and scripts libraries
 
-That means:
+odin_godot supplies a prebuilt engine core: the `.dylib`/`.so`/`.dll` under
+`bin/`. The project's `.odin` files compile into a separate scripts library,
+`res://bin/libodinscripts.*`, which the core loads at runtime.
 
-- **A fresh install has nothing to run yet.** Until you add and build scripts, the editor
-  prints a one-time warning ("no compiled Odin scripts found") — that's expected, not a bug.
-- **There is no interpreter.** Odin is compiled ahead of time, so you need the Odin compiler
-  installed *while developing*. An **exported game does not** — scripts are compiled into the
-  build at export time.
+Until you add and build scripts, the editor prints the one-time warning
+"no compiled Odin scripts found". Odin compiles ahead of time, so development
+requires the compiler. Export compiles and bundles the scripts; the exported
+game needs no compiler.
 
 ## Prerequisites
 
@@ -41,16 +42,16 @@ That means:
 | **Odin compiler — `@ODIN_VERSION@` tested/recommended** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
 | **A C linker** Odin can drive | macOS: Xcode Command Line Tools (`xcode-select --install`) · Linux: `gcc`/`clang` · Windows: Visual Studio Build Tools (run builds from a *"x64 Native Tools Command Prompt for VS"*) |
 
-> **Compiler compatibility:** this addon ships a **prebuilt** core library. `@ODIN_VERSION@`
-> is the release used by the addon and remains the safest choice, especially before Odin 1.0.
-> It is not an artificial lockstep requirement: before boot, the core verifies a complete ABI
-> fingerprint (every boundary size, alignment, and field offset), so another release that
-> compiles the bundled sources to the same contract loads safely. An actual ABI mismatch fails
-> before user code runs and tells you to rebuild/update. If the editor can't find `odin` (common when launched from
-> Finder/Steam, which don't inherit your shell PATH), set the **`odin_godot/odin_bin`**
-> project setting to the absolute path of your `odin` binary.
+> **Compiler compatibility:** `@ODIN_VERSION@` is the tested release used to
+> build the addon's core. Prefer it for the tested toolchain, especially
+> before Odin 1.0. Before boot, the core checks the complete ABI fingerprint:
+> every boundary size, alignment, and field offset. Another compiler release
+> can load when it compiles the bundled sources to the same contract. A
+> mismatch is rejected before user code runs and reports the need to
+> rebuild/update. If a Finder/Steam-launched editor cannot find `odin` on its
+> PATH, set `odin_godot/odin_bin` to the binary's absolute path.
 
-**Optional, per feature** — everything below works without these:
+Install these tools when using the corresponding features:
 
 | For | Install |
 |------|-------|
@@ -63,7 +64,7 @@ That means:
 
 ## Quick start — your first script
 
-1. **Copy the starter** — easiest from inside Godot: **Project → Tools → Set Up Odin Scripts**
+1. **Copy the starter** using Godot's **Project → Tools → Set Up Odin Scripts**
    (copies the template into `res://scripts/` and refreshes the dock). Or from a terminal:
    ```sh
    cp -r addons/odin_godot/template/scripts ./scripts
@@ -72,7 +73,7 @@ That means:
    `_ready`). The required boot boilerplate is generated for you at build time
    (`odin_godot_boot.gen.odin`) — you never write it.
 
-2. **Build the scripts library** — easiest from inside Godot: **Project → Tools → Build Odin
+2. **Build the scripts library** using Godot's **Project → Tools → Build Odin
    Scripts** (progress shows in the Output panel; the editor also rebuilds on save). Or from a
    terminal:
    - **macOS / Linux:**
@@ -89,7 +90,8 @@ That means:
 
 3. **Run it:** open the project in Godot (**restart the editor after adding _or updating_ the
    addon** — Godot registers `.odin` at load and can't hot-swap the extension dll in place),
-   add a `Node` to a scene, **Attach Script → pick `Hello`**, and press **Play**. The Output
+   add a `Node` to a scene, attach `res://scripts/hello.odin` (the `Hello` script),
+   and press **Play**. The Output
    panel prints "Hello from Odin!".
 
 From here, edit `hello.odin` (or add your own) — the editor **rebuilds on save** so new
@@ -104,7 +106,8 @@ All bundled under [`docs/`](docs/index.md):
 - **[Authoring Guide](docs/authoring-guide.md)** — the complete feature reference: the script
   struct convention, `//gd:` markers, every `@export` form, signals, methods, resources,
   autoloads, and the `gd.*` helper catalog.
-- **[Workflow](docs/workflow.md)** — the build/edit/iterate loop, editor DX, and honest limits.
+- **[Workflow](docs/workflow.md)** — builds, editing, reloads, editor tools,
+  and scripting limits.
 - **[Exporting](docs/exporting.md)** — shipping desktop and web builds.
 - **[Debugging](docs/debugging.md)** — `gd.print`, one-click lldb sessions from **Project →
   Tools → Debug Game (LLDB)** (line breakpoints, stepping, live struct inspection; also a
@@ -125,7 +128,7 @@ is ahead-of-time linked into one Emscripten module *per project*. The editor's e
 2. Set the **`odin_godot/emcc_bin`** project setting to the absolute path of `emcc` (and
    `odin_godot/odin_bin` to `odin`) so a Finder/Steam-launched editor can find them.
 
-Then just **Export → Web**. Full walkthrough — including serving headers — in
+Choose **Export → Web**. For the full procedure, including serving headers, see
 [docs/exporting.md](docs/exporting.md). (You can also prebuild manually with
 `addons/odin_godot/build/build_web.sh .`.)
 
@@ -141,9 +144,12 @@ Then just **Export → Web**. Full walkthrough — including serving headers —
 | **Headless/CI runs can't find the extension** ("No loader found for resource: …odin") | Godot registers the addon during the editor's import step, which headless runs skip. Run `godot --headless --path . --import` once (per fresh checkout / addon update) before `--script`/server runs — your CI script should do this unconditionally. |
 | Windows: odin errors on a path with spaces | The build scripts use relative paths to cope, but the most reliable fix is a space-free project path (e.g. `C:\games\mygame`). |
 
-## Platform status (honest)
+<a id="platform-status-honest"></a>
 
-Developed on macOS. macOS and Web are runtime-verified. Linux and Windows desktop cores are
-**cross-build verified** (correct format/arch, entry symbol exported) but not yet runtime-
-tested by the maintainer — please report issues. The C-ABI GDExtension boundary is identical
-across platforms, so they are expected to work.
+## Platform validation
+
+Development and runtime validation cover macOS and Web. Linux and Windows
+desktop cores have cross-build checks for format, architecture, and exported
+entry symbol; the maintainer has not runtime-tested them. They use the same
+GDExtension C interface, but those build checks do not establish runtime
+behavior on either platform.

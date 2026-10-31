@@ -1,10 +1,14 @@
-# 1 · What if your scripts were compiled?
+<a id="1--what-if-your-scripts-were-compiled"></a>
+
+# 1 · Writing compiled Godot scripts
 
 odin_godot lets you attach an `.odin` script to a Godot node and run it as
 compiled native code. Scenes, Inspector properties, and engine callbacks remain
 part of the Godot workflow. The script layout, build step, and debugger change.
 
-## What stays
+<a id="what-stays"></a>
+
+## Godot editor integration
 
 - **Scenes, nodes, the Inspector, the scene tree.** Your game is still built
   from `.tscn` files in the editor. Odin scripts attach to nodes exactly like
@@ -13,12 +17,14 @@ part of the Godot workflow. The script layout, build step, and debugger change.
 - **`@export` variables** show up in the Inspector with defaults, ranges, enum
   dropdowns, resource slots.
 - **Signals** connect in code or the editor.
-- **The play button.** Save an `.odin` file and the extension recompiles and
-  hot-reloads it, so the edit → run loop survives.
+- **The play button.** Saving an `.odin` file triggers a rebuild and editor
+  reload. Use the play button to run the updated game.
 - **GDScript itself.** Odin scripts can coexist with GDScript. You can keep
   existing UI or editor scripts and migrate gameplay one script at a time.
 
-## What changes
+<a id="what-changes"></a>
+
+## Script data and procedures
 
 A GDScript class becomes a plain struct and plain procedures:
 
@@ -61,21 +67,24 @@ mover_process :: proc(self: ^Mover, delta: f64) {
 
 The examples express the same behavior, with three structural differences:
 
-1. **Your state is a struct.** Every field is declared, typed, and laid out in
-   memory exactly as written. Tags on fields (`gd:"export"`) replace
+1. **State lives in a struct.** Fields are declared and typed, with a layout
+   that generated code can inspect. Tags on fields (`gd:"export"`) replace
    annotations on variables.
-2. **Your behavior is procs.** `mover_ready` and `mover_process` are free
-   functions taking `^Mover`. There is no class, no inheritance, and no
-   implicit `self`. Post 2 is entirely about what replaces those reflexes.
-3. **The node is a field.** `self.owner` is the engine node this script rides
-   on. GDScript blurs your script and its node into one `self`; Odin keeps
-   them separate, and that distinction ends up mattering a lot.
+2. **Procedures implement behavior.** `mover_ready` and `mover_process` are free
+   functions taking `^Mover`. The script uses an explicit `self` parameter
+   rather than a class with inheritance. Post 2 explains composition and
+   cross-script calls.
+3. **The struct holds the node.** `self.owner` is the Godot node to which the
+   script is attached. Pass that handle to engine APIs and `self` to
+   procedures that read or change script data.
 
 A code generator (`scriptgen`, run by the build) reads your file and emits the
 registration and argument-conversion code in a sibling `.gen.odin` file. Edit
 the authored script; the build regenerates that file.
 
-## Why bother
+<a id="why-bother"></a>
+
+## Native execution and explicit state
 
 The compile step and fixed data layout affect both execution and framework integration:
 
@@ -106,13 +115,15 @@ The tag declares the field's replication policy. A configured Kit session uses
 it for networking and snapshots; posts 3–6 show how commands, identity, and
 session setup add prediction, drop-in joins, reconnects, saves, and migration.
 
-## The honest costs
+<a id="the-honest-costs"></a>
+
+## Build and debugging requirements
 
 - **A compile step.** Save-to-reload is a compile (a second or two, kept warm),
   rather than an instant re-parse. Type errors are reported before the new
   library loads.
-- **No in-editor breakpoints.** Debugging is prints plus `lldb`, a real
-  native debugger, but not the one in the editor. Crashes give you symbolized
+- **No in-editor breakpoints.** Use logging and the native `lldb` debugger.
+  Crashes give you symbolized
   native backtraces naming your Odin proc ([Debugging](../debugging.md)).
 - **A new language.** Odin uses explicit types, pointers, and memory ownership.
   Its compiler catches invalid field access and type mismatches, while runtime
@@ -120,7 +131,9 @@ session setup add prediction, drop-in joins, reconnects, saves, and migration.
 - **A toolchain.** Everything is pinned in a Nix flake; setup is
   [one page](../getting-started.md).
 
-## Do this now
+<a id="do-this-now"></a>
+
+## Build a first script
 
 Work through [Getting Started](../getting-started.md): toolchain, project
 wiring, and the `Mover` above, attached and moving. When it runs, continue to

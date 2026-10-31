@@ -1,13 +1,15 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>1 · What if your scripts were compiled? · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>1 · Writing compiled Godot scripts · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>1 · What if your scripts were compiled?</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/01-what-if-your-scripts-were-compiled.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#what-stays">What stays</a><a href="#what-changes">What changes</a><a href="#why-bother">Why bother</a><a href="#the-honest-costs">The honest costs</a><a href="#do-this-now">Do this now</a></nav></details>
-<article class="reading-body "><p>odin_godot lets you attach an <code>.odin</code> script to a Godot node and run it as
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>1 · Writing compiled Godot scripts</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/01-what-if-your-scripts-were-compiled.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#godot-editor-integration">Godot editor integration</a><a href="#script-data-and-procedures">Script data and procedures</a><a href="#native-execution-and-explicit-state">Native execution and explicit state</a><a href="#build-and-debugging-requirements">Build and debugging requirements</a><a href="#build-a-first-script">Build a first script</a></nav></details>
+<article class="reading-body "><p><span id="1--what-if-your-scripts-were-compiled"></span></p>
+<p>odin_godot lets you attach an <code>.odin</code> script to a Godot node and run it as
 compiled native code. Scenes, Inspector properties, and engine callbacks remain
 part of the Godot workflow. The script layout, build step, and debugger change.</p>
-<h2 id="what-stays">What stays<a class="heading-anchor" href="#what-stays" aria-label="Link to this section">#</a></h2>
+<p><span id="what-stays"></span></p>
+<h2 id="godot-editor-integration">Godot editor integration<a class="heading-anchor" href="#godot-editor-integration" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><strong>Scenes, nodes, the Inspector, the scene tree.</strong> Your game is still built
 from <code>.tscn</code> files in the editor. Odin scripts attach to nodes exactly like
@@ -16,12 +18,13 @@ stub.</li>
 <li><strong><code>@export</code> variables</strong> show up in the Inspector with defaults, ranges, enum
 dropdowns, resource slots.</li>
 <li><strong>Signals</strong> connect in code or the editor.</li>
-<li><strong>The play button.</strong> Save an <code>.odin</code> file and the extension recompiles and
-hot-reloads it, so the edit → run loop survives.</li>
+<li><strong>The play button.</strong> Saving an <code>.odin</code> file triggers a rebuild and editor
+reload. Use the play button to run the updated game.</li>
 <li><strong>GDScript itself.</strong> Odin scripts can coexist with GDScript. You can keep
 existing UI or editor scripts and migrate gameplay one script at a time.</li>
 </ul>
-<h2 id="what-changes">What changes<a class="heading-anchor" href="#what-changes" aria-label="Link to this section">#</a></h2>
+<p><span id="what-changes"></span></p>
+<h2 id="script-data-and-procedures">Script data and procedures<a class="heading-anchor" href="#script-data-and-procedures" aria-label="Link to this section">#</a></h2>
 <p>A GDScript class becomes a plain struct and plain procedures:</p>
 <div class="code-block"><div class="code-title"><span>GDScript</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-gdscript"># GDScript
 extends Node2D
@@ -54,20 +57,22 @@ mover_process :: <span class="hljs-keyword">proc</span>(self: ^Mover, delta: <sp
 	gd.node2d_set_position(self.owner, pos)
 }</code></pre></div><p>The examples express the same behavior, with three structural differences:</p>
 <ol>
-<li><strong>Your state is a struct.</strong> Every field is declared, typed, and laid out in
-memory exactly as written. Tags on fields (<code>gd:&quot;export&quot;</code>) replace
+<li><strong>State lives in a struct.</strong> Fields are declared and typed, with a layout
+that generated code can inspect. Tags on fields (<code>gd:&quot;export&quot;</code>) replace
 annotations on variables.</li>
-<li><strong>Your behavior is procs.</strong> <code>mover_ready</code> and <code>mover_process</code> are free
-functions taking <code>^Mover</code>. There is no class, no inheritance, and no
-implicit <code>self</code>. Post 2 is entirely about what replaces those reflexes.</li>
-<li><strong>The node is a field.</strong> <code>self.owner</code> is the engine node this script rides
-on. GDScript blurs your script and its node into one <code>self</code>; Odin keeps
-them separate, and that distinction ends up mattering a lot.</li>
+<li><strong>Procedures implement behavior.</strong> <code>mover_ready</code> and <code>mover_process</code> are free
+functions taking <code>^Mover</code>. The script uses an explicit <code>self</code> parameter
+rather than a class with inheritance. Post 2 explains composition and
+cross-script calls.</li>
+<li><strong>The struct holds the node.</strong> <code>self.owner</code> is the Godot node to which the
+script is attached. Pass that handle to engine APIs and <code>self</code> to
+procedures that read or change script data.</li>
 </ol>
 <p>A code generator (<code>scriptgen</code>, run by the build) reads your file and emits the
 registration and argument-conversion code in a sibling <code>.gen.odin</code> file. Edit
 the authored script; the build regenerates that file.</p>
-<h2 id="why-bother">Why bother<a class="heading-anchor" href="#why-bother" aria-label="Link to this section">#</a></h2>
+<p><span id="why-bother"></span></p>
+<h2 id="native-execution-and-explicit-state">Native execution and explicit state<a class="heading-anchor" href="#native-execution-and-explicit-state" aria-label="Link to this section">#</a></h2>
 <p>The compile step and fixed data layout affect both execution and framework integration:</p>
 <p><strong>Gameplay procedures compile to native code.</strong> Arrays and structs have explicit
 layouts, so loops over gameplay state do not require an interpreter. The
@@ -88,13 +93,14 @@ to include it in authority-written state:</p>
 }</code></pre></div><p>The tag declares the field&#39;s replication policy. A configured Kit session uses
 it for networking and snapshots; posts 3–6 show how commands, identity, and
 session setup add prediction, drop-in joins, reconnects, saves, and migration.</p>
-<h2 id="the-honest-costs">The honest costs<a class="heading-anchor" href="#the-honest-costs" aria-label="Link to this section">#</a></h2>
+<p><span id="the-honest-costs"></span></p>
+<h2 id="build-and-debugging-requirements">Build and debugging requirements<a class="heading-anchor" href="#build-and-debugging-requirements" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><strong>A compile step.</strong> Save-to-reload is a compile (a second or two, kept warm),
 rather than an instant re-parse. Type errors are reported before the new
 library loads.</li>
-<li><strong>No in-editor breakpoints.</strong> Debugging is prints plus <code>lldb</code>, a real
-native debugger, but not the one in the editor. Crashes give you symbolized
+<li><strong>No in-editor breakpoints.</strong> Use logging and the native <code>lldb</code> debugger.
+Crashes give you symbolized
 native backtraces naming your Odin proc (<a href="../debugging.html">Debugging</a>).</li>
 <li><strong>A new language.</strong> Odin uses explicit types, pointers, and memory ownership.
 Its compiler catches invalid field access and type mismatches, while runtime
@@ -102,12 +108,13 @@ behavior still needs testing.</li>
 <li><strong>A toolchain.</strong> Everything is pinned in a Nix flake; setup is
 <a href="../getting-started.html">one page</a>.</li>
 </ul>
-<h2 id="do-this-now">Do this now<a class="heading-anchor" href="#do-this-now" aria-label="Link to this section">#</a></h2>
+<p><span id="do-this-now"></span></p>
+<h2 id="build-a-first-script">Build a first script<a class="heading-anchor" href="#build-a-first-script" aria-label="Link to this section">#</a></h2>
 <p>Work through <a href="../getting-started.html">Getting Started</a>: toolchain, project
 wiring, and the <code>Mover</code> above, attached and moving. When it runs, continue to
 post 2 for composition, cross-script access, and the distinction between the
 script struct and its node.</p>
 <p><em>Next: <a href="02-thinking-in-structs.html">Thinking in structs →</a></em></p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../debugging.html"><span>Debugging Odin scripts</span><span aria-hidden="true">→</span></a><a href="../getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="02-thinking-in-structs.html"><span>Thinking in structs</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/01-what-if-your-scripts-were-compiled.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#what-stays" class="">What stays</a><a href="#what-changes" class="">What changes</a><a href="#why-bother" class="">Why bother</a><a href="#the-honest-costs" class="">The honest costs</a><a href="#do-this-now" class="">Do this now</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/01-what-if-your-scripts-were-compiled.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../debugging.html"><span>Debugging Odin scripts</span><span aria-hidden="true">→</span></a><a href="../getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="02-thinking-in-structs.html"><span>Thinking in structs</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/01-what-if-your-scripts-were-compiled.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#godot-editor-integration" class="">Godot editor integration</a><a href="#script-data-and-procedures" class="">Script data and procedures</a><a href="#native-execution-and-explicit-state" class="">Native execution and explicit state</a><a href="#build-and-debugging-requirements" class="">Build and debugging requirements</a><a href="#build-a-first-script" class="">Build a first script</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/01-what-if-your-scripts-were-compiled.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

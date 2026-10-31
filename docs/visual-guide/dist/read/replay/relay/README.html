@@ -96,12 +96,14 @@ TURNSERVER=/path/to/turnserver REPLAY_TURN_PROVIDER=1 \
 nix develop --<span class="hljs-built_in">command</span> bash tests/replay_turn/run.sh</code></pre></div><p>The provider fixture uses a short TTL, waits beyond the credential used for the
 initial selected connection, then migrates/rejoins with later credentials. See
 <span class="local-reference" title="docs/replay/results/relay-credentials-2026-09-07/README.md · available in the repository">recorded evidence</span>.</p>
-<p>This is not instant revocation of credentials already known to a client, encrypted
-credential storage, a public relay deployment, or per-account billing enforcement.
-Operator clock synchronization, provider/relay quotas, public WSS/TLS, long-duration
-and combined-outage coverage remain required deployment work. The optional source
+<p>Issued credentials may remain usable until expiry; the provider cannot revoke a
+copy already held by a client instantly. It does not provide encrypted
+credential storage, a public relay deployment, or per-account billing
+enforcement. Deployment still requires operator clock synchronization,
+provider/relay quotas, public WSS/TLS, and testing of long-duration and
+combined outages. The optional source
 does not implement in-place ICE restart; it supplies current credentials when a
 new connection is created.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/relay/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/relay/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#protocol" class="">Protocol</a><a href="#coturn-and-time" class="">Coturn and time</a><a href="#godot-integration" class="">Godot integration</a><a href="#verification-and-remaining-limits" class="">Verification and remaining limits</a></nav><div class="outline-actions"><a href="../../../reference/replay/relay/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

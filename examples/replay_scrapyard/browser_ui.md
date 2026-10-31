@@ -1,6 +1,6 @@
 # Browser UI acceptance
 
-The UI gate runs three independent Chrome processes against the actual exported
+The UI test runs three independent Chrome processes against the actual exported
 Scrapyard game and local authenticated WebRTC room fixture. It drives real canvas
 keyboard/mouse input for chat, middle-mouse pings, shop cards, ability keys and
 revival. A query-parameter-gated test node supplies observations and prepares
@@ -12,16 +12,21 @@ RSB_UI_LOGS=/absolute/output/directory \
   nix develop --command bash examples/replay_scrapyard/web_ui_run.sh
 ```
 
-The gate first checks muster previews, both picker directions, readiness clearing,
-host Start and late Drop In through actual buttons. It then covers chat focus/cancellation and plain text, late-join chat history
-without expired markers, ping delivery/expiry, purchase accounting without gunfire,
-plate/jam/cooldown HUD state, borrowed camera/revival, rail contact sparks,
-grenade bounce/embers/fuse expiry, Escape menu input/focus/resizing, tally release
-while chatting, slime/sparkjar/spit discs on the owner and remote screens, and
-filled nova fades, single buff bursts, constant zone fill/expiry and common
-whole-world hashes. It also checks the local/remote cone distinction and recorded
-spread bolts, then the natural barrel wipe and next-yard recovery. It quits one peer through the
-menu and verifies the remaining yard continues and removes that player row.
+The test checks muster previews, both picker directions, readiness clearing,
+host Start, and late Drop In through the actual buttons.
+
+UI checks cover chat focus/cancellation and plain text, late-join history
+without expired markers, ping delivery/expiry, purchase accounting without
+gunfire, plate/jam/cooldown HUD state, teammate camera/revival, Escape menu
+input/focus/resizing, and tally release while chatting.
+
+Combat presentation checks cover rail contact sparks, grenade
+bounce/embers/fuse expiry, slime/sparkjar/spit discs on owner and remote
+screens, filled nova fades, single buff bursts, constant zone fill/expiry,
+the local/remote cone distinction, and recorded spread bolts. The test also
+compares whole-world hashes, reaches the natural barrel wipe and next-yard
+recovery, and quits one peer through the menu. The remaining yard must
+continue and remove that player's row.
 It uses an empty single wave to reach the shop, later adds one spitter for the
 disc check, and disables audio. It does not
 replace the separate combat, migration, storage or hardware-listening gates.

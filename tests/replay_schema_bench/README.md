@@ -25,8 +25,8 @@ inferred from whichever source revision happens to be nearby. The comparison
 artifact retains the actual reference source. Times describe warmed, in-process
 codec calls, not whole-game callbacks or a statistical confidence interval.
 
-Validation-density cases now accompany the initial Scrapyard-shaped snapshot:
-zero, dense, sparse and alternating finite floats/booleans/enums. A varying
+The benchmark also covers zero, dense, sparse, and alternating finite
+floats/booleans/enums alongside the Scrapyard-shaped snapshot. A varying
 unconstrained counter byte prevents repeated decode inputs from being identical.
 Each version runs seven trials per process and three alternating process pairs;
 all canonical hashes must agree. The extra cases do not change the original

@@ -6,29 +6,30 @@ timings, and phase references retain that scope. For current script authoring
 and editor setup, use [the authoring guide](../authoring-guide.md) and
 [Workflow](../workflow.md).
 
-The "fully replace GDScript" goal means implementing three engine interfaces. Extracted
-from the pinned engine (`extension_api.json` + `gdextension_interface.h`):
+The implementation plan covered three engine interfaces, extracted from the
+pinned engine's `extension_api.json` and `gdextension_interface.h`:
 
 - **`ScriptLanguageExtension`** — 60 virtual methods (the language singleton, `OdinLanguage`)
 - **`ScriptExtension`** — 37 virtual methods (one per `.odin` resource, `OdinScript`)
 - **`GDExtensionScriptInstanceInfo3`** — 26 function pointers (per-node instance dispatch)
 
-Not all 123 entry points need real bodies. Below, each is tiered **MUST** (core behavior),
+The plan assigned each of the 123 entry points a tier: **MUST** (core behavior),
 **SHOULD** (editor/tooling polish), or **STUB** (return a safe default — empty list / false /
 nil). Phase numbers refer to PLAN.md. Cross-referenced against the miniml_godot reference,
 which shipped with a working subset.
 
-> **Registration mechanics** (proven by `examples/hello/`): we register `OdinLanguage` and
-> `OdinScript` as GDExtension classes whose parent is `ScriptLanguageExtension` /
-> `ScriptExtension`, and supply the virtuals through `get_virtual_func` (name → fn ptr),
-> exactly like the hello example dispatches `_process`. The per-instance vtable is passed to
-> `script_instance_create3`.
+> `examples/hello/` verified the registration mechanism. `OdinLanguage` and
+> `OdinScript` register as GDExtension classes derived from
+> `ScriptLanguageExtension` / `ScriptExtension`. `get_virtual_func` maps each
+> virtual name to a function pointer, as in the hello `_process` example.
+> The per-instance vtable is passed to `script_instance_create3`.
 
 ---
 
 ## 1. `GDExtensionScriptInstanceInfo3` — per-node dispatch (the hot path)
 
-This is where engine lifecycle/method/signal calls enter Odin. The crux is `call_func`.
+Engine lifecycle, method, and signal calls enter Odin through this interface.
+`call_func` dispatches method calls.
 
 | fn ptr | tier | phase | notes |
 |---|---|---|---|
@@ -98,7 +99,7 @@ This is where engine lifecycle/method/signal calls enter Odin. The crux is `call
 
 ### Threading — MUST-stub (Phase 2)
 `_thread_enter` / `_thread_exit` — set up/tear down the Odin `context` per engine thread
-(or assert main-thread-only, like miniml). Important: the resource loader runs off-main.
+(or assert main-thread-only, like miniml). The resource loader runs off the main thread.
 
 ### Reload — Phase 4
 `_reload_all_scripts`, `_reload_scripts`, `_reload_tool_script` — drive the recompile+swap.
@@ -111,9 +112,10 @@ This is where engine lifecycle/method/signal calls enter Odin. The crux is `call
 `_has_named_classes`, `_frame` (miniml used this to register a syntax highlighter on the
 editor main thread — deferred because UI isn't ready at init).
 
-> `_lookup_code` (editor "Lookup Symbol") is a stub, but its Dictionary still needs BOTH
-> `result` AND `type` — `ScriptLanguageExtension::lookup_code` does `ERR_FAIL_COND_V(!ret.has("type"))`
-> UNCONDITIONALLY (even on a failed lookup), so `{result}`-only would log
+> `_lookup_code` (editor "Lookup Symbol") is a stub, but its Dictionary still
+> requires both `result` and `type`. `ScriptLanguageExtension::lookup_code`
+> executes `ERR_FAIL_COND_V(!ret.has("type"))` even on a failed lookup, so
+> returning only `{result}` would log
 > `Condition "!ret.has("type")" is true`. `lv_dict_result_failed` returns
 > `{result: FAILED, type: LOOKUP_RESULT_SCRIPT_LOCATION(0)}`.
 
@@ -129,7 +131,9 @@ AOT Odin, so the debugger is structural only), all 5 `_profiling_*`.
 
 ---
 
-## Key design implications
+<a id="key-design-implications"></a>
+
+## Dispatch and registration requirements
 1. **`_ready` is a notification, not a method call** — handle `NOTIFICATION_READY` in
    `notification_func`; `_process`/`_physics_process` come through `call_func` after
    `set_process(true)` (set when the registered class defines them).
@@ -147,111 +151,110 @@ AOT Odin, so the debugger is structural only), all 5 `_profiling_*`.
 
 ## Editor developer-experience features (implemented)
 
-Two editor-only features built on the language singleton. Both are NATIVE-only
+The recorded editor features use the language singleton and run only natively
 (`core/validate.odin`, `core/highlighter.odin`, `core/diag/`); the web build gets no-op
 stubs (`core/devtools_web.odin`).
 
-### `_validate` — real Odin compiler squiggles
+<a id="_validate--real-odin-compiler-squiggles"></a>
+
+### `_validate` — compiler diagnostics
 `OdinLanguage._validate(script, path, ...)` returns
 `{ "valid": bool, "errors": [ { "line", "column", "message" } ] }` driving the editor's
 inline error squiggles + the Errors panel.
 
-- **Whole-package check.** A single `.odin` file is not a compile unit, so we type-check its
-  PACKAGE: globalize `path`, take its directory, and run
+- **Whole-package check.** A single `.odin` file is not a compile unit, so validation checks its
+  package: globalize `path`, take its directory, and run
   `odin check <pkgdir> -collection:godot=<root> -no-entry-point -custom-attribute:gd_method`,
   parsing `‹file›(‹line›:‹col›) Error: ‹msg›` / `Syntax Error:` lines and keeping those whose
   basename matches the validated file. `valid = (errors == 0)`.
-- **LIVE buffer overlay.** `script` (arg 0) is the possibly-unsaved editor text. We copy the
+- **Unsaved buffer overlay.** `script` (arg 0) is the possibly-unsaved editor text. We copy the
   package dir to a temp overlay, overwrite the one edited file with `script`, then check —
   so errors update as you type, not only on save. The overlay's `*.gen.odin` siblings are
-  the LAST-built ones (stale until the next scriptgen run); existing-code type errors still
+  the last-built ones (stale until the next scriptgen run); existing-code type errors still
   surface correctly.
 - **Collection root config.** The `<root>` for `-collection:godot` is resolved as: project
   setting `odin_godot/root` -> env `ODIN_GODOT_ROOT` -> the repo default. **A consuming
   project must point one of these at wherever odin_godot lives.**
-- **Never breaks the editor.** Any failure (can't globalize/copy, `odin` missing, etc.)
+- **Tool-failure fallback.** Any failure (can't globalize/copy, `odin` missing, etc.)
   returns `{ valid:true, errors:[] }`.
-- **NON-BLOCKING (background worker + cache).** `_validate` runs on the editor MAIN THREAD and
-  is called on every (debounced) edit. Because `-collection:godot=<root>` makes each check
-  re-type-check the whole `godot` binding, running `odin check` synchronously here froze the
-  UI for the full check duration (seconds, up to 10-20s cold on a large collection). So the
-  check is now run on a BACKGROUND THREAD and `_validate` returns instantly:
-  - A coordinator (`core/diag/async.odin`, `validate_async`) keeps a cache of the latest
-    completed diagnostics keyed by a content hash of `script`+`path`, guarded by a `sync.Mutex`.
-  - On each call (main thread): a cache HIT for the exact content builds + returns the result
-    immediately; otherwise it (re)schedules ONE background worker to run `run_check_overlay` and
-    returns the LAST-KNOWN result instantly. The editor re-validates on its own debounce timer,
-    so fresh diagnostics appear ~check-duration later WITHOUT ever freezing the UI.
-  - At most ONE worker is in-flight; edits arriving while it runs COALESCE into a single
-    latest-pending job (no thread pile-up). The worker touches NO Godot/gdext objects — it runs
-    on a private heap+temp-arena context and stores plain `Diagnostic{line,col,message}` data;
-    only the main-thread `_validate` builds the Godot Dictionary. The `odin` binary is resolved
-    on the main thread and passed to the worker. Measured: first-call latency ~0.03 ms vs a
-    ~34 ms warm (≈0.5 s cold) check — the main thread never blocks on the check.
-  - **Why not route diagnostics through the persistent `ols` (see `_complete_code`)?** `ols`
-    computes diagnostics by shelling out to the SAME `odin check` (its `src/server/check.odin`,
-    config `odin_command` / `enable_checker_only_saved`) over the on-disk package — so it is NOT
-    incremental and gives NO speed win over this async path (both are one `odin check`; warm
-    ~34 ms). Measured experiments also showed `ols` did not reliably push `publishDiagnostics`
-    on open/change in this setup. So validation INTENTIONALLY stays on the async `odin check`
-    worker (already non-blocking + warm-fast); the persistent `ols` session is used only where it
-    is a real win — **autocomplete** (it avoids re-indexing the whole `godot` collection per
-    request). Honest-partial by design: a same-speed-but-riskier ols diagnostics path was not
-    shipped.
-- **Reachability / test.** The virtual is engine-dispatched and NOT callable from GDScript,
-  so the load-bearing overlay+check+parse pipeline AND the async coordinator live in
-  `core/diag/` and are proven by `tests/validate/`: clean fixture -> 0 errors; broken live
+- **Background validation and cache.** `_validate` runs on the editor's main
+  thread after debounced edits. A synchronous `odin check` rechecked the whole
+  `godot` binding and blocked the UI for seconds, up to 10-20s cold on a large
+  collection. The implementation moved that work to a background thread:
+  - The coordinator in `core/diag/async.odin` (`validate_async`) caches completed
+    diagnostics by a content hash of `script`+`path`, guarded by `sync.Mutex`.
+  - An exact cache hit returns immediately. A miss schedules
+    `run_check_overlay` and returns the last completed result. The editor's
+    next debounce retrieves updated diagnostics.
+  - At most one worker runs, with one latest pending job. New edits replace
+    that pending job. The worker uses a private heap+temp-arena context and
+    stores `Diagnostic{line,col,message}` data without accessing Godot/gdext
+    objects. The main thread resolves the `odin` binary and builds the Godot
+    Dictionary. Recorded first-call latency was ~0.03 ms, compared with a
+    ~34 ms warm (≈0.5 s cold) check; the main thread did not wait for the check.
+  - The experiment also evaluated diagnostics through persistent `ols`.
+    Its `src/server/check.odin`, configured by `odin_command` /
+    `enable_checker_only_saved`, invoked the same `odin check` on the on-disk
+    package. It was not incremental and showed no validation speed gain in
+    this setup: the warm check was ~34 ms. `publishDiagnostics` also did not
+    reliably arrive on open/change. Validation therefore retained the async
+    worker, while persistent `ols` handled autocomplete to avoid indexing
+    the `godot` collection on every completion request.
+- **Reachability / test.** The virtual is engine-dispatched and cannot be called from GDScript,
+  so the overlay/check/parse pipeline and async coordinator live in
+  `core/diag/` and are checked by `tests/validate/`: clean fixture -> 0 errors; broken live
   buffer -> 1 error at the exact line/column; the async path is non-blocking (first-call
   latency « check duration), eventually correct (broken still flags after the worker finishes),
-  and coalescing (rapid edits keep one worker + one pending). `core/validate.odin` is the thin
-  main-thread Godot glue on top.
+  and coalescing (rapid edits keep one worker + one pending). `core/validate.odin` builds the main-thread Godot response.
 
-### `_complete_code` — autocomplete backed by a PERSISTENT `ols` session
+<a id="_complete_code--autocomplete-backed-by-a-persistent-ols-session"></a>
+
+### `_complete_code` — autocomplete through a persistent `ols` session
 `OdinLanguage._complete_code(code, path, owner)` returns
 `{ "result": int(Error), "force": bool, "call_hint": String, "options": Array }` (the engine
 asserts `result` is present). As the user types, the editor calls it with the full buffer + a
-`U+FFFF` caret marker; we drive the `ols` Odin language server over a LIVE-buffer overlay of the
-script's PACKAGE and map its LSP `CompletionItem`s to Godot options (typing `gd.node2d_set_p`
+`U+FFFF` caret marker; we drive the `ols` Odin language server over an unsaved-buffer overlay of the
+script's package and map its LSP `CompletionItem`s to Godot options (typing `gd.node2d_set_p`
 offers `node2d_set_position`, etc.).
 
-- **Each option Dictionary must be FULLY-FORMED.** Godot's `ScriptLanguageExtension::complete_code`
+- **Required option fields.** Godot's `ScriptLanguageExtension::complete_code`
   (`core/object/script_language_extension.h`, ~L407-420) does `ERR_CONTINUE(!op.has("<key>"))` on
-  EVERY one of `kind` (int), `display` (String), `insert_text` (String), `font_color` (Color),
+  each of `kind` (int), `display` (String), `insert_text` (String), `font_color` (Color),
   `icon` (Ref<Texture2D>, nil ok), `default_value` (Variant, nil ok), `location` (int) before
-  reading it — a missing key both drops the option AND spams the editor log
+  reading it — a missing key drops the option and writes an editor error
   (`Condition "!op.has("font_color")" is true ... at: complete_code (...:413)`). The canonical key
-  set lives ONCE in `core/complete/option_shape.odin` (`Completion_Option_Field`); `core/complete.odin`
+  set is declared in `core/complete/option_shape.odin` (`Completion_Option_Field`); `core/complete.odin`
   builds each option by iterating it (so keys can't drift) and `tests/complete` asserts it covers the
   full required set. `font_color`/`icon` are placeholders here — the editor recomputes the shown
-  color/icon in `CodeTextEditor::_complete_request`; only the KEYS' presence + types matter.
+  color/icon in `CodeTextEditor::_complete_request`; only the keys' presence and types matter.
 
-- **One long-lived `ols`, not a fresh spawn per keystroke.** The naive path (`run_completion`,
-  `core/complete/complete.odin`) starts a brand-new `ols`, makes it index the whole `godot`
-  collection (~1059 files), answers ONE completion, and exits — **~0.5-1.25 s every time**. The
-  persistent session (`core/complete/session.odin`, `session_complete`) keeps ONE `ols`
-  subprocess alive for the editor session over real bidirectional stdio pipes (`core:os`
-  process + pipe API), does the `initialize` handshake + `ols.json` write ONCE, then answers each
-  request as `didOpen`/`didChange` + `textDocument/completion` against the resident index.
-  **Measured (tests/lsp): COLD first completion ~0.67 s; WARM completions ~17-19 ms** — a
-  ~35-40x speedup on the hot path.
-- **Threading.** A dedicated READER THREAD owns `ols` stdout, parses every `Content-Length`
+- **Persistent process.** The fresh-spawn path (`run_completion` in
+  `core/complete/complete.odin`) starts `ols`, indexes the `godot` collection
+  (~1059 files), answers one request, and exits. Recorded latency was
+  ~0.5-1.25 s per request. The persistent path
+  (`core/complete/session.odin`, `session_complete`) retains one subprocess
+  over bidirectional stdio pipes using `core:os`. It performs `initialize`
+  and the `ols.json` write once, then sends `didOpen`/`didChange` and
+  `textDocument/completion` against the retained index. `tests/lsp` measured
+  COLD first completion ~0.67 s and WARM completions ~17-19 ms, a
+  ~35-40x speedup for that tested path.
+- **Threading.** A dedicated reader thread owns `ols` stdout, parses every `Content-Length`
   frame, and hands the awaited response (correlated by request id) to the caller via a cond var;
   notifications (`logMessage`, `publishDiagnostics`) are ignored. Mutexes guard the single
   in-flight request, stdin writes, the shared session/doc state, and start/teardown. The reader
-  runs on a private heap+temp-arena context and NEVER touches Godot/gdext. `session_complete`
-  blocks only the calling thread for the request round-trip (warm: tens of ms) — completion is a
-  discrete action, far cheaper than the fresh spawn it replaces.
+  runs on a private heap+temp-arena context and does not touch Godot/gdext. `session_complete` blocks the calling thread for the request round-trip
+  (warm: tens of ms). The retained index avoids process startup and re-indexing
+  on each completion.
 - **Failure and timeout handling.** If `ols` can't start, dies, or a request times out, `session_complete`
-  returns `ok=false` and the glue (`core/complete.odin`) transparently FALLS BACK to fresh-spawn
+  returns `ok=false` and the glue (`core/complete.odin`) falls back to fresh-spawn
   `run_completion`, so a failed persistent session can still attempt completion. A killed `ols` is detected
-  (reader EOF) and the session RESTARTS on the next call; a short retry backoff prevents
-  spawn-storms; a bogus `ols` binary fails in ~8 ms. The warn-once-if-`ols`-missing behavior and
+  (reader EOF) and the session restarts on the next call; a short retry backoff prevents
+  repeated rapid process launches; a bogus `ols` binary fails in ~8 ms. The warn-once-if-`ols`-missing behavior and
   the `odin_godot/ols_bin` -> `OLS` -> PATH resolution are unchanged. `_finish` (`lv_finish_session`)
   kills the subprocess + reader + temp workspace on editor teardown.
-- **Reachability / test.** The virtual is engine-dispatched, so the persistent session is proven
-  by `tests/lsp/`: COLD vs WARM latency (asserts warm « cold and warm-avg < 300 ms),
-  `node2d_set_position` present (REAL godot procs), crash recovery after killing the live `ols`,
-  clean shutdown, and the bogus-`ols` fast-fail fallback. `tests/complete/` still proves the
+- **Reachability / test.** The virtual is engine-dispatched, and `tests/lsp/` checks the persistent session for COLD vs WARM latency (asserts warm « cold and warm-avg < 300 ms),
+  `node2d_set_position` present (generated godot procedures), crash recovery after killing the live `ols`,
+  clean shutdown, and the bogus-`ols` fast-fail fallback. `tests/complete/` checks the
   fresh-spawn fallback (`run_completion`).
 
 ### Odin syntax highlighter
@@ -262,13 +265,14 @@ language name), `_create`-> a fresh clone, and `_get_line_syntax_highlighting(li
 covers keywords (control-flow distinct), `//` and single-line `/* */` comments, string/char
 /raw-string literals, numbers, PascalCase types, and proc-call identifiers.
 
-- **Deferred registration.** Registered on the FIRST editor `_frame` (guarded by a one-time
-  flag + editor-hint check + a ~30s attempt cap), touching ONLY `ScriptEditor`
-  (`register_syntax_highlighter`) — NEVER `EditorHelp`, whose doc-gen paths crash on
+- **Deferred registration.** Registered on the first editor `_frame` (guarded by a one-time
+  flag + editor-hint check + a ~30s attempt cap), accessing only `ScriptEditor`
+  (`register_syntax_highlighter`) and avoiding `EditorHelp`, whose doc-gen paths crash on
   extension classes. The class itself is registered lazily there too, so an exported game
   (no editor) never registers an editor-only class.
 - **Limitations.** Block comments are highlighted per-line (an unterminated `/*` colors to
-  end-of-line); a `/* ... */` opened on a previous line is not tracked across lines. Colors
-  are sensible dark-theme constants (pulling from `EditorSettings` is an easy later refine).
-  Actual on-screen colors need a display to eyeball; `tests/editor_smoke` only proves the
-  registration path runs in a headless editor without crashing.
+  end-of-line); a `/* ... */` opened on a previous line is not tracked across
+  lines. Colors use fixed dark-theme constants; reading them from
+  `EditorSettings` remained a possible refinement. Checking the colors
+  requires a display. `tests/editor_smoke` verifies registration in a headless
+  editor without crashing; it does not check the rendered colors.

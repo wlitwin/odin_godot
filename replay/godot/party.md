@@ -1,10 +1,10 @@
 # Party setup shared by games
 
-`Party` coordinates durable enrollment, recent-room selection, invite issuance and
-Room configuration. Cavecrawl, Scrapyard, Speedball and Quickdraw use it; their scene code supplies menu
-controls, game options and any game-specific recovery prerequisites. It does not
-own the simulation, choose loadouts, store progression or make an asset checkpoint
-ready by itself.
+`Party` durably stores room enrollment requests and credentials, selects recent
+rooms, issues invites, and configures Room. Cavecrawl, Scrapyard, Speedball, and
+Quickdraw use it. Their scene code supplies menus, game options, and recovery
+prerequisites. The game retains responsibility for simulation, loadouts,
+progression, and assets required to prepare a checkpoint.
 
 ## Lifecycle
 
@@ -48,10 +48,10 @@ The helper does not silently close an existing game session to start another one
 
 ## Storage and permission rules
 
-The service URL hashes to the same slot/reference keys used by Cavecrawl's original
-online implementation. The helper preserves its enrollment/cursor formats, so existing
-enrollment records retain their identities. Namespace/content and an
-exact service URL remain the application's configuration. `Party_Storage` supplies
+The service URL determines storage slot and reference keys. These keys and the
+enrollment/cursor formats remain compatible with Cavecrawl's original online
+implementation, so existing records retain their identities. Configure the
+namespace, content, and exact service URL in the application. `Party_Storage` supplies
 native slot selection and recent-reference CAS callbacks. The optional
 `provision_sqlite.Party_Store` owns a database connection and a copied path, and
 returns those callbacks.
@@ -82,7 +82,7 @@ separate from the room token. Changing parties therefore does not create another
 progression identity. Its local profile still supplies the saved name, loadout,
 cores and parts under the existing co-op profile rules. Its asset preparation
 callback still verifies every spray dependency before acknowledging a takeover
-checkpoint. The shared helper does not replace either policy.
+checkpoint. The game implements both policies separately from Party.
 
 Defaults require verified WSS. Native private CA options and explicit loopback WS
 development mode remain supported. Public TLS/TURN deployment, general invite

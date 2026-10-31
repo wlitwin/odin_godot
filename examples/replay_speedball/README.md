@@ -3,8 +3,7 @@
 A separate [Speedball](../speedball/README.md) port using a complete, replayable
 pitch. Every playable peer predicts all players and the shared ball before the
 authority settles their state. Replay's runner schedules the simulation steps and
-manages input and history. Contacts,
-kicks, spikes, score and kickoff state live in ordinary Odin values in
+manages input and history. Contacts, kicks, spikes, score, and kickoff state live in ordinary Odin values in
 [`shared/pitch`](shared/pitch/types.odin); the Godot script handles input and views.
 Original Speedball, Claimball and Slopball remain independently runnable.
 
@@ -57,7 +56,7 @@ assignment: the first client scores into the left goal. Scene provenance is in
 Unlike the original mixed simulation/discrete fields, the complete score and
 winner participate in replay with the ball. The HUD reads authoritative score;
 goal reset/hold predict immediately. A changed reset counter cuts smoothing.
-The new runner processes contacts in explicit ascending seat order.
+The Replay runner processes contacts in explicit ascending seat order.
 
 Spike commands carry intent, and both authority and prediction derive the origin
 from the issuing seat's world position. The original command accepts issuer-supplied
@@ -69,9 +68,9 @@ The original bot requests within 44 pixels and supplies its captured coordinates
 These differences must be accounted for in a paired benchmark.
 
 The HUD/team colors remain a separate implementation. Direct session menus,
-chat and held scores are now supplied and tested. Public deployment, Steam paths and broader
+chat, and held scores are supplied and tested. Public deployment, Steam paths and broader
 visual/human play-feel review remain pending. The [port ledger](parity.md) records
-what is preserved and what remains. The native Room path described below now exercises migration in this pitch.
+what is preserved and what remains. The native Room path below exercises migration in this pitch.
 This remains an incomplete M6 port, not full game parity.
 
 ## Prediction and presentation
@@ -79,7 +78,7 @@ This remains an incomplete M6 port, not full game parity.
 Presentation selects the state and effects to display. Its smoothing changes the
 drawn pose while the simulation retains the values used for gameplay.
 
-The runner now refreshes remote held-input guesses from each authoritative
+The runner refreshes remote held-input guesses from each authoritative
 snapshot before replaying the speculative suffix. Local input samples, aiming
 stamps and action IDs stay unchanged. The replacement inputs and resulting
 state/events commit atomically; a failed replay preserves the old timeline.
@@ -116,7 +115,7 @@ input capture, held scores/ping, departure and rejoin. It drives the actual
 scene signals and keyboard action map; separate native captures also exercise
 Space activation of the menu and rendered score overlays.
 
-The content ID is now `0x5253504545444234`. Name/start state and commands changed
+The content ID is `0x5253504545444234`. Name/start state and commands changed
 its initial schema in revision 2; revision 3 also changes the manual-start rule:
 the first connected seat leads the match. A planned network handoff preserves that
 leader, while a disconnected leader yields to the first surviving seat. Revision 4
@@ -143,8 +142,7 @@ The fixture enables Room with `RSB_COORD_PORT`, `RSB_MEMBER` (1–3),
 uses room 49, localhost endpoints and fixed development credentials. Members 1
 and 2 can host; member 3 exercises a peer without checkpoint capability. Without
 these Room settings, the normal Solo/Host/Join/Watch flows use direct sessions.
-This remains a fixed migration fixture. The separate [party menu](online.md) now
-uses durable enrollment and invites through a configured room service.
+This remains a fixed migration fixture. The separate [party menu](online.md) uses durable enrollment and invites through a configured room service.
 
 Use a fresh `RSB_MIGRATION_OUT` directory to retain evidence. Set
 `RSB_MIGRATION_MODES=planned` to select one scenario, or
@@ -192,7 +190,7 @@ launchers accept fresh output directories (`RSB_ROUND_OUT`, `RSB_PROFILE_OUT`).
 
 Original Speedball's boot helper already persisted reconnect identity. Its game
 scripts do not expose Play again or a match save/load menu. Restart and saved display
-names are Replay additions. The native save/resume front door is described below.
+names are Replay additions. The native save/resume menu is described below.
 
 
 ## Save and resume a pitch
@@ -299,6 +297,6 @@ corrupt archives, alternate slots and corrupt identity records, checking that th
 previous data remains unchanged. `RSB_BROWSER_SAVE_OUT` selects a fresh artifact
 directory. This is local Chrome process-crash evidence; power-loss durability,
 browser eviction/private modes and other browser engines remain separate
-requirements. Room save publication and abandoned-party restoration now use the
+requirements. Room save publication and abandoned-party restoration use the
 distinct [party recovery flow](online.md#saved-party-recovery).
 [Solo-slot evidence](../../docs/replay/results/speedball-browser-save-2026-09-08/README.md).

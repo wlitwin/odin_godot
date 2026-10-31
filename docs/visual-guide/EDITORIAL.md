@@ -21,6 +21,19 @@ transitions. Common candidates include “simply,” “just,” “seamlessly,�
 Judge each use in context: a technical restriction or a precise use of “only”
 must survive editing. State the actual property in place of a vague adjective.
 
+Edit the paragraph, not only its vocabulary. Replacing a few conspicuous words
+leaves the same problem when a paragraph still relies on slogans, metaphors,
+dramatic fragments, or claims that the reader cannot check. Name the operation,
+its preconditions, and the work still left to the game.
+
+For example, replace “the block ships the verb, the game keeps the ‘and then’”
+with “The component implements the target mutation. The game handles accepted
+cross-entity changes in `<verb>_then`.” Replace a “fingerprint door” with the
+actual admission check and its incompatibility result. A “write-guard walk” can
+usually be described as comparing client fields with framework-applied values.
+Keep a specialized term when it names a real API or protocol concept, and define
+it where the reader first needs it.
+
 Avoid repetitive “not X, but Y” explanations and unsupported absolutes such as
 “you never need” or “everything works automatically.” Preserve restrictions that
 define trust, correctness, compatibility, or supported configurations.
@@ -46,11 +59,20 @@ define trust, correctness, compatibility, or supported configurations.
 
 ## Technical fidelity
 
-Keep API names, identifiers, commands, configurations, schemas, code samples,
-receipts, and numeric limits intact during a prose pass. Check a claim against
-its source before changing its meaning. Preserve linked headings or provide an
-anchor alias. Edit source Markdown and authored templates, then regenerate the
-site; generated reference copies are not editorial inputs.
+Keep API names, identifiers, commands, configurations, schemas, executable code,
+receipts, and numeric limits intact during a prose pass. Natural-language code
+comments may be edited, but preserve functional directives, string literals,
+output, and executable-line order and indentation. Verify examples with comments
+removed; report any source-verified code correction separately. Check a claim
+against its source before changing its meaning. Preserve linked headings or
+provide an anchor alias. Edit source Markdown and authored templates, then
+regenerate the site; generated reference copies are not editorial inputs.
+
+Use a precise heading in place of a rhetorical or slogan-like one. When renaming
+a published heading, retain its old fragment with an explicit named anchor so
+existing links and bookmarks still work. Third-party documentation and generated
+distribution copies should be reviewed against their own sources rather than
+rewritten as SDK-owned prose.
 
 Tutorials describe current behavior and next actions. Dated design, audit, and
 comparison records retain their scope, dates, and results. Give those records a

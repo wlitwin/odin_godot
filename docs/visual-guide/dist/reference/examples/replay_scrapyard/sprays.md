@@ -1,9 +1,9 @@
 # Spray images and decals
 
 Choose a PNG in staging, or place it at this project's `user://spray.png`. G stamps
-it at the runner's simulated position. One decal belongs to each runner: stamping
+it at the player character's simulated position. Each character has one decal: stamping
 again moves it, and selecting a replacement image repaints the standing decal.
-Floor transitions remove the placement but keep the signature. Missing image bytes
+Floor transitions remove the placement but retain the selected image reference. Missing image bytes
 show a diamond until delivery finishes. PNGs are limited to 128 KiB, 2048 pixels
 per dimension and 1,048,576 total pixels before Godot decodes them.
 
@@ -48,10 +48,10 @@ RSY_JITTER=20 RSY_LOSS=1000 RSY_DUPLICATE=1000 nix develop --command bash exampl
 nix develop --command bash examples/replay_scrapyard/spray_migration_run.sh
 ```
 
-Manual saves now bundle the downloaded images referenced by the saved world.
+Manual saves bundle the downloaded images referenced by the saved world.
 They can restore and serve an offline owner’s spray without its original file.
 A browser picker, persistent preference, WebRTC exchange and browser/native save
-bundles now have acceptance gates. A persistent general-purpose network cache,
+bundles have acceptance gates. A persistent general-purpose network cache,
 public web deployment, Steam, full presentation/audio parity and broader quota/
 recovery cases remain work.
 This port adds explicit pixel limits beyond the original compressed-byte limit.

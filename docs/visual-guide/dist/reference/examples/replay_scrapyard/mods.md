@@ -48,7 +48,7 @@ files they must ignore. It selects sparse gun/ability IDs through the ordinary
 buttons, fights with them, compares full worlds, saves, and resumes with no mod
 reload. `mod_migration_run.sh` checks the host's altered gun/mob data through planned
 and crash combat takeover. Native tests also execute the original chain, doubled
-nova and hostile zone data through the ordinary reducers.
+nova and hostile zone data through the ordinary simulation rules.
 
 ```sh
 RSY_ROLE=host RSY_MODS_DIR=/path/to/mods nix develop --command bash examples/replay_scrapyard/play.sh
@@ -57,7 +57,7 @@ RSY_JITTER=20 RSY_LOSS=1000 RSY_DUPLICATE=1000 nix develop --command bash exampl
 nix develop --command bash examples/replay_scrapyard/mod_migration_run.sh
 ```
 
-The game content ID is now `0x5253435241503040` because sparse selection and profile
-validation changed. The catalog's logical layout and stock data fingerprint remain
+Sparse selection and profile validation introduced game content ID
+`0x5253435241503040`. The catalog's logical layout and stock data fingerprint remain
 unchanged. Full matched original-act playtests, broader mod-driven network effect
 scenarios, schema migration and deployment remain roadmap work.

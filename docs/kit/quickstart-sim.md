@@ -1,14 +1,14 @@
 # Server authority and client prediction
 
 The [session-replication quickstart](quickstart.md) lets each client write its
-own position. This guide moves that position to Kit's simulation lane: the
-authority derives movement from validated inputs, while the owning client runs
-the same fixed-tick code locally for immediate response.
+own position. This guide moves that position to Kit’s simulation lane, which
+retains fixed-tick input and state history. The authority derives movement from
+validated inputs; the owning client runs the same tick code locally before the
+authority replies.
 
 The completed example is `examples/hello_sim`. Its session, lobby, entity
-factory, spawn flow, chat, and reconnect behavior are the same concepts used by
-`examples/hello_net`. The differences are limited to the state that needs server
-authority.
+factory, spawn flow, chat, and reconnect setup follow `examples/hello_net`.
+The steps below change movement state and its input path.
 
 ## What changes
 
@@ -63,7 +63,7 @@ player_tick :: proc(self: ^Player, input: Player_Input) {
 }
 ```
 
-The authority runs this proc to produce truth. The owning client runs it for
+The authority runs this proc to advance accepted state. The owning client runs it for
 prediction and may run it again during reconciliation. A tick proc therefore
 must use predicted fields, its input, and values derived from the tick. Do not
 read wall-clock time, input devices, scene-node transforms, or untracked random
@@ -121,9 +121,9 @@ HelloSim :: struct {
 }
 ```
 
-That conventional field layout makes the generated facade lane-aware. One call
-from `_ready` attaches Boot, installs the entity factory, initializes the lane,
-and gives it to Boot:
+These fields let script generation identify the session, Boot, and simulation
+lane. With the declarations in place, call the generated attach procedure from
+`_ready` to install the entity factory and initialize the lane through Boot:
 
 ```odin
 hello_sim_net_attach(self, kboot.Options{
@@ -134,11 +134,11 @@ hello_sim_net_attach(self, kboot.Options{
 
 Under that call, `hello_sim_lane_init` is generated from the `@(gd_tick)` and
 `@(gd_sample)` declarations. It registers the input type, validator, tick
-thunks, descriptors, and optional world passes. `boot_lane` makes the network
+wrappers, entity descriptors, and optional world passes. `boot_lane` makes the network
 pump drive simulation and presentation each frame.
 
-The third argument configures the session and lane together. Override fields on
-the materialized profile when the game's measured needs differ:
+The third argument configures the session and lane together. To tune a profile,
+change fields on the value returned by `network_profile`:
 
 ```odin
 hello_sim_net_attach(
@@ -148,7 +148,7 @@ hello_sim_net_attach(
 )
 ```
 
-where `config` was prepared as ordinary data:
+Prepare `config` before the attach call:
 
 ```odin
 config := kboot.network_profile(.Listen_Server_Action)
@@ -163,7 +163,7 @@ and [Simulation tuning](sim.md#tuning).
 ## 5. Remove frame-rate movement
 
 Delete the code that wrote the local player's position from `_process`.
-The generated network pump now samples inputs, advances fixed ticks, reconciles
+The generated network pump samples inputs, advances fixed ticks, reconciles
 snapshots, writes presentation values, and forwards declared events before the
 entity's `_process` displays them:
 
@@ -215,18 +215,19 @@ HELLO_ROLE=serve $GODOT --headless --path examples/hello_sim
 a player entity and does not participate in host succession. `hello_sim_ready`
 selects `.Dedicated_Competitive` for this role, while ordinary Host uses
 `.Listen_Server_Action`; the dedicated profile also verifies that every input
-class has a semantic validator. A production
+class has generated value constraints or an authored validator. A production
 server still needs deployment, discovery, monitoring, restart, and abuse-control
 infrastructure; Kit does not provide a server fleet or matchmaking service.
 
 A listen server uses the same simulation code, but the hosting player controls
-the authority process. That is convenient for invited sessions, not a fair
-security boundary against the host.
+the authority process. Use it for a trust model that permits that player to judge
+results. A dedicated competitive session needs separately trusted infrastructure.
 
 ## What the simulation lane does not solve
 
-- Native ENet join codes provide discovery and limited UDP hole punching, not a
-  general relay. Symmetric NAT still requires WebRTC with TURN or Steam.
+- Native ENet join codes provide discovery and limited UDP hole punching.
+  They do not relay UDP through symmetric NAT. Use a reachable host or another
+  configured transport, such as WebRTC with TURN or Steam, for that deployment.
 - Prediction hides input latency; it does not make the authority's verdict
   instantaneous. Rejected or divergent actions still reconcile.
 - Godot rigid-body physics cannot be replayed by Kit. Predicted physics must use

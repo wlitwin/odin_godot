@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/session: players, entities, and replication scheduling · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/session: players, entities, and replication scheduling</h1><div class="reader-meta"><span>39 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/session.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-mental-model">The mental model</a><a href="#wire-it-up-before-_start">Wire it up (before *_start)</a><a href="#start-drive-drain">Start, drive, drain</a><a href="#the-replicated-world">The replicated world</a><a href="#roster-moderation-stats">Roster, moderation, stats</a><a href="#command-hooks">Command hooks</a><a href="#interest-management-area-of-interest">Interest management (area of interest)</a><a href="#app-messages">App messages</a><a href="#backup-hosting-and-resume">Backup hosting and resume</a><a href="#ownership-transfer">Ownership transfer</a><a href="#coop-lag-compensation-session_rewound">Coop lag compensation (session_rewound)</a><a href="#three-tiers-of-entry-into-your-code">Three tiers of entry into your code</a><a href="#gotchas">Gotchas</a><a href="#internals-and-design-notes">Internals and design notes</a></nav></details>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/session: players, entities, and replication scheduling</h1><div class="reader-meta"><span>38 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/session.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#session-roles-and-integration">Session roles and integration</a><a href="#configure-callbacks-before-starting">Configure callbacks before starting</a><a href="#start-the-session-and-process-events">Start the session and process events</a><a href="#the-replicated-world">The replicated world</a><a href="#roster-moderation-stats">Roster, moderation, stats</a><a href="#command-hooks">Command hooks</a><a href="#interest-management-area-of-interest">Interest management (area of interest)</a><a href="#app-messages">App messages</a><a href="#backup-hosting-and-resume">Backup hosting and resume</a><a href="#ownership-transfer">Ownership transfer</a><a href="#coop-lag-compensation-session_rewound">Coop lag compensation (session_rewound)</a><a href="#three-tiers-of-entry-into-your-code">Three tiers of entry into your code</a><a href="#lifecycle-and-replication-pitfalls">Lifecycle and replication pitfalls</a><a href="#internals-and-design-notes">Internals and design notes</a></nav></details>
 <article class="reading-body "><p><code>kit/session</code> owns the live multiplayer session: stable player identities,
 roster, entity lifetime, replication scheduling, commands, pings, stats,
 moderation, interest management, and backup snapshots. It drives the lower-level
@@ -11,7 +11,8 @@ moderation, interest management, and backup snapshots. It drives the lower-level
 <p>The package does not import Godot or own sockets. A game provides a transport
 send callback and forwards received packets and peer disconnects. Most Godot
 projects use <a href="netgd.html">kit/netgd</a> or <a href="boot.html">kit/boot</a> for that integration.</p>
-<h2 id="the-mental-model">The mental model<a class="heading-anchor" href="#the-mental-model" aria-label="Link to this section">#</a></h2>
+<p><span id="the-mental-model"></span></p>
+<h2 id="session-roles-and-integration">Session roles and integration<a class="heading-anchor" href="#session-roles-and-integration" aria-label="Link to this section">#</a></h2>
 <h3 id="player-identity">Player identity<a class="heading-anchor" href="#player-identity" aria-label="Link to this section">#</a></h3>
 <p>A client presents a random <code>u64</code> reconnect token. The host maps that token to a
 <code>Player_Id</code> for the run. Reconnecting with the same token after the old
@@ -46,39 +47,42 @@ socket connection alone is not a player; the join handshake creates a seat.</li>
 call sites on hosts and clients. Presentation code can normally react to the
 same spawn, state, and command events on every peer. Authority-specific work is
 still explicit in <code>_then</code> halves, authority steps, host lifecycle methods, and
-other places where only the authority can mutate shared truth.</p>
+other places where only the authority can mutate shared gameplay state.</p>
 <h3 id="entity-factory-and-late-join">Entity factory and late join<a class="heading-anchor" href="#entity-factory-and-late-join" aria-label="Link to this section">#</a></h3>
-<p>The normal Boot surface is generated and typed: <code>&lt;type&gt;_spawn</code>,
+<p>Boot normally provides generated, typed functions: <code>&lt;type&gt;_spawn</code>,
 <code>boot_spawn_send</code>/<code>boot_spawn_cancel</code>, and <code>&lt;type&gt;_despawn</code>. At the advanced
 session layer, <code>session_spawn_make</code> sends authority-side creation through the same
 <code>Make_Entity_Proc</code> used on clients. <code>session_despawn</code> similarly calls the
 installed free procedure on every role. A late joiner&#39;s welcome and complete
 world snapshot use the same reliable ordered channel, so entities are created
 before later deltas can refer to them.</p>
-<h2 id="wire-it-up-before-_start">Wire it up (before *_start)<a class="heading-anchor" href="#wire-it-up-before-_start" aria-label="Link to this section">#</a></h2>
-<p>All pre-start wiring survives re-init: call these once in <code>ready()</code>:</p>
+<p><span id="wire-it-up-before-_start"></span></p>
+<h2 id="configure-callbacks-before-starting">Configure callbacks before starting<a class="heading-anchor" href="#configure-callbacks-before-starting" aria-label="Link to this section">#</a></h2>
+<p>Install these callbacks once in <code>ready()</code>, before starting the session. They
+remain installed when the session is reinitialized:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_configure :: <span class="hljs-keyword">proc</span>(s: ^Session, cfg: Session_Config)
 session_set_transport :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, send: Send_Proc)
 session_set_factory :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, make_entity: Make_Entity_Proc, free_entity: Free_Entity_Proc)
 session_set_command_hook :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, hook: Command_Hook)
 session_app_route :: <span class="hljs-keyword">proc</span>(s: ^Session, tag: <span class="hljs-type">u8</span>, user: <span class="hljs-type">rawptr</span>, handler: App_Handler)</code></pre></div><p><code>session_reset(s)</code> ends the live run and frees its roster, registry, queues,
 profiles, and snapshots while retaining this pre-start wiring and configuration.
-The generated game-network detach uses it for back-to-menu → reattach.
-<code>session_destroy(s)</code> additionally releases the wiring and is the terminal
-teardown for a session value.</p>
-<p><code>Session_Config</code> holds every tunable; zero-valued fields mean the defaults (a zero config
-is the out-of-the-box session). All durations are <strong>seconds</strong>: the session bakes them to
-tick counts itself, so changing <code>tick_hz</code> never silently rescales your timeouts:</p>
+The generated game-network detach uses it when returning to the menu so the
+game can attach again later. <code>session_destroy(s)</code> also releases the callbacks;
+use it when the session value will no longer be used.</p>
+<p><code>Session_Config</code> holds the session settings. Zero-valued fields select the
+defaults, so a zero-initialized config is valid. All durations are in seconds.
+The session converts them to tick counts, preserving timeout durations when
+<code>tick_hz</code> changes:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Session_Config :: <span class="hljs-keyword">struct</span> {
 	tick_hz:         <span class="hljs-type">int</span>, <span class="hljs-comment">// net ticks per second (0 = knet.DEFAULT_TICK_HZ, 20)</span>
 	interp_delay:    <span class="hljs-type">f64</span>, <span class="hljs-comment">// how far in the past remote entities render</span>
-	interp_adapt:    <span class="hljs-type">bool</span>, <span class="hljs-comment">// slew interp_delay to the worst link&#x27;s need? (off; interp_delay = the floor) — see net.md</span>
-	interp_delay_max: <span class="hljs-type">f64</span>, <span class="hljs-comment">// adaptive ceiling, seconds (0 = a generous kit default)</span>
+	interp_adapt:    <span class="hljs-type">bool</span>, <span class="hljs-comment">// adapt interpolation delay (off by default; interp_delay is the floor)</span>
+	interp_delay_max: <span class="hljs-type">f64</span>, <span class="hljs-comment">// maximum adaptive delay in seconds (0 = the Kit default)</span>
 	command_timeout: <span class="hljs-type">f64</span>, <span class="hljs-comment">// prediction auto-revert horizon</span>
 	join_timeout:    <span class="hljs-type">f64</span>, <span class="hljs-comment">// client_start -&gt; Ev_Join_Failed horizon</span>
 	backup_interval: <span class="hljs-type">f64</span>, <span class="hljs-comment">// backup-host snapshot refresh cadence</span>
-	max_players:     <span class="hljs-type">int</span>, <span class="hljs-comment">// NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; rejoins always reclaim their seat)</span>
-	change_events:   <span class="hljs-type">bool</span>, <span class="hljs-comment">// emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything)</span>
+	max_players:     <span class="hljs-type">int</span>, <span class="hljs-comment">// cap for new seats (0 = DEFAULT_MAX_PLAYERS, 8); reconnects use their existing seat</span>
+	change_events:   <span class="hljs-type">bool</span>, <span class="hljs-comment">// emit Ev_Entity_Changed for each dirty entity per tick</span>
 	stream_budget:   <span class="hljs-type">int</span>, <span class="hljs-comment">// per-peer owner-stream bytes per tick (0 = unlimited; requires interest management)</span>
 	traffic:         Traffic_Config, <span class="hljs-comment">// authority ingress: reliable, stream, and action token buckets</span>
 	fingerprint:     <span class="hljs-type">u64</span>, <span class="hljs-comment">// wire-contract hash override (0 = the generated default) — see below</span>
@@ -98,78 +102,89 @@ Each <code>Traffic_Limit</code> has <code>packets_per_second</code>, <code>bytes
 unlimited; the named profiles install complete bounded values. This is separate
 from outbound <code>stream_budget</code>, which prioritizes what the authority sends to
 each observer and therefore requires interest management.</p>
-<p>For a new game, prefer a named complete-stack configuration over filling this
+<p>For a new game, use a named network configuration instead of filling this
 struct directly: <code>kboot.network_profile(.Friends_Coop)</code>,
 <code>.Listen_Server_Action</code>, or <code>.Dedicated_Competitive</code>. The profiles materialize
 and validate <code>Session_Config</code> together with the matching <code>ksim.Lane_Config</code>,
 while still allowing ordinary field overrides. See
 <a href="profiles.html">Network profiles</a>.</p>
-<p><strong>Schema compatibility (on by default).</strong> Descriptors are positional, so a
-skewed peer could otherwise interpret valid bytes as the wrong fields. Before
-writing generated code, scriptgen recursively validates the raw wire roots and
-emits <code>NET_SCHEMA_CANONICAL</code>: field paths, wire kinds and widths, enum storage,
+<p>Schema compatibility checks are on by default. Descriptors are positional, so
+peers built with different schemas could interpret valid bytes as different
+fields. Before writing generated code, scriptgen recursively validates the
+types sent as raw bytes and emits <code>NET_SCHEMA_CANONICAL</code>: field paths, wire
+kinds and widths, enum storage,
 fixed bounds, input classes and constraints, message tags, and action access, prediction,
 argument limits, and scheduling. Platform-width integers, implicit-width enums,
 pointers, unsupported containers, unresolved nested types, and structs with
-hidden padding are build errors. Generated target-side size/alignment assertions
-close the loop between scriptgen&#39;s view and the compiler that builds the game.</p>
+hidden padding are build errors. Generated size/alignment assertions check that
+the target compiler&#39;s layout agrees with scriptgen&#39;s schema.</p>
 <p><code>NET_ABI_FINGERPRINT</code> hashes that readable schema. The complete generated
 <code>NET_FINGERPRINT</code> also covers entity ids, presentation events, RPC signatures, and the
 session&#39;s <code>PROTOCOL_REV</code>; the guard registers it as the session default at load.
-JOIN carries it, so equal contracts seat normally while a mismatch is refused as
-<code>Ev_Join_Denied{.Version}</code>. A checked host also refuses fingerprint-less clients
+JOIN carries the fingerprint. Peers with matching fingerprints pass the
+compatibility check; a mismatch is refused as <code>Ev_Join_Denied{.Version}</code>.
+A checked host also refuses fingerprint-less clients
 from pre-check builds. Comments and formatting do not change the hash; changing
 a path, representation, bound, policy, or schedule does. Rebuild both peers
 after a schema change.</p>
-<p><code>Session_Config.fingerprint</code> is the override: leave it 0 (the default) to use the generated
-value, set it for a hand-rolled multi-module contract, or set <code>ksess.FINGERPRINT_NONE</code> to
-disable the gate (hand-built descriptors, tests; a session with no generated fingerprint is
-unchecked).</p>
-<p>One thing the generated hash <strong>cannot</strong> see is a <em>byte-keyed content table</em>. The hash covers
-wire SHAPES (that a <code>Slot</code> is <code>{item: u16, count: u16}</code>) but not the MEANING a game pins
-to those bytes: an item id → definition registry, a name → id tag table, anything where the
-wire byte is an index into game content. Reorder or rename such a table between builds and
-the shapes still match, so the door passes. A replicated <code>item=1</code> then decodes as the wrong
-thing on the receiving peer. <code>ksess.session_mix_fingerprint(base, contract)</code> folds the
-table&#39;s canonical text onto the shape hash (pass <code>base = 0</code> to mix onto the generated
-default; a bare assignment would <em>replace</em> the shape gate), so that skew is refused at the
-door too. <code>kitems.items_contract(&amp;table)</code> is the ready-made producer for item registries
-(sorted, so registration order does not matter); cavecrawl folds its <code>GEM</code>/<code>TORCH</code> table
-this way.</p>
-<p>In practice the transport hookup is one line, from cavecrawl&#39;s <code>ready</code>:</p>
+<p>Leave <code>Session_Config.fingerprint</code> at 0 to use the generated value. Set it to
+a custom fingerprint when combining declarations from multiple modules, or
+to <code>ksess.FINGERPRINT_NONE</code> to disable compatibility checks for hand-built
+descriptors or tests. A session with no generated fingerprint is unchecked.</p>
+<p>The generated hash cannot detect changes to a content table indexed by a wire
+value. It records that a <code>Slot</code> is <code>{item: u16, count: u16}</code>, but it does not
+record which item definition each ID selects. The same limitation applies to
+name-to-ID tag tables and other indices into game content. If a build reorders
+or renames entries, its fingerprint can still match even though a replicated
+<code>item=1</code> selects a different definition on the receiving peer.</p>
+<p>Use <code>ksess.session_mix_fingerprint(base, contract)</code> to include the table&#39;s
+canonical text in the fingerprint. Pass <code>base = 0</code> to combine it with the
+generated default; assigning a content hash directly would replace the schema
+check. Peers then reject mismatched content tables during admission.
+<code>kitems.items_contract(&amp;table)</code> produces canonical text for item registries,
+sorted so registration order does not matter. Cavecrawl includes its
+<code>GEM</code>/<code>TORCH</code> table this way.</p>
+<p>In cavecrawl&#39;s <code>ready</code>, the game installs its entity factory, attaches the
+transport, and registers transport callbacks:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ksess.session_set_factory(&amp;self.ses, self, cave_make_entity, cave_free_entity)
 netgd.wire_attach(&amp;self.wire, self.owner, &amp;self.ses, MSG_SESSION)
 netgd.wire_listen(&amp;self.wire, <span class="hljs-string">&quot;on_packet&quot;</span>, <span class="hljs-string">&quot;on_peer_left&quot;</span>, <span class="hljs-string">&quot;on_net_up&quot;</span>, <span class="hljs-string">&quot;on_net_down&quot;</span>)</code></pre></div><h3 id="the-allocator-tiers">The allocator tiers<a class="heading-anchor" href="#the-allocator-tiers" aria-label="Link to this section">#</a></h3>
-<p>The kit allocates in three tiers, and the session sits in the middle one.</p>
-<p><strong>Explicit param</strong>: kit/net&#39;s <code>*_make</code> procs (<code>writer_make</code>, <code>registry_make</code>, …) take an
-<code>allocator</code> argument; the caller names where every byte lives.</p>
-<p><strong>Stored and rebound</strong>: kit/sim&#39;s <code>Lane</code> and this <code>Session</code> each keep ONE allocator
-(<code>Session.allocator</code>, adopted from <code>context.allocator</code> at the first <code>*_start</code> and
-held across every re-init) and reinstall it as <code>context.allocator</code> at the top of EVERY root:
-the starts, resume, destroy, <code>session_tick</code>, the packet entry, <code>session_present</code>, the
-spawn/blob/owner/despawn mutators, and the subsystem writers (<code>session_stat_column</code>,
-<code>session_profile_mine</code>, <code>session_set_successor_info</code>). A roster name cloned in a packet
-handler and freed in <code>run_destroy</code>, or a registry shadow made on spawn and freed on despawn,
-therefore always rides one allocator, even when a game hosts under a custom allocator (an
-arena, a tracking allocator) whose ambient differs from the session&#39;s between calls. Set
-<code>s.allocator</code> before <code>*_start</code> to pin a custom one; leave it zero and the session adopts
-whatever <code>context.allocator</code> was in force when it started.</p>
-<p><strong>Ambient</strong>: comms, xfer, album, items, and the UI widgets keep no allocator of their own
-and allocate straight from <code>context.allocator</code>. A game driving them under a custom allocator
-must keep <code>context.allocator</code> STABLE across each subsystem&#39;s init, use, and destroy, because
-their frees inherit whatever ambient is in force at teardown.</p>
+<p>Kit packages use three allocator conventions. The session stores an allocator
+and restores it at each entry point, as described in the second convention.</p>
+<p><strong>Explicit param</strong>: kit/net&#39;s <code>*_make</code> procs (<code>writer_make</code>, <code>registry_make</code>, …)
+take an <code>allocator</code> argument. The caller selects the allocator for each object.</p>
+<p><strong>Stored and rebound</strong>: kit/sim&#39;s <code>Lane</code> and this <code>Session</code> each store one
+allocator. <code>Session.allocator</code> is adopted from <code>context.allocator</code> at the first
+<code>*_start</code> and retained across reinitialization. The session restores it as
+<code>context.allocator</code> at entry points that allocate or free memory: the starts, resume, destroy,
+<code>session_tick</code>, the packet entry, <code>session_present</code>, the spawn/blob/owner/despawn
+mutators, and the subsystem writers (<code>session_stat_column</code>,
+<code>session_profile_mine</code>, <code>session_set_successor_info</code>). A roster name cloned in a
+packet handler and freed in <code>run_destroy</code> therefore uses the same allocator for
+both operations. So does a registry shadow allocated on spawn and freed on
+despawn. This remains true when the game&#39;s ambient allocator differs between
+calls, for example when it uses an arena or a tracking allocator. Set
+<code>s.allocator</code> before <code>*_start</code> to select a custom allocator. If it is zero, the
+session adopts the <code>context.allocator</code> in effect when it starts.</p>
+<p><strong>Ambient</strong>: comms, xfer, album, items, and the UI widgets allocate through
+<code>context.allocator</code> without storing it. A game using a custom allocator must
+keep <code>context.allocator</code> the same across each subsystem&#39;s initialization, use,
+and destruction. Free operations use the ambient allocator in effect at
+teardown.</p>
 <p>An allocator-isolation test checks the stored-and-rebound allocator convention. <code>tests/kitsession</code>&#39;s
 <code>the_session_never_spends_the_ambient_allocator</code> runs a full lifecycle (start, join, both
 spawn paths, blobs, interest, stats, profiles, ticks, kick, leave, disconnect, a re-init,
-destroy) with a tracking allocator handed to the session and a <em>watching</em> allocator
-installed as the ambient, then asserts the session touched the ambient ZERO times. It is the
-only way to catch a newly added root that forgot to rebind, because the omission is silent:
-the session can appear to work while allocating through the wrong allocator.</p>
-<h2 id="start-drive-drain">Start, drive, drain<a class="heading-anchor" href="#start-drive-drain" aria-label="Link to this section">#</a></h2>
-<p>(<a href="boot.html">kit/boot</a> drives this whole section for you: <code>boot_host</code>/
-<code>boot_join</code> call the starts, and generated <code>&lt;game&gt;_net_frame</code> ticks and drains
-through Boot. What follows is
-the lower-level API, available for games that need custom lifecycle ordering.)</p>
+destroy) with a tracking allocator assigned to the session and a separate
+allocator monitoring ambient allocations. The test asserts zero ambient
+allocations. This detects entry points that fail to restore the session
+allocator, a mistake that may otherwise go unnoticed while the session runs.</p>
+<p><span id="start-drive-drain"></span></p>
+<h2 id="start-the-session-and-process-events">Start the session and process events<a class="heading-anchor" href="#start-the-session-and-process-events" aria-label="Link to this section">#</a></h2>
+<p><a href="boot.html">kit/boot</a> manages this lifecycle: <code>boot_host</code>/<code>boot_join</code> start the
+session, and generated <code>&lt;game&gt;_net_frame</code> advances it and drains events through
+Boot. Use the lower-level API below when a game needs custom lifecycle ordering.
+These signatures show the main lifecycle arguments; the source definitions also
+include optional spectator and packet-channel settings.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_host_start :: <span class="hljs-keyword">proc</span>(s: ^Session, name: <span class="hljs-type">string</span>, token: <span class="hljs-type">u64</span> = <span class="hljs-number">0</span>, dedicated := <span class="hljs-literal">false</span>)
 session_client_start :: <span class="hljs-keyword">proc</span>(s: ^Session, token: <span class="hljs-type">u64</span>, name: <span class="hljs-type">string</span>)
 session_client_join :: <span class="hljs-keyword">proc</span>(s: ^Session)     <span class="hljs-comment">// transport is connected: ask for a seat</span>
@@ -177,17 +192,20 @@ session_client_leave :: <span class="hljs-keyword">proc</span>(s: ^Session)    <
 session_tick :: <span class="hljs-keyword">proc</span>(s: ^Session, dt: <span class="hljs-type">f64</span>, now: <span class="hljs-type">f64</span>) -&gt; (ticks: <span class="hljs-type">int</span>, sampled: <span class="hljs-type">int</span>)
 session_poll :: <span class="hljs-keyword">proc</span>(s: ^Session) -&gt; (ev: Event, ok: <span class="hljs-type">bool</span>)
 session_handle_packet :: <span class="hljs-keyword">proc</span>(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader)
-session_peer_disconnected :: <span class="hljs-keyword">proc</span>(s: ^Session, peer: Peer_Id)</code></pre></div><p>The host is a full player too (name, id, stats); it just never JOINs over the wire.</p>
-<p><strong>Dedicated servers.</strong> <code>session_host_start(…, dedicated = true)</code> makes the authority a
-SERVER, not a player. Its seat is flagged <code>Player.dedicated</code> on every roster (the welcome
-carries it, so clients know too): games skip it when spawning avatars
-(<code>if p.dedicated {continue}</code>), the kit lobby/scoreboard hide it, <code>session_count()</code> does not
-count it, and <code>max_players</code> caps humans only. Host migration never arms: a dead dedicated
-server restarts; migration is the peer model&#39;s answer to a <em>player</em>-host leaving. Use this role when infrastructure runs the authority. The player-hosted
-role remains available. The Boot entry point is <a href="boot.html"><code>kboot.boot_serve</code></a>. See <code>examples/slopball/server_run.sh</code>.</p>
-<p>Clients call <code>session_client_start</code> when they begin connecting and <code>session_client_join</code>
-once the transport handshake completes; no WELCOME within <code>join_timeout</code> produces
-<code>Ev_Join_Failed</code> instead of hanging on &quot;Joining…&quot; forever.</p>
+session_peer_disconnected :: <span class="hljs-keyword">proc</span>(s: ^Session, peer: Peer_Id)</code></pre></div><p>The host normally has a player identity, name, and stats. It creates its seat
+locally without sending JOIN over the transport.</p>
+<p><strong>Dedicated servers.</strong> <code>session_host_start(…, dedicated = true)</code> gives the
+authority a server seat flagged <code>Player.dedicated</code>. The welcome includes this
+flag in every client&#39;s roster. Games skip that seat when spawning avatars
+(<code>if p.dedicated {continue}</code>); the Kit lobby and scoreboard hide it, and
+<code>session_count()</code> excludes it. <code>max_players</code> therefore limits human players.
+Host migration is disabled for this role: a dedicated server must restart if
+it fails. Use this role when infrastructure runs the authority, through
+<a href="boot.html"><code>kboot.boot_serve</code></a> in Boot. See <code>examples/slopball/server_run.sh</code>.</p>
+<p>Clients call <code>session_client_start</code> when connecting begins and
+<code>session_client_join</code> once the transport handshake completes. If WELCOME does
+not arrive within <code>join_timeout</code>, the session emits <code>Ev_Join_Failed</code> so the
+game can report the failed join.</p>
 <p>Call <code>session_tick(s, delta, knet.now_s())</code> once per frame: it advances the net ticker
 (delta walk, streams, pings, stats, backup refresh, prediction expiry) and stream-samples
 remote entities. Then drain:</p>
@@ -229,8 +247,8 @@ _ = cave_lobby_net_frame(self, delta, now_s())</code></pre></div><p>The half nam
 <code>_backup_target</code>, <code>_succession</code>, <code>_backup_received</code>, <code>_owner_changed</code>,
 <code>_blob_changed</code>, <code>_stats_updated</code>, <code>_profile_changed</code>, <code>_state_applied</code>, <code>_command_executed</code>,
 <code>_command_confirmed</code>, <code>_command_rejected</code>), except the entity cluster,
-which wears an <code>entity_</code> prefix (<code>_entity_spawned</code>, <code>_entity_resynced</code>,
-<code>_entity_despawned</code>, <code>_entity_changed</code>) so it can never be mistaken for the
+which uses an <code>entity_</code> prefix (<code>_entity_spawned</code>, <code>_entity_resynced</code>,
+<code>_entity_despawned</code>, <code>_entity_changed</code>) to distinguish it from the
 <a href="boot.html">census hooks</a>: <code>&lt;entity&gt;_spawned</code> runs before spawn fields apply,
 while <code>&lt;game&gt;_entity_spawned</code> and the typed <code>&lt;entity&gt;_born</code> hook run after the
 fields are available. Use <code>_spawned</code> for bookkeeping and <code>_born</code> for initial
@@ -240,32 +258,37 @@ event fields; invalid names or signatures are build errors.</p>
 <p>An optional <code>&lt;game&gt;_embodied(self, id)</code> half runs when an entity type tagged
 <code>avatar</code> is born with the local player&#39;s ownership. It covers initial spawn,
 late join, and reconnect reclaim with one typed event.</p>
-<p><strong>Role gates are generated.</strong> An every-role event (<code>player_joined</code>,
-<code>player_left</code>, <code>entity_spawned</code>, <code>owner_changed</code>, <code>blob_changed</code>) may
-declare a <code>_then</code> half: authority only, the event&#39;s consequence. A
-single-role event has its role enforced at dispatch: a client-only
-event queued just before a mid-batch takeover flipped <code>is_host</code> dies at the
-generated gate instead of re-running takeover code (a host death can land as
-two transport signals, so <code>Ev_Succession</code> may queue twice in one batch; the
-role check is why the succession half needs no <code>is_host</code>). A <code>_then</code> on a
-client-only event (the authority never hears <code>Ev_Kicked</code>) or a host-only one
-(<code>Ev_Backup_Target</code> is already authority-only) is a build error.</p>
-<p>The event union includes <code>Ev_Seated</code> (every role&#39;s &quot;I hold a seat now&quot; — the host&#39;s at
-<code>session_host_start</code>, a client&#39;s right before its <code>Ev_Welcomed</code>; not re-fired by a
-takeover, the heir&#39;s seat is the one it held), <code>Ev_Welcomed</code>, <code>Ev_Player_Joined</code> (with <code>rejoin</code>), <code>Ev_Player_Left</code>,
-<code>Ev_Host_Left</code> (alone it ends the run; with <a href="#backup-hosting-and-resume">succession</a>
-armed, <code>Ev_Succession</code> fires beside it and the run survives), <code>Ev_Join_Failed</code>,
-<code>Ev_Join_Denied</code> (<code>.Full</code> / <code>.Locked</code> / <code>.Banned</code> / <code>.Version</code>, each a different
-sentence to the player), <code>Ev_Kicked</code>, <code>Ev_Spawned</code>, <code>Ev_Resynced</code> (a KNOWN entity&#39;s fields caught up
-wholesale, as with interest re-entry or a snapshot over live state; generated
-<a href="net.html#field-change-edges"><code>&lt;field&gt;_edge</code> halves</a>
-re-seed themselves silently, so this event is only for hand-rolled edge
-detection, which re-seeds here or presents the missed changes as fresh events),
-<code>Ev_Despawned</code>, <code>Ev_Owner_Changed</code>,
-<code>Ev_Blob_Changed</code>, <code>Ev_Stats_Updated</code>, <code>Ev_Profile_Changed</code>, <code>Ev_Backup_Received</code>, <code>Ev_State_Applied</code>,
-<code>Ev_Entity_Changed</code> (opt-in), <code>Ev_Command_Executed</code> (host),
-<code>Ev_Command_Confirmed</code> / <code>Ev_Command_Rejected</code> (client). The command events
-cover both immediate co-op and tick-scheduled actions:</p>
+<p>Generated dispatch checks the role required by each event. An event delivered
+to every role (<code>player_joined</code>, <code>player_left</code>, <code>entity_spawned</code>, <code>owner_changed</code>,
+<code>blob_changed</code>) may declare a <code>_then</code> half for authority-only consequences.
+An event restricted to one role is dispatched only while the process has that
+role. For example, a host disconnect can produce two transport signals and
+queue <code>Ev_Succession</code> twice in one batch. After the first event changes
+<code>is_host</code>, generated dispatch skips the second client-only event. The
+succession half therefore needs no <code>is_host</code> check. Declaring <code>_then</code> for a
+client-only event such as <code>Ev_Kicked</code>, or a host-only event such as
+<code>Ev_Backup_Target</code>, is a build error.</p>
+<p>The event union covers session lifecycle (<code>Ev_Seated</code>, <code>Ev_Welcomed</code>,
+<code>Ev_Player_Joined</code> with <code>rejoin</code>, <code>Ev_Player_Left</code>, <code>Ev_Host_Left</code>,
+<code>Ev_Join_Failed</code>, <code>Ev_Join_Denied</code>, <code>Ev_Kicked</code>), entity changes (<code>Ev_Spawned</code>,
+<code>Ev_Resynced</code>, <code>Ev_Despawned</code>, <code>Ev_Owner_Changed</code>, <code>Ev_Blob_Changed</code>,
+<code>Ev_State_Applied</code>, opt-in <code>Ev_Entity_Changed</code>), and updates to stats, profiles,
+and backups (<code>Ev_Stats_Updated</code>, <code>Ev_Profile_Changed</code>, <code>Ev_Backup_Received</code>).</p>
+<p><code>Ev_Seated</code> fires at <code>session_host_start</code> on the host and immediately before
+<code>Ev_Welcomed</code> on a client. A takeover retains the successor&#39;s existing seat
+and does not fire it again. <code>Ev_Host_Left</code> ends the run unless
+<a href="#backup-hosting-and-resume">succession</a> is armed; in that case,
+<code>Ev_Succession</code> also fires so the run can continue. <code>Ev_Join_Denied</code> distinguishes
+<code>.Full</code>, <code>.Locked</code>, <code>.Banned</code>, and <code>.Version</code>, allowing the game to explain the
+refusal to the player.</p>
+<p><code>Ev_Resynced</code> reports that a known entity received a complete field update,
+such as on interest re-entry or when a snapshot is applied over live state.
+Generated <a href="net.html#field-change-edges"><code>&lt;field&gt;_edge</code> halves</a> reset their stored
+comparison values without emitting edges. Games with custom edge detection
+can use this event to reset those values or present missed changes as new events.</p>
+<p>Command events are <code>Ev_Command_Executed</code> on the host and
+<code>Ev_Command_Confirmed</code> / <code>Ev_Command_Rejected</code> on the client. They cover both
+immediate co-op and tick-scheduled actions:</p>
 <ul>
 <li>confirmed: <code>seq</code>, <code>entity</code>, <code>cmd</code>, <code>model</code>;</li>
 <li>rejected: those fields plus typed <code>reason</code>; and</li>
@@ -275,74 +298,77 @@ cover both immediate co-op and tick-scheduled actions:</p>
 <code>_command_executed</code> halves receive those fields positionally. Reasons are
 <code>Access</code>, <code>Rate</code>, <code>Malformed</code>, <code>Stale</code>, <code>Predicate</code>, or <code>Timeout</code>; timeout
 callbacks retain the real sequence, entity, and command. <code>model</code> is
-<code>.Immediate</code> or <code>.Scheduled</code>, so a game using both lanes never has to infer the
-source from raw ids.</p>
+<code>.Immediate</code> or <code>.Scheduled</code>, identifying the action model directly for games
+that use both.</p>
 <h2 id="the-replicated-world">The replicated world<a class="heading-anchor" href="#the-replicated-world" aria-label="Link to this section">#</a></h2>
-<p>For a normal <code>Boot</code> game, generated typed helpers are the sole gameplay
-surface: <code>&lt;type&gt;_spawn</code>, <code>&lt;type&gt;_despawn</code>, <code>&lt;type&gt;_teleport</code>, and
-<code>boot_spawn_send</code>/<code>boot_spawn_cancel</code>. The signatures below are the advanced
-raw layer those helpers implement, for custom factories and deliberately
-mixed-kind batches.</p>
+<p>In a <code>Boot</code> game, use the generated typed helpers for gameplay:
+<code>&lt;type&gt;_spawn</code>, <code>&lt;type&gt;_despawn</code>, <code>&lt;type&gt;_teleport</code>, and
+<code>boot_spawn_send</code>/<code>boot_spawn_cancel</code>. They call the lower-level functions
+below, which are available for custom factories and batches containing
+multiple entity kinds.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_spawn_make :: <span class="hljs-keyword">proc</span>(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -&gt; (entity: <span class="hljs-type">rawptr</span>, id: knet.Net_Id)
 session_spawn_send :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id)
 session_spawn :: <span class="hljs-keyword">proc</span>(s: ^Session, type: Entity_Type, entity: <span class="hljs-type">rawptr</span>, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -&gt; knet.Net_Id
 session_despawn :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id)
 session_start_replicating :: <span class="hljs-keyword">proc</span>(s: ^Session)
 session_teleport :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id)
-session_owner_of :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id) -&gt; knet.Player_Id</code></pre></div><p>Spawning is two-phase because the announcement carries a field snapshot:
-make, set your per-spawn fields, then send. A <a href="boot.html">kit/boot</a> game
-spawns TYPED: every <code>entity=Name:id</code> tag generates a <code>&lt;entity&gt;_spawn</code>
-helper (the tag already knows the struct, so the <code>TYPE</code> const and the
-rawptr cast stop existing at spawn sites), paired with the one role-safe
-announce <code>kboot.boot_spawn_send</code>. From cavecrawl:</p>
+session_owner_of :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id) -&gt; knet.Player_Id</code></pre></div><p>Spawning has separate creation and announcement steps because the announcement
+carries a field snapshot. Create the entity, set its per-spawn fields, then
+send it. In a <a href="boot.html">kit/boot</a> game, each <code>entity=Name:id</code> tag generates a
+typed <code>&lt;entity&gt;_spawn</code> helper. It supplies the entity type and casts internally,
+so the caller needs neither a <code>TYPE</code> constant nor a rawptr cast. Use
+<code>kboot.boot_spawn_send</code> to announce the entity on the appropriate role. From
+cavecrawl:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">sp, sid := spelunker_spawn(&amp;self.boot, owner = p.id)
 sp.x = SPAWN_X + <span class="hljs-type">f32</span>(i) * <span class="hljs-number">60</span>
 sp.y = SPAWN_Y
 sp.hp = MAX_HP
-kboot.boot_spawn_send(&amp;self.boot, sid) <span class="hljs-comment">// authority born hooks run before this returns</span></code></pre></div><p>If validation or dressing fails inside that configuration window, call
+kboot.boot_spawn_send(&amp;self.boot, sid) <span class="hljs-comment">// authority born hooks run before this returns</span></code></pre></div><p>If validation or configuration fails before announcement, call
 <code>kboot.boot_spawn_cancel(&amp;boot, id)</code>. It removes only an unsent authority draft
 or a client-provisional predicted spawn; it cannot delete a committed entity.
 This gives complex factories explicit rollback without forcing ordinary Odin
 callers through a non-capturing callback API.</p>
-<p>(For a TICKING entity the same helper routes through <code>boot_fire_spawn</code>: the
-host mints the real entity, a client a predicted one, as in sim.md&#39;s fired
-projectile.) The raw <code>session_spawn_make</code>/<code>session_spawn_send</code> pair stays
-public underneath, and <code>session_spawn</code> remains for games that build
-entities by hand.</p>
-<p><code>session_start_replicating</code> is the host&#39;s &quot;the world is set up, go live&quot; moment: it commits
-shadows, ships the full world to every already-seated client, and from then on the
-per-tick delta walk broadcasts and every later joiner gets the world behind its welcome.
-<code>session_teleport</code> is for the <em>owner</em> of a streamed entity declaring a jump (respawn,
-level change) so remote screens snap instead of sliding the avatar across the map.</p>
+<p>For a ticking entity, the helper calls <code>boot_fire_spawn</code>: the host creates the
+accepted entity and a client creates a predicted entity, as in sim.md&#39;s fired
+projectile example. The <code>session_spawn_make</code>/<code>session_spawn_send</code> pair remains
+public, and games that build entities directly can use <code>session_spawn</code>.</p>
+<p>Call <code>session_start_replicating</code> on the host after setting up the world. It
+commits the registry&#39;s comparison copies and sends the full world to clients
+already seated. Subsequent network ticks broadcast deltas, and later joiners
+receive the world after their welcome. An entity owner calls
+<code>session_teleport</code> to mark a discontinuous position change on a streamed entity,
+such as a respawn or level change. Remote presentation then snaps to the new
+position instead of interpolating across the map.</p>
 <p>The client-side factory:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Make_Entity_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, type: Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -&gt; (entity: <span class="hljs-type">rawptr</span>, set: ^knet.Command_Set)
-Free_Entity_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, id: knet.Net_Id, entity: <span class="hljs-type">rawptr</span>)</code></pre></div><p>Games rarely write one: tag each exported entity scene with
-<code>entity=Name:id</code> and the generated <code>&lt;game&gt;_entities</code> (<a href="boot.html">kboot.boot_entities</a>
-underneath) installs the GENERATED factory (scene under <code>boot.world</code>, node
-ledger, typed <code>*_spawned</code>/<code>*_freed</code> census hooks, the host&#39;s own spawns born at
-the send). <code>session_set_factory</code> remains the escape hatch for exotic
-creation, and returning nil from <code>make</code> skips the entity safely. The wire
-carries its length, so unknown types are stepped over whole.</p>
+Free_Entity_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, id: knet.Net_Id, entity: <span class="hljs-type">rawptr</span>)</code></pre></div><p>For most games, tag each exported entity scene with <code>entity=Name:id</code> and use
+the generated <code>&lt;game&gt;_entities</code> wrapper around <a href="boot.html">kboot.boot_entities</a>.
+It installs a factory that creates scenes under <code>boot.world</code>, records their
+nodes, dispatches typed <code>*_spawned</code>/<code>*_freed</code> census hooks, and dispatches born
+hooks for the host&#39;s own spawns when they are sent. Use <code>session_set_factory</code>
+for custom creation. Returning nil from <code>make</code> skips an entity. Each entity&#39;s
+wire record includes its length, allowing the receiver to skip unknown types.</p>
 <h3 id="entity-blobs">Entity blobs<a class="heading-anchor" href="#entity-blobs" aria-label="Link to this section">#</a></h3>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_set_blob :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id, data: []<span class="hljs-type">u8</span>)
-session_blob :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id) -&gt; []<span class="hljs-type">u8</span></code></pre></div><p>Entity blobs are the variable-length escape hatch, the RARE-CHANGE arm of
-<a href="net.html#dynamic-collections">net.md&#39;s collections stance</a>
-(bounded state takes a fixed array; a live collection of things takes
-entities): one opaque, <strong>author-dirtied</strong> payload per entity. It is not a
-field: there is no diffing (you say when it changed), no interpolation, and no prediction
-interplay. The host sets it; it ships reliably to every peer,
-<code>Ev_Blob_Changed</code> fires everywhere (the host included), and it rides every
-full snapshot, so late joiners, backup hosts, and saves carry it with <strong>zero
-catch-up code</strong>. Cavecrawl carves a per-floor inscription into the level
-entity this way; a rejoiner reads it off the same event as everyone else.</p>
+session_blob :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id) -&gt; []<span class="hljs-type">u8</span></code></pre></div><p>An entity blob holds one opaque, variable-length payload per entity. Use it
+for state that changes infrequently, following
+<a href="net.html#dynamic-collections">net.md&#39;s collection guidance</a>: fixed arrays for
+bounded state, entities for live collections, and blobs for occasional
+variable-length updates. The game marks changes explicitly by setting the
+blob; the session does not diff, interpolate, or predict its contents.</p>
+<p>The host sets the blob and sends it reliably to every peer.
+<code>Ev_Blob_Changed</code> fires on clients and the host. Full snapshots also include
+blobs, making them available to late joiners, backup hosts, and saves.
+Cavecrawl stores a per-floor inscription on the level entity this way;
+rejoining players read it through the same event handler as other players.</p>
 <p>A blob is capped at 256 KiB and still has to fit the 1 MiB session packet that
 carries its update or world snapshot. Larger one-shot data belongs in
 <code>kit/xfer</code>, which chunks and paces it instead of blocking reliable state.</p>
-<p>Use per-tick replicated fields for simulation state, app messages for
-event-shaped things, and a blob for variable-length state a <em>new observer</em>
-must be able to see. <code>session_blob</code> returns a view (copy it if you keep it),
-and re-received duplicates (a rejoin re-delivers the world) are dropped by
-version, so the event never double-fires.</p>
+<p>Use per-tick replicated fields for simulation state, app messages for transient
+events, and blobs for variable-length state that new observers need to receive.
+<code>session_blob</code> returns a view; copy it if you need to retain it. The session
+discards duplicate versions, including those received when a rejoin delivers
+the world again, so duplicates do not emit another change event.</p>
 <h2 id="roster-moderation-stats">Roster, moderation, stats<a class="heading-anchor" href="#roster-moderation-stats" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_player :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Player_Id) -&gt; (Player, <span class="hljs-type">bool</span>)
 session_roster :: <span class="hljs-keyword">proc</span>(s: ^Session, allocator := <span class="hljs-keyword">context</span>.temp_allocator) -&gt; []Player
@@ -351,17 +377,18 @@ session_count :: <span class="hljs-keyword">proc</span>(s: ^Session, connected_o
 session_set_locked :: <span class="hljs-keyword">proc</span>(s: ^Session, locked: <span class="hljs-type">bool</span>)
 session_kick :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, ban := <span class="hljs-literal">false</span>, reason := Disconnect_Reason.Kicked) -&gt; (was: Peer_Id, ok: <span class="hljs-type">bool</span>)
 session_set_traffic_hook :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, hook: Traffic_Hook)
-session_set_production_log_hook :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, hook: Production_Log_Hook)</code></pre></div><p><code>session_count</code>&#39;s bare call counts PRESENT PEOPLE (connected, non-dedicated), which is what
-every gate that says &quot;players&quot; means (min-players, ready checks, <code>max_players</code>). Opt DOWN
-for the other censuses: <code>connected_only = false</code> includes departed rows (roster size, what a
-save/resume receipt reports), and <code>players_only = false</code> counts a dedicated seat (the wire&#39;s
-view).</p>
-<p><code>session_set_locked</code> is the standard move once a run starts, if drop-in is not wanted: new
-joins are refused with <code>.Locked</code>, while players already in the roster still reconnect freely.
-<code>session_kick</code> tells the target explicitly (<code>Ev_Kicked</code>, not a silent host-crash); with
-<code>ban</code> the token bounces off future joins with <code>.Banned</code> for the rest of the run (bans are
-run-scoped but ride the <a href="#backup-hosting-and-resume">backup snapshot</a>, so a takeover does not
-launder them; persist them yourself if forever matters).</p>
+session_set_production_log_hook :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, hook: Production_Log_Hook)</code></pre></div><p>By default, <code>session_count</code> counts connected players and excludes dedicated
+server seats. Player limits and checks, including min-players, ready checks,
+and <code>max_players</code>, use this count. Set <code>connected_only = false</code> to include
+departed roster entries, as reported by save/resume receipts. Set
+<code>players_only = false</code> to include a dedicated server seat in the count.</p>
+<p>Call <code>session_set_locked</code> when a run should stop accepting new players. New
+joins receive <code>.Locked</code>, while players already in the roster may reconnect.
+<code>session_kick</code> delivers <code>Ev_Kicked</code> to explain the removal to the target. With
+<code>ban</code>, it also rejects future joins using that token with <code>.Banned</code> for the
+rest of the run. Bans are included in the
+<a href="#backup-hosting-and-resume">backup snapshot</a> and survive takeover. The game
+must persist them separately if they should apply to later runs.</p>
 <p>Traffic refusals are observable without writing packet plumbing. The hook gets
 a typed <code>Traffic_Violation</code> containing player, transport peer, class
 (<code>Reliable</code>, <code>Stream</code>, or <code>Action</code>), attempted bytes, and that class&#39;s strike
@@ -393,154 +420,153 @@ hostile peer cannot turn the logger into unbounded allocation or output work.</p
 	metrics_count(record.kind, record.action_reason, record.disconnect)
 }
 
-ksess.session_set_production_log_hook(&amp;self.ses, self, net_log)</code></pre></div><p><strong>Spectators.</strong> <code>session_client_start(..., spectate = true)</code> joins to WATCH: the seat
-receives the whole world (spawns, deltas, streams, stats, chat) and is nobody. It
-bypasses <code>max_players</code> (a full room can be watched), <code>session_count()</code> does not count it,
-player gates and host migration skip it, and the host refuses its commands, streams, and sim
-inputs outright: the seat is receive-only past the join. Every roster reads <code>Player.spectator</code>
-(the lobby marks the row &quot;(watching)&quot;, the scoreboard skips it); the game&#39;s half is the
-same <code>!p.spectator</code> guard its spawn loops already give <code>dedicated</code>. Promotion is not a flag
-flip: a watcher who wants in leaves and rejoins as a player, through the same doors and
-gates as anyone.</p>
-<p>Stats are generic named i64 counters on the <em>player</em> record: host-accumulated, replicated
-to everyone as a full snapshot at ~2 Hz when dirty, and they survive disconnects like
-everything else identity-shaped. Column 0 is always &quot;ping&quot;, fed by the session itself:</p>
+ksess.session_set_production_log_hook(&amp;self.ses, self, net_log)</code></pre></div><p><strong>Spectators.</strong> <code>session_client_start(..., spectate = true)</code> creates a
+receive-only seat. It receives world updates (spawns, deltas, streams, stats,
+chat), but the host rejects its commands, streams, and simulation inputs.
+Spectators bypass <code>max_players</code>, so they can watch a full room.
+<code>session_count()</code> excludes them, as do player checks and host migration.
+<code>Player.spectator</code> is available in every roster; the lobby marks these rows
+&quot;(watching)&quot; and the scoreboard skips them. Game spawn loops should check
+<code>!p.spectator</code> as well as excluding <code>dedicated</code> seats. To become a player, a
+spectator must leave and rejoin, subject to the normal admission checks.</p>
+<p>Stats are named i64 counters on each player record. The host updates them and
+replicates a full stats snapshot to everyone at ~2 Hz when values have changed.
+They survive disconnects with the player identity. Column 0 is always &quot;ping&quot;,
+updated by the session:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_stat_column :: <span class="hljs-keyword">proc</span>(s: ^Session, name: <span class="hljs-type">string</span>) -&gt; Stat_Col  <span class="hljs-comment">// host; idempotent by name</span>
 session_stat_find :: <span class="hljs-keyword">proc</span>(s: ^Session, name: <span class="hljs-type">string</span>) -&gt; (Stat_Col, <span class="hljs-type">bool</span>)
 session_stat_set :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, col: Stat_Col, value: <span class="hljs-type">i64</span>)
 session_stat_add :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, col: Stat_Col, delta: <span class="hljs-type">i64</span>)
-session_stat :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, col: Stat_Col) -&gt; <span class="hljs-type">i64</span></code></pre></div><p><strong>The client-column trap.</strong> <code>session_stat_column</code> registers and runs on the HOST (typically
-in your Start handler): a <code>Stat_Col</code> you stored there is zero-value on every client.
-Handles are 1-BASED so that zero value is <code>STAT_COL_INVALID</code>, and every read/write
-<strong>asserts on it with the fix in the message</strong> instead of silently returning column 0 (the
-auto-fed ping). On any peer that did not register the column, resolve BY NAME with
-<code>session_stat_find</code> (cheap, so do it per read).</p>
-<h3 id="player-profiles-the-lobbys-state-typed">Player profiles (the lobby&#39;s state, typed)<a class="heading-anchor" href="#player-profiles-the-lobbys-state-typed" aria-label="Link to this section">#</a></h3>
-<p>Stats are the <em>host&#39;s</em> ledger about players; the <strong>profile</strong> is each player&#39;s
-own word about themselves: picks, loadout, ready lamp, declared cosmetics.
-One canonical fixed-shape struct per seat, one writer per row (its player),
-host-relayed to every screen:</p>
+session_stat :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, col: Stat_Col) -&gt; <span class="hljs-type">i64</span></code></pre></div><p><code>session_stat_column</code> registers columns on the host, typically in the Start
+handler. A <code>Stat_Col</code> stored by that handler remains zero on clients. Handles
+are 1-based, so zero is <code>STAT_COL_INVALID</code>; reads and writes assert on it with
+a message explaining how to resolve the column. On peers that did not register
+the column, look it up by name with <code>session_stat_find</code>. The lookup is cheap
+enough to perform on each read.</p>
+<p><span id="player-profiles-the-lobbys-state-typed"></span></p>
+<h3 id="typed-player-profiles">Typed player profiles<a class="heading-anchor" href="#typed-player-profiles" aria-label="Link to this section">#</a></h3>
+<p>Each player writes a profile row containing declared choices such as a
+character pick, loadout, ready status, or cosmetics. All seats use the same
+fixed-layout struct, and the host relays each row to other peers. Unlike stats,
+which the host accumulates, profile values are supplied by their players:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Pick :: <span class="hljs-keyword">struct</span> { look, iron: <span class="hljs-type">u8</span>, ready: <span class="hljs-type">bool</span> }
 
-<span class="hljs-comment">// THE DECLARATION — tag the Session field; the install generates into the</span>
-<span class="hljs-comment">// ready thunk, and Pick&#x27;s recursive canonical shape folds into the wire</span>
-<span class="hljs-comment">// fingerprint (a build whose Pick drifted — even at the SAME size — is</span>
-<span class="hljs-comment">// refused at the join door, not scrambled silently):</span>
+<span class="hljs-comment">// Tag the Session field. Script generation installs the profile at ready</span>
+<span class="hljs-comment">// and includes Pick&#x27;s recursive wire layout in the fingerprint. A changed</span>
+<span class="hljs-comment">// layout rejects an incompatible join even when the type&#x27;s size is unchanged.</span>
 ses: ksess.Session <span class="hljs-string">`gd:&quot;profile=Pick&quot;`</span>
 
-<span class="hljs-comment">// MY row: write freely, read instantly — the local echo IS the row</span>
-<span class="hljs-comment">// (a click that lagged its own screen by the relay cadence read as broken).</span>
-<span class="hljs-comment">// BEFORE a seat exists it is a PENDING row that lands under your seat the</span>
-<span class="hljs-comment">// moment you take one and ships from there — a lobby pick ahead of hosting</span>
-<span class="hljs-comment">// or joining needs no &quot;am I joined yet&quot; guard and no re-declare on seat:</span>
+<span class="hljs-comment">// Write and read the local profile row before or after joining.</span>
+<span class="hljs-comment">// Before seating, the row remains pending. Seating assigns it to the player</span>
+<span class="hljs-comment">// and starts replication without a second declaration.</span>
 ksess.session_profile_mine(&amp;self.ses, Pick).look += <span class="hljs-number">1</span>
 
 <span class="hljs-comment">// anyone&#x27;s row, in session_roster order (stable slots on every screen):</span>
 <span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> ksess.session_roster(&amp;self.ses) {
     pick, _ := ksess.session_profile_of(&amp;self.ses, p.id, Pick)
     draw_row(p, pick)
-}</code></pre></div><p>There is no declare call to remember: the session diffs your row once per
-net tick and ships the change; the host relays the table at the stats
-cadence, sends the lot to late joiners behind their welcome, and every peer
-already holds every row when a takeover makes one of them the host. (A raw
-kit consumer without scriptgen installs by hand:
+}</code></pre></div><p>The declaration installs the profile type through generated code. Each
+network tick, the session compares the local row with its previous value and
+sends changes. The host relays the table at the stats cadence and includes it
+after the welcome for late joiners. Every peer therefore has the table if it
+becomes host during takeover. Without scriptgen, install the type with
 <code>ksess.session_profile_install(&amp;ses, Pick)</code> in ready, before <code>*_start</code>.
-Doing so forfeits the fingerprint gate on the row&#39;s shape.)
-<code>Ev_Profile_Changed{player}</code> fires wherever a <em>view</em> of a row changed (never
-for your own local writes), and it pairs like every session event: a
-<code>&lt;game&gt;_profile_changed(self, player)</code> half fires where views change, and
-<code>&lt;game&gt;_profile_changed_then</code> is the authority&#39;s consequence slot. Meta you
-keep in your own record (a saved loadout, a persistent vault) is declared
-from the <code>&lt;game&gt;_seated(self, me)</code> half — every role, once per seat taken —
-not from <code>_welcomed</code> (the client&#39;s alone) plus a hand call at the host&#39;s
-start. For a ready-up flow, draw rows from <code>session_roster</code> and
-<code>session_profile_of</code>, gate the host&#39;s Start action on every row&#39;s <code>ready</code>, and
-use <code>_profile_changed_then</code> to spawn a newly ready player during a live run.
-Profile rows are client-declared and must be validated by the host. Host-minted
-truth such as banked currency or awarded inventory belongs in replicated entity
-fields, not the profile table.</p>
+Manual installation does not include the row&#39;s layout in the generated
+fingerprint check.</p>
+<p><code>Ev_Profile_Changed{player}</code> fires when a peer&#39;s view of another player&#39;s row
+changes; local writes do not emit it. The generated
+<code>&lt;game&gt;_profile_changed(self, player)</code> half receives those changes, and
+<code>&lt;game&gt;_profile_changed_then</code> handles their authority-only consequences. To
+populate the local row from saved game data, use <code>&lt;game&gt;_seated(self, me)</code>,
+which runs on every role once per seat taken. <code>_welcomed</code> runs only on clients
+and would require separate host initialization.</p>
+<p>For a ready-up flow, draw rows from <code>session_roster</code> and <code>session_profile_of</code>,
+require every row&#39;s <code>ready</code> before the host can Start, and use
+<code>_profile_changed_then</code> to spawn a newly ready player during a live run.
+The host must validate client-declared profiles. Authority-awarded values
+such as banked currency or inventory belong in replicated entity fields.</p>
 <h2 id="command-hooks">Command hooks<a class="heading-anchor" href="#command-hooks" aria-label="Link to this section">#</a></h2>
-<p>A command proc may only mutate its target: the constraint the predict/revert/reject-truth
-machinery relies on. The cross-entity half of a command lives in the verb&#39;s name-paired
-<strong><a href="net.html#command-consequences"><code>&lt;verb&gt;_then</code> consequence</a></strong>: &quot;loot chest → items appear
-in MY bag&quot; is a chest-only proc that <em>returns</em> what it took, plus a <code>chest_take_then</code> that
-credits the issuer on the host, a mutation that reaches everyone as an ordinary delta. The
-loser of a race gets a rejected chest command and no credit; phantom items are impossible.
-The consequence&#39;s <code>game</code> param is the factory&#39;s <code>user</code>, the session&#39;s one game pointer.</p>
-<p>The untyped hooks remain underneath for <em>generic</em> reactions that cut across verbs: metrics,
-integration-test receipts, replay logs, anything keyed on &quot;a command ran&quot; rather than on
-one verb&#39;s meaning. Route by type to avoid classifying entities by hand (command ids collide
-across types; every type&#39;s first command is 0):</p>
+<p>A command proc may mutate only its target. Prediction, revert, and rejected
+command correction depend on that restriction. Put cross-entity changes in
+the verb&#39;s name-paired <a href="net.html#command-consequences"><code>&lt;verb&gt;_then</code> consequence</a>.
+For example, taking loot uses a chest-only proc that returns the items taken.
+On the host, <code>chest_take_then</code> credits those items to the issuer&#39;s bag; that
+change reaches peers through an ordinary delta. If another player loses a
+race for the same loot, their chest command is rejected and its consequence
+does not credit their bag. The consequence&#39;s <code>game</code> parameter is the factory&#39;s
+<code>user</code>, the session&#39;s game pointer.</p>
+<p>Use the untyped hooks for reactions shared across verbs, such as metrics,
+integration-test receipts, and replay logs. Route them by entity type to select
+the matching command descriptor. Generated command IDs are stable hashes of
+verb names, independent of declaration order.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">ksess.session_set_type_hook(&amp;self.ses, CHEST_TYPE, self, chest_hook)  <span class="hljs-comment">// wins</span>
 ksess.session_set_command_hook(&amp;self.ses, self, game_hook)            <span class="hljs-comment">// catch-all for the rest</span></code></pre></div><p>A routed type&#39;s hook receives exactly that type&#39;s commands. The host&#39;s own
-local issues and clients&#39; commands land in the same dispatcher, which runs
-AFTER the verb&#39;s <code>_then</code>. It survives session starts, like everything wired in
+commands and clients&#39; commands use the same dispatcher, which runs after the
+verb&#39;s <code>_then</code>. The installed hook survives session starts, like callbacks wired in
 <code>ready()</code>.</p>
 <h2 id="interest-management-area-of-interest">Interest management (area of interest)<a class="heading-anchor" href="#interest-management-area-of-interest" aria-label="Link to this section">#</a></h2>
-<p><strong>Existence global, freshness local.</strong> Every peer still knows every entity: spawns,
-despawns, joins, saves, and migration backups are never filtered, so
-those lifecycle operations continue to include the complete registry. Interest filters the
-per-tick STATE traffic: a peer only receives deltas and owner-stream samples
-for entities near its <strong>focus</strong>, and it is off by default.</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, once — before start or mid-run alike; the locator lends the session</span>
-<span class="hljs-comment">// eyes (it can&#x27;t read your fields):</span>
+<p>Interest management limits per-tick deltas and owner-stream samples to entities
+near a player&#39;s focus position. It is off by default. Every peer still knows
+every entity: spawns, despawns, join snapshots, saves, and migration backups
+are unfiltered and include the complete registry.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Install the authority&#x27;s position callback before start or during play.</span>
 ksess.session_set_interest(&amp;self.ses, <span class="hljs-number">800</span>, <span class="hljs-number">120</span>, self, my_locator)
 my_locator :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, id: knet.Net_Id, entity: <span class="hljs-type">rawptr</span>) -&gt; (x, y, z: <span class="hljs-type">f32</span>, always: <span class="hljs-type">bool</span>) {
-	<span class="hljs-comment">// return each entity&#x27;s position (z = 0 for a 2D world — the math collapses</span>
-	<span class="hljs-comment">// to the plane); `always = true` for placeless entities (the world/level</span>
-	<span class="hljs-comment">// entity, global timers) — relevant to everyone, forever.</span>
+	<span class="hljs-comment">// Return the entity position (z = 0 for 2D). Set always = true for</span>
+	<span class="hljs-comment">// shared entities such as the level or timers that should bypass distance filtering.</span>
 }
-<span class="hljs-comment">// host, every frame: where each player is looking from (their avatar);</span>
-<span class="hljs-comment">// `z` defaults away for 2D games:</span>
-ksess.session_set_focus(&amp;self.ses, pid, avatar.x, avatar.y)</code></pre></div><p>Mechanics worth knowing:</p>
+<span class="hljs-comment">// Update each player&#x27;s observer position on the authority every frame.</span>
+<span class="hljs-comment">// The optional z coordinate defaults for a 2D game.</span>
+ksess.session_set_focus(&amp;self.ses, pid, avatar.x, avatar.y)</code></pre></div><p>The session applies filtering as follows:</p>
 <ul>
-<li><strong>Re-entry resync.</strong> A filtered delta is gone forever, so when an entity
-ENTERS a peer&#39;s interest the host sends that peer one full spawn tuple (the
-same reconcile path a rejoin uses): fields and blob catch up at once. The
-catch-up announces itself as <code>Ev_Resynced</code> (not a second <code>Ev_Spawned</code>; the
-entity was never gone on this peer). The jump is history, not gameplay:
-generated <code>&lt;field&gt;_edge</code> halves re-seed silently by construction; any
-hand-rolled <code>seen_*</code> scratch re-seeds off the event, or wounds taken while
-out of interest present as fresh hits on re-entry. <code>hysteresis</code> widens the
-exit edge (enter at <code>radius</code>, leave at <code>radius + hysteresis</code>) so
-border-dancers don&#39;t thrash this.</li>
+<li><strong>Re-entry resync.</strong> The session does not retain filtered deltas for later
+delivery. When an entity enters a peer&#39;s interest, the host sends a full
+spawn tuple through the rejoin reconciliation path, updating its fields and
+blob together. This emits <code>Ev_Resynced</code>, since the entity already exists on
+that peer. Generated <code>&lt;field&gt;_edge</code> halves reset their comparison values
+without emitting edges. Custom <code>seen_*</code> values should also reset on this
+event; otherwise, earlier damage may appear as new hits on re-entry.
+<code>hysteresis</code> widens the exit boundary: entities enter at <code>radius</code> and leave
+at <code>radius + hysteresis</code>. This avoids repeated resyncs near the boundary.</li>
 <li><strong>Streams route via the host.</strong> Owners send their batches to the host
-instead of the transport&#39;s blind relay (the packets passed through that
-machine anyway; no extra hop), and the host forwards per-recipient at
-entity granularity. Streams need no resync: samples are absolute.</li>
-<li><strong>Stale ghosts are yours to present.</strong> An entity out of interest keeps its
-last-known state on that peer&#39;s screen, frozen, not gone. Dim it, fog it,
-or leave it; that&#39;s a game choice.</li>
-<li><strong>A peer with no focus yet receives everything</strong>: filtering starts when
-you start saying where they are. Commands, stats, chat, and everything
-reliable-and-rare stay unfiltered.</li>
-<li><strong>A mid-run flip takes.</strong> Joiners learn the host&#39;s filtering mode from their
-welcome, and flipping interest after clients are seated re-declares it to
-everyone already connected (<code>SES_AOI</code>). Client streams pass through the host
-authority gateway in either mode; AOI changes whole-batch fanout into
-per-recipient filtering.</li>
+instead of relying on an unfiltered transport relay. Packets already pass
+through the host, so this adds no network hop. The host forwards individual
+entities to each eligible recipient. Stream samples contain absolute state
+and do not need resync.</li>
+<li><strong>The game presents stale entities.</strong> An entity outside interest retains
+its last-known state on that peer. The game chooses whether to dim it,
+obscure it with fog, or leave it visible.</li>
+<li><strong>A peer without a focus receives everything.</strong> Filtering starts when the
+game supplies its focus position. Commands, stats, chat, and infrequent
+reliable messages remain unfiltered.</li>
+<li><strong>Filtering can change during a run.</strong> Joiners receive the host&#39;s filtering
+mode in their welcome. Later changes are announced to connected clients
+through <code>SES_AOI</code>. Client streams pass through the host&#39;s authority checks
+in either mode; AOI changes forwarding from whole batches to filtered
+per-recipient updates.</li>
 </ul>
 <h2 id="app-messages">App messages<a class="heading-anchor" href="#app-messages" aria-label="Link to this section">#</a></h2>
-<p><code>SES_APP</code> lets packages built on top of the session (<a href="comms.html">kit/comms</a> is the first)
-ride its transport hookup instead of asking the game for another kind byte: register a
-handler under a small tag, ship bytes with begin/flush. The session applies its seat gates
-before routing: on the host <code>from</code> is the resolved sender (unseated peers are nobody and
-get dropped); on a client <code>from</code> is <code>PLAYER_ID_INVALID</code> and the handler checks
-<code>from_peer == HOST_PEER</code> when authority matters.</p>
+<p><code>SES_APP</code> lets packages such as <a href="comms.html">kit/comms</a> send messages through the
+session&#39;s existing transport. Register a handler under a small tag, then write
+and flush its payload. The session checks the sender&#39;s seat before routing.
+On the host, <code>from</code> identifies the seated sender; packets from unseated peers
+are dropped. On a client, <code>from</code> is <code>PLAYER_ID_INVALID</code>, and handlers must
+check <code>from_peer == HOST_PEER</code> for messages that require authority.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_app_begin :: <span class="hljs-keyword">proc</span>(s: ^Session, tag: <span class="hljs-type">u8</span>) -&gt; ^knet.Writer
 session_app_flush :: <span class="hljs-keyword">proc</span>(s: ^Session, to_peer: Peer_Id, channel: Channel = .Reliable)
 session_app_send :: <span class="hljs-keyword">proc</span>(s: ^Session, to_peer: Peer_Id, tag: <span class="hljs-type">u8</span>, bytes: []<span class="hljs-type">u8</span>, channel: Channel = .Reliable)
-session_app_send_to :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, tag: <span class="hljs-type">u8</span>, bytes: []<span class="hljs-type">u8</span>)</code></pre></div><p><code>channel</code> defaults to reliable: the right lane for anything event-shaped or that a
-consumer must not miss. Pass <code>.Stream</code> ONLY for tick-stamped, self-superseding payloads
-where the next send makes a lost one worthless (<a href="sim.html">kit/sim</a>&#39;s inputs and snapshot
-batches ride <code>SES_APP</code> on exactly this lane): the receive side routes both channels
-identically, but nothing re-delivers a dropped <code>.Stream</code> message and nothing orders it
-against the reliable lane.</p>
+session_app_send_to :: <span class="hljs-keyword">proc</span>(s: ^Session, player: knet.Player_Id, tag: <span class="hljs-type">u8</span>, bytes: []<span class="hljs-type">u8</span>)</code></pre></div><p><code>channel</code> defaults to reliable. Use it for events or other messages that must
+arrive. Use <code>.Stream</code> only for tick-stamped payloads that supersede earlier
+ones, so a lost update can be replaced by the next send. <a href="sim.html">kit/sim</a>
+uses this channel for input and snapshot batches carried by <code>SES_APP</code>.
+Receivers route both channels identically, but dropped <code>.Stream</code> messages are
+not redelivered, and their ordering relative to reliable messages is undefined.</p>
 <h3 id="host-relay">Host relay<a class="heading-anchor" href="#host-relay" aria-label="Link to this section">#</a></h3>
-<p>Several app-channel subsystems use the same relay pattern. A client sends its word <strong>up</strong> to the
-host; the host <strong>stamps</strong> the sender it already vouched for and rebroadcasts; a peer that
-receives a stamped cast from anyone but the host is looking at a <strong>spoof</strong> and drops it; and
-the author&#39;s own copy comes back, or does not, by policy.</p>
+<p>Several app-channel packages use a shared host relay. A client uploads a
+payload to the host, which attaches the sender identity resolved by the
+session and rebroadcasts it. Peers accept these identity-bearing messages only
+from the host and drop them from any other source. The relay&#39;s echo policy
+determines whether the author receives a copy.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Relay_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, author: knet.Player_Id, r: ^knet.Reader)
 
 relay_route    :: <span class="hljs-keyword">proc</span>(hr: ^Host_Relay, s: ^Session, tag: <span class="hljs-type">u8</span>, user: <span class="hljs-type">rawptr</span>, deliver: Relay_Proc, echo := <span class="hljs-literal">true</span>)
@@ -549,172 +575,188 @@ relay_begin    :: <span class="hljs-keyword">proc</span>(hr: ^Host_Relay) -&gt; 
 relay_begin_as :: <span class="hljs-keyword">proc</span>(hr: ^Host_Relay, author: knet.Player_Id) -&gt; ^knet.Writer <span class="hljs-comment">// HOST only</span>
 relay_flush    :: <span class="hljs-keyword">proc</span>(hr: ^Host_Relay, to: Peer_Id = BROADCAST_PEER)</code></pre></div><p>The envelope it owns, inside the <code>SES_APP</code> framing:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">[tag][RELAY_UP][payload]                     client -&gt; host   (no author: it can't be trusted)
-[tag][RELAY_CAST][author u64][payload]       host -&gt; all/one  (the author the session resolved)</code></pre></div><p>What rides above is a <strong>payload codec and nothing else</strong>; notably, there is no role branch at
-the send door:</p>
+[tag][RELAY_CAST][author u64][payload]       host -&gt; all/one  (the author the session resolved)</code></pre></div><p>The calling package writes its payload through the same API on hosts and
+clients. The relay selects the upload or broadcast framing:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">w := ksess.relay_begin(&amp;c.relay)   <span class="hljs-comment">// host: a stamped cast · client: an upload</span>
 knet.write_u8(w, CO_SAY)
 knet.write_string(w, said)
 ksess.relay_flush(&amp;c.relay)        <span class="hljs-comment">// host: broadcast (+ local echo) · client: to the host</span></code></pre></div><ul>
-<li><strong><code>echo</code></strong> answers &quot;does the machine that authored a message also receive it?&quot; once, for
-both roles: the host&#39;s own broadcast delivers locally, and a client&#39;s cast coming back
-with <code>author == me</code> delivers, iff <code>echo</code>. kit/comms sets it true (authoritative order
-beats a few milliseconds: what you see IS what everyone sees); kit/xfer sets it false
-(you already hold the bytes you sent).</li>
-<li><strong><code>relay_begin_as</code></strong> is the host casting under someone else&#39;s name: a line the authority
-authored with no speaker, history replayed under its original speaker, an album payload
-re-cast under the player who published it. It never rides the wire upward, so nothing it
-says can be spoofed into existence.</li>
-<li><strong>An addressed cast never echoes.</strong> <code>relay_flush(hr, peer)</code> is <em>for that peer</em>, which is
-what lets <code>comms_catchup</code> replay a whole log to one joiner without re-filing it into the
-host&#39;s own.</li>
-<li><strong><code>deliver</code> files and returns.</strong> It gets the payload and the vouched author, and it must
-not author on the same relay: that would reset the session&#39;s scratch writer under the
-payload it is holding. (Tier 2 above, and the reason tier 3 exists.)</li>
+<li><strong><code>echo</code></strong> controls local delivery to the author. When true, the host delivers
+its own broadcast locally, and clients deliver returned messages with
+<code>author == me</code>. kit/comms enables it so the author&#39;s chat follows host order.
+kit/xfer disables it because the sender already holds the transferred bytes.</li>
+<li><strong><code>relay_begin_as</code></strong> lets the host specify the author, for example when
+replaying chat history under the original speaker, sending a line with no
+speaker, or relaying an album payload under its publisher. Clients cannot
+submit an author through this API; author selection occurs only on the host.</li>
+<li><strong>An addressed cast never echoes.</strong> <code>relay_flush(hr, peer)</code> sends only to
+that peer. <code>comms_catchup</code> uses it to replay a log to a joiner without adding
+the entries to the host&#39;s log again.</li>
+<li><strong><code>deliver</code> must queue work and return.</strong> It receives the payload and the
+resolved author. It must not write through the same relay while reading
+the payload, because that would reset the session&#39;s scratch writer and
+invalidate the bytes being read. Use the queued delivery described below.</li>
 </ul>
-<p>Tags are one byte and collisions are LOUD: <code>relay_route</code> asserts on a tag already relayed by
-a different subsystem, naming the taken ones (comms 0, <a href="combat.html">combat</a>&#39;s fires 1, xfer
-2, <a href="sim.html">kit/sim</a> 3). Not every subsystem needs the relay: the fire lane is cast-only with
-no upload arm, and kit/sim&#39;s lane rides <code>SES_APP</code> directly on the stream channel with its
-own tick semantics.</p>
-<h3 id="the-riders-queue-appq">The rider&#39;s queue (appq)<a class="heading-anchor" href="#the-riders-queue-appq" aria-label="Link to this section">#</a></h3>
-<p><code>App_Handler</code> and <code>Relay_Proc</code> both run in the packet switch, so every rider obeys the same
-discipline: <strong>the handler files, the game drains.</strong> <code>App_Queue</code> is the shared type:</p>
+<p>Tags are one byte. <code>relay_route</code> asserts if another package already uses the
+tag and names the existing assignment: comms 0, <a href="combat.html">combat</a>&#39;s fires 1,
+xfer 2, <a href="sim.html">kit/sim</a> 3. Some packages use <code>SES_APP</code> without the relay.
+<code>fire_announce</code> broadcasts, while <code>fire_announce_to</code> sends a transient fire to
+one peer. kit/sim sends directly on the stream channel with its own tick semantics.</p>
+<p><span id="the-riders-queue-appq"></span></p>
+<h3 id="app-message-queues-appq">App message queues (appq)<a class="heading-anchor" href="#app-message-queues-appq" aria-label="Link to this section">#</a></h3>
+<p><code>App_Handler</code> and <code>Relay_Proc</code> run during packet dispatch. Each package queues
+decoded work in its handler so the game can drain it after packet processing.
+<code>App_Queue</code> provides the shared container:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">App_Queue :: <span class="hljs-keyword">struct</span>($T: <span class="hljs-type">typeid</span>)
 
 appq_push    :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T), item: T)              <span class="hljs-comment">// from the handler</span>
 appq_poll    :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T)) -&gt; (item: T, ok: <span class="hljs-type">bool</span>) <span class="hljs-comment">// from the game</span>
 appq_items   :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T)) -&gt; []T                 <span class="hljs-comment">// what&#x27;s still pending</span>
 appq_len     :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T)) -&gt; <span class="hljs-type">int</span>
-appq_destroy :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T))</code></pre></div><p>Riders keep their own public poll: <code>comms_poll</code>, <code>xfer_poll</code>, <code>fire_poll</code>, <code>album_poll</code> all
-have the exact names and signatures games call, all delegating here. It is a
-<strong>container, not a subsystem</strong>: no <code>Session</code> pointer, no <code>Session_Run</code> entry, no
-<code>run_destroy</code> line, and it allocates only through the dynamic array&#39;s own creation
-allocator, which is what lets the tier-B session and its tier-C riders share one type
-without either inheriting the other&#39;s <a href="#the-allocator-tiers">allocator rule</a>.</p>
+appq_destroy :: <span class="hljs-keyword">proc</span>(q: ^App_Queue($T))</code></pre></div><p>Packages expose their own public polling functions: <code>comms_poll</code>, <code>xfer_poll</code>,
+<code>fire_poll</code>, and <code>album_poll</code> delegate storage to <code>App_Queue</code> without changing
+their signatures. The container has no <code>Session</code> pointer, <code>Session_Run</code> entry,
+or <code>run_destroy</code> registration. Its dynamic array retains its creation
+allocator. The session and packages using ambient allocation can therefore
+share the container while retaining their respective
+<a href="#the-allocator-tiers">allocator rules</a>.</p>
 <h2 id="backup-hosting-and-resume">Backup hosting and resume<a class="heading-anchor" href="#backup-hosting-and-resume" aria-label="Link to this section">#</a></h2>
-<p>The host periodically ships a complete re-hostable snapshot (identity table with hashed
-tokens, roster, allocation cursors, stats, every entity as a spawn tuple) to the eldest
-connected client (<code>Ev_Backup_Received</code>). The DOOR travels with the roster: <code>locked</code> and
-the <code>denied</code> ban list ride the snapshot, so a ban outlives the host that issued it and a
-locked room stays locked through a takeover. Otherwise the kicked-with-ban player just
-waits for the migration and walks back in. What a takeover still loses is bounded: up to
-<code>backup_interval</code> of world state, whatever moved since the last refresh. Saving a run
-and surviving a dead host are the same contract: <a href="save.html">kit/save</a> wraps
-<code>session_snapshot</code> in a versioned file envelope.</p>
+<p>The host periodically sends a complete recovery snapshot to the eldest
+connected client, which receives <code>Ev_Backup_Received</code>. It includes the identity
+table with hashed tokens, roster, allocation cursors, stats, and every entity
+as a spawn tuple. It also includes <code>locked</code> and the <code>denied</code> ban list, so a
+takeover preserves room locking and bans. Recovery resumes the last backup
+received. <code>backup_interval</code> controls the send cadence, not a maximum rollback
+window; network delay or loss can leave the available backup older than that interval.
+<a href="save.html">kit/save</a> uses the same <code>session_snapshot</code> representation inside a
+versioned file envelope to save a run.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_snapshot :: <span class="hljs-keyword">proc</span>(s: ^Session, w: ^knet.Writer)
-session_host_resume :: <span class="hljs-keyword">proc</span>(s: ^Session, me: knet.Player_Id, name: <span class="hljs-type">string</span>, backup: []<span class="hljs-type">u8</span>) -&gt; <span class="hljs-type">bool</span></code></pre></div><p>The same <code>session_snapshot</code> bytes leave the session in two envelopes:
-<code>[blob_len u32][game blob][snapshot]</code> for a live backup, and kit/save&#39;s magic-and-<code>FORMAT</code>
-envelope on disk. The backup crosses the wire, where both ends already agreed at the join
-door (<code>PROTOCOL_REV</code> folds into the fingerprint, so a skewed peer never got a seat, let
-alone a backup); the save file crosses time, where there is no door and no peer to refuse,
-so it carries its own version. See
+session_host_resume :: <span class="hljs-keyword">proc</span>(s: ^Session, me: knet.Player_Id, name: <span class="hljs-type">string</span>, backup: []<span class="hljs-type">u8</span>) -&gt; <span class="hljs-type">bool</span></code></pre></div><p>The same <code>session_snapshot</code> bytes use two envelopes:
+<code>[blob_len u32][game blob][snapshot]</code> for a live backup, and kit/save&#39;s
+magic-and-<code>FORMAT</code> envelope on disk. A live backup is exchanged between peers
+whose compatibility was checked at admission: <code>PROTOCOL_REV</code> is included in
+the fingerprint. A save may be loaded by a later build without a join handshake,
+so the file carries its own version. See
 <a href="save.html#versioning-what-crosses-time-what-crosses-the-wire">save.md&#39;s versioning rule</a> for
 the statement and the third convention (the generated FNV field hash).</p>
-<p><code>session_host_resume</code> is called on a fresh session with the factory already installed;
-every other player comes back disconnected and rejoins with their tokens, reclaiming ids,
-stats, and owned entities exactly like any reconnect. The dead run&#39;s host reclaims its
-own seat the same way when it passed a token to <code>session_host_start</code> (with none, it
-returns as a new player). It returns false on a corrupt blob.</p>
-<p>Backups also carry the GAME&#39;S campaign bytes (wave directors, AI clocks, whatever the
-session can&#39;t know) via the same blob split kit/save&#39;s envelope makes:</p>
+<p>Call <code>session_host_resume</code> on a fresh session with the factory already
+installed. Other players are initially disconnected and can rejoin with their
+tokens to reclaim IDs, stats, and owned entities. The previous host can also
+reclaim its seat if it supplied a token to <code>session_host_start</code>; otherwise it
+returns as a new player. <code>session_host_resume</code> returns false on corrupt data.</p>
+<p>Backups can also include game-owned campaign data, such as wave directors and
+AI clocks. As in kit/save&#39;s file envelope, these bytes are stored separately
+from the session snapshot:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Backup_Blob_Proc :: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, w: ^knet.Writer)
 session_set_backup_blob :: <span class="hljs-keyword">proc</span>(s: ^Session, user: <span class="hljs-type">rawptr</span>, write: Backup_Blob_Proc)
-session_backup_parts :: <span class="hljs-keyword">proc</span>(s: ^Session, allocator := <span class="hljs-keyword">context</span>.temp_allocator) -&gt; (game_blob: []<span class="hljs-type">u8</span>, snapshot: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>)</code></pre></div><p>Don&#39;t hand-serialize those bytes: tag the host-local fields <code>gd:&quot;backup&quot;</code> and scriptgen
-generates the version-hashed write/read pair (POD, <code>map[POD]POD</code>, <code>[dynamic]POD</code>); see
-<a href="save.html#declaring-the-game-blob">save</a>. The proc above is what you wire the
-generated writer into.</p>
-<p>The whole host-migration handoff is <code>kboot.boot_migration</code>: the game declares four
-name-paired halves and one <code>ready</code> call; the kit owns the handoff, the fork, the wipe, and
-the caps:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// each wears @(gd_half) — a half that pairs with nothing is a build error</span>
+session_backup_parts :: <span class="hljs-keyword">proc</span>(s: ^Session, allocator := <span class="hljs-keyword">context</span>.temp_allocator) -&gt; (game_blob: []<span class="hljs-type">u8</span>, snapshot: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>)</code></pre></div><p>Tag host-local fields <code>gd:&quot;backup&quot;</code> to generate version-hashed write/read
+procedures for POD, <code>map[POD]POD</code>, and <code>[dynamic]POD</code> data. See
+<a href="save.html#declaring-the-game-blob">save</a>. Install the generated writer through
+the callback above.</p>
+<p><code>kboot.boot_migration</code> coordinates host migration. The game declares four
+name-paired halves and installs them in <code>ready</code>; Kit schedules takeover,
+clears the old world, and limits reconnect attempts:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Declare each callback with @(gd_half); unmatched callbacks fail generation.</span>
 <span class="hljs-meta">@(gd_half)</span> my_game_backup    :: <span class="hljs-keyword">proc</span>(self: ^G, w: ^knet.Writer)  <span class="hljs-comment">// host: the campaign blob (wire</span>
                                                                  <span class="hljs-comment">// the generated gd:&quot;backup&quot; writer in)</span>
-<span class="hljs-meta">@(gd_half)</span> my_game_took_over :: <span class="hljs-keyword">proc</span>(self: ^G, r: ^knet.Reader)  <span class="hljs-comment">// heir: read it back, mend, word it</span>
-<span class="hljs-meta">@(gd_half)</span> my_game_wiped     :: <span class="hljs-keyword">proc</span>(self: ^G)                   <span class="hljs-comment">// every peer: the never-entity pools</span>
+<span class="hljs-meta">@(gd_half)</span> my_game_took_over :: <span class="hljs-keyword">proc</span>(self: ^G, r: ^knet.Reader)  <span class="hljs-comment">// successor: read the backup and restore game state</span>
+<span class="hljs-meta">@(gd_half)</span> my_game_wiped     :: <span class="hljs-keyword">proc</span>(self: ^G)                   <span class="hljs-comment">// every peer: clear pools not managed as entities</span>
 <span class="hljs-meta">@(gd_half)</span> my_game_migrating :: <span class="hljs-keyword">proc</span>(self: ^G, step: kboot.Migrate_Step, target: <span class="hljs-type">string</span>, try: <span class="hljs-type">int</span>)
 
 <span class="hljs-comment">// The generated my_game_net_attach installs my_game_succ_hooks.</span>
 <span class="hljs-comment">// A custom shell may call this after boot_attach:</span>
-kboot.boot_migration(&amp;self.boot, self, my_game_succ_hooks)</code></pre></div><p>On <code>Ev_Backup_Target</code> the kit computes and broadcasts the rendezvous
+kboot.boot_migration(&amp;self.boot, self, my_game_succ_hooks)</code></pre></div><p>On <code>Ev_Backup_Target</code>, Kit computes and broadcasts the successor&#39;s connection address
 (<a href="netgd.html#host-migration"><code>netgd.Succession</code></a>:
-<code>addr:port</code> on native, a reserved room code on web, minted once per run). On
-<code>Ev_Succession</code> the kit notes the fork and runs it off the generated <code>&lt;snake&gt;_events</code>
-TAIL (so your plain event halves still see the old world), then the heir wipes
-(census-driven: the entity table&#39;s <code>_freed</code> hooks empty the by-type maps through the same
-code that fills them, then <code>_wiped</code> clears the pools), raises the promised transport, calls
-<code>session_host_resume</code>, and hands <code>_took_over</code> the blob; everyone else chases under the kit&#39;s
-caps (the event&#39;s refire-on-failed-reconnect is the retry pulse; web knocks ride
-<code>boot_pump</code>). Every arm that needs words (the chase dial, the knock, no heir, gave up, the
-heir&#39;s failures) fires <code>_migrating</code> once; <code>.Taking_Over</code> is the heir&#39;s own word, deduped
-against the double death-signal a <code>kill -9</code> queues. <code>kboot.boot_take_over</code>/<code>boot_chase</code> stay
-public for a manual Resume button (window-gated: they refuse on a live seat). Games that
-raise their own transports (Steam) call <code>kboot.boot_succ_config</code> once so the ceremony knows
-the run&#39;s shape. Cavecrawl&#39;s acceptance-test act 4 kills the host with <code>kill -9</code> and the run
-survives with nobody pressing anything.</p>
-<p>The raw layer stays underneath for exotic transports:</p>
+<code>addr:port</code> on native, a reserved room code on web, allocated once per run).
+On <code>Ev_Succession</code>, Kit schedules migration at the end of the generated
+<code>&lt;snake&gt;_events</code> call, allowing ordinary event halves to finish against the old
+world. The successor then clears that world: the entity table&#39;s <code>_freed</code> hooks
+empty the per-type maps, and <code>_wiped</code> clears the remaining pools. It starts the
+announced transport, calls <code>session_host_resume</code>, and passes the game blob to
+<code>_took_over</code>.</p>
+<p>Other clients reconnect within Kit&#39;s retry limits. A failed reconnect emits
+the succession event again to trigger another attempt; web connection requests
+are driven by <code>boot_pump</code>. <code>_migrating</code> reports each connection attempt and
+failure, including a missing successor or exhausted retries. The successor&#39;s
+<code>.Taking_Over</code> notification is deduplicated when <code>kill -9</code> produces two
+disconnect signals. <code>kboot.boot_take_over</code>/<code>boot_chase</code> remain public for a
+manual Resume button, but refuse to run while the process has a live seat.
+Games managing their own transports, such as Steam, call
+<code>kboot.boot_succ_config</code> once to supply the transport configuration.
+Cavecrawl&#39;s acceptance-test act 4 kills the host with <code>kill -9</code> and verifies
+that the run continues without manual intervention.</p>
+<p>Custom transports can use the lower-level API:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Ev_Backup_Target :: <span class="hljs-keyword">struct</span> { player: knet.Player_Id } <span class="hljs-comment">// (host) holder changed — name them</span>
 session_set_successor_info :: <span class="hljs-keyword">proc</span>(s: ^Session, info: []<span class="hljs-type">u8</span>)
 session_successor :: <span class="hljs-keyword">proc</span>(s: ^Session) -&gt; (knet.Player_Id, []<span class="hljs-type">u8</span>)
 Ev_Succession :: <span class="hljs-keyword">struct</span> { successor: knet.Player_Id } <span class="hljs-comment">// (client) host gone, successor named</span>
-session_backup_parts :: <span class="hljs-keyword">proc</span>(...) -&gt; (game_blob, snapshot: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>) <span class="hljs-comment">// copies</span></code></pre></div><p>The session names WHO; the info blob is opaque to it (a Steam lobby id fits where an
-<code>addr:port</code> does). Live migration is supported only for the cooperative lane.
+session_backup_parts :: <span class="hljs-keyword">proc</span>(...) -&gt; (game_blob, snapshot: []<span class="hljs-type">u8</span>, ok: <span class="hljs-type">bool</span>) <span class="hljs-comment">// copies</span></code></pre></div><p>The session selects the successor player. It treats the connection info as
+opaque bytes, allowing a Steam lobby ID or an <code>addr:port</code> address. Live
+migration is supported only for the cooperative lane.
 <code>boot_migration</code> requires that no simulation lane is installed; this precondition
 is asserted in development builds. Simulation-lane recovery restarts the authority
 with fresh lane history rather than migrating live rollback state.</p>
 <h2 id="ownership-transfer">Ownership transfer<a class="heading-anchor" href="#ownership-transfer" aria-label="Link to this section">#</a></h2>
-<p>Ownership is <em>which peer&#39;s writes stream out</em> of an entity&#39;s owner-stream fields:
-carrying, mounting, possession, and dragging a downed friend are all one call, usually
-from a command hook:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_set_owner :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id)</code></pre></div><p><code>PLAYER_ID_INVALID</code> hands it back to nobody: the entity rests where its last owner left
-it (host-authoritative deltas still flow). Every peer gets <code>Ev_Owner_Changed{id, owner, prev}</code>: the new carrier starts gluing the entity to itself from that event.
-Remote screens SNAP across the handoff (the transfer resets the stream ring and bumps the
-warp), and the old owner stops streaming by construction: <code>registry_write_streams</code> only
-walks entities owned by me. In-flight packets from the old owner may land for ~a round
-trip; they carry the pre-bump warp, so the first new-warp sample supersedes them with a
-snap, never a blend.</p>
+<p>An entity&#39;s network owner is the player allowed to send its owner-stream
+fields. Transfer that ownership with <code>session_set_owner</code>, usually from a
+command hook, to implement carrying, mounting, possession, or dragging a
+downed character:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">session_set_owner :: <span class="hljs-keyword">proc</span>(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id)</code></pre></div><p><code>PLAYER_ID_INVALID</code> removes the stream owner. The entity retains its last
+streamed state while host-authoritative deltas continue. Every peer receives
+<code>Ev_Owner_Changed{id, owner, prev}</code>; a new carrier can begin attaching the
+entity&#39;s position to its own from that event. Transfer resets stream history
+and increments the warp marker, causing remote presentation to snap across
+the handoff. The old owner stops sending because <code>registry_write_streams</code>
+visits only locally owned entities. Its in-flight packets may arrive for
+about a round trip with the previous warp marker. The first sample with the
+new marker supersedes them without blending.</p>
 <h2 id="coop-lag-compensation-session_rewound">Coop lag compensation (session_rewound)<a class="heading-anchor" href="#coop-lag-compensation-session_rewound" aria-label="Link to this section">#</a></h2>
-<p>A coop shooter aims at what its screen shows — the host&#39;s truth as of a round trip
-plus the interp delay AGO — so a hitscan judged against the host&#39;s live world lands
-behind a moving target. <code>session_rewound</code> judges where the <strong>shooter</strong> saw it:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host, in the fire verb&#x27;s `_then`: sweep the beam against the world AS THE SHOOTER SAW IT</span>
+<p>A co-op shooter aims at the positions displayed on its screen. By the time a
+shot reaches the host, those positions are about a round trip plus the
+interpolation delay behind the host&#39;s live state. Testing hitscan against
+live positions can therefore miss a moving target that appeared under the
+crosshair. <code>session_rewound</code> temporarily restores streamed positions for the
+time the shooter saw:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// In the authority fire consequence, trace against the shooter&#x27;s historical view.</span>
 ksess.session_rewound(&amp;self.ses, by, &amp;sweep, <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>) {
     sw := <span class="hljs-keyword">cast</span>(^Sweep)user
     <span class="hljs-keyword">for</span> id, m <span class="hljs-keyword">in</span> sw.game.mobs { <span class="hljs-comment">/* m.x, m.y READ where the shooter saw them */</span> }
 })
-<span class="hljs-comment">// the live world is back here: wound the live bodies you collected</span></code></pre></div><p>For the span of the query every streamed body but the shooter&#39;s own is wound back —
-<strong>both timelines</strong>: other clients&#39; bodies (their inbound streams are the history) and
-the authority&#39;s own streamed bodies (its mobs, its avatar — the host keeps the history
-of what it shipped, <code>registry_write_streams</code> <code>keep_history</code>). Host-authoritative deltas
-(owner = nobody) have no stream history and judge live; the host&#39;s own shots judge
-live. The rewind is <strong>RTT + interp_delay</strong> — the stream&#39;s trip down to the shooter and
-the shot&#39;s trip back up both count (the half-RTT form is the classic off-by-one-transit;
-it&#39;s derived once in <code>session_rewound</code>&#39;s comment). <code>session_rewind_secs(s, shooter)</code>
-returns the same number for a receipt or a hand-swept ledger. Until the shooter&#39;s first
-pong lands the rewind is interp only — conservative, never ahead of the truth.</p>
+<span class="hljs-comment">// The live world is restored here; apply damage to the targets found.</span></code></pre></div><p>During the query, every streamed body except the shooter&#39;s own is rewound.
+For other clients&#39; bodies, the host uses inbound stream history. For its own
+streamed bodies, such as mobs or its avatar, it uses the outbound history
+retained by <code>registry_write_streams</code> with <code>keep_history</code>. Entities updated
+through host-authoritative deltas with no owner have no stream history and
+are tested at live positions. The host&#39;s own shots are also tested live.</p>
+<p>The rewind duration is <code>RTT + interp_delay</code>: it includes both the stream&#39;s
+trip to the shooter and the shot&#39;s return trip. Using half the RTT would omit
+one transit; the derivation is documented in <code>session_rewound</code>&#39;s comment.
+<code>session_rewind_secs(s, shooter)</code> returns that duration for diagnostics or
+custom hit queries. Until the shooter&#39;s first pong arrives, only the
+interpolation delay is used, giving a shorter rewind.</p>
 <h2 id="three-tiers-of-entry-into-your-code">Three tiers of entry into your code<a class="heading-anchor" href="#three-tiers-of-entry-into-your-code" aria-label="Link to this section">#</a></h2>
-<p><a href="conventions.html#event-delivery">Kit&#39;s event-delivery conventions</a> state the delivery rule for the
-whole kit: poll unions for multi-event, tuple-poll for single-event, synchronous callbacks
-only for an answer the kit cannot proceed without, <strong>everything else is an event.</strong>
-kit/session has the most entry points of any package; here is that rule applied to all of
-them, so you can tell which mechanism a given entry point uses.</p>
-<p>There are three tiers, and <strong>the tier is derived, not chosen</strong>:</p>
+<p><a href="conventions.html#event-delivery">Kit&#39;s event-delivery conventions</a> use poll
+unions for multiple event types and tuple-poll functions for a single event
+type. Callbacks run synchronously only when Kit needs a result or temporary
+operation state. The session applies these conventions in three tiers.</p>
+<p>Choose the tier by checking these requirements in order:</p>
 <ol>
-<li><strong>Does the session need an answer to finish what it is doing?</strong> It holds a pointer, a
-position, or a byte range it cannot compute itself, and the operation stops until you
-hand it over. → <strong>pull callback.</strong></li>
-<li><strong>Otherwise: does your code need state that exists only INSIDE the operation</strong> (a
-command&#39;s window before its result is decided, a packet&#39;s live byte view, or the tick the
-authority is standing in) that cannot be re-derived a frame later? → <strong>atomic
-authority hook.</strong></li>
-<li><strong>Everything else, which is nearly everything.</strong> → <strong>presentation event.</strong></li>
+<li>Use a <strong>pull callback</strong> when the session needs a pointer, position, or byte
+range before it can finish an operation.</li>
+<li>Use an <strong>atomic authority hook</strong> when game code needs state available only
+during that operation, such as a command&#39;s pending result, a packet&#39;s byte
+view, or the authority&#39;s current simulation tick.</li>
+<li>Use a <strong>presentation event</strong> for work that can be queued until the operation
+finishes without changing its meaning.</li>
 </ol>
-<p>The tie-breaker, applied in that order: <em>if the same meaning survives being queued and
-drained next frame, it must be queued.</em></p>
-<h3 id="tier-1--pull-callbacks-the-session-is-asking-a-question">Tier 1 — pull callbacks (the session is asking a question)<a class="heading-anchor" href="#tier-1--pull-callbacks-the-session-is-asking-a-question" aria-label="Link to this section">#</a></h3>
+<p>If next-frame delivery preserves the required information and behavior, queue
+the work.</p>
+<p><span id="tier-1--pull-callbacks-the-session-is-asking-a-question"></span></p>
+<h3 id="tier-1--callbacks-that-return-required-data">Tier 1 — callbacks that return required data<a class="heading-anchor" href="#tier-1--callbacks-that-return-required-data" aria-label="Link to this section">#</a></h3>
 <p>These callbacks return information the session needs before it can continue.
-Keep them <strong>total and cheap</strong>: return a valid answer promptly, including for
-empty or unavailable input. Do not mutate the world, send, spawn, or
-despawn inside one: the session is mid-operation and holding invariants.</p>
+Return a valid answer promptly, including for empty or unavailable input.
+Do not perform additional world mutations, sends, spawns, or despawns inside
+these callbacks; the session has not yet completed the calling operation.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -731,7 +773,7 @@ despawn inside one: the session is mid-operation and holding invariants.</p>
 <tr>
 <td><code>Free_Entity_Proc</code></td>
 <td>on every despawn, both roles</td>
-<td>only the game knows how its entity dies (and the node must die before the id is reused)</td>
+<td>the game must free the entity and node before the ID can be reused</td>
 </tr>
 <tr>
 <td><code>Locator_Proc</code> (<a href="#interest-management-area-of-interest">interest</a>)</td>
@@ -749,12 +791,13 @@ despawn inside one: the session is mid-operation and holding invariants.</p>
 <td>the lane cannot read or advance your simulation</td>
 </tr>
 </tbody></table>
-</div><p>React to the <em>event</em> the answer produced (<code>Ev_Spawned</code> fires right after <code>make</code>, on the
-host too) rather than doing game work in the answer.</p>
-<h3 id="tier-2--atomic-authority-hooks-the-moment-does-not-survive-the-frame">Tier 2 — atomic authority hooks (the moment does not survive the frame)<a class="heading-anchor" href="#tier-2--atomic-authority-hooks-the-moment-does-not-survive-the-frame" aria-label="Link to this section">#</a></h3>
-<p>These run on the session&#39;s stack, inside the operation, because the operation IS the
-context. They may mutate the world through the ordinary mutators; they may not re-enter
-the operation that called them.</p>
+</div><p>Put game reactions in the event emitted by the operation. For example,
+<code>Ev_Spawned</code> follows entity creation on both clients and the host.</p>
+<p><span id="tier-2--atomic-authority-hooks-the-moment-does-not-survive-the-frame"></span></p>
+<h3 id="tier-2--hooks-that-use-operation-local-state">Tier 2 — hooks that use operation-local state<a class="heading-anchor" href="#tier-2--hooks-that-use-operation-local-state" aria-label="Link to this section">#</a></h3>
+<p>These hooks run synchronously while operation-specific state is available.
+They may use ordinary world mutators, but must not re-enter the operation
+that called them.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -776,67 +819,71 @@ the operation that called them.</p>
 <tr>
 <td><code>App_Handler</code> / <code>Relay_Proc</code> (<a href="#app-messages">app messages</a>)</td>
 <td>the packet switch</td>
-<td><code>^knet.Reader</code> is a view into the receive buffer; it dies when the packet does</td>
+<td><code>^knet.Reader</code> views the receive buffer and is valid only during packet processing</td>
 </tr>
 </tbody></table>
-</div><p>The reader is the trap: an app handler that <em>keeps</em> a slice instead of copying it is holding
-freed transport memory next frame. Every handler in the kit does one thing: decode and
-<strong>file</strong>, and no more. See the queue below.</p>
-<h3 id="tier-3--presentation-runs-on-your-frame-world-consistent">Tier 3 — presentation (runs on your frame, world consistent)<a class="heading-anchor" href="#tier-3--presentation-runs-on-your-frame-world-consistent" aria-label="Link to this section">#</a></h3>
-<p>Two shapes, one property: they run from <code>session_tick</code> / your pump, after the world is
-whole, on the game&#39;s own stack. That is the property that matters: not whether you drained
-it or the kit handed it to you.</p>
+</div><p>An app handler must copy any bytes it needs after returning. Retaining a
+slice into the reader would leave it pointing at released transport memory
+next frame. Kit handlers decode the payload and queue the result for later
+delivery, as described in <a href="#the-riders-queue-appq">App_Queue</a>.</p>
+<p><span id="tier-3--presentation-runs-on-your-frame-world-consistent"></span></p>
+<h3 id="tier-3--queued-and-scheduled-presentation">Tier 3 — queued and scheduled presentation<a class="heading-anchor" href="#tier-3--queued-and-scheduled-presentation" aria-label="Link to this section">#</a></h3>
+<p>Presentation runs from <code>session_tick</code> or the game&#39;s pump after the state
+updates it depends on have completed. The game may drain an event queue or
+receive a scheduled callback:</p>
 <ul>
-<li><strong>Drained</strong>: <code>session_poll</code>&#39;s <code>Event</code> union and the generated <a href="#event-halves-and-generated-dispatch">event halves</a>; the SES_APP riders&#39; polls (<code>comms_poll</code>, <code>xfer_poll</code>, <code>fire_poll</code>, <code>album_poll</code>), all now the same <a href="#the-riders-queue-appq"><code>App_Queue</code></a>.</li>
+<li><strong>Drained</strong>: <code>session_poll</code>&#39;s <code>Event</code> union and the generated <a href="#event-halves-and-generated-dispatch">event halves</a>; the SES_APP packages&#39; polls (<code>comms_poll</code>, <code>xfer_poll</code>, <code>fire_poll</code>, <code>album_poll</code>), which use <a href="#the-riders-queue-appq"><code>App_Queue</code></a>.</li>
 <li><strong>Kit-driven</strong>: generated <a href="net.html#reliable-presentation-events"><code>@(gd_event)</code> presentation</a>, generated <a href="net.html#field-change-edges"><code>&lt;field&gt;_edge</code> halves</a> (fired by the presentation pass inside <code>session_tick</code>), and <code>session_present</code>&#39;s <code>Later_Proc</code> (drained on the same clock, interp-delayed).</li>
 </ul>
-<p>**So: a new feature is tier 3 unless it answers a question the session is blocked on (tier</p>
-<ol>
-<li>or reads state the operation destroys (tier 2).** Nothing else earns a synchronous
-entry, and a feature that reaches for one should be able to name its row in a table above.</li>
-</ol>
-<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+<p>Use tier 3 for new features unless they need a required callback result
+(tier 1) or operation-local state (tier 2). Document the specific requirement
+when adding a synchronous entry point.</p>
+<p><span id="gotchas"></span></p>
+<h2 id="lifecycle-and-replication-pitfalls">Lifecycle and replication pitfalls<a class="heading-anchor" href="#lifecycle-and-replication-pitfalls" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong><code>Session_Config</code> durations are seconds, resolved at <code>*_start</code>.</strong> <code>session_init</code> bakes
-them to tick counts against the configured rate, so configure <em>before</em> starting, and
-mid-run read the resolved fields (<code>session_tick_hz(s)</code>, <code>s.pending_max_age</code>), not <code>cfg</code>.</li>
-<li><strong><code>session_init</code> is re-entrant.</strong> <code>host_start</code> / <code>client_start</code> /
-<code>host_resume</code> on a session that already ran tears down the previous <em>run&#39;s</em> state
-(registry, command ctx, roster, tokens, stats, backup blob) but preserves everything
-wired before start: transport, factory, hooks, app routes, config. Back-to-lobby →
-rehost needs no rewiring; equally, nothing from the old run survives.</li>
-<li><strong>Rejoins pass the lock and capacity gates.</strong> A returning token&#39;s seat is its
-own: that is the whole reconnect promise; only a ban shuts a known token out. Don&#39;t
-count on <code>session_set_locked</code> or <code>max_players</code> to keep a specific player out: kick with
-<code>ban = true</code>.</li>
-<li><strong><code>session_kick</code> doesn&#39;t sever the socket.</strong> It returns the seat the player held so the
-game can also drop the transport connection (<code>netgd.wire_drop</code>); without that, the
-kicked client still holds a socket it can talk on, even though the session ignores
-unseated peers.</li>
-<li><strong>Deltas carry state, not events</strong> (see <a href="net.html#gotchas">kit/net&#39;s gotchas</a>): a
-replicated byte the host pulses within one net tick never ships. Cavecrawl&#39;s match flow
-keeps <code>level.won</code> at 1 for the whole end screen and every peer reacts to the edge
-locally.</li>
-<li><strong>The write guard survives release builds: counting, not halting.</strong> A client&#39;s local
-write to a host-lane replicated field is the canonical silent-divergence bug (see
-<a href="net.html#gotchas">kit/net&#39;s gotchas</a>); dev builds assert on it with the class, field,
-and fix named. A <code>-disable-assert</code> build keeps the walk, logs the first offender ONCE,
-and counts from there: <code>session_guard_hits(s)</code> is the tally, worth surfacing beside
-<code>session_malformed(s)</code>&#39;s dropped-packet count (the netgraph draws the latter). Nonzero
-in the field means some client code writes host-lane state locally: silent divergence
-until the next authoritative delta stomps it.</li>
-<li><strong>The factory&#39;s <code>make</code> is a tier-1 <em>answer</em>, not a reaction point</strong>: keep it to
-instantiate-and-return; game reactions belong on <code>Ev_Spawned</code>, which fires right after
-(on the host too, via <code>session_spawn_make</code>). It is not the session&#39;s only synchronous
-entry: it is one row in <a href="#three-tiers-of-entry-into-your-code">three tiers</a>, which is
-the page to read before adding another.</li>
-<li><strong>Hosts don&#39;t get client events.</strong> There is no <code>Ev_Welcomed</code>/<code>Ev_Command_Confirmed</code> on
-the authority (its commands run directly), but it <em>does</em> get <code>Ev_State_Applied</code>,
-<code>Ev_Spawned</code>/<code>Ev_Despawned</code>, and <code>Ev_Command_Executed</code>, which is what repaint code
-should key on. The one seat-time thing both roles share — &quot;I hold a seat now, declare
-my per-seat meta&quot; — is <code>Ev_Seated</code> (every role), so a <code>_seated</code> half replaces the
-client-only <code>_welcomed</code> half plus the hand call at the host&#39;s own start that games
-used to pair with it.</li>
+<li><strong>Configure durations before <code>*_start</code>.</strong> <code>Session_Config</code> durations are in
+seconds. <code>session_init</code> converts them to tick counts at the configured rate.
+During a run, read the resolved fields (<code>session_tick_hz(s)</code>,
+<code>s.pending_max_age</code>) rather than <code>cfg</code>.</li>
+<li><strong>Starting again clears the previous run.</strong> <code>host_start</code> / <code>client_start</code> /
+<code>host_resume</code> can reuse a session value. <code>session_init</code> tears down its
+registry, command context, roster, tokens, stats, and backup blob, while
+preserving the transport, factory, hooks, app routes, and configuration
+installed before start. Returning to the lobby and rehosting requires no
+rewiring.</li>
+<li><strong>Rejoins bypass locking and capacity checks.</strong> A known token may reclaim
+its seat even when <code>session_set_locked</code> is set or <code>max_players</code> is reached.
+To exclude that player for the run, kick with <code>ban = true</code>.</li>
+<li><strong>Custom transports must close kicked connections.</strong> <code>session_kick</code> returns
+the former transport peer so the game can drop it with <code>netgd.wire_drop</code> or
+an equivalent operation. Until then the socket remains open, though the
+session ignores packets from unseated peers. Boot&#39;s <code>boot_kick</code> performs
+both steps and schedules the close after <code>Ev_Kicked</code> is flushed.</li>
+<li><strong>Deltas contain sampled state</strong> (see <a href="net.html#gotchas">kit/net&#39;s gotchas</a>).
+A replicated byte set and reset within one network tick is not sent.
+Cavecrawl keeps <code>level.won</code> at 1 throughout the end screen so each peer can
+react to the field change locally.</li>
+<li><strong>The write guard counts violations in release builds.</strong> A client that
+writes a host-lane replicated field can diverge from authority state until
+the next authority delta replaces it (see
+<a href="net.html#gotchas">kit/net&#39;s gotchas</a>). Development builds assert with the
+class, field, and correction named. A <code>-disable-assert</code> build still checks
+fields, logs the first violation once, and increments
+<code>session_guard_hits(s)</code>. A nonzero count indicates a local client write to
+authority-owned state. Expose it alongside <code>session_malformed(s)</code>, the
+dropped-packet count shown by the netgraph.</li>
+<li><strong>Keep the factory&#39;s <code>make</code> limited to creation.</strong> Instantiate the entity
+and return it; put game reactions in <code>Ev_Spawned</code>. The host receives that
+event too, through <code>session_spawn_make</code>. Before adding another synchronous
+callback, check its required timing against the
+<a href="#three-tiers-of-entry-into-your-code">three tiers</a>.</li>
+<li><strong>Use events delivered to the relevant role.</strong> The authority executes its
+commands directly and receives neither <code>Ev_Welcomed</code> nor
+<code>Ev_Command_Confirmed</code>. It does receive <code>Ev_State_Applied</code>,
+<code>Ev_Spawned</code>/<code>Ev_Despawned</code>, and <code>Ev_Command_Executed</code>, which presentation
+code can handle on the host. Use <code>Ev_Seated</code> or its <code>_seated</code> half to
+initialize per-seat metadata on every role. <code>_welcomed</code> would initialize
+only clients and require a separate call when the host starts.</li>
 </ul>
 <h2 id="internals-and-design-notes">Internals and design notes<a class="heading-anchor" href="#internals-and-design-notes" aria-label="Link to this section">#</a></h2>
 <h3 id="trust-and-admission">Trust and admission<a class="heading-anchor" href="#trust-and-admission" aria-label="Link to this section">#</a></h3>
@@ -847,62 +894,71 @@ through the host authority gateway; it resolves the transport peer to a seated p
 preflights the complete batch, verifies every row against current entity ownership and wire
 size, then relays it. Clients accept owner streams only from the host. <code>stream_budget</code>
 can limit outbound per-peer owner-stream bytes when interest management is enabled.
-<code>Session_Config.traffic</code> independently token-buckets every seated peer&#39;s reliable and
-stream ingress, and the shared action bucket covers both command execution models.
+<code>Session_Config.traffic</code> applies token-bucket rate and byte limits to every
+seated peer&#39;s reliable and stream ingress. The shared action bucket covers
+both command execution models.
 Immediate and tick-scheduled client actions enter one
 <code>session_authority_action_admit</code> pipeline after their model-specific header is
 decoded: authenticated playing seat, model-qualified dedup window, structural
 payload/target/descriptor, declared access, argument policy, tick plausibility,
 shared byte/rate budget, and bounded model queue. <code>Authority_Ingress_Stats</code>
 counts admissions and refusals by model, reason, and stage; execution callbacks
-remain model-specific after this door.
-The fingerprint gate refuses <em>version skew</em>, not intent; the write guard catches
-application bugs, not an attacker.</p>
-<p>Current default defenses include bounds-checked decoding and parse failures
-counted by <code>session_malformed</code>; reliable entity updates commit transactionally; co-op and sim
-commands are exactly-once, access-gated, and dedup-windowed; owner-stream senders are
-ownership-checked at the host; sim inputs are structurally checked, capped, and semantically
-validated when the game declares a validator; spectator seats are receive-only at four
-separate admission points; malicious-but-well-formed traffic is rate/byte bounded by
-the named profiles; packet, field, message, profile, event, command, blob, and
-replication containers are admitted against semantic ceilings before allocation;
-and schema mismatch is rejected during the join.
+remain model-specific after admission.
+Fingerprint checks detect incompatible builds. The write guard detects
+application mistakes in the local process. Neither establishes that a remote
+client is trustworthy.</p>
+<p>The current defaults check decoding bounds, count parse failures through
+<code>session_malformed</code>, and commit reliable entity updates transactionally.
+Co-op and simulation commands use access checks and deduplication windows for
+exactly-once execution. The host checks owner-stream senders against entity
+ownership. Simulation inputs have structural checks and size limits; the game
+can declare a validator to check their meaning. Four separate admission points
+enforce receive-only spectator seats.</p>
+<p>Named profiles bound traffic by rate and bytes, including structurally valid
+traffic from a malicious peer. Packet, field, message, profile, event, command,
+blob, and replication containers have semantic limits checked before
+allocation. Schema mismatches are rejected during join.
 These defenses cover malformed traffic, application mistakes, and version skew;
 they are not a complete adversarial-server policy.</p>
-<p>A game outgrowing invited-friends play (public lobbies, strangers, stakes) should still use
-an encrypting transport, tune the profile budgets against measured legitimate peaks, install
-a traffic hook for moderation plus the bounded structured production-log hook, and use the existing state-hash
-probe for desync forensics. These controls bound admitted work; they are not account identity,
-DDoS protection before the transport, or a substitute for application-level
-validation of well-shaped player intent.</p>
-<h3 id="recipes-over-existing-pieces">Recipes over existing pieces<a class="heading-anchor" href="#recipes-over-existing-pieces" aria-label="Link to this section">#</a></h3>
-<p>Genre staples that need no new machinery:</p>
-<p><strong>Character-portable saves</strong> let a character travel between servers while worlds stay with
-their hosts. The character is a client-side blob: bag, appearance,
-and whatever follows the player rather than the world. Persist it with <a href="save.html">kit/save&#39;s</a>
-file helpers; on <code>Ev_Welcomed</code>, ship it to the host on an app tag
-(<code>session_app_send(HOST_PEER, TAG_CHARACTER, blob)</code>); the host validates and applies it to
-your avatar (an ordinary host-authoritative mutation; deltas carry it to everyone). Write
-it back on quit and at an application-appropriate checkpoint. The host stays
-authoritative: a hacked blob is just input to validate, not truth to obey.</p>
-<p><strong>Player-addressed state</strong> (roles, a saboteur, secret objectives). Send it with
-player-addressed app messages, <code>session_app_send_to(player, tag, bytes)</code>, or the typed
+<p>For public lobbies or other play with untrusted clients, use an encrypted
+transport, tune profile budgets against measured legitimate peaks, and install
+the traffic hook for moderation and the bounded production-log hook for
+diagnostics. The state-hash probe helps investigate desynchronization. These
+controls limit admitted work. They do not provide account identity or DDoS
+protection before the transport, and the game must still validate the meaning
+of structurally valid player requests.</p>
+<p><span id="recipes-over-existing-pieces"></span></p>
+<h3 id="gameplay-patterns-using-session-apis">Gameplay patterns using session APIs<a class="heading-anchor" href="#gameplay-patterns-using-session-apis" aria-label="Link to this section">#</a></h3>
+<p>The following patterns combine existing session APIs for common game features.</p>
+<p><strong>Character-portable saves</strong> let a character travel between servers while
+worlds remain with their hosts. Store the character&#39;s bag, appearance, and
+other portable data in a client-side blob using <a href="save.html">kit/save&#39;s</a> file
+helpers. On <code>Ev_Welcomed</code>, send it to the host under an app tag
+(<code>session_app_send(HOST_PEER, TAG_CHARACTER, blob)</code>). The host validates and
+applies it to the avatar, and authority deltas distribute the result to peers.
+Save it on quit and at application-appropriate checkpoints. The host must
+validate all submitted values before applying them, including data loaded from
+a player&#39;s save.</p>
+<p><strong>Player-addressed state.</strong> Send private roles or objectives through
+<code>session_app_send_to(player, tag, bytes)</code>, or through the typed
 <a href="net.html#typed-app-messages"><code>@(gd_message)</code></a> form
-(<code>role_send_to(&amp;ses, player, msg)</code>) when the secret is a POD payload, not replicated
-fields: the delta walk broadcasts to every recipient and does not provide per-player
-field filtering. Addressing is not end-to-end secrecy: the host sees the message,
-and ENet is plaintext. Use an appropriate encrypted transport and keep authoritative
-secret state on the host. Replicate only the public consequences.</p>
-<p><strong>Player-to-player trade</strong> (the mediating entity: every true multi-party
-transaction). A trade mutates TWO players&#39; bags atomically, and a command may
-only mutate its target, so make the TRANSACTION the target. The trade window
-is an ordinary entity the host spawns when two players shake hands: its
-replicated fields are the offer slots (item + count, a <em>reference</em>; the bags
-stay untouched until commit) and one confirm byte per side. Every edit is a
-single-target predicted command on the Trade, which means every trade race is
-already solved by machinery you have: two edits to the same slot serialize in
-host arrival order, the loser reverts through reject-truth like any contended
-chest.</p>
+(<code>role_send_to(&amp;ses, player, msg)</code>) for POD payloads. Replicated fields are
+broadcast to recipients without per-player field filtering, so they cannot
+hold secrets from those recipients. Addressing does not provide end-to-end
+secrecy: the host sees the message, and ENet is plaintext. Use an encrypted
+transport and retain authoritative secret state on the host. Replicate only
+its public consequences.</p>
+<p><strong>Player-to-player trade.</strong> A trade must update both players&#39; bags together,
+while a command may mutate only its target. Represent the pending transaction
+as a <code>Trade</code> entity spawned by the host when two players begin trading. Its
+replicated fields hold offer slots (item + count) and one confirmation value
+per side. Offers reference items; the bags remain unchanged until commit.
+Each edit is a single-target predicted command on the Trade. The host
+processes conflicting edits in arrival order, and a rejected edit reverts
+through command correction, as with a contested chest.</p>
+<p>The excerpt shows transaction ordering. Before indexing either offer array,
+validate that the submitted slot is within its bounds. The authority must also
+validate item IDs, quantities, and bag contents before committing the trade.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Trade :: <span class="hljs-keyword">struct</span> {
 	owner:      gd.Node2d,
 	net_id:     knet.Net_Id,
@@ -911,24 +967,20 @@ chest.</p>
 	offer_b:    [<span class="hljs-number">4</span>]kitems.Slot <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	confirm_a:  <span class="hljs-type">bool</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	confirm_b:  <span class="hljs-type">bool</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
-	state:      <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// OPEN / DONE / FAILED — an edge every screen words</span>
+	state:      <span class="hljs-type">u8</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>, <span class="hljs-comment">// OPEN / DONE / FAILED; present changes through the field edge</span>
 }
 
-<span class="hljs-comment">// WHICH seat is acting is never an argument — it&#x27;s derived from the ISSUER.</span>
-<span class="hljs-comment">// The verbs below declare `by: knet.Player_Id` right after the receiver, so</span>
-<span class="hljs-comment">// the framework fills it with the true issuer (it never rides the wire): a</span>
-<span class="hljs-comment">// hostile peer cannot edit or confirm the OTHER side of the table, and a</span>
-<span class="hljs-comment">// spectator&#x27;s command finds no seat and rejects.</span>
+<span class="hljs-comment">// Declare by after the receiver so the framework supplies the issuer.</span>
+<span class="hljs-comment">// The peer cannot submit a different player&#x27;s ID as that argument. The</span>
+<span class="hljs-comment">// predicates use it to restrict edits and confirmations to the matching side.</span>
 trade_seat :: <span class="hljs-keyword">proc</span>(self: ^Trade, by: knet.Player_Id) -&gt; (side: <span class="hljs-type">u8</span>, seated: <span class="hljs-type">bool</span>) {
 	<span class="hljs-keyword">if</span> <span class="hljs-type">u64</span>(by) == self.a {<span class="hljs-keyword">return</span> <span class="hljs-number">0</span>, <span class="hljs-literal">true</span>}
 	<span class="hljs-keyword">if</span> <span class="hljs-type">u64</span>(by) == self.b {<span class="hljs-keyword">return</span> <span class="hljs-number">1</span>, <span class="hljs-literal">true</span>}
 	<span class="hljs-keyword">return</span> <span class="hljs-number">0</span>, <span class="hljs-literal">false</span>
 }
 
-<span class="hljs-comment">// THE DUPE-GUARD, single-target and therefore race-proof: ANY offer edit</span>
-<span class="hljs-comment">// clears BOTH confirms in the same verb, so the switch-the-item-at-the-last-</span>
-<span class="hljs-comment">// second scam is structurally dead — a confirm racing an edit lands on</span>
-<span class="hljs-comment">// cleared state and the commit below refuses.</span>
+<span class="hljs-comment">// Editing either offer clears both confirmations in the same target mutation.</span>
+<span class="hljs-comment">// A later confirmation must accept the revised offers before commit.</span>
 <span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
 trade_offer :: <span class="hljs-keyword">proc</span>(self: ^Trade, by: knet.Player_Id, slot: <span class="hljs-type">u8</span>, item: <span class="hljs-type">u16</span>, count: <span class="hljs-type">u16</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">if</span> self.state != TRADE_OPEN {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
@@ -949,95 +1001,94 @@ trade_confirm :: <span class="hljs-keyword">proc</span>(self: ^Trade, by: knet.P
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>, self.confirm_a &amp;&amp; self.confirm_b <span class="hljs-comment">// the second confirm seals it</span>
 }
 
-<span class="hljs-comment">// The NOTARY: the confirm&#x27;s consequence, host only. The verb could only see</span>
-<span class="hljs-comment">// the table; the consequence sees the world — it re-validates that both</span>
-<span class="hljs-comment">// offers still sit in their bags (someone may have dropped a promised item</span>
-<span class="hljs-comment">// mid-trade) and either moves everything or fails the whole table. Both</span>
-<span class="hljs-comment">// outcomes are ordinary host mutations: deltas carry the verdict and the</span>
-<span class="hljs-comment">// items to every screen at once, and phantom items are impossible — nothing</span>
-<span class="hljs-comment">// was predicted into anyone&#x27;s bag.</span>
+<span class="hljs-comment">// Authority-only consequence. Recheck both inventories before moving the</span>
+<span class="hljs-comment">// offered items; an item may have left a bag since the offer was made.</span>
+<span class="hljs-comment">// Record success or failure in authority state for normal replication.</span>
+<span class="hljs-comment">// Client prediction changes the trade table, not either inventory.</span>
 <span class="hljs-meta">@(gd_half)</span>
 trade_confirm_then :: <span class="hljs-keyword">proc</span>(game: ^MyGame, self: ^Trade, by: knet.Player_Id, sealed: <span class="hljs-type">bool</span>) {
 	<span class="hljs-keyword">if</span> !sealed {<span class="hljs-keyword">return</span>}
 	<span class="hljs-keyword">if</span> game_move_offers(game, self) { <span class="hljs-comment">// validate both bags, then swap</span>
 		self.state = TRADE_DONE
 	} <span class="hljs-keyword">else</span> {
-		self.state = TRADE_FAILED <span class="hljs-comment">// the run words it; the goods never moved</span>
+		self.state = TRADE_FAILED <span class="hljs-comment">// present failure; no offered items moved</span>
 	}
-}</code></pre></div><p>The trade is an entity, so a mid-trade host
-migration resumes with the window intact, a reconnecting player finds their
-table where they left it, and a late joiner spectating the market sees it:
-the ordinary snapshot restores its fields. <code>Ev_Player_Left</code> is the one edge you own: the host
-despawns any table naming the departed (their seat may reclaim it later, but
-an open offer must not outlive its owner&#39;s presence). Escrow is the variant
-when a promised item must not be double-promised to two windows: the offer&#39;s
-<code>_then</code> moves the item bag→table on the host instead of referencing it, and
-the failed-commit path hands it back; start with references and reach for
-escrow only when your economy needs the exclusivity. And note what is NOT
-here: predicting the bags themselves. Items landing one beat after the seal
-reads as a handshake; items vanishing from your bag on a rejected prediction
-reads as theft.</p>
-<p><strong>Owner-detected events</strong> (a ball drops in the cup, a cart reaches the checkpoint;
-anything derived from state some PLAYER&#39;s machine simulates). The rule: <strong>position-derived
-events belong to the position authority.</strong> If the host adjudicates them off its
-stream-sampled copy, the deciding eye runs ~a fifth of a second behind the owner&#39;s screen
-and everyone watches the ball roll past the hole. Two shapes, both already primitives: the
-split is whether the event leaves a <em>signature in owner state</em>:</p>
+}</code></pre></div><p>Snapshots include the Trade&#39;s fields, so host migration can restore an open
+window and late joiners can see its current offers. The game must also handle
+<code>Ev_Player_Left</code>: the host despawns any table naming the departed player, so
+open offers do not outlive a participant&#39;s presence. A player may reclaim
+their seat later, but must begin a new trade after that cleanup.</p>
+<p>Use escrow when an item must not be offered in two windows at once. The
+offer&#39;s <code>_then</code> moves it from the bag to the table on the host, and a failed
+commit returns it. Reference-based offers are sufficient when this
+exclusivity is unnecessary. In either design, predict changes to the trade
+window while the authority commits changes to the bags. The player sees the
+bag update after acceptance, avoiding inventory changes that must be undone
+when a prediction is rejected.</p>
+<p><strong>Owner-detected events.</strong> When a player&#39;s machine simulates movement, it
+should also detect events derived from that movement, such as a ball entering
+a cup or a cart reaching a checkpoint. The host&#39;s stream-sampled copy can be
+~a fifth of a second behind the owner&#39;s screen. If the host alone detects the
+event, the ball may appear to pass the hole before the result arrives. The
+owner can report the result through either persistent state or a command:</p>
 <ul>
-<li><em>State signature</em> (the common one): the owner&#39;s sim applies the event to its OWNED
-fields (snap the ball into the cup and stop) and that rest state streams out like any
-movement. The host runs its own predicate against its copy and fires the authoritative
-CONSEQUENCE (advance the hole, credit the stat) when the signature arrives; convergence
-is guaranteed because the signature is durable, and the wait happens off-screen.</li>
-<li><em>No natural signature</em> (or the consequence needs arguments): the owner issues a
-<strong>predicted command</strong>: instant locally, validated by the host, consequences in the
-command hook. This is the same machinery as every other verb.</li>
+<li><em>State signature</em>: the owner changes its owned fields to record the result,
+for example by stopping the ball inside the cup. That persistent state
+streams to the host, which checks its own predicate before applying
+consequences such as advancing the hole or crediting stats. Later samples
+still contain the result if an earlier sample is lost, while the owner&#39;s
+presentation already shows the ball at rest.</li>
+<li><em>Command</em>: when no persistent state identifies the event, or its consequence
+needs arguments, issue a predicted command. The target changes locally
+immediately; the host validates the command and runs its consequence hook
+after acceptance.</li>
 </ul>
-<p>This is a recipe, not tooling: the predicates and signatures are game logic. A generic
-&quot;owner event&quot; message would just be an unvalidated command, strictly worse than
-the command loop that already exists.</p>
+<p>The game implements the predicates and state signatures. Use the command
+validation path for owner requests rather than adding a generic owner-event
+message without validation.</p>
 <h3 id="adding-a-session-subsystem-the-touchpoint-checklist">Adding a session subsystem (the touchpoint checklist)<a class="heading-anchor" href="#adding-a-session-subsystem-the-touchpoint-checklist" aria-label="Link to this section">#</a></h3>
 <p>The session&#39;s subsystems, interest (<code>interest.odin</code>), profiles (<code>profile.odin</code>), stats
 (<code>stats.odin</code>), backup/succession (<code>backup.odin</code>), all integrate through the same ~8
 touchpoints:</p>
 <ol>
-<li><strong>Wire kind(s)</strong>: claim the next <code>SES_*</code> id(s) in session.odin&#39;s single table; netgd&#39;s
+<li><strong>Wire kind(s)</strong>: claim the next <code>SES_*</code> id(s) in session.odin&#39;s table; netgd&#39;s
 netgraph name table follows it.</li>
 <li><strong>Packet case(s)</strong>: one <code>case</code> per kind in the packet switch. Role/seat gate first
-(gate returns leave <code>r.err</code> CLEAR; they&#39;re not malformed), then call your
-<code>&lt;sub&gt;_recv</code> proc; sticky <code>r.err</code> rides back into the malformed counter.</li>
+(rejections leave <code>r.err</code> clear because they are not malformed), then call
+<code>&lt;sub&gt;_recv</code>. A sticky <code>r.err</code> increments the malformed counter.</li>
 <li><strong>A net_tick slot</strong>: if you send on a cadence, add one call in <code>session_net_tick</code>&#39;s
-spine (stats/profile ride the ~2 Hz lobby-alive cadence; pick yours).</li>
-<li><strong>Welcome parade</strong>: what does a LATE JOINER need to hear? <code>host_handle_join</code> sends
-world, stats, profiles, and the standing succession info; a subsystem with standing
-state joins that parade or late joiners live without it.</li>
-<li><strong>State scoping</strong>: run state goes in <code>Session_Run</code> (wiped wholesale every re-init;
-a field there can never leak into a rehost); pre-start wiring goes in
-<code>Session_Wiring</code> (untouched by re-init). Owned containers add ONE line to
-<code>run_destroy</code>. If some state must survive a <code>host_resume</code> specifically, that&#39;s a
-<code>keep_*</code> flag on <code>session_init</code> (profiles are the worked example).</li>
-<li><strong>Departure sweep</strong>: what happens to your per-player state when a player leaves?
-<code>mark_left</code> is the one funnel (dedup windows, interest pairs prune there).</li>
+sequence. Stats and profiles use the ~2 Hz lobby cadence; choose the
+appropriate cadence for the new subsystem.</li>
+<li><strong>Late-join state</strong>: <code>host_handle_join</code> sends the world, stats, profiles,
+and current succession info. Include any persistent subsystem state that
+a late joiner needs.</li>
+<li><strong>State scoping</strong>: put run state in <code>Session_Run</code>, which is cleared on each
+reinitialization, and pre-start wiring in <code>Session_Wiring</code>, which is
+retained. Add owned-container cleanup to <code>run_destroy</code>. State that must
+survive <code>host_resume</code> specifically needs a <code>keep_*</code> flag on <code>session_init</code>;
+profiles provide an example.</li>
+<li><strong>Departure cleanup</strong>: remove per-player state through <code>mark_left</code>, where
+deduplication windows and interest pairs are also pruned.</li>
 <li><strong>Event union, or the tier above it.</strong> New game-facing events join <code>Event</code>, and
 scriptgen&#39;s <code>SESSION_EVENTS</code> table if games should get generated halves. If your
-subsystem instead wants to <em>enter</em> game code, derive which of the
+subsystem instead calls game code, determine which of the
 <a href="#three-tiers-of-entry-into-your-code">three tiers</a> it belongs to before writing the
-proc type; and if it rides <code>SES_APP</code>, take the <a href="#host-relay">relay</a>
-and the <a href="#the-riders-queue-appq">queue</a> rather than a fifth copy of them.
+proc type. For <code>SES_APP</code> messages, reuse the <a href="#host-relay">relay</a>
+and the <a href="#the-riders-queue-appq">queue</a>.
 Adding a variant fails to compile in <code>kit/boot/forward.odin</code>, which holds the
 kit&#39;s own forwarding table as one exhaustive (non-<code>#partial</code>) switch. Give the new
-variant its row: the kit-side consequence (a lane forward, a widget repaint, a
-succession arm) or an empty case carrying the one word that says why the kit owes it
-nothing.</li>
+variant a case for its Kit consequence, such as lane forwarding, a widget
+repaint, or succession handling. If it needs no Kit reaction, add an empty
+case with a comment explaining why.</li>
 <li><strong>Fingerprint</strong>: if your wire shape depends on game declarations (profile rows do),
-fold it into the build fingerprint so version skew is refused at the door, not
-debugged in the field.</li>
+include it in the build fingerprint so incompatible peers are rejected
+during admission.</li>
 </ol>
 <p>See also: <a href="net.html">kit/net</a> (the core underneath), <a href="netgd.html">kit/netgd</a> (the transport
-binding), <a href="sim.html">kit/sim</a> (the server-authority resim lane, everything on this page,
-identity through moderation, works unchanged beside it), <a href="comms.html">kit/comms</a>,
+binding), <a href="sim.html">kit/sim</a> (the server-authority simulation lane, which also
+uses this page&#39;s identity, replication, and moderation APIs), <a href="comms.html">kit/comms</a>,
 <a href="combat.html">kit/combat</a>, <a href="items.html">kit/items</a>, <a href="ui.html">kit/ui</a>, <a href="save.html">kit/save</a>,
 <a href="steamgd.html">kit/steamgd</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/session.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#wire-it-up-before-_start" class="">Wire it up (before *_start)</a><a href="#start-drive-drain" class="">Start, drive, drain</a><a href="#the-replicated-world" class="">The replicated world</a><a href="#roster-moderation-stats" class="">Roster, moderation, stats</a><a href="#command-hooks" class="">Command hooks</a><a href="#interest-management-area-of-interest" class="">Interest management (area of interest)</a><a href="#app-messages" class="">App messages</a><a href="#backup-hosting-and-resume" class="">Backup hosting and resume</a><a href="#ownership-transfer" class="">Ownership transfer</a><a href="#coop-lag-compensation-session_rewound" class="">Coop lag compensation (session_rewound)</a><a href="#three-tiers-of-entry-into-your-code" class="">Three tiers of entry into your code</a><a href="#gotchas" class="">Gotchas</a><a href="#internals-and-design-notes" class="">Internals and design notes</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/session.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="boot.html"><span>kit/boot: standard game integration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/session.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#session-roles-and-integration" class="">Session roles and integration</a><a href="#configure-callbacks-before-starting" class="">Configure callbacks before starting</a><a href="#start-the-session-and-process-events" class="">Start the session and process events</a><a href="#the-replicated-world" class="">The replicated world</a><a href="#roster-moderation-stats" class="">Roster, moderation, stats</a><a href="#command-hooks" class="">Command hooks</a><a href="#interest-management-area-of-interest" class="">Interest management (area of interest)</a><a href="#app-messages" class="">App messages</a><a href="#backup-hosting-and-resume" class="">Backup hosting and resume</a><a href="#ownership-transfer" class="">Ownership transfer</a><a href="#coop-lag-compensation-session_rewound" class="">Coop lag compensation (session_rewound)</a><a href="#three-tiers-of-entry-into-your-code" class="">Three tiers of entry into your code</a><a href="#lifecycle-and-replication-pitfalls" class="">Lifecycle and replication pitfalls</a><a href="#internals-and-design-notes" class="">Internals and design notes</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/session.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

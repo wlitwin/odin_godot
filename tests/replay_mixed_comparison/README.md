@@ -97,4 +97,5 @@ the normal comparison or summed as disjoint CPU costs.
 The run plan and receipt record that setting; traces retain cumulative reused and
 simulated correction ticks separately. It does not lower cadence or relax any
 workload/freshness checks. Use the core differential corpus to validate reuse
-semantics; a small reused count in a real workload is not a performance success.
+semantics; a small reused count in a real workload does not establish a
+performance improvement.

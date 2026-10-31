@@ -31,7 +31,7 @@ The fixed dweller pool still holds 16 living entities. If it is full, a pending
 spawn stays pending until space is freed. The original uses dynamic entities, so
 custom waves that exceed this simultaneous population do not have identical spawn
 pacing. Definition limits, collision/AI behavior and unrelated combat rules are
-unchanged by this increment.
+unchanged by the director timing change.
 
 ## Existing saves
 

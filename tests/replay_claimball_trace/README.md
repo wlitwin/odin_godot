@@ -17,11 +17,12 @@ times. Per-frame marks retain state/frontier and drained-effect hashes. Playback
 must consume the same callback sequence, produce the same outbound traffic and
 match every frame; it does not use Godot or an active server.
 
-Capture adds allocations and hashing; it is not timing-neutral. A replay proves
-receiver behavior for the captured delivery schedule, not a counterfactual server
-response or identical wall-clock scheduling across new live runs. Raw recordings
-can contain credentials/private payloads. This fixture uses isolated explicit test
-identities, and published evidence must state what data it retains.
+Capture adds allocation and hashing work, so it can affect runtime timing.
+Replay checks receiver behavior for the captured delivery schedule. It does not
+compute different server responses or require new live runs to reproduce the
+same wall-clock schedule. Raw recordings can contain credentials/private
+payloads. This fixture uses isolated explicit test identities, and published
+evidence must state which data it retains.
 
 The historical Claimball observer-effect failure remains open until a failing
 trace establishes its cause. A clean capture/replay alone is not a fix claim.
@@ -29,10 +30,10 @@ trace establishes its cause. A clean capture/replay alone is not a fix claim.
 
 Set `RCB_TRACE_PAUSE_MS=1800` or `2000` to introduce a single local observer stall
 after confirmation reaches tick 174; larger pauses are refused by this fixture.
-The actual subsequent pump timestamp is recorded. The historical receiver's code
-can be built in an isolated collection overlay to compare the same transport stream.
-Strict operation/state agreement is still required; a passing old/new comparison
-means that schedule does not explain the prior failure.
+The recording retains the actual timestamp of the next pump. Build the
+historical receiver in an isolated collection overlay to compare both versions
+against that transport stream. Both must match its recorded operations and
+state. If they pass, this schedule does not reproduce the earlier failure.
 
 `mutate/` changes one recorded state/effect expectation and reseals the record's
 integrity digest. Replay must reject it, verifying that successful completion

@@ -1,14 +1,17 @@
-# Experimental support envelope
+<a id="experimental-support-envelope"></a>
 
-This is the support assessment for the framework-first implementation as of
-2026-09-20. **Retain Replay as an experimental library alongside Kit.** It has
-working primitives for the requested multiplayer styles and representative
-integration evidence. It is not a certified production service, an automatic
-replacement for Kit, or proof that arbitrary gameplay is deterministic.
+# Experimental support scope
+
+This support assessment records the Replay implementation and its evidence
+as of 2026-09-20. **Retain Replay as an experimental library alongside Kit.**
+The modes below have representative integration tests. Those tests do not
+certify a production service, establish arbitrary gameplay determinism, or
+justify replacing Kit automatically.
 
 Start with [getting started](getting-started.md), then use the
 [compatibility policy](compatibility.md) and the exact package contracts below.
-The [framework audit](../docs/replay/framework-audit.md) maps implementation gates.
+The [framework audit](../docs/replay/framework-audit.md) maps implementation
+features to their checks.
 
 ## Modes and tested combinations
 
@@ -65,9 +68,9 @@ authenticated direct link. A signed denial/invalid registration does retire the
 native link's keys. The current owner does not automatically reconnect failed
 background control; after service recovery, the application closes/reopens the
 party and restores/rejoins using its durable enrollment and participant archive.
-This deliberate distinction prevents an unreviewed background rebind from changing
-an active process identity underneath its transport. Continuous automatic control
-recovery is a follow-up capability, not a claimed guarantee.
+Keeping reconnect explicit prevents a background rebind from changing the
+active process identity while its transport still uses the old one.
+Continuous automatic control recovery is not implemented by this owner.
 
 A final native test kills the actual service after admission. Party readiness
 fails after about 10.46 seconds while both existing encrypted links remain live;
@@ -78,7 +81,9 @@ The service cannot authorize new joins/rebinds while unavailable. Existing-link
 continuation is not offline revocation awareness. Applications requiring continuous
 online authorization must choose a stricter session policy.
 
-## Bounds, not scale promises
+<a id="bounds-not-scale-promises"></a>
+
+## Implementation bounds
 
 | Surface | Enforced implementation bounds |
 | --- | --- |
@@ -98,9 +103,9 @@ hardware. Profile callbacks must not change simulation or block network progress
 
 ## Authoring and performance assessment
 
-The strongest authoring result is specific: the same paid-revive transfer in
-isolated Scrapyard variants added the predicate and both wallet assignments to
-Replay's existing value reducer, reused for prediction and authority. Its feature
+In isolated Scrapyard variants, the paid-revive transfer added its predicate
+and both wallet assignments to Replay's value reducer, shared by prediction
+and authority. Its feature
 patch changed 3 files with 11 added physical lines versus Kit's 4 files/19 added
 lines, and the 72 peer receipts preserved the agreed transfer behavior. These are
 agent-authored structural measurements, not human productivity or debugging-time
@@ -108,7 +113,7 @@ proof. A separate existing-family weapon required the same authored resource in
 both implementations. See [revive](../docs/replay/results/paid-revive-authoring-2026-09-08/README.md)
 and [weapon](../docs/replay/results/weapon-authoring-2026-09-08/README.md).
 
-Costs are mixed. The quiet Cavecrawl comparison measured Replay callbacks around
+The quiet Cavecrawl comparison measured Replay callbacks around
 340–401 µs mean versus Kit's 81–85 µs on one machine, while owner motion had similar
 local-response ranges and Replay predicted the complete inventory transfer.
 Subsequent same-binary encoding pairs reduced client application traffic 41.7%
@@ -126,9 +131,9 @@ measured about 19.5–21.4 ms process CPU for two peers over 2400 ticks in accel
 test time. It does not predict full-game rollback cost. See [combat](../docs/replay/results/scrapyard-combat-comparison-2026-09-08/README.md)
 and [P2P profiling](../docs/replay/results/p2p-profile-2026-09-05/README.md).
 
-The evidence supports trying the complete-world authoring approach and profiling
-representative workloads. It does **not** justify replacing Kit everywhere or
-claiming performance/ergonomic superiority. Keep both implementations available.
+These results support evaluating complete-world authoring with representative
+workloads. They do not establish performance or authoring superiority across
+games. Keep both implementations available while evaluating the tradeoffs.
 
 ## Security and compatibility boundaries
 
@@ -142,8 +147,8 @@ enrollment/service-key compromise. Functional packet tests are not certification
 There is no human account system, exactly-once external-effect outbox, arbitrary
 dynamic reference-graph snapshotter, deterministic Godot physics solver, general
 NAT service or automatic game-content converter. Those are explicit support
-boundaries. Full game parity and subjective play-feel superiority remain separate
-follow-up work under the user's framework-first direction.
+boundaries. Full game parity and subjective play-feel comparisons require
+separate evaluation.
 
 Run [the smoke command](../tests/replay_framework/run.sh), then the focused
 integration gate for your selected transport and recovery profile. Pin source and

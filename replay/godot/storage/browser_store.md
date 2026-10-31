@@ -1,10 +1,11 @@
 # Browser blob storage
 
 Use the browser store to persist bounded opaque bytes in IndexedDB, such as a
-profile or encoded save. `browser_store.odin` provides asynchronous operations. Keep I/O outside simulation steps. An operation has one owner and three
-phases: Idle, Pending, Complete. Submission returning `true` means work started;
-only Complete with error None is a success receipt. Close each operation after
-consuming its result.
+profile or encoded save. `browser_store.odin` provides asynchronous operations
+that run outside simulation steps. Each operation has one owner and moves
+through Idle, Pending, and Complete. A submission returning `true` reports that
+work started. Only Complete with error None confirms success. Consume the
+result, then close the operation.
 
 ```odin
 write: storagegd.Browser_Store_Op
@@ -29,8 +30,9 @@ the revision; a mismatch returns Conflict without replacing another writer's
 value. The revision range is 1 through 2^53−1. After a conflict, load the current
 record and decide how to proceed. The API does not merge profiles or inventories.
 
-Records hold a revision and a Blob. Reads validate shape and Blob size before
-materializing bytes, then check the copy again on the Godot side. Limits are
+Records hold a revision and a Blob. Reads validate the record structure and
+Blob size before copying bytes into memory, then check the copy again on the
+Godot side. Limits are
 1 byte–16 MiB per operation, 16 retained operations and 64 MiB of reserved operation
 capacity per page. Namespace/key strings use 1–128 ASCII letters, digits, dots,
 underscores, hyphens and slashes. Each namespace maps to an origin-local database
@@ -53,8 +55,9 @@ without an automatic volatile fallback.
 
 Closing a pending operation discards its receipt and attempts to abort an active
 transaction. A write may already have committed. Read its record to determine the
-result; closing is not proof of rollback. A pending operation does not become successful merely because time has elapsed. A blocked database open reports Open, and a caller may close an operation
-it no longer wants to await.
+result; closing is not proof of rollback. Elapsed time does not turn a pending
+operation into a success. A blocked database open reports Open; the caller may
+close an operation it no longer wants to await.
 
 `tests/replay_browser_store/run.sh` exercises the real Godot/WASM bridge and
 IndexedDB: 1 MiB and 16 MiB exact-content round trips, fresh browser recovery,

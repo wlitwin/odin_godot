@@ -4,9 +4,10 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../getting-started.html">Replay sessions and rooms</a><a href="../p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Coordinator-backed RTC signaling</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/godot/rendezvous.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#explicit-providers-and-p2p-rosters">Explicit providers and P2P rosters</a></nav></details>
-<article class="reading-body "><p>Use <code>Rendezvous</code> to admit authenticated room members to RTC signaling. It is a
-bounded JSON frontend alongside the native authority Service.
-It borrows that Service and a raw Websocket listener. Poll the listener once,
+<article class="reading-body "><p>Use <code>Rendezvous</code> to admit authenticated room members to RTC signaling, the
+exchange of connection information used to establish WebRTC. It handles JSON
+messages alongside the native authority Service and borrows that Service and
+a raw Websocket listener. Poll the listener once,
 route binary messages to <code>auth.service_receive</code>, route text to
 <code>rendezvous_receive</code>, and call <code>rendezvous_pump</code> every frame. Close the frontend
 before closing its borrowed owners.</p>
@@ -19,8 +20,9 @@ peer ID 1. Other enabled members receive increasing IDs. A disconnected RTC inst
 retain its ID through authenticated continuation; a fresh instance does not gain
 that reservation merely by presenting the member key. A second live connection
 for an already admitted identity is rejected.</p>
-<p>The relay introduces an authority star and overwrites the sender ID itself.
-Only admitted peers can relay SDP/ICE, and clients can signal only the authority.
+<p>The relay connects each client to the authority and supplies the sender ID
+itself. Only admitted peers can relay SDP/ICE connection information, and
+clients can signal only the authority.
 It never carries gameplay packets. New authority terms remove old signaling
 memberships. Expired grants, disabled/rebound members, disconnected sockets and
 expired challenges are pruned. Existing direct data channels remain subject to
@@ -55,11 +57,11 @@ ID/token match. Incomplete connections are deliberately rebuilt, with replacemen
 introductions to both endpoints. A rejected or expired continuation surfaces an
 error for the enclosing session to handle; it never silently adopts a new ID.
 Legacy relays remain opt-in and need not implement continuation.</p>
-<p>Real-browser gates cover host/client recovery with unchanged connection
+<p>Browser integration tests cover host/client recovery with unchanged connection
 serials, packets received during the outage, wrong-token rejection and late join
 after recovery. Cavecrawl also continues in the same epoch with no migration.
-Its planned/crash and broader migration gates remain available. Public provisioning,
-TLS/TURN deployment and other browser engines still need acceptance. The local
+Separate tests cover planned, crash, and other migration scenarios. Public
+provisioning, TLS/TURN deployment, and other browser engines still need acceptance. The local
 fixture contains test keys and is not a production account/admission service.</p>
 <h2 id="explicit-providers-and-p2p-rosters">Explicit providers and P2P rosters<a class="heading-anchor" href="#explicit-providers-and-p2p-rosters" aria-label="Link to this section">#</a></h2>
 <p><code>rendezvous_provider_init</code> accepts a borrowed <code>Rendezvous_Provider</code> with a clock,
@@ -76,5 +78,5 @@ The <a href="../p2p/admission/README.html">P2P admission provider</a> authentica
 without creating a gameplay authority lease. Its current creator transport and
 credential-issuance boundaries remain explicit.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../p2p/admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/rendezvous.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../p2p/admission/README.html"><span>Fixed-roster P2P admission</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/rendezvous.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#explicit-providers-and-p2p-rosters" class="">Explicit providers and P2P rosters</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/rendezvous.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

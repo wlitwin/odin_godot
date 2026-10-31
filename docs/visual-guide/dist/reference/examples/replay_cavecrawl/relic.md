@@ -21,13 +21,14 @@ Replay still computes carrying on the authority's simulation ticks. Original Kit
 streams that position from the owner. C7 [carrier lifecycle rules](carrier.md)
 retain ownership through death and ordinary disconnect, park absent carriers’
 props, and resume carrying on rejoin. C8 [old-host prop adoption](adoption.md) uses recorded authority observations;
-the owner-stream profile remains separate comparison work.
+the [owner-motion companion](../replay_cavecrawl_owned/README.md) has separate
+implementation and comparison evidence.
 
 ## Existing saves
 
 Current content is `0x4341564552504c39`. Normal loads reject C1–C8 archives; use
-`tools/upgrade_save` with a new destination. C8 adds authority observation fields to the world; the network protocol is
-unchanged. C5 conversion retains every saved frame and peer field,
+`tools/upgrade_save` with a new destination. C8 adds authority observation fields
+to the world; the network protocol is unchanged. C5 conversion retains every saved frame and peer field,
 including the old relic position and ownership, before applying current rules on
 advancement. A relic already reset by an old descent stays as recorded; the
 converter cannot recover its former carrier or position. Keep the original file

@@ -39,7 +39,7 @@ Two valid approaches:
 - Embed baked values in World/checkpoints. Replay owns their lifetime naturally;
   no external lookup or store pin is needed after copying. Cavecrawl uses this.
 - Store only portable definition references in World and keep a frozen catalog
-  available to the reducer. Pin every version its retained history may read, and
+  available to the simulation step. Pin every version its retained history may read, and
   serialize/transfer those dependencies with checkpoints before allowing restore.
   Never hide mutable Resource data behind a reference to reduce history size.
 
@@ -51,8 +51,9 @@ must not mutate/reenter the same store.
 
 # Godot baking
 
-`scenegd.bake` runs a typed extractor against an authored source and publishes
-only after complete success. Source can be a Resource pointer, typed script value,
+Baking converts authored Resource or scene data into immutable simulation values.
+`scenegd.bake` runs a typed extractor and publishes only after complete success.
+The source can be a Resource pointer, typed script value,
 or a fixed batch. The source is borrowed synchronously; it must stay alive during
 extraction. The output has the store's pointer-free canonical value type.
 
@@ -66,7 +67,8 @@ ref, report := scenegd.bake(&store, source, GAME_CONTENT_VERSION,
     })
 ```
 
-The first `bake_fail` wins. Numeric narrowing follows validation. Schema checks
+The context retains the first error reported through `bake_fail`. Validate
+numbers before narrowing their types. Schema checks
 and an optional typed validator run before publication. Application rules such as
 collision geometry, wave limits and cross-field constraints remain explicit.
 

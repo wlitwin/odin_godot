@@ -1,22 +1,23 @@
 # Choosing an authority and presentation model
 
-Multiplayer code has to answer two separate questions:
-
-1. Which process decides the authoritative value?
-2. Which point in time should each player see?
+A multiplayer game chooses both the process that decides an authoritative
+value and the simulation time each player sees. These choices affect trust,
+response time, and the work required to correct predictions.
 
 Kit offers several answers because no single choice is best for co-op movement,
 competitive hitscan, and shared physics. Select a model for each contested
 entity or field; the rest of the session can continue to use reliable
 replication.
 
-## Summary
+<a id="summary"></a>
+
+## Model comparison
 
 | Model | Authoritative writer | Local presentation | Remote presentation | Typical use |
 | --- | --- | --- | --- | --- |
 | Session replication | Host for `replicate`; entity owner for `owner` | Owner-streamed state is immediate | Owner streams are interpolated in the past | Invited co-op, player movement that the host need not verify, owner-simulated Godot physics |
 | Predict self | Server simulation | The local player's state is predicted at the current tick | Other players are interpolated on a delayed watched clock | Competitive movement and aimed actions |
-| Contested object | Server simulation, with a temporary local presentation claim | The claimant predicts the object while its interaction is active | Other peers watch authoritative snapshots | A ball, vehicle, carried object, or other isolated shared object |
+| Contested object | Server simulation | Every peer predicts; a claim displays the local prediction while its interaction is active | Peers without an active claim display delayed authoritative snapshots | A ball, vehicle, carried object, or other isolated shared object |
 | Predict world | Server simulation | The client predicts local and remote simulation from echoed inputs | Corrections are reconciled and visually smoothed | Games where current contact between several moving bodies must look coherent |
 
 The first model is provided by `kit/net` and `kit/session`. The other three use
@@ -58,10 +59,10 @@ rewound shot with the same shot judged against the live server state.
 
 ### One shared object
 
-A contested object can use a presentation claim. The server remains
-authoritative, but the client that initiated an interaction temporarily presents
-its predicted version of the object. Other peers continue to display delayed
-authoritative snapshots.
+Every peer predicts a contested object, while a presentation claim chooses
+which pose a client displays. A client influencing the object can claim it to
+show its local prediction. Peers without a claim display delayed authority
+snapshots. The server decides accepted state regardless of claims.
 
 Claims are useful when round-trip delay on a kick, grab, or steering handoff is
 noticeable but predicting the whole world would be excessive. Tie the claim to
@@ -88,10 +89,12 @@ snapshots, and contact resolution must be replay-safe.
 [`examples/slopball`](../../examples/slopball/README.md), which implements a
 similar game using owner-simulated physics.
 
-## Hybrid games are expected
+<a id="hybrid-games-are-expected"></a>
 
-The choice is not global. A simulation-lane entity can still contain reliable
-delta fields:
+## Combining replicated and predicted fields
+
+Select replication per field. A simulation-lane entity can contain both
+predicted movement and reliable delta fields:
 
 ```odin
 Player :: struct {
@@ -109,7 +112,7 @@ rollback and should remain on the session layer.
 
 The [promotion checklist](sim.md#promoting-a-coop-game) moves one entity at a
 time from an owner stream to the simulation lane. A hybrid is a supported end
-state, not merely an intermediate step.
+state for games that need both models.
 
 ## Presentation rules
 

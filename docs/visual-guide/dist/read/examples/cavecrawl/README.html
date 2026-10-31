@@ -36,11 +36,11 @@ door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span cla
 </thead>
 <tbody><tr>
 <td><code>cavecrawl.odin</code></td>
-<td>the vocabulary, the CaveLobby state, ready/process</td>
+<td>shared declarations, CaveLobby state, ready/process</td>
 </tr>
 <tr>
 <td><code>net.odin</code></td>
-<td>identity + the Host/Join/Steam doors (the transport forwards are generated)</td>
+<td>identity and Host/Join/Steam handlers; transport forwarders are generated</td>
 </tr>
 <tr>
 <td><code>world.odin</code></td>
@@ -48,7 +48,7 @@ door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span cla
 </tr>
 <tr>
 <td><code>input.odin</code></td>
-<td>keys/mouse and the player verbs they drive</td>
+<td>keyboard/mouse sampling and the commands it issues</td>
 </tr>
 <tr>
 <td><code>rocks.odin</code></td>
@@ -76,8 +76,8 @@ door_toggle :: <span class="hljs-keyword">proc</span>(self: ^Door, px: <span cla
 
 bash examples/cavecrawl/run.sh            <span class="hljs-comment"># integration test: multiple real ENet processes,</span>
                                           <span class="hljs-comment"># 120ms injected latency (CAVECRAWL_OK)</span></code></pre></div><p>The integration test (<code>run.sh</code> + <code>cave_test.gd</code>) is a reusable pattern for
-testing a game: real processes over real sockets drive the <code>@(gd_method)</code>
-surface and assert against log lines. Loot
+testing a game: processes communicate over sockets, call its <code>@(gd_method)</code>
+procedures, and check log lines. Loot
 races, predicted combat under latency, a kill mid-flight, quit-and-resume,
 and a host handover all run headless from <code>tests/run_all.sh</code>.</p>
 <p>WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores
@@ -86,5 +86,5 @@ same-machine identities) · <code>CAVE_STEAM=0</code> (force ENet when Steam is
 running; Steam lobbies use the Spacewar app id, see
 <a href="../../docs/kit/steamgd.html">steamgd</a>).</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/cavecrawl/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="../../docs/kit/steamgd.html"><span>kit/steamgd — Steam transport and invite flow</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/cavecrawl/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/cavecrawl/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

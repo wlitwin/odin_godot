@@ -41,9 +41,9 @@ gets a publication receipt; later successful publication replaces that room&#39;
 saved progress. <code>RCB_ROOM_CHECKPOINT_MS</code> optionally requests the supported cadence.
 Party publication does not create a browser-local game-save slot.</li>
 <li>Standalone native file saves still use the matching host profile. Browser Solo
-now uses named local checkpoint slots, described in the session guide.</li>
+uses named local checkpoint slots, described in the session guide.</li>
 </ul>
-<p>The Room service now supports operator-selected checkpoint model <code>claimball</code> with
+<p>The Room service supports operator-selected checkpoint model <code>claimball</code> with
 content C3 (<code>0x52434c41494d4233</code>). Requests cannot choose executable validation code.
 The backend validates and persists complete authority checkpoints, including the
 roster and ball/player state. No game schema changed for the Party integration.</p>
@@ -58,7 +58,7 @@ validates the persisted C3 checkpoints.</p>
 and crash runs pass, but the original cause remains unestablished; this is retained
 as an open issue. No clock, lease, fault or recovery limit was relaxed. See the
 <span class="local-reference" title="docs/replay/results/claimball-online-2026-09-13/README.md · available in the repository">full receipts</span>.
-Native WSS and browser whole-party restoration now have separate acceptance
+Native WSS and browser whole-party restoration have separate acceptance
 <span class="local-reference" title="docs/replay/results/claimball-party-restore-2026-09-13/README.md · available in the repository">receipts</span>.
 Public deployment, broader network/OS/hardware testing, consecutive failures, Steam
 and human parity remain further work. <code>RCB_PROBE=1</code>
@@ -79,5 +79,5 @@ last live tick or cosmetic chat line after total process loss.</p>
 It distinguishes an approved backup from preparation, stale progress or uncertain
 control; a prior host change does not imply the next backup is ready.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/godot/room_backup.html"><span>Recovery-backup status</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/online.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../replay/godot/room_backup.html"><span>Recovery-backup status</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/online.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#identity-and-admission" class="">Identity and admission</a><a href="#connections-and-saves" class="">Connections and saves</a><a href="#acceptance-and-limits" class="">Acceptance and limits</a><a href="#reopening-a-saved-party" class="">Reopening a saved Party</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_claimball/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

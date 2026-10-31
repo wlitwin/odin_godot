@@ -4,8 +4,9 @@
 REPLAY_SLOPBALL3D_UI_OUT=/absolute/fresh/output nix develop --command bash tests/replay_slopball3d_ui/run.sh
 ```
 
-The fixture builds/imports/waits/builds an isolated project, then drives host,
-client and observer through the native UI. It checks leader Start, names/teams/ping,
+The fixture prepares and builds an isolated project, imports it in Godot, waits
+for editor-started compiler jobs, and performs a final build. It then drives host,
+client, and observer through the native UI, checking leader Start, names/teams/ping,
 movement, typing suppression, literal and named-observer chat, a real goal,
 departed rows, same-seat rejoin with score preserved and clean shutdown. Movement
 probes report X/Z in millimetres, with a 10 mm stationary tolerance while typing.

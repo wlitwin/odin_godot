@@ -8,11 +8,12 @@
 diagnostics. It builds a bounded scalar-field program from Odin compiler type
 information and encodes logical values independently of struct padding, native
 offsets and endian-qualified scalar storage. No scriptgen attributes are required.</p>
-<p>Initialization also compiles validation indices and contiguous copy spans. The
-codec still validates constrained values before writing; adjacent canonical bytes
-then copy in bulk. Padding, excluded fields and endian-qualified values split spans
-as needed. This local program does not change fingerprints or wire bytes. Schema
-options are fixed at initialization; rebuild a schema to change them.</p>
+<p>Initialization prepares validation indices and contiguous copy spans. The
+codec validates constrained values before writing, then copies adjacent
+canonical bytes in bulk. Padding, excluded fields, and endian-qualified
+values split spans where separate handling is needed. These local indices
+preserve the canonical fingerprints and wire bytes. Schema options remain
+fixed until the schema is rebuilt.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">State :: <span class="hljs-keyword">struct</span> {
     position: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
     health: <span class="hljs-type">i32</span>,
@@ -81,8 +82,8 @@ and host migration require their separate archive and authority protocols.</p>
 <h2 id="verification">Verification<a class="heading-anchor" href="#verification" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash tests/replay_schema/run.sh</code></pre></div><p>Native tests pin bytes, padding/endian equivalence, projections, enum/bit-set
 validation, field diagnostics, transactional failure, allocation ownership, and
-envelope mutation/truncation rejection. The gate also type-checks the instantiated
-schema/correction/transport/adapter surface for WASM. That type-check alone does
+envelope mutation/truncation rejection. The test also type-checks instantiated
+schema, correction, transport, and adapter code for WASM. That type-check alone does
 not establish cross-platform replay or execution parity; see the separate
 <a href="unions.html#acceptance">tagged-union execution evidence</a> for its tested corpus.</p>
 <h2 id="field-differences">Field differences<a class="heading-anchor" href="#field-differences" aria-label="Link to this section">#</a></h2>
@@ -102,10 +103,10 @@ ascending ranges use bounds, and sparse/wide enums retain exact membership check
 Native qualified-endian and packed/unaligned fields still use byte-safe reads.</p>
 <p>The program preserves field order and returns the same first invalid field path.
 Validation completes before encoding writes output or decoding commits a candidate.
-Tagged unions retain the general guard-aware validator. Only local compiled metadata
-changes: canonical fields, fingerprints, envelope checksums and bytes do not.
-No runtime code generation, platform-specific vector instruction or relaxed float
-validation is introduced. <code>Schema</code> owns and releases the program with its other
+Tagged unions retain the general guard-aware validator. The validation program is local metadata; canonical fields, fingerprints,
+envelope checksums, and bytes stay unchanged. It uses no runtime code
+generation or platform-specific vector instructions, and preserves float
+validation rules. <code>Schema</code> owns and releases the program with its other
 metadata; do not mutate compiled schema metadata after initialization.</p>
 <p><a href="../../tests/replay_schema_bench/README.html">The codec benchmark</a> compares exact bytes
 and timing with an explicitly retained reference implementation. Use game-level
@@ -127,9 +128,9 @@ select grouped validation; otherwise the original scalar loop handles the value.
 The decision is not cached and changes no schema state, so dense and sparse values
 can alternate safely. Nonzero blocks fall back in original field order, preserving
 first-error paths. Encode/decode still validate fully before writing output.</p>
-<p>This adds local metadata and retains a small dense-input overhead in the measured
-microbenchmark. It changes no canonical bytes, fingerprints, public projection or
-wire/save version. <a href="../../tests/replay_schema_blocks/README.html">Oracle checks</a> and
+<p>The measured microbenchmark records a small dense-input overhead for this
+local metadata and probe. Canonical bytes, fingerprints, public projection,
+and wire/save versions are unchanged. <a href="../../tests/replay_schema_blocks/README.html">Oracle checks</a> and
 <span class="local-reference" title="docs/replay/results/codec-blocks-2026-09-08/README.md · available in the repository">measurement evidence</span>
 record the supported cases and tradeoffs.</p>
 <h2 id="structural-compression-metadata">Structural compression metadata<a class="heading-anchor" href="#structural-compression-metadata" aria-label="Link to this section">#</a></h2>
@@ -161,5 +162,5 @@ arithmetic; float narrowing rejects overflow and nonfinite values. It supports
 packed/endian-qualified values through canonical bytes, without a wire-format
 change. See the <a href="../godot/debug/scrubber.html#editing-a-preview">Godot preview editor</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="unions.html"><span>Tagged value unions</span><span aria-hidden="true">→</span></a><a href="../diagnostics.html"><span>Explaining a local replay failure</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_schema_bench/README.html"><span>Canonical codec microbenchmark</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/schema/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="unions.html"><span>Tagged value unions</span><span aria-hidden="true">→</span></a><a href="../diagnostics.html"><span>Explaining a local replay failure</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_schema_bench/README.html"><span>Canonical codec microbenchmark</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/schema/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#contracts" class="">Contracts</a><a href="#public-and-authority-projections" class="">Public and authority projections</a><a href="#envelopes" class="">Envelopes</a><a href="#verification" class="">Verification</a><a href="#field-differences" class="">Field differences</a><a href="#compiled-validation" class="">Compiled validation</a><a href="#sparse-validation-blocks" class="">Sparse validation blocks</a><a href="#structural-compression-metadata" class="">Structural compression metadata</a><a href="#local-scalar-authoring" class="">Local scalar authoring</a></nav><div class="outline-actions"><a href="../../../reference/replay/schema/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

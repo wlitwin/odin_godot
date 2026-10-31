@@ -42,9 +42,9 @@ and later credential-based rejoin remain distinct operations.
   saved progress. `RCB_ROOM_CHECKPOINT_MS` optionally requests the supported cadence.
   Party publication does not create a browser-local game-save slot.
 - Standalone native file saves still use the matching host profile. Browser Solo
-  now uses named local checkpoint slots, described in the session guide.
+  uses named local checkpoint slots, described in the session guide.
 
-The Room service now supports operator-selected checkpoint model `claimball` with
+The Room service supports operator-selected checkpoint model `claimball` with
 content C3 (`0x52434c41494d4233`). Requests cannot choose executable validation code.
 The backend validates and persists complete authority checkpoints, including the
 roster and ball/player state. No game schema changed for the Party integration.
@@ -66,7 +66,7 @@ An initial browser run ended with `Fenced` before handoff. The diagnostic planne
 and crash runs pass, but the original cause remains unestablished; this is retained
 as an open issue. No clock, lease, fault or recovery limit was relaxed. See the
 [full receipts](../../docs/replay/results/claimball-online-2026-09-13/README.md).
-Native WSS and browser whole-party restoration now have separate acceptance
+Native WSS and browser whole-party restoration have separate acceptance
 [receipts](../../docs/replay/results/claimball-party-restore-2026-09-13/README.md).
 Public deployment, broader network/OS/hardware testing, consecutive failures, Steam
 and human parity remain further work. `RCB_PROBE=1`

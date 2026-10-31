@@ -26,32 +26,34 @@ multiplayer framework, and export a game.
   - lifecycle procs, custom methods (`@(gd_method)`), signals, `@(gd_connect)`, `@onready`
   - multiplayer RPCs (`@(gd_rpc)`)
   - custom resources, global class names, typed cross-script references, autoloads
-  - the full `gd.*` ergonomic-helper catalog (a task → one-liner table)
+  - `gd.*` helpers grouped by task
   - editor tooling: `@tool`, `gd.is_editor()`, custom icons, EditorPlugin
 - **[Shared API conventions](authoring-guide.md#api-conventions-shared-by-kit-and-replay)**:
   Odin names, generated prefixes, owner lifetimes, and the normal Kit/Replay frame loops.
 
-## Use it day-to-day
+<a id="use-it-day-to-day"></a>
 
-- **[Workflow](workflow.md)**: the dev loop and editor experience:
+## Development workflow
+
+- **[Workflow](workflow.md)** covers building, editing, and debugging scripts:
   - building (`build/build_scripts.sh`) and the project layout it expects
   - live editing: recompile-and-reload on save, plus the manual `script.reload(true)` fallback
-  - editor DX: live error squiggles (`_validate`), autocomplete (`ols`), syntax highlighting
+  - editor support: inline errors (`_validate`), autocomplete (`ols`), syntax highlighting
   - debugging: `gd.print` / `gd.error`, `lldb`, reading crash backtraces
   - **AOT limitations** (no in-editor breakpoints, recompile-on-save latency, …)
-- **[Debugging](debugging.md)**: the deep `lldb` + crash-backtrace reference (what Workflow
-  summarizes).
-- **[Pure-Odin Events](events.md)**: `events.Event(T)` provides typed one-to-many dispatch at
-  direct-call cost for scripts in the same dll (the C#-events-vs-Godot-signals split). It
-  covers when to use it vs an engine signal vs batching, the module-boundary rule, and the
-  hot-reload resubscribe pattern.
-- **[Script Modules](modules.md)**: the opt-in scaling tool for large projects. It splits
-  scripts into `res://modules/<name>/` packages, one dll each, rebuilt + hot-swapped
-  independently on save. It covers the cost model (when NOT to use them), the no-cross-imports
-  rule and why, cross-module communication patterns, reload/collision semantics, and export.
-  The same page also covers two things every project can use without splitting anything:
-  **script subpackages** (annotated classes in subfolders of one module) and **`res://shared/`**
-  (read-only packages of types, constants and pure procs that every module may import).
+- **[Debugging](debugging.md)** expands on Workflow's `lldb` and crash-backtrace
+  guidance.
+- **[Pure-Odin Events](events.md)** explains typed one-to-many dispatch through
+  `events.Event(T)` for scripts in the same dll. It covers direct-call cost,
+  comparison with engine signals and batching, module boundaries, and
+  resubscribing after hot reload.
+- **[Script Modules](modules.md)** describes splitting a large project into
+  `res://modules/<name>/` directories, each compiled to its own dll and rebuilt
+  independently on save. It explains full-build and save-time costs, import
+  isolation, communication between modules, reload, collisions, and export.
+  It also covers organization within a single dll through script subpackages,
+  and **`res://shared/`** for types, constants, and pure procedures that several
+  modules may import.
 
 ## Build multiplayer with Kit
 
@@ -65,19 +67,18 @@ multiplayer framework, and export a game.
 - **[kit/sim](kit/sim.md)** provides fixed-tick, server-authoritative prediction
   and reconciliation for contested state. It composes with ordinary session
   replication on a per-field basis and includes bounded lag-compensation tools.
-- **[Timelines: choosing a model](kit/timelines.md)** explains whose timeline each thing
-  presents from and who arbitrates disagreement: the four shipped answers (coop,
-  predict-self, contested-object, predict-world) with their worked games, and the
-  choose-by-what-is-contested guide. Read this when picking between the two kits.
-- **[Build a game in a day](kit/build-a-game-in-a-day.md)** is the tutorial: a co-op cave
-  crawler from empty scene to Steam invite, the same arc `examples/cavecrawl` proves.
-- **[Gameplay recipes: the kit + play recipe](recipes.md)** is the compositional *pattern*
-  the tutorial uses without naming: an entity is a struct of `play` primitives, and each
-  networked behavior is sliced into seven authority/time slots (State, Cadence, Intent,
-  Authority, Prediction, Reconcile, Presentation). It includes one worked example (a gun) and five
-  real items set against the skeleton. Read this when "how do I structure *this* gameplay
-  item?" is the question. It's the multiplayer answer to Godot's component-composition
-  articles.
+- **[Timelines: choosing a model](kit/timelines.md)** compares authority and
+  display timing for coop, predict-self, contested-object, and predict-world.
+  Use its worked games and interaction-based selection guide to choose a Kit
+  model.
+- **[Build a game in a day](kit/build-a-game-in-a-day.md)** follows a coop cave
+  crawler from scene setup through Steam invites, using `examples/cavecrawl`
+  as the reference implementation.
+- **[Gameplay recipes: the kit + play recipe](recipes.md)** shows how to compose
+  an entity from `play` structs and divide a networked behavior into seven
+  responsibilities: State, Cadence, Intent, Authority, Prediction, Reconcile,
+  and Presentation. A worked gun example and five gameplay items show where
+  their fields, commands, and hooks belong.
 
 ## Learn from the examples
 
@@ -96,24 +97,26 @@ independently runnable.
 - `examples/cavecrawl` is the **co-op reference** (see [kit/](kit/index.md)):
   the main Kit packages in one game, covered by a latency-injected,
   multi-process integration test (`run.sh`).
-- `examples/slopball` / `examples/slopball3d` are the **smallest complete kit games**: a
-  physics co-op pitch (engine physics via `play.Puppet`), in 2D and 3D.
+- `examples/slopball` / `examples/slopball3d` are small complete Kit games:
+  coop soccer with engine physics through `play.Puppet`, in 2D and 3D.
 - `examples/quickdraw` is the **server-authority reference** (kit/sim): a western duel
   that exercises lag-compensated hitscan with an A/B acceptance test at
   240 ms RTT.
-- `examples/speedball` is **the contested object** (kit/sim): slopball's soccer premise
-  on the other netcode, where every peer predicts the ball and touches resolve locally.
-  Read the two side by side to pick a model.
-- **[examples/survivors](../examples/survivors/README.md)** is the headline single-player
-  example: a complete survivors-like in pure Odin, with a per-file feature map. Its co-op
-  layer is the ENGINE-NATIVE (host-authoritative) variant, retained for the interop tests.
+- `examples/speedball` uses kit/sim for the same soccer game, with every peer
+  predicting the ball so local touches respond immediately. Compare it with
+  Slopball to see the effect of changing simulation models.
+- **[examples/survivors](../examples/survivors/README.md)** is a complete
+  single-player survivors-like in pure Odin with a per-file feature map.
+  Its engine-native host-authoritative coop layer is retained for interop tests.
 - **[examples/coop_arena](../examples/coop_arena/README.md)** is the engine-native
   **peer-authoritative** path end-to-end: one codebase, three modes (single-player, native
   ENet, browser WebRTC with a room-code lobby). It predates the toolkit and shows the raw
-  surface the kit absorbs.
-- `tests/showcase/`: the smallest "everything wired" pure-Odin scene (coin collector).
+  networking calls that Kit's helpers now coordinate.
+- `tests/showcase/` is a minimal pure-Odin coin-collector scene.
 
-## Ship it
+<a id="ship-it"></a>
+
+## Export and distribution
 
 - **[Exporting](exporting.md)**: native desktop export (the `OdinExportPlugin`) and web/WASM
   export (the Emscripten SIDE_MODULE + COOP/COEP serving).
@@ -125,8 +128,8 @@ independently runnable.
 
 ## Design history & internals
 
-These are *not* on the learning path. They record how the engine is built and what was
-verified, for contributors:
+These contributor records describe implementation decisions, earlier development,
+and the behavior verified at the time:
 
 - [PLAN.md](../PLAN.md): the original architecture and phased delivery plan.
 - [design/script-language-api.md](design/script-language-api.md): the

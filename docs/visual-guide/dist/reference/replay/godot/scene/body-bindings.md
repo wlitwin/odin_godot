@@ -1,11 +1,15 @@
-# Choosing a body contract
+<a id="choosing-a-body-contract"></a>
 
-`Simulation_Body2` / `Simulation_Body3` are for replayable World-owned motion.
-`Body2` / `Body3` plus `session_body*_frame/sample` are for cooperative Godot solver
-motion accepted through the entity-ownership protocol. Keep one motion adapter
-per node;
-do not use both contracts concurrently or let an unrelated controller write its
-transform. Authored collision geometry/scale remains separate from the pose.
+# Selecting simulation or solver motion
+
+Choose the body adapter according to which system computes motion.
+`Simulation_Body2` / `Simulation_Body3` display poses from replayable World state.
+`Body2` / `Body3`, driven through `session_body*_frame/sample`, use cooperative
+Godot solver motion accepted by the entity-ownership protocol.
+
+Give each node one motion adapter. Using both at once, or letting another
+controller write its transform, creates conflicting writers. Authored collision
+geometry and scale remain separate from the selected pose.
 
 ```odin
 body: scenegd.Simulation_Body2
@@ -14,14 +18,15 @@ error := scenegd.simulation_body2_present(&body, {epoch, view_revision},
     view.Pose2{position=display.position, angle=display.angle}, display.teleport_cut)
 ```
 
-The simulation-driven binding freezes rigid bodies, applies the selected pose to
-node and PhysicsServer, and resets engine interpolation on scope/cut changes.
+The simulation-driven binding freezes rigid bodies and applies the selected
+pose to both the node and PhysicsServer. It resets engine interpolation when
+the presentation scope or teleport cut changes.
 It preserves authored child offsets and rejects invalid poses or older epochs.
 The 3D variant requires a finite unit quaternion. It offers no observation/sample
 publication API. Character bodies are supported as passive scene representations;
-application controllers must not call move_and_slide on them. Gameplay collision
-and movement remain in the replayable model. A passive body is not a substitute
-for implementing gameplay collisions there.
+application controllers must not call move_and_slide on them. Implement movement
+and gameplay collision in the replayable model; the passive Godot body only
+represents its result.
 
 The cooperative facade centralizes authority selection and suspension:
 
@@ -37,11 +42,13 @@ sample, error := scenegd.session_body2_sample(&session, &body, physics_frame)
 // Feed nonempty samples to the existing authenticated observation/admission path.
 ```
 
-Selection reads the latest authority frame, never local prediction. Missing/fenced
-state or an absent entity suspends solving/publication. `eligible=false` disables
-local solving for game rules such as kickoff or menus while still presenting the
-authority pose. Optional presentation state changes observer interpolation only
-within the matching owned scope; it grants no publication permission.
+Frame selection reads the latest authority frame to decide who may operate
+the solver; it never takes that permission from local prediction. Missing or
+fenced authority state, or an absent entity, suspends solving and publication.
+Set `eligible=false` to disable local solving during kickoff or menus while
+continuing to display the authority pose. Optional presentation state changes
+observer interpolation only within the matching ownership scope and grants no
+permission to publish observations.
 
 Sample rechecks readiness, fencing, pause, client phase and authority epoch, so a
 transition between frame selection and sampling cannot publish a stale observation
@@ -49,8 +56,10 @@ under a new epoch. Call frame selection before operating the local solver and
 sampling. A Room caller passes its Session and includes Room/handoff eligibility
 in `eligible`; these helpers do not override Room admission or game permissions.
 
-Existing Body2/Body3 drivers retain the offer/preparing/owner/observer protocol,
-full pose/velocity reseeding, revision/epoch rejection and visual correction.
+Body2/Body3 retain their existing ownership-transfer stages: an authority offer,
+preparation, and selection as owner or observer. The drivers reseed complete
+poses and velocities, reject invalid revisions/epochs, and smooth visual
+corrections.
 A prepared sample can commit an authority-issued transfer through `owned.accept`;
 the helper does not bypass authenticated sender checks or game transition rules.
 Absent samples use sequence zero. The adapter remains a presentation/producer owner,

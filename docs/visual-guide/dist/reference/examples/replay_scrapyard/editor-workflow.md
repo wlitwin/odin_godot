@@ -1,10 +1,10 @@
 # Authoring a feature in Godot
 
-Replay Scrapyard now has an optional **Replay** editor dock and an F6 ability
-workbench. The first complete example is Salvefield: a placed zone with radius,
-duration, pulse timing and a referenced healing status. Its existing rules and
-stock balance are preserved; drafts exercise additions without entering the
-canonical catalog until reviewed. Baking validates the saved Resources and copies
+Replay Scrapyard provides an optional **Replay** editor dock and an F6 ability
+workbench. Its Salvefield example exposes a placed zone's radius, duration, pulse
+timing, and referenced healing status. Drafts let you test additions before
+admitting them to the gameplay catalog; the example retains Salvefield's existing
+rules and stock balance. Baking validates the saved Resources and copies
 their gameplay values into the catalog used by runs and headless tests.
 
 ## One-time setup
@@ -16,9 +16,11 @@ when Odin is not on PATH. The editor shows job progress while remaining responsi
 Native authoring/testing jobs target macOS/Linux; they are development tools, not
 browser gameplay services.
 
-## The accepted first milestone
+<a id="the-accepted-first-milestone"></a>
 
-1. Open `data/abilities/salvefield.tres` in the Inspector. `status` is now a
+## Validate and test Salvefield
+
+1. Open `data/abilities/salvefield.tres` in the Inspector. `status` is a
    **StatusDef Resource picker**. Choose a status by Resource instead of remembering
    its numeric ID. The bake validates type/path/membership and stores the stable ID.
 2. Change radius, duration or pulse timing. **Save & Validate Content** checks the
@@ -50,13 +52,13 @@ browser gameplay services.
    independently edited Resources first; the buttons save open scenes and the
    selected saved Resource. Failed validation/baking preserves the last valid files.
 
-The milestone was exercised through the actual editor plugin and running workbench,
-not only through equivalent CLI commands. [Acceptance evidence](../../docs/replay/results/editor-workflow-2026-09-21/README.md)
+These steps were exercised through the actual editor plugin and running
+workbench, in addition to the CLI commands. [Acceptance evidence](../../docs/replay/results/editor-workflow-2026-09-21/README.md)
 records the exact checks and limits.
 
 ## References and shared extraction
 
-Ability `status`, mob `boom_status`, and combo `present`/`incoming`/`output` now
+Ability `status`, mob `boom_status`, and combo `present`/`incoming`/`output`
 reference StatusDef Resources. Optional missing references bake to ID 0. Required
 ones fail validation. Referenced statuses must be catalog resources under
 `data/status`; duplicate/missing IDs and invalid values are rejected.
@@ -66,9 +68,10 @@ one explicit mapping each. Catalog admission, export, validation, preview and
 isolated authoring scenarios reuse them. Inspector hints do not define game rules.
 The old catalog's canonical bytes are unchanged by this migration.
 
-Runner appearances are now an Inspector array of `ScrapRunnerStyle` Resources,
-with stable look IDs and idle/run textures. Swapping or reorganizing styles needs
-no Becca/Joe/unknown fields in the view script. The three existing gameplay look
+Player-character appearances use an Inspector array of `ScrapRunnerStyle`
+Resources with stable look IDs and idle/run textures. Swapping or reorganizing
+styles changes the array rather than hard-coded Becca/Joe/unknown fields in the
+view script. The three existing gameplay look
 IDs/capacity remain an explicit game contract; duplicate/missing styles reject.
 
 ## Create a draft

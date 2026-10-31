@@ -3,8 +3,12 @@
 This is a dated implementation record for framework contributors. Each entry
 records the APIs, tests, failures, and open work at that point; words such as
 "current", "now", and "remaining" refer to the entry's date. Older entries can
-therefore describe gaps that later entries close. Test counts, timings, hashes,
+therefore describe gaps that later entries close. Undated closing sections retain
+the status recorded during the initial milestones. Test counts, timings, hashes,
 and compatibility scopes are retained as evidence, not current guarantees.
+
+Scrapyard calls its player characters runners. Replay’s runtime runner is separate:
+it advances simulation and manages input and history.
 
 The 2026-09-20 [framework completion](framework-completion.md) scope defers
 exhaustive parity across every game. Use the [release assessment](release-assessment.md)
@@ -176,12 +180,14 @@ platform/deployment gates remain open. See [contract](../../replay/godot/steam_r
 and [evidence/limits](results/steam-room-2026-09-20/README.md). Originals remain
 preserved and the full M0–M9 goal stays active.
 
-## M2 shared runtime aliases accepted without losing tag guardrails — 2026-09-20
+<a id="m2-shared-runtime-aliases-accepted-without-losing-tag-guardrails--2026-09-20"></a>
 
-Scriptgen now proves an unresolved shared type has no inline Godot metadata before
-accepting it. The proof follows aliases and generics in their defining/caller import
-contexts, recognizes engine/stdlib leaves and stays bounded. Tagged fields, methods,
-ticks and signals remain refused, including aliases and ambiguous `gd` imports.
+## M2 shared runtime aliases and metadata validation — 2026-09-20
+
+Scriptgen now checks unresolved shared types for inline Godot metadata before
+accepting them. It follows aliases and generics in their defining/caller import
+contexts and recognizes engine/stdlib leaves, within explicit resolution bounds.
+Tagged fields, methods, ticks and signals remain refused, including aliases and ambiguous `gd` imports.
 Hello now declares its actual field as `game.Timeline`.
 
 Thirty-one focused cases and the existing full generator suite pass. Isolated Kit
@@ -337,7 +343,7 @@ malformed/canonical rejection, signed zero, no partial admission and opt-out/res
 Frozen old-server/new-client and new-server/old-client tests retain full packets;
 new/new peers use compact packets with the same model contract. A diagnostic live
 case sends all 320 observations in 30,582 bytes instead of 80,320. In six same-binary
-A/B pairs, median client application traffic falls from 7.285 to 4.245 KiB/s (41.7%).
+A/B cases, median client application traffic falls from 7.285 to 4.245 KiB/s (41.7%).
 Host traffic is essentially unchanged; callback variation does not establish a CPU
 improvement. Full raw and compact gameplay/backup predicates pass.
 
@@ -567,7 +573,7 @@ M0–M9 goal remains active.
 A delayed Restore reply can arrive after its request-start local deadline even
 though the coordinator has only just reserved the actor. Room previously attempted
 another Restore in that state. It now retains the exact prepared point and requests
-a cheap correlated renewal. Installation still requires a successful renewal and
+a correlated renewal. Installation still requires a successful renewal and
 a live permit. An expired coordinator reservation refuses renewal.
 
 A deterministic SQLite/Room test fails before the fix and passes afterward; its
@@ -1169,7 +1175,7 @@ work; the full roadmap stays active.
 
 Native WSS/ENet and browser RTC gates now kill all players, the observer and the
 service, reopen the same database with creation disabled, and restore the published
-world. An independent reader verifies publication one's complete moving/scored
+world. An independent reader verifies the first publication's complete moving/scored
 state before shutdown. The observer registers first without authority; the owner
 returns in epoch 2 / incarnation 3, restores the exact tick/digest, and players
 reclaim their seats and prediction boundaries. New spikes/chat and publication two
@@ -1571,7 +1577,8 @@ acceptance requirements.
 The canonical schema now compiles a reversible byte permutation for large fixed
 arrays. Optional shuffled LZ4 packets retain every history/query value and include
 a separate transform signature. Old formats remain available, a size heuristic
-skips already compact deltas, and a new candidate must win after its signature.
+skips already compact deltas, and selects a new candidate only when its payload
+plus signature is smaller than the existing choices.
 Canonical fingerprints and checkpoint/state semantics are unchanged. Scratch is
 lazy and bounded to twice the canonical snapshot size per server/receiving client.
 
@@ -1625,8 +1632,8 @@ Kit and Scrapyard remain preserved; the full M0–M9 goal stays active.
 ## M3/M9 bounded snapshot selection and queue-pressure finding — 2026-09-09
 
 Snapshot selection now uses a bounded sparse preflight and the existing LZ4 stage
-to avoid fully encoding a losing candidate. Selected kind/bytes, sparse ties,
-full-snapshot fallback, wire/checkpoint formats and workspace size stay unchanged.
+to avoid fully encoding a candidate that cannot reduce the selected size.
+Selected kind/bytes, sparse ties, full-snapshot fallback, wire/checkpoint formats and workspace size stay unchanged.
 The new 768-case/seven-budget native/executed-WASM corpus passes in default/speed
 builds. Six delta tests, 132 network tests, ten recovery tests, WASM checks and six
 frozen compatibility cases pass. The actual-game profile verifies 6,000 identical
@@ -1920,9 +1927,8 @@ full M0–M9 goal stays active.
 
 The library now owns the copied pending payload and epoch-scoped action tickets
 previously tracked by Scrapyard's dash code. Session/Room wrappers retain blocked
-input, filter speculative/foreign/duplicate results, and process recovery's known,
-retained, retired and unknown outcomes without blindly retrying gameplay. A reused
-sequence in a new epoch cannot consume an old result.
+input and filter speculative/foreign/duplicate results. They handle known,
+retained, retired and unknown recovery outcomes explicitly. A reused sequence in a new epoch cannot consume an old result.
 
 All 127 network tests and the expanded WASM check pass. Native Godot verifies
 resync delivery and an actual checkpoint/recovery-report path through a Room
@@ -2043,7 +2049,7 @@ This adds measured jam coverage and a new input-loss reproduction; it does not
 close raw-loss acceptance or the full M0–M9 goal.
 The buffered audit also supports this profile. A same-build repeat delivers all
 thirty remote dashes; an earlier diagnostic attempt fails repeated resync/drain.
-Both are retained, and neither explains away the original single-dash failure.
+Both are retained. Neither establishes the cause of the original single-dash failure.
 
 ## M3/M4/M9 receipt queue through resync and full endurance gate — 2026-09-09
 
@@ -2375,7 +2381,9 @@ Browser file saves, public TLS/TURN deployment, other browsers/Steam, raw faults
 full comparisons and wider playtests remain work. Original Kit, original games and
 sibling Scrapyard remain preserved; the complete M0–M9 objective stays active.
 
-## M5/M6 Speedball native party front door and observers — 2026-09-08
+<a id="m5m6-speedball-native-party-front-door-and-observers--2026-09-08"></a>
+
+## M5/M6 Speedball native party menus and observers — 2026-09-08
 
 Configured native Speedball deployments now use the shared Party helper for Create,
 invite Join, Watch only, Rejoin Recent and Copy Invite. Durable room credentials
@@ -2476,7 +2484,9 @@ Public room discovery/enrollment, lobby/consecutive-migration integration, resta
 saves and browser/Steam/play-feel parity remain work. Original Kit, original
 Speedball and sibling Scrapyard remain preserved. The complete roadmap stays active.
 
-## M6 Speedball session and social front door — 2026-09-08
+<a id="m6-speedball-session-and-social-front-door--2026-09-08"></a>
+
+## M6 Speedball session and social menus — 2026-09-08
 
 Replay Speedball now has a scene-authored Solo/Host/Join/Watch menu, validated
 names and direct address/port entry, host-controlled manual start, chat/input
@@ -2702,8 +2712,8 @@ shot deals three damage; each player fires seven rounds and reloads twice. The
 
 Two preliminary setup races are retained separately. The final driver waits for
 both declarations and initial equipped states before cycling. Verified binaries
-were reused in fresh copies after the GDScript-only barrier change. No game or
-weapon law was weakened.
+were reused in fresh copies after the GDScript-only barrier change. Gameplay and
+weapon rules were unchanged.
 
 This is an existing-family data extension, not a human productivity or performance
 claim. New-family mechanics, save/migration/browser acceptance for this weapon,
@@ -3133,7 +3143,9 @@ broader actor/menu and browser/platform interaction, hardware listening, playtes
 and the full comparison remain requirements. Original projects and the shared
 index remain preserved; the full roadmap stays active.
 
-## M8 Scrapyard borrowed camera — 2026-09-07
+<a id="m8-scrapyard-borrowed-camera--2026-09-07"></a>
+
+## M8 Scrapyard camera while downed — 2026-09-07
 
 The downed player's camera now follows a living connected teammate, keeps an
 eligible target, returns on revival and reselects after loss. Eligibility reads
@@ -3468,8 +3480,8 @@ remain part of the full active roadmap. Original projects remain available.
 ## M3/M4 recipient views and interest management — 2026-09-07
 
 An optional server transmission policy now filters recipient state, held controls
-and gameplay facts before they enter the wire. Client simulation groups remain a
-separate authored closure. Complete authority checkpoints retain hidden state, and
+and gameplay facts before transmission. The game defines client simulation
+groups separately. Complete authority checkpoints retain hidden state, and
 restored/departing authorities apply the appropriate view/group boundaries. Stable
 policy IDs enter contracts; zero-policy behavior and older contracts are preserved.
 Invalid views fail closed instead of falling back to a complete world.
@@ -4342,8 +4354,8 @@ retained. Deliberately unavailable-asset fallback still needs its own live gate.
 
 [Asset evidence](results/scrapyard-assets-2026-09-06/README.md) records successes,
 failures, screenshots, source hashes and a source archive. It also records a test
-filename collision I caused and the reconstructed admission coverage that now
-passes. Original Kit and sibling Scrapyard remain separate and unchanged.
+filename collision and the reconstructed admission coverage, which now passes.
+Original Kit and sibling Scrapyard remain separate and unchanged.
 
 The full goal remains active. Next work includes asset payloads in manual save
 bundles/cache persistence, host-only mod overlays, remaining recovery/identity
@@ -4636,7 +4648,8 @@ and six mob resources into a validated value catalog. Godot and native stock agr
 at fingerprint `17831446703124821416`. The catalog, gun state/cadence, stable enemy/
 shot/drop pools, enemy timers and combat counters all live in the complete world.
 Four ballistic irons and the scrapbot/hulk brains are playable. Swept shots obey
-cover and see prior projectile kills; death payout and hoover preserve scrap.
+cover and query targets after earlier projectile kills. Death rewards and
+automatic pickup collection conserve scrap.
 Explicit capacity handling preserves ammo and money, and per-player feedback
 aggregation fits the network event budget even with 64 simultaneous deaths.
 
@@ -5178,7 +5191,9 @@ increment above), Speedball/Claimball and authored prediction
 scope/boundary handling remain. Full-world prediction with mixed presentation is
 not partial prediction. M4 owner streams/parity and M7–M9 also remain open.
 
-## Completed increments
+<a id="completed-increments"></a>
+
+## Initial implementation milestones
 
 - **M0:** architecture, implementation sequence, source baseline inventory, and
   paired-game comparison protocol written.
@@ -5220,7 +5235,7 @@ type-check, and four-process real gameplay acceptance. Individual gates are reru
 when their dependencies change.
 The complete legacy repository suite has not been rerun for this additive increment.
 
-Latest verified Godot receipts:
+Recorded Godot receipts for these milestones:
 
 ```text
 REPLAY_HELLO_WALK x=144.000015258789
@@ -5229,7 +5244,9 @@ REPLAY_HELLO_OK
 REPLAY_LOOT_VIEW_OK
 ```
 
-## Remaining M2 follow-through
+<a id="remaining-m2-follow-through"></a>
+
+## Early M2 follow-through
 
 - Expanded frame-sampling/confirmation tests and the WASM fixture pass; keep them green.
 - Human visual/play-feel review has not been performed. The tests establish
@@ -5241,7 +5258,9 @@ REPLAY_LOOT_VIEW_OK
   The examples spell the generic directly. Revisit alias diagnostics during
   authoring stabilization rather than silently weakening Kit's existing checks.
 
-## Next milestone
+<a id="next-milestone"></a>
+
+## Early M4 integration status
 
 M4 is underway: basic room controls and a separate Cavecrawl implementation now
 exist. Locks, custom admission, kicks, bans/unbans, and explicit seat replacement
@@ -5474,8 +5493,8 @@ does not disable cave combat or alter gameplay rules.
 ## Authenticated coordinator service and SQLite decisions
 
 The authority package now exposes authenticated control RPCs and a client wrapper
-that correlates replies with its Lease. Per-participant HMAC-SHA-256 keys, process
-identity, client nonce, request sequence, and request hash bind the conversation.
+that correlates replies with its Lease. Per-participant HMAC-SHA-256 keys
+authenticate the control RPCs. Reply correlation checks process identity, client nonce, request sequence, and request hash.
 The service stages a command and commits its decision/result/replay frontier in a
 single durable CAS, including Query and rejected commands. Old mutations cannot
 follow a newer read or reexecute after restart; retrying a renewal does not extend
@@ -5529,9 +5548,9 @@ frontiers before resetting prediction.
 
 The presentation journal can end an epoch with explicit cancellations. Session
 preserves/drains those changes across role replacement, and Cavecrawl now keys
-verdict display by epoch plus sequence. A prior cancellation cannot masquerade as
-a new accepted action. The Room driver combines the authenticated control client,
-lease, gameplay Session, prepared copies, periodic replication, final freeze/release,
+verdict display by epoch plus sequence. A cancellation from the prior epoch
+cannot match a newly accepted action. The Room driver combines the authenticated
+control client, lease, gameplay Session, prepared copies, periodic replication, final freeze/release,
 takeover, old-host rejoin, and surviving-client redirect/retry. It reports actual
 checkpoint tick separately from the later Welcome tick, known rollback, and local
 protocol interruption. The cave HUD shows recovery and known rollback.
@@ -5557,7 +5576,7 @@ An Odin WASM-check process exited unexpectedly once; the subsequent check passed
 without a source workaround, and no compiler fix is claimed.
 
 The [Room contract](../../replay/godot/room.md) documents the new API and limits.
-This is substantial M5 progress, not its full completion: dynamic incarnation/
+M5 is not complete: dynamic incarnation/
 endpoint provisioning, successor loss, repeated and partitioned real migrations,
 return of a killed host, broader combat cases, and a competitive migration gate
 still need implementation/evidence. Original Kit and game projects remain separate.

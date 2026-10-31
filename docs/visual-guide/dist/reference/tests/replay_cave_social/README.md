@@ -10,11 +10,11 @@ REPLAY_CAVE_SOCIAL_OUT=/absolute/fresh/output nix develop --command bash tests/r
 
 The test harness builds an isolated Cavecrawl copy, runs native host/client/observer
 processes with 120 ms receive delay, and exports a separate Chrome project with
-the existing coordinator-backed migration fixture. The unchanged shared telemetry
-and Comms unit gates can also be run with `tests/replay_telemetry/run.sh` and
+the coordinator-backed migration fixture. Run the shared telemetry and Comms
+unit tests separately with `tests/replay_telemetry/run.sh` and
 `tests/replay_comms/run.sh`.
 
-A native keyboard gate types F and submits invalid/valid names with Enter,
+A native keyboard case types F and submits invalid/valid names with Enter,
 requiring continued editing on rejection and no ping/chat side effects.
 
 Native checks require the authority's zero row and a measured remote RTT, hide

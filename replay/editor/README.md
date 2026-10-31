@@ -34,12 +34,12 @@ selection/name/kind/latency arguments. It publishes an atomic JSON result with
 Issues contain `source`, `path`, `message` and optionally a source line. Source
 links open Resources, scenes or scripts through the editor's normal interfaces.
 
-Save & Validate/Bake saves open scenes and the selected saved Resource. Save other
-independently edited Resources before running a project-wide action. The worker
-builds current Odin code and runs typed checks in a separate bounded process.
-Checks that instantiate authored views run in that isolated process; they are not
-performed against a live game's World. Actual scene scripts may run their normal
-construction/ready code, so choose appropriate leaf view scenes for validation.
+Save & Validate/Bake saves open scenes and the selected saved Resource. Save
+other edited Resources before running a project-wide action. The worker builds
+current Odin code and runs typed checks in a separate bounded process. View
+validation instantiates authored scenes there, outside the live game's World.
+Their scripts can still run construction/ready code, so use view scenes whose
+initialization is appropriate for isolated validation.
 
 `jobs.py` supplies bounded process-group ownership, per-stage logs, cancellation
 files and atomic result publication. UI waits are nonblocking. Cancellation and
@@ -68,9 +68,9 @@ isolated encounter and scenario runner.
 
 See [the walkthrough](../../examples/replay_scrapyard/editor-workflow.md). It covers
 Resource-based status references, shared checked extraction, a complete Salvefield
-workflow, authored runner appearances, non-overwriting stable-ID draft scaffolding,
-recording verification and real local peers. Actor drafts preserve the game's
-existing root binding and compose a generated visual child; rules and feature
+workflow, authored player-character appearances, draft scaffolding with stable IDs
+that does not replace existing files, recording verification, and local peers.
+Actor drafts preserve the game's existing root binding and compose a generated visual child; rules and feature
 assertions remain explicit TODOs. Drafts do not enter the stock catalog automatically.
 
 The UI uses the same commands as CI, including the existing recording verifier and

@@ -1,6 +1,6 @@
 # Screen effects
 
-The original health vignette, brief zoom kicks and floor veil now render above
+The original health vignette, brief zoom kicks and floor veil render above
 the yard and below the HUD. The copied vignette fills the viewport and both
 overlays ignore mouse input. Health at 1–3 HP drives the red pulse; healing above
 that range or becoming downed hides it.

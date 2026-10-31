@@ -8,7 +8,7 @@
 Kit packages. It is primarily a contributor reference. Game authors do not need
 to memorize it before using the quickstarts.</p>
 <h2 id="event-delivery">Event delivery<a class="heading-anchor" href="#event-delivery" aria-label="Link to this section">#</a></h2>
-<p>Kit chooses an event shape according to the lifetime of the data and whether the
+<p>Kit chooses an event representation according to the lifetime of the data and whether the
 caller can wait until the next frame.</p>
 <h3 id="queued-events">Queued events<a class="heading-anchor" href="#queued-events" aria-label="Link to this section">#</a></h3>
 <p>Packages with several event types expose a tagged <code>Event</code> union and a poll proc:</p>
@@ -19,7 +19,7 @@ caller can wait until the next frame.</p>
 }</code></pre></div><p><code>session_poll</code>, <code>comms_poll</code>, and <code>xfer_poll</code> use this pattern. Events are queued
 so normal game reactions run from the game&#39;s frame loop, after Kit has completed
 the operation that produced them.</p>
-<p>When a package has one queue shape, the poll proc returns a tuple instead of a
+<p>When a package queues one event type, the poll proc returns a tuple instead of a
 one-variant union. <code>album_poll</code> and <code>fire_poll</code> follow this rule.</p>
 <h3 id="current-state">Current state<a class="heading-anchor" href="#current-state" aria-label="Link to this section">#</a></h3>
 <p>Queries such as <code>boot_phase</code> and <code>session_count</code> read current state without
@@ -30,8 +30,8 @@ The generated <code>&lt;game&gt;_net_frame</code> is the normal game loop. The l
 <code>Code_State</code>; it is a service call, not a read-only query or an event drain.
 Boot calls it for games using the generated frame loop.</p>
 <h3 id="synchronous-callbacks">Synchronous callbacks<a class="heading-anchor" href="#synchronous-callbacks" aria-label="Link to this section">#</a></h3>
-<p>A callback is synchronous only when Kit cannot finish an operation without an
-answer. Examples include:</p>
+<p>A callback runs synchronously when Kit needs its result to finish an operation
+or when it must use temporary operation state. Examples include:</p>
 <ul>
 <li>entity factory create/free procedures;</li>
 <li>the interest-management locator;</li>
@@ -51,7 +51,7 @@ must remain in the same transaction.</li>
 <p>Do not retain pointers into temporary readers or re-enter the owning subsystem
 from an atomic hook unless that API explicitly permits it. If a game reaction
 can wait until the next frame, queue it instead. <code>ksess.App_Queue</code> provides this
-file-and-drain pattern for application messages.</p>
+queue-and-poll storage for application messages.</p>
 <p>The full session-specific classification is in
 <a href="session.html#three-tiers-of-entry-into-your-code">Three tiers of entry into your code</a>.</p>
 <h3 id="generated-halves">Generated halves<a class="heading-anchor" href="#generated-halves" aria-label="Link to this section">#</a></h3>
@@ -112,7 +112,7 @@ noun shown at call sites, such as <code>Hp_Bar</code> with <code>hp_*</code> and
 name. Their naming rules are documented in <a href="net.html">kit/net</a>,
 <a href="session.html">kit/session</a>, and <a href="sim.html">kit/sim</a>.</p>
 <h2 id="package-boundaries">Package boundaries<a class="heading-anchor" href="#package-boundaries" aria-label="Link to this section">#</a></h2>
-<p>The dependency direction is intentional:</p>
+<p>Packages depend on lower-level mechanisms in this order:</p>
 <ul>
 <li><code>kit/net</code>, <code>kit/session</code>, and <code>kit/sim</code> are engine-independent mechanisms.</li>
 <li><code>kit/netgd</code>, <code>kit/steamgd</code>, <code>kit/ui</code>, and <code>kit/fx</code> adapt those mechanisms to
@@ -140,5 +140,5 @@ a backend whose authority outlives any one live session.</p>
 database. Recipes for character-portable data, private per-player messages, and
 player-to-player transactions are documented in <a href="session.html#recipes-over-existing-pieces">kit/session</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/conventions.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/conventions.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#event-delivery" class="">Event delivery</a><a href="#queued-events" class="subsection">Queued events</a><a href="#current-state" class="subsection">Current state</a><a href="#synchronous-callbacks" class="subsection">Synchronous callbacks</a><a href="#generated-halves" class="subsection">Generated halves</a><a href="#godot-signals" class="subsection">Godot signals</a><a href="#lifetime-and-ownership-suffixes" class="">Lifetime and ownership suffixes</a><a href="#procedure-prefixes" class="">Procedure prefixes</a><a href="#package-boundaries" class="">Package boundaries</a><a href="#out-of-scope-systems" class="">Out-of-scope systems</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/conventions.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

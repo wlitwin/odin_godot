@@ -55,11 +55,12 @@ ready and start. Everyone needs the matching content-51/K build.</p>
 <td><code>scripts/turret_bridge.odin</code></td>
 </tr>
 </tbody></table>
-</div><p>The turret holds a generation-checked operator credit. There is no second mounted
-flag on Player, Godot ownership RPC, or timer to reconcile. Mount/release actions
+</div><p>The turret records its operator&#39;s seat and player generation in a <code>Credit</code> value.
+It needs no second mounted flag on Player, Godot ownership RPC, or timer to
+reconcile. Mount/release actions
 carry the turret&#39;s pool handle, so delayed input cannot operate a replacement
 turret that happens to occupy the same slot. Existing reliable action intents own
-queueing and outcome tracking; the reducer decides whether the claim succeeds.
+queueing and outcome tracking; the simulation rule validates mount/release requests.
 These actions use receipt timing alongside dash. Held aim/fire remain controls.</p>
 <p>Rollback restores turret state with the rest of World. Correcting a predicted
 claim also corrects its shots and ammo. The scene pool follows that state through
@@ -73,7 +74,7 @@ third player and empties it. If the departed host was the operator, ordinary
 disconnect cleanup releases the turret instead.</p>
 <p>Content advances from <strong>50/J to 51/K</strong> (<code>0x525343524150304b</code>), protocol 7 unchanged.
 The offline converter accepts content 50 as well as prior supported revisions.
-Frozen old catalog/action contracts map explicitly to the new shape; old runs
+Frozen old catalog/action contracts map explicitly to the new representation; old runs
 receive an empty turret pool and zero turret definitions/targets. Conversion
 preserves their original catalog rather than adding this ability to an existing
 run. The historical recording verifier accepts <code>--content50</code>. See <a href="saves.html">saves</a>.</p>
@@ -90,5 +91,5 @@ and occupied host-crash recovery. Browser compilation and pure WASM execution ar
 covered; this feature has not had a separate interactive browser or human balance
 playtest. See the <a href="../../docs/replay/turret-progress.html">implementation receipt</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/turret-progress.html"><span>Shared turret implementation receipt</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/shared-turret.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/turret-progress.html"><span>Shared turret implementation receipt</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/shared-turret.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/shared-turret.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -12,7 +12,8 @@ Copy this directory&#39;s contents into a <strong>new</strong> project root cont
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">ODIN_GODOT_ROOT=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>/addons/odin_godot&quot;</span> SKIP_CORE=1 \
 bash addons/odin_godot/build/build_scripts.sh .</code></pre></div><p>Open the project in Godot and run <code>main.tscn</code>. Arrows move; Space takes the center
 coin when close enough. The coin and both bags belong to one World, the value
-that holds mutable simulation state. A step transfers the coin atomically. The same model runs offline or with a server:</p>
+that holds mutable simulation state. A step transfers the coin atomically.
+The same model runs offline or with a server:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-comment"># Separate terminals, native ENet on the same machine:</span>
 REPLAY_STARTER_ROLE=host godot --path .
 REPLAY_STARTER_ROLE=client godot --path .
@@ -28,9 +29,9 @@ The starter consumes occurrence notifications without playing irreversible effec
 When adding effects, use occurrence IDs to revise or cancel them if prediction changes.</p>
 <p>Build artifacts and generated scripts remain in your project, not in the addon.
 The installed <code>addons/odin_godot/docs/replay.md</code> guide describes the model,
-supported envelopes and more advanced components. The project is intentionally
+supported configurations and more advanced components. The project is intentionally
 small; it does not claim host migration, persistence or competitive rollback merely
 because those library packages are present.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">build/template/replay/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">build/template/replay/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/build/template/replay/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

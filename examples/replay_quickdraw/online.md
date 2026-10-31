@@ -23,7 +23,7 @@ IndexedDB components. Native parties use the optional SQLite adapter; `RQ_ROOMS_
 selects its database. `RQ_PROFILE` still selects the separate native personal profile.
 Native direct-address and file-save paths remain available when no service is configured.
 Browser direct ENet launch is refused with an explanation; use a configured party.
-Browser solo play shares the model and now has separate [local save slots](browser-saves.md)
+Browser solo play shares the model and has separate [local save slots](browser-saves.md)
 in the standalone menu. Party publication does not write those slots.
 
 Defaults require verified WSS. `RQ_ROOM_LOCAL=1` permits explicit loopback WS development.
@@ -36,7 +36,7 @@ The bundled room service recognizes Quickdraw content D2 when selected by the op
 and supplies its typed checkpoint backend. A live online authority's Save/F5 publishes
 through Room rather than writing a local file. `RQ_ROOM_CHECKPOINT_MS` optionally sets
 the shared publication interval; zero keeps it manual. Native file resume still refuses
-coordinated archives. No gameplay content/schema change is introduced by this integration.
+coordinated archives. This party integration uses the existing gameplay content and schema.
 
 
 Published checkpoints also support an abandoned party. A fresh trusted player uses

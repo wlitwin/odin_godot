@@ -18,7 +18,8 @@ Typed paint is empty here, so real child painting can add game-specific work.</p
 <p>At 1,024 active views, the first expanded comparison measured original Nodes2 at
 609.7 µs, indexing at 107.0 µs, cached Nodes2 at 45.05 µs and typed ownership at
 70.58 µs per presentation call. Caching avoided roughly 75% of root property writes.
-Typed lifetime/payload bookkeeping adds work; ergonomics are not cost-free.</p>
+Typed lifetime and payload tracking add work alongside their ownership and
+authoring benefits.</p>
 <p>That comparison exposed a sparse regression: one active view in a capacity-1,024
 pool still scanned capacity and cleared whole indexes. The final implementation
 tracks occupied buckets and uses a retained-membership path after full duplicate/
@@ -162,9 +163,9 @@ its small baked definitions to preserve its existing checkpoint contract.</p>
 <p>Implemented: indexed identity lookup, exclusive property caching/invalidation,
 changed-value paint, retained-membership fast paths and sparse index clearing.
 These reduce measured repeated work without changing gameplay assignments.</p>
-<p>Keep detached projections for ownership/ergonomics; make no universal zero-copy
-promise. The measured copy cost does not justify introducing chunked/COW storage
-and mandatory mutation tracking now. Memory can still become significant for much
+<p>Keep detached projections for explicit ownership and convenient call sites.
+They do not guarantee zero copying. The measured copy cost does not justify introducing chunked/COW storage
+and mandatory mutation tracking in this work. Memory can still become significant for much
 larger Worlds/history; revisit with an actual target workload and a storage design
 that retains ordinary assignments and transactional replay.</p>
 <p>Do not add a broad snapshot encoding/hash cache here. Inspection shows snapshot
@@ -179,5 +180,5 @@ dependency rules. This work leaves wire hashes, schemas, checkpoint versions and
 replay semantics unchanged. A future optimization must preserve those contracts
 or introduce an explicit compatibility change.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/godot-bridge-performance.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/replay/godot-bridge-performance.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#view-ownership" class="">View ownership</a><a href="#copy-codec-and-replay-costs" class="">Copy, codec and replay costs</a><a href="#decisions" class="">Decisions</a></nav><div class="outline-actions"><a href="../../../reference/docs/replay/godot-bridge-performance.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

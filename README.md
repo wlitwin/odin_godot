@@ -8,17 +8,20 @@ of time to native code and dispatch through a typed registry. The SDK supports
 custom resources, autoloads, editor tools, multiplayer RPCs, hot reload, and
 native and WebAssembly exports. A Nix flake pins the development toolchain.
 
-> **Status: working engine.** `nix develop --command bash tests/run_all.sh` is green across a
-> 39-test end-to-end suite (every feature below, plus the showcase, the examples' co-op runs,
-> and the Asset-Library drop-in layout), plus 7 browser-gated web tests that verify the WASM
-> export in a real headless Chrome when one is available. The headline examples are a pure-Odin coin-collector
+> The recorded verification summary covers a 39-test end-to-end suite, including
+> the showcase, example co-op runs, and Asset-Library drop-in layout, through
+> `nix develop --command bash tests/run_all.sh`. It also includes 7 browser-gated
+> web tests that verify WASM exports in headless Chrome when available. Examples
+> include a pure-Odin coin-collector
 > (`tests/showcase/`), a complete top-down arena shooter (`examples/survivors/`), a
 > drop-in co-op cave crawler built with the Kit multiplayer toolkit
 > (`examples/cavecrawl/`), and a server-authoritative western duel with lag-compensated
 > hitscan on the kit/sim lane (`examples/quickdraw/`, tested at 240 ms RTT). All of
-> them are built with **zero GDScript gameplay code**.
+> them use zero GDScript gameplay code.
 
-## What you can do (the 60-second tour)
+<a id="what-you-can-do-the-60-second-tour"></a>
+
+## Script example and SDK features
 
 ```odin
 //gd:extends Area2D            // base Godot class
@@ -28,7 +31,7 @@ package game_scripts
 import gd "godot:godot"
 
 Coin :: struct {
-	owner:     gd.Area2d,                        // first field = the node, always
+	owner:     gd.Area2d,                        // first field stores the engine node handle
 	collected: gd.Signal1(int) `gd:"args=value"`, // typed signal field -> collected(value: int)
 	value:     gd.Int `gd:"export,range=1:100"`, // @export var with an Inspector slider
 	taken:     bool,                             // untagged = private per-instance state
@@ -44,11 +47,12 @@ coin_collect :: proc(self: ^Coin, body: gd.Node2d) {
 	if self.taken { return }
 	self.taken = true
 	coin_emit_collected(self, i64(self.value))   // typed emitter generated from the signal field
-	gd.node_queue_free(self.owner)               // gd.* ergonomic helper
+	gd.node_queue_free(self.owner)               // gd.* helper queues node deletion
 }
 ```
 
-The generated `godot` binding exposes the engine API as typed Odin. The `gd.*`
+In the example, `self` points to script data and `self.owner` is the Godot node
+handle. The generated `godot` binding exposes the engine API as typed Odin. The `gd.*`
 helpers wrap common engine calls and their argument conversions:
 
 | | |
@@ -60,12 +64,12 @@ helpers wrap common engine calls and their argument conversions:
 | **Classes** | `extends` any engine class, global `class_name`, custom **resources** (`.tres`), **autoload** singletons |
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
 | **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)); [named profiles](docs/kit/profiles.md) validate coherent co-op, listen-server, or dedicated settings. `@(gd_rpc)` remains available for Godot's engine-native path. |
-| **Ship it** | hot reload on save, native desktop export, WebAssembly export |
-| **Scale it** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules |
+| **Build and export** | hot reload on save, native desktop export, WebAssembly export |
+| **Script modules** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules |
 
-Because Odin is **ahead-of-time compiled**, it differs from interpreted GDScript in a few
-ways: no `eval`/REPL, no in-editor breakpoints (use `lldb`), and `@export` changes need a
-recompile (the editor does it for you on save). See [Workflow](docs/workflow.md).
+Odin compiles ahead of time, so scripts have no `eval`/REPL or Godot script-line
+breakpoints; use `lldb` for native debugging. Changing `@export` declarations
+requires recompilation, which the editor starts on save. See [Workflow](docs/workflow.md).
 
 ## Quickstart
 
@@ -76,7 +80,7 @@ nix develop                  # toolchain shell: odin, ols, emcc, llvm/lld, + $GO
 bash build/build_scripts.sh examples/survivors
 $GODOT --path examples/survivors          # arrow keys move; auto-fire; survive
 
-# Or verify everything headless (reproducible from one command):
+# Run the repository's headless suite:
 nix develop --command bash tests/run_all.sh
 ```
 
@@ -87,12 +91,12 @@ nix develop --command bash tests/run_all.sh
 ==> survivors PASS ==> web          PASS browser-verified   ALL GREEN
 ```
 
-New here? Start with **[Getting Started](docs/getting-started.md)**: it installs the
-toolchain, wires the extension into a Godot project, and walks you through your first Odin
-script from empty file to a moving node. Here for multiplayer? The
-**[quickstart](docs/kit/quickstart.md)** goes zero-to-two-windows in two small files, and
-its **[simulation version](docs/kit/quickstart-sim.md)** moves motion to server authority.
-Choose its trust and timing baseline from the **[network profiles](docs/kit/profiles.md)**.
+Start with [Getting Started](docs/getting-started.md) to install the toolchain,
+load the extension in a Godot project, and write a script that moves a node.
+For multiplayer, the [quickstart](docs/kit/quickstart.md) builds a two-window
+example in two files. Its [simulation version](docs/kit/quickstart-sim.md) moves
+motion to server authority. Choose trust and timing settings through
+[network profiles](docs/kit/profiles.md).
 
 ## Documentation
 
@@ -122,16 +126,16 @@ Godot arena shooter in the browser. The repository also includes the
 [Replay Scrapyard port](examples/replay_scrapyard/contributor-guide.md), with a visual
 guide to its authored scenes, replayable World, input, and presentation.
 
-**Building multiplayer? Start with the [Kit overview](docs/kit/index.md).** These
-three are its references:
+The [Kit overview](docs/kit/index.md) introduces the multiplayer packages.
+These three projects demonstrate their use:
 
 - **`examples/cavecrawl/`** is the co-op reference: a drop-in-join cave crawler exercising
   every toolkit package (replicated fields, predicted commands + `_then` consequences,
   generated entity factory, reconnect, save/resume, host migration, Steam), covered by a
   latency-injected integration test.
 - **`examples/slopball/`** is the smallest complete kit game: a physics co-op ball pitch
-  (~850 lines), engine physics replicated through `play.Puppet`. Start here to see the
-  whole multiplayer surface in one sitting.
+  (~850 lines), with engine physics replicated through `play.Puppet`. It shows
+  session setup, entity replication, and gameplay in one project.
 - **`examples/slopball3d/`** uses the same replication model with 3D bodies
   (`play.Puppet3`, Node3D containers).
 
@@ -139,15 +143,15 @@ Single-player and engine-plumbing references:
 
 - **`examples/survivors/`** is a complete top-down arena shooter in pure Odin; each script is
   commented to teach one slice of the binding ([README](examples/survivors/README.md)). Its
-  net layer uses the ENGINE-NATIVE path (`MultiplayerSpawner`/`@(gd_rpc)`), a
-  GDScript-parity demonstration, not the recommended way to build co-op (that's the kit).
-- **`examples/coop_arena/`** is the engine-native multiplayer path end-to-end: ONE
-  peer-authoritative codebase over `MultiplayerSynchronizer` + `@(gd_rpc)` that runs
+  network layer uses Godot's engine-native path (`MultiplayerSpawner`/`@(gd_rpc)`)
+  to demonstrate those APIs. The Kit examples above provide the higher-level
+  session and replication workflow for co-op.
+- **`examples/coop_arena/`** uses one peer-authoritative codebase for engine-native multiplayer over `MultiplayerSynchronizer` + `@(gd_rpc)` that runs
   single-player, over native ENet, and in the browser over WebRTC (room-code lobby)
-  ([README](examples/coop_arena/README.md)). It shows the raw engine surface the kit
-  absorbs.
-- **`tests/showcase/`** is a minimal pure-Odin coin-collector, the smallest "everything wired"
-  scene. Run it: `$GODOT --path tests/showcase`.
+  ([README](examples/coop_arena/README.md)). It configures the engine APIs that
+  Kit wraps for session-based games.
+- **`tests/showcase/`** is a minimal pure-Odin coin-collector combining script
+  registration, input, signals, and scene behavior. Run it: `$GODOT --path tests/showcase`.
 - **`examples/hello/`** is the lowest-level path: a hand-registered GDExtension class (not a
   script) proving the Odin↔GDExtension ABI.
 
@@ -161,7 +165,7 @@ Single-player and engine-plumbing references:
 | `gdext/`, `libgd/` | the hand-owned GDExtension C-ABI runtime the binding sits on |
 | `core/` | the extension core (`-build-mode:dll`): `ScriptLanguageExtension`, `OdinScript`, instance dispatch, loader, hot reload, export plugin, editor tooling, web entry |
 | `runtime/` | the shared registry contract (`Class_Desc`) imported by both core and scripts |
-| `scriptgen/` | the codegen preprocessor (nice authoring form → registration boilerplate) |
+| `scriptgen/` | reads script tags/attributes and generates registration code |
 | `build/` | the compose+compile pipelines (scripts → dll / wasm; export builds) |
 | `tests/` | per-feature headless milestones + `run_all.sh` |
 | `docs/` | this documentation set |

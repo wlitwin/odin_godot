@@ -2,53 +2,54 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Exporting — shipping your game · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html" aria-current="page">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Exporting — shipping your game</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../reference/docs/exporting.md" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Exporting — shipping your game</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../reference/docs/exporting.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#how-export-works-both-targets">How export works (both targets)</a><a href="#native-desktop-macos--verified">Native desktop (macOS) — verified</a><a href="#cross-compile-linux--windows--build-verified">Cross-compile (Linux / Windows) — build-verified</a><a href="#web--wasm--verified-in-a-real-browser">Web / WASM — verified in a real browser</a><a href="#verify-it-headless">Verify it headless</a></nav></details>
-<article class="reading-body "><p>An exported game has <strong>no Odin compiler</strong>. So <code>.odin</code> scripts are compiled <strong>ahead of time, at
-export</strong>, by an editor export plugin, and the resulting library is bundled into the build. This
-covers the two targets: native desktop and web/WASM.</p>
+<article class="reading-body "><p>The editor export plugin compiles <code>.odin</code> scripts ahead of time and bundles
+the resulting library into the exported game. Players do not need an Odin
+compiler. Native desktop and web/WASM exports use different library layouts,
+described below.</p>
 <p>Implementation notes on plugin registration, per-platform bundling, and the
 <code>when WEB</code> split are in
 <a href="design/export-internals.html">design/export-internals.md</a> and
-<a href="design/web-internals.html">design/web-internals.md</a>. This page is the user-facing how-to.</p>
+<a href="design/web-internals.html">design/web-internals.md</a>.</p>
 <h2 id="how-export-works-both-targets">How export works (both targets)<a class="heading-anchor" href="#how-export-works-both-targets" aria-label="Link to this section">#</a></h2>
-<p>Two GDExtension classes in <code>core/export_plugin.odin</code> are registered <strong>only at editor
-initialization</strong>, so they don&#39;t exist in a running/exported game:</p>
+<p>Two GDExtension classes in <code>core/export_plugin.odin</code> are registered at editor
+initialization and are absent from running/exported games:</p>
 <ul>
-<li><strong><code>OdinExportPlugin</code></strong> (<code>EditorExportPlugin</code>) does the work. On <code>_export_begin</code> it reads the
-target OS from the export feature set, resolves the toolchain (the <code>odin_godot/odin_bin</code> /
-<code>odin_godot/emcc_bin</code> project settings → <code>ODIN</code>/<code>EMCC</code> env → <code>PATH</code>, so it works even when
-the editor is launched outside a toolchain shell), shells the matching build script, and
-<code>add_shared_object</code>s the freshly-compiled scripts library so the exporter copies it <strong>beside
-the executable</strong>.</li>
-<li><strong><code>OdinEditorPlugin</code></strong> (<code>EditorPlugin</code>) is a thin host that constructs and registers the
-export plugin.</li>
+<li><strong><code>OdinExportPlugin</code></strong> (<code>EditorExportPlugin</code>) builds and bundles scripts. On
+<code>_export_begin</code>, it reads the target OS from export features and resolves
+tools in this order: <code>odin_godot/odin_bin</code> / <code>odin_godot/emcc_bin</code> project
+settings, <code>ODIN</code>/<code>EMCC</code> environment variables, then <code>PATH</code>. Project settings
+let it find tools when the editor starts outside a toolchain shell. It runs
+the matching build script and calls <code>add_shared_object</code> to include the
+compiled library beside the executable.</li>
+<li><strong><code>OdinEditorPlugin</code></strong> (<code>EditorPlugin</code>) constructs and registers the export
+plugin.</li>
 </ul>
-<p>The <strong>core</strong> dll is exported automatically by Godot&#39;s own GDExtension handling (it&#39;s listed in
-the <code>.gdextension</code>&#39;s <code>[libraries]</code>); the plugin only bundles the dynamically-loaded scripts
-library, which Godot doesn&#39;t otherwise know about. At runtime an exported game finds the scripts
-library as a <strong>sibling of the core dll</strong> (via <code>dladdr</code>), since <code>res://</code> is packed and can&#39;t be
-<code>dlopen</code>ed.</p>
+<p>Godot exports the core library from the <code>.gdextension</code> manifest&#39;s
+<code>[libraries]</code> entries. The plugin adds the dynamically loaded scripts library,
+which is not listed there. At runtime, native exports locate scripts beside
+the core through <code>dladdr</code>; the packed <code>res://</code> filesystem cannot provide a
+library to <code>dlopen</code>.</p>
 <blockquote>
-<p><strong>Keep your scripts self-contained.</strong> The exporter bundles <code>libodinscripts</code> but <strong>not its
-transitive native dependencies</strong>. A pure-Odin scripts library is self-contained and ships
-fine. If your scripts <code>foreign import</code> a third-party native lib, however, that lib is <strong>not</strong>
-bundled automatically, so <code>dlopen</code> will fail on a player&#39;s machine and the game will then run
-with no Odin scripts. If you pull in native deps, add them to the export yourself (e.g.
-another <code>add_shared_object</code> via your own export plugin, or place them beside the executable).</p>
+<p>The exporter bundles <code>libodinscripts</code> without collecting its transitive
+native dependencies. Pure-Odin scripts are self-contained. If scripts use
+<code>foreign import</code> for a third-party native library, bundle that dependency
+separately, for example through <code>add_shared_object</code> in a custom export
+plugin or by placing it beside the executable. A missing dependency causes
+<code>dlopen</code> to fail on the player&#39;s machine, leaving the game without Odin scripts.</p>
 </blockquote>
 <p><strong>Script modules.</strong> If the project uses <a href="modules.html">script modules</a>
 (<code>res://modules/&lt;name&gt;/</code>), the export plugin builds <strong>one optimized dll per module</strong> and
-bundles each beside the main scripts dll, which is the exact sibling layout the exported game
-scans for at runtime. A module whose dll is missing <strong>fails the export loudly, naming the
-module</strong>, so an export never silently ships without a module&#39;s classes. The <code>BUILD_MODULES=0</code>
-env var skips modules at build <em>and</em> bundling as well, and it does so just as loudly, because
-the result lacks the module classes; it is a scoped-build/CI switch, not a shipping
-configuration. On <strong>web</strong>, all modules compose into the single wasm. See
+bundles each beside the main scripts library, where the exported game scans
+for them at runtime. A missing module library fails export with an error
+naming the module. <code>BUILD_MODULES=0</code> skips module building and bundling and
+warns that their classes will be absent. Use it for scoped builds or CI checks,
+not release exports. On web, all modules link into the single wasm. See
 <a href="modules.html#exporting-with-modules">Script Modules — Exporting</a>.</p>
 <h2 id="native-desktop-macos--verified">Native desktop (macOS) — verified<a class="heading-anchor" href="#native-desktop-macos--verified" aria-label="Link to this section">#</a></h2>
-<p>This is the firm, end-to-end-verified path. The exported <code>.app</code> loads the extension and runs an
-Odin script compiled at export time.</p>
+<p>The macOS export test verifies that the exported <code>.app</code> loads the extension
+and runs an Odin script compiled during export.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-variable">$GODOT</span> --headless --path your_project --export-release <span class="hljs-string">&quot;macOS&quot;</span> out/Game.app</code></pre></div><p>A verified bundle looks like:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">out/Game.app/Contents/MacOS/Game                          (universal template, ad-hoc signed)
 out/Game.app/Contents/Resources/Game.pck                  (project + rewritten .gdextension)
@@ -74,26 +75,26 @@ relocatable object (<code>-build-mode:obj -use-single-module -target:&lt;t&gt;</
 cross <strong>gcc wrapper</strong> (<code>pkgsCross.gnu64</code> / <code>pkgsCross.mingwW64</code>) that carries the target glibc
 / mingw sysroot:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_cross.sh linux   tests/phase35&#x27;</span>
-nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_cross.sh windows tests/phase35&#x27;</span></code></pre></div><p>The outputs are the right format/arch and <strong>export the entry symbol</strong> (<code>tests/cross/run.sh</code>
-asserts this; gated to SKIP when no cross toolchain is present). These targets are
-<strong>build-verified but NOT runtime-verified on this macOS host</strong>. A Linux/Windows Godot has to
-load them. See <strong><a href="distribution.html">distribution.md</a></strong> for the full status table, the
-packaged addon, and the exact CI steps to runtime-confirm.</p>
+nix develop .#cross --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash build/build_cross.sh windows tests/phase35&#x27;</span></code></pre></div><p><code>tests/cross/run.sh</code> checks output format, architecture, and exported entry
+symbols. It reports SKIP if the cross toolchain is unavailable. These checks
+verify builds; they do not run Linux/Windows Godot or load the resulting
+libraries on those targets. See <a href="distribution.html">distribution.md</a> for the
+status table, packaged addon, and target-host runtime checks.</p>
 <h2 id="web--wasm--verified-in-a-real-browser">Web / WASM — verified in a real browser<a class="heading-anchor" href="#web--wasm--verified-in-a-real-browser" aria-label="Link to this section">#</a></h2>
-<p>The full extension (core <code>ScriptLanguageExtension</code> + the generated binding + your compiled
-scripts) builds into <strong>one Emscripten <code>SIDE_MODULE</code> wasm</strong>, Godot&#39;s web export bundles it, and
-an Odin script&#39;s <code>_ready</code> <strong>runs in a real browser</strong>. A headless-Chrome driver verifies this,
-asserting that the Odin script ran and that a <code>@(gd_method)</code> returns the right value. The full
-pure-Odin coin-collector game loop is also verified in-browser (<code>tests/web_showcase/</code>).</p>
+<p>The core <code>ScriptLanguageExtension</code>, generated binding, and compiled scripts
+link into one Emscripten <code>SIDE_MODULE</code> wasm bundled by Godot&#39;s web exporter.
+A headless-Chrome test checks that a script&#39;s <code>_ready</code> runs in the browser and
+a <code>@(gd_method)</code> returns the expected value. <code>tests/web_showcase/</code> also checks
+the pure-Odin coin-collector game loop in-browser.</p>
 <h3 id="toolchain-setup-one-time">Toolchain setup (one-time)<a class="heading-anchor" href="#toolchain-setup-one-time" aria-label="Link to this section">#</a></h3>
-<p>Web export needs the <strong>Odin compiler</strong> <em>and</em> <strong>Emscripten</strong> on the machine doing the export
-(the same as a desktop build, plus emcc). If you work from the Nix dev shell both are already
-present; if you installed the addon into your own project, set them up once:</p>
+<p>Web export needs the Odin compiler and Emscripten on the export host. The Nix
+development shell supplies both. For an addon installed in another project,
+configure them once:</p>
 <ol>
 <li><p><strong>Install the Emscripten SDK</strong> from <a href="https://emscripten.org/docs/getting_started/downloads.html" rel="noreferrer">https://emscripten.org/docs/getting_started/downloads.html</a>:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">git <span class="hljs-built_in">clone</span> https://github.com/emscripten-core/emsdk &amp;&amp; <span class="hljs-built_in">cd</span> emsdk
-./emsdk install 4.0.20 &amp;&amp; ./emsdk activate 4.0.20</code></pre></div><p><strong>Pin 4.0.20</strong>: it&#39;s the exact version Godot 4.7&#39;s web templates were built with, so the
-dylink/longjmp ABI matches. (Newer emcc generally works too; 4.0.20 is the safe default.)</p>
+./emsdk install 4.0.20 &amp;&amp; ./emsdk activate 4.0.20</code></pre></div><p>Use 4.0.20 to match the dylink/longjmp ABI of Godot 4.7&#39;s web templates.
+The Web caveats below describe verification with another emcc version.</p>
 </li>
 <li><p><strong>Point the editor at the binaries.</strong> When you launch Godot from Finder/Steam/the Project
 Manager, the editor process doesn&#39;t inherit your shell <code>PATH</code>, so it can&#39;t see <code>odin</code> or
@@ -103,19 +104,19 @@ Manager, the editor process doesn&#39;t inherit your shell <code>PATH</code>, so
 <li><code>odin_godot/odin_bin</code> → your <code>odin</code></li>
 <li><code>odin_godot/emcc_bin</code> → <code>…/emsdk/upstream/emscripten/emcc</code></li>
 </ul>
-<p>With those set, <strong>the export dialog can build and package the web game</strong>: the plugin finds the
-tools, builds the wasm, and bundles it. Alternatively, launch the editor from a terminal
+<p>The export plugin uses these settings to find tools, build the wasm, and
+bundle it from the export dialog. Alternatively, launch the editor from a terminal
 where both are already on <code>PATH</code> (e.g. after <code>source ./emsdk/emsdk_env.sh</code>).</p>
 </li>
 </ol>
 <h3 id="build-the-wasm">Build the wasm<a class="heading-anchor" href="#build-the-wasm" aria-label="Link to this section">#</a></h3>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_web.sh your_project
-<span class="hljs-comment"># -&gt; your_project/bin/libodin_godot.wasm  (one Emscripten SIDE_MODULE)</span></code></pre></div><p>Unlike native (a stable core dll that <code>dlopen</code>s a swappable scripts dll), the browser has no
-dynamic loader we control and no compiler: <strong>everything links AOT into a single side module.</strong>
-A build switch (<code>-define:ODIN_GODOT_WEB=true</code>) plus arch-gated files select the in-module path
-(no <code>dlopen</code>, no hot reload, no editor/export code).</p>
+<span class="hljs-comment"># -&gt; your_project/bin/libodin_godot.wasm  (one Emscripten SIDE_MODULE)</span></code></pre></div><p>Native builds load scripts separately through <code>dlopen</code>. Web builds link the
+core, binding, and scripts ahead of time into one side module. The build
+switch <code>-define:ODIN_GODOT_WEB=true</code> and architecture-gated files select this
+in-module path, excluding <code>dlopen</code>, hot reload, and editor/export code.</p>
 <h3 id="export-and-serve">Export and serve<a class="heading-anchor" href="#export-and-serve" aria-label="Link to this section">#</a></h3>
-<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-variable">$GODOT</span> --headless --path your_project --export-release <span class="hljs-string">&quot;Web&quot;</span> out/index.html</code></pre></div><p>Requirements, all automated by the example projects:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-variable">$GODOT</span> --headless --path your_project --export-release <span class="hljs-string">&quot;Web&quot;</span> out/index.html</code></pre></div><p>The example projects configure these requirements:</p>
 <ul>
 <li>The project <code>.gdextension</code> keeps its <strong>native</strong> <code>macos.*</code> entries <strong>and</strong> adds
 <code>web.{debug,release}.wasm32 = &quot;res://bin/libodin_godot.wasm&quot;</code>. The native entry is what loads
@@ -124,25 +125,25 @@ the extension <strong>on the macOS export host</strong> so the loader recognizes
 resolve in the browser.</li>
 <li>The Web export preset needs <code>variant/extensions_support=true</code> (selects Godot&#39;s dlink web
 runtime).</li>
-<li>The editor&#39;s export plugin builds the wasm at export time (it shells <code>build/build_web.sh</code>),
-so the file the <code>.gdextension</code> references actually exists.</li>
-<li>Script code must not import <code>core:os</code>, because Odin&#39;s native OS layer doesn&#39;t compile for
-the wasm target, so the export fails with <code>Undeclared name: _read_directory_iterator</code>-style
-compile errors naming <code>core/os</code> files. Go through the engine instead: <code>gd.singleton_os()</code> +
+<li>The editor&#39;s export plugin runs <code>build/build_web.sh</code> at export time to
+produce the wasm file referenced by <code>.gdextension</code>.</li>
+<li>Script code must not import <code>core:os</code>, because Odin&#39;s native OS layer does
+not compile for wasm. Importing it produces errors in <code>core/os</code> files, such
+as <code>Undeclared name: _read_directory_iterator</code>. Use engine APIs instead: <code>gd.singleton_os()</code> +
 <code>gd.os_get_environment(...)</code> / <code>gd.os_has_environment(...)</code> work on every platform
 (see <code>examples/barrage/scripts/game_state.odin</code> for the pattern).</li>
 <li>Odin&#39;s <code>int</code> is <strong>32-bit on wasm32</strong> (it&#39;s pointer-sized). Never store an engine 64-bit
-value, above all <strong>instance IDs</strong> (from <code>object_get_instance_id</code>), in <code>int</code>: it compiles
-clean, works natively, and silently truncates on web, so <code>gd_instance_from_id</code> resolves to
-nothing (e.g. &quot;enemies stopped dying, no errors&quot;). Use <code>i64</code>/<code>gd.Int</code> for IDs and anything
+value, especially instance IDs from <code>object_get_instance_id</code>, in <code>int</code>. The
+code can compile and work natively while truncating IDs on web, causing
+<code>gd_instance_from_id</code> to return no object. Use <code>i64</code>/<code>gd.Int</code> for IDs and anything
 else that is 64-bit engine-side.</li>
 </ul>
 <p><strong>Serving:</strong> Godot web needs <code>SharedArrayBuffer</code>, which requires two HTTP headers:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">Cross-Origin-Opener-Policy:   same-origin
-Cross-Origin-Embedder-Policy: require-corp</code></pre></div><p>A plain static host or <code>python -m http.server</code> does <strong>not</strong> set these, which is the usual
-cause of &quot;my web export won&#39;t start&quot;. The addon bundles a one-command Node server that does:</p>
-<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash addons/odin_godot/build/serve.sh path/to/export_dir   <span class="hljs-comment"># then open http://localhost:8099/</span></code></pre></div><p>Deploying instead of testing locally? Set the same two headers on your host. On <strong>itch.io</strong>,
-tick the <strong>&quot;SharedArrayBuffer support&quot;</strong> box in the HTML5 settings and it configures them.</p>
+Cross-Origin-Embedder-Policy: require-corp</code></pre></div><p>Configure these headers on the serving host. <code>python -m http.server</code> does not
+set them by default. The addon includes a Node server that supplies them:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash addons/odin_godot/build/serve.sh path/to/export_dir   <span class="hljs-comment"># then open http://localhost:8099/</span></code></pre></div><p>Use the same two headers in deployment. On itch.io, enable
+<strong>&quot;SharedArrayBuffer support&quot;</strong> in the HTML5 settings to configure them.</p>
 <h3 id="web-caveats">Web caveats<a class="heading-anchor" href="#web-caveats" aria-label="Link to this section">#</a></h3>
 <ul>
 <li>The browser offers <strong>no hot reload</strong> (there is no <code>dlopen</code>, and only one shared linear
@@ -159,8 +160,7 @@ version anyway: <code>EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh</code
 nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash tests/web/run.sh&#x27;</span>           <span class="hljs-comment"># web    -&gt; PHASEWEB_OK</span>
 nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash tests/web_showcase/run.sh&#x27;</span>  <span class="hljs-comment"># web game loop -&gt; PHASEWEBSHOWCASE_OK</span></code></pre></div><p>The web tests are <strong>browser-gated</strong>: with Chrome + <code>puppeteer-core</code> present they run in a
 headless browser and assert the Odin script ran; without them they still build + web-export and
-report a non-fatal <code>SKIP</code>. The full suite (<code>tests/run_all.sh</code>) wires all of these in.
-&lt;/content&gt;</p>
+report a non-fatal <code>SKIP</code>. The full suite (<code>tests/run_all.sh</code>) wires all of these in.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="design/export-internals.html"><span>Phase 5 — the export pipeline</span><span aria-hidden="true">→</span></a><a href="design/web-internals.html"><span>Web / WASM target — Odin scripts in the browser</span><span aria-hidden="true">→</span></a><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/exporting.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="design/export-internals.html"><span>Phase 5 — the export pipeline</span><span aria-hidden="true">→</span></a><a href="design/web-internals.html"><span>Web / WASM target — Odin scripts in the browser</span><span aria-hidden="true">→</span></a><a href="modules.html"><span>Script modules — splitting a project into per-module dlls</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/exporting.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#how-export-works-both-targets" class="">How export works (both targets)</a><a href="#native-desktop-macos--verified" class="">Native desktop (macOS) — verified</a><a href="#cross-compile-linux--windows--build-verified" class="">Cross-compile (Linux / Windows) — build-verified</a><a href="#web--wasm--verified-in-a-real-browser" class="">Web / WASM — verified in a real browser</a><a href="#toolchain-setup-one-time" class="subsection">Toolchain setup (one-time)</a><a href="#build-the-wasm" class="subsection">Build the wasm</a><a href="#export-and-serve" class="subsection">Export and serve</a><a href="#web-caveats" class="subsection">Web caveats</a><a href="#verify-it-headless" class="">Verify it headless</a></nav><div class="outline-actions"><a href="../../reference/docs/exporting.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

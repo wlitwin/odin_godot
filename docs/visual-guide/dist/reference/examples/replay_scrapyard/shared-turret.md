@@ -32,11 +32,12 @@ ready and start. Everyone needs the matching content-51/K build.
 | Authored node composition | `entities/turret.tscn`, `scripts/views/turret.odin` |
 | Typed scene pool and targeted input | `scripts/turret_bridge.odin` |
 
-The turret holds a generation-checked operator credit. There is no second mounted
-flag on Player, Godot ownership RPC, or timer to reconcile. Mount/release actions
+The turret records its operator's seat and player generation in a `Credit` value.
+It needs no second mounted flag on Player, Godot ownership RPC, or timer to
+reconcile. Mount/release actions
 carry the turret's pool handle, so delayed input cannot operate a replacement
 turret that happens to occupy the same slot. Existing reliable action intents own
-queueing and outcome tracking; the reducer decides whether the claim succeeds.
+queueing and outcome tracking; the simulation rule validates mount/release requests.
 These actions use receipt timing alongside dash. Held aim/fire remain controls.
 
 Rollback restores turret state with the rest of World. Correcting a predicted
@@ -53,7 +54,7 @@ disconnect cleanup releases the turret instead.
 
 Content advances from **50/J to 51/K** (`0x525343524150304b`), protocol 7 unchanged.
 The offline converter accepts content 50 as well as prior supported revisions.
-Frozen old catalog/action contracts map explicitly to the new shape; old runs
+Frozen old catalog/action contracts map explicitly to the new representation; old runs
 receive an empty turret pool and zero turret definitions/targets. Conversion
 preserves their original catalog rather than adding this ability to an existing
 run. The historical recording verifier accepts `--content50`. See [saves](saves.md).

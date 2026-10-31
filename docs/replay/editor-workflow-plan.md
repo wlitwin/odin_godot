@@ -1,8 +1,8 @@
 # Replay editor authoring workflow
 
-Completed goal: complete the six authoring improvements after the typed adapter work.
-Keep simulation policy explicit and preserve Kit, the original game and existing
-canonical game data/rules. Use isolated authored drafts for new-feature exercises.
+This completed plan specified six authoring improvements after the typed adapter
+work. It required explicit simulation policy, preservation of Kit and the original
+game/data/rules, and isolated authored drafts for new-feature exercises.
 
 | Gate | Deliverable | Acceptance |
 | --- | --- | --- |
@@ -23,8 +23,8 @@ encounter; correction/takeover tests verify its behavior. The developer can bake
 see current/stale status without assembling a terminal command. Document and test
 these concrete actions; this milestone is intermediate, not the goal's finish.
 
-Editor tooling is an optional thin UI over existing Odin code and explicit build
-commands. It may use Godot-native editor scripting; game/model/validation code stays
+The planned editor tooling was an optional UI over existing Odin code and explicit
+build commands. It may use Godot-native editor scripting; game/model/validation code stays
 in Odin. No automatic mutation of live matches, inferred authority/effect policies,
 or full-game parity campaign. Acceptance is recorded in [editor-workflow-progress.md](editor-workflow-progress.md)
 and [results](results/editor-workflow-2026-09-21/README.md).

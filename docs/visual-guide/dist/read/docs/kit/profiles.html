@@ -3,11 +3,11 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html" aria-current="page">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>Network profiles</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/profiles.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-by-authority-model">Choose by authority model</a><a href="#defaults-at-a-glance">Defaults at a glance</a><a href="#supported-starting-envelopes">Supported starting envelopes</a><a href="#overrides-remain-ordinary-fields">Overrides remain ordinary fields</a><a href="#hand-wired-stacks">Hand-wired stacks</a></nav></details>
-<article class="reading-body "><p>Kit&#39;s named network profiles configure the session and simulation lane as one
-validated unit. They are starting points, not hidden modes: a profile returns an
-ordinary <code>kboot.Network_Config</code>, so the game can inspect and override every
-field before attaching.</p>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#choose-by-authority-model">Choose by authority model</a><a href="#default-timing-and-traffic-budgets">Default timing and traffic budgets</a><a href="#measured-framework-limits">Measured framework limits</a><a href="#override-profile-values">Override profile values</a><a href="#direct-component-setup">Direct component setup</a></nav></details>
+<article class="reading-body "><p>A named network profile returns a <code>kboot.Network_Config</code> containing session and
+simulation-lane settings. Choose a profile for the authority model, inspect or
+override its fields, then pass the complete value to the generated attach procedure.
+Attachment validates the session and lane configuration together.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_profile(.Listen_Server_Action)
 cfg.session.max_players = <span class="hljs-number">4</span>
 cfg.lane.smooth_cut = <span class="hljs-number">48</span>
@@ -16,14 +16,13 @@ cfg.lane.rewind_max = <span class="hljs-number">30</span>
 my_game_net_attach(self, kboot.Options{
 	title = <span class="hljs-string">&quot;MY GAME&quot;</span>,
 	env = <span class="hljs-string">&quot;MY_GAME&quot;</span>,
-}, cfg)</code></pre></div><p><code>rewind_max</code> is an absolute gameplay ceiling, not automatic credit granted to
-every client. For each shooter the authority derives a tighter live envelope
-from its measured RTT/jitter, input margin, snapshot cadence, and configured
-watch delay (with one cadence of interpolation-phase slack). Until that clock
-sample is warm, competitive rewind judges live.</p>
-<p>Omitting the third argument is exactly <code>.Friends_Coop</code>. Prefer naming the
-profile in production game code because it records the intended trust and
-latency model where the stack is attached.</p>
+}, cfg)</code></pre></div><p><code>rewind_max</code> caps historical rewind for hit judgment. For each shooter, the
+authority computes a tighter window from measured RTT and jitter, input margin,
+snapshot cadence, and configured watch delay, with one cadence of
+interpolation-phase slack. Until clock sampling is established, competitive
+rewind judges the current state.</p>
+<p>Omitting the third argument selects <code>.Friends_Coop</code>. Name the profile in game
+code so the authority and timing choice is visible at the attachment call.</p>
 <h2 id="choose-by-authority-model">Choose by authority model<a class="heading-anchor" href="#choose-by-authority-model" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -49,11 +48,10 @@ latency model where the stack is attached.</p>
 <td>Clients are adversarial and the authority runs on infrastructure they do not control. Every simulation input class must use <code>@(gd_input)</code> constraints or a semantic validator.</td>
 </tr>
 </tbody></table>
-</div><p>A profile does not create a trust boundary. <code>.Dedicated_Competitive</code> only has
-that meaning when the authority is actually started with <code>kboot.boot_serve</code> on
-a trusted machine. Running the same configuration through <code>boot_host</code> is still
-a listen server. Encryption, account identity, moderation, deployment policy,
-and game-specific command predicates remain application responsibilities.</p>
+</div><p>Run <code>.Dedicated_Competitive</code> with <code>kboot.boot_serve</code> on trusted infrastructure.
+Using that profile with <code>boot_host</code> still gives authority to the hosting player.
+The application supplies encryption, account identity, moderation, deployment
+policy, and game-specific command predicates.</p>
 <p>The generated attach knows whether the game has a simulation lane and whether
 all of its input classes have generated <code>@(gd_input)</code> constraints or an
 authored validator. It refuses a dedicated profile with an unvalidated input
@@ -66,11 +64,11 @@ Player_Input :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-meta">@(gd_sample)</span>
 player_sample :: <span class="hljs-keyword">proc</span>(self: ^Game, tick: <span class="hljs-type">u64</span>, input: ^Player_Input) {
 	<span class="hljs-comment">// Read local controls.</span>
-}</code></pre></div><p>Structural decoding only proves that bytes fit <code>Player_Input</code>; the generated
-sanitizer proves that their values obey the declared input language. Add the
-sample validator hook as well when legality depends on multiple fields or game
-state.</p>
-<h2 id="defaults-at-a-glance">Defaults at a glance<a class="heading-anchor" href="#defaults-at-a-glance" aria-label="Link to this section">#</a></h2>
+}</code></pre></div><p>Decoding reconstructs <code>Player_Input</code>; the generated sanitizer applies its
+declared value constraints. Add a sample validator when validity depends on
+several fields or game state.</p>
+<p><span id="defaults-at-a-glance"></span></p>
+<h2 id="default-timing-and-traffic-budgets">Default timing and traffic budgets<a class="heading-anchor" href="#default-timing-and-traffic-budgets" aria-label="Link to this section">#</a></h2>
 <p>All three profiles use bounded admission and the generated wire fingerprint
 gate. Their main timing choices are:</p>
 <p>| Profile | Session rate | Session interpolation | Sim / snapshot rate | History | Rewind limit | Future-input limit | Watched delay | Snapshot budget |
@@ -118,10 +116,12 @@ snapshot budgets are safe without AOI and are enabled above; they prioritize
 owned/stale rows and force a full row after deferral or AOI re-entry. Public
 games should still install AOI. <code>traffic.stream</code> is the distinct bounded
 client-to-authority ingress shown above.</p>
-<h2 id="supported-starting-envelopes">Supported starting envelopes<a class="heading-anchor" href="#supported-starting-envelopes" aria-label="Link to this section">#</a></h2>
-<p><code>network_profile_envelope(profile)</code> publishes the scale limits verified by the
-engine-free benchmark gate. These are framework envelopes, not promises about
-your game logic, physics, engine nodes, transport overhead, or hosting machine:</p>
+<p><span id="supported-starting-envelopes"></span></p>
+<h2 id="measured-framework-limits">Measured framework limits<a class="heading-anchor" href="#measured-framework-limits" aria-label="Link to this section">#</a></h2>
+<p><code>network_profile_envelope(profile)</code> reports the framework limits exercised by
+the engine-free benchmark gate. Measure the complete game before treating these
+limits as a deployment capacity: game logic, physics, engine nodes, transport
+overhead, and hardware contribute additional cost.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -161,16 +161,17 @@ your game logic, physics, engine nodes, transport overhead, or hosting machine:<
 </div><p><code>tests/kitstress</code> measures server CPU, application egress bytes, session
 resident/peak allocation, join/snapshot/resume cost, per-recipient AOI fanout,
 and reconciliation cost at increasing sizes. Its optimized native reference
-run exercises 2/100, 4/500, and 8/2,000 player/entity fanout shapes plus
-32/128/512 predicted entities. The test uses generous complexity tripwires;
-repeat it on deployment hardware and add the engine/game frame before raising
-an envelope. “Hot” means dirty and inside one recipient&#39;s AOI in the same tick;
+run exercises 2/100, 4/500, and 8/2,000 player/entity fanout cases plus
+32/128/512 predicted entities. Its thresholds detect large cost regressions.
+Repeat the measurement on deployment hardware and include the engine/game frame
+before increasing the supported limits. “Hot” means dirty and inside one recipient&#39;s AOI in the same tick;
 unchanged and out-of-interest entities are sparse and do not consume snapshot
 rows.</p>
-<h2 id="overrides-remain-ordinary-fields">Overrides remain ordinary fields<a class="heading-anchor" href="#overrides-remain-ordinary-fields" aria-label="Link to this section">#</a></h2>
-<p><code>network_profile</code> materializes every timing field, including booleans. That
-means an override never has to fight the lower-level &quot;zero means default&quot;
-convention:</p>
+<p><span id="overrides-remain-ordinary-fields"></span></p>
+<h2 id="override-profile-values">Override profile values<a class="heading-anchor" href="#override-profile-values" aria-label="Link to this section">#</a></h2>
+<p><code>network_profile</code> fills every timing field, including booleans. Assign an
+override on that returned value rather than relying on a lower-level
+“zero means default” convention:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_profile(.Listen_Server_Action)
 cfg.session.interp_adapt = <span class="hljs-literal">false</span>
 cfg.session.interp_delay = <span class="hljs-number">0.12</span>
@@ -185,9 +186,11 @@ otherwise trigger reconciliation on nearly every snapshot.</p>
 <p>Build overrides by editing a value returned from <code>network_profile</code>. A partial
 <code>Network_Config{...}</code> literal is rejected rather than silently combining two
 different default systems.</p>
-<h2 id="hand-wired-stacks">Hand-wired stacks<a class="heading-anchor" href="#hand-wired-stacks" aria-label="Link to this section">#</a></h2>
-<p>The generated facade is the normal path. A game using the lower-level lifecycle
-can apply the same contract directly:</p>
+<p><span id="hand-wired-stacks"></span></p>
+<h2 id="direct-component-setup">Direct component setup<a class="heading-anchor" href="#direct-component-setup" aria-label="Link to this section">#</a></h2>
+<p>The generated <code>&lt;game&gt;_net_attach</code> wrapper is the usual entry point. A game
+managing component lifetimes directly can configure the same settings before
+attachment:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cfg := kboot.network_configure(
 	&amp;self.ses,
 	kboot.network_profile(.Listen_Server_Action),
@@ -200,7 +203,7 @@ kboot.boot_attach(&amp;self.boot, self.owner, &amp;self.ses, &amp;self.comms, op
 my_game_lane_init(self, &amp;self.lane, &amp;self.ses, cfg = cfg.lane)
 kboot.boot_lane(&amp;self.boot, &amp;self.lane)</code></pre></div><p><code>godot:kit/netcfg</code> contains the engine-free implementation and can be imported
 directly for tooling or tests. <code>kit/boot</code> re-exports its game-facing types and
-procedures so normal scripts need only <code>kboot</code>.</p>
+procedures so game scripts can use the <code>kboot</code> import for that setup.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/profiles.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-by-authority-model" class="">Choose by authority model</a><a href="#defaults-at-a-glance" class="">Defaults at a glance</a><a href="#supported-starting-envelopes" class="">Supported starting envelopes</a><a href="#overrides-remain-ordinary-fields" class="">Overrides remain ordinary fields</a><a href="#hand-wired-stacks" class="">Hand-wired stacks</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/profiles.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/profiles.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#choose-by-authority-model" class="">Choose by authority model</a><a href="#default-timing-and-traffic-budgets" class="">Default timing and traffic budgets</a><a href="#measured-framework-limits" class="">Measured framework limits</a><a href="#override-profile-values" class="">Override profile values</a><a href="#direct-component-setup" class="">Direct component setup</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/profiles.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

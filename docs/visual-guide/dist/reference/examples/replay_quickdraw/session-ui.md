@@ -1,6 +1,6 @@
 # Quickdraw sessions and social UI
 
-The separate Replay game now starts at a scene-authored menu. Enter a name and
+Replay Quickdraw starts at a scene-authored menu. Enter a name and
 choose Solo, Host, Join or Watch. Address and port are editable before connection.
 Host opens a waiting duel; the first connected player is the match leader and can
 Start. Gameplay remains stationary until that command is accepted. Solo starts
@@ -29,11 +29,11 @@ profile helpers. Explicit `RQ_TOKEN`, a bot, or `RQ_PERSIST=0` bypasses these lo
 preferences for tests. `RQ_PROFILE` selects an alternate identity path; the name
 uses that path plus `.name`. Corrupt data is preserved and joining reports the
 failure. These preferences are distinct from game checkpoints and Room credentials.
-Browser identity/name persistence and service-backed party invitations now use the
+Browser identity/name persistence and service-backed party invitations use the
 shared [Party integration](online.md). Public deployment remains separate work.
 
-The experimental content ID is now `0x52515549434b4432` (D2). Adding names, start
-policy and their actions changes the complete state/action schema. D1 peers and
+Names, start policy, and their actions use experimental content ID
+`0x52515549434b4432` (D2) because they change the complete state/action schema. D1 peers and
 archives are intentionally incompatible; there is no implicit old-save conversion.
 Original Kit Quickdraw remains separately runnable with its original content and
 protocol. Host migration still requires a compatible prepared checkpoint; changing
@@ -49,6 +49,6 @@ This is a session/UI parity increment, not full Quickdraw completion. Broader co
 feedback review, public/browser/Steam paths, measurements and human
 visual/play-feel review remain in the full roadmap.
 
-[Native file saves](saves.md) now add Save/F5 and Resume solo/host. They preserve a
+[Native file saves](saves.md) provide Save/F5 and Resume solo/host. They preserve a
 complete authority checkpoint and require its host identity; coordinated Room
 recovery remains a separate path.

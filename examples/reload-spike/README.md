@@ -1,7 +1,9 @@
 # Spike R — in-process hot reload of an Odin scripts dll
 
-Validates the architectural keystone behind "stable CORE dll + swappable SCRIPTS dll"
-(PLAN.md §2) and the Phase-4 hot-reload loop.
+This early experiment tested the two-library design in PLAN.md §2 and the
+Phase-4 hot-reload plan: retain the core dll while replacing a scripts dll in
+the same process. The results below describe library loading and fresh globals,
+not migration of live Godot node state.
 
 Run (from repo root, in the nix shell):
 ```sh
@@ -15,24 +17,35 @@ v1: marker=0xBEEF bump=101,102 behavior=1
 v2: bump=101 behavior=2
 ```
 
-## What it proves
-1. **`@(init)` procs run automatically on `dlopen`** (`auto_init_on_dlopen=true`). This is the
-   mechanism the codegen-preprocessor relies on: each compiled script's generated
-   `@(init) register()` self-registers its `ClassDesc` into the core the moment the scripts
-   dll loads — no explicit host call required. (We still export a `script_boot` fallback in
-   case a future platform/target doesn't auto-run dll initializers.)
-2. **In-process unload → load of a rebuilt dll works** — the host loads `script_v1`, calls in,
-   `unload_library`, then loads a separately-rebuilt `script_v2` in the same process.
-3. **Fresh per-load state** — `v2 bump=101` (not continuing from v1's 102), so a reload starts
-   with clean globals.
-4. **Rebuilt behavior is picked up** — `behavior` goes 1 → 2 across the swap.
+<a id="what-it-proves"></a>
 
-## Notes / caveats for the real core
-- The host here is itself Odin (loading an Odin dll), so two Odin runtimes coexist — the same
-  shape as Godot→core(Odin dll)→scripts(Odin dll). Each dll owns its globals (good isolation).
-- This validates the *dll mechanics* only. Preserving/migrating **live node state** across a
-  reload is a higher-level core concern (Phase 4): re-instantiate live instances and re-apply
-  their serialized property state after the swap.
-- macOS `dlclose` doesn't always physically unload, but the fresh-state + new-behavior result
-  confirms v2's code is what executed after the swap.
-- Built with `-build-mode:dll -define:VERSION=N`; host uses `core:dynlib.initialize_symbols`.
+## Recorded checks
+
+1. **`@(init)` runs on `dlopen`.** The fixture records
+   `auto_init_on_dlopen=true`. The Phase-4 design proposed generated
+   `@(init) register()` procedures registering `ClassDesc` values during load.
+   The spike also exports `script_boot` as a fallback for targets that do not
+   run initializers automatically.
+2. **A process can replace a loaded library.** The host loads `script_v1`,
+   calls it, invokes `unload_library`, then loads a separately built `script_v2`.
+3. **Globals start fresh after replacement.** `v2 bump=101` starts a new
+   sequence rather than continuing from v1's 102.
+4. **Calls use the rebuilt behavior.** `behavior` changes from 1 → 2.
+
+The current native core explicitly calls `odin_scripts_boot` and reads
+`odin_scripts_manifest`; the spike's registration description records the
+earlier design. See the current [module guide](../../docs/modules.md).
+
+<a id="notes--caveats-for-the-real-core"></a>
+
+## Scope of the experiment
+
+- An Odin host loads an Odin dll, so two Odin runtimes coexist, as in
+  Godot→core(Odin dll)→scripts(Odin dll). Each dll has its own package globals.
+- The fixture covers library mechanics only. Phase 4's node-state work required
+  re-instantiating live script instances and reapplying their serialized
+  properties after a swap.
+- macOS `dlclose` may retain the old mapping. Fresh globals and changed behavior
+  show that calls nevertheless executed v2 after the swap.
+- Builds use `-build-mode:dll -define:VERSION=N`; the host calls
+  `core:dynlib.initialize_symbols`.

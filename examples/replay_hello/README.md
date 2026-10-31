@@ -30,7 +30,8 @@ The Network scene accepts `REPLAY_ROLE=host|server|client|observer`, `REPLAY_POR
 `REPLAY_ADDRESS`, and receive-delay `REPLAY_LATENCY` (milliseconds). `server` is an
 avatarless authority; `host` has a local player. `REPLAY_TOKEN` provides a
 deterministic identity label for tests; normal clients generate random credentials.
-Persistence across app restarts and host migration remain future work.
+This Network example does not persist identity across app restarts or perform
+host migration.
 
 The fault decorator also accepts `REPLAY_JITTER` in milliseconds and
 `REPLAY_LOSS`/`REPLAY_DUPLICATE` in packets per 10,000. Loss/duplication affect
@@ -91,8 +92,8 @@ leaves that interaction unconfirmed and advances by commands for inspection.
 `run.sh` requires `REPLAY_HELLO_OK` and `REPLAY_LOOT_VIEW_OK` and rejects script
 errors, engine errors, and scenario failures. It builds on the engine-free
 `tests/replay` and `tests/replay_view` suites, including a WASM type-check of the
-instantiated view/clock/adapter/game surface. The broader [input/history/recording acceptance](../../tests/replay_hello_input/README.md)
-now also runs real Chrome workflows. These are technical behavior checks, not a
+instantiated view, clock, adapter, and game code. The broader [input/history/recording tests](../../tests/replay_hello_input/README.md)
+also run Chrome workflows. These are technical behavior checks, not a
 network comparison or a claim of human play-feel parity.
 
 

@@ -1,4 +1,6 @@
-# Using the new Replay bridge in Scrapyard
+<a id="using-the-new-replay-bridge-in-scrapyard"></a>
+
+# Initial Replay bridge integration in Scrapyard
 
 This record covers Scrapyard's initial authoring-bridge integration for
 **enemies, loot and gameplay audio**, including its lifetime changes, measured
@@ -33,9 +35,11 @@ come with scene creation/free on membership churn. The timing below measures
 steady presentation, not that creation cost. High-churn projectiles should be
 evaluated separately before migration.
 
-## Improvements driven by actual use
+<a id="improvements-driven-by-actual-use"></a>
 
-Two missing shared primitives became apparent:
+## Shared primitives added by the integration
+
+The integration added two shared primitives:
 
 1. **Animation separate from changed-data painting.** A stationary enemy still
    animates. `View_Binding.frame` and `view_pool_frame` advance presentation time
@@ -58,9 +62,9 @@ new adapter. Both paint the same detached frames through the real game paint
 function, with identical catalogs, mixed enemy kinds and one drop per enemy.
 Three alternating process pairs per size use warmup plus five 120-call batches.
 Simulation state is checked unchanged after every benchmark. Builds do not overlap
-measurement. These are native CPU presentation timings, not rendered FPS or GPU
-measurements. Both builds use the same framework version and the build helper's default
-`-debug` flags, with no `SCRIPT_BUILD_FLAGS` optimization override. Release-build
+measurement. These measure elapsed time spent in native presentation calls,
+not process/thread CPU time, rendered FPS, or GPU work. Both builds use the same
+framework version and the build helper's default `-debug` flags, with no `SCRIPT_BUILD_FLAGS` optimization override. Release-build
 timings can differ.
 
 | Enemies and drops, each | Previous paint | New paint |
@@ -69,12 +73,12 @@ timings can differ.
 | 8 | 81.05 µs | 84.32 µs |
 | 32 | 85.04 µs | 96.84 µs |
 
-The 32-entity case adds about 11.8 µs, or 14% of this isolated paint call. Typed
-projection, comparison and ownership work is measurable. This integration is
-**not a general performance win**. Its value here is explicit lifetimes and a
-smaller, testable Godot boundary, plus fewer unused nodes. It also adds setup and
-projection code; animation rules remain game code. There is no line-count or human
-productivity superiority claim.
+The 32-entity case adds about 11.8 µs, or 14% of this isolated paint call.
+Projection, comparison, and scene-lifetime management add measurable work.
+The integration reduces unused nodes and gives each entity a distinct view
+lifetime while passing detached values to the rig. It also adds setup and
+projection code; animation rules remain in the game. These results do not show
+a general performance improvement or measure code volume or human productivity.
 
 The complete observed World is still used elsewhere in Scrapyard's paint function.
 Detached mob values reduce what rigs receive; they do not remove all World copies

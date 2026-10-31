@@ -9,4 +9,4 @@ The producer scripts these world conditions and captures/encodes them through
 the C6 checkpoint API. They are conversion/advancement fixtures, not recordings
 of actual network departure. Live migration scenarios test real membership loss
 and rejoin separately. `source.tar.gz` freezes the producer and C6 model;
-`SHA256.json` seals the original outputs. Do not regenerate with a newer model.
+`SHA256.json` records hashes of the original outputs. Do not regenerate with a newer model.

@@ -4,18 +4,20 @@
 REPLAY_SCRUBBER_OUT=/absolute/fresh/output nix develop --command bash tests/replay_scrubber/run.sh
 ```
 
-The runner builds an isolated Replay Hello copy, waits for editor builds, then
-builds the final native library. It runs the existing Hello/Loot fixtures, new
-headless UI checks, a rendered run/capture, the four-process network fixture and WASM checking. It verifies prepared
-and framework hashes before executing, retains binary and driver digests, and
-requires fresh result directories. The original examples are unchanged.
+The runner prepares an isolated Replay Hello copy and waits for editor builds
+before compiling the final native library. It runs the existing Hello/Loot
+fixtures, headless UI checks, a rendered capture, the four-process network
+fixture, and WASM checking. Before execution it verifies prepared and framework
+hashes, retains binary and driver digests, and requires fresh result directories.
+The original examples remain unchanged.
 
-The new driver exercises real F10 input and the real Branch button, including a
-complete press/release before the next frame. It checks that past/head selection
-changes views while preserving live state and one-shot counts; Resume preserves
-the original future and prior pause; Branch resets to the selected frame with a
-new epoch; held device input stays gated until release; a new shot emits once;
-wrapped history remains bounded; reset clears a stale selection.
+The driver sends F10 input and presses the Branch button, including a complete
+press/release before the next frame. Selecting a past frame or the history head
+must change the display without changing live state or one-shot counts. Resume
+must retain the original future and prior pause; Branch must reset to the
+selected frame in a new epoch. The checks also cover held input suppression
+until release, one emission from a new shot, bounded wrapped history, and clearing
+a stale selection on reset.
 
 The field-editor extension selects schema paths, rejects model-invalid pool counts
 and integer overflow, changes a copied preview, resets it, discards edits on tick

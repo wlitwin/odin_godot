@@ -6,9 +6,9 @@ characters **runners** and its guns **irons**. Replay's runtime runner is separa
 it schedules simulation steps and manages input/history. Godot presents the
 resulting state and effects through authored scenes.
 
-**Start with the [visual contributor guide](contributor-guide.md):**
-run the game, learn the state boundaries, follow a turret from input to scene,
-and choose a first change with the right tests.
+The [visual contributor guide](contributor-guide.md) starts with running the
+game, then follows a turret from input to scene. Use it to choose a first change
+and identify the tests that cover it.
 
 The [code guide](code-guide.md) maps the frame loop, input, session startup,
 event handling and presentation, with the project's formatting command.
@@ -16,7 +16,8 @@ event handling and presentation, with the project's formatting command.
 [Shared turret](shared-turret.md) adds a deployable ability that any player can
 operate, with shared ammunition, predicted claims, handoffs and occupied recovery.
 
-[Stormcaller](stormcaller.md) is a new Replay-only enemy built through this workflow: an authored pulse attack, composed charge view, and tested correction/recovery behavior.
+[Stormcaller](stormcaller.md) demonstrates a Replay-only enemy with an authored
+pulse attack, a composed charge view, and tested correction/recovery behavior.
 
 The [editor workflow](editor-workflow.md) adds validation/baking, refreshable
 previews, Resource pickers, feature drafts and an ability workbench with replay tests.
@@ -24,55 +25,57 @@ previews, Resource pickers, feature drafts and an ability workbench with replay 
 The [authoring tools workflow](authoring-tools.md) covers typed enemy registration,
 one canonical bake, frozen revisions and reusable feature tests.
 
-Start with the [editor-first authoring guide](editor-first.md): authored actor scenes,
-reusable child view components, detached HUD/display values and validated gameplay
-Resources around the replayable model. Enemy, runner and HUD scenes have independent
-F6 previews. The [initial bridge comparison](bridge.md) records the earlier migration
-and its measured tradeoffs; current composition is described in the authoring guide.
+For scene composition, read the [editor-first authoring guide](editor-first.md).
+It explains authored actor scenes, reusable child components, detached HUD/display
+values, and validated gameplay Resources around the replayable model. Enemy,
+runner, and HUD scenes have independent F6 previews. The
+[initial bridge comparison](bridge.md) retains the earlier integration's measured
+tradeoffs; use the authoring guide for current composition.
 
-[Dash input](controls.md) now uses receipt-time actions with explicit outcomes;
+[Dash input](controls.md) uses receipt-time actions with explicit outcomes;
 movement and held combat input retain scheduled controls.
 
-The [online party menu](online.md) now creates, joins and rejoins rooms through
+The [online party menu](online.md) creates, joins and rejoins rooms through
 the standalone Replay room service. It uses the shared Party helper while keeping
 personal progression separate from network credentials and retaining asset-aware
 takeover checks. Native TLS and local browser RTC gates pass; the full port and
 public deployment remain in progress.
 
-This is a separate reimplementation of the sibling Scrapyard project using Replay.
-The original game remains runnable. This version currently covers seeded cover,
-runner movement/dash, staging, ballistics, grenades, historical rail/healing queries, all enemy brains, status/reaction rules, damage, drops, camera
-and multiplayer views. The [historical port ledger](roadmap.md) records remaining comparison work; exhaustive
-parity is outside the current canonical-authoring goal.
+This separate Replay implementation keeps the sibling Scrapyard game runnable.
+It covers seeded cover, runner movement/dash, staging, ballistics, grenades,
+historical rail/healing queries, all enemy brains, status/reaction rules, damage,
+drops, camera, and multiplayer views. The [historical port ledger](roadmap.md)
+records remaining comparison work. This authoring example does not establish
+exhaustive parity with the original game.
 
-[Audio and local settings](audio.md) now include the original sound assets, music
+[Audio and local settings](audio.md) include the original sound assets, music
 crossfades, persisted volume/shake preferences and menu controls.
 
 Original dirt/grass dressing and the animated gate/direction arrow are restored.
 The [scenery gate](../../docs/replay/results/scrapyard-scenery-2026-09-07/README.md)
 checks three floors across host/client/observer. The [bottom shop cards](shop.md)
-now restore clickable purchases and the original shortcut order; broader HUD and
+provide clickable purchases in the original shortcut order; broader HUD and
 hardware-audio parity remain work.
 
-The [combat HUD](hud.md) now includes the original health/cooldown/status displays,
+The [combat HUD](hud.md) includes the original health/cooldown/status displays,
 large magazine, boss health and revive prompt, driven from Replay state.
 
-[Run transitions](transitions.md) now include large departure/wipe panels,
+[Run transitions](transitions.md) include large departure/wipe panels,
 current wave/rest information and recovery narration reconstructed from state.
 
 [Borrowed eyes](camera.md) follows a living teammate while downed, returns on
 revival and handles a watched host's loss without changing local controls or HUD.
 
-[Chat and yard history](chat.md) now include named messages, a late-join scrollback,
+[Chat and yard history](chat.md) include named messages, a late-join scrollback,
 wave/run announcements and history retained through asset-aware host migration.
 
 [Positional pings](pings.md) use middle mouse, with a stamped floating name and
 the original fading diamond; late-join history excludes old markers.
 
-[Browser UI acceptance](browser_ui.md) now exercises chat, pings, shop, HUD and
+[Browser UI acceptance](browser_ui.md) exercises chat, pings, shop, HUD and
 camera/revival in three actual Chrome processes with shared world-state checks.
 
-[Actor presentation](actors.md) now restores downed poses/beacons, muzzle/reload
+[Actor presentation](actors.md) provides downed poses/beacons, muzzle/reload
 cues, ghost tint and enemy attack/hit/death behavior with lifecycle checks.
 
 [Combat feedback](feedback.md) adds bounded bursts, debris, damage numbers and
@@ -102,7 +105,7 @@ for the current seat while keeping gameplay profiles concrete.
 [Editor workbench](workbench.md) provides inspector-driven previews of the real
 game, with a live tally and Esc menu.
 
-[Browser play and migration](browser.md) now have a real three-browser gate,
+[Browser play and migration](browser.md) have a three-browser gate,
 including PNG upload, an asset-dependent checkpoint, planned/crash recovery and
 continued combat with whole-world state comparison.
 
@@ -155,15 +158,16 @@ RSY_JITTER=20 RSY_LOSS=1000 RSY_DUPLICATE=1000 nix develop --command bash exampl
 REPLAY_REQUIRE_BASELINE=1 nix develop --command bash tests/replay_scrapyard/run.sh
 ```
 
-The menu offers Solo, Host, Join, Watch and Resume solo at localhost; port defaults to 49610.
-Pick a name, skin and iron, mark ready, then the displayed lobby leader starts. WASD moves and Shift
-dashes; hold the left mouse button to fire. All seven irons have
+The menu offers Solo, Host, Join, Watch, and Resume solo, using localhost and
+port 49610 by default. Pick a name, skin, and iron, then mark ready. The displayed
+lobby leader starts the game. WASD moves, Shift dashes, and holding the left
+mouse button fires. All seven irons have
 magazines, automatic reloads and deterministic jams (continued trigger pulls
 clear jams). The lobber bounces and blasts mobs; the lance pierces; the mender
-heals the first living friend. Interactive play now runs waves, floor clears,
+heals the first living friend. Interactive play runs waves, floor clears,
 shops, regroup/departure and wipe/reset. Hold F to revive; the clear-stage panel
 lists purchases and parts. [Run rules](run.md) explain what persists within the
-world. [Local co-op profiles](profiles.md) now save cores, parts and loadouts;
+world. [Local co-op profiles](profiles.md) save cores, parts and loadouts;
 [Room recovery](recovery.md) carries live combat checkpoints to a successor.
 F5 saves an uncoordinated solo/host run; [run saves](saves.md) describe fresh-process
 resume and identity requirements. `RSY_RUN=0` retains isolated
@@ -174,13 +178,13 @@ Equip shared turret to deploy one; press T nearby to mount/release, then aim/fir
 normally. Its last round despawns it and automatically dismounts the operator.
 Project name, custom user-data directory and port are separate from the original.
 
-One reducer—a function that applies inputs to gameplay values—handles
-roster/profile actions, readiness, start/drop-in,
-movement, dash, gun mechanisms, enemies, projectiles, drops and events. Server
-authority and local prediction replace the original's owner-streamed movement;
-remote player characters are displayed using the observed view clock.
-The model never calls Godot. Arena rendering and collision use the same saved cover
-list, and camera/animation/smoothing do not modify it.
+The reducer applies input to gameplay values: roster/profile actions, readiness,
+start/drop-in, movement, dash, gun mechanisms, enemies, projectiles, drops, and
+events. The server computes accepted state, the local player predicts, and remote
+characters display on the observed view clock. This differs from the original's
+owner-streamed movement. The model never calls Godot. Arena rendering and
+collision use the same saved cover list; camera movement, animation, and
+smoothing do not modify it.
 
 The test compiles selected unmodified original arena/movement procedures into an
 isolated oracle and compares every cover plus final position bits for 12 layouts
@@ -217,7 +221,7 @@ surge. The normal ability gate now explicitly checks that friendly transmutation
 
 `gauntlet_run.sh` exercises all three floor-one waves (4/4/5 enemies), records each
 saved rest deadline and refuses early wave/floor completion. Its players use normal
-weapons and support casts, then gathers the crew for a separately spawned barrel
+weapons and support casts, then gather the crew for a separately spawned barrel
 chain. The [matched solo comparison](../../docs/replay/results/solo-gauntlet-2026-09-13/README.md)
 uses isolated original/Replay games with one player and no support casts. All six
 games clear the waves; one Replay stationary barrel finale is blocked by cover,
@@ -232,7 +236,9 @@ use the host’s catalog, including sparse loadouts, and saves retain that catal
 
 The [stress/profiling record](../../docs/replay/results/scrapyard-stress-2026-09-06/README.md)
 includes a 40-enemy workload, raw timings and memory/traffic observations. The [optimized-build copy fix](../../docs/replay/results/scrapyard-copy-lowering-2026-09-06/README.md)
-now permits ordinary -o:speed builds. A fair baseline comparison remains open.
+permits ordinary -o:speed builds. That stress record did not establish a matched
+baseline comparison. Later optimized paired idle and firing/reload comparisons
+passed; the [port ledger](roadmap.md) links those results and their workloads.
 
 [Authority-only rewind history](authority-history.md) reduces ordinary snapshot traffic while preserving complete recovery checkpoints.
 

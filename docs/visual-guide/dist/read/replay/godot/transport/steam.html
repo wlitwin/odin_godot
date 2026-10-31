@@ -30,8 +30,8 @@ err := rgd.session_open(&amp;session, initial, model, options)
 <span class="hljs-comment">// Normal session_frame / session_changes / session_issue calls follow.</span></code></pre></div><p>Initialization is explicit and uses the client Steam API. It can launch an app
 session/presence and requires a suitable installed GodotSteam build, Steam client
 and app entitlement. <code>steam_available</code> only checks native capability and has none
-of those initialization effects. Missing runtime/capability or an unexpected API
-shape returns a typed error; it does not silently fall back to ENet.</p>
+of those initialization effects. Missing runtime/capability or unexpected API
+methods return a typed error; the adapter does not fall back to ENet.</p>
 <p>The runtime requests manual callbacks. <code>Steam</code> transport polling pumps
 <code>run_callbacks</code> before polling its peer. If the game is waiting for lobby/invite
 callbacks before opening a Session, call <code>steam_runtime_poll</code> in its own outer
@@ -73,7 +73,7 @@ exercise both transfer modes and pending-buffer copies, then run a complete Repl
 handshake, validated loot action and authority checkpoint. Constructor/initialization
 failure cases verify rejection and cleanup. The fixture uses no Valve service.</p>
 <p><code>tests/replay_steam/capability_run.sh</code> loads a supplied addon and inspects the real
-class/method surface with Steam auto-initialization disabled. The pinned release
+class and required methods with Steam auto-initialization disabled. The pinned release
 passed this on macOS ARM64. <code>tests/replay_steam/live_run.sh</code> is an opt-in live test
 for two logged-in Steam accounts/devices. Its output uses a separate live sentinel;
 contract or capability success cannot satisfy that gate.</p>
@@ -81,8 +81,8 @@ contract or capability success cannot satisfy that gate.</p>
 SteamGameServer support and broader platforms remain pending. <a href="../steam_room.html">Room endpoint/recovery integration</a> supplies explicit Steam
 addresses and fresh peer construction through takeover/rejoin. Its local contract
 fixture remains distinct from live multi-account acceptance. Existing ENet/RTC Room
-profiles remain available. These gaps stay
-requirements of the full roadmap; this adapter is not a completed Steam deployment.</p>
+profiles remain available. These gaps remain requirements for a complete Steam
+deployment.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="multiplayer-generations.html"><span>MultiplayerPeer connection generations</span><span aria-hidden="true">→</span></a><a href="../steam_room.html"><span>Steam destinations for Room recovery</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/steam.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="multiplayer-generations.html"><span>MultiplayerPeer connection generations</span><span aria-hidden="true">→</span></a><a href="../steam_room.html"><span>Steam destinations for Room recovery</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/steam.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-bounds" class="">Ownership and bounds</a><a href="#validation-and-outstanding-work" class="">Validation and outstanding work</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/steam.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

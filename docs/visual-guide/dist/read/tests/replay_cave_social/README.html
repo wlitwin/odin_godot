@@ -9,10 +9,10 @@ those displays as gameplay state. The native and Chrome cases below cover
 different UI and authority-change boundaries.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_CAVE_SOCIAL_OUT=/absolute/fresh/output nix develop --<span class="hljs-built_in">command</span> bash tests/replay_cave_social/run.sh</code></pre></div><p>The test harness builds an isolated Cavecrawl copy, runs native host/client/observer
 processes with 120 ms receive delay, and exports a separate Chrome project with
-the existing coordinator-backed migration fixture. The unchanged shared telemetry
-and Comms unit gates can also be run with <code>tests/replay_telemetry/run.sh</code> and
+the coordinator-backed migration fixture. Run the shared telemetry and Comms
+unit tests separately with <code>tests/replay_telemetry/run.sh</code> and
 <code>tests/replay_comms/run.sh</code>.</p>
-<p>A native keyboard gate types F and submits invalid/valid names with Enter,
+<p>A native keyboard case types F and submits invalid/valid names with Enter,
 requiring continued editing on rejection and no ping/chat side effects.</p>
 <p>Native checks require the authority&#39;s zero row and a measured remote RTT, hide
 observer and departed rows, then leave/rejoin with a fresh measurement. A ping
@@ -32,5 +32,5 @@ and <code>execute_web.sh WEB_EXPORT FRESH_RUN</code> retain preparation hashes a
 drivers. GDScript-only fixture revisions use separate exports/runs. Production
 gameplay, canonical world data and original Cavecrawl files are unchanged.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_cave_social/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_cave_social/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_cave_social/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -41,6 +41,6 @@ your own app ID. `STEAM_TEST_PORT` is the virtual port, default 49499 in this fi
 `REPLAY_STEAM_LIVE_OK`; retain both logs and actual game/extension versions. The
 host is an automatic small acceptance game and exits after the shared loot result.
 
-The currently collected evidence has no live-network success claim. The user has
-been asked about availability of two-account testing; meanwhile other roadmap work
-can continue. See [the adapter contract](../../replay/godot/transport/steam.md).
+The collected evidence does not establish live Steam networking. That requires
+the separate two-account/device test described above. See
+[the adapter contract](../../replay/godot/transport/steam.md).

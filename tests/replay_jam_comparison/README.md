@@ -31,7 +31,7 @@ transitions; they must remain valid and converge to authority.
 At least three jams and two completed clears per player are required, with visible
 jam exposure, repeated reloads, movement/cast/status work and the existing damage/
 kill/loot conservation gates. An uncleared final jam is permitted and must remain
-in the final state; the harness does not reset it for a green result. The mechanism
+in the final state; the harness does not clear it to make the test pass. The mechanism
 checks are in addition to ordinary world accounting and transport validation.
 
 The full plan uses three alternating Kit/Replay pairs in each of the existing

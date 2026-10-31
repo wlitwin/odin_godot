@@ -1,7 +1,8 @@
 # Browser authority migration work
 
-The native Room's migration and fencing rules remain the reference. WebRTC packet
-exchange and a P2P duel do not by themselves make browser authority migration safe.
+Browser authority migration must preserve the native Room's lease, recovery,
+and fencing rules. WebRTC packet exchange or a working P2P duel alone does not
+validate those requirements.
 
 Implemented and tested prerequisites:
 
@@ -31,9 +32,9 @@ two handoffs, control partition/fencing, successor loss during handoff and a kil
 host returning with a fresh incarnation. Monotonic driver receipts distinguish
 fault-to-action time from the narrower Room timer.
 
-Remaining acceptance and integration:
+Additional verified integration:
 
-Actual Coturn relay gates now pass Cavecrawl over UDP/TCP and Scrapyard's asset-aware
+Coturn relay gates pass Cavecrawl over UDP/TCP and Scrapyard's asset-aware
 combat flow over UDP. Selected browser candidate pairs and Coturn logs prove relayed
 traffic at join, handoff and rejoin. Incorrect relay credentials do not fall back to
 direct gameplay in relay-only mode. See [relay evidence](results/turn-relay-2026-09-07/README.md).
@@ -44,12 +45,15 @@ Chrome gate covers automatic successor selection, a zero-loss handoff and concur
 isolated rooms. This uses explicit loopback WS with RTC gameplay; public WSS/TURN
 deployment is still separate work.
 
+Remaining acceptance and integration:
+
 - Public account/room provisioning and trust boundaries. Authenticated
   signaling-only reconnect now preserves healthy channels and peer IDs; broader
   network/provider-outage envelopes still need measurement.
 - External asset dependencies and gameplay recovery in richer browser game ports;
   broader workloads and repeated timing measurements for the existing failure matrix.
-- Actual browser sleep/clock anomalies, TLS/TURN and additional browser engines.
+- Browser sleep/clock anomalies, deployed TLS/TURN configurations, and
+  additional browser engines.
 - Broader interruption measurements, including time before local fencing, and
   checkpoint age/lost ticks/transfer size under representative gameplay.
 
@@ -59,5 +63,5 @@ remaining failure matrix or public deployment envelope.
 See [WebSocket](../../replay/godot/transport/websocket.md),
 [paired clock](../../replay/authority/paired_clock.md) and
 [rendezvous](../../replay/authority/rendezvous.md) for current APIs and limits.
-This completes no additional milestone by declaration; all remaining gates are
-part of the active M0–M9 objective.
+These local results do not complete another milestone. The remaining gates
+still belong to the active M0–M9 objective.

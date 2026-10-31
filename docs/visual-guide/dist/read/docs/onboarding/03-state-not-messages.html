@@ -1,21 +1,23 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>3 · State, not messages · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>3 · Field replication · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../kit/timelines.html">Prediction and timelines</a><a href="../kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>3 · State, not messages</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/03-state-not-messages.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-model">The model</a><a href="#entities-the-world-as-a-table-of-structs">Entities: the world as a table of structs</a><a href="#setup">Setup</a><a href="#movement-owner-written-fields">Movement: owner-written fields</a><a href="#what-the-model-gives-you">What the model gives you</a></nav></details>
-<article class="reading-body "><p>Adding multiplayer requires a rule for each shared value: who may write it,
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin in Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin in Godot</p><h1>3 · Field replication</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/onboarding/03-state-not-messages.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#authority-written-state">Authority-written state</a><a href="#registered-entities-and-owners">Registered entities and owners</a><a href="#setup">Setup</a><a href="#movement-owner-written-fields">Movement: owner-written fields</a><a href="#session-operations">Session operations</a></nav></details>
+<article class="reading-body "><p><span id="3--state-not-messages"></span></p>
+<p>Adding multiplayer requires a rule for each shared value: who may write it,
 and how other peers receive it. Hand-written RPCs can scatter those rules
 across scripts. Kit puts them on fields and lets the session synchronize the
 registered state. This post sets up that arrangement, including entity creation
 and player identity.</p>
-<h2 id="the-model">The model<a class="heading-anchor" href="#the-model" aria-label="Link to this section">#</a></h2>
+<p><span id="the-model"></span></p>
+<h2 id="authority-written-state">Authority-written state<a class="heading-anchor" href="#authority-written-state" aria-label="Link to this section">#</a></h2>
 <p>One machine, the <strong>host</strong>, runs the authority that decides shared state. Every
 registered entity has replicated fields on each peer. At network ticks, the
 session sends changes from the authority to those copies.</p>
-<p>You know why this works from post 2: your state is a struct with a fixed
-layout. The toolkit keeps a shadow copy, diffs it after each tick, and ships
-only the bytes that changed. So the entire replication API is a tag:</p>
+<p>The struct layout lets Kit keep a shadow copy of selected fields and compare
+their bytes at each network tick. It sends changed fields to peers. Tag a
+field to include it in reliable replication:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Hole :: <span class="hljs-keyword">struct</span> {
 	owner:  gd.Node2d,
 	net_id: knet.Net_Id,
@@ -27,7 +29,8 @@ only the bytes that changed. So the entire replication API is a tag:</p>
 to clients. A player who joins later receives the current value in a snapshot.
 The field retains the result, so a late joiner does not need the original call
 that changed it.</p>
-<h2 id="entities-the-world-as-a-table-of-structs">Entities: the world as a table of structs<a class="heading-anchor" href="#entities-the-world-as-a-table-of-structs" aria-label="Link to this section">#</a></h2>
+<p><span id="entities-the-world-as-a-table-of-structs"></span></p>
+<h2 id="registered-entities-and-owners">Registered entities and owners<a class="heading-anchor" href="#registered-entities-and-owners" aria-label="Link to this section">#</a></h2>
 <p>Replicated structs are <strong>entities</strong> in a registry. Each has a type, a numeric
 <code>net_id</code>, and a network owner: the player allowed to write its owner-streamed
 fields. This differs from the script&#39;s <code>owner</code> field, which holds a Godot node.
@@ -43,13 +46,11 @@ Tags on the exported scene declare the entity type and stable wire ID:</p>
 <span class="hljs-meta">@(gd_half)</span>
 hole_spawned :: <span class="hljs-keyword">proc</span>(game: ^Golf, self: ^Hole, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.holes[id] = self
-}</code></pre></div><p>scriptgen turns those tags into a factory table, and the same factory runs on
-every machine, host included. There is no separate &quot;server spawns, then sends a
-spawn message you handle differently&quot; path. The host asks the session to spawn;
-the session builds the scene <em>locally</em> and tells everyone else to build <em>the
-same scene</em>. You write the declaration once, and there is no per-role creation
-code to write. When a player joins mid-game, the session recreates the registry
-through the same table. A resumed save uses that table too.</p>
+}</code></pre></div><p>Scriptgen turns these tags into a factory table used on the host and remote
+peers. When the host requests a spawn, the session creates the scene locally
+and sends peers the information needed to create the same entity. The
+generated factory handles each role. Mid-game joins and resumed saves use
+the table to recreate the entities included in their state.</p>
 <h2 id="setup">Setup<a class="heading-anchor" href="#setup" aria-label="Link to this section">#</a></h2>
 <p><code>kit/boot</code> configures the session and its frame pump from your entity and
 container declarations:</p>
@@ -68,45 +69,46 @@ golf_host_tick :: <span class="hljs-keyword">proc</span>(self: ^Golf) { run_the_
 
 golf_process :: <span class="hljs-keyword">proc</span>(self: ^Golf, delta: <span class="hljs-type">f64</span>) {
 	frame := golf_net_frame(self, delta, now_s())
-}</code></pre></div><p>That is a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
-(<code>kboot.boot_host</code> / <code>boot_join</code>), connection lifecycle, and the pump that
-drives it all. Your game reacts by declaring <strong>event halves</strong>: plain procs
-named for the event (<code>golf_player_joined</code>, <code>golf_entity_spawned</code>, an
-authority-only <code>golf_player_joined_then</code> for consequences) that the generated
-<code>golf_net_frame</code> dispatches to synchronously. There are no callbacks into a
-half-initialized script. The component
-calls remain available when a game needs custom dispatch ordering.</p>
-<p>One concept in the join call pays off for the rest of the series: a player
-joins with a <strong>reconnect token</strong> (<code>ksave.token</code>, an env var, or a small file
-under <code>user://</code>). The token <em>is</em> their identity. Crash, restart, rejoin with
-the same token, and you get the same seat, the same stats, the same entities.
-There is no separate reconnect system; identity is state too.</p>
+}</code></pre></div><p>With the declared scenes, containers, and handlers in place, these generated
+procedures drive the lobby UI, chat, scoreboard, host/join controls
+(<code>kboot.boot_host</code> / <code>boot_join</code>), and connection lifecycle. The game receives
+events through name-paired procedures called event halves, marked
+<code>@(gd_half)</code>. Examples include <code>golf_player_joined</code>, <code>golf_entity_spawned</code>, and
+the authority-only <code>golf_player_joined_then</code> for consequences.
+<code>golf_net_frame</code> dispatches these synchronously after attachment, once the
+script is initialized. Lower-level component calls remain available for
+custom dispatch ordering.</p>
+<p>A player joins with a reconnect token obtained through <code>ksave.token</code>, an
+environment variable, or a small file under <code>user://</code>. The session uses that
+token to recognize a returning identity. Rejoining with the same token after
+a crash reclaims the seat, stats, and entities retained for that identity.</p>
 <h2 id="movement-owner-written-fields">Movement: owner-written fields<a class="heading-anchor" href="#movement-owner-written-fields" aria-label="Link to this section">#</a></h2>
 <p>Waiting for authority updates would delay local movement by a round trip. In
 cooperative games that trust player motion, the entity&#39;s <strong>network owner</strong> can
 write movement fields instead:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span></code></pre></div><p>streamed unreliably at tick rate, and rendered by everyone else through a short
-interpolation buffer that stays smooth through jitter and packet loss. Your
-machine moves your avatar with local, zero-latency code; remote screens watch
-a slightly delayed, smoothed version. (That &quot;slightly delayed&quot; becomes post 5.)</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">x, y: <span class="hljs-type">f32</span> <span class="hljs-string">`gd:&quot;owner&quot;`</span>, <span class="hljs-comment">// continuous owner fields interpolate by default</span></code></pre></div><p>The session streams these fields unreliably at tick rate. Remote peers render
+them through a short interpolation buffer to absorb jitter and packet loss.
+The owner moves locally without waiting for a network round trip; remote
+screens display a delayed, smoothed version. Post 5 explains that timing.</p>
 <p>Authority-written fields use state deltas; owner-written fields use motion
 streams. Each field selects one policy.</p>
-<h2 id="what-the-model-gives-you">What the model gives you<a class="heading-anchor" href="#what-the-model-gives-you" aria-label="Link to this section">#</a></h2>
+<p><span id="what-the-model-gives-you"></span></p>
+<h2 id="session-operations">Session operations<a class="heading-anchor" href="#session-operations" aria-label="Link to this section">#</a></h2>
 <p>The same registry and snapshot mechanism supports these session operations:</p>
 <ul>
 <li><strong>Drop-in joins</strong>: the registry replays through your factory.</li>
 <li><strong>Reconnect after a crash</strong>: the token reclaims the seat, and the snapshot
 restores the world.</li>
-<li><strong>Saves</strong>: a save file is the snapshot machinery pointed at disk
-(<code>ksave.save_write</code> / <code>ksave.resume</code>, post 6).</li>
-<li><strong>Host migration</strong>: a backup snapshot plus &quot;everyone rejoins the new host&quot;;
-the toolkit automates the handoff (post 6).</li>
+<li><strong>Saves</strong>: <code>ksave.save_write</code> / <code>ksave.resume</code> write and restore an authority
+session snapshot with the game&#39;s additional saved state (post 6).</li>
+<li><strong>Host migration</strong>: cooperative sessions can restore a backup and reconnect
+peers to the new host after the game&#39;s migration setup (post 6).</li>
 <li><strong>Single-player</strong>: a session with one seat, using the same gameplay code.</li>
 </ul>
 <p>Each operation needs its documented setup, but uses the same entity identities
 and field declarations. The next post adds actions on shared state: two players
 taking the same item need an authority verdict as well as local feedback.</p>
-<p><em>Next: <a href="04-verbs-not-rpcs.html">Verbs, not RPCs →</a></em></p>
+<p><em>Next: <a href="04-verbs-not-rpcs.html">Predicted commands →</a></em></p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="04-verbs-not-rpcs.html"><span>Writing a Kit command</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/03-state-not-messages.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-model" class="">The model</a><a href="#entities-the-world-as-a-table-of-structs" class="">Entities: the world as a table of structs</a><a href="#setup" class="">Setup</a><a href="#movement-owner-written-fields" class="">Movement: owner-written fields</a><a href="#what-the-model-gives-you" class="">What the model gives you</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/03-state-not-messages.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="04-verbs-not-rpcs.html"><span>Writing a Kit command</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/03-state-not-messages.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authority-written-state" class="">Authority-written state</a><a href="#registered-entities-and-owners" class="">Registered entities and owners</a><a href="#setup" class="">Setup</a><a href="#movement-owner-written-fields" class="">Movement: owner-written fields</a><a href="#session-operations" class="">Session operations</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/03-state-not-messages.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

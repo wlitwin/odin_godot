@@ -14,7 +14,8 @@ bash addons/odin_godot/build/build_scripts.sh .
 
 Open the project in Godot and run `main.tscn`. Arrows move; Space takes the center
 coin when close enough. The coin and both bags belong to one World, the value
-that holds mutable simulation state. A step transfers the coin atomically. The same model runs offline or with a server:
+that holds mutable simulation state. A step transfers the coin atomically.
+The same model runs offline or with a server:
 
 ```sh
 # Separate terminals, native ENet on the same machine:
@@ -37,6 +38,6 @@ When adding effects, use occurrence IDs to revise or cancel them if prediction c
 
 Build artifacts and generated scripts remain in your project, not in the addon.
 The installed `addons/odin_godot/docs/replay.md` guide describes the model,
-supported envelopes and more advanced components. The project is intentionally
+supported configurations and more advanced components. The project is intentionally
 small; it does not claim host migration, persistence or competitive rollback merely
 because those library packages are present.

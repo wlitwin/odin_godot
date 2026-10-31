@@ -12,36 +12,37 @@ appear.</p>
 the <a href="../authoring-guide.html">Authoring Guide</a> open for API details, and use
 <a href="../kit/build-a-game-in-a-day.html">Build a game in a day</a> for a step-by-step project.</p>
 <ol>
-<li><strong><a href="01-what-if-your-scripts-were-compiled.html">What if your scripts were compiled?</a></strong>
+<li><strong><a href="01-what-if-your-scripts-were-compiled.html">Writing compiled Godot scripts</a></strong>
 covers the scene workflow, the compile step, and the script layout. It ends
 with a moving node.</li>
 <li><strong><a href="02-thinking-in-structs.html">Thinking in structs</a></strong> maps the script conventions. Each
 GDScript feature (<code>@export</code>, <code>@onready</code>, signals, inheritance, autoloads) maps
 to an Odin convention or an explicit alternative. It also distinguishes
 the script struct (<code>self</code>) from the engine node (<code>self.owner</code>).</li>
-<li><strong><a href="03-state-not-messages.html">State, not messages</a></strong> is the multiplayer
+<li><strong><a href="03-state-not-messages.html">Field replication</a></strong> introduces the multiplayer
 model: declare which fields replicate and which peer writes them. It builds
-a hosted, joinable game in one <code>ready()</code>.</li>
-<li><strong><a href="04-verbs-not-rpcs.html">Verbs, not RPCs</a></strong> treats player actions as predicted
+a hosted session from declared scenes, handlers, and a <code>ready()</code> setup call.</li>
+<li><strong><a href="04-verbs-not-rpcs.html">Predicted commands</a></strong> treats player actions as predicted
 commands. The generated pipeline handles submission and rejection; the
 command supplies the game-specific validation and target mutation.</li>
 <li><strong><a href="05-the-two-timelines.html">The two timelines</a></strong> explains why local and remote
 screens show different moments, and how to schedule an effect beside its
 visible cause.</li>
-<li><strong><a href="06-the-shape-of-a-shippable-game.html">The shape of a shippable game</a></strong> covers
+<li><strong><a href="06-the-shape-of-a-shippable-game.html">Identity, recovery, and transport testing</a></strong> covers
 persistent identity, drop-in joins, saves, host migration, and Steam,
 including the setup and integration tests those features need.</li>
-<li><strong><a href="07-the-competitive-turn.html">The competitive turn</a></strong> moves motion authority
+<li><strong><a href="07-the-competitive-turn.html">Server-authoritative simulation</a></strong> moves motion authority
 to the server. It introduces local input prediction, correction, and
 presentation for contested objects, using three versions of a soccer game.</li>
 </ol>
-<p>Posts 1–6 are the co-op path; post 7 is the turn onto the competitive one. Both
-ride the same declarative surface, chosen per FIELD, so a game can be co-op in
-its lobby and server-authoritative in its hitboxes. The deeper references are
+<p>Posts 1–6 cover cooperative replication; post 7 adds server-authoritative
+simulation. Both use field declarations to select the state policy, so a game
+can combine a cooperative lobby with server-authoritative hitboxes. The
+references are
 <a href="../kit/sim.html">kit/sim</a> (the full lane) and <a href="../kit/timelines.html">timelines</a>
 (the per-field choosing guide).</p>
 <p><strong>Prerequisites:</strong> familiarity with the Godot editor, scenes, and nodes. The
 examples introduce the Odin syntax and networking concepts they use.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="01-what-if-your-scripts-were-compiled.html"><span>1 · What if your scripts were compiled?</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/index.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../kit/build-a-game-in-a-day.html"><span>Build a multiplayer game in a day</span><span aria-hidden="true">→</span></a><a href="01-what-if-your-scripts-were-compiled.html"><span>1 · Writing compiled Godot scripts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/onboarding/index.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/docs/onboarding/index.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -12,7 +12,7 @@ first committed authority frame at recovered tick + 1, requiring adoption to
 seat 2 with one version increment. Surviving processes then observe continued
 carrying and the successor's fresh release. The returning host keeps seat 1.
 
-The browser gate extends the RTC party/social story: host seat 1 carries first,
+The browser gate extends the RTC party/social scenario: host seat 1 carries first,
 the successor becomes carrier after handoff, and all three peers observe the
 successor release it. Test probes only read authority observations; drivers use
 ordinary actions. Prepared source/framework and binary/export identities are

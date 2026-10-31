@@ -32,8 +32,8 @@ err := rgd.session_open(&session, initial, model, options)
 Initialization is explicit and uses the client Steam API. It can launch an app
 session/presence and requires a suitable installed GodotSteam build, Steam client
 and app entitlement. `steam_available` only checks native capability and has none
-of those initialization effects. Missing runtime/capability or an unexpected API
-shape returns a typed error; it does not silently fall back to ENet.
+of those initialization effects. Missing runtime/capability or unexpected API
+methods return a typed error; the adapter does not fall back to ENet.
 
 The runtime requests manual callbacks. `Steam` transport polling pumps
 `run_callbacks` before polling its peer. If the game is waiting for lobby/invite
@@ -85,7 +85,7 @@ handshake, validated loot action and authority checkpoint. Constructor/initializ
 failure cases verify rejection and cleanup. The fixture uses no Valve service.
 
 `tests/replay_steam/capability_run.sh` loads a supplied addon and inspects the real
-class/method surface with Steam auto-initialization disabled. The pinned release
+class and required methods with Steam auto-initialization disabled. The pinned release
 passed this on macOS ARM64. `tests/replay_steam/live_run.sh` is an opt-in live test
 for two logged-in Steam accounts/devices. Its output uses a separate live sentinel;
 contract or capability success cannot satisfy that gate.
@@ -94,5 +94,5 @@ Live Valve relay/P2P behavior, invitations/lobby UX, entitlement/account boundar
 SteamGameServer support and broader platforms remain pending. [Room endpoint/recovery integration](../steam_room.md) supplies explicit Steam
 addresses and fresh peer construction through takeover/rejoin. Its local contract
 fixture remains distinct from live multi-account acceptance. Existing ENet/RTC Room
-profiles remain available. These gaps stay
-requirements of the full roadmap; this adapter is not a completed Steam deployment.
+profiles remain available. These gaps remain requirements for a complete Steam
+deployment.

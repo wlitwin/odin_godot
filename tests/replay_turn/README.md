@@ -1,4 +1,6 @@
-# Actual TURN relay gates
+<a id="actual-turn-relay-gates"></a>
+
+# TURN relay tests with Coturn
 
 These fixtures use Coturn and real Chrome peer connections. They force
 `iceTransportPolicy: "relay"`, inspect the selected candidate pair through the
@@ -91,7 +93,7 @@ Configuration validation runs independently:
 nix develop --command bash tests/replay_turn/config_run.sh
 ```
 
-It checks bounded ICE JSON, server/URL/credential shapes, relay-only requirements,
+It checks bounded ICE JSON, server/URL/credential structures, relay-only requirements,
 owned configuration strings and propagation into Room options, plus WASM compilation.
 
 The authoritative contracts are
@@ -99,7 +101,7 @@ The authoritative contracts are
 [Godot's connection API](https://docs.godotengine.org/en/stable/classes/class_webrtcpeerconnection.html),
 and the browser's [selected-pair statistics](https://www.w3.org/TR/webrtc-stats/#dom-rtctransportstats-selectedcandidatepairid).
 See [recorded results](../../docs/replay/results/turn-relay-2026-09-07/README.md) for
-actual acceptance and the remaining public deployment envelope.
+actual acceptance and the remaining public deployment limits.
 
 The [UDP datagram fault gate](../replay_turn_faults/README.md) adds a bounded
 multi-client loopback proxy and Slopball planned/crash recovery checks under actual

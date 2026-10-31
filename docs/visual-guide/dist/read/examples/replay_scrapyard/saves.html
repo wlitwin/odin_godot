@@ -9,7 +9,9 @@ with the same identity. Native files and browser slots contain the complete
 gameplay checkpoint and required spray images. The sections below describe each
 store and the explicit conversion path for older Replay archives.</p>
 <p>Current content 51 adds shared turrets; content 50 added authored pulse attacks and
-content 49 records takeover timer resets in the simulation. Content 48 made rewind history authority-only in ordinary replication; complete saves retain it. Content 47 added receipt-time dash actions. The explicit offline converter
+content 49 records takeover timer resets in the simulation. Content 48 made
+rewind history authority-only in ordinary replication; complete saves retain it.
+Content 47 added receipt-time dash actions. The explicit offline converter
 accepts content 42–50 and retains their pending action IDs/ticks, recorded controls
 and assets. Frozen old action enums prevent the new Dash member from changing the
 source schema. The <a href="controls.html">control contract</a> explains why the legacy dash
@@ -111,8 +113,8 @@ Identity verification here prevents accidental selection of another local save;
 local archives are not a secure competitive progression ledger.</p>
 <p>The tool validates the old contract, the full archive and bundle, matching
 container metadata, complete current-frame image dependencies and bounded PNG
-header information. It updates schema/content/protocol/contract stamps, maps any
-pending original actions into the new shape, and rebuilds container checksums.
+header information. It updates schema/content/protocol/contract stamps, maps
+pending original actions into the new representation, and rebuilds container checksums.
 Godot performs the full PNG decode during normal resume. The world, roster, action
 sequences/refusal reasons, image bytes, tick and old epoch remain intact. Raw
 checkpoints are supported only when their worlds have no external image dependencies.</p>
@@ -150,5 +152,5 @@ and action-target fields are zero. Existing catalogs and pending action identiti
 remain intact, so this conversion does not inject the new ability into an old run.
 See <a href="shared-turret.html">shared turret</a> for behavior and recovery tests.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../replay/assets/bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/saves.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="controls.html"><span>Controls and discrete intents</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/storage/browser_store.html"><span>Browser blob storage</span><span aria-hidden="true">→</span></a><a href="../../replay/assets/bundles.html"><span>Self-contained save bundles</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/saves.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#converting-older-replay-runs" class="">Converting older Replay runs</a><a href="#content-50--stormcaller" class="">Content 50 / Stormcaller</a><a href="#content-51--shared-turret" class="">Content 51 / shared turret</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/saves.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

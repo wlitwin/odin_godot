@@ -1,11 +1,13 @@
-# Editor-first Replay authoring and canonical Scrapyard
+<a id="editor-first-replay-authoring-and-canonical-scrapyard"></a>
+
+# Editor-first Replay authoring with Scrapyard
 
 Completed 2026-09-20; see [delivery assessment](editor-first-progress.md).
 
-Goal: make normal Godot scene composition the everyday presentation workflow
-around Replay's composed value simulation. Replay Scrapyard is the canonical worked
-example, alongside the untouched original game. This follows the completed bridge
-and its initial Scrapyard integration; it is not a new full-game parity campaign.
+This completed plan defined a Godot scene-composition workflow for presentation
+around Replay's composed value simulation. Replay Scrapyard was the worked
+example, alongside the untouched original game. The scope followed the completed
+bridge and initial Scrapyard integration, without adding a full-game parity campaign.
 
 ## Ownership rules
 
@@ -40,7 +42,10 @@ state through a small typed adapter. New gameplay behavior remains an explicit
 state/rule change with a documented authoring/baking path. Scrapyard should teach
 that distinction through runnable code, not only prose.
 
-## Current status
+<a id="current-status"></a>
 
-E1–E6 complete. The canonical guide reflects the migrated scenes, typed adapters,
-Resource baking, procedural exceptions and measured/validated support envelope.
+## Recorded completion status
+
+E1–E6 were completed. The authoring guide describes the migrated scenes, typed
+adapters, Resource baking, procedural exceptions, and measured/validated
+configurations.

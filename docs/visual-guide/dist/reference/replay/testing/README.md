@@ -2,8 +2,8 @@
 
 Use `replay/testing` to compare a feature's corrected or restored simulation
 against an uninterrupted reference. It runs without Godot and owns/destroys its
-timelines, checkpoint buffers and temporary servers. Results include before/after frames and a structured
-report (`phase`, failing tick where available, timeline/network error, final
+timelines, checkpoint buffers and temporary servers. Results include before/after
+frames and a structured report (`phase`, failing tick where available, timeline/network error, final
 canonical state hash). Only `.Complete` is success; a zero-initialized report fails.
 
 ```odin
@@ -27,7 +27,7 @@ assert(result.report.phase == .Complete)
 Takeover runs to step 20, captures/encodes/decodes a network checkpoint, restores a
 new authority epoch, and continues through step 70. The uninterrupted reference
 receives the same epoch observation. A drive callback may submit scripted inputs
-or actions identically to both owners; nil supplies neutral input. Before/after
+or actions identically to both server runtimes; nil supplies neutral input. Before/after
 frames let the feature assert a remaining wind-up, exactly one hit, or other rules.
 It compares continuation frames/events and audits the restored timeline.
 

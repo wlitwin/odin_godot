@@ -7,15 +7,17 @@ across all games. That plan takes precedence over the game-parity gates below.
 Milestone proposals, open rows, and results retain their historical scope;
 both versions of each game remain preserved.
 
-The revised framework-first scope now has a completed
-[experimental release assessment](release-assessment.md). Historical open parity
-and external/platform rows below remain history/follow-up, not claims of verified
-completion or reasons to restart an exhaustive game campaign.
+The revised framework scope has a completed
+[experimental release assessment](release-assessment.md). The result summaries
+below record status at each step; later results may address an earlier open
+item. Historical parity and external/platform rows remain follow-up records.
+Use the release assessment for aggregate framework status rather than treating
+these entries as a new exhaustive game campaign.
 
-This is an experimental second library for Odin/Godot multiplayer. Its purpose
-is to test whether a complete replayable world makes gameplay easier to author,
-debug, and migrate than the existing per-field Kit model. The existing framework
-and existing games remain available throughout the experiment.
+Replay is an experimental multiplayer library in odin_godot. This roadmap
+compares authoring, debugging, and migration using a complete replayable world
+with Kit's per-field model. Kit and the original games remain available
+throughout the experiment.
 
 Read [architecture](architecture.md) for invariants and the initial API, and
 [comparison](comparison.md) for the game inventory and evaluation protocol.
@@ -25,7 +27,7 @@ Read [architecture](architecture.md) for invariants and the initial API, and
 - One gameplay simulation contract for offline play, player-hosted co-op,
   server-authoritative action, and eventually deterministic P2P rollback.
 - Ordinary cross-entity gameplay operations, replayable entity lifetime, and
-  automatic separation of simulation from presentation.
+  a framework-managed presentation lifecycle separate from simulation.
 - Host migration, late join, reconnect, saves, and diagnostics designed around
   explicit checkpoints and session state.
 - Godot remains the scene editor and presentation engine; Odin simulation is
@@ -67,8 +69,8 @@ game work; an open parity row alone does not imply a missing framework capabilit
 The [recent-fact encoding increment](results/compact-recent-facts-2026-09-20/README.md)
 reduces measured quiet Cavecrawl host application traffic by 30.6% while retaining
 complete facts and delivery cadence. Negotiation/legacy, bounded decoding,
-recipient filtering and native/browser recovery gates pass. This closes that
-measured header-overhead follow-up; broader M3/M9 completion remains open.
+recipient filtering and native/browser recovery gates pass. Those results
+address the measured header overhead; broader M3/M9 completion remains open.
 
 The latest [authority hit-history increment](results/authority-hit-history-2026-09-14/README.md)
 addresses the recorded loaded Scrapyard raw-UDP freshness failure for the tested
@@ -82,8 +84,7 @@ and [correct Godot scalar/enum call storage](results/ptrcall-abi-2026-09-14/READ
 Their rejected loaded runs and queue/pacing/fence candidates remain evidence of
 those earlier versions, rather than current completion claims.
 
-Sequence is dependency-based, not a calendar estimate. M2 should challenge M1's
-API before schema/codegen freezes it. M5 is required before calling the co-op
+Sequence is dependency-based, not a calendar estimate. M2 should exercise M1's API before schema/codegen fixes its representation. M5 is required before calling the co-op
 library a replacement for Kit. M7 can proceed independently after the shared
 schema/session prerequisites; Scrapyard's server/co-op port does not require it.
 
@@ -129,29 +130,34 @@ Acceptance:
 - Reads cannot mutate saved frames or events; old pool handles reject recycled slots.
 - An intentionally impure step is caught by audit as a state or event mismatch.
 
-Follow-up before larger state stores: decide whether the typed whole-world API
-remains ergonomic in M2; measure memory/copy cost; add managed variable-size
-collections only with a clear ownership and serialization contract. Tagged value
-unions now have replay, canonical codec, native/WASM/x86-64 and ENet acceptance.
-Immutable asset handles need their own complete storage contract. Owned audit capture and
-canonical field diagnostics now have native/WASM checks and a real-save inspection
-tool. An opt-in live Godot overlay now exposes local/Session status and bounded
-audit reports in Hello and Cavecrawl. The [local history dock](../../replay/godot/debug/scrubber.md)
-now inspects retained frames and explicitly resumes or branches Hello's offline
-timeline, with native/browser view and input checks. A generic scalar editor now
-validates changes to a copied preview before an explicit local branch; see the
-[field-editor acceptance](results/field-editor-2026-09-14/README.md). Portable local
-recordings now export the replayable suffix and verify complete frames/events in
-fresh native/WASM processes; [acceptance](results/local-recording-2026-09-14/README.md)
-includes native Godot and completed Chrome downloads. The
-[loaded-recording viewer](results/recording-playback-2026-09-14/README.md) now opens
-those files in native/Chrome Godot, presents expected frames and mismatch details,
-and supports an explicit branch while preserving the original game. The
-[network recording adapter](results/network-recording-2026-09-14/README.md) now
-preserves full network batches and recorded admission decisions in real Scrapyard
-authority/prediction/browser exports, with native/WASM verification. Continuous/
-multi-window recording, coordinated multi-field editing and richer network-runner
-tools remain additional work.
+The planned follow-up before larger state stores was to evaluate the typed
+whole-world API in M2, measure memory/copy cost, and add variable-size
+collections only with an explicit ownership and serialization contract.
+Tagged value unions received replay, canonical codec, native/WASM/x86-64, and
+ENet acceptance. Immutable asset handles still needed their own complete
+storage contract.
+
+Owned audit capture and canonical field diagnostics received native/WASM
+checks and a real-save inspection tool. The opt-in Godot overlay exposes
+local/Session status and bounded audit reports in Hello and Cavecrawl. The
+[local history dock](../../replay/godot/debug/scrubber.md) inspects retained
+frames and explicitly resumes or branches Hello's offline timeline, with
+native/browser view and input checks. A generic scalar editor validates a
+copied preview before an explicit local branch; see the
+[field-editor acceptance](results/field-editor-2026-09-14/README.md).
+
+Portable local recordings export the replayable suffix and verify complete
+frames/events in fresh native/WASM processes. Their
+[acceptance](results/local-recording-2026-09-14/README.md) includes native Godot
+and completed Chrome downloads. The
+[loaded-recording viewer](results/recording-playback-2026-09-14/README.md) opens
+those files in native/Chrome Godot, presents expected frames and mismatch
+details, and supports explicit branching while preserving the original game.
+The [network recording adapter](results/network-recording-2026-09-14/README.md)
+preserves complete network batches and recorded admission decisions in real
+Scrapyard authority/prediction/browser exports, with native/WASM verification.
+Continuous/multi-window recording, coordinated multi-field editing, and richer
+network-runner tools remain additional work.
 
 ## M2 — Presentation and Godot hello
 
@@ -330,7 +336,8 @@ Acceptance:
 The [Cavecrawl social-detail gate](results/cave-social-details-2026-09-14/README.md)
 now covers measured scoreboard latency, stamped ping names, rename/input capture,
 expiry/rejoin and a browser handoff with fresh telemetry and old-scope marker
-retirement. This closes those presentation rows while broader parity remains open.
+retirement. These checks cover the listed presentation rows; broader parity
+remains open.
 
 The [C4 director comparison](results/cave-director-2026-09-14/README.md) corrects
 initial/within-wave pacing, death-anchored rests, empty waves and per-floor den
@@ -437,20 +444,26 @@ Implementation:
    TLS service restart with a fresh trusted reader. The standalone service now
    registers Cavecrawl, Speedball and Scrapyard backends through a bounded room hub;
    all three actual game models pass native publication/download/restart gates.
-   Room/Party now handles manual/automatic publication and exact lost-reply recovery;
+
+   Room/Party handles manual/automatic publication and exact lost-reply recovery;
    Cavecrawl's native and browser gates publish during play and after host migration.
-   A separate guarded Restore API now grants a fresh registered process a newer
+
+   A separate guarded Restore API grants a fresh registered process a newer
    epoch for an exact durable publication; native TLS tests restore all three game
    models and advance their simulation after service restart. Expiry/quarantine,
    request replay, policy and atomic epoch/frontier process-kill gates pass.
-   Room/Party now drives published restoration and Cavecrawl's rejoin/retry UI
+
+   Room/Party drives published restoration and Cavecrawl's rejoin/retry UI
    passes native and browser service-kill tests with new guests and continued saves.
-   Atomic checkpoint/asset packages now persist complete declared dependency sets;
+
+   Atomic checkpoint/asset packages persist complete declared dependency sets;
    Scrapyard restores its spray from an empty cache in native and browser processes,
    continues firing and republishes. Publication/root/package commit-kill gates pass.
-   Competing prepared fresh returners now pass native and browser Cavecrawl races:
+
+   Competing prepared fresh returners pass native and browser Cavecrawl races:
    one wins epoch 2, the other follows, and subsequent loot is conserved in a new
    publication. Temporary checkpoint-service Busy responses retry automatically.
+
    Remaining game save/restore acceptance, broader asset profiles,
    broader recovery policy cases and remaining game UI remain required;
    storing a save does not grant authority. The linked plan specifies these steps.
@@ -538,7 +551,7 @@ correction size/frequency, replay depth/time, and repeated or missing effects.
 Run the migrating simulation acceptance from M5 against at least one action game.
 
 The [Speedball UI result](results/speedball-ui-2026-09-08/README.md) adds its direct
-session front door, named chat/scoreboard and lifecycle controls, retaining the
+session menu, named chat/scoreboard, and lifecycle controls, retaining the
 contested-ball acceptance gate. The [Speedball migration result](results/speedball-room-2026-09-08/README.md)
 adds the native Room path, moving scored checkpoint recovery and new-epoch social/
 action acceptance. The [round/profile result](results/speedball-rounds-2026-09-08/README.md)
@@ -560,7 +573,7 @@ admits a new guest, completes round 2 and republishes it with names/profile pres
 Other browsers, public relay routing and broader workload acceptance remain required.
 
 Quickdraw's [session UI increment](results/quickdraw-ui-2026-09-13/README.md) now
-adds an interactive front door, authority-owned names/start state, literal chat,
+adds an interactive session menu, authority-owned names/start state, literal chat,
 named observers, a nonzero scoreboard and same-seat rejoin. The unchanged combat
 A/B/lob gates pass, and planned/crash Room gates preserve named rows and chat across
 exact combat restoration. Native profile and rendered UI checks pass. Broader
@@ -836,21 +849,25 @@ pressure and the broader M9 adoption requirements remain open. The
 [mixed movement/status cohort](results/scrapyard-mixed-2026-09-08/README.md) now adds
 three alternating pairs with movement, frostwave and battlecry, measured status
 exposure, conservation and final convergence. Injury/DOT/dash/reload combinations,
-changing waves and raw faults combined with this workload remain separate gates. The
-[endurance comparison](results/scrapyard-endurance-2026-09-08/README.md) now measures
+changing waves and raw faults combined with this workload remain separate gates.
+
+The [endurance comparison](results/scrapyard-endurance-2026-09-08/README.md) now measures
 injury/regen reactions, dash and reload with both delay and raw loss. Its delay
 condition passes; raw-loss acceptance remains rejected for missing remote dash
 edges and long observed-frame gaps. Bounded prediction stalling and opt-in
-receipt-time actions are implemented/tested, but do not close that input problem. The subsequent
-[input audit](results/input-frontier-2026-09-08/README.md) identifies obsolete-tick
+receipt-time actions are implemented/tested, but do not close that input problem.
+
+The subsequent [input audit](results/input-frontier-2026-09-08/README.md) identifies obsolete-tick
 capture and adds authority-frontier fencing plus explicit control-consumption
 receipts. Replay passes the raw-loss workload after those changes; paired acceptance
-still fails for a Kit-side cast refusal, which remains recorded work. The
-[cast-submission audit](results/cast-submission-2026-09-09/README.md) corrects that
+still fails for a Kit-side cast refusal, which remains recorded work.
+
+The [cast-submission audit](results/cast-submission-2026-09-09/README.md) corrects that
 classification: local prediction rejection did not mean the command was unsent.
 Contract version 2 records the actual submission receipt. A fresh cohort still
-fails raw-loss gameplay/observation gates; delay-only acceptance remains separate. The subsequent
-[Receipt resync-queue increment](results/receipt-resync-2026-09-09/README.md) adds
+fails raw-loss gameplay/observation gates; delay-only acceptance remains separate.
+
+The subsequent [Receipt resync-queue increment](results/receipt-resync-2026-09-09/README.md) adds
 bounded command admission during same-epoch recovery and validates it directly.
 Its fresh endurance cohort passes all 24 windows and 56 report cases; previous
 failures, long observed-frame gaps and the remaining workloads stay explicit.
@@ -1004,12 +1021,17 @@ broader comparison/adoption costs remain work.
 | Migration loses or duplicates outcomes | Crash-at-every-phase fixtures | Strengthen checkpoint/commit/dedup protocol, document unavoidable loss |
 | Benchmark compares different gameplay | Content/rules hashes and parity matrix | Mark unmatched scenarios; do not attribute differences to framework |
 
-## Immediate next implementation
+<a id="immediate-next-implementation"></a>
 
-This section's original port-first sequence is superseded by the
-[framework completion order](framework-completion.md#order-of-work). Finish native
-authenticated P2P integration, audit shared gaps, and stabilize the public API.
-The game work below is a follow-up inventory unless it exposes a framework defect.
+## Historical next steps and follow-up inventory
+
+The original port-first sequence was superseded by the
+[framework completion order](framework-completion.md#order-of-work). That
+change prioritized native authenticated P2P integration, shared-gap audits,
+and public API stabilization. Those priorities are recorded here as historical
+next steps; the [release assessment](release-assessment.md) reports the
+subsequent framework outcome. Game work remained a follow-up inventory unless
+it exposed a framework defect.
 
 Continue the [Scrapyard port ledger](../../examples/replay_scrapyard/roadmap.md).
 The separate game now has the arena, stock gun/enemy/effect/ability catalog,
@@ -1042,7 +1064,7 @@ combinations, richer browser workloads and public provisioning/deployment remain
 
 Use comparable workloads to complete M9's authoring/runtime measurements and
 stabilization decisions. Keep both frameworks and both versions of each game
-independently runnable. Remaining requirements are work, not implicit parity waivers.
+independently runnable. Deferred requirements still need their own acceptance before a parity claim.
 
 
 The [loaded checkpoint-transfer increment](results/checkpoint-compression-2026-09-13/README.md)

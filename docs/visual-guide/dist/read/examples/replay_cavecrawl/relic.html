@@ -48,11 +48,12 @@ version. Descent now retains that state as part of the complete replayable world
 streams that position from the owner. C7 <a href="carrier.html">carrier lifecycle rules</a>
 retain ownership through death and ordinary disconnect, park absent carriers’
 props, and resume carrying on rejoin. C8 <a href="adoption.html">old-host prop adoption</a> uses recorded authority observations;
-the owner-stream profile remains separate comparison work.</p>
+the <a href="../replay_cavecrawl_owned/README.html">owner-motion companion</a> has separate
+implementation and comparison evidence.</p>
 <h2 id="existing-saves">Existing saves<a class="heading-anchor" href="#existing-saves" aria-label="Link to this section">#</a></h2>
 <p>Current content is <code>0x4341564552504c39</code>. Normal loads reject C1–C8 archives; use
-<code>tools/upgrade_save</code> with a new destination. C8 adds authority observation fields to the world; the network protocol is
-unchanged. C5 conversion retains every saved frame and peer field,
+<code>tools/upgrade_save</code> with a new destination. C8 adds authority observation fields
+to the world; the network protocol is unchanged. C5 conversion retains every saved frame and peer field,
 including the old relic position and ownership, before applying current rules on
 advancement. A relic already reset by an old descent stays as recorded; the
 converter cannot recover its former carrier or position. Keep the original file
@@ -63,5 +64,5 @@ archive conversion. Isolated Godot processes inspect retained transition frames,
 and the full multiplayer campaign exercises carry/move/set-down under normal and
 faulted network delivery.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="carrier.html"><span>Carrier death, disconnect and recovery</span><span aria-hidden="true">→</span></a><a href="adoption.html"><span>Old-host prop adoption</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_cave_relic/README.html"><span>Cavecrawl relic acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/relic.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="carrier.html"><span>Carrier death, disconnect and recovery</span><span aria-hidden="true">→</span></a><a href="adoption.html"><span>Old-host prop adoption</span><span aria-hidden="true">→</span></a><a href="../replay_cavecrawl_owned/README.html"><span>Cavecrawl with owner motion</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/relic.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#existing-saves" class="">Existing saves</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/relic.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

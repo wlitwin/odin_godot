@@ -3,20 +3,21 @@
 Replay runs gameplay rules against a complete Odin world that can be saved and
 replayed. Use it when local simulation, prediction or recovery needs to reproduce
 a game's state from recorded inputs. It lives beside Kit and uses its own
-replication, simulation and session runtimes. **Both implementations and both
-versions of each ported game must remain available.**
+replication, simulation and session runtimes. Keep both implementations and both
+versions of each ported game available.
 
 Replay implements local simulation, server-authoritative prediction/reconciliation,
 cooperative owner streams, and deterministic P2P rollback. Its shared foundations
-include bounded typed history, entity pools/RNG, canonical codecs, presentation
+include bounded typed history, entity pools and random-number generators,
+canonical codecs, presentation
 journals, recipient views, checkpoints, durable enrollment and host migration.
 Godot owns scenes/input/output; the simulation packages run without Godot.
 
 Start with [getting started](getting-started.md), the
 [Session starter project](../build/template/replay/README.md), and the
 [checked lifecycle recipes](../examples/replay_recipes/README.md). Most games
-need one Timeline, Session or Room runtime owner; the package reference below includes
-advanced mechanisms and tools, not a checklist of required imports. Kit (v1)
+need one Timeline, Session or Room runtime owner. The package reference below
+also includes optional advanced mechanisms and tools. Kit (v1)
 and Replay (v2) share [Odin/API conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
 while retaining their different gameplay models.
 
@@ -79,7 +80,9 @@ nix develop --command bash examples/replay_loot/run.sh
 The test gate runs native tests, type-checks the instantiated example for WASM,
 and executes the example. It is also registered in `tests/run_all.sh`.
 
-## The contract
+<a id="the-contract"></a>
+
+## World state and step requirements
 
 ```odin
 import replay "godot:replay"
@@ -98,23 +101,26 @@ err := replay.init(&timeline, replay.Frame(World){}, step)
 // Check err, advance with typed inputs, copy frames for presentation, and destroy.
 ```
 
-Store **all mutable gameplay state** in `World`, including RNG, cooldowns,
+Store all mutable gameplay state in `World`, including RNG, cooldowns,
 scheduled work, entity lifetime, and entity allocation. A step can modify several
 entities directly. Read device input before calling `advance`. Draw from copies
 returned by `current` or `read`; presentation never writes into simulation.
 
 The value-storage implementation supports scalars, enums, bit sets, fixed
-arrays, ordinary structs and supported tagged unions containing those values. Initialization recursively
-rejects pointers, slices, strings, maps, procedures, and other unsupported types.
+arrays, ordinary structs, and supported tagged unions containing those values.
+Initialization recursively rejects pointers, slices, strings, maps, procedures,
+and other unsupported types.
 Struct padding is allowed: frames copy typed values within one process; they
-are **not wire packets**. Canonical wire codecs live in `replay/schema`; dynamic collections
-remain future storage work.
+are not wire packets. Canonical wire codecs live in `replay/schema`; dynamic
+collections remain future storage work.
 
 Treat a live `Timeline` as a single owner of allocations: keep it in one place,
 pass it by pointer, and call `destroy` once. Frame and event reads return/copy
 owned values. Pool pointers and step contexts are borrowed for the current step.
 
-## Present limits
+<a id="present-limits"></a>
+
+## Current capabilities and limits
 
 - Room has native/browser planned/crash migration, returned-host, repeated-handoff,
   control-partition and successor-loss evidence. Owner-driven co-op and native/
@@ -138,9 +144,9 @@ owned values. Pool pointers and step contexts are borrowed for the current step.
 - Whole frames and replay scratch are copied. This deliberately prioritizes
   correctness while the API is explored; scale claims require measurements.
 
-The API is experimental. The framework audit and each package's tested envelope
-determine what can be described as supported; historical game parity ledgers do
-not imply missing framework features.
+The API is experimental. Use the framework audit and each package's tested
+configurations to assess support. Historical game-parity records compare
+individual ports; they are not a checklist of missing framework features.
 
 ## Optional exact correction reuse
 

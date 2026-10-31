@@ -1,9 +1,10 @@
 # Editor-first authoring delivery
 
-E1–E6 of the [editor-first goal](editor-first-plan.md) are complete.
+This records the completed E1–E6 delivery from the
+[editor-first plan](editor-first-plan.md).
 [Final source/test receipts](results/editor-first-2026-09-20/README.md) record the
 implementation, validation, measured tradeoffs and preserved original sources.
-The canonical entry point is [Scrapyard's authoring guide](../../examples/replay_scrapyard/editor-first.md).
+The authoring entry point is [Scrapyard's authoring guide](../../examples/replay_scrapyard/editor-first.md).
 
 | Gate | Delivered |
 | --- | --- |
@@ -42,7 +43,7 @@ A stale migration test read `.polygon` on a MeshInstance2D. It now uses the exis
 representation-independent ViewProbe.vertices helper and keeps the same shape/count
 assertion. The failed receipt is preserved. Another initial harness entry referenced
 a nonexistent camera_test.gd; the actual revive and crash-camera fixtures are now
-used. An early runner compile failed after removing a local catalog alias still
+used. An early compile failed after removing a local catalog alias still
 used by the status display; that alias was retained.
 
 ## Measured cost
@@ -69,5 +70,5 @@ authoring and ownership, not a blanket performance promise.
 
 The original game, Kit and existing gameplay/content schemas remain unchanged.
 Generated arenas, high-churn projectile/beam batches and specialized feedback remain
-procedural by explicit design. The current guide documents that boundary rather
-than presenting partial conversion as an invisible limitation.
+procedural by explicit design. The guide identifies the rendering paths that remain procedural and explains
+their ownership.

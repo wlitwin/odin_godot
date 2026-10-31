@@ -1,8 +1,9 @@
 # Authenticated authority service and durable storage
 
 Use `Service` to expose a room's authority coordinator over Replay's transport
-interface. `Rpc_Client` correlates replies with a time-limited `Lease`; the SQLite
-adapter durably commits each coordinator decision with compare-and-swap.
+interface. `Rpc_Client` correlates replies with a time-limited `Lease`. The
+SQLite adapter durably commits each decision with compare-and-swap: it accepts
+the replacement record only when the stored revision matches the expected one.
 [Process registration](registration.md) supplies fresh incarnations for known
 members, and the [Room driver](../godot/room.md) connects these decisions to live
 gameplay.
@@ -41,11 +42,12 @@ remain at the queue head and block all later requests.
 
 ## Atomic replay protection
 
-Decision record version 3 includes a per-member request sequence, request hash,
-result, and bound client nonce. The service evaluates a command on a private coordinator copy, then
-commits its decision and replay frontier together through one real CAS operation.
-This includes reads and rejected commands: an older delayed mutation cannot run
-after a newer Query, including after service restart.
+Decision record version 3 stores each member's request sequence, request hash,
+result, and bound client nonce. The service evaluates a command on a private
+coordinator copy, then atomically commits both the decision and the request
+frontier through compare-and-swap (CAS). Reads and rejected commands update
+that frontier too. An older delayed mutation therefore cannot execute after a
+newer Query, even after service restart.
 
 An identical retry of the latest request returns its recorded result and a fresh
 view of current remaining lease time; it does not renew again or repeat the
@@ -125,8 +127,8 @@ authenticated RPCs, and restores the successor's simulation at epoch 2. The gate
 then kills the coordinator, reopens its SQLite record as generation 2, keeps the
 successor alive, waits through quarantine, and resumes its retained world at epoch 3.
 
-This proves the decision service, durability, and simulation transfer components.
-The fixture uses explicit test provisioning and a separate checkpoint connection.
-This fixture does not prove migration of live Cavecrawl clients, gameplay
-rendezvous or every M5 crash/partition scenario. Consult the
+These results validate the fixture's decision service, durable decisions, and
+simulation transfer. It uses explicit test provisioning and a separate checkpoint
+connection, so it does not establish migration of live Cavecrawl clients,
+gameplay rendezvous, or every M5 crash/partition scenario. Consult the
 [Room driver](../godot/room.md) and its acceptance cases for those integrations.

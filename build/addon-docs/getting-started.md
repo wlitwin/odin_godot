@@ -1,8 +1,8 @@
 # Getting started
 
-This walks you from a freshly-installed addon to a running Odin script: install the Odin
-toolchain, copy the starter, build, then write, attach, and run your own `.odin` script. By
-the end you'll have a `Node2D` that prints on `_ready` and moves every frame.
+Install the Odin toolchain, copy the starter, and build a scripts library.
+Then write and attach a `.odin` script to a `Node2D` that prints on `_ready`
+and moves every frame.
 
 > This page is written for the **drop-in addon** (you copied `addons/odin_godot/` into your
 > project). If you're working from the odin_godot *source repo* instead, its `nix develop`
@@ -12,7 +12,7 @@ the end you'll have a `Node2D` that prints on `_ready` and moves every frame.
 
 You need three things on your machine (the addon already provides the prebuilt engine core):
 
-1. **Godot 4.6+** — <https://godotengine.org>
+1. **Godot 4.7+** — <https://godotengine.org> (the addon's `.gdextension` minimum)
 2. **The Odin compiler — release `@ODIN_VERSION@` tested/recommended** —
    <https://github.com/odin-lang/Odin/releases>. The bundled prebuilt core validates a
    scripts library's complete native ABI fingerprint before boot. Another compiler release
@@ -38,11 +38,11 @@ Once the addon is in `res://addons/odin_godot/`, Godot auto-discovers its
 2. **A build** — `addons/odin_godot/build/build_scripts.sh` (or `.ps1` on Windows) compiles
    that package into `res://bin/libodinscripts.<ext>`, which the core loads at runtime.
 
-The fastest way to both is the bundled starter.
+The bundled starter supplies the scripts package for this build.
 
 ### 2a. Copy the starter
 
-**Easiest — from inside Godot:** **Project → Tools → Set Up Odin Scripts**. This copies the
+**In Godot:** **Project → Tools → Set Up Odin Scripts**. This copies the
 template into `res://scripts/` and refreshes the FileSystem dock (the template lives inside the
 addon, so it isn't visible there to drag yourself). Or from a terminal:
 
@@ -55,12 +55,13 @@ You now have `res://scripts/`:
 - **`hello.odin`** — a minimal example class you'll replace below. Every `.odin` in
   `scripts/` shares the same `package scripts` line at the top.
 
-The first build drops three generated files next to it, all `*.gen.odin` build artifacts you
-never write or edit: **`odin_godot_scripts.gen.odin`** (the registration code for every script
+The first build writes three generated files beside it. These `*.gen.odin`
+files are build artifacts; edit the authored source instead: **`odin_godot_scripts.gen.odin`** (the registration code for every script
 in the directory), **`odin_godot_boot.gen.odin`** (the `odin_scripts_boot` export the core
 calls after it loads your dll), and **`odin_godot_guard.gen.odin`** (a staleness guard that
-fails the build if the generated code ever drifts from your sources). Need to customize the
-boot shim? Add your own file defining `odin_scripts_boot` and the generated one steps aside.
+fails the build when generated code no longer matches its sources). To
+customize the boot shim, define `odin_scripts_boot` in an authored file;
+the generator then omits its default implementation.
 
 ### 2b. (Optional) editor settings
 
@@ -82,8 +83,8 @@ package scripts
 
 import gd "godot:godot"
 
-// The script struct. The FIRST field MUST be the owner node handle — the core writes the
-// node pointer there. Its type is just the handle you want to use (Node2d here).
+// The script struct's first field must be the owner node handle. The core writes the
+// node pointer there. Use the engine handle type needed by the script (Node2d here).
 Mover :: struct {
 	owner: gd.Node2d,
 	speed: f32 `gd:"export,default=120"`,   // @export var, tunable in the Inspector
@@ -108,16 +109,17 @@ A few rules this demonstrates (full details in the [Authoring Guide](authoring-g
 - **Prefix proc names with the struct name** (`mover_ready`, `mover_process`) — all scripts
   share one package, so the prefix avoids collisions and is stripped to derive the
   GDScript-facing name.
-- The `//gd:` markers declare the class. `//gd:extends` is authoritative for the base class;
-  the `owner` field type is just the handle you use in code.
+- The `//gd:` markers supply engine metadata. `//gd:extends` selects the base
+  class; if omitted, the base derives from the `owner` handle. A declared
+  base requires an `owner` handle of that type or one of its ancestors.
 
-You do **not** write the registration boilerplate — the build runs `scriptgen`, which emits it
-into `scripts/odin_godot_scripts.gen.odin`, one generated file for the whole directory (a
-build artifact you never edit, hidden in the FileSystem dock).
+The build runs `scriptgen` to generate registration code in
+`scripts/odin_godot_scripts.gen.odin`, one file for the directory. The editor
+hides that build artifact from the FileSystem dock.
 
 ## 4. Build
 
-**The easy way — from inside Godot:** **Project → Tools → Build Odin Scripts**. This compiles
+**In Godot:** **Project → Tools → Build Odin Scripts**. This compiles
 your `scripts/` package into `res://bin/libodinscripts.<ext>` and reports progress in the
 Output panel — no terminal needed. (The editor also rebuilds automatically when you save a
 script.)

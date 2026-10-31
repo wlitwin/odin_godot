@@ -2,32 +2,38 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/items — item definitions and stack-aware inventories · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/items — item definitions and stack-aware inventories</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/items.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model">Mental model</a><a href="#definitions-the-table">Definitions: the Table</a><a href="#slots-and-operations">Slots and operations</a><a href="#which-ops-take-the-table">Which ops take the Table</a><a href="#worked-example-looting-a-chest">Worked example: looting a chest</a><a href="#grid-packing-shape-as-a-mechanic">Grid packing (shape as a mechanic)</a><a href="#gotchas">Gotchas</a></nav></details>
-<article class="reading-body "><p>Reach for <code>kit/items</code> when entities carry things: bags, chests, pickups, loot. It gives you
-a 4-byte <code>Slot</code>, a definition <code>Table</code> (names, stack sizes), and deterministic operations
-(add, take, put, transfer) that are safe inside predicted commands.</p>
-<p><strong>Lane compatibility:</strong> inventories normally remain on reliable delta fields
-mutated through commands. <code>Slot</code> operations are pure and deterministic, so they
-are safe inside predicted commands on either lane. <code>Inventory($N)</code> has not been
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/items — item definitions and stack-aware inventories</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/items.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#replicated-inventory-state">Replicated inventory state</a><a href="#definitions-the-table">Definitions: the Table</a><a href="#slots-and-operations">Slots and operations</a><a href="#operations-that-require-the-table">Operations that require the Table</a><a href="#worked-example-looting-a-chest">Worked example: looting a chest</a><a href="#grid-packing">Grid packing</a><a href="#inventory-invariants-and-return-values">Inventory invariants and return values</a></nav></details>
+<article class="reading-body "><p><code>kit/items</code> represents inventories in bags, chests, and pickups. It provides a
+4-byte <code>Slot</code>, a definition <code>Table</code> containing names and stack sizes, and
+deterministic add, take, put, and transfer operations. Use table-free
+operations inside predicted commands; perform operations that need item
+definitions in the authority hook that holds the table.</p>
+<p>Inventories normally use reliable delta fields mutated through commands.
+Table-free <code>Slot</code> operations are pure and deterministic and can run inside
+predicted commands on either lane. <code>Inventory($N)</code> has not been
 covered by the simulation-descriptor tests; do not put it on the simulation
 lane without adding that coverage.</p>
-<h2 id="mental-model">Mental model<a class="heading-anchor" href="#mental-model" aria-label="Link to this section">#</a></h2>
-<p>An inventory is a <strong>plain fixed-size array of 4-byte Slot values living inside a replicated
-entity struct</strong>:</p>
+<p><span id="mental-model"></span></p>
+<h2 id="replicated-inventory-state">Replicated inventory state<a class="heading-anchor" href="#replicated-inventory-state" aria-label="Link to this section">#</a></h2>
+<p>An inventory stores a fixed-size array of 4-byte Slot values in a replicated
+entity struct:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Chest :: <span class="hljs-keyword">struct</span> {
 	slots: [<span class="hljs-number">8</span>]kitems.Slot <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 	...
-}</code></pre></div><p>Tag the inventory as replicated state. Slots then use the <a href="net.html">kit/net</a>
-shadow-delta walk like other fixed-layout fields. Predicate rejections carry
-authoritative inventory state back when a prediction loses a race.</p>
-<p>Every operation is <strong>deterministic and allocation-free</strong>. They run inside <code>@(gd_command)</code>
-procs, so the predicting client and the host execute the same op from byte-identical args
-and land on identical slots. Two players grabbing the same last item both predict success;
-the host runs them in arrival order, the second op finds the slot empty and rejects, and the
-loser&#39;s optimistic state reverts. The command pipeline returns the verdict and applies the correction.</p>
-<p>Item <strong>definitions are code, not wire</strong>: every peer registers the same table in <code>ready()</code>
-(ids are game constants), so only 4-byte slots ever ship.</p>
+}</code></pre></div><p>Tag the inventory as replicated state. <a href="net.html">kit/net</a> then compares slots
+with its stored copy and sends changes as it does for other fixed-layout
+fields. When a command predicate rejects a conflicting prediction, the reply
+includes authority inventory state for correction.</p>
+<p>Operations are deterministic and allocation-free. A predicting client and the
+host produce identical slots when given the same starting state and arguments.
+Their starting state can differ during contention: two players taking the
+last item may both predict success. The host processes their commands in
+arrival order; the second finds the slot empty and rejects. The command
+pipeline returns the verdict and corrects the rejected prediction.</p>
+<p>Every peer registers the same item definitions in <code>ready()</code>, using game
+constants for IDs. The inventory replicates 4-byte slots containing those IDs
+and counts; it does not send the definition table.</p>
 <h2 id="definitions-the-table">Definitions: the Table<a class="heading-anchor" href="#definitions-the-table" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Item_Id :: <span class="hljs-keyword">distinct</span> <span class="hljs-type">u16</span>
 
@@ -50,13 +56,13 @@ items_register :: <span class="hljs-keyword">proc</span>(t: ^Table, id: Item_Id,
 
 items_def :: <span class="hljs-keyword">proc</span>(t: ^Table, id: Item_Id) -&gt; (Item_Def, <span class="hljs-type">bool</span>)
 
-<span class="hljs-comment">// Display name (&quot;&quot; for empty/unknown — UIs render blanks, not crashes).</span>
+<span class="hljs-comment">// Display name (&quot;&quot; for empty or unknown items).</span>
 items_name :: <span class="hljs-keyword">proc</span>(t: ^Table, id: Item_Id) -&gt; <span class="hljs-type">string</span>
 
 table_destroy :: <span class="hljs-keyword">proc</span>(t: ^Table)</code></pre></div><p>Cavecrawl registers its table once in <code>ready()</code> (<code>cavecrawl.odin</code>):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">kitems.items_register(&amp;self.table, GEM, <span class="hljs-string">&quot;gem&quot;</span>, <span class="hljs-number">99</span>)
 kitems.items_register(&amp;self.table, TORCH, <span class="hljs-string">&quot;torch&quot;</span>, <span class="hljs-number">5</span>)</code></pre></div><h2 id="slots-and-operations">Slots and operations<a class="heading-anchor" href="#slots-and-operations" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// One inventory slot: 4 POD bytes. INVARIANT: an empty slot is exactly</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// One inventory slot: 4 POD bytes. An empty slot must be exactly</span>
 <span class="hljs-comment">// {ITEM_NONE, 0} — every op normalizes on the way out, so slot equality (and</span>
 <span class="hljs-comment">// the replication layer&#x27;s byte-level diffing) stays meaningful.</span>
 Slot :: <span class="hljs-keyword">struct</span> {
@@ -82,8 +88,8 @@ take :: <span class="hljs-keyword">proc</span>(slots: []Slot, idx: <span class="
 put :: <span class="hljs-keyword">proc</span>(t: ^Table, slots: []Slot, idx: <span class="hljs-type">int</span>, item: Item_Id, count: <span class="hljs-type">u16</span>) -&gt; (accepted: <span class="hljs-type">u16</span>)
 
 <span class="hljs-comment">// Move up to `count` from one slot of `from` into `to` (stacking rules apply).</span>
-<span class="hljs-comment">// Anything that doesn&#x27;t fit goes straight back where it came from — the pair</span>
-<span class="hljs-comment">// of inventories is never left torn. Returns how many moved.</span>
+<span class="hljs-comment">// Any remainder returns to the source slot. Both inventories are updated</span>
+<span class="hljs-comment">// together. Returns how many moved.</span>
 transfer :: <span class="hljs-keyword">proc</span>(t: ^Table, from: []Slot, from_idx: <span class="hljs-type">int</span>, to: []Slot, count: <span class="hljs-type">u16</span>) -&gt; (moved: <span class="hljs-type">u16</span>)
 
 <span class="hljs-comment">// The `slots: [N]Slot gd:&quot;replicate&quot;` field, packaged: embed it (`using inv:</span>
@@ -92,15 +98,20 @@ transfer :: <span class="hljs-keyword">proc</span>(t: ^Table, from: []Slot, from
 <span class="hljs-comment">// `slots[:]` — growing ops still take the Table, drain/read ops stay command-safe.</span>
 Inventory :: <span class="hljs-keyword">struct</span>($N: <span class="hljs-type">int</span>) {
 	slots: [N]Slot <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
-}</code></pre></div><h2 id="which-ops-take-the-table">Which ops take the Table<a class="heading-anchor" href="#which-ops-take-the-table" aria-label="Link to this section">#</a></h2>
-<p>Ops that can grow a stack consult the defs for <code>max_stack</code>: <code>add</code>, <code>put</code>, <code>transfer</code>. Ops
-that only drain or read slots don&#39;t: <code>take</code>, <code>remove</code>, <code>count_of</code>.</p>
-<p>The table-free ops are exactly the ones usable inside a <code>@(gd_command)</code> proc, which sees only
-its entity and args, with no ambient state. Crediting with stacking rules happens where the
-table lives: the command hook or host code.</p>
+}</code></pre></div><p><span id="which-ops-take-the-table"></span></p>
+<h2 id="operations-that-require-the-table">Operations that require the Table<a class="heading-anchor" href="#operations-that-require-the-table" aria-label="Link to this section">#</a></h2>
+<p>Operations that can grow a stack consult the definitions for <code>max_stack</code>:
+<code>add</code>, <code>put</code>, and <code>transfer</code>. Operations that only remove or read items do not
+need the table: <code>take</code>, <code>remove</code>, and <code>count_of</code>.</p>
+<p>Use the table-free operations inside a <code>@(gd_command)</code> proc, which sees only
+its target entity and arguments. Add items with stacking rules in the command
+hook or host code that has access to the table.</p>
 <h2 id="worked-example-looting-a-chest">Worked example: looting a chest<a class="heading-anchor" href="#worked-example-looting-a-chest" aria-label="Link to this section">#</a></h2>
-<p>The command half is table-free, predicted, and range-gated with the same
-<a href="interact.html">kit/interact</a> gate the prompt uses (<code>examples/cavecrawl/scripts/chest.odin</code>):</p>
+<p>The command removes items without consulting the table and can therefore be
+predicted. It checks range with the same <a href="interact.html">kit/interact</a> procedure
+used by the prompt. The example below shows a local scratch-field approach;
+the current <code>examples/cavecrawl/scripts/chest.odin</code> returns the taken Slot to
+its generated consequence instead:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
 chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span class="hljs-type">i32</span>, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> {
 	<span class="hljs-keyword">if</span> !kinter.in_range({px, py, <span class="hljs-number">0</span>}, {self.x, self.y, <span class="hljs-number">0</span>}, REACH) {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
@@ -108,8 +119,8 @@ chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span c
 	<span class="hljs-keyword">if</span> taken.count == <span class="hljs-number">0</span> {<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>}
 	self.last_take = taken
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
-}</code></pre></div><p>The cross-entity half runs host-only, in the command hook, where the table lives
-(<code>host.odin</code>):</p>
+}</code></pre></div><p>Crediting another entity runs only on the host, in a command hook that can
+access the table. A <code>host.odin</code> handler can apply it as follows:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">cave_credit :: <span class="hljs-keyword">proc</span>(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 	av, has := self.avatar_of[player]
 	<span class="hljs-keyword">if</span> !has {<span class="hljs-keyword">return</span>}
@@ -118,44 +129,47 @@ chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span c
 	<span class="hljs-keyword">if</span> leftover := chest.last_take.count - credited; leftover &gt; <span class="hljs-number">0</span> {
 		_ = kitems.add(&amp;self.table, chest.slots[:], chest.last_take.item, leftover)
 	}
-}</code></pre></div><p><code>last_take</code> is a plain field that never rides the wire; it carries what the command took
-across to the hook. <a href="ui.html">kit/ui</a>&#39;s <code>inv_refresh</code> renders the bag from the same slots and
-table.</p>
-<h2 id="grid-packing-shape-as-a-mechanic">Grid packing (shape as a mechanic)<a class="heading-anchor" href="#grid-packing-shape-as-a-mechanic" aria-label="Link to this section">#</a></h2>
-<p>For inventories where the SHAPE matters (2x3 rifles, 3x3 crates, attaché-case
-Tetris), <code>packing.odin</code> adds a second board type with the same replication
-mechanism: a packed inventory is a fixed array of 10-byte <code>Packed_Entry</code> values
-inside a replicated struct, and board dimensions are game constants passed to
-the ops.</p>
+}</code></pre></div><p>In this example, <code>last_take</code> is an unreplicated scratch field that carries the
+removed Slot to the hook. <a href="ui.html">kit/ui</a>&#39;s <code>inv_refresh</code> renders the bag from
+the same slots and table.</p>
+<p><span id="grid-packing-shape-as-a-mechanic"></span></p>
+<h2 id="grid-packing">Grid packing<a class="heading-anchor" href="#grid-packing" aria-label="Link to this section">#</a></h2>
+<p>For inventories with spatial footprints, such as 2x3 rifles or 3x3 crates,
+<code>packing.odin</code> provides a board represented by a fixed array of 10-byte
+<code>Packed_Entry</code> values inside a replicated struct. Pass board dimensions as
+game constants to its operations.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Stash :: <span class="hljs-keyword">struct</span> {
 	grid: [<span class="hljs-number">12</span>]kitems.Packed_Entry <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 }
 
 <span class="hljs-comment">// ready(), every peer:</span>
 items_register(&amp;table, RIFLE, <span class="hljs-string">&quot;rifle&quot;</span>, shape = kitems.shape_of(<span class="hljs-string">&quot;XXX&quot;</span>))
-items_register(&amp;table, BOOT, <span class="hljs-string">&quot;boot&quot;</span>, shape = kitems.shape_of(<span class="hljs-string">&quot;X.&quot;</span>, <span class="hljs-string">&quot;X.&quot;</span>, <span class="hljs-string">&quot;XX&quot;</span>))</code></pre></div><p>Shapes are up to 4x4 with a solid-cell mask (<code>shape_of</code> reads row strings), and
-each placement is <strong>self-describing</strong> (the entry stores its shape), so the same
-table/table-free split holds: <code>pack_move</code>, <code>pack_remove</code>, <code>pack_at</code>, and
-<code>pack_fits</code> are table-free and command-safe (the drag-to-rearrange command is
-one predicted <code>pack_move</code>), while the growing ops (<code>pack_place</code> with a shape
-you looked up, <code>pack_add</code> which stacks then auto-places) live host/hook side
-with the table. <code>pack_find_spot</code> scans row-major, so a predicted command and
-the host derive the same anchor from the same grid bytes. Conflicts resolve the
-same way: two players dragging into the same corner both predict, the host runs
-them in arrival order, the loser reverts.</p>
-<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
+items_register(&amp;table, BOOT, <span class="hljs-string">&quot;boot&quot;</span>, shape = kitems.shape_of(<span class="hljs-string">&quot;X.&quot;</span>, <span class="hljs-string">&quot;X.&quot;</span>, <span class="hljs-string">&quot;XX&quot;</span>))</code></pre></div><p>Shapes use a solid-cell mask up to 4x4; <code>shape_of</code> builds it from row strings.
+Each entry stores its shape, allowing <code>pack_move</code>, <code>pack_remove</code>, <code>pack_at</code>,
+and <code>pack_fits</code> to run without a table inside commands. A drag-to-rearrange
+command can use one predicted <code>pack_move</code>. Operations that add placements run
+in host code or hooks with the table: <code>pack_place</code> takes a looked-up shape,
+while <code>pack_add</code> stacks items and finds space for new entries.</p>
+<p><code>pack_find_spot</code> scans in row-major order, so a prediction and the host derive
+the same placement anchor from the same grid bytes. If two players predict a
+move into the same corner, the host processes them in arrival order and
+rejects the conflicting move. The rejected prediction then reverts.</p>
+<p><span id="gotchas"></span></p>
+<h2 id="inventory-invariants-and-return-values">Inventory invariants and return values<a class="heading-anchor" href="#inventory-invariants-and-return-values" aria-label="Link to this section">#</a></h2>
 <ul>
-<li>Keep command-side ops deterministic: no table, no allocation, no clocks. They re-run on
-the host from byte-identical args and must land on identical slots.</li>
+<li>Keep command-side operations deterministic: no table, allocation, or clocks.
+Re-execution on the host must produce the same slots from the same state
+and arguments.</li>
 <li>An empty slot is exactly <code>{ITEM_NONE, 0}</code>; every op normalizes on the way out. Don&#39;t
 hand-write slots that break this: replication diffs bytes.</li>
 <li>Unknown (unregistered) items get <code>max_stack = 1</code>: they refuse to stack rather than merge
 blindly.</li>
 <li><code>items_register</code> asserts on id 0 (the empty-slot marker), and re-registration is safe:
 call it in <code>ready()</code> every run, on every peer, with the same constants.</li>
-<li>Returns are budgets, not booleans: <code>add</code> may credit less than asked (inventory full).
-Handle the leftover, as <code>cave_credit</code> does by putting it back in the chest.</li>
+<li>Check returned counts. <code>add</code> may credit fewer items than requested when the
+inventory is full. Handle the remainder, as <code>cave_credit</code> does by returning
+it to the chest.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="interact.html"><span>kit/interact</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/items.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model" class="">Mental model</a><a href="#definitions-the-table" class="">Definitions: the Table</a><a href="#slots-and-operations" class="">Slots and operations</a><a href="#which-ops-take-the-table" class="">Which ops take the Table</a><a href="#worked-example-looting-a-chest" class="">Worked example: looting a chest</a><a href="#grid-packing-shape-as-a-mechanic" class="">Grid packing (shape as a mechanic)</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/items.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="net.html"><span>kit/net: replication core</span><span aria-hidden="true">→</span></a><a href="interact.html"><span>kit/interact</span><span aria-hidden="true">→</span></a><a href="ui.html"><span>kit/ui — stock-theme widgets</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/items.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#replicated-inventory-state" class="">Replicated inventory state</a><a href="#definitions-the-table" class="">Definitions: the Table</a><a href="#slots-and-operations" class="">Slots and operations</a><a href="#operations-that-require-the-table" class="">Operations that require the Table</a><a href="#worked-example-looting-a-chest" class="">Worked example: looting a chest</a><a href="#grid-packing" class="">Grid packing</a><a href="#inventory-invariants-and-return-values" class="">Inventory invariants and return values</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/items.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

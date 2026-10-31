@@ -1,46 +1,47 @@
 # kit/comms — chat, pings, system lines
 
-How players talk while they play: text chat, positional pings/markers, and host-authored
-system lines ("alice joined the cave"). It rides the [session](session.md)'s SES_APP
-extension point on the reliable channel. The package supplies the chat packet
-format and route; the game supplies the UI and system-line wording.
+`kit/comms` sends text chat, positional pings/markers, and host-authored system
+lines such as "alice joined the cave". It uses the [session](session.md)'s
+SES_APP messages on the reliable channel. The package supplies the packet
+format and routing; the game supplies the UI and system-line wording.
 
-**Lane compatibility: lane-agnostic.** Chat is session-level: it works identically
-beside the coop lane, the sim lane, or both. Nothing here touches ticks or prediction.
+Chat operates at the session level and works with the cooperative lane, the
+simulation lane, or both. It does not participate in simulation ticks or prediction.
 
 ```odin
 import kcomms "godot:kit/comms"
 ```
 
-## Mental model
+<a id="mental-model"></a>
 
-Everything routes through the host, which stamps the speaker and rebroadcasts, so every peer
-sees the same lines in the same order (**the host's order**), on any transport. Your own chat
-line comes back with the broadcast rather than echoing locally, so what you see is what
-everyone sees.
+## Host routing and event delivery
 
-The send half lives in
-[`ksess.Host_Relay`](session.md#host-relay)
-(stamp, spoof-drop, echo policy, addressed replay), and comms runs it with `echo = true` (that
-is the "comes back with the broadcast" behavior). What kit/comms adds on top is a payload
-codec (two message kinds) over a bounded log and the shared rider queue. `comms_say` writes
-the same bytes on the host and on a client, and the relay picks the arm. There is no
-`is_host` at any send door in the package.
+All messages route through the host, which attaches the speaker identity and
+rebroadcasts them in host order. A client's own chat line is displayed when
+that broadcast returns, preserving the same ordering as other peers.
 
-Two shapes come out the other end:
+[`ksess.Host_Relay`](session.md#host-relay) handles sender identity, source
+checks, echo policy, and replay to individual recipients. Comms sets
+`echo = true`, which delivers the host's broadcast back to its author.
+`kit/comms` adds encoding for two message kinds, a bounded log, and a shared
+event queue. `comms_say` writes the same payload on hosts and clients; the
+relay selects broadcast or upload without a caller-side `is_host` check.
 
-- **Lines** land in a bounded log (`LOG_MAX :: 64` lines, older evict) that a UI repaints
+The receiver delivers two kinds of events:
+
+- **Lines** land in a bounded log (`LOG_MAX :: 64` lines, oldest evicted) that a UI repaints
   from; [kit/ui's chat box](ui.md) does exactly this.
 - **Markers** (pings) are transient poll-once events, not log lines. The game turns them
   into world visuals.
 
-The session already vouches for senders (only seated players reach the handler), and clients
-drop chat frames that don't come from the host's peer. A peer broadcasting lines directly is
-spoofing.
+The session admits only seated senders to the handler. Clients drop chat
+broadcasts received from any peer other than the host, preventing another
+client from submitting a broadcast with an invented speaker identity.
 
 ## API by task
 
-**Bind it:** call this once, next to the session (host or client, before or after it starts):
+**Initialize:** call once with the session, on the host or client, before or
+after session start:
 
 ```odin
 comms_init :: proc(c: ^Comms, ses: ^ksess.Session, tag := COMMS_TAG)
@@ -48,17 +49,19 @@ comms_destroy :: proc(c: ^Comms)
 ```
 
 `COMMS_TAG` is `u8(0)`; pass another tag if the game claims 0 for itself (cavecrawl keeps
-comms on 0 and puts fire announcements on `TAG_FIRE :: u8(1)`). Destroy the comms before the
-session: it must outlive the session's traffic.
+comms on 0 and puts fire announcements on `TAG_FIRE :: u8(1)`). Destroy Comms
+before destroying the session, since teardown removes its route from the
+session.
 
-**Speak:** anyone can call this:
+**Send player messages:** hosts and clients use these procedures:
 
 ```odin
 comms_say :: proc(c: ^Comms, text: string)                  // clipped to MAX_SAY (240 bytes)
 comms_ping :: proc(c: ^Comms, kind: u8, pos: [3]f32)        // kind is game-defined; 2D leaves z zero
 ```
 
-**Narrate:** only the host may call this. The game supplies the text ("bob joined the cave"); comms transports it:
+**Send a system line:** only the host may call this. The game supplies text
+such as "bob joined the cave":
 
 ```odin
 comms_system :: proc(c: ^Comms, text: string)
@@ -66,8 +69,8 @@ comms_system :: proc(c: ^Comms, text: string)
 
 System lines carry `SYSTEM_LINE :: knet.Player_Id(0)` as the speaker (real ids start at 1).
 
-**Catch a drop-in joiner up:** the host calls this on `Ev_Player_Joined`; it replays the whole
-log to that one player:
+**Replay history to a joiner:** the host calls this on `Ev_Player_Joined` to
+send the log to that player:
 
 ```odin
 comms_catchup :: proc(c: ^Comms, player: knet.Player_Id)
@@ -85,7 +88,8 @@ comms_line_name :: proc(c: ^Comms, line: Line) -> string    // "" for system lin
 
 ## Worked example (cavecrawl)
 
-The pump polls events, repaints the chat box only when a line landed, and visualizes markers.
+The frame loop polls events, repaints the chat box when a line arrives, and
+creates visuals for markers.
 
 ```odin
 refresh_chat := false
@@ -104,8 +108,8 @@ if refresh_chat {
 }
 ```
 
-The host's join handling is one call. `comms_welcome` owns the ordering (catchup first,
-skipped on rejoin, THEN the join line), so you don't have to:
+On the host, `comms_welcome` sends history to a new joiner before broadcasting
+the join line. It skips history replay on rejoin:
 
 ```odin
 case ksess.Ev_Player_Joined:
@@ -117,23 +121,25 @@ case ksess.Ev_Player_Joined:
     }
 ```
 
-## Gotchas
+<a id="gotchas"></a>
 
-- **No kind byte for chat.** Comms frames live *inside* the session's SES_APP framing under
-  one tag; the game never multiplexes chat into its own packets. If your game also uses
-  SES_APP, claim a different tag (see [session.md](session.md)).
+## Message ordering and limits
+
+- **Reserve a unique app tag.** Comms messages use one tag inside the session's
+  SES_APP framing. The game does not need a separate transport packet kind
+  for chat. Other SES_APP users must choose different tags (see
+  [session.md](session.md)).
 - **Catchup before the join line.** `comms_welcome` handles this ordering for you. The join
-  line is about to be minted and broadcast to everyone *including* the joiner; replay the log
-  first or the joiner sees their own arrival twice. Rejoins skip catchup (a same-session
+  line is broadcast to everyone, including the joiner. Replay the log first
+  or the joiner sees their own arrival twice. Rejoins skip catchup (a same-session
   reconnect may still hold this run's log). Use `comms_catchup`/`comms_system` directly only
   when your join lifecycle differs.
 - **Your own line does not echo locally** (on a client). It lands when the host's broadcast
   comes back. Don't paint an optimistic local copy or you'll double it.
 - **`comms_system` asserts `is_host`.** System lines come from the authority; clients that
-  want flavor text ask the host (or just say it).
+  want a system line must ask the host; ordinary player text uses `comms_say`.
 - **Bytes, not runes:** `MAX_SAY` is a 240-*byte* budget, clipped at a rune boundary (never
-  mid-UTF-8). The host clips again on receipt; it doesn't take the client's word for the
-  length.
+  mid-UTF-8). The host enforces the same limit again on receipt.
 
 Siblings: [session.md](session.md) (SES_APP routing, roster, events) ·
 [ui.md](ui.md) (the chat box that repaints from this log) · [net.md](net.md) (Writer/Reader).

@@ -12,11 +12,10 @@ can instead use `kit/netgd` and `kit/session` directly.
 
 ## The generated game-network facade
 
-The normal game shell declares one direct `Boot`, `Session`, and `Comms` field.
-A simulation game also declares one direct `Lane`. From that shape, scriptgen
-generates `<game>_net_attach`, `<game>_net_pump`, `<game>_net_frame`, and
-`<game>_net_detach`; no
-additional annotation is required.
+Declare one direct `Boot`, `Session`, and `Comms` field on the game script.
+A simulation game also declares one direct `Lane`. Scriptgen uses those fields
+to generate `<game>_net_attach`, `<game>_net_pump`, `<game>_net_frame`, and
+`<game>_net_detach` without an additional annotation.
 
 ```odin
 import gd "godot:godot"
@@ -52,16 +51,16 @@ if kboot.boot_phase(&self.boot) != .Menu {
 ```
 
 `my_game_net_attach` attaches Boot, installs the generated entity factory and
-typed message routes, arms declared migration hooks, and initializes/attaches
+typed message routes, connects declared migration hooks, and initializes/attaches
 the generated simulation lane when the class owns one. Its optional third
 argument is a complete `kboot.Network_Config`; zero selects `.Friends_Coop`.
 Start with `kboot.network_profile`, then override ordinary `session` or `lane`
 fields. The whole pair is validated before either layer starts. See
 [Network profiles](profiles.md).
 
-`my_game_net_frame` is the common complete operation: it calls the generated
-pump/event dispatch and then the generated cooperative authority step plus
-same-frame edge pass when one exists. It returns a `kboot.Net_Frame`: `marks`
+Use `my_game_net_frame` for the standard frame loop. It pumps the network and
+dispatches events, then runs the generated cooperative authority step and
+same-frame field-change checks when declared. It returns a `kboot.Net_Frame`: `marks`
 contains positional comms markers and `ticks` is the number of co-op network
 ticks advanced this frame. The marker slice is temporary and must be consumed
 this frame.
@@ -79,10 +78,10 @@ of event dispatch.
 
 The lower-level `boot_attach`, `<game>_entities`, `<game>_messages`,
 `<game>_lane_init`, `boot_lane`, `boot_pump`, and `<game>_events` procedures
-are primitives for custom frame ordering, not alternate spellings of
-`<game>_net_frame`. Use them only when event dispatch or lane installation must
-occur at a custom point. A shell with multiple direct sessions or lanes is left
-on these explicit APIs because the generator cannot safely guess a graph.
+allow custom frame ordering. Use them when event dispatch or lane installation
+must occur at a particular point outside `<game>_net_frame`. A game script
+with multiple direct sessions or lanes must use these explicit APIs because
+the generator cannot infer which components to connect.
 
 ## Standard signal methods
 
@@ -104,8 +103,8 @@ For a co-op authority loop, use the fixed network ticks returned by the
 generated network pump. Presentation animations can continue to use frame
 `delta`.
 
-Declare the authority pass and hand it those ticks; the generated proc holds
-the role gate and the loop:
+Declare the authority pass with `@(gd_step = "authority")`. The generated
+procedure checks the role and calls the pass once per advanced network tick:
 
 ```odin
 @(gd_step = "authority")
@@ -126,11 +125,11 @@ screen shake ([kfx.Shake](fx.md)) can nudge them both as one. A 3D game sets
 
 ### Adopting your own scenes
 
-Set `Options.lobby_scene` / `chat_scene` / `score_scene` to hand boot a
-game-authored scene to adopt (`nil` builds the stock widget). Boot resolves the
-nodes it drives by name and pours the stock behavior into them; everything else
-in the scene is your own chrome. The node names each widget requires are listed
-in [ui.md's adopt contract](ui.md#adopting-your-own-scenes).
+Set `Options.lobby_scene` / `chat_scene` / `score_scene` to use a game-authored
+scene; `nil` builds the stock widget. Boot finds the nodes it controls by name
+and connects the standard widget behavior. The game controls the rest of the
+scene's layout and appearance. Required node names are listed in
+[ui.md's scene requirements](ui.md#adopting-your-own-scenes).
 
 ## The generated event loop
 
@@ -154,11 +153,13 @@ compile time.
 
 `boot_phase(b)` reports the coarse lifecycle as a `Boot_Phase`:
 
-- `.Menu`: no seat is held and none is coming; the Host/Join doors are showing.
-- `.Connecting`: a join is in flight (a code at the phonebook, or a survivor's
-  host-migration chase).
-- `.Lobby`: a seat is held; hosting counts as this phase too.
-- `.Playing`: the world reached this screen (first spawn, state, or resync).
+- `.Menu`: the player has no seat or pending connection; Host/Join controls
+  are visible.
+- `.Connecting`: a join is pending, including join-code lookup or an attempt to
+  reconnect after host migration.
+- `.Lobby`: the player holds a seat, including when hosting.
+- `.Playing`: this peer has received world state through a first spawn, state
+  update, or resync.
 
 The phase is derived from the session's run, join, and timeout state plus Boot's
 join-code rendezvous. Boot stores only whether replicated world state has
@@ -191,26 +192,24 @@ my_game_exit_tree :: proc(self: ^My_Game) {
 }
 ```
 
-Use detach alone when the same owner will attach again; use both calls when
-that owner is finished. HelloNet and HelloSim include this exit callback.
+Use detach alone when the same script instance will attach again; use both
+calls when that instance is finished. HelloNet and HelloSim include this exit callback.
 
 At the lower level, `boot_net_detach(b)` performs the same full ordered
 teardown using the session/comms/lane pointers retained by `Boot`.
-`boot_detach(b)` releases only the state created by `boot_attach` and the Boot
-doors; it deliberately leaves caller-owned lane, comms, and session values to
-their matching destroy procedures. All three forms are idempotent.
+`boot_detach(b)` releases only the state created by `boot_attach` and Boot's
+connection helpers. The caller must destroy its lane, comms, and session with
+their corresponding procedures. All three forms are idempotent.
 
-**Lifetime and teardown:** Boot lives as long as its node. Each lower layer
-destroys the resources it initializes; node trees belong to the scene. Boot
-created the container nodes (`ui_layer` / `stage` / `world`), so `boot_detach`
-queue-frees those, and the widgets, the legend, and the world's entities
-parented under them ride the subtree down with one free each. The [kui
-`*_destroy`](ui.md) calls free only their Odin-side tracking arrays (the nodes
-belong to the container, i.e. boot); `netgd.wire_detach` frees the wire's own
-gauge and shim containers. Transport doors close the peer they installed;
-teardown leaves a peer installed by another owner alone. A raw `wire_attach`
-only borrows its peer, so the caller closes that peer separately. Nothing is
-freed twice.
+Boot lives as long as its node. Each lower layer destroys the resources it
+initializes, while the scene owns node trees. `boot_detach` queues Boot's
+container nodes (`ui_layer` / `stage` / `world`) for deletion. Their widget,
+legend, and entity children are freed with the subtree. The
+[kui `*_destroy`](ui.md) calls release only Odin tracking arrays;
+`netgd.wire_detach` releases the wire's gauge and shim containers. Connection
+helpers close the peer they installed and leave externally installed peers
+alone. A raw `wire_attach` borrows its peer, so its caller closes that peer
+separately. These ownership rules prevent duplicate frees.
 
 ## Desktop unthrottle
 
@@ -218,60 +217,62 @@ In development builds on desktop, Boot disables vsync and caps rendering at 120
 fps. This prevents an occluded local test window from having its whole main loop
 paced by the compositor while two peers run on one machine.
 
-The unthrottle is dev-builds-only, keyed on the build flag `-disable-assert`
-(the release line every kit guardrail keys on). Headless and web runs are left
-untouched, and so is every release build: a shipped game never tears by default
-nor caps a 240 Hz display at 120. Set `Options.keep_vsync = true` to retain the
-engine's normal vsync policy in development, or set `Options.max_fps` to choose
-a different development cap.
+This setting applies only to development builds, identified by the absence of
+`-disable-assert`. Boot leaves rendering policy unchanged in headless, web,
+and release builds, so it does not impose a 120 fps cap on a 240 Hz display in
+release. Set `Options.keep_vsync = true` to retain the engine's normal vsync
+policy in development, or use `Options.max_fps` for a different development cap.
 
-## Connecting: the doors
+<a id="connecting-the-doors"></a>
+
+## Starting connections
 
 `boot_host(b, port, name)` and `boot_join(b, addr, port, token, name)` do
 transport setup, session start, and menu/status/chat updates. They call
 `netgd.begin_host` / `netgd.begin_join`, which remain available for custom
 lifecycle ordering.
 
-Under both is one door per direction, parameterized by transport:
+Both call transport-independent helpers that accept a transport and endpoint:
 
 ```odin
 boot_open_host(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token = 0, dedicated = false) -> bool
 boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = false, status = "Joining...") -> bool
 ```
 
-Every named host/join entry point combines those two operations with a status
-line. The lifecycle setup,
-reconnect identity, [host-migration](netgd.md#swapping-transports) config (its
-flavor comes from the transport's own record, so a door is never told twice),
-phase, menu, chat, and roster, is written once, and a new transport inherits
-all of it by filling a `netgd.Transport`. Steam supplies both entry points through
-one record (`ksteam.TRANSPORT`, documented in [steamgd.md](steamgd.md)).
+Named host/join entry points use these helpers for lifecycle setup, reconnect
+identity, [host-migration](netgd.md#swapping-transports) configuration, phase,
+menu, chat, roster, and status updates. Transport-specific migration settings
+come from the `netgd.Transport` record. Implementing that record lets a new
+transport reuse the shared setup. Steam provides it as `ksteam.TRANSPORT`,
+documented in [steamgd.md](steamgd.md).
 
-### Single player (the solo door)
+<a id="single-player-the-solo-door"></a>
 
-`boot_single(b, name)` is the same game, alone: a full authority session over
-`netgd.OFFLINE` — an `OfflineMultiplayerPeer` seats you as host id 1 and your
-per-tick broadcasts have no remote recipients. Without that peer, `send_bytes`
-reports "peer isn't set" every tick. The authoritative simulation and
-`boot_open_host` setup run as they do in a multiplayer session. Succession never arms (nobody to
-migrate to); works identically on native and web.
+### Single player
+
+`boot_single(b, name)` starts an authority session over `netgd.OFFLINE`.
+An `OfflineMultiplayerPeer` assigns the player host id 1, and per-tick
+broadcasts have no remote recipients. That peer is still required; without
+it, `send_bytes` reports "peer isn't set" every tick. Authority simulation
+and `boot_open_host` setup work as in multiplayer, on both native and web.
+Host succession is disabled because there is no successor.
 
 ### Dedicated server
 
-`boot_serve(b, port, name)` is the dedicated-server door: same transport, but
-the authority holds an infrastructure seat: no avatar, no roster row,
-uncounted by player gates, and host migration never arms (see
-[session.md](session.md)). Nobody presses Start on a server, so auto-start your
-world once `session_count(players_only = true)` reaches your threshold
-(`examples/slopball`'s `serve` role is the model).
+`boot_serve(b, port, name)` starts a dedicated server on the same transport.
+Its authority holds an infrastructure seat with no avatar or roster row. The
+seat does not count toward player gates, and host migration is disabled; see
+[session.md](session.md). Start the world automatically when
+`session_count(players_only = true)` reaches the game's threshold, as the
+`serve` role in `examples/slopball` does.
 
 ### Spectator
 
-`boot_spectate(b, addr, port, token, name)` is the watching door, the
-dedicated pattern pointed the other way: a seat that sees everything and is
-nobody. It bypasses a full room, counts toward nothing, and is receive-only past
-the join ([session.md's spectator paragraph](session.md) has the contract). Give
-it the same `!p.spectator` skip your spawn loops give `dedicated`.
+`boot_spectate(b, addr, port, token, name)` joins as a spectator. The seat
+receives the game state, can join a full room, does not count toward player
+gates, and is receive-only after admission. See
+[session.md's spectator rules](session.md). Skip spectators in avatar spawn
+loops with `!p.spectator`, just as those loops exclude `dedicated` seats.
 
 ## Transport forwards
 
@@ -279,59 +280,65 @@ The four transport forwards, `on_packet`, `on_peer_left`, `on_net_up`, and
 `on_net_down`, are generated from the `boot: kboot.Boot` field on your script
 struct. They route through the boot's own wire and session pointers, dispatch by
 name (so they survive hot reload), and can be overridden by hand-writing a
-same-named `@(gd_method)`. The `Options.methods` list still names them (the
-method-name lint holds), but their bodies are not yours to write.
+same-named `@(gd_method)`. `Options.methods` still names these methods, and
+scriptgen checks those names at build time.
 
 ## Identity from an env prefix
 
 Set `Options.env = "MY"` and `boot_port(b, def)` / `boot_name(b, def)` /
-`boot_token(b)` read `MY_PORT` / `MY_NAME` / `MY_TOKEN` (the token is persisted
-in `user://my_token`). The whole [bad-link
-shim](netgd.md#link-simulation) then answers `MY_LATENCY` /
-`MY_JITTER` / `MY_LOSS` without a separate `latency_env`, putting the whole
-per-game env family under one prefix.
+`boot_token(b)` read `MY_PORT` / `MY_NAME` / `MY_TOKEN`. The token persists
+in `user://my_token`. The [link-simulation shim](netgd.md#link-simulation)
+also reads `MY_LATENCY` / `MY_JITTER` / `MY_LOSS` from that prefix without a
+separate `latency_env` setting.
 
 ## Identity and tokens
 
-Identity pairs with [`ksave.token`](save.md): the
-env-or-file-or-per-instance ladder in one call. The same-machine seat-stealing
-behavior is a documented option.
+Boot uses [`ksave.token`](save.md) to choose an identity token from an
+environment override, a persisted file, or a per-instance value. See that
+reference for the option to reclaim a seat from another local instance.
 
 ## Chat, keys, and net stats
 
-`boot_chat(b, text)` is the whole `text_submitted` handler, focus release
-included ([kui.chat_submit](ui.md)); it latches `b.talk_sent` so the
-submitting ENTER can't reopen the chat. `boot_keys_frame(b, "talk", "board",
-"esc")` is the flow-key trio once per frame — the HELD scoreboard
-(refresh-then-show), ENTER-to-talk behind that latch, ESC handing the
-keyboard back from the chat — returning whether the keyboard was IN CHAT at
-frame start, which is the one gate your own hotkeys read
-(`kui.chat_typing(&b.chat)` is the raw predicate). `boot_net_stats(b)` returns
-the complete [`kui.Net_Stats`](ui.md#netgraph) fill: link quality,
+Use `boot_chat(b, text)` as the `text_submitted` handler. It submits the
+message, releases focus through [kui.chat_submit](ui.md), and sets
+`b.talk_sent` so the Enter key that submitted it cannot reopen chat.
+
+Call `boot_keys_frame(b, "talk", "board", "esc")` once per frame to refresh
+and display the scoreboard while its key is held, open chat with Enter, and
+release chat focus with Escape. It returns whether chat held keyboard focus
+at frame start; use that result to suppress gameplay hotkeys. For a direct
+focus query, call `kui.chat_typing(&b.chat)`.
+
+`boot_net_stats(b)` returns [`kui.Net_Stats`](ui.md#netgraph) with link quality,
 packet/byte rates, malformed/policy/rate drops, and bytes-by-kind. If
 `boot_lane` installed a simulation lane, the same call also fills lead/gaps,
 ack age, rewind/clamps, replay ticks/cost, command pressure, snapshot mix, and
 AOI pressure. Pass it directly to `netgraph_refresh`.
 
-## The album (payload catch-up), registered
+<a id="the-album-payload-catch-up-registered"></a>
 
-A game with a [kit/xfer album](xfer.md) (sprays, skins) hands it to boot once —
-`boot_album(b, &album)` after `album_init` — and both of its chores become the
-kit's: `boot_pump` pumps it once per net tick, and every `Ev_Player_Joined`
-replays the retained payloads to the newcomer (`album_welcome`). The game does
-not need a separate player-joined handler to populate the spray wall.
+## Registering payload catch-up
 
-## The web room, surfaced
+Register a [kit/xfer album](xfer.md), such as one holding sprays or skins,
+with `boot_album(b, &album)` after `album_init`. `boot_pump` then advances it
+once per network tick and calls `album_welcome` on every `Ev_Player_Joined`
+to send retained payloads to the new player. No separate player-joined handler
+is required for those payloads.
 
-The WebRTC door's rendezvous is pumped like the join-code phonebook's:
-`boot_web_pulse` (inside `boot_pump`) logs `BOOT_ROOM_CODE <code>` the moment
-the relay assigns one, words it in the lobby status pre-world ("share it with
-the crew") or into chat mid-run (a room born mid-run is a takeover's), and
-words a failed handshake with the relay's reason + the doors restored —
-everything web games hand-latched in their own `process()`. `boot_room_code(b)`
-answers for both coded doors now. The doors also `transport_close` whatever
-the LAST door left open before binding, so a retry or a by-hand rejoin never
-inherits a stale signaling socket.
+<a id="the-web-room-surfaced"></a>
+
+## Web room codes and connection retries
+
+During `process()`, `boot_pump` advances WebRTC rendezvous through
+`boot_web_pulse`, as it does join-code lookup. When the relay assigns a room code, Boot logs
+`BOOT_ROOM_CODE <code>` and displays it in lobby status before play or in chat
+during a run. A room created during play belongs to a host takeover. If the
+relay handshake fails, Boot displays the reason and restores connection
+controls. `boot_room_code(b)` returns the code for either connection method.
+
+Before binding a new transport, the connection helpers call `transport_close`
+on the previous one. Retries and manual rejoins therefore release the old
+signaling socket.
 
 ## The entity factory
 
@@ -376,8 +383,8 @@ migrations deliberate.
 Entity-specific options follow the type declaration in the same tag:
 
 ```odin
-mob_scene:    ^gd.Resource `gd:"entity=Mob:3,stream_hz=30"`, // AI the eye reads through interp
-runner_scene: ^gd.Resource `gd:"entity=Runner:2,avatar"`,    // a SEAT'S body, not an NPC
+mob_scene:    ^gd.Resource `gd:"entity=Mob:3,stream_hz=30"`, // interpolated NPC position updates
+runner_scene: ^gd.Resource `gd:"entity=Runner:2,avatar"`,    // marks the player avatar for succession
 ```
 
 - `stream_hz=N` sets the default owner-stream rate for every entity of this
@@ -409,18 +416,17 @@ matched and rekeyed. Initialize its presentation at the prediction site or keep
 the scene hidden until the first authoritative presentation.
 
 `boot_node(b, id)` looks up an entity's node (the `nodes[id]` map).
-`boot_entities_wipe(b)` is the back-to-lobby / takeover wipe, and it is
-census-driven: it fires the `_freed` hooks per live entity (the by-type maps
-empty through the same code that fills them) before freeing the nodes. The scene
-is read through the field at spawn time, so editor wiring and hot reload keep
-working, and `session_set_factory` remains the escape hatch for exotic creation.
+`boot_entities_wipe(b)` removes entities when returning to the lobby or taking
+over as host. It enumerates live entities and calls each `_freed` hook before
+freeing its node, allowing per-type game maps to clear through their usual
+teardown code. The factory reads the scene field at spawn time, preserving
+Inspector wiring and hot reload. Use `session_set_factory` for custom creation.
 
 ## Entity queries
 
-Every `entity=` tag also generates the typed queries that stand in for a
-hand-kept `map[Net_Id]^T` plus owner and `avatar_of` mirrors; they read the
-kit's own ledgers instead (the registry's entity and owner, the boot's type
-index):
+Each `entity=` tag generates typed queries that read the registry's entity and
+owner records and Boot's per-type index. Use them instead of maintaining a
+parallel `map[Net_Id]^T`, owner map, or `avatar_of` lookup:
 
 ```odin
 mob, ok := mob_of(&self.boot, id)          // the entity behind an id
@@ -448,8 +454,8 @@ The pointer in `Net_Entity(T)` is frame-local: retain `tracked.ref`, not
 
 The per-type index is sorted by `Net_Id`, so a query walks only that entity
 kind and cross-entity simulation passes have the same order on every peer.
-`*_all` is the sole enumeration surface: it resolves the pointer, stable ref,
-ID, and current owner together in one pass.
+Enumerate with `*_all` to resolve each entity's pointer, stable reference, ID,
+and current owner together in one pass.
 Client-predicted entities are included while they live under provisional IDs;
 Boot carries the provisional-to-authoritative alias when a predicted spawn is
 rekeyed, so a reference retained at fire time continues resolving. The alias is

@@ -7,8 +7,7 @@
 <article class="reading-body "><p>A separate <a href="../speedball/README.html">Speedball</a> port using a complete, replayable
 pitch. Every playable peer predicts all players and the shared ball before the
 authority settles their state. Replay&#39;s runner schedules the simulation steps and
-manages input and history. Contacts,
-kicks, spikes, score and kickoff state live in ordinary Odin values in
+manages input and history. Contacts, kicks, spikes, score, and kickoff state live in ordinary Odin values in
 <a href="shared/pitch/types.odin.html"><code>shared/pitch</code></a>; the Godot script handles input and views.
 Original Speedball, Claimball and Slopball remain independently runnable.</p>
 <p>From the repository root:</p>
@@ -47,7 +46,7 @@ assignment: the first client scores into the left goal. Scene provenance is in
 <p>Unlike the original mixed simulation/discrete fields, the complete score and
 winner participate in replay with the ball. The HUD reads authoritative score;
 goal reset/hold predict immediately. A changed reset counter cuts smoothing.
-The new runner processes contacts in explicit ascending seat order.</p>
+The Replay runner processes contacts in explicit ascending seat order.</p>
 <p>Spike commands carry intent, and both authority and prediction derive the origin
 from the issuing seat&#39;s world position. The original command accepts issuer-supplied
 coordinates. This is a deliberate trust-model change, not equivalent command
@@ -57,14 +56,14 @@ within 30 pixels, leaving room inside the 44-pixel predicate for both to be vali
 The original bot requests within 44 pixels and supplies its captured coordinates.
 These differences must be accounted for in a paired benchmark.</p>
 <p>The HUD/team colors remain a separate implementation. Direct session menus,
-chat and held scores are now supplied and tested. Public deployment, Steam paths and broader
+chat, and held scores are supplied and tested. Public deployment, Steam paths and broader
 visual/human play-feel review remain pending. The <a href="parity.html">port ledger</a> records
-what is preserved and what remains. The native Room path described below now exercises migration in this pitch.
+what is preserved and what remains. The native Room path below exercises migration in this pitch.
 This remains an incomplete M6 port, not full game parity.</p>
 <h2 id="prediction-and-presentation">Prediction and presentation<a class="heading-anchor" href="#prediction-and-presentation" aria-label="Link to this section">#</a></h2>
 <p>Presentation selects the state and effects to display. Its smoothing changes the
 drawn pose while the simulation retains the values used for gameplay.</p>
-<p>The runner now refreshes remote held-input guesses from each authoritative
+<p>The runner refreshes remote held-input guesses from each authoritative
 snapshot before replaying the speculative suffix. Local input samples, aiming
 stamps and action IDs stay unchanged. The replacement inputs and resulting
 state/events commit atomically; a failed replay preserves the old timeline.</p>
@@ -91,7 +90,7 @@ per process. The gate checks validated names, host-only start, literal chat,
 input capture, held scores/ping, departure and rejoin. It drives the actual
 scene signals and keyboard action map; separate native captures also exercise
 Space activation of the menu and rendered score overlays.</p>
-<p>The content ID is now <code>0x5253504545444234</code>. Name/start state and commands changed
+<p>The content ID is <code>0x5253504545444234</code>. Name/start state and commands changed
 its initial schema in revision 2; revision 3 also changes the manual-start rule:
 the first connected seat leads the match. A planned network handoff preserves that
 leader, while a disconnected leader yields to the first surviving seat. Revision 4
@@ -111,8 +110,7 @@ clear correction smoothing associated with the old epoch.</p>
 uses room 49, localhost endpoints and fixed development credentials. Members 1
 and 2 can host; member 3 exercises a peer without checkpoint capability. Without
 these Room settings, the normal Solo/Host/Join/Watch flows use direct sessions.
-This remains a fixed migration fixture. The separate <a href="online.html">party menu</a> now
-uses durable enrollment and invites through a configured room service.</p>
+This remains a fixed migration fixture. The separate <a href="online.html">party menu</a> uses durable enrollment and invites through a configured room service.</p>
 <p>Use a fresh <code>RSB_MIGRATION_OUT</code> directory to retain evidence. Set
 <code>RSB_MIGRATION_MODES=planned</code> to select one scenario, or
 <code>RSB_MIGRATION_RENDER=1</code> for native windows and recovery screenshots. Each scenario
@@ -149,7 +147,7 @@ it also checks malformed-file preservation and explicit-token precedence. Both
 launchers accept fresh output directories (<code>RSB_ROUND_OUT</code>, <code>RSB_PROFILE_OUT</code>).</p>
 <p>Original Speedball&#39;s boot helper already persisted reconnect identity. Its game
 scripts do not expose Play again or a match save/load menu. Restart and saved display
-names are Replay additions. The native save/resume front door is described below.</p>
+names are Replay additions. The native save/resume menu is described below.</p>
 <h2 id="save-and-resume-a-pitch">Save and resume a pitch<a class="heading-anchor" href="#save-and-resume-a-pitch" aria-label="Link to this section">#</a></h2>
 <p>Direct native hosts and solo players can click <strong>Save · F5</strong> or press F5 outside
 chat. The menu&#39;s <strong>Save file</strong> field chooses the destination (<code>RSB_SAVE</code> supplies its
@@ -226,9 +224,9 @@ corrupt archives, alternate slots and corrupt identity records, checking that th
 previous data remains unchanged. <code>RSB_BROWSER_SAVE_OUT</code> selects a fresh artifact
 directory. This is local Chrome process-crash evidence; power-loss durability,
 browser eviction/private modes and other browser engines remain separate
-requirements. Room save publication and abandoned-party restoration now use the
+requirements. Room save publication and abandoned-party restoration use the
 distinct <a href="online.html#saved-party-recovery">party recovery flow</a>.
 <span class="local-reference" title="docs/replay/results/speedball-browser-save-2026-09-08/README.md · available in the repository">Solo-slot evidence</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../speedball/README.html"><span>speedball — the contested twin</span><span aria-hidden="true">→</span></a><a href="online.html"><span>Speedball party menus</span><span aria-hidden="true">→</span></a><a href="assets.html"><span>Speedball scene provenance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../speedball/README.html"><span>speedball — whole-pitch prediction with Kit</span><span aria-hidden="true">→</span></a><a href="online.html"><span>Speedball party menus</span><span aria-hidden="true">→</span></a><a href="assets.html"><span>Speedball scene provenance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_speedball/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authored-rules-and-deliberate-differences" class="">Authored rules and deliberate differences</a><a href="#prediction-and-presentation" class="">Prediction and presentation</a><a href="#sessionui-acceptance" class="">Session/UI acceptance</a><a href="#native-host-migration" class="">Native host migration</a><a href="#play-again-and-local-profiles" class="">Play again and local profiles</a><a href="#save-and-resume-a-pitch" class="">Save and resume a pitch</a><a href="#browser-parties" class="">Browser parties</a><a href="#browser-solo-save-slots" class="">Browser solo save slots</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_speedball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

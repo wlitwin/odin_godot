@@ -1,22 +1,29 @@
-# Barrage — the data-oriented odin_godot showcase
+<a id="barrage--the-data-oriented-odin_godot-showcase"></a>
 
-A top-down bullet-hell: survive escalating waves, beat the three-phase boss. Thousands
-of simultaneous bullets are simulated in an Odin `#soa` pool and rendered through **one
-RenderingServer MultiMesh** — no nodes, no physics bodies, one draw call. The suite
-drives the real game headless and asserts >4000 live bullets (`run.sh`, sentinel
-`BARRAGE_OK`).
+# Barrage — data-oriented odin_godot example
+
+Barrage is a top-down bullet-hell game with escalating waves and a three-phase
+boss. It simulates thousands of bullets in an Odin `#soa` pool and renders them
+through one RenderingServer MultiMesh in one draw call. Individual bullets have
+no nodes or physics bodies. The headless suite drives the game and checks >4000
+live bullets (`run.sh`, sentinel `BARRAGE_OK`).
 
 Run it: open this folder in Godot (build first: `Project > Tools > Build Odin Scripts`
 or `bash ../../build/build_scripts.sh .`), press Play.
 
-## Why it's shaped like this
+<a id="why-its-shaped-like-this"></a>
 
-Five **isolated script modules** (each its own dll; no cross-imports — the build
-enforces it): `scripts/` (main: GameState autoload + Player), `modules/barrage`
-(the SOA bullet core), `modules/enemies` (waves + boss), `modules/powerups`
-(resources + pickups), `modules/ui` (menu/HUD/game-over). Every arrow between them is
-engine-mediated: groups + `object_call` by name, typed signals wired in `game.tscn`
-`[connection]`s, and the autoload. Saving a file in one module rebuilds only that dll.
+## Script module layout
+
+The game uses five isolated script modules, each compiled into its own dll.
+The build prohibits imports between modules. `scripts/` contains the GameState
+autoload and Player; `modules/barrage` handles the SOA bullet simulation;
+`modules/enemies` handles waves and the boss; `modules/powerups` contains
+resources and pickups; and `modules/ui` provides menu, HUD, and game-over scenes.
+
+Modules communicate through Godot groups, name-based `object_call`, typed signals
+connected in `game.tscn` through `[connection]` entries, and the autoload. Saving
+a script rebuilds only its module's dll.
 
 ## Feature → file map
 
@@ -32,21 +39,20 @@ engine-mediated: groups + `object_call` by name, typed signals wired in `game.ts
 | `resource=` PackedScene/typed-resource exports | `spawner.odin`, `manager.odin` |
 | **Typed-array export** (`array=`), assigned from the scene | `manager.odin` (`drop_table`), `game.tscn` |
 | `@(gd_connect)` declarative signal wiring | `modules/powerups/pickup.odin` (`body_entered`) |
-| **Pure-Odin `events.Event(T)`** (same-module fan-out; cross-module edge stays ONE engine call) | `spawner.odin` (`slow_changed`), `enemy.odin` (subscribe/exit_tree/reload) |
-| Typed cross-dll reads (`rt.script_of`) | `pickup.odin` (PowerupConfig) |
+| **Pure-Odin `events.Event(T)`** (same-module fan-out; cross-module notification uses one engine call) | `spawner.odin` (`slow_changed`), `enemy.odin` (subscribe/exit_tree/reload) |
+| Typed Resource access within a module (`rt.script_of`) | `pickup.odin` (PowerupConfig) |
 | Autoload + engine-mediated state | `scripts/game_state.odin` |
 | Scene loading (title → game → game-over) | `modules/ui/*.odin` |
 | Group discovery, `instantiate` + `add_child_deferred` | `spawner.odin`, `manager.odin` |
 | Export groups, ranges on every tunable | `scripts/player.odin` |
 
-Not here: `gd_rpc`/multiplayer — see `examples/survivors` (co-op) for that story.
+For `gd_rpc` and multiplayer examples, see the coop layer in `examples/survivors`.
 
 ## Web export
 
-The project exports to Web out of the box: the `.gdextension`'s `web.*.wasm32` entry
-points at `res://bin/libodin_godot.wasm`, which the export plugin AOT-builds (all five
-script modules composed into ONE Emscripten SIDE_MODULE) when you export the Web
-preset. `bash web_run.sh` (inside the dev shell) exports headless and verifies the
-game boots and plays in a real browser (`BARRAGE_WEB_OK`). Note the scripts avoid
-`core:os` (no OS layer on wasm) — env checks go through the engine's `OS` singleton
-(`game_state.odin`, `is_test`).
+The `.gdextension`'s `web.*.wasm32` entry points to
+`res://bin/libodin_godot.wasm`. Exporting the Web preset compiles all five script
+modules into one Emscripten SIDE_MODULE. Run `bash web_run.sh` inside the
+development shell to export headlessly and check browser startup and gameplay
+(`BARRAGE_WEB_OK`). Scripts use the engine's `OS` singleton for environment
+checks because `core:os` has no WASM OS layer; see `game_state.odin`, `is_test`.

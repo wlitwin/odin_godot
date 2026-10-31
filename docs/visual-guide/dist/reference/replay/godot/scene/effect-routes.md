@@ -24,17 +24,18 @@ for change in changes { scenegd.effect_route_change(&route, change) }
 error := scenegd.effect_route_frame(&route, render_delta)
 ```
 
-Journal policy already determines speculative or watched delivery. Default route
-policy Journal follows it. Confirmed delays this route until a confirmed Begin or
-Confirm, useful for effects that should not be shown speculatively. The first
-accepted start creates a lifetime; Update changes its value, Confirm marks it, and
-Cancel retires it. Neither Update nor Confirm restarts its age or scene. Reused
-slots get fresh generations and child bindings. Expired, canceled and capacity-
-dropped IDs remain consumed so replay cannot restart them.
+The journal decides when to deliver speculative or watched occurrences. The
+default route policy, Journal, uses that timing. Confirmed waits for a confirmed
+Begin or a Confirm change before showing an effect. The first accepted start
+creates its scene lifetime. Update changes its value, Confirm marks it confirmed,
+and Cancel retires it; Update and Confirm do not restart the age or scene.
+Reused slots receive new generations and child bindings. IDs remain consumed
+after expiry, cancellation, or capacity drops, preventing replay from starting
+them again.
 
-Changing the filter to exclude an active event cancels it. A later Update does
-not invent a speculative Begin; use a stable event category for routing, and
-ordinary value changes for animation. When a confirmed-only effect has not begun,
+If the filter excludes an active event, the route cancels it. A later Update
+cannot start a new speculative effect. Keep event-category filtering stable
+and animate through value changes. When a confirmed-only effect has not begun,
 its Confirm may start it, subject to its consumption ledger.
 
 `effect_route_clear` removes live visuals without forgetting consumed IDs.
@@ -44,7 +45,8 @@ no new Begin at or below it can arrive, including delayed watched/confirmed even
 Do not use the render clock as that frontier. Full cue pools drop new effects;
 check `route.route.cues.stats`. Ledger history/per-tick capacity is explicit.
 Root properties and Rig lifetimes follow the [view ownership contract](view-pools.md).
-Scene instances are created on entry; bounded capacity does not mean prewarming.
+Scene instances are created when effects enter the route. Setting a capacity
+does not instantiate those scenes in advance.
 
 For audio, the callback returns `(Audio_Cue, include)` and may borrow streams from
 a presentation asset owner through `user`. Godot players retain their own stream
@@ -61,9 +63,9 @@ for change in changes { scenegd.audio_route_change(&audio, change) }
 Update moves an active spatial voice; it does not change the clip or restart
 playback. Confirmed-only routes play once upon confirmation. Cancel stops only a
 voice still owned by that occurrence, so canceling a stolen old voice cannot stop
-its replacement. Full voice pools steal in bounded round-robin order; consumed
-IDs remain tombstoned. `audio_route_epoch` clears voices under a newer epoch and
-`audio_route_retire` has the same safe-frontier requirement as visual routes.
+its replacement. Full voice pools steal in bounded round-robin order; the
+ledger continues to record consumed IDs after their voices are gone.
+`audio_route_epoch` clears voices under a newer epoch and `audio_route_retire` has the same safe-frontier requirement as visual routes.
 Use `audio_pool_volume(&audio.pool, volume)` for a local volume setting.
 
 The pure `view.Cue_Route(Event, Value)` is also usable without Godot. Native and
@@ -81,6 +83,6 @@ one initializer. Cancel retires matching voices without calling either projector
 A contextual projector sees the original Confirm even when the route delays its
 start until confirmation, so it can choose the correct historical placement.
 
-Scrapyard uses this callback for pitch derived from the occurrence ID and wound
-positions reconstructed at the event tick. Event-only routing remains available
+Scrapyard uses this callback to derive pitch from occurrence IDs and reconstruct
+damage-effect positions at the event's tick. Event-only routing remains available
 when a sound depends only on its gameplay payload.

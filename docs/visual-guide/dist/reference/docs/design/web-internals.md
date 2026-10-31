@@ -9,7 +9,7 @@ results and resolved blockers below retain that version and test scope. Use
 The **full** odin_godot extension (core `ScriptLanguageExtension` + the generated
 `godot`/`gdext` binding + a project's compiled `.odin` scripts) builds into **one
 Emscripten `SIDE_MODULE` wasm**, Godot 4.6.2's headless web export bundles it, and an
-Odin script's `_ready` **verifiably runs in a real browser** — it prints `WEB_RAN` +
+Odin script's `_ready` ran in a browser — it prints `WEB_RAN` +
 `WEB_ASSERT_OK` (the latter from calling an Odin `@(gd_method)` `add(2,3)==5`) to the JS
 console, captured by a headless-Chrome driver.
 
@@ -99,8 +99,8 @@ Godot 4.6.2's web templates were built with emscripten **4.0.20**. The module wa
 and **runs in the browser** both with the dev shell's **5.0.6** and with a manual
 **emsdk 4.0.20** install — so the exact match is *not* required here: `-sSUPPORT_LONGJMP=wasm`
 keeps the longjmp ABI self-contained and the dylink format is cross-compatible. The
-earlier "must relink under 4.0.20" concern was a red herring (the true blocker was #3
-above). To pin anyway: `EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh`.
+earlier "must relink under 4.0.20" hypothesis did not explain the failure;
+blocker #3 above did. To pin anyway: `EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh`.
 
 ## In-browser verification
 
@@ -119,28 +119,30 @@ and is correct on every target — so it was applied rather than left as a remai
 
 ---
 
-## The FULL showcase game loop in the browser (`tests/web_showcase/`)
+<a id="the-full-showcase-game-loop-in-the-browser-testsweb_showcase"></a>
 
-`tests/web/` only proves a trivial `_ready`. `tests/web_showcase/` proves the **real**
-pure-Odin coin-collector loop runs in a browser: a GDScript `driver.gd` (the export's main
+## Showcase gameplay in the browser (`tests/web_showcase/`)
+
+`tests/web/` verifies the small `_ready` example. `tests/web_showcase/` checks
+the coin-collector gameplay loop in a browser: a GDScript `driver.gd` (the export's main
 scene) moves the Player onto a Coin and steps **physics**, so the Area2D's `body_entered`
 fires naturally → Odin `collect` → `game_state_add` increments the **shared** score →
 script-declared `collected` signal emits → coin `queue_free`d → the cross-script HUD Label
 reflects the new score. The driver prints `SHOWCASE_WEB_OK score=<n> value=<v>`; the
 console shows e.g. `physics-collected coin; shared get_score()=5; listener value=5;
-cross-script HUD='Score: 5'`. No simulated keyboard input is needed — the physics-collide
-path is fully driveable programmatically. Run: `bash tests/web_showcase/run.sh` →
+cross-script HUD='Score: 5'`. The driver triggers physics contact programmatically without simulated
+keyboard input. Run: `bash tests/web_showcase/run.sh` →
 `PHASEWEBSHOWCASE_OK`. Wired into `tests/run_all.sh` as the browser-gated `web_showcase`.
 
-To make the **editor** "Export → Web" work for a project, two things are required and now
-automated:
+The recorded implementation automated two requirements for the editor's
+"Export → Web" operation:
 
 * The project `.gdextension` keeps its **native** `macos.*` entries AND adds
   `web.{debug,release}.wasm32 = "res://bin/libodin_godot.wasm"`. The native entry is what
   loads the extension **on the macOS export host** so its `OdinResourceFormatLoader`
   recognizes the authored `.odin` files and **packs them** — without it the sources are
   excluded from the pck and the scripts' base types cannot be resolved in the browser.
-* `core/export_plugin.odin`'s `_export_begin`, on the `web` feature, now **builds** the
+* `core/export_plugin.odin`'s `_export_begin`, on the `web` feature, builds the
   SIDE_MODULE by shelling `build/build_web.sh <project>` (inheriting the editor's nix PATH
   so `odin`/`emcc` resolve), so the `res://bin/libodin_godot.wasm` the `.gdextension`
   references actually exists at export. Godot's GDExtension export handling then bundles it
@@ -155,13 +157,12 @@ that context is **unusable for allocating scripts**: `ODIN_OS == .Freestanding` 
 `NO_DEFAULT_TEMP_ALLOCATOR`, so `temp_allocator` is **nil** — any `core:fmt`/temp
 allocation silently yields `""` (the HUD's `fmt.ctprintf("Score: %d", …)` produced an
 empty Label) — and the main allocator is Odin's own wasm allocator (the unsafe
-`memory.grow` path from blocker #4). Benign on native (heap-backed default context); only
-the showcase's HUD was the first web script to actually allocate.
+`memory.grow` path from blocker #4). Benign on native (heap-backed default context); the showcase HUD was the first tested web script to allocate.
 
-Fix (one indirection, native unchanged): scriptgen now emits `context = rt.script_context()`
+The fix added one indirection while preserving native behavior: scriptgen emits `context = rt.script_context()`
 instead of `runtime.default_context()`. `runtime/context.odin` defines `script_context()` —
 on native a settable hook is nil so it returns `runtime.default_context()` byte-for-byte;
 on web the core installs the hook (`core/scripts_web.odin` `web_script_context`) returning a
 context whose `allocator` **and** `temp_allocator` are the engine-backed, alignment-correct
 `web_aligned_allocator`. Files: `runtime/context.odin` (new), `scriptgen/generate.odin`,
-`core/scripts_web.odin`. All native phase tests stay green (the hook is nil there).
+`core/scripts_web.odin`. All native phase tests passed with the hook nil.

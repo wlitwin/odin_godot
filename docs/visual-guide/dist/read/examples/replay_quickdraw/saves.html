@@ -24,9 +24,9 @@ Presentation is freshly seeded so historical shots/hurt flashes/rings do not rep
 <p>A local file is not a host-election credential. Quickdraw refuses file resume for
 configured Room sessions and for permit/custom-policy archives; those require their
 recovery service. File resume deliberately creates a new direct session. Stop the
-old direct game before replacing it. Configured online authorities now publish through <a href="online.html">Room</a>; public
-deployment remains separate work. <a href="online.html">Abandoned-party restoration</a> now has
-its own service-backed acceptance path.</p>
+old direct game before replacing it. Configured online authorities publish through
+<a href="online.html">Room</a>; public deployment remains separate work.
+<a href="online.html">Abandoned-party restoration</a> has its own service-backed acceptance path.</p>
 <p>Writes use the existing bounded staged-file/rename helper. A failed write leaves the
 previous committed file intact. Missing, damaged, incompatible or wrong-owner files
 do not open a session and show a specific menu explanation. This is the existing
@@ -34,13 +34,13 @@ process-crash save boundary, not a new portable power-loss durability guarantee.
 Native identity and display-name preferences remain separate; do not share an identity
 file as a game-save export.</p>
 <p>The game content/schema remains D2; this feature does not add gameplay fields. D1
-archives still have no implicit conversion. Browser IndexedDB slots and identity persistence now have their own
-<a href="browser-saves.html">browser-local flow</a>; they do not use native file paths.</p>
+archives still have no implicit conversion. Browser IndexedDB slots and identity
+persistence have their own <a href="browser-saves.html">browser-local flow</a>; they do not use native file paths.</p>
 <p>Run <code>tests/replay_quickdraw_save/run.sh</code> from the Nix development environment for a
 fresh-process combat save/resume fixture. It uses isolated paths and identities,
 kills only its owned writers after a durable receipt, checks negative loads and
 failed-write preservation, then continues respawn, equipment, purchases, lobs and
 named chat in a fresh host/client pair.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Quickdraw parties</span><span aria-hidden="true">→</span></a><a href="browser-saves.html"><span>Browser-local Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/saves.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Quickdraw parties</span><span aria-hidden="true">→</span></a><a href="browser-saves.html"><span>Browser-local Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/saves.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_quickdraw/saves.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

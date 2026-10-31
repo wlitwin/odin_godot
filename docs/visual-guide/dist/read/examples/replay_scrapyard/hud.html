@@ -10,7 +10,7 @@ and nearby-teammate revive prompt. It shares the copied steel theme with the
 counter. The scene owns layout and node lifetime; <code>scripts/hud.odin</code> supplies values.</p>
 <p>The game&#39;s adapter passes the predicted local player and tick plus the confirmed
 world into the HUD each frame. Health, ammunition, ability cooldowns and dash
-readiness therefore follow the same local state as the runner. Boss health and
+readiness therefore follow the predicted player state used for local movement. Boss health and
 downed-teammate eligibility use confirmed state; the local revive hold displays
 its progress. A spectator sees the boss bar without personal health/ammo panels.
 The HUD retains neither a world nor a Session and makes no gameplay decisions.</p>
@@ -35,11 +35,11 @@ hold/cancel/completion, and <code>run_loop.sh</code> checks magazine placement a
 and descent. Existing workbench and shop gates remain runnable.</p>
 <p>See <span class="local-reference" title="docs/replay/results/scrapyard-hud-2026-09-07/README.md · available in the repository">evidence</span>.
 Native captures use Dummy audio because the local CoreAudio issue remains open.
-<a href="transitions.html">Run transitions</a> are now implemented. Browser interaction,
+<a href="transitions.html">Run transitions</a> are implemented. Browser interaction,
 additional platforms, listening/feel comparisons and
-broader UI parity remain work. The <a href="camera.html">downed-player camera</a> is now
-implemented and tested separately. The full roadmap is not completed by this HUD
-slice.</p>
+broader UI parity remain work. The <a href="camera.html">downed-player camera</a> has separate
+implementation and tests. This HUD evidence does not establish completion of
+the full roadmap.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="transitions.html"><span>Run transitions</span><span aria-hidden="true">→</span></a><a href="camera.html"><span>Borrowed eyes</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/hud.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="transitions.html"><span>Run transitions</span><span aria-hidden="true">→</span></a><a href="camera.html"><span>Following a teammate while downed</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/hud.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/hud.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

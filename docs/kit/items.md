@@ -1,19 +1,23 @@
 # kit/items — item definitions and stack-aware inventories
 
-Reach for `kit/items` when entities carry things: bags, chests, pickups, loot. It gives you
-a 4-byte `Slot`, a definition `Table` (names, stack sizes), and deterministic operations
-(add, take, put, transfer) that are safe inside predicted commands.
+`kit/items` represents inventories in bags, chests, and pickups. It provides a
+4-byte `Slot`, a definition `Table` containing names and stack sizes, and
+deterministic add, take, put, and transfer operations. Use table-free
+operations inside predicted commands; perform operations that need item
+definitions in the authority hook that holds the table.
 
-**Lane compatibility:** inventories normally remain on reliable delta fields
-mutated through commands. `Slot` operations are pure and deterministic, so they
-are safe inside predicted commands on either lane. `Inventory($N)` has not been
+Inventories normally use reliable delta fields mutated through commands.
+Table-free `Slot` operations are pure and deterministic and can run inside
+predicted commands on either lane. `Inventory($N)` has not been
 covered by the simulation-descriptor tests; do not put it on the simulation
 lane without adding that coverage.
 
-## Mental model
+<a id="mental-model"></a>
 
-An inventory is a **plain fixed-size array of 4-byte Slot values living inside a replicated
-entity struct**:
+## Replicated inventory state
+
+An inventory stores a fixed-size array of 4-byte Slot values in a replicated
+entity struct:
 
 ```odin
 Chest :: struct {
@@ -22,18 +26,21 @@ Chest :: struct {
 }
 ```
 
-Tag the inventory as replicated state. Slots then use the [kit/net](net.md)
-shadow-delta walk like other fixed-layout fields. Predicate rejections carry
-authoritative inventory state back when a prediction loses a race.
+Tag the inventory as replicated state. [kit/net](net.md) then compares slots
+with its stored copy and sends changes as it does for other fixed-layout
+fields. When a command predicate rejects a conflicting prediction, the reply
+includes authority inventory state for correction.
 
-Every operation is **deterministic and allocation-free**. They run inside `@(gd_command)`
-procs, so the predicting client and the host execute the same op from byte-identical args
-and land on identical slots. Two players grabbing the same last item both predict success;
-the host runs them in arrival order, the second op finds the slot empty and rejects, and the
-loser's optimistic state reverts. The command pipeline returns the verdict and applies the correction.
+Operations are deterministic and allocation-free. A predicting client and the
+host produce identical slots when given the same starting state and arguments.
+Their starting state can differ during contention: two players taking the
+last item may both predict success. The host processes their commands in
+arrival order; the second finds the slot empty and rejects. The command
+pipeline returns the verdict and corrects the rejected prediction.
 
-Item **definitions are code, not wire**: every peer registers the same table in `ready()`
-(ids are game constants), so only 4-byte slots ever ship.
+Every peer registers the same item definitions in `ready()`, using game
+constants for IDs. The inventory replicates 4-byte slots containing those IDs
+and counts; it does not send the definition table.
 
 ## Definitions: the Table
 
@@ -59,7 +66,7 @@ items_register :: proc(t: ^Table, id: Item_Id, name: string, max_stack: u16 = 1,
 
 items_def :: proc(t: ^Table, id: Item_Id) -> (Item_Def, bool)
 
-// Display name ("" for empty/unknown — UIs render blanks, not crashes).
+// Display name ("" for empty or unknown items).
 items_name :: proc(t: ^Table, id: Item_Id) -> string
 
 table_destroy :: proc(t: ^Table)
@@ -75,7 +82,7 @@ kitems.items_register(&self.table, TORCH, "torch", 5)
 ## Slots and operations
 
 ```odin
-// One inventory slot: 4 POD bytes. INVARIANT: an empty slot is exactly
+// One inventory slot: 4 POD bytes. An empty slot must be exactly
 // {ITEM_NONE, 0} — every op normalizes on the way out, so slot equality (and
 // the replication layer's byte-level diffing) stays meaningful.
 Slot :: struct {
@@ -101,8 +108,8 @@ take :: proc(slots: []Slot, idx: int, count: u16) -> (taken: Slot)
 put :: proc(t: ^Table, slots: []Slot, idx: int, item: Item_Id, count: u16) -> (accepted: u16)
 
 // Move up to `count` from one slot of `from` into `to` (stacking rules apply).
-// Anything that doesn't fit goes straight back where it came from — the pair
-// of inventories is never left torn. Returns how many moved.
+// Any remainder returns to the source slot. Both inventories are updated
+// together. Returns how many moved.
 transfer :: proc(t: ^Table, from: []Slot, from_idx: int, to: []Slot, count: u16) -> (moved: u16)
 
 // The `slots: [N]Slot gd:"replicate"` field, packaged: embed it (`using inv:
@@ -114,19 +121,25 @@ Inventory :: struct($N: int) {
 }
 ```
 
-## Which ops take the Table
+<a id="which-ops-take-the-table"></a>
 
-Ops that can grow a stack consult the defs for `max_stack`: `add`, `put`, `transfer`. Ops
-that only drain or read slots don't: `take`, `remove`, `count_of`.
+## Operations that require the Table
 
-The table-free ops are exactly the ones usable inside a `@(gd_command)` proc, which sees only
-its entity and args, with no ambient state. Crediting with stacking rules happens where the
-table lives: the command hook or host code.
+Operations that can grow a stack consult the definitions for `max_stack`:
+`add`, `put`, and `transfer`. Operations that only remove or read items do not
+need the table: `take`, `remove`, and `count_of`.
+
+Use the table-free operations inside a `@(gd_command)` proc, which sees only
+its target entity and arguments. Add items with stacking rules in the command
+hook or host code that has access to the table.
 
 ## Worked example: looting a chest
 
-The command half is table-free, predicted, and range-gated with the same
-[kit/interact](interact.md) gate the prompt uses (`examples/cavecrawl/scripts/chest.odin`):
+The command removes items without consulting the table and can therefore be
+predicted. It checks range with the same [kit/interact](interact.md) procedure
+used by the prompt. The example below shows a local scratch-field approach;
+the current `examples/cavecrawl/scripts/chest.odin` returns the taken Slot to
+its generated consequence instead:
 
 ```odin
 @(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
@@ -139,8 +152,8 @@ chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> bool {
 }
 ```
 
-The cross-entity half runs host-only, in the command hook, where the table lives
-(`host.odin`):
+Crediting another entity runs only on the host, in a command hook that can
+access the table. A `host.odin` handler can apply it as follows:
 
 ```odin
 cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
@@ -154,17 +167,18 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 }
 ```
 
-`last_take` is a plain field that never rides the wire; it carries what the command took
-across to the hook. [kit/ui](ui.md)'s `inv_refresh` renders the bag from the same slots and
-table.
+In this example, `last_take` is an unreplicated scratch field that carries the
+removed Slot to the hook. [kit/ui](ui.md)'s `inv_refresh` renders the bag from
+the same slots and table.
 
-## Grid packing (shape as a mechanic)
+<a id="grid-packing-shape-as-a-mechanic"></a>
 
-For inventories where the SHAPE matters (2x3 rifles, 3x3 crates, attaché-case
-Tetris), `packing.odin` adds a second board type with the same replication
-mechanism: a packed inventory is a fixed array of 10-byte `Packed_Entry` values
-inside a replicated struct, and board dimensions are game constants passed to
-the ops.
+## Grid packing
+
+For inventories with spatial footprints, such as 2x3 rifles or 3x3 crates,
+`packing.odin` provides a board represented by a fixed array of 10-byte
+`Packed_Entry` values inside a replicated struct. Pass board dimensions as
+game constants to its operations.
 
 ```odin
 Stash :: struct {
@@ -176,26 +190,31 @@ items_register(&table, RIFLE, "rifle", shape = kitems.shape_of("XXX"))
 items_register(&table, BOOT, "boot", shape = kitems.shape_of("X.", "X.", "XX"))
 ```
 
-Shapes are up to 4x4 with a solid-cell mask (`shape_of` reads row strings), and
-each placement is **self-describing** (the entry stores its shape), so the same
-table/table-free split holds: `pack_move`, `pack_remove`, `pack_at`, and
-`pack_fits` are table-free and command-safe (the drag-to-rearrange command is
-one predicted `pack_move`), while the growing ops (`pack_place` with a shape
-you looked up, `pack_add` which stacks then auto-places) live host/hook side
-with the table. `pack_find_spot` scans row-major, so a predicted command and
-the host derive the same anchor from the same grid bytes. Conflicts resolve the
-same way: two players dragging into the same corner both predict, the host runs
-them in arrival order, the loser reverts.
+Shapes use a solid-cell mask up to 4x4; `shape_of` builds it from row strings.
+Each entry stores its shape, allowing `pack_move`, `pack_remove`, `pack_at`,
+and `pack_fits` to run without a table inside commands. A drag-to-rearrange
+command can use one predicted `pack_move`. Operations that add placements run
+in host code or hooks with the table: `pack_place` takes a looked-up shape,
+while `pack_add` stacks items and finds space for new entries.
 
-## Gotchas
+`pack_find_spot` scans in row-major order, so a prediction and the host derive
+the same placement anchor from the same grid bytes. If two players predict a
+move into the same corner, the host processes them in arrival order and
+rejects the conflicting move. The rejected prediction then reverts.
 
-- Keep command-side ops deterministic: no table, no allocation, no clocks. They re-run on
-  the host from byte-identical args and must land on identical slots.
+<a id="gotchas"></a>
+
+## Inventory invariants and return values
+
+- Keep command-side operations deterministic: no table, allocation, or clocks.
+  Re-execution on the host must produce the same slots from the same state
+  and arguments.
 - An empty slot is exactly `{ITEM_NONE, 0}`; every op normalizes on the way out. Don't
   hand-write slots that break this: replication diffs bytes.
 - Unknown (unregistered) items get `max_stack = 1`: they refuse to stack rather than merge
   blindly.
 - `items_register` asserts on id 0 (the empty-slot marker), and re-registration is safe:
   call it in `ready()` every run, on every peer, with the same constants.
-- Returns are budgets, not booleans: `add` may credit less than asked (inventory full).
-  Handle the leftover, as `cave_credit` does by putting it back in the chest.
+- Check returned counts. `add` may credit fewer items than requested when the
+  inventory is full. Handle the remainder, as `cave_credit` does by returning
+  it to the chest.

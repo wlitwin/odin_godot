@@ -2,8 +2,8 @@
 
 Use the client enrollment journal to preserve identity across a crash during
 Create or Join. It persists the exact request before sending it, then persists a
-successful credential before exposing it for use. Its
-native SQLite and browser IndexedDB drivers use compare-and-swap, so another
+successful credential before exposing it for use. Its native SQLite and browser
+IndexedDB drivers use compare-and-swap, so another
 process/tab cannot silently replace the identity in the same slot.
 
 `Enrollment_Journal` owns the state machine and canonical codec without depending
@@ -31,8 +31,8 @@ stateDiagram-v2
     WritingGrant --> Failed: failed or conflicting receipt
 ```
 
-`enrollment_request` returns nothing before the request write's receipt.
-`enrollment_grant` returns nothing until the credential write's receipt. A storage
+`enrollment_request` exposes the request only after its write completes.
+`enrollment_grant` exposes the credential only after its write completes. A storage
 failure preserves the previous in-memory record, clears staged buffers and stops
 the owner. It does not assume that a missing acknowledgement proves the storage
 transaction failed. Reopen the slot to resolve that uncertainty.
@@ -44,8 +44,8 @@ that request and receives the same credential. A ready slot loads directly witho
 another enrollment request. The game still performs Room's challenged process
 registration; a stored credential is not a live authority lease.
 
-The slot is immutable: absent → pending (revision 1) → ready (revision 2). It
-cannot become another identity or service. Both a competing initial creator and a
+The slot permits only absent → pending (revision 1) → ready (revision 2). Once
+assigned, it cannot change to another identity or service. Both a competing initial creator and a
 stale grant writer fail with `Conflict`; neither receives usable state from its
 failed write. A fresh owner can then load the winner. There is no automatic
 read-latest-and-overwrite path, deletion, account reset or credential retirement.
@@ -108,8 +108,8 @@ API; the test fixture checks its exact output length and rejects an empty result
 The client record is version 1, kind `0x5043`, envelope epoch 1, revision in tick,
 and game content in content. It contains a bounded canonical service URL, the exact
 Create/Join request, pending/ready state and that member's grant. Maximum encoded
-storage is 4096 bytes. State/revision, request shape, URL tail, content and credential
-shape are validated when loading. It contains no shared authority state.
+storage is 4096 bytes. Loading validates state/revision, request structure,
+URL tail, content, and credential structure. It contains no shared authority state.
 
 The native SQLite adapter is currently **macOS/Linux**. It uses a separate client
 file/table with the existing checked private-file, WAL/FULL/fullfsync setup. New

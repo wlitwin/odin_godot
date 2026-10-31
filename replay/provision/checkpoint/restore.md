@@ -1,9 +1,9 @@
 # Restoring a published checkpoint
 
 Use a Restore decision when no live authority remains and a trusted member
-needs to resume a published checkpoint. Checkpoint protocol **3** retains the explicit `Restore` decision introduced in
-version 2 and adds complete asset-package transfer. Upload/download do
-not grant authority. A restore selects one exact durable publication and obtains a
+needs to resume a published checkpoint. Checkpoint protocol **3** retains
+version 2's explicit `Restore` decision and adds complete asset-package
+transfer. Upload and download do not grant authority. A restore selects one exact durable publication and obtains a
 new authority epoch only after current membership, policy, lease and storage checks.
 The private Bundle/Record and gameplay/checkpoint formats remain unchanged.
 
@@ -106,12 +106,12 @@ owner-rebind refusal. The opt-in does not itself check or grant a saved-world cl
 ## Validation and integration status
 
 Low-level callers should refresh a successful Restore grant with a new correlated
-authority `Renew` before paying runtime setup costs. The Restore request may
+authority `Renew` before beginning runtime setup. The Restore request may
 spend much of its lifetime in transfer/validation, and its local lease deadline
 is anchored to request start. Even an already expired local permit can request
 renewal; only the coordinator decides whether the reservation still exists.
 Installation and simulation still require a live permit. `Room` handles this
-exchange automatically. The [delayed-grant gate](../../../tests/replay_restore_renewal/README.md)
+exchange automatically. The [delayed-grant test](../../../tests/replay_restore_renewal/README.md)
 covers both a successful same-epoch renewal and an expired-reservation refusal.
 
 Native TLS fixtures restore the three actual Cavecrawl, Speedball and Scrapyard
@@ -124,7 +124,7 @@ the restore commit recover respectively epoch 1/request 2 or epoch 2/request 3,
 while publication 1 remains intact; fresh coordinator startup is inactive.
 
 Godot Room/Party drives the complete download/preparation/restore lifecycle and
-Cavecrawl exposes resume/retry UI. Separate native and browser gates resume actual
+Cavecrawl exposes resume/retry UI. Separate native and browser tests resume actual
 saved cave play and accept new guests after all original processes have exited.
 Room distinguishes service-known rollback from local confirmation history.
 Atomic asset packages cover declared dependencies including Scrapyard sprays.

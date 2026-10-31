@@ -5,7 +5,9 @@ This survival arena game uses compiled Odin scripts for gameplay. It demonstrate
 through a move, fight, upgrade, and restart loop. The visuals use `Polygon2D`
 geometry without external art assets.
 
-## The loop
+<a id="the-loop"></a>
+
+## Gameplay loop
 
 Move with the arrow keys or WASD. Weapons attack nearby enemies automatically;
 defeated enemies drop XP gems. Collect gems to fill the XP bar.
@@ -30,12 +32,14 @@ nix develop --command bash -c 'bash build/build_scripts.sh examples/survivors'
 - Walk over the green **XP gems** (they magnet toward you within pickup range).
 - On **LEVEL UP**, click one of the three upgrade buttons.
 - Four enemy types ramp in over time: **swarmer** (fast/weak), **grunt** (baseline), **brute**
-  (tanky), **tank** (huge/slow) — each a different `EnemyConfig` `.tres`.
+  (high health), **tank** (large/slow). Each uses a different `EnemyConfig` `.tres`.
 
 The headless checks below verify the gameplay loop. Use a windowed run to assess
 pacing, feedback, and controls.
 
-## Co-op — the HOST-authoritative variant
+<a id="co-op--the-host-authoritative-variant"></a>
+
+## Host-authoritative co-op
 
 > For peer-authoritative engine-native co-op, read
 > [`examples/coop_arena`](../coop_arena/README.md). It simulates player actions locally
@@ -54,13 +58,16 @@ open transport.
 `coop_player.tscn`, and `coop_enemy.tscn`.
 
 Replication uses these Godot facilities:
-- **MultiplayerSpawner** — the host spawns `coop_enemy.tscn` into `Enemies`; the engine
-  auto-instantiates (and auto-despawns) it on every client.
-- **MultiplayerSynchronizer** — streams continuous state from the authority: each player's
-  `position` + Odin `@export hp` (authority = the owning peer), each enemy's `position`/`hp`/`id`
-  (authority = host). Configs live in the `.tscn` (see the gotcha below).
-- **`@(gd_rpc)`** carries discrete events: player spawn (peer→authority), the client's
-  `request_damage`, shared score, and per-player level-up XP grants.
+
+- **MultiplayerSpawner** creates `coop_enemy.tscn` under `Enemies` when the host
+  spawns an enemy, then replicates creation and despawn to clients.
+- **MultiplayerSynchronizer** streams continuous state. Each player's owning
+  peer supplies `position` and Odin `@export hp`; the host supplies each enemy's
+  `position`/`hp`/`id`. Author the replication configuration in the `.tscn`, as
+  described below.
+- **`@(gd_rpc)`** carries discrete events: player spawn requests from peers to
+  the authority, the client's `request_damage`, shared score, and per-player
+  level-up XP grants.
 
 The host owns enemies, waves, and enemy deaths. A client submits a
 `request_damage` RPC, which the host applies to its enemy state. Each player
@@ -87,65 +94,77 @@ Use two interactive clients to assess the effect of latency on play.
 nix develop --command bash -c 'bash examples/survivors/run.sh'   # prints SURVIVORS_OK
 ```
 
-`run.sh` runs four checks: (1) a headless **editor-open** smoke test (no crash / missing
-virtual), (2) a **live `game.tscn`** run for 600 frames that must log no script/engine errors,
-(3) `test_survivors.gd`, which drives the **real** loop through actual physics overlaps +
-frame stepping, rather than manually emitting signals, and asserts each link; and (4) a **unified
-single-mode** smoke of `coop.tscn` (`COOP_ROLE=single`, host-with-no-net) that must boot + run
-clean (`SINGLE_DONE`):
+`run.sh` runs four checks:
+
+1. Open the editor headlessly and check for crashes or missing virtual methods.
+2. Run `game.tscn` for 600 frames without script/engine errors.
+3. Run `test_survivors.gd` through physics overlaps and frame stepping, checking
+   each gameplay milestone below.
+4. Run `coop.tscn` in single mode (`COOP_ROLE=single`, host with no network) and
+   require successful startup and completion (`SINGLE_DONE`).
 
 | Milestone | What it proves |
 | --- | --- |
 | `base-types` | `//gd:extends` resolves (Player = CharacterBody2D, Hud = CanvasLayer). |
 | `weapon-equipped` | the player auto-spawns its starting Weapon child (auto-attack). |
 | `input-move` | `Input.action_press` → the Odin `_process` walks the player. |
-| `kill+gem` | a real bullet overlap → typed `take_damage` → enemy dies → a **kill** is counted **and** an XP gem drops. |
-| `gem-xp` | the player overlaps the gem → shared `game_state` **XP** increases. |
-| `levelup` | enough XP → `leveled_up` → the upgrade **menu is visible** and the **tree is paused**. |
-| `upgrade-applied` | invoking a menu button handler (as a click would) **applies** the upgrade (an observable player stat / weapon changes) and **resumes**. |
-| `difficulty` | the spawn interval **shrinks** as run-time grows. |
-| `game-over` | a real contact hit drops HP to 0 → `died` → **GameOver** state + the screen shows. |
+| `kill+gem` | a real bullet overlap → typed `take_damage` → enemy dies → a kill is counted and an XP gem drops. |
+| `gem-xp` | the player overlaps the gem → shared `game_state` XP increases. |
+| `levelup` | enough XP → `leveled_up` → the upgrade menu is visible and the tree is paused. |
+| `upgrade-applied` | invoking a menu button handler (as a click would) applies the upgrade (an observable player stat / weapon changes) and resumes. |
+| `difficulty` | the spawn interval shrinks as run-time grows. |
+| `game-over` | a real contact hit drops HP to 0 → `died` → GameOver state + the screen shows. |
 | `restart` | the restart handler reloads + resets to a fresh run (level 1, 0 kills, Playing). |
 
 It is also wired into the repo-wide suite (`tests/run_all.sh`, as `survivors | SURVIVORS_OK`).
 
-## Feature map — which odin_godot feature each file demonstrates
+<a id="feature-map--which-odin_godot-feature-each-file-demonstrates"></a>
 
-Scripts live in `scripts/` (each a single authored `.odin`; its `*.gen.odin` sibling is
-generated boilerplate). `game_state.odin` / `util.odin` are shared *module* files without an attached
-Godot node or script-state owner.
+## SDK features by script
+
+Authored `.odin` scripts live in `scripts/`; builds also produce `*.gen.odin`
+registration code. `game_state.odin` and `util.odin` are shared package files
+without an attached Godot node or script-state owner. Here, shared package code
+runs in the same scripts library; it is not a separately compiled script module.
 
 ### Custom Resources (data-driven; `//gd:extends Resource` + `.tres` instances)
 
 | Script / assets | Features |
 | --- | --- |
-| **`enemy_config.odin`** + `config/{swarmer,grunt,brute,tank}.tres` | custom Resource; `@export` of int / f32 (`range=` sliders) / `gd.Color`; global `class_name` so it type-filters a picker. hp, speed, damage, xp_value, points, radius, color. |
-| **`weapon_config.odin`** + `config/{pistol,orbit_blade,aura}.tres` | a custom Resource with an `enum=` int `@export` (`kind`: Projectile/Orbit/Aura) the `weapon` switch reads; many `range=` sliders; String name + Color. |
-| **`upgrade_config.odin`** + `config/up_*.tres` (10) | a Resource mixing a String name, a `multiline` String description, **two** `enum=` ints (kind + stat), an f32 amount, **and** a typed cross-resource picker (`resource=WeaponConfig`) — one custom resource referencing another. |
+| **`enemy_config.odin`** + `config/{swarmer,grunt,brute,tank}.tres` | Defines a custom Resource with int / f32 `@export` fields (`range=` sliders), `gd.Color`, and a global `class_name` for typed Inspector pickers. Fields include hp, speed, damage, xp_value, points, radius, and color. |
+| **`weapon_config.odin`** + `config/{pistol,orbit_blade,aura}.tres` | Defines a Resource with an `enum=` int `@export` (`kind`: Projectile/Orbit/Aura), `range=` sliders, String name, and Color. The `weapon` script selects behavior from `kind`. |
+| **`upgrade_config.odin`** + `config/up_*.tres` (10) | Defines String name and `multiline` description, two `enum=` ints (kind + stat), an f32 amount, and a typed cross-resource picker (`resource=WeaponConfig`). Demonstrates one custom Resource referencing another. |
 
-### Modules (owner-less shared package code)
+<a id="modules-owner-less-shared-package-code"></a>
+
+### Shared package code without a node
 
 | Script | Features |
 | --- | --- |
-| **`game_state.odin`** | the shared cross-script **module** pattern — run time, kills, score, level, the XP curve + `add_xp`/`add_kill`, the run state machine (Playing/LevelUp/GameOver), and `pending_levelups`. No owner struct, no Godot glue; every script shares these package globals. |
-| **`util.odin`** | **groups** as a decoupled "find that kind of thing" query (`find_player`/`find_game`/`nearest_enemy`); typed area damage (`damage_enemies_in_radius` calls `enemy_take_damage` typed); vector helpers. |
+| **`game_state.odin`** | Stores package globals for run time, kills, score, level, the XP curve, `add_xp`/`add_kill`, Playing/LevelUp/GameOver state, and `pending_levelups`. Every script in the package shares them; no owner struct or Godot attachment is required. |
+| **`util.odin`** | Queries Godot groups through `find_player`/`find_game`/`nearest_enemy`, applies typed area damage with `damage_enemies_in_radius` calling `enemy_take_damage`, and supplies vector helpers. |
 
 ### Node scripts
 
+For node scripts, `self` points to the Odin script data and `self.owner` holds
+the Godot node handle.
+
 | Script | Features |
 | --- | --- |
-| **`game.odin`** | the root scene controller and state machine: `@onready` child refs; scene-tree pausing (`gd.scene_tree_set_pause`); the **Input** ergonomics (`gd.action_add_key`) to bind WASD onto the `ui_*` actions; typed cross-script **connects** (player `leveled_up`/`died`) + calls into the menus/player; `@(gd_method)` accessors so GDScript/the test can read the module's state. |
-| **`player.odin`** | **input** axes; `@export` stats + combat **multipliers** (groups) that upgrades mutate; PackedScene + WeaponConfig slots; spawns Weapon children; XP/leveling (`player_gain_xp` → emits `leveled_up`); `@(gd_method) apply_upgrade` (the `Upgrade_Kind`/`Upgrade_Stat` switch — observable effect); signals `health_changed`/`leveled_up`/`died`; `@(gd_method) take_damage`. |
-| **`weapon.odin`** | **one script, three behaviors** switched on the WeaponConfig enum: Projectile (auto-fires bullets at the nearest in-range enemy, multishot fan), Orbit (runtime-built spinning blade `Polygon2D`s + area damage), Aura (periodic radius damage). Reads the WeaponConfig and the parent Player’s current multipliers for each shot; constructs nodes at runtime. |
-| **`bullet.odin`** | `@export` damage/speed/**pierce**; `_physics_process`; `@(gd_connect="area_entered")`; typed cross-script (`rt.script_of → Enemy`) so it only damages enemies and pierces N before despawning. |
-| **`enemy.odin`** | `@export` of a custom-Resource slot **and** a PackedScene (gem); reads EnemyConfig; runtime restyle (`node2d_set_scale` + recolor from config); `_physics_process` chase; `@(gd_method) take_damage`; `@(gd_connect="body_entered")` contact; **`gd.add_child_deferred`** to drop the gem safely during a physics flush; the `died` signal field. |
-| **`xp_gem.odin`** | `@export value`; `_physics_process` magnet that reads the player's live `pickup_range` (typed); `@(gd_connect="body_entered")` collect → `player_gain_xp` (typed, may level up). |
-| **`spawner.odin`** | `@export` PackedScene + four EnemyConfig slots; **difficulty scaling** (`interval_at(t)` + a time-shifted weighted type pick); writes the chosen config onto a fresh enemy before `add_child`; `@(gd_method) interval_at` exposed for the test. |
-| **`hud.odin`** | `@onready` auto-wired child refs (XP/Health `ProgressBar` + info `Label`); reads the shared module each frame; property helpers (`gd.set_float`/`gd.set_string`); typed cross-script signal **connect** to `health_changed`. |
-| **`levelup_menu.odin`** | a bank of 10 typed custom-resource `@export` slots (the pool); `@onready` button refs; `gd.connect_to` wiring each Button's `pressed` to a `@(gd_method)`; reading a resource's String fields generically (`gd.get_string`); typed calls into the player (`apply_upgrade`) and Game (`after_pick`). `process_mode=Always` keeps it live while paused. |
-| **`game_over.odin`** | `@onready` refs; reads the module for the run summary; `gd.connect_to` on the Restart button; a typed call into `game_restart` (reload + reset). |
+| **`game.odin`** | Controls the root scene and run state. Uses `@onready` child references, `gd.scene_tree_set_pause`, and `gd.action_add_key` to bind WASD to `ui_*` actions. Connects typed player `leveled_up`/`died` signals, calls menus/player scripts, and exposes module state through `@(gd_method)` accessors for GDScript/tests. |
+| **`player.odin`** | Reads input axes; exports stats, grouped combat multipliers, PackedScene, and WeaponConfig slots; spawns Weapon children. `player_gain_xp` emits `leveled_up`; `@(gd_method) apply_upgrade` uses `Upgrade_Kind`/`Upgrade_Stat`. Declares `health_changed`/`leveled_up`/`died` and exposes `@(gd_method) take_damage`. |
+| **`weapon.odin`** | Selects three behaviors from WeaponConfig: Projectile fires at the nearest in-range enemy with a multishot fan; Orbit creates spinning blade `Polygon2D`s and applies area damage; Aura applies periodic radius damage. Reads the parent Player’s current multipliers for each shot and constructs effect nodes at runtime. |
+| **`bullet.odin`** | Exports damage/speed/pierce, moves in `_physics_process`, and receives `@(gd_connect="area_entered")`. Resolves `rt.script_of → Enemy` for typed cross-script damage, piercing N enemies before despawn. |
+| **`enemy.odin`** | Exports a custom-Resource slot and PackedScene for gems. Reads EnemyConfig, applies `node2d_set_scale` and config color, chases in `_physics_process`, and exposes `@(gd_method) take_damage`. Uses `@(gd_connect="body_entered")` for contact, `gd.add_child_deferred` for gem drops during physics flush, and a `died` signal field. |
+| **`xp_gem.odin`** | Declares `@export value`, follows the player within its typed `pickup_range` in `_physics_process`, and collects through `@(gd_connect="body_entered")` calling `player_gain_xp`, which can trigger level-up. |
+| **`spawner.odin`** | Exports a PackedScene and four EnemyConfig slots. Uses `interval_at(t)` and a time-shifted weighted type selection for difficulty. Sets the fresh enemy’s config before `add_child` and exposes `@(gd_method) interval_at` to tests. |
+| **`hud.odin`** | Resolves XP/Health `ProgressBar` and info `Label` children through `@onready`, reads shared package state each frame, writes properties through `gd.set_float`/`gd.set_string`, and connects the typed `health_changed` signal. |
+| **`levelup_menu.odin`** | Holds 10 typed custom-resource `@export` slots and `@onready` buttons. Uses `gd.connect_to` to route Button `pressed` to `@(gd_method)`, reads Resource Strings through `gd.get_string`, and calls `apply_upgrade` and Game `after_pick`. `process_mode=Always` keeps the menu active while paused. |
+| **`game_over.odin`** | Uses `@onready` references, reads shared run-summary state, connects Restart through `gd.connect_to`, and calls typed `game_restart` to reload and reset. |
 
-### `gd.*` ergonomic helpers used throughout
+<a id="gd-ergonomic-helpers-used-throughout"></a>
+
+### `gd.*` helper procedures
 
 `get_node` · `get_parent` · `get_tree` · `add_child` · **`add_child_deferred`** · `add_to_group`
 · `instantiate` · `load_scene` · `connect`/`connect_to` · `set_bool`/`set_float`/`set_string` ·
@@ -169,11 +188,12 @@ examples/survivors/
 
 ## Notes / scope
 
-- **Movement** translates the `CharacterBody2D` directly (a kinematic position move) rather than
-  `move_and_slide` — it keeps the input→movement point front-and-center.
-- **Orbit / Aura** weapons apply damage by a group + distance query (`damage_enemies_in_radius`)
-  rather than per-blade `Area2D`s; the **Projectile** weapon uses real `Area2D` bullets, which is
-  the physics path the headless test asserts the kill through.
+- **Movement** translates the `CharacterBody2D` directly instead of calling
+  `move_and_slide`. The example demonstrates the input-to-position update
+  without solver-based movement.
+- **Orbit / Aura** weapons use a group and distance query
+  (`damage_enemies_in_radius`) for damage. **Projectile** weapons use `Area2D`
+  bullets; the headless test checks kills through their physics overlaps.
 - Spawn an XP gem with `gd.add_child_deferred` when handling a bullet’s
   `area_entered` signal. Godot cannot change collision monitoring while flushing
   physics queries.

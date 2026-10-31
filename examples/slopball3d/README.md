@@ -1,29 +1,35 @@
-# slopball3d — co-op physics soccer, third dimension on
+<a id="slopball3d--co-op-physics-soccer-third-dimension-on"></a>
+
+# slopball3d — cooperative 3D physics soccer with Kit
 
 Use this Kit example to replicate 3D Godot physics bodies. The ball is a
 `RigidBody3D` that arcs, bounces and tumbles; players are `CharacterBody3D` capsules.
 `play.Puppet3` lets the ball's entity owner simulate it and stream its pose and
 momentum, while other peers freeze their solver and display the received state.
 
-## What 3D actually changed
+<a id="what-3d-actually-changed"></a>
 
-The 3D version reuses Kit's session and replication APIs, with these physics and
-rotation choices:
+## 3D physics and rotation
 
-- **The wire core changed nothing.** Session, streams, deltas, commands, chat, lobby:
-  all dimension-free. A kicker streams its pose as one `pos: [3]f32` field.
-- **Rotation uses a quaternion.** The 2D puppet must snap its angle
-  (a componentwise lerp sweeps the long way around the ±π wrap); the stream layer's
-  `.Quat` kind nlerps hemisphere-safely, so `rot: gd.Quaternion` on `play.Puppet3`
-  interps correctly and watchers see the tumble turn smoothly.
-- **Angular velocity crosses the seam.** A 3D ball's tumble is its rolling contact —
-  `play.Puppet3` streams it and seeds it at the handoff alongside linear velocity.
-- **The engine trap is identical.** RigidBody3D ignores node transform writes exactly
-  like its 2D sibling; every imposed pose goes through `PhysicsServer3D.body_set_state`.
-- **The whole feel ledger transferred verbatim** (see slopball's README): seat
-  anticipation, sticky possession, intent gating, render-error smoothing, predicted
-  possession (`puppet3_claim`), physics interpolation + cut resets. The arbitration
-  runs on ground-plane (XZ) distances; kicks loft with a y impulse.
+The 3D version uses the same Session, streams, deltas, commands, chat, and
+lobby APIs. A kicker streams position as one `pos: [3]f32` field. Its physics
+and rotation use these rules:
+
+- `play.Puppet3` streams `rot: gd.Quaternion` with the `.Quat` interpolation
+  kind, using nlerp with hemisphere correction. The 2D puppet uses snapped
+  angles; directly interpolating their scalar values across ±π would take
+  the long arc.
+- Ownership transfer seeds angular velocity as well as linear velocity,
+  preserving the ball's tumble and rolling motion.
+- Impose poses through `PhysicsServer3D.body_set_state`, as for the 2D
+  version, because solver synchronization can replace direct node transforms.
+- Ownership arbitration uses ground-plane XZ distance, anticipates contact,
+  retains possession, and gates claims on input. `puppet3_claim` predicts
+  possession locally; render-error smoothing and physics interpolation apply
+  only to presentation and reset at cuts. Kicks add a y impulse for loft.
+
+See the [2D ownership and timing guide](../slopball/README.md) for the shared
+session and presentation rules.
 
 ## Run it
 

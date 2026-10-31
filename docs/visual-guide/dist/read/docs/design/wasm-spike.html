@@ -8,10 +8,11 @@
 experiment; they are not the current web-export status. See the subsequent
 <a href="web-internals.html">web implementation</a> and current <a href="../exporting.html">export guide</a>.</p>
 <h2 id="verdict--yellow">Verdict: 🟡 YELLOW<a class="heading-anchor" href="#verdict--yellow" aria-label="Link to this section">#</a></h2>
-<p>The full compile + link + dynamic-linking ABI path is <strong>proven</strong>, and Godot 4.6.2&#39;s
-web exporter <strong>accepts and bundles</strong> an Odin-produced wasm SIDE_MODULE as a
-GDExtension. No fundamental blocker found. Two explicit, named steps remain before
-🟢 GREEN (an actual extension loading and running in a browser):</p>
+<p>The spike verified compilation, linking, and the dynamic-linking ABI for its
+leaf module. Godot 4.6.2&#39;s web exporter accepted and bundled that wasm
+SIDE_MODULE as a GDExtension. The experiment found no fundamental blocker,
+but two steps remained before 🟢 GREEN: loading and running an extension in a
+browser.</p>
 <ol>
 <li><strong>Emscripten version reconciliation.</strong> The spike was linked with emscripten <strong>5.0.6</strong>
 (current dev shell). Godot 4.6.2&#39;s web templates were built with emscripten <strong>4.0.20</strong>.
@@ -22,13 +23,14 @@ the extension&#39;s <code>entry_symbol</code> is invoked at runtime. This needs 
 execution, which the spike did not exercise. (The spike used a leaf <code>add()</code> module; the real binding must also
 compile the full <code>godot/</code> package to <code>freestanding_wasm32</code> and export <code>*_init</code>.)</li>
 </ol>
-<p><strong>Single most important finding:</strong> Godot 4.6.2&#39;s headless web export, with
-<code>variant/extensions_support=true</code>, automatically uses the <strong>dlink</strong> web runtime template
+<p>Godot 4.6.2&#39;s headless web export with <code>variant/extensions_support=true</code> used
+the dlink web runtime template
 (<code>godot.side.wasm</code>, 41 MB) and copies the Odin <code>web.release.wasm32</code> wasm into the output
-unchanged. The GDExtension web pipeline exists and accepts our artifact today.</p>
+unchanged. This verified that the export pipeline accepted the spike artifact;
+it did not verify browser loading.</p>
 <hr>
 <h2 id="1-godot-462s-emscripten-version-4020-authoritative">1. Godot 4.6.2&#39;s emscripten version: <strong>4.0.20</strong> (authoritative)<a class="heading-anchor" href="#1-godot-462s-emscripten-version-4020-authoritative" aria-label="Link to this section">#</a></h2>
-<p>Source — the <em>installed</em> export template, not hearsay:</p>
+<p>The installed export template recorded the compiler version:</p>
 <ul>
 <li><code>~/Library/Application Support/Godot/export_templates/4.6.2.stable/web_dlink_release.zip</code>
 → <code>godot.js</code> contains literally:
@@ -37,13 +39,15 @@ unchanged. The GDExtension web pipeline exists and accepts our artifact today.</
 4.0.0 (LTO-thin ≥ 4.0.9, closure ≥ 4.0.11). The exact build version lives in the binary,
 and that is <strong>4.0.20</strong>.</li>
 </ul>
-<p>The previous note claiming <strong>4.0.11</strong> (in <code>flake.nix</code> and <code>PLAN.md</code>) was <strong>wrong</strong>;
-4.0.11 is merely the closure-compiler threshold from <code>detect.py</code>, not the build version.</p>
+<p>The previous <strong>4.0.11</strong> claim in <code>flake.nix</code> and <code>PLAN.md</code> confused the
+closure-compiler threshold in <code>detect.py</code> with the build version. That threshold
+is 4.0.11; the installed template was built with 4.0.20.</p>
 <p>Installed templates present for 4.6.2.stable include the GDExtension-capable dlink set:
 <code>web_dlink_release.zip</code>, <code>web_dlink_debug.zip</code>, <code>web_dlink_nothreads_*</code>. So no
 multi-hundred-MB download is needed for step 4 on this machine.</p>
 <h2 id="2-emscripten-pin-resolution">2. Emscripten pin resolution<a class="heading-anchor" href="#2-emscripten-pin-resolution" aria-label="Link to this section">#</a></h2>
-<p><strong>Time-boxed out</strong> (per the spike brief). nixpkgs&#39;s <code>emscripten</code> derivation is coupled to
+<p>The spike did not complete pinning within its time budget. nixpkgs&#39;s
+<code>emscripten</code> derivation is coupled to
 a specific bundled LLVM/binaryen; overriding just <code>emscripten.version</code> does not work
 (source hash + toolchain mismatch). The dev shell ships 5.0.6.</p>
 <p><strong>Recommendation for a future pass:</strong> pin emscripten <strong>4.0.20</strong> via an <strong>emsdk-based</strong>
@@ -67,7 +71,7 @@ emcc spike.wasm.o \
     -sSUPPORT_LONGJMP=wasm \
     -O2 \
     -o spike.wasm</code></pre></div><p>Result: <code>spike.wasm</code> is a valid wasm module whose <strong>first custom section is <code>dylink.0</code></strong>
-— the Emscripten marker that identifies a true SIDE_MODULE (this is what Godot&#39;s web
+— the Emscripten marker for a SIDE_MODULE (this is what Godot&#39;s web
 runtime reads to dynamically link it). Its imports are minimal
 (<code>env.memory</code>, <code>env.__memory_base</code>, <code>env.__stack_pointer</code>) and it exports our procs
 (<code>add</code>, <code>sum_to</code>) plus a few Odin runtime helpers (<code>memcpy</code>, <code>__ashlti3</code>, …).</p>
@@ -77,8 +81,8 @@ minimal dynamic-linking imports (shared memory/table, zeroed <code>__memory_base
 <code>__table_base</code> / <code>GOT.*</code>) and calls the exports:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">add(2,3)   = 5
 sum_to(5)  = 15
-RESULT: PASS</code></pre></div><p>This de-risks the SIDE_MODULE ABI: Odin codegen links and runs correctly through the
-emscripten side-module relocation model.</p>
+RESULT: PASS</code></pre></div><p>These calls verified that the spike&#39;s Odin code linked and executed through
+the Emscripten side-module relocation model.</p>
 <h2 id="4-freestanding-wasm-runtime-shim-details">4. Freestanding-wasm runtime shim details<a class="heading-anchor" href="#4-freestanding-wasm-runtime-shim-details" aria-label="Link to this section">#</a></h2>
 <p>For a <strong>leaf</strong> module (no setjmp/longjmp, no OS/syscalls) <strong>no shim was needed</strong>:</p>
 <ul>
@@ -97,8 +101,8 @@ a no-op for this leaf module but is kept in the command for fidelity.</li>
 </ul>
 <p>Open item for the full binding: compiling the entire <code>godot/</code> package to
 <code>freestanding_wasm32</code> may surface missing libc/runtime symbols; resolve by importing them
-from the Godot main module (they exist in <code>godot.side.wasm</code>&#39;s environment) rather than
-shimming. Not exercised here (the <code>godot/</code> package is being regenerated concurrently).</p>
+from the Godot main module (they exist in <code>godot.side.wasm</code>&#39;s environment) rather than adding a shim. The spike did not exercise this; the <code>godot/</code>
+package was being regenerated during the experiment.</p>
 <h2 id="5-godot-web-export-integration-proven-as-far-as-headless-allows">5. Godot-web export integration (proven as far as headless allows)<a class="heading-anchor" href="#5-godot-web-export-integration-proven-as-far-as-headless-allows" aria-label="Link to this section">#</a></h2>
 <p><code>examples/wasm-spike/web-export-test.sh</code> builds a throwaway Godot project whose
 <code>.gdextension</code> has only web entries:</p>
@@ -134,5 +138,5 @@ usable (e.g. <code>OdinHello.new().add(2,3) == 5</code>).</li>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">cd</span> /Users/walter/data/code/odin/odin_godot
 nix develop . --<span class="hljs-built_in">command</span> bash examples/wasm-spike/build.sh          <span class="hljs-comment"># §3 + ABI test</span>
 nix develop . --<span class="hljs-built_in">command</span> bash examples/wasm-spike/web-export-test.sh <span class="hljs-comment"># §5 export accept</span></code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="web-internals.html"><span>Web / WASM target — Odin scripts in the browser</span><span aria-hidden="true">→</span></a><a href="../exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/wasm-spike.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="web-internals.html"><span>Web / WASM target — Odin scripts in the browser</span><span aria-hidden="true">→</span></a><a href="../exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/wasm-spike.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#verdict--yellow" class="">Verdict: 🟡 YELLOW</a><a href="#1-godot-462s-emscripten-version-4020-authoritative" class="">1. Godot 4.6.2's emscripten version: 4.0.20 (authoritative)</a><a href="#2-emscripten-pin-resolution" class="">2. Emscripten pin resolution</a><a href="#3-working-compile--link-command-sequence-proven" class="">3. Working compile + link command sequence (proven)</a><a href="#abi-smoke-test-standalone-instantiation" class="subsection">ABI smoke test (standalone instantiation)</a><a href="#4-freestanding-wasm-runtime-shim-details" class="">4. Freestanding-wasm runtime shim details</a><a href="#5-godot-web-export-integration-proven-as-far-as-headless-allows" class="">5. Godot-web export integration (proven as far as headless allows)</a><a href="#precise-remaining-steps-for--green" class="subsection">Precise remaining steps for 🟢 GREEN</a><a href="#reproduce" class="">Reproduce</a></nav><div class="outline-actions"><a href="../../../reference/docs/design/wasm-spike.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -5,12 +5,12 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>MultiplayerPeer connection generations</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/multiplayer-generations.md" download>Page source ↓</a></div></div>
 
 <article class="reading-body "><p>Connection generations distinguish successive connections when a backend reuses
-a numeric peer ID. The shared Godot MultiplayerPeer adapter assigns a nonzero,
-increasing generation
-to each accepted connection within one open adapter lifetime. A reused numeric
-peer ID receives a new generation. Duplicate connect notifications for an active
-ID are idempotent. Unknown/disconnected peers report zero; exhaustion refuses a
-new connection instead of wrapping the counter.</p>
+a numeric peer ID. During one open lifetime, the shared Godot MultiplayerPeer
+adapter assigns each accepted connection a nonzero, increasing generation.
+A reused numeric peer ID receives a new generation. Duplicate connect
+notifications for an active ID preserve its generation. Unknown/disconnected
+peers report zero. When the counter is exhausted, the adapter refuses new
+connections instead of wrapping it.</p>
 <p><code>Transport.generation</code> and <code>Received.generation</code> expose this local metadata. ENet
 uses it directly; the Steam wrapper forwards it. Delay, Router, Fragments and
 Remap can therefore retire buffered work from a replaced connection using their
@@ -26,8 +26,9 @@ live-peer capacity and does not retain a growing set of disconnected IDs.</p>
 queueing that connection&#39;s packets. The adapter owns polling and reading while
 attached; external consumers must not remove or reorder its backend packets.
 Godot&#39;s upstream <a href="https://raw.githubusercontent.com/godotengine/godot/master/modules/enet/enet_multiplayer_peer.cpp" rel="noreferrer">ENet implementation</a>
-queues received packets separately from its peer registry, which is why the
-queued-prefix boundary is necessary rather than assuming disconnect purges them.</p>
+queues received packets separately from its peer registry. The adapter must
+therefore identify and discard packets queued before the new connection;
+disconnect does not imply that queue was purged.</p>
 <p>Closing the adapter ends all borrowed handles and resets its generation namespace.
 Close outer wrappers as well before reopening an owner; an old borrowed handle
 must not be reused against a new owner lifetime. The native creator-rejoin path
@@ -36,5 +37,5 @@ still explicitly replaces its complete transport when server ID 1 is reused.</p>
 and checkpoint layouts do not change. Public admission, account identity and
 provider-specific authentication remain separate requirements.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/multiplayer-generations.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/multiplayer-generations.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/multiplayer-generations.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

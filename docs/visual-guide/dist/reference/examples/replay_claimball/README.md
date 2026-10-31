@@ -1,8 +1,9 @@
 # Replay Claimball
 
-Run this [Claimball](../claimball/README.md) port to predict **only the local
-avatar and shared ball** before the authority settles their state. Replay
-Speedball instead predicts the complete pitch. Other active avatars are removed from the prediction group; the
+Run this [Claimball](../claimball/README.md) port to predict only the local
+avatar and shared ball before the authority settles their state. Replay
+Speedball instead predicts the complete pitch. Other active avatars are removed
+from the prediction group; the
 authority continues to simulate everyone. Original Claimball/Speedball/Slopball
 remain runnable in their original directories.
 
@@ -21,26 +22,28 @@ For automatic separate windows, set `RCB_ROLE=host` and
 `RCB_ROLE=client`; `server` and `observer` also work. Port defaults to 49490.
 `RCB_PLAYERS` is the start threshold, `RCB_GOALS` the winning score, and
 `RCB_TOKEN` a deterministic test identity label. Normal native menu play persists
-its identity and name in a separate profile. Launchers use localhost. WASD moves, Space kicks, E spikes.
+its identity and name in a separate profile. Launchers use localhost. WASD moves,
+Space kicks, and E spikes.
 `RCB_BOT=striker` drives a match; `idle` watches; `spiker` retains the optional
 two-command scenario. Fault controls are `RCB_LATENCY`/`RCB_JITTER` in milliseconds
 and `RCB_LOSS`/`RCB_DUPLICATE` in ten-thousandths. Native macOS is tested; the WASM
 fixture is a type-check, not browser multiplayer acceptance.
 
-## The group and the claim
+<a id="the-group-and-the-claim"></a>
+
+## Prediction groups and ball presentation claims
 
 [`shared/pitch`](shared/pitch/types.odin) declares a `Prediction_Group`, the subset
 of world state a client simulates speculatively. Projection builds that subset
 from an authority frame: it retains the local player/ball and records timestamped
-remote players (outsiders) separately. Its
-validator rejects reintroduced remote simulation members. The ordinary gameplay
+remote players (outsiders) separately. Its validator rejects reintroduced remote simulation members. The ordinary gameplay
 step iterates the group's connected players. Outside avatars do not produce
 predicted contacts, matching the original's predict-self policy; remote touches
 arrive through authoritative correction. See the [group contract](../../replay/net/groups.md).
 
-Presentation—the displayed state and effects—draws remote players from observed
-authority frames. A local influence inside
-38 pixels claims the ball. The claim stays active through fast flight, including
+Presentation draws remote players from observed authority frames. When the
+local player influences the ball within 38 pixels, the display begins using
+that player's predicted ball pose, called a claim. The claim stays active through fast flight, including
 when the ball leaves reach. Once untouched and below 0.6 units/tick, it fades back
 to observed presentation over 0.25 seconds. A fast ball that this player never
 influenced does not create a claim. Claim state is presentation-only.
@@ -51,7 +54,9 @@ new kickoff back toward the old goal position. It is an intentional clarificatio
 of the original's claim/reset behavior. Score/winner presentation remains
 authoritative, while the complete score and reset state participate in replay.
 
-## What is preserved and what is pending
+<a id="what-is-preserved-and-what-is-pending"></a>
+
+## Ported behavior and validation limits
 
 Pitch geometry, movement/momentum, kick cadence/reach/power, dribble contact,
 rolling friction/cap/bounce, goals, kickoff hold, team/spawn correspondence, claim
@@ -63,7 +68,8 @@ As in Replay Speedball, spikes carry intent and use the issuing seat's current
 world position rather than supplied coordinates; two queued commands run on
 successive ticks. The HUD/team tint are initial replacements. Native session menus, names, chat,
 scoreboard, leave/rejoin, Play again and native save/resume now have automated
-acceptance. Initial native Room handoff/crash migration is tested. Party menus and browser RTC handoff/crash paths are now tested locally. Steam,
+acceptance. Initial native Room handoff/crash migration is tested. Party menus
+and browser RTC handoff/crash paths are tested locally. Steam,
 broader contested scenarios and human visual review remain pending. This is an
 initial M6 slice, not full parity or a paired performance comparison.
 
@@ -116,7 +122,7 @@ Native authority saves and fresh-process solo/host resume are described in the
 is required to resume. `tests/replay_claimball_save/run.sh` verifies exact moving
 state, ownership/error handling, rejoin, continued commands and match restart.
 
-Native coordinator-driven handoff and crash recovery now have a separate
+Native coordinator-driven handoff and crash recovery have a separate
 [migration guide](migration.md). A successor restores the complete authority world
 while clients continue to predict one avatar. The shared package is named
 `claimball_pitch` to coexist with Speedball's `pitch` in service programs; its import

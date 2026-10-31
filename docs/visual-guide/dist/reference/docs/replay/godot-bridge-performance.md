@@ -17,7 +17,8 @@ Typed paint is empty here, so real child painting can add game-specific work.
 At 1,024 active views, the first expanded comparison measured original Nodes2 at
 609.7 µs, indexing at 107.0 µs, cached Nodes2 at 45.05 µs and typed ownership at
 70.58 µs per presentation call. Caching avoided roughly 75% of root property writes.
-Typed lifetime/payload bookkeeping adds work; ergonomics are not cost-free.
+Typed lifetime and payload tracking add work alongside their ownership and
+authoring benefits.
 
 That comparison exposed a sparse regression: one active view in a capacity-1,024
 pool still scanned capacity and cleared whole indexes. The final implementation
@@ -92,9 +93,9 @@ Implemented: indexed identity lookup, exclusive property caching/invalidation,
 changed-value paint, retained-membership fast paths and sparse index clearing.
 These reduce measured repeated work without changing gameplay assignments.
 
-Keep detached projections for ownership/ergonomics; make no universal zero-copy
-promise. The measured copy cost does not justify introducing chunked/COW storage
-and mandatory mutation tracking now. Memory can still become significant for much
+Keep detached projections for explicit ownership and convenient call sites.
+They do not guarantee zero copying. The measured copy cost does not justify introducing chunked/COW storage
+and mandatory mutation tracking in this work. Memory can still become significant for much
 larger Worlds/history; revisit with an actual target workload and a storage design
 that retains ordinary assignments and transactional replay.
 

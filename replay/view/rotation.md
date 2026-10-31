@@ -5,11 +5,11 @@ corrections. They retain rotational correction error as local presentation state
 alongside positional error. Read complete detached poses:
 
 ```odin
-// before and after belong to the SAME simulation tick.
+// before and after belong to the same simulation tick.
 view.smooth_correct_pose(&smoother2, before2, after2)
 view.smooth3_correct_pose(&smoother3, before3, after3)
 
-// Ordinary movement/rotation proceeds in truth; only correction error decays.
+// The current pose includes ordinary movement/rotation; only correction error decays.
 shown2 := view.smooth_present(&smoother2, current2, render_dt)
 shown3 := view.smooth3_present(&smoother3, current3, render_dt)
 ```
@@ -29,7 +29,7 @@ available and clear angular error on their explicit/large cuts too.
 `smooth_rebase` additionally preserves the displayed 2D angle when rebasing a
 whole displayed pose; its existing position cut remains 48.
 
-A finite nonpositive half-life disables smoothing. Invalid truth, render duration
+A finite nonpositive half-life disables smoothing. An invalid current pose, render duration
 or nonfinite half-life holds the previous shown pose and leaves state unchanged.
 Correction poses/cut parameters must be finite; 3D rotations must be nonzero.
 At the exactly-180-degree ambiguity a canonical quaternion sign chooses a stable

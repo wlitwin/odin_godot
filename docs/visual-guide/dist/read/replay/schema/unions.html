@@ -17,8 +17,8 @@ apply :: <span class="hljs-keyword">proc</span>(action: Action) {
     <span class="hljs-keyword">case</span> Put:  <span class="hljs-comment">// value.amount belongs to Put</span>
     <span class="hljs-keyword">case</span>:      <span class="hljs-comment">// nil: no action</span>
     }
-}</code></pre></div><p>There is no second handwritten enum or a set of unrelated argument fields to keep
-in sync. Reference-bearing variants, raw unions, shared-nil unions, unsupported
+}</code></pre></div><p>The union type declares its alternatives and carries the active variant&#39;s
+value. Reference-bearing variants, raw unions, shared-nil unions, unsupported
 scalar types and platform-width wire integers remain rejected. Validation examines
 all possible variants, including hidden fields and zero-length arrays. Merely
 leaving a forbidden variant inactive does not make its type safe.</p>
@@ -80,9 +80,9 @@ duplication. Both see four accepted transfers, conserve inventory and compare th
 same final world. The in-memory network suite additionally covers checkpoint
 capture/decode/restore and local audit of that model.</p>
 <p>These tests establish the stated type/codec/runner behavior on the recorded targets.
-They do not establish every OS, every user union layout, an unbounded dynamic-state
-model or full roadmap completion. See the
+Their results do not extend to untested operating systems or user union
+layouts, an unbounded dynamic-state model, or the full roadmap. See the
 <span class="local-reference" title="docs/replay/results/tagged-unions-2026-09-07/README.md · available in the repository">recorded union evidence</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/schema/unions.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/schema/unions.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#canonical-representation" class="">Canonical representation</a><a href="#public-projections-and-variant-changes" class="">Public projections and variant changes</a><a href="#replay-and-diagnostics" class="">Replay and diagnostics</a><a href="#acceptance" class="">Acceptance</a></nav><div class="outline-actions"><a href="../../../reference/replay/schema/unions.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

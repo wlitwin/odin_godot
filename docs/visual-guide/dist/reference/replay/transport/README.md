@@ -1,11 +1,14 @@
 # Replay transports
 
-Use `Transport` to drive packet delivery independently of the simulation and its
-network policy. It is a borrowed interface over a concrete adapter. It provides `send`,
-`receive`, `poll`, `status`, `peer_connected`, and `close`. Accepted sends copy payloads; receive
-copies into caller storage. `Buffer_Too_Small` retains the pending packet and
-reports the required size. A peer ID identifies a transport connection, not a
-stable player seat. Session admission and reconnect identity are separate work.
+`Transport` delivers packets through an adapter while simulation and network
+policy remain with the runner. The interface borrows that adapter and provides
+`send`, `receive`, `poll`, `status`, `peer_connected`, and `close`.
+
+An accepted send copies its payload; receive copies a packet into caller-owned
+storage. If the destination is too small, `Buffer_Too_Small` reports the required
+size and retains the pending packet for a later read. A peer ID identifies a
+transport connection. The session separately assigns stable player seats and
+handles admission and reconnect identity.
 
 Packets are bounded to 64 KiB at this interface. A transport may have a smaller
 configured limit. There is no implicit broadcast: callers explicitly enumerate
@@ -26,12 +29,13 @@ callbacks have these specific effects:
 | `fragments_transport` | Frees fragmentation storage; leaves its base open. |
 | `router_transport` | Closes that lane; leaves the router and base open. |
 
-Close a forwarding wrapper as one stack; do not separately close stale copies of
-its base handle. For a borrowing wrapper, destroy its dependent runners first,
-close/destroy the wrapper, then close the base adapter. After closing all router
-lanes, call `router_destroy` to free the router's buffers, then close its base.
-These rules also apply when wrappers are composed: closing Fragments over Delay
-leaves Delay open until its own handle is closed.
+When a wrapper forwards close to its base, close through the wrapper and do not
+close stale copies of the base handle separately. For a wrapper that leaves
+its base open, destroy dependent runners first, close/destroy the wrapper,
+then close the base adapter. After closing all router lanes, call
+`router_destroy` to release its buffers before closing the base. Apply these
+rules at each level of a composed stack: closing Fragments over Delay releases
+Fragments while Delay remains open until its own handle is closed.
 
 ## Deterministic memory adapter
 
@@ -86,7 +90,7 @@ It owns/releases its peer reference, connection-tracking callables, and pending
 receive buffer. Connection signals maintain a live peer set without game-script
 callbacks, so disconnected recipients are rejected before sending. Polling a
 disconnected peer is a no-op. ENet constructors return false on Godot web targets;
-a WebRTC adapter is still required.
+use the WebRTC adapter described below for browser connections.
 
 `Delay` is a bounded receive-delay decorator for real transports. It preserves
 delivery order, packet ownership, connection visibility, and backpressure. The
@@ -98,8 +102,9 @@ nix develop --command bash tests/replay_enet/run.sh
 
 That gate starts a server and two client processes, transfers canonical world
 envelopes in both delivery modes, verifies sender metadata and decoded data, and
-requires clean shutdown. It is a transport/codec acceptance test, **not** the
-roadmap's server-prediction/client/observer gameplay acceptance gate.
+requires clean shutdown. Its evidence covers transport and codec behavior.
+The roadmap's server-prediction/client/observer gameplay gate tests a separate
+layer.
 
 Fresh project preparation uses a normal headless editor startup for 120 frames,
 allowing queued editor work to finish. The immediate `--import` shutdown path
@@ -175,10 +180,12 @@ accumulate inside the adapter. It does not drop accepted packets, change wire
 framing, enlarge receive buffers or prioritize away checkpoint traffic.
 `Fragment_Stats.queue_limited` records those admission deferrals.
 
-## Recording a real interface
+<a id="recording-a-real-interface"></a>
 
-The optional [trace package](trace/README.md) captures exact transport callback
-observations with bounded owned storage and preserves nil-callback semantics.
-Strict playback checks caller operations and outbound bytes without opening a
-real endpoint. Caller marks can record pump times/configuration; the Claimball
-observer fixture also compares per-frame state and effect hashes.
+## Recording transport calls
+
+The optional [trace package](trace/README.md) records adapter calls and their
+results in bounded owned storage, preserving nil-callback behavior. Strict
+playback checks the caller's operation sequence and outbound bytes without
+opening an endpoint. Caller marks retain pump times and configuration; the
+Claimball observer fixture also compares state and effect hashes each frame.

@@ -16,8 +16,10 @@ The data-channel interceptor owns copies of outgoing RPC buffers. It delays
 messages by 40±10 ms, preserves reliable order through one FIFO drain per channel,
 and applies 5% loss/duplication only to unreliable data. It never erases reliable
 control messages. Queues are capped at 128 messages/64 KiB per browser. It is
-installed after Replay has charged send credit, so erased messages exercise the
-credit-fence path. A separate post-workload 400 ms blackout requires a new dash,
+installed after Replay has charged send credit. Erased messages therefore test
+credit-fence recovery: reclaiming send-window capacity for lost unreliable
+packets without retransmitting their gameplay payloads. See the
+[RTC flow-control rules](../../replay/godot/transport/rtc.md#packet-limits-and-flow-control). A separate post-workload 400 ms blackout requires a new dash,
 credit-fence progress and at least ten common canonical world hashes.
 
 Speed-optimized WASM and the available hardware WebGL renderer are used, while
@@ -33,7 +35,7 @@ reuse. Failed runtime receipts are preserved before browser cleanup. Only owned
 processes are shut down. The first two synthetic members use the existing local
 signaling fixture with its explicit expected member count of two.
 
-RTC now limits staged unreliable datagrams to eight per destination, in addition
+RTC limits staged unreliable datagrams to eight per destination, in addition
 to its existing 16 in-flight credits. The large-message exception and ordinary
 memory limits preserve sendability without queuing several stale worlds. The
 fixture checks that bound, records memory/credit high-water marks, and waits up to

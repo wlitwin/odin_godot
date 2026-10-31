@@ -1,13 +1,16 @@
-# Godot bridge and measured optimization goal
+<a id="godot-bridge-and-measured-optimization-goal"></a>
+
+# Godot bridge implementation plan
 
 Completed 2026-09-20. See [delivery evidence](results/godot-bridge-2026-09-20/README.md).
 
-Goal: make the boundary between replayable gameplay values and authored
-Godot scenes easier to use, while reducing measured overhead. This follows the
-completed framework-first implementation; it is a new goal, not a game-parity
-campaign. Preserve Kit, original games and separately runnable Replay versions.
+This completed plan defined improvements to the API connecting replayable
+gameplay values and authored Godot scenes, together with measured overhead
+reductions. It followed the framework-first implementation and required
+preserving Kit, original games, and separate Replay versions without adding a
+game-parity campaign.
 
-Current implementation/evidence is tracked in [bridge progress](godot-bridge-progress.md).
+Implementation and evidence are tracked in [bridge progress](godot-bridge-progress.md).
 
 ## Invariants
 
@@ -37,8 +40,9 @@ Current implementation/evidence is tracked in [bridge progress](godot-bridge-pro
 | B6 | Explicit simulation-driven and cooperative body bindings | Authored transform ownership, authority-gated observations, freeze/reseed/transfer/correction; no claim that Godot physics becomes deterministic |
 | B7 | Measured optimization and delivery | Compare representative lookup/property/copy/encoding/replay costs; implement justified improvements, document public APIs and remaining limits, maintain compile-checked examples |
 
-Start with B1/B2 because the current `Nodes2` implementation repeatedly scans arrays
-and applies all four properties on every presentation call. Preserve its default
+The plan started with B1/B2 because the original `Nodes2` implementation
+repeatedly scanned arrays and applied all four properties on every presentation
+call. Preserve its default
 behavior for existing games; higher-level bindings can opt into property caching.
 Current scene/resource extraction, input latches, cues, Audio_Pool and Body2/Body3
 are implementation foundations, not functionality to rewrite under new names.

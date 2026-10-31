@@ -1,7 +1,7 @@
 # Framework completion plan
 
-**Active priority, 2026-09-20:** finish Replay as a usable multiplayer framework.
-The user explicitly redirected work away from achieving 100% parity across every
+**Priority set on 2026-09-20:** finish Replay as a usable multiplayer framework.
+The scope was explicitly redirected away from achieving 100% parity across every
 ported game. This plan supersedes exhaustive game-parity requirements in the
 original roadmap and individual port ledgers. Those ledgers remain useful history
 and follow-up backlogs; their open rows do not automatically block the framework.
@@ -43,7 +43,7 @@ authoring/behavior validation; game-specific visual fidelity is separate.
 3. Close that list, including shared event-loss/recovery issues when reproduced.
    Use games to expose library problems; move game-only differences to follow-up.
 4. Consolidate public setup APIs, examples and documentation. Complete one
-   representative authoring comparison and the supported-envelope assessment.
+   representative authoring comparison and the supported-configuration assessment.
 
 ## Deferred game work
 
@@ -52,7 +52,7 @@ matching every menu and game-specific behavior, and repeated full-game parity
 campaigns are follow-up work unless they expose a missing framework primitive or
 shared correctness defect. Existing ports remain available as testbeds.
 
-Do not expand a port just to make its ledger green. Do not rerun all games after
+Do not expand a port solely to mark its ledger complete. Do not rerun all games after
 an isolated change. Run the affected framework checks and representative integration
 cases, then continue to the next framework gap.
 

@@ -1,6 +1,6 @@
 # Quickdraw combat presentation
 
-The gunner skin now uses the original seat palette directly. The gun and hitscan
+The gunner skin uses the original seat palette directly. The gun and hitscan
 beam retain their own colors instead of inheriting a whole-avatar tint. Drone and
 lob skins also use their owner's palette directly. The view geometry is stored as
 immutable meshes, preserving the original vertices and tint values without asking
@@ -35,5 +35,5 @@ a fresh ledger so independent sessions may reuse epoch one. Normal acceptance re
 zero dropped rings. Broader stress and human visual comparison remain separate work.
 
 `tests/replay_quickdraw_feedback/run.sh` builds an isolated game and runs its existing
-UI/profile gates plus three-peer combat presentation acceptance. Pure tests cover
+UI/profile tests plus three-peer combat presentation checks. Pure tests cover
 health/life boundaries and actual journal update/cancel/reappearance behavior.

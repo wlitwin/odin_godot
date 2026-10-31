@@ -2,8 +2,8 @@
 
 The addon includes `godot:replay` beside `godot:kit`. Replay uses an explicit value
 world, fixed simulation ticks, ordered input/actions and checkpoints. The library
-is experimental; its APIs/formats and supported envelopes are not a stable release
-promise. Kit and its authoring model remain available independently.
+is experimental; its APIs, formats, and supported configurations are not
+guaranteed to remain stable. Kit and its authoring model remain available independently.
 
 ## Start with the included project
 

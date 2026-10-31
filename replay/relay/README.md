@@ -96,9 +96,11 @@ The provider fixture uses a short TTL, waits beyond the credential used for the
 initial selected connection, then migrates/rejoins with later credentials. See
 [recorded evidence](../../docs/replay/results/relay-credentials-2026-09-07/README.md).
 
-This is not instant revocation of credentials already known to a client, encrypted
-credential storage, a public relay deployment, or per-account billing enforcement.
-Operator clock synchronization, provider/relay quotas, public WSS/TLS, long-duration
-and combined-outage coverage remain required deployment work. The optional source
+Issued credentials may remain usable until expiry; the provider cannot revoke a
+copy already held by a client instantly. It does not provide encrypted
+credential storage, a public relay deployment, or per-account billing
+enforcement. Deployment still requires operator clock synchronization,
+provider/relay quotas, public WSS/TLS, and testing of long-duration and
+combined outages. The optional source
 does not implement in-place ICE restart; it supplies current credentials when a
 new connection is created.

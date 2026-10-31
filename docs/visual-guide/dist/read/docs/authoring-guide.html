@@ -2,13 +2,13 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Authoring guide — the Odin script feature reference · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html" aria-current="page">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Authoring guide — the Odin script feature reference</h1><div class="reader-meta"><span>54 min read</span><span>Odin × Godot</span><a href="../../reference/docs/authoring-guide.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#api-conventions-shared-by-kit-and-replay">API conventions shared by Kit and Replay</a><a href="#single-file-authoring">Single-file authoring</a><a href="#anatomy-of-a-script">Anatomy of a script</a><a href="#reserved-shapes">Reserved shapes</a><a href="#manual-overrides">Manual overrides</a><a href="#generated-names">Generated names</a><a href="#multiplayer-rpcs-gd_rpc">Multiplayer RPCs (@(gd_rpc))</a><a href="#ergonomic-helpers">Ergonomic helpers</a><a href="#supported-odin--variant-types">Supported Odin → Variant types</a><a href="#threads--memory">Threads &amp; memory</a><a href="#building">Building</a><a href="#multiple-scripts-in-one-package">Multiple scripts in one package</a><a href="#custom-resources">Custom resources</a><a href="#global-class-names">Global class names</a><a href="#typed-cross-script-references">Typed cross-script references</a><a href="#autoload-singletons">Autoload singletons</a><a href="#editor-tooling">Editor tooling</a></nav></details>
-<article class="reading-body "><p>This is the complete reference for writing Odin scripts: the struct convention, the <code>//gd:</code>
-markers, every <code>@export</code> form, lifecycle, methods, signals, resources, autoloads,
-cross-script access, the <code>gd.*</code> helper catalog, and editor tooling. New to odin_godot? Read
-<strong><a href="getting-started.html">Getting Started</a></strong> first for setup and a hello-world; this page is the
-deep dive. For the build/edit/debug loop, see <strong><a href="workflow.html">Workflow</a></strong>.</p>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Authoring guide — the Odin script feature reference</h1><div class="reader-meta"><span>51 min read</span><span>Odin × Godot</span><a href="../../reference/docs/authoring-guide.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#api-conventions-shared-by-kit-and-replay">API conventions shared by Kit and Replay</a><a href="#single-file-authoring">Single-file authoring</a><a href="#anatomy-of-a-script">Anatomy of a script</a><a href="#reserved-procedure-signatures-and-fields">Reserved procedure signatures and fields</a><a href="#manual-overrides">Manual overrides</a><a href="#generated-names">Generated names</a><a href="#multiplayer-rpcs-gd_rpc">Multiplayer RPCs (@(gd_rpc))</a><a href="#godot-helper-procedures">Godot helper procedures</a><a href="#supported-odin--variant-types">Supported Odin → Variant types</a><a href="#threads--memory">Threads &amp; memory</a><a href="#building">Building</a><a href="#multiple-scripts-in-one-package">Multiple scripts in one package</a><a href="#custom-resources">Custom resources</a><a href="#global-class-names">Global class names</a><a href="#typed-cross-script-references">Typed cross-script references</a><a href="#autoload-singletons">Autoload singletons</a><a href="#editor-tooling">Editor tooling</a></nav></details>
+<article class="reading-body "><p>This reference covers the Odin script struct convention, <code>//gd:</code> markers,
+<code>@export</code> forms, lifecycle callbacks, methods, signals, resources, autoloads,
+cross-script access, <code>gd.*</code> helpers, and editor tooling. Start with
+<a href="getting-started.html">Getting Started</a> for setup and a first script. For the
+build, edit, and debug loop, see <a href="workflow.html">Workflow</a>.</p>
 <p>Write <code>&lt;name&gt;.odin</code> using the struct and procedure conventions below. The
 <code>scriptgen</code> preprocessor, run by <code>build/build_scripts.sh</code>, reads its tags and
 markers and generates registration code, including Variant argument wrappers,
@@ -58,8 +58,9 @@ the whole-word prefix, such as <code>http_server_*</code> for <code>HTTPServer</
 <td>Raw net/P2P/transport APIs for custom policies</td>
 </tr>
 </tbody></table>
-</div><p>Choose one normal owner path for a game. Higher-level owners drive their lower
-layers; do not also pump those layers yourself. Keep live owners at stable
+</div><p>Choose one top-level runtime to drive the game. Kit&#39;s generated network
+callbacks, Replay Session, and Replay Room each advance their lower layers;
+do not also advance those layers yourself. Keep live owners at stable
 addresses and pass them by pointer. Configuration and copied World/frame values
 may be copied; live owners with allocations, callbacks or connections may not.
 Start configuration from the documented defaults, rather than assuming every
@@ -79,7 +80,7 @@ components such as Pool and owned state need no independent destructor.</p>
 <p>The ordinary call sequence is setup, frame/service, drain, read, teardown.
 Queries read current state; frame/service calls advance it; queue consumers
 must drain until empty. Configuration fields and documented observations form
-the supported author surface of a runtime owner. Its other fields are storage
+the supported API of a runtime owner. Its other fields are storage
 for the implementation, not another way to drive it.</p>
 <p>Successful action or chat submission can mean that work was queued locally.
 Use the authoritative receipt or confirmed presentation change when game logic
@@ -88,17 +89,17 @@ needs an accepted outcome; a successful send alone does not establish it.</p>
 <a href="../replay/getting-started.html">Replay starting path</a> for each model&#39;s concrete
 lifetimes, defaults and extension points.</p>
 <h2 id="single-file-authoring">Single-file authoring<a class="heading-anchor" href="#single-file-authoring" aria-label="Link to this section">#</a></h2>
-<p>There is exactly <strong>one file per script</strong>: the <code>.odin</code> you write is also the resource
+<p>There is one file per script: the <code>.odin</code> you write is also the resource
 you attach to a node. Put your scripts under the project (e.g. <code>res://scripts/foo.odin</code>)
 and attach <code>res://scripts/foo.odin</code> directly in the scene. The loader reads its
 canonical resource path and binds it to the descriptor generated for that exact file.
 <code>//gd:class</code> is optional and only adds a Godot global-class alias. There is no separate
 &quot;resource stub&quot; file to keep in sync.</p>
-<p>The generated code lands in <strong>one <code>odin_godot_scripts.gen.odin</code> per scripts directory</strong>,
-holding a banner-marked section per script, beside the sources it was generated from (the
-directory&#39;s package and the generated file&#39;s package must match, so it cannot live anywhere
-else). The loader <strong>ignores <code>*.gen.odin</code></strong>, so a generated file is never treated as an
-attachable script, and the editor hides these files from the FileSystem dock by default.</p>
+<p>Each scripts directory gets one <code>odin_godot_scripts.gen.odin</code> beside its sources,
+with a marked section for each script. The generated file must share the
+directory&#39;s package. The loader ignores <code>*.gen.odin</code>, so generated files are
+not attachable scripts. The editor hides them from the FileSystem dock by
+default.</p>
 <h2 id="anatomy-of-a-script">Anatomy of a script<a class="heading-anchor" href="#anatomy-of-a-script" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node          // base Godot class. Optional — derived from `owner` when omitted.</span>
 <span class="hljs-comment">//gd:class Ping            // optional: opt into Godot&#x27;s global class namespace</span>
@@ -107,10 +108,10 @@ attachable script, and the editor hides these files from the FileSystem dock by 
 
 <span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 
-<span class="hljs-comment">// The script struct. The FIRST field MUST be the owner Object handle (the core</span>
-<span class="hljs-comment">// writes the owner pointer there at offset 0). Its type is just the handle you</span>
-<span class="hljs-comment">// want to use in your procs (gd.Node, gd.Object, gd.Node2d, ...). The actual base</span>
-<span class="hljs-comment">// class comes from //gd:extends.</span>
+<span class="hljs-comment">// The script struct&#x27;s first field must be the owner Object handle. The core</span>
+<span class="hljs-comment">// writes the owner pointer at offset 0. Choose the handle type used by your</span>
+<span class="hljs-comment">// procedures (gd.Node, gd.Object, gd.Node2d, ...). The base follows</span>
+<span class="hljs-comment">// //gd:extends when present; otherwise it is derived from the handle type.</span>
 Ping :: <span class="hljs-keyword">struct</span> {
 	owner:  gd.Node,
 	pinged: gd.Signal1(<span class="hljs-type">int</span>) <span class="hljs-string">`gd:&quot;args=value&quot;`</span>, <span class="hljs-comment">// signal field -&gt; declared signal (see Signals)</span>
@@ -119,10 +120,10 @@ Ping :: <span class="hljs-keyword">struct</span> {
 	scratch: <span class="hljs-type">int</span>,                 <span class="hljs-comment">// untagged -&gt; private per-instance state</span>
 }
 
-<span class="hljs-comment">// Engine calls (add_child, connect_to, queue_free, ...) take `self.owner` —</span>
-<span class="hljs-comment">// NEVER `self`. `self` is this Odin struct; engine handles are raw pointers,</span>
-<span class="hljs-comment">// so both compile, but the engine dereferencing your struct is a segfault.</span>
-<span class="hljs-comment">// scriptgen rejects the bare-`self` form at build time</span>
+<span class="hljs-comment">// Engine calls (add_child, connect_to, queue_free, ...) take `self.owner`.</span>
+<span class="hljs-comment">// `self` points to this Odin struct. Engine handles are distinct types,</span>
+<span class="hljs-comment">// so the compiler rejects a script pointer passed as an engine handle.</span>
+<span class="hljs-comment">// scriptgen also rejects the bare-`self` form at build time</span>
 <span class="hljs-comment">// (&quot;...is the ^Ping script struct, not an engine object — pass self.owner&quot;).</span>
 
 <span class="hljs-comment">// Lifecycle procs: matched by name (after stripping an optional `&lt;struct&gt;_`</span>
@@ -173,21 +174,21 @@ ping_emit_ping :: <span class="hljs-keyword">proc</span>(self: ^Ping, value: <sp
 </tbody></table>
 </div><p>The authored <code>res://scripts/&lt;x&gt;.odin</code> path is the runtime identity. Markers add
 engine metadata and behavior; they do not decide which compiled descriptor attaches.
-That means several scripts may share a base type—or even a struct name across separate
-Odin packages—without annotations or ambiguous inference.</p>
+Several scripts may therefore share a base type, or a struct name across
+separate Odin packages, because their resource paths distinguish them.</p>
 <p><code>//gd:extends</code> and the <code>owner</code> field state the same fact twice, so scriptgen
-cross-checks them: <strong>the owner handle must be the declared base or one of its
-ancestors.</strong></p>
+cross-checks them. The owner handle must be the declared base or one of its
+ancestors.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends CharacterBody2D</span>
 Player :: <span class="hljs-keyword">struct</span> { owner: gd.Node2d }   <span class="hljs-comment">// fine — a wider handle; the script only calls Node2D methods</span>
 
 <span class="hljs-comment">//gd:extends Node</span>
-Player :: <span class="hljs-keyword">struct</span> { owner: gd.Node2d }   <span class="hljs-comment">// build error — a NARROWER handle</span></code></pre></div><p>A narrower handle is the bug: every class handle is a <code>rawptr</code> alias, so Odin
-accepts it, the class registers as a plain <code>Node</code>, and every <code>gd.node2d_*</code> call
-then reaches through that handle into an object that never was a Node2D, causing a crash
-at the engine boundary. The build error names both spellings and both fixes.</p>
-<p>Leave the marker off and the base is <strong>derived</strong> from the handle instead, so there
-is only one place to be wrong:</p>
+Player :: <span class="hljs-keyword">struct</span> { owner: gd.Node2d }   <span class="hljs-comment">// build error — a NARROWER handle</span></code></pre></div><p>A narrower handle lets a script call methods its Godot base does not support.
+Class handles share the distinct <code>gd.Object</code> representation, so Odin accepts a
+<code>gd.Node2d</code> handle even when the registered class is a plain <code>Node</code>. A <code>gd.node2d_*</code> call through
+that handle can then crash inside Godot. The build error names the declared
+base, the handle type, and the two ways to make them consistent.</p>
+<p>Omit the marker to derive the base from the handle type:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:class Coin</span>
 <span class="hljs-keyword">package</span> scripts
 Coin :: <span class="hljs-keyword">struct</span> { owner: gd.Area2d }     <span class="hljs-comment">// registers as Area2D</span></code></pre></div><p>The base falls back to <code>Node</code> only where the handle can&#39;t be placed (no
@@ -265,28 +266,27 @@ and the runtime reflection registrar:</p>
 &quot;In the wire fingerprint&quot; means the declaration contributes to
 <code>NET_FINGERPRINT</code>. Peers compare that fingerprint at join and reject mismatched
 builds before interpreting gameplay packets.</p>
-<p><strong><code>backup</code> is not in the fingerprint.</strong> A backup is guarded by the codec&#39;s own
-<code>fnv1a32</code> format stamp at the LOAD door, so a save written by a drifted build is refused
-rather than misread; it is not guarded at the JOIN door. Two peers whose save files
-disagree can still play together, and folding save shape into the fingerprint would ground
-them over a file neither peer is about to send the other. The rule the column follows:
-<strong>yes</strong> iff the shape must match across a SOCKET, not merely across a file.</p>
-<p><strong>A wire declaration is a first token.</strong> If a declaration folds into <code>NET_FINGERPRINT</code>,
-it names what the field IS and it leads the tag. (<code>backup</code> and <code>manual</code> lead their tags
-too, without crossing a wire.) Two consequences:</p>
+<p><code>backup</code> is excluded from the session fingerprint. Its codec checks a
+<code>fnv1a32</code> format stamp when loading a save and rejects an incompatible format.
+That check is separate from network admission: peers with different save
+formats can still play together if their network declarations agree. The
+table marks a declaration yes when peers must agree on its wire representation.</p>
+<p>A declaration that contributes to <code>NET_FINGERPRINT</code> selects the field kind
+and must be the tag&#39;s first token. <code>backup</code> and <code>manual</code> also lead their tags,
+though they do not contribute to the fingerprint. The selected kind determines
+which options may follow:</p>
 <ul>
-<li><strong>The three lanes are three tokens.</strong> <code>replicate</code>, <code>owner</code>, and <code>predict</code> are each a
-first token, and each carries its own CLOSED option set (below). <code>slack=</code> is an option
-the predict lane HAS, not &quot;an option requiring predict&quot;; the invalid combinations
-(<code>owner</code> with <code>predict</code>, <code>slack=</code> without <code>predict</code>) are unspellable.</li>
-<li><strong><code>entity=Name:id</code> leads its tag.</strong> It carries a permanent public type id and builds
-the factory table; it is not an Inspector detail of an export. An entity field is
-necessarily an exported <code>PackedScene</code>, so both of those are SYNTHESIZED: write
-<code>`gd:&quot;entity=Mob:3&quot;`</code>, not <code>`gd:&quot;export,resource=PackedScene,entity=Mob:3&quot;`</code>.
-The kind&#39;s own knobs trail as entity tokens — <code>stream_hz=N</code> (the kind&#39;s
-owner-stream rate, every peer, every spawn) and <code>avatar</code> (a seat&#39;s body: a host
-takeover parks it with its seat instead of adopting it) — and export specs may
-still ride behind them (<code>entity=Mob:3,stream_hz=30,group=Spawns</code>); see
+<li><code>replicate</code>, <code>owner</code>, and <code>predict</code> each select one lane with its own allowed
+options, listed below. <code>slack=</code> belongs to the predicted lane. Combining
+<code>owner</code> with <code>predict</code>, or using <code>slack=</code> outside <code>predict</code>, is invalid.</li>
+<li><code>entity=Name:id</code> declares a permanent public type id and an entry in the
+factory table. Scriptgen makes the field an exported <code>PackedScene</code>, so write
+<code>`gd:&quot;entity=Mob:3&quot;`</code> rather than
+<code>`gd:&quot;export,resource=PackedScene,entity=Mob:3&quot;`</code>. Follow it with entity
+options: <code>stream_hz=N</code> sets the kind&#39;s owner-stream rate for every peer and
+spawn, and <code>avatar</code> marks a seat&#39;s body so a host takeover parks it with the
+seat instead of adopting it. Export specifications can follow, as in
+<code>entity=Mob:3,stream_hz=30,group=Spawns</code>. See
 <a href="kit/boot.html#the-entity-factory">kit/boot</a>.</li>
 </ul>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
@@ -313,11 +313,12 @@ still ride behind them (<code>entity=Mob:3,stream_hz=30,group=Spawns</code>); se
 <td>the above, plus <code>slack=N</code>, <code>glide=N</code>, <code>cut=N</code></td>
 </tr>
 </tbody></table>
-</div><p><code>_edge</code> halves pair with <code>gd:&quot;replicate&quot;</code> fields only: predicted state resims and
-continuous owner-streamed state interpolates by default, so each of those lanes has its own presentation path.</p>
+</div><p><code>_edge</code> halves pair with <code>gd:&quot;replicate&quot;</code> fields and discrete owner fields.
+Predicted state uses resimulation, and continuous owner-streamed state uses
+interpolation, so those fields have separate presentation paths.</p>
 <p>A field&#39;s resolved lane is what folds into <code>NET_FINGERPRINT</code>, so two builds that resolve a
 field to the same lane share a session bit for bit regardless of how the tag is spelled.
-A field picks ONE lane: the deprecated combined spelling <code>gd:&quot;replicate,interp,owner,wire=f16&quot;</code>
+A field selects one lane. The deprecated combined spelling <code>gd:&quot;replicate,interp,owner,wire=f16&quot;</code>
 is refused at build time, with the error naming its replacement, <code>gd:&quot;owner,wire=f16&quot;</code>
 (continuous owner fields interpolate automatically).</p>
 <h3 id="exports">Exports<a class="heading-anchor" href="#exports" aria-label="Link to this section">#</a></h3>
@@ -325,8 +326,8 @@ is refused at build time, with the error naming its replacement, <code>gd:&quot;
 the property name, the field type maps to a Variant type. <code>offset</code>/<code>size</code> are
 derived with <code>offset_of</code> / <code>size_of</code>, so the core narrows native Variant widths
 (Int=i64, Float=f64) to your field&#39;s real width (e.g. <code>f32</code>).</p>
-<p><strong>Supported field types</strong>: the FULL Godot Variant set. Use the <code>gd.&lt;Type&gt;</code> binding
-type (or, for the scalar atoms, the bare Odin scalar, which is width-narrowed):</p>
+<p>Export fields use the supported Godot Variant types below. Use a <code>gd.&lt;Type&gt;</code>
+binding type or a bare Odin scalar, which the runtime narrows to the field&#39;s width:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -352,15 +353,15 @@ type (or, for the scalar atoms, the bare Odin scalar, which is width-narrowed):<
 </tr>
 <tr>
 <td>Handles</td>
-<td><code>gd.Object</code> and any object/class handle (<code>gd.Node2d</code>, <code>gd.Texture2D</code>, …) or a pointer to one (<code>^gd.Node2d</code>); <code>gd.Rid</code></td>
+<td>Resource handles such as <code>gd.Texture2d</code> and pointers to them; <code>gd.Object</code> with an explicit <code>resource=</code> hint; <code>gd.Rid</code> (see below)</td>
 </tr>
 </tbody></table>
 </div><p>Note: <code>gd.Callable</code>/<code>gd.Signal</code>/<code>gd.Rid</code> map to their Variant types but are not
 meaningfully editable in the Inspector (Godot itself doesn&#39;t expose them as exports);
 prefer them only for cross-script data, not for editor-tunable values. An unrecognized
 field type is a hard <code>scriptgen: error:</code> (so a typo is never silently an <code>Object</code>).</p>
-<p><strong>Export hints.</strong> Extend the tag with one comma-separated hint spec:
-<code>`gd:&quot;export,SPEC&quot;`</code>. Top-level tokens are comma-separated; values WITHIN a spec
+<p>Extend the tag with a hint specification: <code>`gd:&quot;export,SPEC&quot;`</code>.
+Top-level tokens are comma-separated; values within a specification
 are colon-separated (so a file filter&#39;s commas never collide) and are rewritten to
 Godot&#39;s comma-joined <code>hint_string</code> form:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
@@ -438,8 +439,23 @@ Godot&#39;s comma-joined <code>hint_string</code> form:</p>
 </tr>
 </tbody></table>
 </div><p><code>resource=</code> is for an <code>Object</code>/resource-handle field; <code>range</code>/<code>enum</code> for an int or
-float; <code>multiline</code> for a <code>gd.String</code>. <strong>A typed resource handle derives its own
-<code>resource=</code> hint</strong>: <code>bullet_scene: gd.Packed_Scene `` </code>gd:&quot;export&quot;<code> `` is the preferred spelling — the build reads the class from the type, the Inspector shows a PackedScene picker, and no cast is needed at the call site (</code>gd.instantiate(self.bullet_scene)<code>). Spell </code>resource=<code>only on a type-erased</code>gd.Object<code>field. Either way the hint is mandatory for object exports, and the build refuses one without it: the hint is what makes the runtime take a reference on the assigned resource, so a hint-less object export would hold a dangling pointer once the scene loader&#39;s own reference drops (node handles are not exportable at all — wire scene nodes with</code>onready=<code>). **</code>array=ELEM<code>** (on a </code>gd.Array<code> field) and **</code>dict=KEY;VALUE<code>** (on a </code>gd.Dictionary<code>field) declare *typed* collections, the same Inspector editors that GDScript&#39;s</code>Array[T]<code>/</code>Dictionary[K,V]<code> produce. Each element/key/value is a builtin (</code>int<code>, </code>float<code>, </code>String<code>, </code>Vector2<code>, </code>Color<code>, …) or a Resource class name (</code>Texture2D<code>, </code>PackedScene<code>, …). At most one hint per field. (A scene that bodies a wire entity does NOT declare a hint: **</code>gd:&quot;entity=Name:id&quot;<code>** is its own first token and synthesizes both the export and the </code>resource=PackedScene<code> hint; see [Entities](kit/net.md#declaring-a-replicated-entity) and [kit/boot](kit/boot.md)&#39;s entity factory (</code>&lt;game&gt;_entities`).) Example:</p>
+float; <code>multiline</code> for a <code>gd.String</code>. A typed resource handle derives its own
+<code>resource=</code> hint. Prefer <code>bullet_scene: gd.Packed_Scene `` </code>gd:&quot;export&quot;<code>``: the build reads the class from the type, the Inspector shows a PackedScene picker, and</code>gd.instantiate(self.bullet_scene)` needs no cast.</p>
+<p>Write <code>resource=</code> explicitly only for a type-erased <code>gd.Object</code> field. Object
+exports require a resource hint, whether derived or explicit, so the runtime
+can retain the assigned resource. Without a hint, the scene loader could drop
+its reference and leave a dangling pointer; the build rejects that declaration.
+Node handles such as <code>gd.Node2d</code> or <code>^gd.Node2d</code> cannot be exported. Use
+<code>onready=</code> to reference scene nodes.
+<strong><code>array=ELEM</code></strong> (on a <code>gd.Array</code> field) and
+<strong><code>dict=KEY;VALUE</code></strong> (on a <code>gd.Dictionary</code> field) declare <em>typed</em> collections, the same
+Inspector editors that GDScript&#39;s <code>Array[T]</code> / <code>Dictionary[K,V]</code> produce. Each element/key/value
+is a builtin (<code>int</code>, <code>float</code>, <code>String</code>, <code>Vector2</code>, <code>Color</code>, …) or a Resource class name
+(<code>Texture2D</code>, <code>PackedScene</code>, …). Each field accepts at most one hint. For a
+scene used to spawn a network entity, <code>gd:&quot;entity=Name:id&quot;</code> generates both
+the export and the <code>resource=PackedScene</code> hint. See
+<a href="kit/net.html#declaring-a-replicated-entity">Entities</a> and the <code>&lt;game&gt;_entities</code>
+factory in <a href="kit/boot.html">kit/boot</a>.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Probe :: <span class="hljs-keyword">struct</span> {
 	owner:       gd.Node,
 	health:      <span class="hljs-type">i32</span>        <span class="hljs-string">`gd:&quot;export,range=0:100:5&quot;`</span>,
@@ -455,9 +471,9 @@ read/write them through the <code>array_*</code> / <code>dictionary_*</code> met
 only drives the export&#39;s <em>typing</em>: the Inspector widget and the engine-side key/value
 type enforcement.</p>
 </blockquote>
-<p><strong>Type-driven form.</strong> Instead of the tag, you can declare the field as a <code>gd.Typed_Array(T)</code> /
-<code>gd.Typed_Dictionary(K, V)</code> and a bare <code>gd:&quot;export&quot;</code> derives the same hint from the type,
-with no duplication:</p>
+<p>Alternatively, declare the field as <code>gd.Typed_Array(T)</code> or
+<code>gd.Typed_Dictionary(K, V)</code>. A bare <code>gd:&quot;export&quot;</code> then derives the hint from
+the type:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">scores: gd.Typed_Array(<span class="hljs-type">i64</span>)                       <span class="hljs-string">`gd:&quot;export&quot;`</span>,  <span class="hljs-comment">// == array=int</span>
 loot:   gd.Typed_Dictionary(gd.String, gd.Packed_Scene) <span class="hljs-string">`gd:&quot;export&quot;`</span>, <span class="hljs-comment">// == dict=String;PackedScene</span></code></pre></div><p>Element types are the Odin spellings (<code>i64</code>, <code>gd.String</code>, <code>gd.Texture2d</code>); Resource handles are
 mapped back to their engine class name automatically (<code>gd.Texture2d</code> → <code>Texture2D</code>). For
@@ -488,13 +504,15 @@ reset-to-default arrow works:</p>
 	speed: <span class="hljs-type">f32</span>       <span class="hljs-string">`gd:&quot;export,default=200&quot;`</span>,
 	name:  gd.String <span class="hljs-string">`gd:&quot;export,default=Hero&quot;`</span>,
 	alive: <span class="hljs-type">bool</span>      <span class="hljs-string">`gd:&quot;export,default=true&quot;`</span>,
-}</code></pre></div><p>Only scalar Variant types support <code>default=</code> (numbers, bool, and <code>String</code>). A <code>default=</code>
-on a math-struct/handle field is reported at <strong>boot</strong>, by the reflection registrar, in the
-editor&#39;s output, not by <code>scriptgen</code> (see &quot;Which tier catches what&quot; below), so the message
-is clear but arrives late. Set those in <code>_ready</code> or from the scene instead.</p>
-<h3 id="which-tier-catches-what">Which tier catches what<a class="heading-anchor" href="#which-tier-catches-what" aria-label="Link to this section">#</a></h3>
-<p>Two different things read a <code>`gd:&quot;export,…&quot;`</code> tag; knowing which one reports a given
-problem saves time:</p>
+}</code></pre></div><p>Only scalar Variant types support <code>default=</code>: numbers, bool, and <code>String</code>.
+The reflection registrar reports <code>default=</code> on a math-struct or handle field
+in the editor&#39;s output at boot, after <code>scriptgen</code> has run. Set those values
+in <code>_ready</code> or in the scene instead. The following table explains when each
+validation check runs.</p>
+<p><span id="which-tier-catches-what"></span></p>
+<h3 id="export-validation-at-build-and-registration">Export validation at build and registration<a class="heading-anchor" href="#export-validation-at-build-and-registration" aria-label="Link to this section">#</a></h3>
+<p>Both <code>scriptgen</code> and the runtime reflection registrar read
+<code>`gd:&quot;export,…&quot;`</code> tags. They validate different parts of the declaration:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -507,19 +525,20 @@ problem saves time:</p>
 <tbody><tr>
 <td><code>scriptgen</code></td>
 <td>build</td>
-<td>the tag&#39;s VOCABULARY: the first token, and every spec NAME behind it</td>
+<td>the first token and each specification name that follows it</td>
 <td><code>scriptgen: error: player.odin:7: …</code>, the build stops</td>
 </tr>
 <tr>
 <td>the reflection registrar</td>
 <td>boot / class registration</td>
-<td>what each spec MEANS: a value&#39;s type, a hint&#39;s arity, the Variant a hint requires</td>
+<td>each specification&#39;s value type, hint arity, and required Variant type</td>
 <td>an error in Godot&#39;s output, the field registers with that spec dropped</td>
 </tr>
 </tbody></table>
-</div><p>Only the runtime knows a field&#39;s real Variant width, so only the runtime can say <code>array=</code>
-needs a <code>gd.Array</code> or that <code>default=Hero</code> won&#39;t fit a <code>Vector2</code>. Spelling needs none of
-that, so <strong>a misspelled spec is a build error</strong>:</p>
+</div><p>The runtime uses the field&#39;s reflected Variant type to check whether <code>array=</code>
+has a <code>gd.Array</code> field or <code>default=Hero</code> has a compatible type rather than a
+<code>Vector2</code>. Scriptgen can check specification names earlier, so a misspelling
+stops the build:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hp: <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;export,rnage=0:100&quot;`</span>
 <span class="hljs-comment">// scriptgen: error: Player.hp: unknown export spec &quot;rnage&quot; — did you mean `range`?</span></code></pre></div><p>The recognized spec set is <a href="../decl/decl.odin.html"><code>decl/decl.odin</code></a>&#39;s <code>EXPORT_SPECS</code>, and
 <code>tests/scriptgen</code> asserts it against the registrar&#39;s own switches, so the two tiers agree
@@ -535,28 +554,27 @@ the field value, and run instead of the raw field access from both GDScript and 
 
 <span class="hljs-comment">// reads of `hp` return this; writes are clamped into [0,100].</span>
 player_get_hp :: <span class="hljs-keyword">proc</span>(self: ^Player) -&gt; <span class="hljs-type">i32</span> { <span class="hljs-keyword">return</span> self.hp }
-player_set_hp :: <span class="hljs-keyword">proc</span>(self: ^Player, v: <span class="hljs-type">i32</span>) { self.hp = clamp(v, <span class="hljs-number">0</span>, <span class="hljs-number">100</span>) }</code></pre></div><p>The <code>get</code>/<code>set</code> procs are <strong>plain Odin procs</strong> (no <code>@(gd_method)</code> needed) named exactly as
+player_set_hp :: <span class="hljs-keyword">proc</span>(self: ^Player, v: <span class="hljs-type">i32</span>) { self.hp = clamp(v, <span class="hljs-number">0</span>, <span class="hljs-number">100</span>) }</code></pre></div><p>The <code>get</code>/<code>set</code> procs are plain Odin procedures (no <code>@(gd_method)</code> needed) named exactly as
 written in the tag. The backing field still exists: the getter/setter may use it as
-storage (as above) or compute from other state. Combine with <code>group=</code>/<code>default=</code> freely
+storage (as above) or compute from other state. Combine them with <code>group=</code>/<code>default=</code>
 (a defaulted getter/setter field applies its default through the setter).</p>
 <h3 id="onready-node-references">@onready node references<a class="heading-anchor" href="#onready-node-references" aria-label="Link to this section">#</a></h3>
 <p>A struct field tagged <code>`gd:&quot;onready=PATH&quot;`</code> is auto-wired to a child node on <code>_ready</code>,
 mirroring GDScript&#39;s <code>@onready var sprite = $Sprite</code>. On the node&#39;s READY (<em>before</em> any
 <code>@(gd_connect)</code> wiring and your own <code>_ready</code> proc), the core resolves
-<code>get_node(owner, &quot;PATH&quot;)</code> and writes the result into the field, so your <code>_ready</code> sees a
-fully-resolved, non-null reference:</p>
+<code>get_node(owner, &quot;PATH&quot;)</code> and writes the result into the field before your
+<code>_ready</code> runs:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Player :: <span class="hljs-keyword">struct</span> {
 	owner:  gd.Character_Body2d,
 	sprite: gd.Node2d <span class="hljs-string">`gd:&quot;onready=Sprite&quot;`</span>,    <span class="hljs-comment">// owner-relative node path</span>
 	label:  gd.Node   <span class="hljs-string">`gd:&quot;onready=HUD/Label&quot;`</span>,
 }</code></pre></div><p>The field must be an object/node handle (<code>gd.Node2d</code>, <code>gd.Sprite2D</code>, <code>gd.Object</code>, …). The
-handle IS the node pointer, so use the bare handle type, not <code>^gd.Node2d</code>. An <code>@onready</code>
-field is a <strong>private auto-wired ref</strong>, NOT a serialized <code>@export</code>: it never appears in the
-property list / Inspector.</p>
-<p><strong>Script-resolving form — <code>^&lt;script struct&gt;</code>.</strong> When the field&#39;s type is a pointer to one
-of your own script structs, the core resolves the node <em>and</em> its typed Odin script struct
-(<code>rt.script_of</code> semantics) in one step — the two-field idiom (a handle field plus a
-<code>rt.script_of</code> call in <code>_ready</code>) collapses into one declaration:</p>
+handle contains the node pointer, so use the bare handle type, not <code>^gd.Node2d</code>.
+An <code>@onready</code> field is a private reference resolved at runtime. It is not
+serialized or shown in the property list or Inspector.</p>
+<p>When the field type is <code>^&lt;script struct&gt;</code>, the core resolves the node and its
+typed Odin script struct using the same checks as <code>rt.script_of</code>. One
+declaration replaces a separate node handle and <code>rt.script_of</code> call in <code>_ready</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Player :: <span class="hljs-keyword">struct</span> {
 	owner: gd.Character_Body2d,
 	hud:   ^Hud <span class="hljs-string">`gd:&quot;onready=HudLayer/Hud&quot;`</span>,   <span class="hljs-comment">// node -&gt; ^Hud, wired before _ready</span>
@@ -564,17 +582,17 @@ of your own script structs, the core resolves the node <em>and</em> its typed Od
 
 <span class="hljs-comment">// instead of:</span>
 <span class="hljs-comment">//   hud_control: gd.Control `gd:&quot;onready=HudLayer/Hud&quot;`,</span>
-<span class="hljs-comment">//   hud_script:  ^Hud,                          // + rt.script_of in _ready</span></code></pre></div><p>The pointee must be a script struct in the module (build error otherwise). The ref is
-class-checked: if the node exists but carries no <code>Hud</code> script, the field stays nil and a
-loud <code>push_error</code> names the field — never a wrongly-typed pointer. The declared form is
-also <strong>hot-reload safe</strong>: after a changed-layout reload the core re-resolves these refs
-once every instance has migrated, where a hand-cached <code>rt.script_of</code> pointer would dangle.</p>
-<p>A typed ref is your <strong>struct</strong>, not the node — engine calls take the node, which is the
-ref&#39;s <code>.owner</code>: <code>gd.canvas_item_set_visible(self.hud.owner, false)</code>. Passing the ref
-itself is a compile error (<code>Cannot assign value ... of type &#39;^Hud&#39; to &#39;Canvas_Item&#39;</code>):
-engine handles are a <em>distinct</em> type, so no ordinary pointer can pose as one.</p>
-<p><strong>Array form — <code>[N]Handle</code> / <code>[N]^Script</code> with a <code>%d</code> template.</strong> A fixed-array field
-wires N sibling nodes in one declaration; the path holds exactly one <code>%d</code>, substituted
+<span class="hljs-comment">//   hud_script:  ^Hud,                          // + rt.script_of in _ready</span></code></pre></div><p>The pointee must be a script struct in the module; other types are a build
+error. If the node exists but carries no <code>Hud</code> script, the field stays nil and
+<code>push_error</code> names the field. After a changed-layout hot reload, the core
+re-resolves these declared references once every instance has migrated. A
+manually cached <code>rt.script_of</code> pointer would instead refer to the old storage.</p>
+<p>A typed reference points to script data. Pass its <code>.owner</code> to engine calls,
+as in <code>gd.canvas_item_set_visible(self.hud.owner, false)</code>. Passing the script
+reference itself is a compile error (<code>Cannot assign value ... of type &#39;^Hud&#39; to &#39;Canvas_Item&#39;</code>)
+because engine handles are distinct types.</p>
+<p>For a fixed-array field, use <code>[N]Handle</code> or <code>[N]^Script</code> to resolve N sibling
+nodes in one declaration. The path holds exactly one <code>%d</code>, substituted
 with 0-based indices at READY:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Shop :: <span class="hljs-keyword">struct</span> {
 	owner:   gd.Control,
@@ -582,12 +600,11 @@ with 0-based indices at READY:</p>
 	choices: [<span class="hljs-number">3</span>]^Choice   <span class="hljs-string">`gd:&quot;onready=Panel/Choice%d&quot;`</span>, <span class="hljs-comment">// typed script refs work too</span>
 }</code></pre></div><p>Each element resolves independently (a missing index leaves that slot nil with the
 engine&#39;s path error); a <code>%d</code> on a scalar field — or an array without one — is a build
-error. This replaces the numbered-field bank (<code>card0</code>, <code>card1</code>, …) plus the hand-written
-regather loop in <code>_ready</code>.</p>
-<p><strong>Scene-unique names — <code>%Name</code>.</strong> Godot&#39;s unique-name syntax (a node with <em>Access as
-Unique Name</em> checked, GDScript&#39;s <code>$</code> <code>%Name</code>) works in any <code>onready=</code> path — the marker
-passes straight through to <code>get_node</code>, so you don&#39;t have to hard-code the path from the
-owner:</p>
+error. This replaces separate numbered fields (<code>card0</code>, <code>card1</code>, …) and a
+manual lookup loop in <code>_ready</code>.</p>
+<p>Godot&#39;s scene-unique <code>%Name</code> syntax works in any <code>onready=</code> path. Check <em>Access
+as Unique Name</em> on the node, as for GDScript&#39;s <code>$</code> <code>%Name</code> lookup. The marker
+passes through to <code>get_node</code>, so the path can start at the unique node:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Player :: <span class="hljs-keyword">struct</span> {
 	owner: gd.Character_Body2d,
 	hud:   ^Hud       <span class="hljs-string">`gd:&quot;onready=%Hud&quot;`</span>,          <span class="hljs-comment">// unique name, anywhere in the scene</span>
@@ -607,22 +624,24 @@ so they follow the same scoping rules as GDScript&#39;s <code>%Name</code>.</p>
 <li><strong>Methods</strong>: tagged <code>@(gd_method)</code>. Any name; exposed minus the struct prefix.</li>
 </ul>
 <h4 id="reload--the-hot-reload-hook"><code>reload</code> — the hot-reload hook<a class="heading-anchor" href="#reload--the-hot-reload-hook" aria-label="Link to this section">#</a></h4>
-<p><code>&lt;struct&gt;_reload(self: ^T)</code> runs on each live instance <strong>after a hot reload</strong> swaps the
-scripts dll (editor save-on-rebuild, or an explicit <code>script.reload(true)</code> in a running game),
-with the <strong>new</strong> code. You rarely need it: a same-layout reload preserves your struct in place
-and re-points all engine entry points (<code>_process</code>, methods, signals) to the new code
-automatically. Procedure values are different: a callback/dispatch table, an <code>events.Event</code>,
-or a behaviour-tree node like <code>flow.Action.Call.fn</code> contains addresses in one DLL generation.
-Reflection detects that state recursively. Rebuild it in <code>reload</code>:</p>
+<p><code>&lt;struct&gt;_reload(self: ^T)</code> runs with the new code after a hot reload swaps the
+scripts library. Reloads occur on editor save-on-rebuild or an explicit
+<code>script.reload(true)</code> in a running game. A same-layout reload preserves the
+struct in place and redirects engine entry points (<code>_process</code>, methods,
+signals) to the new code.</p>
+<p>Stored procedure values still point into the old library. These include a
+callback or dispatch table, an <code>events.Event</code>, or a behaviour-tree node such
+as <code>flow.Action.Call.fn</code>. Reflection detects procedure-bearing state
+recursively. Rebuild that state in <code>reload</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">boss_reload :: <span class="hljs-keyword">proc</span>(self: ^Boss) {
     self.behaviour = build_behaviour_tree()  <span class="hljs-comment">// re-capture fresh proc pointers</span>
-}</code></pre></div><p>The reload hook is an explicit ownership promise: after it returns, no state or external
-registration may call the previous generation. The core then releases this instance&#39;s lease
-and unloads the image as soon as no other live instance owns it.
-If detected procedure-bearing or opaque <code>rawptr</code> state has no hook, the instance is <strong>not</strong>
-rebound—it stays safely and coherently on its old code, pins only that one generation, and a
-warning tells you which script needs the hook. Other instances and intermediate generations
-continue reloading normally.</p>
+}</code></pre></div><p>After the reload hook returns, no state or external registration may call
+the previous library generation. The core releases the instance&#39;s lease on
+that generation and unloads it once no live instance retains it.</p>
+<p>If reflection detects procedure-bearing or opaque <code>rawptr</code> state without a
+hook, the instance stays on its old code and retains that generation. A
+warning identifies the script that needs a hook. Other instances and
+intermediate generations continue reloading normally.</p>
 <p>Reflection cannot see a callback erased inside an engine <code>Callable</code>/Variant container or
 registered with an external library without being stored in the struct. Those cases carry the
 same contract: define <code>reload</code>, remove/replace the old registration there, and never allow the
@@ -634,9 +653,8 @@ does not hot-reload itself.</p>
 heap-backed default context before calling your proc, so your proc body can use
 ordinary Odin (allocations, etc.).</p>
 <h3 id="signals">Signals<a class="heading-anchor" href="#signals" aria-label="Link to this section">#</a></h3>
-<p>Signals follow the GDScript pattern of <strong>declare / emit / connect</strong>.</p>
-<p><strong>Declare</strong> a signal as a typed STRUCT FIELD of one of the <code>gd.Signal0</code> … <code>gd.Signal4</code>
-marker types (arity = payload count). The <strong>field name is the signal name</strong>, the type
+<p>Declare a signal as a struct field of one of the <code>gd.Signal0</code> … <code>gd.Signal4</code>
+marker types, whose arity is the payload count. The field name is the signal name, the type
 parameters are the payload types, and the optional <code>gd:&quot;args=...&quot;</code> tag names the payload
 (comma-separated, one name per parameter, with omitted names synthesizing as <code>arg0</code>, <code>arg1</code>, …).
 No tag is required; the field is recognized by its type. Declared signals are reported
@@ -651,11 +669,10 @@ through <code>_get_script_signal_list</code>, so GDScript and the editor see the
 args (object/node handles present as <code>Object</code>). A signal field costs one nil pointer of
 instance size and is never read or written at runtime; it exists so the declaration is
 part of the type, checked by the compiler, and visible to reflection.</p>
-<p><strong><code>gd.SignalN</code>: the struct-payload general form.</strong> Its single parameter is the argument
-LIST as an inline struct: the struct&#39;s <strong>field names are the arg names</strong> (no <code>args=</code> tag:
-a tag on a <code>SignalN</code> field is a build error), and any number of args works. Prefer it for
-5+ payload args (past the arity family&#39;s cap) or whenever you want named args without the
-tag:</p>
+<p><code>gd.SignalN</code> accepts an inline struct describing any number of arguments.
+Its field names become the argument names; an <code>args=</code> tag on a <code>SignalN</code> field
+is a build error. Use it for 5+ payload arguments, beyond the arity family&#39;s
+cap, or to name arguments in the type declaration:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Enemy :: <span class="hljs-keyword">struct</span> {
 	owner: gd.Node2d,
 	hit:   gd.SignalN(<span class="hljs-keyword">struct</span> {
@@ -665,28 +682,28 @@ tag:</p>
 		crit:   <span class="hljs-type">bool</span>,
 		combo:  <span class="hljs-type">i64</span>,
 	}), <span class="hljs-comment">// hit(amount, who, pos, crit, combo) — 5 named args</span>
-}</code></pre></div><p><code>SignalN</code>&#39;s parameter must be the payload <strong>struct</strong>, never itself a single
-Variant-mappable type, so <code>gd.SignalN(gd.Vector2)</code> is rejected. For one payload value,
+}</code></pre></div><p><code>SignalN</code> requires a payload struct. A single Variant-mappable type such as
+<code>gd.SignalN(gd.Vector2)</code> is rejected. For one payload value,
 either <code>gd.Signal1(gd.Vector2)</code> (name it with <code>args=</code>) or wrap it so the field name names
 it: <code>gd.SignalN(struct { pos: gd.Vector2 })</code> → <code>moved(pos: Vector2)</code>.</p>
 <p><strong>Emit</strong> with the generated typed helper <code>&lt;struct_snake&gt;_emit_&lt;field&gt;</code> (e.g.
 <code>ping_emit_pinged(self, value)</code>), which codegen emits from the signal field and which
 calls through <code>gd.emit</code>/<code>gd.emit_args</code> (returning the engine <code>Error</code>, which you may
 ignore):</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">player_emit_health_changed(self, <span class="hljs-type">i64</span>(self.health))   <span class="hljs-comment">// generated typed emitter</span></code></pre></div><p><strong>Connect</strong> a signal to a handler proc (which must be a <code>@(gd_method)</code> so the engine can
-dispatch to it). Three ways, increasingly declarative:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">player_emit_health_changed(self, <span class="hljs-type">i64</span>(self.health))   <span class="hljs-comment">// generated typed emitter</span></code></pre></div><p>Connect a signal to a handler procedure marked <code>@(gd_method)</code> so the engine can
+dispatch to it. Use a helper call or declarative wiring:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// 1. Connect an emitter&#x27;s signal to a target&#x27;s method, from any script (gd.* helper):</span>
 gd.connect_to(player, <span class="hljs-string">&quot;health_changed&quot;</span>, self.owner, <span class="hljs-string">&quot;on_health_changed&quot;</span>)
 
-<span class="hljs-comment">// 2. Connect one of the OWNER&#x27;s own signals to its own method:</span>
+<span class="hljs-comment">// 2. Connect one of the Godot owner&#x27;s signals to its own method:</span>
 gd.connect(self.owner, <span class="hljs-string">&quot;body_entered&quot;</span>, <span class="hljs-string">&quot;collect&quot;</span>)
 
-<span class="hljs-comment">// 3. Declaratively — see @(gd_connect) below — no _ready/connect call at all.</span></code></pre></div><h3 id="declarative-signal-wiring-gd_connect">Declarative signal wiring (<code>@(gd_connect)</code>)<a class="heading-anchor" href="#declarative-signal-wiring-gd_connect" aria-label="Link to this section">#</a></h3>
-<p>Tag a <code>@(gd_method)</code> proc with <code>@(gd_connect = &quot;signal_name&quot;)</code> to have the core
-auto-connect the <strong>owner&#39;s</strong> <code>signal_name</code> to this method <strong>on READY</strong>, so you needn&#39;t write
-a <code>_ready</code> proc just to wire a signal. The connection happens before your own <code>_ready</code> runs
+<span class="hljs-comment">// 3. Use @(gd_connect), shown below, instead of a _ready/connect call.</span></code></pre></div><h3 id="declarative-signal-wiring-gd_connect">Declarative signal wiring (<code>@(gd_connect)</code>)<a class="heading-anchor" href="#declarative-signal-wiring-gd_connect" aria-label="Link to this section">#</a></h3>
+<p>Tag a <code>@(gd_method)</code> procedure with <code>@(gd_connect = &quot;signal_name&quot;)</code> to connect
+the Godot owner&#39;s <code>signal_name</code> to this method on READY. The connection happens
+before your own <code>_ready</code> runs
 (order: <code>@onready</code> field resolution → <code>@(gd_connect)</code> connections → your <code>_ready</code>).</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// `on_body` is auto-connected to the owner&#x27;s `body_entered` on READY. No manual connect.</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Connect the Godot owner&#x27;s `body_entered` to `on_body` on READY.</span>
 <span class="hljs-meta">@(gd_method, gd_connect = &quot;body_entered&quot;)</span>
 enemy_on_body :: <span class="hljs-keyword">proc</span>(self: ^Enemy, body: gd.Node2d) {
 	<span class="hljs-keyword">if</span> self.dead { <span class="hljs-keyword">return</span> }
@@ -697,23 +714,23 @@ enemy_on_body :: <span class="hljs-keyword">proc</span>(self: ^Enemy, body: gd.N
 }</code></pre></div><p><code>@(gd_connect)</code> implies the proc is a signal target, so it must also be a <code>@(gd_method)</code> (use
 <code>@(gd_method, gd_connect = &quot;...&quot;)</code>). The signal must exist on the emitter (an engine signal
 like <code>body_entered</code> / <code>area_entered</code>, or one a script declared with a signal field).</p>
-<p><strong>Path-qualified form — another node&#39;s signal.</strong> <code>@(gd_connect = &quot;Path/To/Node:signal&quot;)</code>
-wires a <em>different emitter</em>&#39;s signal to this method: the part before the last <code>:</code> is a node
+<p>Use <code>@(gd_connect = &quot;Path/To/Node:signal&quot;)</code> to connect another node&#39;s signal
+to this method. The part before the last <code>:</code> is a node
 path resolved at READY exactly like an <code>onready=</code> ref (owner-relative, absolute
 <code>/root/...</code>, or <code>..</code> — anything <code>get_node</code> takes), the part after is the signal:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The child turret&#x27;s own `fired` signal, into the parent — no _ready connect call.</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Connect the child turret&#x27;s `fired` signal to the parent before _ready.</span>
 <span class="hljs-meta">@(gd_method, gd_connect = &quot;Turret/Barrel:fired&quot;)</span>
 tank_on_fired :: <span class="hljs-keyword">proc</span>(self: ^Tank, heat: gd.Int) { ... }</code></pre></div><p>Children ready before parents, so a child emitter&#39;s script (and its declared signals)
-exists by the time the parent wires. A missing node or signal fails <strong>soft and loud</strong>: the
-connection is skipped and a <code>push_error</code> names the declaring class/method. For an emitter
-you only know at runtime (spawned scenes), <code>gd.connect_to</code> from <code>_ready</code> remains the
-manual escape hatch. (<code>@(gd_connect)</code> requires the <code>-custom-attribute:gd_connect</code> build
+exists by the time the parent connects. For a missing node or signal, the
+connection is skipped and <code>push_error</code> names the declaring class and method.
+Use <code>gd.connect_to</code> from <code>_ready</code> for emitters resolved at runtime, such as
+spawned scenes. (<code>@(gd_connect)</code> requires the <code>-custom-attribute:gd_connect</code> build
 flag, which <code>build/build_scripts.sh</code> passes for you.)</p>
-<p><strong>Indexed form — one handler for a bank of emitters.</strong> A single <code>%d</code> in the path probes
-<code>Choice0</code>, <code>Choice1</code>, … (silently, until the first missing index) and connects <strong>each</strong>
-match with its index <strong>bound</strong> as a trailing callable argument — the engine passes it
-after the signal&#39;s own args on every dispatch:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Panel/Choice0..ChoiceN&#x27;s `pressed` all wire here; `idx` says which fired.</span>
+<p>A single <code>%d</code> in the path connects a sequence of emitters to one handler. It
+probes <code>Choice0</code>, <code>Choice1</code>, … until the first missing index and binds each
+match&#39;s index as a trailing callable argument. The engine passes that index
+after the signal&#39;s own arguments on every dispatch:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Connect Panel/Choice0..ChoiceN&#x27;s `pressed` here; `idx` identifies the emitter.</span>
 <span class="hljs-meta">@(gd_method, gd_connect = &quot;Panel/Choice%d:pressed&quot;)</span>
 menu_on_choice :: <span class="hljs-keyword">proc</span>(self: ^Menu, idx: gd.Int) {
 	menu_pick(self, <span class="hljs-type">int</span>(idx))
@@ -722,37 +739,38 @@ a declaration that connects nothing reports <code>push_error</code>.</p>
 <p>Scene-unique names work in the path part too, with the same rules as <code>onready=</code>
 (segment-start <code>%</code> = unique-name marker, mid-name <code>%d</code> = the indexed template):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method, gd_connect = &quot;%SavePanel:saved&quot;)</span>     <span class="hljs-comment">// unique-name emitter</span>
-<span class="hljs-meta">@(gd_method, gd_connect = &quot;%Inv/Slot%d:pressed&quot;)</span>  <span class="hljs-comment">// unique prefix + indexed bank</span></code></pre></div><h2 id="reserved-shapes">Reserved shapes<a class="heading-anchor" href="#reserved-shapes" aria-label="Link to this section">#</a></h2>
-<p>Several toolkit declarations are recognized by the SHAPE of a proc rather than by anything
-you write in the attribute: a parameter&#39;s name, its position, or its type. The declaration
-reads as ordinary Odin, so a rename can silently change what a proc IS. This table is the
-whole set.</p>
+<span class="hljs-meta">@(gd_method, gd_connect = &quot;%Inv/Slot%d:pressed&quot;)</span>  <span class="hljs-comment">// unique prefix + indexed bank</span></code></pre></div><p><span id="reserved-shapes"></span></p>
+<h2 id="reserved-procedure-signatures-and-fields">Reserved procedure signatures and fields<a class="heading-anchor" href="#reserved-procedure-signatures-and-fields" aria-label="Link to this section">#</a></h2>
+<p>Some toolkit declarations depend on a parameter&#39;s name, position, or type, or
+on a script field&#39;s type. Changing those parts can change the generated
+behavior even when the Odin code still compiles. The following table lists
+these declarations and the result of changing them.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
 <th>Shape</th>
 <th>Where it is legal</th>
 <th>What it means</th>
-<th>Rename it and…</th>
+<th>Effect of changing the declaration</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>first param <code>self: ^&lt;Class&gt;</code></td>
 <td>every bound proc</td>
-<td>THE receiver: it is how scriptgen knows the proc belongs to this class at all</td>
-<td>the proc is not bound; nothing generates, no diagnostic</td>
+<td>identifies the receiver class by type</td>
+<td>the parameter name may change; a type that no longer matches the class prevents binding</td>
 </tr>
 <tr>
-<td>a pointer param <strong>immediately after the receiver</strong></td>
-<td><code>@(gd_command)</code> / <code>@(gd_method)</code> on an <em>embedded block</em></td>
-<td>the WIELDER: scriptgen fills it with <code>self</code>, so the block can touch the entity that carries it. Never a wire arg (a pointer can&#39;t cross the wire)</td>
-<td>a pointer there on a <em>direct</em> command is a build error (&quot;un-wire-able arg&quot;)</td>
+<td>a pointer param immediately after the receiver</td>
+<td><code>@(gd_command)</code> / <code>@(gd_method)</code> on an embedded block</td>
+<td>identifies the containing entity, called the wielder; scriptgen supplies <code>self</code> so the block can access it. The pointer is never a wire argument</td>
+<td>a pointer there on a direct command is a build error (&quot;un-wire-able arg&quot;)</td>
 </tr>
 <tr>
 <td><code>by: knet.Player_Id</code> (after the receiver/wielder)</td>
 <td><code>@(gd_command)</code></td>
-<td>the ISSUER, framework-filled with the true sender, so a predicate can arbitrate on WHO without trusting a client-claimed argument</td>
-<td><code>by</code> under any other name is an ordinary wire arg, i.e. client-controlled. The name <strong>and</strong> the type together are the declaration; a wire arg <em>named</em> <code>by</code> is refused outright</td>
+<td>identifies the issuer; the framework supplies the resolved sender so the predicate does not need to trust a client-supplied identity</td>
+<td>under another name, the parameter is ordinary client-controlled wire data. Both the name and type are required; other wire args named <code>by</code> are refused</td>
 </tr>
 <tr>
 <td>typed entity params before <code>mine</code></td>
@@ -774,9 +792,9 @@ whole set.</p>
 </tr>
 <tr>
 <td><code>l: ^ksim.Lane</code></td>
-<td>reserved <em>against</em> you: a generated fact door already names its lane param <code>l</code></td>
+<td>generated fact announcement procedures reserve <code>l</code> for the lane parameter</td>
 <td>—</td>
-<td>an author arg named <code>l</code> is refused, because the door&#39;s own binding would shadow it</td>
+<td>an author arg named <code>l</code> is refused because the generated parameter would shadow it</td>
 </tr>
 <tr>
 <td>a <code>kit/boot</code> <code>Boot</code> field on the script struct</td>
@@ -785,13 +803,14 @@ whole set.</p>
 <td>see the note below</td>
 </tr>
 </tbody></table>
-</div><p><strong>The <code>Boot</code> match.</strong> The shell is declared by a field whose type&#39;s qualifier resolves to
-an import of <code>godot:kit/boot</code>. The <strong>alias is free</strong> (<code>kboot</code>, <code>boot</code>, whatever you import
-it as): the import PATH is what is checked, not the spelling. Only a <code>Boot</code> from a
-different package fails to declare the shell.</p>
+</div><p>A field declares the game shell when its type&#39;s qualifier resolves to an
+import of <code>godot:kit/boot</code>. Any import alias works, including <code>kboot</code> or <code>boot</code>,
+because scriptgen checks the import path. A <code>Boot</code> from a different package
+does not declare the shell.</p>
 <h2 id="manual-overrides">Manual overrides<a class="heading-anchor" href="#manual-overrides" aria-label="Link to this section">#</a></h2>
-<p>Wherever scriptgen generates a proc <em>for your convenience</em>, <strong>a hand-written proc of that
-name wins.</strong> That is the one override mechanism; there is no separate opt-out tag or configuration token.</p>
+<p>To override one of the generated procedures below, define a procedure with
+the same name. Scriptgen then uses the authored implementation. There is no
+separate opt-out tag or configuration token.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -812,44 +831,45 @@ name wins.</strong> That is the one override mechanism; there is no separate opt
 <td><code>@(gd_method)</code> of that name</td>
 </tr>
 </tbody></table>
-</div><p>Every yield is <strong>printed</strong>, once per run:</p>
+</div><p>Scriptgen prints each override once per run:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">scriptgen: yielded: runner_of (census accessor — the hand-written proc of that name wins)</code></pre></div><p>That line confirms an intended override took effect and, when you didn&#39;t intend one,
-tells you something in your package is already wearing a generated name. Check it if a proc
+tells you a procedure in your package already uses a generated name. Check it if a proc
 you meant to override (<code>runner_of</code> where the entity is <code>Runner_Bot</code>) seems to do nothing.</p>
-<p><strong>The one exception: <code>@(gd_event)</code> announce doors refuse.</strong> Write a proc with a declared
-event&#39;s door name and it is a build error, not a yield. The door is not a convenience you
-could re-implement: its generated body holds four gates game code has no way to reproduce:
-it broadcasts the tuple only on the authority, fires the <code>_fx</code> half on the causer&#39;s <em>live</em>
-pass with <code>mine=true</code>, fires it on every watching screen when that screen&#39;s watch clock
-reaches the fact&#39;s tick with <code>mine=false</code>, and stays silent through resim replays so a
-reconcile can&#39;t re-announce. The build error asks you to rename yours.</p>
-<p><strong><code>gd:&quot;manual&quot;</code> means &quot;I call the generated thing myself.&quot;</strong> Not &quot;replace this generated
-proc&quot;, but &quot;stop calling it for me: I own the call site.&quot; It applies to an embedded sim
-block&#39;s <code>@(gd_tick)</code> (see <a href="kit/sim.html">kit/sim</a>): the block&#39;s state still flattens into the
-descriptor and its verbs still hoist, only the auto-call is suppressed so your own tick can
-drive it with whatever ordering or condition you want. It is a general token, not a
-sim-specific one: a <code>manual</code> on something with nothing generated to call is a build error
-naming what it expected to find.</p>
+<p>Announcement procedures generated by <code>@(gd_event)</code> cannot be overridden. An
+authored procedure with the same name is a build error requiring a rename.
+The generated procedure coordinates authority-only broadcasts, <code>_fx</code>
+execution on the causer&#39;s live pass with <code>mine=true</code>, execution on watching
+screens at the fact&#39;s tick with <code>mine=false</code>, and suppression during
+resimulation so reconciliation cannot announce the event again.</p>
+<p><code>gd:&quot;manual&quot;</code> suppresses an automatic call while retaining the generated
+procedure for game code to call. For an embedded simulation block&#39;s
+<code>@(gd_tick)</code>, the block&#39;s state still joins the entity descriptor and its
+commands still join the command table, but the game chooses when and whether
+to call its tick. See <a href="kit/sim.html">kit/sim</a>. The token is not limited to
+simulation: using <code>manual</code> where there is no generated procedure to call is a
+build error naming what scriptgen expected.</p>
 <h2 id="generated-names">Generated names<a class="heading-anchor" href="#generated-names" aria-label="Link to this section">#</a></h2>
-<p>Three naming formulas produce identifiers you are expected to <em>call</em>, and one produces a
-name you are expected to <em>write</em>. They are not interchangeable, and two of them are one
-letter apart.</p>
+<p>Generated wrappers, wire constants, and lifecycle hooks use different naming
+rules. Use the wrapper to issue an action and implement the matching hook to
+receive a callback.</p>
 <p><strong>Action policies.</strong> <code>@(gd_command)</code> is owner-only and non-predicted by default. Use
 <code>knet.ACTION_OWNER_PREDICTED</code>, <code>knet.ACTION_ANY_SEAT</code>,
 <code>knet.ACTION_ANY_SEAT_PREDICTED</code>, or <code>knet.ACTION_AUTHORITY</code> when the verb differs.
 Both co-op and sim descriptors carry the same typed <code>knet.Action_Policy</code>, and access is
 enforced before the verb predicate. A <code>knet.Action_Policy{...}</code> literal can additionally
-set <code>max_args_bytes</code>; old comma-string annotations remain accepted only for migration.</p>
+set <code>max_args_bytes</code>. Quoted comma-string command policies are rejected; use a
+typed preset or literal.</p>
 <p>Every generated command wrapper returns <code>knet.Action_Outcome</code>. Most call sites use
-<code>knet.command_ok(outcome)</code> and stay single-player-shaped. UI that cares about an immediate
-refusal can inspect <code>outcome.reason</code>; the generated game-shell
+<code>knet.command_ok(outcome)</code> to test whether the action applied or was predicted.
+UI that needs the cause of an immediate refusal can inspect <code>outcome.reason</code>;
+the generated game-shell
 <code>&lt;game&gt;_command_rejected</code> half receives the final authority reason (<code>Access</code>, <code>Rate</code>,
 <code>Malformed</code>, <code>Stale</code>, <code>Predicate</code>, or <code>Timeout</code>) for both co-op and tick-scheduled verbs.
 Its <code>model</code> parameter distinguishes <code>.Immediate</code> from <code>.Scheduled</code>; no packet or pending
-table is part of the author surface.</p>
-<p><strong>Command wrappers: two formulas.</strong> A verb declared directly on the entity keeps its own
-proc name; a verb hoisted out of an embedded block is renamed after the PATH it was reached
-through, so two blocks of the same type on one entity never collide:</p>
+table is required in game code.</p>
+<p>A command declared directly on the entity keeps its procedure name with a
+<code>_cmd</code> suffix. A command from an embedded block includes its field path, so
+two blocks of the same type on one entity get distinct names:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -866,7 +886,7 @@ through, so two blocks of the same type on one entity never collide:</p>
 <td><code>gunner_primary_fire_cmd</code> (i.e. <code>&lt;class&gt;_&lt;path&gt;_&lt;verb&gt;_cmd</code>)</td>
 </tr>
 </tbody></table>
-</div><p>The composed form&#39;s path is the FIELD path, joined with <code>_</code>, so a block three levels down
+</div><p>The composed form&#39;s path is the field path, joined with <code>_</code>, so a block three levels down
 still lands on the entity that owns the net id. Both formulas can reach the same name, and
 when they do it is a build error naming both declarations rather than a silently
 unreachable verb.</p>
@@ -874,11 +894,11 @@ unreachable verb.</p>
 (<code>GUNNER_CMD_BUY</code>, <code>GUNNER_CMD_PRIMARY_FIRE</code>); world-pass fact ids are not
 (<code>FACT_ROUND_OVER</code>), and neither is <code>NET_FINGERPRINT</code>. Commands are per-entity, so several
 classes in one package can declare a verb of the same name, and the class prefix keeps their
-constants apart. Facts and the fingerprint are <strong>module-wide</strong>: there is exactly one door
-per event name across the whole package (a second is a build error, as is a u16 hash
+constants apart. Facts and the fingerprint are module-wide: there is exactly
+one announcement procedure per event name across the package (a second is a build error, as is a u16 hash
 collision between two events), and exactly one fingerprint.</p>
-<p><strong><code>&lt;entity&gt;_spawn</code> vs <code>&lt;entity&gt;_spawned</code>.</strong> These are one letter apart and point in
-opposite directions:</p>
+<p>Call <code>&lt;entity&gt;_spawn</code> to create an entity. Implement <code>&lt;entity&gt;_spawned</code> to
+receive the framework&#39;s creation notification:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -901,31 +921,31 @@ opposite directions:</p>
 <td>the hook: it calls you once the Mob exists, on every peer</td>
 </tr>
 </tbody></table>
-</div><p>So <code>mob_spawn(…)</code> inside <code>mob_spawned(…)</code> is an infinite spawn loop, and a <code>mob_spawn</code> you
-wrote by hand silently takes over the factory (it is a census name: it yields, and prints
-<code>yielded: mob_spawn</code>). If a spawn seems to do nothing, check that line first. The same
-<code>-ed</code> shape marks the other framework-called hook, <code>&lt;entity&gt;_freed</code>.</p>
-<p>All of these are keyed by the entity&#39;s TARGET STRUCT, which is why two <code>entity=</code> tags may
-not name the same struct. Doing so would generate the whole census twice.</p>
+</div><p>Calling <code>mob_spawn(…)</code> inside <code>mob_spawned(…)</code> creates an infinite spawn loop.
+An authored <code>mob_spawn</code> replaces the generated factory because the name is a
+census accessor; scriptgen prints
+<code>yielded: mob_spawn</code>. Check that line if spawning does not behave as expected.
+The other framework-called hook, <code>&lt;entity&gt;_freed</code>, also uses the <code>-ed</code> suffix.</p>
+<p>These identifiers are keyed by the entity&#39;s target struct. Two <code>entity=</code> tags
+cannot name the same struct because that would generate its entity accessors
+twice.</p>
 <h2 id="multiplayer-rpcs-gd_rpc">Multiplayer RPCs (<code>@(gd_rpc)</code>)<a class="heading-anchor" href="#multiplayer-rpcs-gd_rpc" aria-label="Link to this section">#</a></h2>
 <blockquote>
-<p><strong>Two multiplayer stories: pick before you read on.</strong> This section is the
-ENGINE-NATIVE surface: <code>@(gd_rpc)</code> mirroring GDScript&#39;s <code>@rpc</code>, plus the
-<code>MultiplayerSpawner</code>/<code>MultiplayerSynchronizer</code> interop it enables. It is the right
-tool for GDScript parity, porting an existing RPC design, or talking to
-non-Odin peers. <strong>Building a co-op game from scratch? Use the
-<a href="kit/index.html">Kit multiplayer toolkit</a> instead</strong>: replicated struct fields,
-predicted commands with typed <code>_then</code> consequences, generated entity
-factories, drop-in join, reconnect, and host migration, with zero RPCs to
-design. The <a href="kit/build-a-game-in-a-day.html">tutorial</a> builds a whole co-op
-game on it; <code>examples/cavecrawl</code> and <code>examples/slopball</code> are its references
-(<code>examples/coop_arena</code> and <code>examples/survivors</code> demonstrate the raw path
-below).</p>
+<p>This section covers Godot&#39;s native multiplayer APIs: <code>@(gd_rpc)</code> mirrors
+GDScript&#39;s <code>@rpc</code> and supports <code>MultiplayerSpawner</code>/<code>MultiplayerSynchronizer</code>
+interoperation. Use these APIs when porting an RPC design or communicating
+with non-Odin peers. For a new cooperative game, the
+<a href="kit/index.html">Kit multiplayer toolkit</a> provides replicated fields, predicted
+commands with typed <code>_then</code> consequences, entity factories, joining,
+reconnect, and host migration. The game still defines its state and gameplay
+rules. See the <a href="kit/build-a-game-in-a-day.html">tutorial</a>, <code>examples/cavecrawl</code>,
+and <code>examples/slopball</code>. <code>examples/coop_arena</code> and <code>examples/survivors</code>
+demonstrate the native RPC APIs below.</p>
 </blockquote>
 <p>Mark a <code>@(gd_method)</code> proc with <code>@(gd_rpc)</code> to expose it to Godot&#39;s high-level multiplayer,
 exactly like GDScript&#39;s <code>@rpc(...)</code> annotation. The annotation only declares the <em>config</em>;
 the engine routes <code>node.rpc(&quot;method&quot;, args)</code> (and incoming remote calls) to your proc through
-the same dispatch path a normal method call uses, so no extra plumbing is needed.</p>
+the same dispatch path as a normal method call.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node</span>
 <span class="hljs-comment">//gd:class Player</span>
 <span class="hljs-keyword">package</span> game
@@ -946,8 +966,8 @@ player_ping :: <span class="hljs-keyword">proc</span>(self: ^Player) { <span cla
 player_take_damage :: <span class="hljs-keyword">proc</span>(self: ^Player, amount: gd.Int) {
 	self.health -= amount
 }</code></pre></div><p><code>gd_rpc</code> implies <code>gd_method</code>: an RPC must be a registered, name-dispatchable method, so you
-can drop the <code>gd_method</code> and write just <code>@(gd_rpc)</code> if you prefer (both forms are equivalent).</p>
-<p><strong>Config tokens</strong> (mirroring GDScript <code>@rpc</code> defaults):</p>
+can write <code>@(gd_rpc)</code> alone. Both forms are equivalent.</p>
+<p><strong>Config tokens and SDK defaults:</strong></p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -968,7 +988,7 @@ can drop the <code>gd_method</code> and write just <code>@(gd_rpc)</code> if you
 </tr>
 <tr>
 <td><code>call_local</code></td>
-<td>the RPC ALSO runs on the calling peer</td>
+<td>the RPC also runs on the calling peer</td>
 <td>off</td>
 </tr>
 <tr>
@@ -977,8 +997,8 @@ can drop the <code>gd_method</code> and write just <code>@(gd_rpc)</code> if you
 <td><code>0</code></td>
 </tr>
 </tbody></table>
-</div><p>Codegen emits this into the class&#39;s <code>_get_rpc_config</code> surface, which the engine reads (once,
-per node) to learn the method&#39;s RPC config. From GDScript / another script you then call it as
+</div><p>Codegen exposes this configuration through <code>_get_rpc_config</code>, which the engine
+reads once per node. From GDScript or another script, call the method as
 usual:</p>
 <div class="code-block"><div class="code-title"><span>GDScript</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-gdscript"># A multiplayer peer must be active (e.g. ENetMultiplayerPeer or, for a single-process
 # loopback, OfflineMultiplayerPeer):
@@ -989,12 +1009,13 @@ request damage while still applying it locally. The exact config a script regist
 observable from GDScript via <code>node.get_script().get_rpc_config()</code> (a Dictionary keyed by
 method name → <code>{rpc_mode, transfer_mode, call_local, channel}</code>).</p>
 <h3 id="host--join-over-enet-the-gd-multiplayer-helpers">Host / join over ENet (the <code>gd.*</code> multiplayer helpers)<a class="heading-anchor" href="#host--join-over-enet-the-gd-multiplayer-helpers" aria-label="Link to this section">#</a></h3>
-<p><code>godot/Ergonomics_Multiplayer.odin</code> wraps the ENet peer + MultiplayerAPI plumbing so standing
-up a P2P session and reacting to peers is a few readable lines. Every helper takes the node
-(e.g. a script&#39;s <code>self.owner</code>) and reaches its MultiplayerAPI through <code>Node.get_multiplayer()</code>:</p>
+<p><code>godot/Ergonomics_Multiplayer.odin</code> provides helpers to create an ENet peer,
+install it in the MultiplayerAPI, and receive connection callbacks. Each
+helper takes a node, such as a script&#39;s <code>self.owner</code>, and accesses its
+MultiplayerAPI through <code>Node.get_multiplayer()</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 
-<span class="hljs-comment">// Host or join (call from a LIVE frame — the node must be inside the tree). Each returns a</span>
+<span class="hljs-comment">// Host or join while the node is inside the tree. Each returns a</span>
 <span class="hljs-comment">// bool so you can branch on failure (port in use, ENet unavailable on web, …):</span>
 <span class="hljs-meta">@(gd_method)</span>
 player_host :: <span class="hljs-keyword">proc</span>(self: ^Player, port: gd.Int) {
@@ -1062,36 +1083,38 @@ compile but return <code>false</code> on wasm32, so branch on the bool. For brow
 helpers below instead. The query helpers (<code>is_server</code>, <code>my_peer_id</code>, <code>rpc_sender_id</code>,
 <code>connected_peers</code>) are platform-independent and work over any peer (ENet <strong>or</strong> WebRTC).</p>
 </blockquote>
-<p>These are proven end-to-end by <code>tests/rpc_net</code>: two real headless Godot processes (a server +
-a client) connect over ENet and exchange <code>@(gd_rpc)</code> calls in both directions, asserting each
-call executed on the <em>other</em> peer with the correct <code>get_remote_sender_id()</code>.</p>
-<p><strong>Launch parameters — who am I, from the outside.</strong> A networked instance gets told its
-role/relay/room from outside the game: an env var natively (how launch scripts and the
-integration harness steer host/client instances), the page URL&#39;s query string on web (the
-friend-clicks-a-link front door). <code>gd.launch_param</code> reads both in one call, env first:</p>
+<p><code>tests/rpc_net</code> runs a headless Godot server and client, connects them over
+ENet, and exchanges <code>@(gd_rpc)</code> calls in both directions. It checks that each
+call executes on the other peer with the correct <code>get_remote_sender_id()</code>.</p>
+<p>Launch parameters select an instance&#39;s role, relay, or room. Native launch
+scripts and the integration harness use environment variables; a browser
+instance can read the page URL&#39;s query string. <code>gd.launch_param</code> checks the
+environment first, then the web query parameter:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">role := gd.launch_param(<span class="hljs-string">&quot;COOP_ROLE&quot;</span>, <span class="hljs-string">&quot;role&quot;</span>)   <span class="hljs-comment">// env COOP_ROLE, else ?role= on web</span>
 url  := gd.web_query(<span class="hljs-string">&quot;url&quot;</span>)                     <span class="hljs-comment">// web-only knob; &quot;&quot; on native</span></code></pre></div><p><code>gd.web_query</code> evaluates <code>location.search</code> through the JavaScriptBridge (values
 percent-decoded via <code>gd.uri_decode</code>); <code>gd.IS_WEB</code> is the compiled-for-the-browser constant
-the platform branches use. Results are temp-allocated. Both coop examples boot through
-this — their native and in-browser acids are its proof.</p>
+the platform branches use. Results are temp-allocated. Both cooperative
+examples use these helpers during startup and exercise them in their native
+and browser integration tests.</p>
 <h3 id="webrtc--web-co-op-gdwebrtc_host--gdwebrtc_join">WebRTC / web co-op (<code>gd.webrtc_host</code> / <code>gd.webrtc_join</code>)<a class="heading-anchor" href="#webrtc--web-co-op-gdwebrtc_host--gdwebrtc_join" aria-label="Link to this section">#</a></h3>
-<p>For co-op <strong>in the browser, over the internet, with no port-forwarding</strong>, use WebRTC. The
-browser has a native WebRTC stack; Godot exposes it through <code>WebRTCMultiplayerPeer</code> /
-<code>WebRTCPeerConnection</code>. <code>godot/Ergonomics_WebRtc.odin</code> drives the whole async setup: open a
-signaling channel, trade an SDP offer/answer, trickle ICE, build the data channels, install
-the peer, so a game only writes:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// host becomes peer id 1 and gets a ROOM CODE to share; the joiner uses that code:</span>
+<p>WebRTC supports browser multiplayer over the internet without port-forwarding.
+Godot exposes the browser&#39;s implementation through <code>WebRTCMultiplayerPeer</code>
+and <code>WebRTCPeerConnection</code>. <code>godot/Ergonomics_WebRtc.odin</code> opens a signaling
+channel, exchanges the SDP offer and answer, sends ICE connection candidates,
+creates data channels, and installs the peer. The game starts hosting or
+joining and polls the setup each frame:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// The host becomes peer id 1 and receives a room code for the joiner to use:</span>
 <span class="hljs-meta">@(gd_method)</span> lobby_host :: <span class="hljs-keyword">proc</span>(self: ^Lobby) { gd.webrtc_host(self.owner, <span class="hljs-string">&quot;wss://your-server/rtc&quot;</span>) }
 <span class="hljs-meta">@(gd_method)</span> lobby_join :: <span class="hljs-keyword">proc</span>(self: ^Lobby) { gd.webrtc_join(self.owner, <span class="hljs-string">&quot;wss://your-server/rtc&quot;</span>, <span class="hljs-string">&quot;WATR&quot;</span>) }
 
-<span class="hljs-comment">// pump the signaling socket every frame until connected (cheap no-op afterwards):</span>
+<span class="hljs-comment">// Poll signaling every frame until connected; later calls do no setup work:</span>
 lobby_process :: <span class="hljs-keyword">proc</span>(self: ^Lobby, _delta: <span class="hljs-type">f64</span>) {
     gd.webrtc_poll(self.owner)
     code := gd.webrtc_room_code(self.owner) <span class="hljs-comment">// host: &quot;&quot; until the server assigns it — display to share</span>
-}</code></pre></div><p>Once connected, <strong>the same <code>@(gd_rpc)</code> methods and <code>gd.rpc</code> / <code>gd.rpc_id</code> calls used over ENet
-use the WebRTC peer</strong>: a <code>WebRTCMultiplayerPeer</code> is a <code>MultiplayerPeer</code> like any other, and the high-level
-RPC layer is transport-agnostic. Nothing about your RPC code changes; only the transport
-setup does.</p>
+}</code></pre></div><p>Once connected, the existing <code>@(gd_rpc)</code> methods and <code>gd.rpc</code> / <code>gd.rpc_id</code>
+calls use the WebRTC peer. Godot&#39;s RPC layer accepts a <code>WebRTCMultiplayerPeer</code>
+through the same <code>MultiplayerPeer</code> interface used for ENet, so the RPC
+declarations and calls can stay the same.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -1124,41 +1147,47 @@ setup does.</p>
 <td><code>gd.webrtc_close(self.owner)</code></td>
 </tr>
 </tbody></table>
-</div><p><strong>Signaling server.</strong> WebRTC needs a rendezvous channel to swap connection info before the
-peer-to-peer link exists. The server brokers a <strong>room-code lobby</strong>: a host <code>create</code>s a room and
-gets a short CODE; a friend <code>join</code>s that CODE; the server relays the SDP offer/answer + ICE
-candidates between the two <em>verbatim</em> (it never parses their contents). The wire protocol is
-<strong>JSON text frames</strong> over a raw WebSocket (server path <code>/rtc</code>). Any server speaking this
-small protocol works; a Node reference implementation ships at <code>tests/webrtc/signal_server.mjs</code>
-(used by the headless tests; the maintainer runs an Elixir implementation in production):</p>
+</div><p>WebRTC needs a signaling server to exchange connection information before the
+peer-to-peer link exists. The host sends <code>create</code> and receives a room code;
+the other player sends <code>join</code> with that code. The server relays SDP offers,
+answers, and ICE candidates without parsing their contents. The protocol uses
+JSON text frames over a WebSocket at <code>/rtc</code>. A compatible server can implement
+the protocol below. The Node reference implementation at
+<code>tests/webrtc/signal_server.mjs</code> serves the headless tests; the maintainer uses
+an Elixir implementation in production.</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">client -&gt; server                                  server -&gt; client
   {&quot;type&quot;:&quot;create&quot;}                                 {&quot;type&quot;:&quot;created&quot;,&quot;room&quot;:&quot;&lt;CODE&gt;&quot;,&quot;id&quot;:1}
   {&quot;type&quot;:&quot;join&quot;,&quot;room&quot;:&quot;&lt;CODE&gt;&quot;}                   {&quot;type&quot;:&quot;joined&quot;,&quot;room&quot;:&quot;&lt;CODE&gt;&quot;,&quot;id&quot;:&lt;n&gt;}
   {&quot;type&quot;:&quot;signal&quot;,&quot;to&quot;:&lt;peerId&gt;,&quot;data&quot;:&lt;opaque&gt;}   {&quot;type&quot;:&quot;peer&quot;,&quot;id&quot;:&lt;peerId&gt;}
   {&quot;type&quot;:&quot;leave&quot;}                                  {&quot;type&quot;:&quot;signal&quot;,&quot;from&quot;:&lt;peerId&gt;,&quot;data&quot;:&lt;opaque&gt;}
                                                     {&quot;type&quot;:&quot;peer_left&quot;,&quot;id&quot;:&lt;peerId&gt;}
-                                                    {&quot;type&quot;:&quot;error&quot;,&quot;reason&quot;:&quot;no_room&quot;|&quot;full&quot;|&quot;bad_msg&quot;}</code></pre></div><p>The host (id 1) creates the offer; the joiner answers. <strong>Deployment:</strong> the <em>game</em> traffic is
-peer-to-peer WebRTC (NAT-punching, no port-forwarding), but this signaling server must be
-reachable by both players during setup, so host it at a public <code>wss://HOST/rtc</code>. <code>Ergonomics_WebRtc .odin</code> already configures a public <strong>STUN</strong> server on the <code>WebRTCPeerConnection</code>; for symmetric-NAT
-pairs add a <strong>TURN</strong> relay to its <code>_ICE_CONFIG_JSON</code> (localhost needs neither).</p>
+                                                    {&quot;type&quot;:&quot;error&quot;,&quot;reason&quot;:&quot;no_room&quot;|&quot;full&quot;|&quot;bad_msg&quot;}</code></pre></div><p>The host (id 1) creates the offer and the joiner answers. Both players must be
+able to reach the signaling server during setup, so deploy it at a public
+<code>wss://HOST/rtc</code>. Game traffic then uses WebRTC&#39;s peer-to-peer connection and
+NAT traversal without port-forwarding. <code>Ergonomics_WebRtc .odin</code> configures a public STUN server on the <code>WebRTCPeerConnection</code>. Add a
+TURN relay to <code>_ICE_CONFIG_JSON</code> for symmetric-NAT pairs; localhost needs
+neither STUN nor TURN.</p>
 <blockquote>
-<p><strong>Native caveat:</strong> desktop/native Godot ships <strong>no</strong> WebRTC implementation: <code>WebRTCPeer Connection</code> is an abstract extension point (&quot;No default WebRTC extension configured&quot;) that
+<p>Desktop/native Godot ships no WebRTC implementation: <code>WebRTCPeer Connection</code> is an abstract extension point (&quot;No default WebRTC extension configured&quot;) that
 the separate <a href="https://github.com/godotengine/webrtc-native" rel="noreferrer"><code>godot-webrtc</code></a> GDExtension must
-fill. So these helpers are a <strong>web-target path</strong>: they compile and run natively, but
-<code>initialize</code> fails unless <code>godot-webrtc</code> is installed (out of scope here). Prove + use them
-in the browser export, which is exactly what <code>tests/webrtc</code> does.</p>
+fill. These helpers target web exports. They compile and run natively, but
+<code>initialize</code> fails unless <code>godot-webrtc</code> is installed. Native extension setup
+is outside this guide&#39;s scope. <code>tests/webrtc</code> exercises the browser export.</p>
 </blockquote>
-<p>Proven end-to-end by <code>tests/webrtc</code>: <strong>two real headless-Chrome instances</strong> load the same
-exported web page (one <code>?role=host</code>, one <code>?role=join</code>), establish a genuine browser-native
-WebRTC data channel via the signaling server, and exchange <code>@(gd_rpc)</code> calls in both
-directions, asserting, from each browser&#39;s JS console, that the call executed on the <em>other</em>
-browser with the correct sender id (the in-browser mirror of <code>tests/rpc_net</code>).</p>
-<h2 id="ergonomic-helpers">Ergonomic helpers<a class="heading-anchor" href="#ergonomic-helpers" aria-label="Link to this section">#</a></h2>
-<p>The <code>godot</code> package ships a hand-written ergonomics layer (<code>godot/Ergonomics*.odin</code>) that
-collapses the common (but otherwise verbose) StringName / Variant / method-bind dances
-into <code>gd.&lt;helper&gt;(...)</code> one-liners. Every helper takes/returns <code>Object</code>/<code>Node</code>/<code>Resource</code>,
-which are type-aliases all object handles (<code>Node2d</code>, <code>Area2d</code>, <code>Label</code>, …) collapse to, so a
-script&#39;s <code>self.owner</code> passes with no cast and a returned <code>Node</code> assigns to any handle var.</p>
+<p><code>tests/webrtc</code> loads the same exported web page in two headless Chrome
+instances, one with <code>?role=host</code> and one with <code>?role=join</code>. They establish a
+browser-native WebRTC data channel through the signaling server and exchange
+<code>@(gd_rpc)</code> calls in both directions. Assertions in each browser&#39;s JS console
+check execution on the other browser with the correct sender id, matching the
+native checks in <code>tests/rpc_net</code>.</p>
+<p><span id="ergonomic-helpers"></span></p>
+<h2 id="godot-helper-procedures">Godot helper procedures<a class="heading-anchor" href="#godot-helper-procedures" aria-label="Link to this section">#</a></h2>
+<p>The <code>godot/Ergonomics*.odin</code> helpers create the StringName and Variant values
+and resolve the method bindings needed for common engine calls. Their
+<code>Object</code>/<code>Node</code>/<code>Resource</code> parameters and results share the representation used
+by object handles such as <code>Node2d</code>, <code>Area2d</code>, and <code>Label</code>. A script&#39;s
+<code>self.owner</code> therefore passes without a cast, and a returned <code>Node</code> assigns
+to another handle type.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -1315,23 +1344,25 @@ script&#39;s <code>self.owner</code> passes with no cast and a returned <code>No
 / <code>gd.action_add_*</code> wrap the <code>InputMap</code> singleton (constructing the <code>InputEventKey</code> /
 <code>InputEventMouseButton</code> for you). Settings/actions registered at runtime are visible to
 GDScript (<code>ProjectSettings.get_setting</code>, <code>InputMap.has_action</code>, <code>Input.is_action_pressed</code>)
-but are NOT persisted to <code>project.godot</code>: they are the &quot;register my game&#39;s settings +
-actions on an autoload&#39;s <code>_ready</code>&quot; pattern (see below). <code>gd.get_setting_string</code> is the one
-that allocates (in <code>context.allocator</code>); the rest are <code>proc &quot;contextless&quot;</code>.</p>
+but do not persist to <code>project.godot</code>. Register them during an autoload&#39;s
+<code>_ready</code>, as shown below. <code>gd.get_setting_string</code> allocates its returned string
+in <code>context.allocator</code>; the other setting and action helpers are
+<code>proc &quot;contextless&quot;</code>.</p>
 <p>All helpers are <code>proc &quot;contextless&quot;</code> except the ones that allocate: <code>gd.get_string</code>
 (returned Odin <code>string</code>, in <code>context.allocator</code> — <code>delete</code> it) and the slice-returning
 queries <code>gd.nodes_in_group</code> / <code>gd.array_unpack</code> / <code>rt.scripts_in_group</code> (in
-<code>context.temp_allocator</code> by default — call-local, iterate now and don&#39;t stash, or pass a
-real allocator to keep the slice). All are fine inside any script proc, since those run
-with the script context set. For a script-declared signal field, prefer the generated typed
-<code>&lt;struct_snake&gt;_emit_&lt;field&gt;</code> helper; <code>gd.emit_args</code> is the by-name escape hatch (and the
-path <code>gd.emit</code>/<code>emit_args</code> both take: Godot&#39;s <code>emit_signal</code> is a vararg method, so they
-varcall it rather than ptrcall).</p>
-<p><strong>The interning pattern.</strong> The <code>gd.*</code> helpers above all take plain Odin <code>cstring</code>s and do the
-Godot <code>String</code> / <code>String_Name</code> interning internally, which is the ergonomic path, so reach for a
-helper first. When you call a <em>raw</em> bound method that has no wrapper, it takes a <code>String_Name</code>
-(method/signal/action/animation/property names) or a <code>String</code>, and you intern inline with
-<code>gd.sname(&quot;…&quot;)</code> / <code>gd.gstr(&quot;…&quot;)</code> rather than spelling out <code>new_string_name_cstring(…, true)</code>:</p>
+<code>context.temp_allocator</code> by default; iterate before the temporary storage is
+reset, or pass a persistent allocator to retain the slice). Script procedures
+run with a context set, so they can call either form. For a script-declared
+signal field, prefer the generated typed <code>&lt;struct_snake&gt;_emit_&lt;field&gt;</code> helper.
+Use <code>gd.emit_args</code> for by-name dispatch. Both <code>gd.emit</code> and <code>emit_args</code> use a
+Variant call because Godot&#39;s <code>emit_signal</code> is a vararg method and cannot use
+the pointer-call path.</p>
+<p>The helpers above accept Odin <code>cstring</code>s and create the Godot <code>String</code> or
+<code>String_Name</code> internally. For a raw bound method without a helper, create
+those values with <code>gd.sname(&quot;…&quot;)</code> or <code>gd.gstr(&quot;…&quot;)</code>. Names for methods, signals,
+actions, animations, and properties usually take <code>String_Name</code>. The helper
+avoids spelling out <code>new_string_name_cstring(…, true)</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// raw call (no dedicated helper): intern the name inline</span>
 <span class="hljs-keyword">if</span> gd.object_has_method(enemy, gd.sname(<span class="hljs-string">&quot;take_damage&quot;</span>)) {
     <span class="hljs-comment">// ...</span>
@@ -1341,8 +1372,8 @@ calls almost always use.</p>
 <p><code>gd.Vector2</code> is an Odin <code>[2]f32</code>, so it supports Odin&#39;s vector operations: component access
 (<code>pos.x</code>), compound assignment (<code>pos.x += 10</code>), and whole-vector arithmetic (<code>pos += other</code>,
 <code>pos * delta</code>). The only round-trip is the get/set across the engine boundary. For the
-common &quot;move/rotate/scale by a delta&quot; cases, Godot&#39;s own one-call methods skip even that, so you
-don&#39;t need get → modify → set at all:</p>
+common move, rotate, and scale operations, Godot provides methods that apply
+the delta directly:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -1371,18 +1402,18 @@ don&#39;t need get → modify → set at all:</p>
 <td><code>gd.node2d_set_global_position(self.owner, p)</code> · <code>gd.node2d_get_global_position(self.owner)</code></td>
 </tr>
 <tr>
-<td>set ONE position component (keep the other)</td>
+<td>set one position component (keep the other)</td>
 <td><code>gd.node2d_set_x(self.owner, 100)</code> · <code>gd.node2d_set_y(self.owner, 250)</code> (and <code>_global_x</code> / <code>_global_y</code>)</td>
 </tr>
 </tbody></table>
 </div><p>The <code>node2d_set_x</code> / <code>_set_y</code> (+ <code>_global_x</code> / <code>_global_y</code>) helpers cover the absolute-component
-case (&quot;snap x to 100, keep y&quot;) without the get → modify → set round-trip. <strong>The same setters
-exist for the other positional types:</strong> <code>node3d_set_x/_y/_z</code> (+ <code>_global_*</code>), and
+case (&quot;snap x to 100, keep y&quot;) without a separate get, modify, and set. The same setters
+exist for other positional types: <code>node3d_set_x/_y/_z</code> (+ <code>_global_*</code>), and
 <code>control_set_x/_y</code>, <code>control_set_width/_height</code>, <code>control_set_global_x/_y</code>. If you ever need it by
 hand (a component with no setter, or another type), it&#39;s plain Odin array math:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">pos := gd.node2d_get_position(self.owner)
 pos.x = <span class="hljs-number">100</span>                                  <span class="hljs-comment">// Odin array swizzle — no Vector2 ctor needed</span>
-gd.node2d_set_position(self.owner, pos)</code></pre></div><p>The same shape generalizes: every Godot method on a node is bound as
+gd.node2d_set_position(self.owner, pos)</code></pre></div><p>Godot methods on nodes are bound as
 <code>gd.&lt;class_snake&gt;_&lt;method&gt;(handle, args…)</code> (so reach for <code>node2d_translate</code>, <code>control_set_size</code>,
 <code>sprite2d_set_frame</code>, …), and the math types (<code>Vector2/3</code>, <code>Color</code>, <code>Rect2</code>, …) are plain Odin
 structs/arrays you manipulate with normal operators.</p>
@@ -1436,7 +1467,7 @@ structs/arrays you manipulate with normal operators.</p>
 <td>object handle</td>
 </tr>
 </tbody></table>
-</div><p>Unsupported types produce a clear <code>scriptgen</code> error (no silent miscompile).
+</div><p>Scriptgen rejects unsupported types with a build error.
 Raw <code>gd.Variant</code> signatures are not supported at this method boundary; use a
 concrete supported type or a lower-level Variant dispatch API.</p>
 <h3 id="method-value-ownership">Method value ownership<a class="heading-anchor" href="#method-value-ownership" aria-label="Link to this section">#</a></h3>
@@ -1449,12 +1480,12 @@ Keep returned storage valid until marshaling finishes: literals, instance-owned
 strings and <code>context.temp_allocator</code> data work; a view into a local stack array
 does not. Copy an argument with <code>strings.clone</code> if you retain it across frames.
 The trampoline does not free an Odin string you return from your own allocator.</p>
-<p>A bare <code>@(gd_method)</code> preserves the earlier engine-value contract: owning builtin
+<p>A bare <code>@(gd_method)</code> uses these ownership rules: owning builtin
 argument copies belong to the callee, while returned Godot values are borrowed.
-Thus existing methods that free their <code>gd.String</code>/<code>gd.Array</code> parameters or return
-an instance-owned value keep working. Object-handle arguments are borrowed pointers,
+The method must free its <code>gd.String</code>/<code>gd.Array</code> argument copies and may return
+an instance-owned value. Object-handle arguments are borrowed pointers,
 not owning builtin copies.</p>
-<p>For new engine-value APIs, state ownership in the existing attribute:</p>
+<p>To change these ownership rules, add options to the attribute:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_method=&quot;borrowed_args,owned_return&quot;)</span>
 player_copy_values :: <span class="hljs-keyword">proc</span>(self: ^Player, values: gd.Array) -&gt; gd.Array {
     <span class="hljs-keyword">return</span> gd.new_array_array(values)
@@ -1469,38 +1500,39 @@ retaining or replacing a handle. A copied Array/Dictionary reference may still
 share mutable contents—ownership does not imply a deep copy.</p>
 <p><code>owned_return</code> transfers one owned builtin reference to the trampoline, which
 releases it after the outgoing Variant retains the value. It also supports a
-<strong>declared RefCounted subclass</strong> with one owned reference (factory results, or a
+declared RefCounted subclass with one owned reference (factory results, or a
 new object after <code>ref_counted_init_ref</code>). It rejects Node/Object/scalar results;
 a Variant does not own a Node&#39;s lifetime. Native Odin string results already use
 the conversion path and do not take this option. Returning a borrowed argument
 as <code>owned_return</code> requires first acquiring a separate reference.</p>
 <p>The options also follow composed methods and property accessors when the accessor
-proc has the annotated <code>gd_method</code>. Unannotated accessors retain the legacy
-contract. A String property&#39;s getter may return an Odin <code>string</code>, which is copied;
+proc has the annotated <code>gd_method</code>. Unannotated accessors use the default
+ownership rules. A String property&#39;s getter may return an Odin <code>string</code>, which is copied;
 its actual exported storage remains <code>gd.String</code>. Native <code>string</code> exports are
 rejected by scriptgen and reflection because their storage is not a Godot String.</p>
 <h2 id="threads--memory">Threads &amp; memory<a class="heading-anchor" href="#threads--memory" aria-label="Link to this section">#</a></h2>
-<p>Practical rules for what runs where and who owns which allocation:</p>
+<p>Script callbacks use the engine thread and the allocators installed by the
+runtime:</p>
 <ul>
-<li><strong>Everything script-facing runs on the engine&#39;s main thread.</strong> Lifecycle procs
+<li>Lifecycle procs
 (<code>*_ready</code>, <code>*_process</code>, …), <code>@(gd_method)</code> calls, <code>@(gd_connect)</code> handlers and
 <code>@(gd_rpc)</code> procs are all invoked by the engine on its main thread; the generated
 trampolines add no synchronization. Don&#39;t call <code>gd.*</code> / engine APIs from threads you
 spawn with <code>core:thread</code>: compute on the worker, then apply the result back on the
 main thread from a lifecycle proc (e.g. poll a mutex-guarded value in <code>*_process</code>).</li>
-<li><strong><code>rt.script_of</code> is main-thread-only too</strong>: it resolves through the core&#39;s live-instance
+<li><code>rt.script_of</code> is main-thread-only: it resolves through the core&#39;s live-instance
 registry, which the main thread mutates as script instances are created and freed.</li>
-<li><strong><code>context.allocator</code> is a real, persistent allocator</strong> inside script procs: the Odin
+<li><code>context.allocator</code> is persistent inside script procedures: the Odin
 heap default on native, an engine-backed (alignment-correct) allocator on web. Either
 way, what you <code>make</code>/<code>new</code> there lives until you free it.</li>
-<li><strong><code>context.temp_allocator</code> is call-local.</strong> The core resets its shared temp arena once
+<li><code>context.temp_allocator</code> supplies temporary storage. The core resets its shared temp arena once
 per frame from the main-thread frame pump, so never stash a temp pointer (including
 <code>fmt.tprintf</code>/<code>fmt.ctprintf</code> results) across frames. Copy anything you keep into
 <code>context.allocator</code> memory.</li>
-<li><strong>String-returning helpers allocate: the caller frees.</strong> <code>gd.get_string</code> (and helpers
-like it that return an Odin <code>string</code>) allocate from <code>context.allocator</code>; <code>delete(s)</code>
+<li>The caller frees strings allocated by <code>gd.get_string</code> and helpers
+like it that return an Odin <code>string</code>. They allocate from <code>context.allocator</code>; use <code>delete(s)</code>
 when you&#39;re done with it.</li>
-<li><strong><code>gd.sname</code> interns forever.</strong> It is <code>new_string_name_cstring(name, true)</code>:
+<li><code>gd.sname</code> uses <code>new_string_name_cstring(name, true)</code>:
 <code>static = true</code> hands Godot the cstring pointer to keep for the program&#39;s lifetime.
 Pass only string literals (or otherwise program-lifetime, ASCII) names; never a name
 built at runtime from a temporary buffer such as <code>fmt.ctprintf(...)</code>.</li>
@@ -1522,12 +1554,12 @@ attached resource),</li>
 <code>@(gd_input)</code> / <code>@(gd_sample)</code> / <code>@(gd_step)</code> / <code>@(gd_event)</code> / <code>@(gd_half)</code> /
 <code>@(gd_message)</code> marker attributes; the
 build script passes them for you. The set lives in <code>decl/decl.odin</code>&#39;s <code>ATTRS</code>, and
-tests/scriptgen asserts the build scripts against it: Odin refuses an unknown custom
-attribute outright, so a name the schema grew and a build script did not would be a
-compile error in every game.</p>
-<p>The build, the <strong>live-editing (show-on-save) loop</strong>, the editor DX (validation / autocomplete
-/ highlighting), debugging, and the editor settings (<code>odin_godot/odin_bin</code>,
-<code>odin_godot/scripts_dir</code>, …) are all covered in <strong><a href="workflow.html">Workflow</a></strong>.</p>
+<code>tests/scriptgen</code> checks that the build scripts pass those attributes. Odin
+rejects an unknown custom attribute, so adding one to the schema also requires
+updating the build scripts.</p>
+<p><a href="workflow.html">Workflow</a> covers builds, live editing with updates on save,
+validation, autocomplete, highlighting, debugging, and editor settings such
+as <code>odin_godot/odin_bin</code> and <code>odin_godot/scripts_dir</code>.</p>
 <h2 id="multiple-scripts-in-one-package">Multiple scripts in one package<a class="heading-anchor" href="#multiple-scripts-in-one-package" aria-label="Link to this section">#</a></h2>
 <p>All the <code>.odin</code> files in one directory are one Odin package. Because lifecycle/method procs
 and generated emit helpers live in that shared package, prefix your proc names with the
@@ -1535,8 +1567,9 @@ struct name (<code>ping_ready</code>, <code>ping_add</code>) to avoid collisions
 derive the GDScript-facing name. One script struct per file (identified by its
 first field being named <code>owner</code>).</p>
 <h3 id="organizing-a-project">Organizing a project<a class="heading-anchor" href="#organizing-a-project" aria-label="Link to this section">#</a></h3>
-<p>A flat <code>res://scripts/</code> is the right shape for most projects, and nothing below is needed
-until it stops being comfortable. In order of how much they cost you:</p>
+<p>Start with one <code>res://scripts/</code> directory. Split out packages when the directory
+becomes hard to navigate, and consider modules when rebuild latency warrants
+separate libraries:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -1562,8 +1595,8 @@ until it stops being comfortable. In order of how much they cost you:</p>
 </tr>
 <tr>
 <td><strong>a script module</strong> (<code>res://modules/&lt;name&gt;/</code>)</td>
-<td>a subsystem, once save latency actually hurts (hundreds of scripts)</td>
-<td>its own dll, so no shared types or globals with other modules: cross-module talk is engine-mediated</td>
+<td>a subsystem whose rebuild latency warrants a separate library (hundreds of scripts)</td>
+<td>its own dll, so no shared types or globals with other modules: cross-module calls go through the engine</td>
 </tr>
 <tr>
 <td><strong><code>res://shared/</code></strong></td>
@@ -1574,10 +1607,9 @@ until it stops being comfortable. In order of how much they cost you:</p>
 </div><p>The last three are covered in <strong><a href="modules.html">Script Modules</a></strong>, including the cost model,
 the isolation rule, and the exact build-time refusals.</p>
 <h2 id="custom-resources">Custom resources<a class="heading-anchor" href="#custom-resources" aria-label="Link to this section">#</a></h2>
-<p><code>//gd:extends Resource</code> makes the script a <strong>custom resource</strong>, a pure data
-container (a <code>RefCounted</code>, not a scene-tree node), exactly like a GDScript
-<code>extends Resource</code>. Everything is the same as any other script; only the base
-differs. Use it for designer-tunable data assets you create, edit in the
+<p><code>//gd:extends Resource</code> attaches the script to a custom resource, a RefCounted
+data container outside the scene tree, like GDScript&#39;s <code>extends Resource</code>.
+Use it for designer-tunable data assets you create, edit in the
 Inspector, and save as <code>.tres</code>.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Resource</span>
 <span class="hljs-comment">//gd:class ItemData</span>
@@ -1633,9 +1665,9 @@ editor knows it as a type.</p>
 </li>
 </ul>
 <h2 id="global-class-names">Global class names<a class="heading-anchor" href="#global-class-names" aria-label="Link to this section">#</a></h2>
-<p>Every <code>//gd:class &lt;Name&gt;</code> is registered as a <strong>global class</strong>, a first-class engine
-type, exactly like a GDScript <code>class_name</code>. No extra annotation is needed; the class
-name you already declare becomes the global name.</p>
+<p><code>//gd:class &lt;Name&gt;</code> registers the script as a global class, like GDScript&#39;s
+<code>class_name</code>. The declared name becomes the engine&#39;s global name without
+another annotation.</p>
 <p>The marker is optional. Without it, the script still attaches, instantiates, reloads,
 and supports typed <code>rt.script_of</code> access through its source-path identity. It does
 not reserve a project-wide global type name. Use it when another editor surface needs a
@@ -1653,11 +1685,10 @@ resource/node-typed <code>@export</code> picker).</li>
 <code>_get_global_class_name(path)</code> virtuals, which reparse the <code>.odin</code> file&#39;s markers and
 hand back <code>{name, base_type, icon_path}</code>.</p>
 <h2 id="typed-cross-script-references">Typed cross-script references<a class="heading-anchor" href="#typed-cross-script-references" aria-label="Link to this section">#</a></h2>
-<p>Because every script of one module compiles into ONE shared dll, a struct type declared
-in one script (e.g. <code>Enemy</code>) is the <em>same</em> type everywhere in that dll. <code>rt.script_of(obj, T)</code> turns
-a live Godot object into a typed <code>^T</code> pointer to the Odin script struct the engine
-allocated for it, giving DIRECT typed field and proc access across scripts, with no
-Variant marshaling:</p>
+<p>All scripts in a module compile into one shared library, so they can use the
+same struct types. <code>rt.script_of(obj, T)</code> resolves a live Godot object to a
+typed <code>^T</code> pointer to its Odin script data. Scripts in that module can then
+access fields and call procedures directly without Variant marshaling:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 <span class="hljs-keyword">import</span> rt <span class="hljs-string">&quot;godot:runtime&quot;</span>
 
@@ -1672,7 +1703,7 @@ controller_attack :: <span class="hljs-keyword">proc</span>(self: ^Controller, a
 }</code></pre></div><ul>
 <li><code>script_of</code> returns <code>nil</code> when <code>obj</code> is nil or carries no Odin script of <em>our</em>
 language (a foreign-language node, a placeholder, or a plain engine node). It is
-nil-safe, never a wild cast.</li>
+safe to call with a nil object.</li>
 <li>Works on web too (single module: the same resolver is wired directly).</li>
 <li><strong>Subpackages are not a boundary:</strong> a class in a subfolder of the same module lives in the
 same dll, so import that package and name its type: <code>rt.script_of(node, ui.Hud)</code>.</li>
@@ -1681,65 +1712,65 @@ typed access within <em>one</em> module only: across modules it returns <code>ni
 (modules can&#39;t import each other&#39;s types), and cross-module access goes through the
 engine (signals, name-based calls, autoloads). See <a href="modules.html">Script Modules</a>.</li>
 <li>For calling across a dll boundary (e.g. a tool that dispatches by name), the
-GDScript-style by-name path is <code>gd.vcall</code> (below); <code>script_of</code> is the zero-overhead
+GDScript-style by-name path is <code>gd.vcall</code> (below); <code>script_of</code> provides direct
 typed path within the shared scripts dll.</li>
 </ul>
-<p><strong>Typed spawning.</strong> These three helpers combine scene instantiation and typed
+<p>These three helpers combine scene instantiation and typed
 script lookup. Choose one according to whether the new instance&#39;s <code>_ready</code>
 needs to see the initial field values:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// poke-first (fields visible to the spawnee&#x27;s _ready): spawn_scripted + add_child</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Set initial fields before _ready with spawn_scripted + add_child:</span>
 node, b := rt.spawn_scripted(self.bullet_scene, Bullet)
 <span class="hljs-keyword">if</span> b == <span class="hljs-literal">nil</span> { <span class="hljs-keyword">return</span> }
 b.dir = dir; b.damage = dmg
 gd.add_child(arena, node)
 
-<span class="hljs-comment">// just-spawn-it (pokes happen after _ready ran):</span>
+<span class="hljs-comment">// Assign fields after _ready has run:</span>
 <span class="hljs-keyword">if</span> e := rt.spawn_as(parent, self.enemy_scene, Enemy); e != <span class="hljs-literal">nil</span> { e.tier = <span class="hljs-number">2</span> }
 
 <span class="hljs-comment">// from a physics callback (body_entered, contact resolution): deferred parenting —</span>
-<span class="hljs-comment">// _ready runs at idle time, so pokes through the returned ^T are ready-visible.</span>
+<span class="hljs-comment">// _ready runs at idle time and sees assignments through the returned ^T.</span>
 <span class="hljs-keyword">if</span> g := rt.spawn_as_deferred(parent, self.gem_scene, Gem); g != <span class="hljs-literal">nil</span> { g.value = <span class="hljs-number">5</span> }</code></pre></div><p>All are nil-safe (nil scene, failed instantiate, or a root without the expected script
 → nil <code>^T</code>; the caller&#39;s nil-check decides whether that&#39;s fatal).</p>
-<p><strong>By-name calls — <code>gd.vcall</code>.</strong> Where types can&#39;t be shared (across script modules, or
-any engine-mediated dispatch), <code>gd.vcall</code> converts Odin arguments to Variants
+<p>Where types cannot be shared, such as across script modules or through
+engine-mediated dispatch, <code>gd.vcall</code> converts Odin arguments to Variants
 automatically, calls by name, and frees every temporary; the typed forms unwrap the
-result. One line instead of two per argument:</p>
+result:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">gd.vcall_void(spawner, <span class="hljs-string">&quot;register_kill&quot;</span>)
 hits := gd.vcall_int(field, <span class="hljs-string">&quot;spawn_aimed&quot;</span>, x, y, sx, sy, speed, dmg, gd.Int(<span class="hljs-number">1</span>))
 <span class="hljs-keyword">if</span> gd.vcall_bool(game_state, <span class="hljs-string">&quot;is_cleared&quot;</span>) { ... }</code></pre></div><p>Accepted argument types: integers, floats, bool, cstring/string, <code>gd.String</code>,
 <code>gd.String_Name</code>, object/node handles, <code>Vector2/2i/3/3i/4</code>, <code>Color</code>, <code>Rect2</code>, and
-prebuilt <code>Variant</code>s (passed through, caller keeps ownership). Anything else refuses the
-WHOLE call with a loud error — never a half-converted argument list. A nil target is a
-silent no-op returning zero (by-name targets are routinely group/path lookups that
-legitimately miss). <code>method</code> must be a string literal (interned).</p>
-<p><strong>Typed group queries.</strong> The scene tree&#39;s group index is the decoupled &quot;find that kind of
-thing&quot; query (<code>gd.add_to_group</code> in <code>_ready</code>; no node paths, no hand-kept registries), and
-the <code>rt</code> layer composes it with <code>script_of</code> so the answer comes back as script structs,
-class-checked — a member carrying a different script (or none) is skipped, never
-reinterpreted:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// every player, as struct pointers (temp-allocated: iterate now, don&#x27;t stash):</span>
+prebuilt <code>Variant</code>s, which pass through with ownership retained by the caller.
+An unsupported argument rejects the entire call and reports an error. A nil
+target is a silent no-op returning zero, which supports group or path lookups
+that find no object. <code>method</code> must be an interned string literal.</p>
+<p>Use scene-tree groups to find nodes without retaining their paths or a
+separate registry. Add nodes with <code>gd.add_to_group</code> in <code>_ready</code>, then use the
+<code>rt</code> queries to resolve group members through <code>script_of</code>. The queries return
+script pointers and skip members that carry a different script or no script:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// Find players through a temporary slice of struct pointers; iterate before it resets:</span>
 <span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> rt.scripts_in_group(self.owner, <span class="hljs-string">&quot;players&quot;</span>, player) {
 	p.hp -= <span class="hljs-number">1</span>                                     <span class="hljs-comment">// direct field access</span>
 	pos := gd.node2d_get_global_position(p.owner) <span class="hljs-comment">// engine calls via the owner</span>
 }
 
 <span class="hljs-comment">// the single-expected-object query (the game orchestrator, the world, the camera):</span>
-game := rt.first_script_in_group(self.owner, <span class="hljs-string">&quot;game&quot;</span>, Game)</code></pre></div><p><code>first_script_in_group</code> scans past members with other scripts, so a mixed group can never
-hand back a wrong class (contrast with <code>gd.first_in_group</code> + <code>script_of</code>, which inspects
-only whichever node the engine lists first). The node-level forms (<code>gd.nodes_in_group</code>,
+game := rt.first_script_in_group(self.owner, <span class="hljs-string">&quot;game&quot;</span>, Game)</code></pre></div><p><code>first_script_in_group</code> scans until it finds a member with the requested
+script. Calling <code>gd.first_in_group</code> and then <code>script_of</code> instead checks only
+the first node listed by the engine. The node-level forms (<code>gd.nodes_in_group</code>,
 <code>gd.first_in_group</code>) and the generic engine-array unpacker (<code>gd.array_unpack</code>) live in the
 <a href="#ergonomic-helpers">ergonomics layer</a>. One timing note: nodes join groups as they enter
 the tree, so a group scan inside another node&#39;s <code>_ready</code> can run before later siblings
-have registered — scan from process/tick code, where the question is actually asked.</p>
+have registered. Query from process or tick code when the game needs the result.</p>
 <h3 id="any-class-references--static-dispatch-interfaces">Any-class references &amp; static dispatch (&quot;interfaces&quot;)<a class="heading-anchor" href="#any-class-references--static-dispatch-interfaces" aria-label="Link to this section">#</a></h3>
-<p><code>script_of</code> answers &quot;is this exactly class T&quot;. The other question games ask — a bullet
-hitting <em>anything damageable</em>, a cursor over <em>anything interactable</em> — needs the reverse:
-&quot;whatever this is, hand me its struct AND tell me what it is.&quot; That is
-<code>rt.script_any(obj) -&gt; (ptr: rawptr, id: typeid)</code>: nil,nil for a plain engine node, a
-foreign module&#39;s class, or no script at all.</p>
-<p>Odin has no interfaces on purpose; the pattern the typeid unlocks is the <strong>per-type static
-table</strong> — one entry per class, constant for all instances, nothing registered per instance
-and no lifecycle to forget (the C++/C# vtable, spelled out):</p>
+<p>Use <code>script_of</code> when the expected class is known. For a bullet that can damage
+several classes, or a cursor that can interact with several classes,
+<code>rt.script_any(obj) -&gt; (ptr: rawptr, id: typeid)</code> returns the instance data
+and its type. It returns nil,nil for a plain engine node, a foreign module&#39;s
+class, or an object without a script.</p>
+<p>A static table can map each <code>typeid</code> to the operations that class supports.
+Each entry applies to every instance of its class, so the game needs no
+per-instance registration or teardown. This explicitly represents a dispatch
+table similar to a C++ or C# vtable:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Damage_Entry :: <span class="hljs-keyword">struct</span> {
 	id:   <span class="hljs-type">typeid</span>,
 	hurt: <span class="hljs-keyword">proc</span>(ctx: <span class="hljs-type">rawptr</span>, amount: <span class="hljs-type">int</span>),
@@ -1759,40 +1790,38 @@ hurt :: <span class="hljs-keyword">proc</span>(node: gd.Object, amount: <span cl
 	<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
 }</code></pre></div><p><code>rt.dispatch(table, obj)</code> composes the resolve and the table scan; <code>rt.lookup(table, id)</code>
 is the scan alone (for call sites that must distinguish &quot;not a script&quot; from &quot;no entry&quot;,
-or that already hold the typeid). Both are generic on the ENTRY type: any struct with an
-<code>id: typeid</code> field fits, checked at instantiation — so <code>INTERACT_IMPLS</code>, <code>SAVE_IMPLS</code>,
-and friends reuse the same two helpers with their own entry shapes, no shared header
-struct and no id-must-be-first layout convention. The <code>[:]</code> at the call site is what
-erases the table&#39;s LENGTH (<code>[2]Damage_Entry</code> → <code>[]Damage_Entry</code>); the <code>$E</code> type parameter
-erases the entry TYPE — two axes of &quot;slice polymorphism&quot;, both compile-checked.</p>
-<p>Why an array and a loop, not a <code>map[typeid]</code>? Deliberate: at game-type counts a scan of
-contiguous pairs beats or ties a hash (and <code>script_any</code>&#39;s engine round trip dominates
-either), and — the load-bearing part — the <code>[?]</code> literal is CONSTANT-initialized into the
-binary, while a package-global map must be BUILT, and global/<code>@(init)</code>-time building runs
-at dll load, exactly where the web target&#39;s allocator is not yet usable (the
-<code>runtime/context.odin</code> trap; scriptgen&#39;s own generated tables are <code>[?]</code> arrays for the
-same reason). If the set outgrows a scan or you want per-file registration, a map
-lazy-initialized inside the dispatch proc (first call is always post-boot) is the safe
-spelling.</p>
-<p>The proc literals must be capture-free (Odin has no closures) — <code>ctx</code> is how the instance
-travels, which is exactly a vtable&#39;s <code>this</code>. Type safety is <code>script_of</code>&#39;s class check,
-relocated: the core reports the instance&#39;s class name, and <code>script_any</code> resolves it against
-<em>this dll&#39;s own registry</em> to a typeid — a class this module never registered resolves to
-nil, so a foreign module&#39;s struct can never be handed out under a wrong layout. Same
-main-thread contract as <code>script_of</code>; works on web (the resolver is wired directly there).
-For a closed set with per-type <em>call sites</em> rather than one shared verb, a tagged union
-(<code>union {^bug, ^cactus}</code> + exhaustive <code>switch</code>) buys compile-time completeness checking
-instead — pick the table when N types share one verb, the union when the switch sites
-want the compiler watching them.</p>
-<p>For shared state with <em>no</em> per-node instance to reference (a global score, a constant
-table), the package-level &quot;module&quot; pattern (file-private vars + package procs like
-<code>game_state_add</code>) is the simplest tool: the scripts in one directory are one Odin
-package, so they share those globals with zero Godot glue. It is NOT, however, a real
-Godot singleton: it is not reachable at <code>/root/Name</code>, not visible to GDScript, and has no
-<code>_ready</code>. When you need that (a manager node GDScript can call, lifecycle, persistence
-across scene changes), use an <strong>autoload</strong> (see below).</p>
+or that already hold the typeid). Both are generic on the entry type: any
+struct with an <code>id: typeid</code> field works, checked at instantiation.
+<code>INTERACT_IMPLS</code> and <code>SAVE_IMPLS</code> can therefore use their own entry structs
+without a shared header or a requirement that <code>id</code> come first. <code>[:]</code> converts
+the table from an array to a slice (<code>[2]Damage_Entry</code> → <code>[]Damage_Entry</code>), and
+the <code>$E</code> parameter accepts different entry types. The compiler checks both
+the slice and entry types.</p>
+<p>The <code>[?]</code> literal is initialized as constant data in the binary. A
+package-global <code>map[typeid]</code> instead needs allocation during library loading,
+when the web target&#39;s allocator is not yet usable; see <code>runtime/context.odin</code>.
+Scriptgen&#39;s generated tables use <code>[?]</code> arrays for the same reason. A short
+contiguous scan also avoids hash-table overhead for small sets. If the table
+outgrows a scan or needs per-file registration, initialize a map lazily inside
+the dispatch procedure on its first call after boot.</p>
+<p>Procedure literals must be capture-free because Odin has no closures. Pass
+the instance through <code>ctx</code>. The core reports the instance&#39;s class name, and
+<code>script_any</code> resolves it through the current library&#39;s registry to a typeid.
+A class from an unregistered module resolves to nil, preventing access through
+an incompatible struct layout. Like <code>script_of</code>, these queries require the
+main thread and work on web through a directly wired resolver.</p>
+<p>For a closed set whose callers need type-specific behavior, a tagged union
+such as <code>union {^bug, ^cactus}</code> with an exhaustive <code>switch</code> lets the compiler
+check that each type is handled. Use the table when N types share one
+operation; use the union when callers need exhaustive case analysis.</p>
+<p>For a global score or constant table without a per-node instance, use
+file-private variables and package procedures such as <code>game_state_add</code>.
+Scripts in one directory share an Odin package and can access that state
+directly. Package state has no <code>/root/Name</code> node, GDScript visibility, or
+<code>_ready</code> callback. Use an autoload when a manager needs those engine features
+or persistence across scene changes.</p>
 <h2 id="autoload-singletons">Autoload singletons<a class="heading-anchor" href="#autoload-singletons" aria-label="Link to this section">#</a></h2>
-<p>A <code>.odin</code> script can be a real Godot <strong>autoload</strong> singleton: a node added under <code>/root</code>
+<p>A <code>.odin</code> script can be a Godot autoload singleton: a node added under <code>/root</code>
 at startup, reachable everywhere (from GDScript as <code>Name</code> or <code>/root/Name</code>, from Odin via
 <code>gd.get_node</code> on any node&#39;s tree), persistent across scene changes, running <code>_ready</code> once.</p>
 <p>Write a normal script whose base is a <code>Node</code> (or any <code>Node</code> subclass), give it a
@@ -1809,8 +1838,8 @@ GameManager :: <span class="hljs-keyword">struct</span> {
 }
 
 game_manager_ready :: <span class="hljs-keyword">proc</span>(self: ^GameManager) {
-	<span class="hljs-comment">// Runs ONCE at startup. A good place to register the game&#x27;s project settings +</span>
-	<span class="hljs-comment">// input actions from Odin (see the ergonomic helpers above):</span>
+	<span class="hljs-comment">// Runs once at startup. Register the game&#x27;s project settings and</span>
+	<span class="hljs-comment">// input actions here using the Godot helpers described above:</span>
 	gd.set_setting_int(<span class="hljs-string">&quot;game/lives&quot;</span>, <span class="hljs-number">3</span>)
 	gd.add_action(<span class="hljs-string">&quot;fire&quot;</span>)
 	gd.action_add_key(<span class="hljs-string">&quot;fire&quot;</span>, <span class="hljs-type">i64</span>(gd.Key.Space))
@@ -1827,34 +1856,35 @@ game_manager_get_score :: <span class="hljs-keyword">proc</span>(self: ^GameMana
 }</code></pre></div><p><code>project.godot</code>:</p>
 <div class="code-block"><div class="code-title"><span>Configuration</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-ini"><span class="hljs-section">[autoload]</span>
 
-<span class="hljs-attr">GameManager</span>=<span class="hljs-string">&quot;*res://scripts/game_manager.odin&quot;</span></code></pre></div><p>The leading <code>*</code> is what makes the entry a <strong>singleton node</strong>: Godot instantiates the
-script&#39;s base node (<code>//gd:extends Node</code>), attaches the Odin script, runs <code>_ready</code>, and adds
-it under <code>/root</code> with the autoload&#39;s name. Without the <code>*</code> the path would be loaded as a
-plain resource, not added to the tree. GDScript then reaches it directly:</p>
+<span class="hljs-attr">GameManager</span>=<span class="hljs-string">&quot;*res://scripts/game_manager.odin&quot;</span></code></pre></div><p>Godot instantiates the script&#39;s base node (<code>//gd:extends Node</code>), attaches the
+Odin script, and adds it under <code>/root</code> with the autoload&#39;s name, running
+<code>_ready</code>. The leading <code>*</code> also exposes that name as a GDScript global.
+Without <code>*</code>, the node is still autoloaded but must be accessed through the
+scene tree. With it, GDScript can call the global directly:</p>
 <div class="code-block"><div class="code-title"><span>GDScript</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-gdscript">GameManager.add_score(5)                       # autoload name is a global identifier
 get_node(&quot;/root/GameManager&quot;).call(&quot;add_score&quot;, 5)
 print(GameManager.get_score())</code></pre></div><p><code>@(gd_method)</code> procs are GDScript-callable (the proc name has its <code>&lt;struct_snake&gt;_</code> prefix
-stripped: <code>game_manager_add_score</code> → <code>add_score</code>). The node is the SAME instance for the
+stripped: <code>game_manager_add_score</code> → <code>add_score</code>). The node is the same instance for the
 whole session, so its struct fields are your singleton state.</p>
 <blockquote>
 <p>The base must be a <code>Node</code> subclass: an autoload entry is added to the scene tree, and a
 non-<code>Node</code> base cannot be parented. (A <code>Resource</code>/<code>RefCounted</code> script in <code>[autoload]</code>
 would load but not become a <code>/root</code> node.)</p>
 </blockquote>
-<p><strong>Alternative: <code>Engine.register_singleton</code>.</strong> For a <em>non-node</em> global (e.g. exposing an
-object to GDScript as <code>Engine.get_singleton(&quot;Name&quot;)</code> without putting it in the scene tree),
+<p>For a non-node global, such as exposing an object to GDScript as
+<code>Engine.get_singleton(&quot;Name&quot;)</code> outside the scene tree,
 the binding also has <code>gd.engine_register_singleton(engine, name, obj)</code> /
 <code>gd.engine_get_singleton(engine, name)</code>. The <code>[autoload]</code> node form above is the
-GDScript-parity path (lifecycle + <code>/root/Name</code> + persistence); <code>register_singleton</code> is the
-lower-level escape hatch when you specifically do not want a node.</p>
+form provides lifecycle callbacks, <code>/root/Name</code>, and scene-change persistence.
+Use <code>register_singleton</code> to register an object that does not need a node.</p>
 <p>See <code>tests/autoload/</code> for a full, headless-verified example (a <code>GameManager</code> autoload whose
 <code>_ready</code> registers a project setting + an input action, driven from GDScript).</p>
 <h2 id="editor-tooling">Editor tooling<a class="heading-anchor" href="#editor-tooling" aria-label="Link to this section">#</a></h2>
-<p>Odin scripts can run <strong>in the editor</strong> and extend it. See <code>tests/editortools/</code> for the
+<p>Odin scripts can run in the editor and extend it. See <code>tests/editortools/</code> for the
 headless-verified examples of everything below.</p>
 <h3 id="tool-scripts--gdis_editor"><code>@tool</code> scripts + <code>gd.is_editor()</code><a class="heading-anchor" href="#tool-scripts--gdis_editor" aria-label="Link to this section">#</a></h3>
-<p>A <code>//gd:tool</code> marker makes the engine build a <strong>real instance in the editor</strong> (not a
-placeholder), so the script&#39;s lifecycle (<code>_ready</code>, <code>_process</code>, <code>_enter_tree</code>, …) runs at
+<p>A <code>//gd:tool</code> marker makes the engine instantiate the script in the editor,
+so its lifecycle callbacks (<code>_ready</code>, <code>_process</code>, <code>_enter_tree</code>, …) run at
 edit time too. Branch editor-only logic with the <code>gd.is_editor()</code> helper (it wraps
 <code>Engine.is_editor_hint()</code>):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node</span>
@@ -1881,16 +1911,16 @@ Create Node/Resource dialogs):</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node</span>
 <span class="hljs-comment">//gd:class IconNode</span>
 <span class="hljs-comment">//gd:icon res://icon.svg</span>
-<span class="hljs-keyword">package</span> my_game_scripts</code></pre></div><p>The path threads into both the script&#39;s <code>_get_class_icon_path</code> virtual and the global class
-registry&#39;s <code>icon_path</code> (so <code>ProjectSettings.get_global_class_list()</code> carries it). <em>(The icon
-PIXELS rendering in the dock is a visual editor behavior: the registered path is what these
-hooks provide.)</em></p>
+<span class="hljs-keyword">package</span> my_game_scripts</code></pre></div><p>The path is returned by the script&#39;s <code>_get_class_icon_path</code> virtual and stored
+in the global class registry&#39;s <code>icon_path</code>, visible through
+<code>ProjectSettings.get_global_class_list()</code>. These hooks register the path;
+checking that the icon renders in the dock requires a visual editor check.</p>
 <h3 id="editorplugin">EditorPlugin<a class="heading-anchor" href="#editorplugin" aria-label="Link to this section">#</a></h3>
-<p>A <code>//gd:extends EditorPlugin</code> script (also <code>//gd:tool</code>) is a real editor plugin. Register it
+<p>A <code>//gd:extends EditorPlugin</code> script with <code>//gd:tool</code> can extend the editor. Register it
 with the standard Godot plugin format, a <code>res://addons/&lt;name&gt;/plugin.cfg</code>:</p>
 <div class="code-block"><div class="code-title"><span>Configuration</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-ini"><span class="hljs-section">[plugin]</span>
 <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;My Odin Plugin&quot;</span>
-<span class="hljs-attr">script</span>=<span class="hljs-string">&quot;my_plugin.odin&quot;</span>     <span class="hljs-comment">; relative to the addon dir</span></code></pre></div><p>…and enable it in <code>project.godot</code>:</p>
+<span class="hljs-attr">script</span>=<span class="hljs-string">&quot;my_plugin.odin&quot;</span>     <span class="hljs-comment">; relative to the addon dir</span></code></pre></div><p>Enable it in <code>project.godot</code>:</p>
 <div class="code-block"><div class="code-title"><span>Configuration</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-ini"><span class="hljs-section">[editor_plugins]</span>
 <span class="hljs-attr">enabled</span>=PackedStringArray(<span class="hljs-string">&quot;res://addons/&lt;name&gt;/plugin.cfg&quot;</span>)</code></pre></div><p>When the project opens, Godot instantiates the plugin in the editor and dispatches
 <code>_enter_tree</code> / <code>_exit_tree</code> (which arrive as Node ENTER_TREE / EXIT_TREE notifications, so
@@ -1921,10 +1951,10 @@ double underscore):</p>
 my_inspector__can_handle :: <span class="hljs-keyword">proc</span>(self: ^MyInspector, object: ^gd.Object) -&gt; <span class="hljs-type">bool</span> { <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span> }
 
 <span class="hljs-meta">@(gd_method)</span>
-my_inspector__parse_begin :: <span class="hljs-keyword">proc</span>(self: ^MyInspector, object: ^gd.Object) { <span class="hljs-comment">/* add controls */</span> }</code></pre></div><p>These virtuals <strong>dispatch into Odin</strong> when invoked (verified headless by calling them
-directly). Whether the editor auto-invokes them during a <em>live</em> Inspector rebuild (after
-<code>add_inspector_plugin()</code> and selecting a handled object in the dock) is a UI-driven path
-that is <strong>visual-only</strong> (not asserted headless).</p>
+my_inspector__parse_begin :: <span class="hljs-keyword">proc</span>(self: ^MyInspector, object: ^gd.Object) { <span class="hljs-comment">/* add controls */</span> }</code></pre></div><p>Headless tests call these virtuals directly and verify dispatch into Odin.
+They do not check whether the editor invokes them during a live Inspector
+rebuild after <code>add_inspector_plugin()</code> and selection of a handled object.
+That behavior requires a visual editor check.</p>
 <h3 id="optional-replay-view-descriptors">Optional Replay view descriptors<a class="heading-anchor" href="#optional-replay-view-descriptors" aria-label="Link to this section">#</a></h3>
 <p><code>//gd:replay_view</code> is an optional header declaration for Node2D presentation
 scripts. It generates a typed descriptor over public Replay/Godot helpers, without
@@ -1937,5 +1967,5 @@ handwritten descriptors share the same implementation. See
 <a href="../replay/godot/scene/adapter-bindings.html">adapter bindings</a> for ownership, lifetimes,
 scene validation and the distinct permanent-runner and entity-enemy examples.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow — the dev loop, editor DX, and debugging</span><span aria-hidden="true">→</span></a><a href="kit/conventions.html"><span>Kit API conventions</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/authoring-guide.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-conventions-shared-by-kit-and-replay" class="">API conventions shared by Kit and Replay</a><a href="#single-file-authoring" class="">Single-file authoring</a><a href="#anatomy-of-a-script" class="">Anatomy of a script</a><a href="#reserved-shapes" class="">Reserved shapes</a><a href="#manual-overrides" class="">Manual overrides</a><a href="#generated-names" class="">Generated names</a><a href="#multiplayer-rpcs-gd_rpc" class="">Multiplayer RPCs (@(gd_rpc))</a><a href="#ergonomic-helpers" class="">Ergonomic helpers</a><a href="#supported-odin--variant-types" class="">Supported Odin → Variant types</a><a href="#threads--memory" class="">Threads &amp; memory</a><a href="#building" class="">Building</a><a href="#multiple-scripts-in-one-package" class="">Multiple scripts in one package</a><a href="#custom-resources" class="">Custom resources</a><a href="#global-class-names" class="">Global class names</a><a href="#typed-cross-script-references" class="">Typed cross-script references</a><a href="#autoload-singletons" class="">Autoload singletons</a><a href="#editor-tooling" class="">Editor tooling</a></nav><div class="outline-actions"><a href="../../reference/docs/authoring-guide.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="getting-started.html"><span>The first Odin script</span><span aria-hidden="true">→</span></a><a href="workflow.html"><span>Workflow: builds, editor tools, and debugging</span><span aria-hidden="true">→</span></a><a href="kit/conventions.html"><span>Kit API conventions</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/authoring-guide.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#api-conventions-shared-by-kit-and-replay" class="">API conventions shared by Kit and Replay</a><a href="#single-file-authoring" class="">Single-file authoring</a><a href="#anatomy-of-a-script" class="">Anatomy of a script</a><a href="#reserved-procedure-signatures-and-fields" class="">Reserved procedure signatures and fields</a><a href="#manual-overrides" class="">Manual overrides</a><a href="#generated-names" class="">Generated names</a><a href="#multiplayer-rpcs-gd_rpc" class="">Multiplayer RPCs (@(gd_rpc))</a><a href="#godot-helper-procedures" class="">Godot helper procedures</a><a href="#supported-odin--variant-types" class="">Supported Odin → Variant types</a><a href="#threads--memory" class="">Threads &amp; memory</a><a href="#building" class="">Building</a><a href="#multiple-scripts-in-one-package" class="">Multiple scripts in one package</a><a href="#custom-resources" class="">Custom resources</a><a href="#global-class-names" class="">Global class names</a><a href="#typed-cross-script-references" class="">Typed cross-script references</a><a href="#autoload-singletons" class="">Autoload singletons</a><a href="#editor-tooling" class="">Editor tooling</a></nav><div class="outline-actions"><a href="../../reference/docs/authoring-guide.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

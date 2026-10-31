@@ -28,8 +28,9 @@ RSY_SLOW_BACKUP=1 REPLAY_MIGRATION_PHASE=planned nix develop --command bash exam
 The migration fixture deliberately adjusts initial positions, target health and
 ability duration/speed to keep observable combat state active. Slow mode reduces
 final-transfer bandwidth after the ordinary backup is prepared and requires the
-source to stay frozen for longer than one lease duration. These are acceptance scenarios; complete game recovery coverage,
-deployment and full original-act parity remain work.
+source to stay frozen for longer than one lease duration. These acceptance
+scenarios do not establish complete game recovery coverage, deployment, or
+full original-act parity.
 
 ## Lobby recovery
 
@@ -53,7 +54,7 @@ See [recorded recovery evidence](../../docs/replay/results/scrapyard-recovery-20
 Content `0x5253435241503049` records the last observed authority epoch in `World`.
 Its versioned `Model.authority` policy applies the original `succ_fixups` rule
 on the first committed tick after a takeover: director rest and every existing
-mob's attack/reinforcement deadline become **restored tick + 150**. An Over-stage
+mob's attack/reinforcement deadline become restored tick + 150. An Over-stage
 world also receives a fresh 150-tick dwell. Initial startup does not apply grace;
 repeated ticks in the same epoch do not extend it. Dedicated authorities work the
 same way even though both have playable seat zero.

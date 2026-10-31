@@ -4,26 +4,33 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Scrapyard combat contract</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/combat.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>The port loads all seven GunDef resources, their projectile subresources, and six
-MobDef resources, eight status resources and eight ordered combo resources and six ability resources through Godot. It validates numeric bounds before narrowing them,
+<article class="reading-body "><p>This page records the combat-rule comparison and its measured test scope.
+Resource counts and world sizes below describe that revision. Use
+<a href="run.html">run rules</a>, <a href="profiles.html">profiles</a>, and <a href="saves.html">saves</a> for current
+progression, persistence, and saved-content guidance.</p>
+<p>The compared implementation loads seven GunDef resources and their projectile
+subresources, six MobDef resources, eight status resources, eight ordered combo
+resources, and six ability resources through Godot. It validates numeric
+bounds before narrowing them,
 then copies names and numbers into a value-owned catalog. Resource references are
 released at the boundary. Sorted filenames retain the original last-file override
 rule. IDs must be dense within 16 guns/eight mob definitions; gaps fail validation.</p>
 <p>The authority&#39;s catalog lives in the complete world and therefore travels in
 snapshots, late-join baselines and authority checkpoints. <code>tools/stock.py</code> generates
 the matching native test catalog; <code>--check</code> detects stale generated data. The
-Godot gates require equality between the runtime resource catalog and that stock
+Godot tests require equality between the runtime resource catalog and that stock
 catalog. This is gameplay-data transfer; arbitrary mod assets/abilities and full
 mod compatibility remain separate work.</p>
-<p>All seven stock irons and six stock enemy types are enabled. Interactive play uses the <a href="run.html">run loop</a>. With <code>RSY_RUN=0</code>, the default isolated
+<p>All seven stock weapons and six stock enemy types are enabled. Interactive play uses the <a href="run.html">run loop</a>. With <code>RSY_RUN=0</code>, the default isolated
 yard starts eight melee enemies. <code>RSY_ENCOUNTER=mixed</code> cycles scuttlers, hulks, spitters
 and poppers; <code>RSY_ENCOUNTER=boss RSY_MOBS=1</code> starts a Titan. The enemy test harness
 uses a 36-HP Titan override; ordinary play retains the authored 600 HP unless
 <code>RSY_BOSS_HP</code> is set. <code>RSY_ENCOUNTER=barrels</code> uses an authored line of two barrels
 and a hulk for chain testing. <code>RSY_MOBS=0</code> retains the empty arena scenario.
-Player abilities now use reliable predicted actions; <a href="abilities.html">abilities.md</a>
-describes their delivery. Waves/floors, wipe/revive and shops now run; durable profile/bank persistence
-remains required work.</p>
+Player abilities use reliable predicted actions; <a href="abilities.html">abilities.md</a>
+describes their delivery. Waves/floors, wipe/revive, and shops are included.
+These combat checks do not establish durable profile/bank persistence; see
+<a href="profiles.html">profiles</a> for that separate lifecycle.</p>
 <p>Every gun mechanism, next-pull tick, shot, enemy action/reap timer, damage/kill
 counter and scrap pile belongs to the world. Stable pool generations govern entity
 lifetime. A projectile sweeps against current living targets and cover before
@@ -77,12 +84,12 @@ scaling retains their original exceptions. Ability wounds use the caster’s dea
 lines and fire 60-tick projectiles on a 150-tick cadence. Poppers burst at close
 range, hurt the crew and leave no loot when they self-detonate. Titans preserve
 wind-up duration, cooldown/add clocks, enrage and maximum health; a pair of adds is
-reserved together and retries at capacity. Only members present at the beginning
-of the enemy pass think that tick. Boss death cancels its wind-up, produces five
+reserved together and retries at capacity. Only members present at the beginning of the enemy pass run AI during that
+tick. Boss death cancels its wind-up, produces five
 scrap piles and awards three in-world cores to each connected runner. Bank/profile
 persistence and complete floor progression are not established by that payout.</p>
 <p>Barrels are stationary, shootable props excluded from crowd separation. Death
-chains damage/status payloads through the same rulebook, with no prop kill/loot
+chains damage/status payloads through the same reaction rules, with no prop kill/loot
 award. Corpses remain allocated until their saved reap tick, so recursion cannot
 invalidate a borrowed body pointer. Status washes, spit discs, barrel art and the
 Titan&#39;s wind-up ring are driven from the observed value state. Enemy-owned visuals
@@ -95,7 +102,7 @@ owner-local wall pacer and owner-streamed movement have different timing/trust
 semantics. Replay launches from the tick&#39;s simulated muzzle, without a claimed
 owner position or muzzle leash. Jam salt uses seat/floor, versus registry ID/floor.</li>
 <li>Enemy move speed, wall-follow, bite range/cadence, soft separation, clamped damage,
-payout and hoover formulas follow the selected original rules. Stable slot/seat
+payout and pickup-attraction formulas follow the selected original rules. Stable slot/seat
 ordering replaces map iteration. Spawn flavor derives from seed/floor instead of
 host wall time; no exact spawn trace equivalence is claimed.</li>
 <li>Cover blocks at exact first contact, including segment endpoints. The original
@@ -104,18 +111,17 @@ shortens flight TTL to <code>integer(contact + 1)</code>; crossing-tick behavior
 view stamps. Beam judgment geometry matches the original, while exact cover clipping
 retains the contact-boundary difference above. A normal network test proves current
 application of historical client queries, not identical timing to the old pacer.</li>
-<li>Grenade motion/beam geometry match isolated original test corpora. Grenades now
-advance in saved ticks rather than the original per-render-frame host/view copies.
+<li>Grenade motion/beam geometry match isolated original test corpora. Replay grenades advance in saved ticks rather than the original per-render-frame host/view copies.
 Beam/boom visuals last nine/17 ticks instead of 0.14/0.28 wall-clock seconds.</li>
 <li>Corpses reap after 42 saved ticks. The original schedules a presentation callback
 after 0.7 seconds. Full attack animations, audio and visual/feel parity remain work.</li>
 </ul>
 <p>Native checks cover the content codec, capacity/conservation, cover occlusion,
 corpse recensus, rollback of death/payout/pickup, tiny aim values and tick exhaustion,
-and complete checkpoint continuation during active combat. The expanded world
-measures 52,380 canonical bytes and 18,397 scalar fields; this is not a bandwidth,
+and complete checkpoint continuation during active combat. The recorded expanded world measured 52,380 canonical bytes and 18,397 scalar
+fields; this is not a bandwidth,
 CPU or scaling benchmark. Real-process evidence is recorded separately in the
 Replay progress/results ledger.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="run.html"><span>The run loop</span><span aria-hidden="true">→</span></a><a href="abilities.html"><span>Player abilities</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/combat.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="run.html"><span>Waves, floors, and run progression</span><span aria-hidden="true">→</span></a><a href="profiles.html"><span>Local co-op profiles</span><span aria-hidden="true">→</span></a><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/combat.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/combat.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

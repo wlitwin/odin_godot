@@ -1,7 +1,8 @@
 # Shared turret ability
 
-Replay Scrapyard only. Deploy a stationary, shared turret with authored ammunition
-and cadence. One operator at a time; T mounts/releases a nearby turret, normal aim
+This plan scoped a stationary, shared turret with authored ammunition and cadence
+to Replay Scrapyard. Completion is recorded in the
+[implementation receipt](turret-progress.md). One operator at a time; T mounts/releases a nearby turret, normal aim
 and fire operate it. Empty turrets despawn in the same deterministic step and their
 operator is immediately dismounted. Death, disconnect, generation/warp changes and
 floor/run cleanup release occupancy. Another player cannot forcibly steal a seat.
@@ -20,5 +21,5 @@ Implementation gates:
    forced dismount, stale handles, blocked ordinary actions and pool saturation.
    Late correction and checkpoint takeover while occupied; native/WASM equality.
 5. Real local peers exercising different operators and occupied authority recovery,
-   relevant model/scene/old-save regressions, documentation and honest assessment
+   relevant model/scene/old-save regressions, documentation and assessment
    of any framework gaps exposed. No full-game parity campaign.

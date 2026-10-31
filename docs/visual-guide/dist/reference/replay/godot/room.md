@@ -1,11 +1,12 @@
 # Coordinator-driven game rooms
 
-Use `Room(State, Control, Action, Event, Seats)` when a game needs
-coordinator-approved authority and host migration. It combines an authenticated
-coordinator client, a time-limited authority lease, independently owned prepared
-checkpoints, and the gameplay `Session`. It runs
-initial hosting/joining, periodic trusted backups, planned handoff, abrupt takeover,
-old-owner rejoin, and surviving-client redirection.
+Use `Room(State, Control, Action, Event, Seats)` when a coordinator must approve
+the gameplay authority and transfers to another host. Room owns the coordinator
+client, a time-limited authority lease, prepared checkpoint storage, and the
+gameplay `Session`. It drives initial hosting and joining, periodic trusted
+backups, planned handoff, abrupt takeover, old-owner rejoin, and redirection of
+surviving clients. When authority permission becomes unusable, gameplay is
+fenced: it stops while control processing seeks valid authorization.
 
 [Dedicated infrastructure rooms](dedicated.md) keep authorities and standbys
 avatarless through bootstrap, failover and return; authenticated member identity
@@ -16,9 +17,9 @@ use ENet or WebSocket (`control_backend = .Websocket`, with a full URL in
 `coordinator`). For RTC, set `session.backend = .Rtc` and `session.rtc.url` to the
 trusted signaling provider. Room derives the authority-specific room code from
 the verified view and supplies its challenged authorization callback.
-Member IDs/keys/game tokens remain provisioned. Browser Room instances use the
-[paired clock](../authority/paired_clock.md) and Godot cryptographic nonces. It obtains fresh process
-incarnations through the [registration handshake](../authority/registration.md).
+Member IDs/keys/game tokens remain provisioned. Browser Room instances use the [paired clock](../authority/paired_clock.md)
+and Godot cryptographic nonces. Each new process obtains an incarnation through
+the [registration handshake](../authority/registration.md).
 
 ```odin
 options := replaygd.Room_Options{
@@ -49,9 +50,10 @@ action, and `room_handoff` requests a planned transfer. Dispose with `room_close
 publication runs in `room_frame` alongside the existing lease and migration work.
 Trusted Party members can also [resume published progress](room_restore.md) from a
 fresh process when no live authority remains, using a new fenced grant.
-Runtime owners remain at stable addresses; models/immutable asset descriptors must remain
-valid across role changes. A selected successor receives complete authority data.
-The room does not choose arbitrary peers or grant hosting permission itself.
+Keep runtime owners at stable addresses and keep models and immutable asset
+descriptors valid across role changes. A selected successor receives complete
+authority data, so it must have explicit hosting permission. The coordinator
+controls that permission; Room does not grant it to arbitrary peers.
 
 ## Transition behavior
 
@@ -79,12 +81,12 @@ Presentation resets close retained old-epoch effects with Cancel changes, includ
 confirmed continuous effects. They do not replay the new checkpoint's historical
 cosmetics. Applications should treat cancellation of an already-finished one-shot
 as harmless and derive ongoing world presentation from the current frame. Counters
-or action UI keyed by sequence must include epoch; Cavecrawl now does this. These
+or action UI keyed by sequence must also include epoch, as Cavecrawl does. These
 cosmetic resets do not implement an external persistent-effect outbox.
 
-Planned handoff waits for local queued commands to settle, then freezes gameplay
-with a phase-aware permit while retaining control-plane renewal of the owner's
-lease. The frozen owner drains unadmitted gameplay traffic so a full primary queue
+Planned handoff waits for local queued commands to settle, then disables
+gameplay through a phase-specific permit while continuing to renew the owner's
+lease through the control connection. The frozen owner drains unadmitted gameplay traffic so a full primary queue
 cannot block checkpoint acknowledgments on the shared transport. Neither draining
 nor renewal advances the world or admits new commands. Once the successor has
 prepared the exact acknowledged final point, the owner retires its lease and
@@ -96,7 +98,8 @@ commands are explicitly retired by this profile's restore policy; their IDs and
 verdicts remain accounted for. Abrupt takeover uses the latest owned, coordinator-
 accepted checkpoint after lease expiry.
 
-A transition checks its lease after Room's initial preflight. If a valid clock
+Before replacing a runtime, Room checks its lease again after the initial
+transition checks. If a valid clock
 reaches the deadline between those checks, Room keeps the old runtime/prepared
 checkpoint, marks gameplay fenced and waits for fresh authenticated control
 progress. It does not extend that deadline, reset the lease clock or count the
@@ -123,23 +126,23 @@ a failed claim does not make an old archive eligible or establish authority.
 
 `examples/replay_quickdraw/early_claim_run.sh` injects an early signed claim while
 the owner is live, requires a Busy response followed by a newer prepared point,
-then kills the owner after tick 600 and checks continued combat. The controlled
-failure before the fix froze preparation at sequence 2 while transfer advanced to
-sequence 72. Both normal and gameplay-fault runs pass after the change.
+then kills the owner after tick 600 and checks continued combat. The recorded regression failure froze preparation at sequence 2 while transfer
+advanced to sequence 72. The corrected implementation passed both normal and
+gameplay-fault runs.
 
 `Room.recovery` reports source/destination epochs, the actual approved checkpoint
 tick, previous locally confirmed tick, known lost ticks, archive bytes, and observed
 protocol interruption. `install_us` measures elapsed wall time of the successful
 authority-runtime replacement call, including archive decode and runtime setup;
 it is not CPU time or total disruption. Takeover can reuse the receiver's existing
-checkpoint schema cache before releasing the old Session. The checkpoint tick is distinct from the later Welcome tick
-when the guest finally joins. `known_lost_ticks` cannot describe work no participant
+checkpoint schema cache before releasing the old Session. The checkpoint tick is distinct from the later Welcome tick when the guest
+finally joins. `known_lost_ticks` cannot describe work no participant
 reported; it is not proof that unobserved work was preserved. Interruption is measured
 from the local recognition of fencing/transition until the replacement is usable,
 not from an unknowable remote crash time or a physical input-to-display measurement.
 
 Cavecrawl displays reconnect/host-change feedback and notes known rollback. Its
-four-process gates run coordinator, initial host, trusted successor, and a third
+four-process tests run coordinator, initial host, trusted successor, and a third
 guest. The guest loots and opens a door, stays alive through migration, retains its
 bag, and performs a newly acknowledged action in epoch 2. Planned mode additionally
 checks that the old host rejoins; crash mode kills it.
@@ -155,9 +158,9 @@ receipts included checkpoint 112 / zero known lost ticks / 436 ms local interrup
 for planned transfer, and checkpoint 101 / six known lost ticks / 558 ms for crash
 recovery. These are scenario receipts, not latency percentiles or a full comparison.
 The coordinator explicitly reported Planned versus Abrupt recovery in the matching
-gates. All original games remain separate.
+tests. These results concern the Replay examples described here.
 
-Quickdraw now exercises the same driver during active hitscan/lob combat:
+Quickdraw exercises the same driver during active hitscan/lob combat:
 
 ```sh
 nix develop --command bash examples/replay_quickdraw/migration_run.sh
@@ -173,7 +176,9 @@ expiry/discovery time is visible alongside Room's narrower interruption metric.
 The test's two hosting members are explicitly trusted; this does not authorize
 passing competitive authority secrets to an arbitrary player.
 
-## Remaining M5 work
+<a id="remaining-m5-work"></a>
+
+## Additional coverage and remaining work
 
 Replay Slopball additionally exercises planned and crash migration while an
 owner-streamed RigidBody2D is moving. The successor checks the exact approved world,
@@ -192,8 +197,8 @@ it does not replay or transfer Godot solver contact caches.
   [Dedicated-server policy](dedicated.md) has its own integration gates.
 - External outbox/idempotency integration where games need persistent services.
 
-These gates cover the scenarios described above; the remaining migration and
-roadmap cases need separate acceptance.
+The tests cover the scenarios described above. Other migration and roadmap
+cases require separate acceptance.
 
 ## External checkpoint dependencies
 

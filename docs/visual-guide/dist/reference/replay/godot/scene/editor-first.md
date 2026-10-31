@@ -10,12 +10,14 @@ observed remote presentation, typed scene composition and recovery. Other networ
 policies still use their appropriate examples; Scrapyard is not a universal game
 architecture or a claim of production certification.
 
-## Two compositions, one explicit boundary
+<a id="two-compositions-one-explicit-boundary"></a>
+
+## Gameplay values and Godot presentation
 
 Compose gameplay from owned state and pure procedures: movement, health, gun
-mechanisms, inventory, cooldowns and AI. A frame stores the complete `World` state at one tick;
-it can contain many typed components and modules. Godot nodes, Resources, device
-state, animation clocks and I/O remain outside it. `examples/replay_recipes/components.odin`
+mechanisms, inventory, cooldowns and AI. A frame stores the complete `World`
+state at one tick, including its typed components and modules. Godot nodes,
+Resources, device state, animation clocks and I/O remain outside it. `examples/replay_recipes/components.odin`
 is a compile-checked small composition; Scrapyard's Player/Gun_State/Cooldown and
 separate game/brains/abilities/effects modules show the larger version.
 
@@ -63,9 +65,9 @@ ok := scenegd.view_pool_load(&views, parent, "res://enemy.tscn", capacity,
 error := scenegd.view_pool_present(&views, scope, items)
 ```
 
-`present` receives a value, not a World pointer. It may delegate to typed child
-view scripts. `validate` returns a `definitions.Report` describing missing or
-invalid scene components/assets. `retired` is
+`present` receives a detached display value and may pass it to typed child view
+scripts. It has no pointer through which to mutate World. `validate` returns a
+`definitions.Report` describing missing or invalid scene components/assets. `retired` is
 optional and can stop local processing or discard pending visual notices before
 queued node deletion; it must also tolerate a partially initialized script after
 failed validation. Godot owns the script instance; the rig borrows its pointer and
@@ -81,24 +83,30 @@ skips `present`. Do not additionally call the framework frame hook for the same
 animation clock. Deliberately batched renderers may use the lower-level Rig/frame
 API instead. Neither mechanism runs simulation during replay.
 
-## Choose identities and property ownership deliberately
+<a id="choose-identities-and-property-ownership-deliberately"></a>
+
+## Scene identity and property ownership
 
 Entity views use full generation handles and explicit epoch/reset scopes. Missing
 entities retire; replacement generations get new script lifetimes. The adapter
 recognizes game boundaries such as a new floor/run or an observation reset.
-The game-specific scope policy is visible code, not an inferred authority rule.
+The game supplies the scope policy explicitly; changing a display scope does
+not change who has authority over gameplay.
 
-A fixed-seat roster/avatar or permanent HUD may instead keep an authored scene for
-its UI lifetime. Scrapyard's four runner scenes represent seats; their display
-includes body generation/warp/epoch so local transient cues reset on body rebind.
-Their node identity survives a respawn. Enemy scenes represent entity lifetimes
-and are replaced. Both are intentional identities with explicit reset behavior.
+A fixed-seat avatar, roster entry, or permanent HUD can keep an authored scene
+for its UI lifetime. Scrapyard calls its playable characters runners; these are
+different from Replay's runtime runner, which advances simulation. Its four
+character scenes represent seats and keep their node identities across respawns.
+Their display values include body generation, warp, and epoch so transient cues
+reset when a new body is bound. Enemy scenes instead follow entity lifetimes
+and are replaced when that identity ends.
 
 Give each property one writer. For entity pools, the bridge owns the root transform;
-child view scripts animate authored children. For permanent runner scenes, their
-view script applies the selected/smoothed root pose. Capture authored child origins
-and scales in ready, then apply relative animation. A child offset edited in the
-scene should not be overwritten by a magic position in a central render loop.
+child view scripts animate authored children. For permanent character scenes,
+the view script applies the selected and smoothed root pose. Capture authored
+child origins and scales in ready, then apply relative animation. A central
+render loop should preserve those offsets instead of replacing them with fixed
+positions.
 
 A view can publish a local visual notice for a presentation service. Scrapyard's
 enemy view reports observed health loss to its adapter, which routes particles and
@@ -115,10 +123,11 @@ or explicitly retain every external definition version needed by history.
 
 Visual-only Resources can remain local scene assets. Scrapyard's enemy appearance
 Resources hold atlas frames, textures, tint and presentation speed; gameplay MobDef
-Resources hold health, speed, radius and combat data. Editing an appearance does
-not secretly alter collision or damage. Root visual scale is not a physics bake.
-The library does not automatically convert arbitrary Godot physics scenes into a
-deterministic collision model.
+Resources hold health, speed, radius and combat data. Appearance edits change
+presentation only. Scaling a visual root does not generate gameplay collision
+geometry; the game must implement that geometry in its replayable model.
+The library does not convert arbitrary Godot physics scenes into deterministic
+collision models.
 
 Adding a gameplay component requires its owned state, step/action functions,
 validation and any authoring-to-value mapping. Adding an arbitrary gameplay script
@@ -130,8 +139,8 @@ need the project's compatibility/version policy; adding a decorative child does 
 Permanent actors, equipment and HUD components benefit from authored scenes and
 local scripts. Generated arenas, dense projectile batches, trails and procedural
 geometry can remain specialized renderers. Keep their lifetime and sampling policy
-explicit and measure them before changing allocation strategy. A component need
-not be a separate script for every Sprite; encapsulate a coherent visual behavior.
+explicit and measure them before changing allocation strategy. Group related
+visual behavior in a component rather than requiring a script for each Sprite.
 
 Pure UI display, camera following and animation can use display state. Permissions,
 hit judgment, ownership transfer and action acceptance use the appropriate authority

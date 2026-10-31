@@ -47,8 +47,8 @@ spent cores or replace earned state; reconnect/migration keeps the existing clai
 state. This local file is editable by its owner and is not a competitive economy
 service or an anti-cheat mechanism.
 
-Only authority observations are saved—never speculative purchases or predicted
-rewards. The owner writes a staged file, flushes/closes it, then renames it over the
+The profile saves only authority observations. Speculative purchases and
+predicted rewards are not persisted. The owner writes a staged file, flushes/closes it, then renames it over the
 previous record. The previous file and in-memory saved record remain unchanged if
 writing fails; the game reports that failure visibly. This is a process-crash
 boundary, not a portable power-loss/fsync guarantee. After recovery, the installed

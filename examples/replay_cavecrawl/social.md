@@ -8,8 +8,7 @@ a player row. Departed player rows are hidden.
 
 The game initializes the optional shared `telemetry.Diagnostics` runtime, which
 collects local diagnostic measurements, and adds its application lane when opening
-Solo/Session/Room. It updates diagnostics after
-the outer session pump and reads the result only for presentation. Measurements
+Solo/Session/Room. It updates diagnostics after the outer session pump and reads the result only for presentation. Measurements
 are not world state, saved progress or host-migration data. Fencing and authority/
 connection changes invalidate them; the new authority measures again. Leaving a
 session clears readback before a new connection can use the same UI.
@@ -25,8 +24,7 @@ Enter in the name field submits the chosen name through the existing name-profil
 and lobby Profile action path. This works while the lobby/menu is open during
 play. Invalid names preserve the previous choice and keep the field editing. Typing
 inside the name field captures social/gameplay shortcuts, including F. A valid
-submission releases field focus
-and consumes the Enter edge so it does not also trigger chat/gameplay. It introduces
+submission releases field focus and consumes the Enter edge so it does not also trigger chat/gameplay. It introduces
 no new simulation command, content revision or archive conversion.
 
 The [native and Chrome gate](../../tests/replay_cave_social/README.md) covers measured

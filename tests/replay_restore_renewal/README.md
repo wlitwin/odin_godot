@@ -19,8 +19,8 @@ Coverage:
 - The native checkpoint fixture publishes/downloads/restores actual Cave,
   Speedball and Scrapyard models after service restart. Its delayed grant is
   expired, its renewal is live, and the saved tick-1 world advances to tick 11
-  in epoch 2. The low-level fixture now follows Room's renewal-before-install
-  protocol instead of consuming the expensive Restore reply directly.
+  in epoch 2. The low-level fixture renews the permit before installation,
+  matching Room's protocol.
 - An isolated Claimball build injects backpressure only on the Restore request.
   All other control/transfer traffic uses the underlying transport unchanged.
   Full native and browser party tests kill all game processes and restart the

@@ -6,10 +6,10 @@
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#context-carried-by-a-reliable-action">Context carried by a reliable action</a></nav></details>
 <article class="reading-body "><p>Use owner streams when an authenticated participant produces observations, such
 as a Godot solver pose, that the authority accepts into replayable state.
-<code>State(Value)</code> stores entity ownership, current value, sample frontiers and
-pending handoff in ordinary replayable world state. <code>Sample(Value)</code> is an external observation;
-the library never invokes a physics solver during replay. <code>Rules(Value)</code> supplies
-immutable validation policy outside the saved state.</p>
+<code>State(Value)</code> stores entity ownership, its current value, accepted-sample
+frontiers, and pending handoff in replayable world state. <code>Sample(Value)</code> carries
+an external observation; replay applies that value without invoking a physics
+solver. <code>Rules(Value)</code> supplies immutable validation policy outside saved state.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">owned.init(&amp;body, object_key, epoch, tick, initial_owner, initial_pose, rules)
 owned.offer(&amp;body, next_owner, tick, timeout_ticks)
 result := owned.accept(&amp;body, authenticated_sender, sample, tick, rules)
@@ -21,10 +21,11 @@ do not mutate state, changed values at the same sequence conflict, and older sco
 sequences or decreasing producer ticks are rejected.</p>
 <p>An offer reserves a new revision and a complete preparation baseline. The old owner
 remains accepted until the first valid sample for the proposed revision commits at
-an authority tick. Cancel/expiry burn the reserved revision. <code>cut</code> explicitly changes
-the complete value/owner and advances its discontinuity marker; <code>bind_epoch</code> preserves
-value and owner while invalidating prior scopes and pending offers. Overflow never
-wraps a revision. These primitives do not elect/fence a legitimate session authority.</p>
+an authority tick. Cancellation or expiry permanently retires the reserved
+revision. <code>cut</code> changes the complete value/owner and advances its discontinuity
+marker. <code>bind_epoch</code> preserves value and owner while invalidating prior scopes
+and pending offers. Revision overflow is rejected without wrapping. The session
+must establish legitimate authority and fencing separately from these primitives.</p>
 <p><code>valid</code> checks structural state and value constraints. <code>sample_valid</code> additionally
 accepts a canonical zero sample as an empty upstream control slot. Values containing
 references are rejected. <code>Pose2</code> and <code>Pose3</code> include position, rotation, linear and
@@ -35,8 +36,9 @@ may impose additional game constraints; it cannot prove an untrusted solver was 
 authority-observed state, local identity, live epoch and connection eligibility.
 It reports reseeds separately from cuts. Preparing → Owner retains the same revision
 and local solver; a fresh producer rebases sequence/tick counters from accepted state.
-<code>capture</code> cannot publish from an observer. Producer ticks order that producer&#39;s
-lineage; <code>accepted_at</code> is the authority&#39;s history timestamp.</p>
+<code>capture</code> cannot publish from an observer. Producer ticks order observations
+within that producer&#39;s stream; <code>accepted_at</code> records the authority tick at which
+an observation was accepted.</p>
 <p>The Godot <a href="../godot/scene/body2.html">Body2</a> and <a href="../godot/scene/body3.html">Body3</a> adapters supply
 actual rigid/character handling.
 The <a href="../../docs/replay/owner-streams.html">profile design</a> and separate
@@ -60,5 +62,5 @@ history timestamp and does not certify an honest engine result.</p>
 <p>Owner Cavecrawl uses this for original-style issued-position interactions and a
 64-pixel throw-origin leash, while preserving current replicated avatar positions.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/scene/body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="../godot/scene/body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/owner-streams.html"><span>Cooperative body ownership</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/owned/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/scene/body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="../godot/scene/body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../docs/replay/owner-streams.html"><span>Cooperative body ownership</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/owned/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#context-carried-by-a-reliable-action" class="">Context carried by a reliable action</a></nav><div class="outline-actions"><a href="../../../reference/replay/owned/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

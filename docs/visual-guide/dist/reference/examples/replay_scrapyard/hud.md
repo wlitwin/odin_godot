@@ -7,7 +7,7 @@ counter. The scene owns layout and node lifetime; `scripts/hud.odin` supplies va
 
 The game's adapter passes the predicted local player and tick plus the confirmed
 world into the HUD each frame. Health, ammunition, ability cooldowns and dash
-readiness therefore follow the same local state as the runner. Boss health and
+readiness therefore follow the predicted player state used for local movement. Boss health and
 downed-teammate eligibility use confirmed state; the local revive hold displays
 its progress. A spectator sees the boss bar without personal health/ammo panels.
 The HUD retains neither a world nor a Session and makes no gameplay decisions.
@@ -40,8 +40,8 @@ and descent. Existing workbench and shop gates remain runnable.
 
 See [evidence](../../docs/replay/results/scrapyard-hud-2026-09-07/README.md).
 Native captures use Dummy audio because the local CoreAudio issue remains open.
-[Run transitions](transitions.md) are now implemented. Browser interaction,
+[Run transitions](transitions.md) are implemented. Browser interaction,
 additional platforms, listening/feel comparisons and
-broader UI parity remain work. The [downed-player camera](camera.md) is now
-implemented and tested separately. The full roadmap is not completed by this HUD
-slice.
+broader UI parity remain work. The [downed-player camera](camera.md) has separate
+implementation and tests. This HUD evidence does not establish completion of
+the full roadmap.

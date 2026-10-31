@@ -6,8 +6,8 @@ admission hub persists credentials; its authority coordinator grants and checks
 time-bounded hosting leases. It supports one game content ID
 and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
 browser clients use RTC. The service stores and transfers durable checkpoints
-for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball and Slopball3D models. It does not run gameplay;
-checkpoint download does not grant authority or automatically resume a game.
+for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball,
+and Slopball3D models. It does not run gameplay; checkpoint download does not grant authority or automatically resume a game.
 
 The bundled SQLite service currently runs on macOS/Linux. Both frameworks and all
 original games remain separate. This is an experimental deployment example, not
@@ -98,8 +98,8 @@ selects a different compatibility contract. Current compiled models are:
 Each admitted room receives one bounded checkpoint endpoint. Unknown-room traffic
 does not create endpoints, load storage or restart coordinators. Metadata and
 checkpoint bytes commit atomically with publication and a compare-and-swap
-(CAS) against the full coordinator Record. A final authorization guard rejects a lease that expires during validation or
-storage work. A normal player cannot read authority-only checkpoints; reads require
+(CAS) against the full coordinator Record. A final authorization guard rejects
+a lease that expires during validation or storage work. A normal player cannot read authority-only checkpoints; reads require
 trusted hosting permission, and dedicated rooms additionally require infrastructure.
 
 Use the [checkpoint client API](../../replay/provision/checkpoint/README.md) on the
@@ -114,16 +114,15 @@ and its declared external asset bytes. Scrapyard's current and executable pendin
 spray dependencies use a [complete atomic package](../../replay/provision/checkpoint/assets.md),
 validated by the service and installed before restoration. Personal profiles remain
 separate. [Room/Party](../../replay/godot/room_save.md) handles manual/automatic
-publication and Cavecrawl exposes its save status; other games still need UI and
-asset preparation, and
-all-members-gone gameplay needs the complete Room/Party restore flow. The service
-now supports an explicit [published restore grant](../../replay/provision/checkpoint/restore.md):
+publication; game integrations must supply UI and asset preparation.
+Recovery after all members leave requires the complete Room/Party restore flow.
+The service supports an explicit [published restore grant](../../replay/provision/checkpoint/restore.md):
 expired-owner registration remains lease/quarantine fenced, then a separate CAS
 authorizes an exact saved publication under a newer epoch. Native model fixtures
-exercise this. Room/Party now drives it through Cavecrawl's native/browser rejoin
-menu, with callback-gated asset preparation. Scrapyard now also passes native/browser
+exercise this. Room/Party drives it through Cavecrawl's native/browser rejoin
+menu, with callback-gated asset preparation. Scrapyard also passes native/browser
 restoration after deleting its local spray copy. Broader asset profiles and game
-acceptance remain open. Slopball now has native WSS and browser RTC acceptance
+acceptance remain open. Slopball has native WSS and browser RTC acceptance
 for restoring its published owner-streamed world and first actual solver momentum
 after all game processes and the service stop; see [its restore flow](../replay_slopball/online.md#reopening-a-saved-party).
 Slopball3D also has native/browser acceptance for quaternion and angular-momentum
@@ -156,8 +155,8 @@ handoff, loot conservation and fresh-process rejoin. Browser acceptance includes
 two simultaneous isolated rooms. Native uses verified fixture TLS; browser uses
 explicit loopback WS and real RTC. See [recorded evidence](../../docs/replay/results/cave-online-menu-2026-09-07/README.md).
 
-The checkpoint gate uses the actual standalone service and each of the three game
-models over verified TLS. It publishes and downloads a tick-1 checkpoint, kills
+The original checkpoint gate used the standalone service and three game models
+over verified TLS. The fixture publishes and downloads a tick-1 checkpoint, kills
 the service, reopens the same database, and verifies the identical archive from a
 fresh trusted incarnation 2 with zero authority lease. It also rejects mismatched
 deployment models before database creation. This is native seeded-state persistence

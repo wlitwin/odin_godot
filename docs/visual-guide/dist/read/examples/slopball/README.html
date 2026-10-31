@@ -3,53 +3,53 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>slopball — co-op physics soccer with Kit</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/slopball/README.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-model">The model</a><a href="#run-it">Run it</a><a href="#the-feel-ledger">The feel ledger</a><a href="#automated-tests">Automated tests</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#ownership-and-scoring">Ownership and scoring</a><a href="#run-it">Run it</a><a href="#solver-and-presentation-timing">Solver and presentation timing</a><a href="#automated-tests">Automated tests</a></nav></details>
 <article class="reading-body "><p>Use this Kit example to replicate Godot physics bodies: the ball uses
 <code>RigidBody2D</code> and the players use <code>CharacterBody2D</code>. <code>play.Puppet</code> connects the
 ball&#39;s solver state to Kit&#39;s owner stream. The entity owner—the player permitted
 to write its owner-controlled fields—simulates the ball and sends its pose and
 velocity to the other peers.</p>
-<h2 id="the-model">The model<a class="heading-anchor" href="#the-model" aria-label="Link to this section">#</a></h2>
-<ul>
-<li><strong>Your kicker is yours.</strong> Each peer runs <code>move_and_slide</code> for its OWN CharacterBody2D
-and owner-streams the resulting pose; every other screen glides the body to the stream.
-Remote kickers stay solid (frozen kinematic to the solver), so crowds feel like crowds.</li>
-<li><strong>One peer simulates the ball.</strong> <code>play.Puppet</code> wraps the RigidBody2D: the entity&#39;s
-owner runs the solver and streams pose + velocity; everyone else freezes the body and
-follows. The HOST hands the seat to the <strong>last toucher</strong> by plain proximity arbitration
-(<code>host.odin</code>) — granted a step <em>before</em> contact, so your kicks resolve on your own
-solver with no round trip. The handoff carries momentum.</li>
-<li><strong>Goals are host truth.</strong> The host scores off the <em>streamed</em> pose and bumps plain
-<code>gd:&quot;replicate&quot;</code> fields on the ball entity — host-authoritative deltas and a client&#39;s
-owner stream sharing one entity is exactly what the field tags mean.</li>
-</ul>
+<p><span id="the-model"></span></p>
+<h2 id="ownership-and-scoring">Ownership and scoring<a class="heading-anchor" href="#ownership-and-scoring" aria-label="Link to this section">#</a></h2>
+<p>Each peer runs <code>move_and_slide</code> for its own CharacterBody2D and streams the
+resulting pose. Other peers interpolate that pose while keeping remote
+kickers solid and fixed relative to their local solver.</p>
+<p>One peer at a time simulates the RigidBody2D ball through <code>play.Puppet</code>. Its
+entity owner streams pose and velocity; other peers freeze their solver and
+follow the stream. The host&#39;s proximity arbitration in <code>host.odin</code> transfers
+ownership to the last toucher, anticipating contact by one step so that the
+receiving player&#39;s local solver can resolve the kick before a round trip.
+The transfer includes momentum.</p>
+<p>The host judges goals from the streamed pose and updates <code>gd:&quot;replicate&quot;</code>
+fields on the ball. An entity can therefore combine authority-written score
+with owner-streamed motion, with each field selecting its policy.</p>
 <h2 id="run-it">Run it<a class="heading-anchor" href="#run-it" aria-label="Link to this section">#</a></h2>
 <p>From <code>examples/slopball</code>, build once with <code>bash ../../build/build_scripts.sh .</code>,
 then open two windows on one machine:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">SLOP_NAME=lefty  godot --path .    <span class="hljs-comment"># Host</span>
 SLOP_NAME=righty godot --path .    <span class="hljs-comment"># Join</span></code></pre></div><p>WASD moves, Space kicks, first to <code>SLOP_GOALS</code> (default 3) takes the match. Odd seats
 defend the left goal, even the right.</p>
-<h2 id="the-feel-ledger">The feel ledger<a class="heading-anchor" href="#the-feel-ledger" aria-label="Link to this section">#</a></h2>
-<p>The example applies seven measures to avoid stutter during ownership changes
-and display frames:</p>
+<p><span id="the-feel-ledger"></span></p>
+<h2 id="solver-and-presentation-timing">Solver and presentation timing<a class="heading-anchor" href="#solver-and-presentation-timing" aria-label="Link to this section">#</a></h2>
+<p>The example uses these rules to manage ownership changes and display frames:</p>
 <ol>
-<li><strong>RigidBody2D ignores node transform writes</strong> — live ones are stomped by the
-server sync; frozen ones vanish when the freeze lifts. Every imposed pose
-goes through <code>PhysicsServer2D.body_set_state</code> (<code>play.Puppet</code> does this).</li>
-<li><strong>Ownership transfers must flush the freshest sample</strong> into the fields
-before the ring resets, and <strong>seed the fresh ring</strong> so watcher interp flows
-through the seam instead of pausing an interp window (kit does both now).</li>
-<li><strong>Run the session at the solver&#39;s rate</strong> (60Hz here; <code>SLOP_HZ</code> drives both).</li>
-<li><strong>Arbitration is feel</strong>: grant the seat <em>before</em> contact (anticipation),
-make possession sticky, debounce moving-ball challenges, and let statues
-never claim — an idle body doesn&#39;t need the seat.</li>
-<li><strong>Smooth corrections, never authority</strong>: the body snaps to truth; the drawn
-skin glides in (~63ms half-life). Deliberate cuts snap outright.</li>
-<li><strong>Predict possession</strong>: <code>puppet_claim</code> seizes the sim the frame your screen
-sees the touch; the host confirms it or denies it with a smoothed correction.</li>
-<li><strong>The last stutter wasn&#39;t netcode</strong>: physics-tick stepping vs display
-refresh. <code>physics/common/physics_interpolation=true</code>, reset it at cuts,
-and never lerp an angle across the ±π wrap.</li>
+<li>Write imposed poses through <code>PhysicsServer2D.body_set_state</code>, as
+<code>play.Puppet</code> does. Solver synchronization can overwrite direct node
+transforms on a live RigidBody2D, and unfreezing can discard transforms
+written while frozen.</li>
+<li>Flush the latest sample into the fields before resetting the interpolation
+ring, then seed the new ring. Kit performs both operations so observers
+can continue interpolating across an ownership change.</li>
+<li>Run the session at the solver&#39;s rate: 60Hz here, controlled by <code>SLOP_HZ</code>.</li>
+<li>Grant ownership before contact, retain possession across small gaps, and
+debounce challenges from a moving ball. Idle bodies do not claim it.</li>
+<li>Apply accepted corrections to the physics body immediately, then smooth
+only the drawn skin with a ~63ms half-life. Explicit cuts snap the skin too.</li>
+<li><code>puppet_claim</code> predicts possession when the local screen sees contact. The
+host confirms or denies that claim; a denial produces a smoothed correction.</li>
+<li>Enable <code>physics/common/physics_interpolation=true</code> to interpolate between
+physics ticks and display frames, and reset it at cuts. Do not linearly
+interpolate an angle across the ±π wrap.</li>
 </ol>
 <h2 id="automated-tests">Automated tests<a class="heading-anchor" href="#automated-tests" aria-label="Link to this section">#</a></h2>
 <ul>
@@ -60,5 +60,5 @@ seat transfer lands on all three screens, the striker&#39;s local solver scores,
 three screens agree on the ball within a few pixels at the same session tick.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/slopball/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-model" class="">The model</a><a href="#run-it" class="">Run it</a><a href="#the-feel-ledger" class="">The feel ledger</a><a href="#automated-tests" class="">Automated tests</a></nav><div class="outline-actions"><a href="../../../reference/examples/slopball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/slopball/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#ownership-and-scoring" class="">Ownership and scoring</a><a href="#run-it" class="">Run it</a><a href="#solver-and-presentation-timing" class="">Solver and presentation timing</a><a href="#automated-tests" class="">Automated tests</a></nav><div class="outline-actions"><a href="../../../reference/examples/slopball/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -10,8 +10,8 @@ then runs host/client/spectator and three-member occupied host-crash scenarios.
 The real-peer fixture uses 120 ms configured latency, admits normal ability and
 mount/release actions, rejects an occupied claim, hands remaining ammo to another
 player, and requires empty-turret cleanup plus matching complete world hashes.
-Spectators must drain the scene at their observed clock; occupancy disappears at
-the authoritative final shot. The crash fixture waits for a backup that contains
+Spectators remove the turret view when their observed clock reaches the final
+shot; that shot clears occupancy on the authority. The crash fixture waits for a backup that contains
 the occupied turret before killing only its own original host process.
 
 `fixtures/content50.checkpoint` is a genuine tick-12 content-50/J checkpoint,

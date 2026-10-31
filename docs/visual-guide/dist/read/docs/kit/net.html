@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>kit/net: replication core · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../authoring-guide.html">Script API</a><a href="../events.html">Signals and events</a><a href="../workflow.html">Editor workflow</a><a href="../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="timelines.html">Prediction and timelines</a><a href="profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../exporting.html">Export reference</a><a href="../debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/net: replication core</h1><div class="reader-meta"><span>32 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/net.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-mental-model">The mental model</a><a href="#declaring-a-replicated-entity">Declaring a replicated entity</a><a href="#command-consequences">Command consequences</a><a href="#composing-verbs-from-embedded-blocks">Composing verbs from embedded blocks</a><a href="#wire-codecs">Wire codecs</a><a href="#dynamic-collections">Dynamic collections</a><a href="#field-change-edges">Field-change edges</a><a href="#advanced-registry-primitives">Advanced: registry primitives</a><a href="#the-per-tick-walks">The per-tick walks</a><a href="#advanced-the-command-loop-primitives">Advanced: the command-loop primitives</a><a href="#typed-app-messages">Typed app messages</a><a href="#wire-tick-and-clocks">Wire, tick, and clocks</a><a href="#the-two-timelines-presenting-consequences">The two timelines (presenting consequences)</a><a href="#one-package-two-lanes">One package, two lanes</a><a href="#gotchas">Gotchas</a></nav></details>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Kit</a><span>/</span><span>Guide</span></div><p class="eyebrow">Kit</p><h1>kit/net: replication core</h1><div class="reader-meta"><span>31 min read</span><span>Odin × Godot</span><a href="../../../reference/docs/kit/net.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#replication-lanes">Replication lanes</a><a href="#declaring-a-replicated-entity">Declaring a replicated entity</a><a href="#command-consequences">Command consequences</a><a href="#composing-verbs-from-embedded-blocks">Composing verbs from embedded blocks</a><a href="#wire-codecs">Wire codecs</a><a href="#dynamic-collections">Dynamic collections</a><a href="#field-change-edges">Field-change edges</a><a href="#advanced-registry-primitives">Advanced: registry primitives</a><a href="#the-per-tick-walks">The per-tick walks</a><a href="#advanced-the-command-loop-primitives">Advanced: the command-loop primitives</a><a href="#typed-app-messages">Typed app messages</a><a href="#wire-tick-and-clocks">Wire, tick, and clocks</a><a href="#the-two-timelines-presenting-consequences">The two timelines (presenting consequences)</a><a href="#shared-replication-and-simulation-primitives">Shared replication and simulation primitives</a><a href="#constraints-and-failure-cases">Constraints and failure cases</a></nav></details>
 <article class="reading-body "><p><code>kit/net</code> implements Kit&#39;s engine-independent wire primitives, entity registry,
 field descriptors, reliable delta replication, owner streams, interpolation,
 and command prediction. It does not import Godot and is covered by headless
@@ -13,7 +13,8 @@ drives the registry and schedules messages. Import <code>kit/net</code> directly
 such as <code>Net_Id</code> and <code>Player_Id</code>, wire readers and writers, custom interpolation
 procedures, clocks, and low-level tests. <a href="netgd.html">kit/netgd</a> provides the
 Godot transport adapter.</p>
-<h2 id="the-mental-model">The mental model<a class="heading-anchor" href="#the-mental-model" aria-label="Link to this section">#</a></h2>
+<p><span id="the-mental-model"></span></p>
+<h2 id="replication-lanes">Replication lanes<a class="heading-anchor" href="#replication-lanes" aria-label="Link to this section">#</a></h2>
 <p>Session replication has two field lanes:</p>
 <ul>
 <li><strong>Reliable deltas</strong> are selected by <code>gd:&quot;replicate&quot;</code>. The host writes shared
@@ -51,8 +52,8 @@ to their leaves. It rejects <code>int</code>, <code>uint</code>, <code>uintptr</
 pointers, strings, dynamic or fixed-capacity containers, unresolved types, and
 implicit struct padding. Custom field codecs still require a recursively valid
 in-memory value and a literal fixed codec size.</p>
-<p>The generated guard exposes the canonical contract, its hashes, and one
-structured package-level projection:</p>
+<p>The generated guard exposes the wire schema, its hashes, and structured
+metadata for the package:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">NET_SCHEMA_CANONICAL  <span class="hljs-comment">// readable, deterministic wire metadata</span>
 NET_ABI_FINGERPRINT   <span class="hljs-comment">// hash of that metadata alone</span>
 NET_FINGERPRINT       <span class="hljs-comment">// complete session contract, including the ABI</span>
@@ -60,11 +61,11 @@ NET_SCHEMA            <span class="hljs-comment">// knet.Net_Schema: structured,
 widths, array and protocol bounds, enum bases and values, input-class ids and
 admission constraints, message tags, and each action&#39;s access, prediction,
 argument ceiling, and immediate/tick scheduling. Generated <code>size_of</code>,
-<code>align_of</code>, and field-layout
-assertions then pin those expectations in every target compile. The raw ABI is
+<code>align_of</code>, and field-layout assertions check those expectations in every
+target compile. The raw ABI is
 little-endian; a target with a different layout cannot retain the same accepted
 fingerprint.</p>
-<p><code>NET_SCHEMA</code> is the tooling/debugging view of that same walk. It contains flat
+<p><code>NET_SCHEMA</code> exposes that metadata to tools and diagnostics. It contains flat
 static tables for entity kinds, recursive type nodes, replicated fields, input
 classes and constraints, actions, presentation events, argument layouts,
 outcome layouts, profiles, and typed messages. Each action carries its resolved
@@ -95,6 +96,7 @@ registry.</p>
 policy, schedule, or codec name/size does. If a custom codec&#39;s <em>meaning</em> changes
 without changing its declared name or size, rename/version it or mix a semantic
 contract with <code>session_mix_fingerprint</code>; code bodies are not schema data.</p>
+<p><span id="the-command-loop"></span></p>
 <h3 id="commands">Commands<a class="heading-anchor" href="#commands" aria-label="Link to this section">#</a></h3>
 <p>A command is a proc marked <code>@(gd_command)</code> whose return value says whether its
 mutation applied. The bare marker is owner-only and waits for authority state.
@@ -143,7 +145,7 @@ id, execution model, policy, typed argument/outcome metadata, and consequence
 metadata. Only the callback differs: <code>Command_Desc</code> adds immediate invocation,
 while <code>Sim_Cmd</code> adds scheduled exec/apply thunks. Moving a verb between models
 does not duplicate or reinterpret its declaration.</p>
-<p>For a tighter encoded-argument envelope, use the typed literal form. Zero uses
+<p>To set a smaller encoded-argument limit, use the typed literal form. Zero uses
 the 4096-byte default; a positive value is enforced before client send and
 again at authority ingress:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.Action_Policy {
@@ -159,10 +161,10 @@ transferring ownership.</p>
 <ul>
 <li>confirmation retains the optimistic mutation;</li>
 <li>predicate rejection includes authoritative entity state rather than restoring
-a possibly stale local snapshot; admission failures are compact and restore
-the local capture while the ordinary state lane supplies newer truth;</li>
+a possibly stale local snapshot; admission failures send a compact result and
+restore the local capture while ordinary replication supplies newer state;</li>
 <li>timeout reverts an action whose result never arrives; and</li>
-<li>an intervening authoritative update unwinds pending predictions, applies truth,
+<li>an intervening authoritative update unwinds pending predictions, applies that state,
 and replays still-valid commands in issue order.</li>
 </ul>
 <p>The generated wrapper takes <code>^kboot.Boot</code> so the call site is the same for a
@@ -198,7 +200,7 @@ game_command_rejected :: <span class="hljs-keyword">proc</span>(
 	<span class="hljs-keyword">case</span> .Timeout:   show_connection_feedback()
 	<span class="hljs-keyword">case</span>:            <span class="hljs-comment">// Malformed/Stale are normally logged, not player choices.</span>
 	}
-}</code></pre></div><p><code>Action_Reject_Reason</code> is deliberately gameplay-sized:</p>
+}</code></pre></div><p><code>Action_Reject_Reason</code> groups failures by the response a game may need to show:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -233,15 +235,14 @@ game_command_rejected :: <span class="hljs-keyword">proc</span>(
 </tbody></table>
 </div><p><code>game_command_confirmed</code> receives <code>(seq, entity, cmd, model)</code>. On the authority,
 <code>game_command_executed</code> receives <code>(player, entity, cmd, reason, seq, model)</code>
-for both execution models. These are generated callbacks: gameplay code never
-parses a verdict packet or maintains a sequence map. <code>model</code> disambiguates the
-two sequence/id namespaces when a game uses both. Non-predicted actions keep a
+for both execution models. The generated callbacks handle verdict decoding and
+sequence tracking. <code>model</code> disambiguates the two sequence/id namespaces when a
+game uses both. Non-predicted actions keep a
 receipt-only entry, so they confirm, reject, and time out through exactly the
 same callback path without gaining speculative write privileges.</p>
-<p><strong>Waiting for the authority without language-level async.</strong> A purchase dialog,
-transaction prompt, or similar UI may care about the final verdict for one
-particular issue. Turn the generated outcome into a session-scoped receipt and
-poll it from the frame loop:</p>
+<p>A purchase dialog, transaction prompt, or similar UI may need the final verdict
+for one particular action. Turn the generated outcome into a session-scoped
+receipt and poll it from the frame loop:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">outcome := spelunker_buy_cmd(&amp;game.boot, game.me, ITEM_BOOTS)
 receipt := ksess.session_action_receipt(&amp;game.ses, outcome)
 
@@ -253,17 +254,17 @@ receipt := ksess.session_action_receipt(&amp;game.ses, outcome)
 	<span class="hljs-keyword">case</span> .Unavailable: show_connection_error()
 	<span class="hljs-keyword">case</span> .Pending:     <span class="hljs-comment">// `ready` is false for this state</span>
 	}
-}</code></pre></div><p>Receipts are optional and bounded (<code>MAX_ACTION_RECEIPTS</code>, 64 watched asks per
-run). A terminal poll consumes its watched slot; call <code>session_action_forget</code>
+}</code></pre></div><p>Receipts are optional and bounded (<code>MAX_ACTION_RECEIPTS</code>, 64 watched actions per
+run). Polling a final result releases its watched slot; call <code>session_action_forget</code>
 when the owning UI disappears first. They cover both <code>.Immediate</code> and
 <code>.Scheduled</code> actions without aliasing equal raw sequences and preserve the
 typed rejection reason. A pending watched receipt becomes <code>.Unavailable</code>
 across reset/rehost. A small result cache closes the issue/result race for
 synchronous in-memory transports.</p>
-<p>This is an acknowledgement, not a remote-value return. Durable inventory,
-currency, ownership, and world state still come from replicated fields and
-their edges. No additional request/response protocol or wire message is
-created by a receipt.</p>
+<p>A receipt acknowledges the action&#39;s result. Durable inventory, currency,
+ownership, and world state still come from replicated fields and their change
+callbacks. A receipt uses the existing action result and creates no additional
+request/response protocol or wire message.</p>
 <p>Generated command IDs are stable hashes of command names, not declaration
 positions. Reordering procedures does not renumber the protocol. Renaming a
 command intentionally creates a new ID; collisions within a command set are a
@@ -271,21 +272,21 @@ build error. The session&#39;s schema fingerprint provides the broader
 compatibility gate.</p>
 <h3 id="reliable-presentation-events">Reliable presentation events<a class="heading-anchor" href="#reliable-presentation-events" aria-label="Link to this section">#</a></h3>
 <p><code>@(gd_event)</code> declares a typed, non-durable occurrence. The author keeps the
-presentation body under <code>_fx</code>; scriptgen generates the suffix-free announcement
-door taking the game&#39;s <code>^Boot</code>:</p>
+presentation body under <code>_fx</code>; scriptgen generates an announcement procedure
+with the suffix removed, taking the game&#39;s <code>^Boot</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_event = &quot;audience=everyone,timing=auto&quot;)</span>
 chest_spark_fx :: <span class="hljs-keyword">proc</span>(g: ^Game, chest: ^Chest, mine: <span class="hljs-type">bool</span>, strength: <span class="hljs-type">f32</span>) {
 	particles_restart(chest, strength)
 	<span class="hljs-keyword">if</span> mine {camera_kick(g)}
 }
 
-<span class="hljs-comment">// Authority gameplay code — no Fx/Rpc/send suffix and no role branch.</span>
+<span class="hljs-comment">// Announce the event from authority gameplay code.</span>
 chest_spark(&amp;g.boot, chest, <span class="hljs-number">0.8</span>)</code></pre></div><p>The signature is <code>(game, entity refs…, mine: bool, wire args…)</code>, with the game
 pointer first. One entity parameter is the inferred anchor; with several,
 write <code>anchor=PARAM</code>, or <code>anchor=none</code> for a world occurrence. Arguments after
 <code>mine</code> use the command wire primitives. The body returns nothing and is
-presentation only—damage, inventory, spawning, and other truth remain commands,
-authority steps, and replicated fields.</p>
+presentation only. Use commands, authority steps, and replicated fields for
+damage, inventory, spawning, and other durable gameplay state.</p>
 <p>The policy has two independent axes:</p>
 <ul>
 <li><code>audience=everyone</code> presents on every eligible screen.</li>
@@ -302,16 +303,17 @@ continuous <code>owner</code> state uses the session interpolation clock. An anc
 event in a lane-owning game uses that lane&#39;s watch clock. Other static and
 custom clocks must say <code>immediate</code> or use the lower-level explicit scheduler.</li>
 </ul>
-<p>The anchor also chooses the existing transport implementation. A sim-tracked
-anchor lowers onto <code>SIM_FACT</code>; a cooperative/static event lowers onto the
+<p>The anchor also determines which transport implementation carries the event. A
+sim-tracked anchor uses <code>SIM_FACT</code>; a cooperative/static event uses the
 session&#39;s reliable event frame and presentation queue. Both enter the wire
 fingerprint with id, argument schema, anchor, audience, and timing. Neither is
 join-replayed. Cooperative/static events are authority-minted; clients ask
 through commands. A sim event may also present from the owning live pass, where
 it is derived from the same replayable tick rather than an unconfirmed
 standalone prediction.</p>
-<p><code>@(gd_event)</code> is the sole declared presentation-event form. Tick <code>_fx</code>, field <code>_edge</code>, command
-<code>_then</code>, and resimulation <code>_apply</code> retain their distinct phase contracts.</p>
+<p><code>@(gd_event)</code> is the sole declaration for presentation events. Tick <code>_fx</code>, field
+<code>_edge</code>, command <code>_then</code>, and resimulation <code>_apply</code> callbacks still run in their
+respective phases.</p>
 <h3 id="network-tick-and-interpolation">Network tick and interpolation<a class="heading-anchor" href="#network-tick-and-interpolation" aria-label="Link to this section">#</a></h3>
 <p>For session replication, the fixed network tick (20 Hz by default) schedules
 deltas and streams; ordinary gameplay may still run at frame rate. Remote owner
@@ -319,7 +321,9 @@ streams render at <code>interp_delay</code>, normally far enough behind the newe
 to interpolate between two values. If no newer sample exists, presentation
 holds the latest value instead of extrapolating indefinitely.</p>
 <h2 id="declaring-a-replicated-entity">Declaring a replicated entity<a class="heading-anchor" href="#declaring-a-replicated-entity" aria-label="Link to this section">#</a></h2>
-<p>In a game you tag fields and mark procs; scriptgen emits the descriptor. From
+<p>Tag fields and mark procedures so scriptgen can emit the descriptor. The
+<code>owner: gd.Node2d</code> field below holds the Godot node; it is separate from the
+network entity owner that controls write access. This example comes from
 <code>examples/cavecrawl/scripts/chest.odin</code>:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Chest :: <span class="hljs-keyword">struct</span> {
 	owner:  gd.Node2d,
@@ -335,22 +339,22 @@ chest_take :: <span class="hljs-keyword">proc</span>(self: ^Chest, slot: <span c
 	<span class="hljs-keyword">return</span> taken.count &gt; <span class="hljs-number">0</span>, taken
 }
 
-<span class="hljs-comment">// Fires on the HOST only, after the take applies: the cross-entity half,</span>
-<span class="hljs-comment">// typed, next to its verb (see &quot;Consequences&quot; below).</span>
+<span class="hljs-comment">// After acceptance, the authority runs this cross-entity consequence.</span>
 <span class="hljs-meta">@(gd_half)</span>
 chest_take_then :: <span class="hljs-keyword">proc</span>(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: <span class="hljs-type">i32</span>, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>, taken: kitems.Slot) {
 	cave_credit(game, by, self, taken)
 }</code></pre></div><p>Owner-streamed float/vector/quaternion fields interpolate by default:
 <code>x, y: f32 </code>gd:&quot;owner&quot;`` (the spelunker&#39;s position). Discrete owner fields
-snap automatically; write <code>snap</code> to opt a float-shaped generation/meter out of
-the continuous default. Under the hood these become:</p>
+snap to the received value; write <code>snap</code> when a float field, such as a generation
+counter or meter, should also update without interpolation. The generated
+descriptor uses these types:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Field_Desc :: <span class="hljs-keyword">struct</span> {
 	offset: <span class="hljs-type">uintptr</span>,
 	size:   <span class="hljs-type">int</span>,
 	flags:  Field_Flags,
 	lerp:   Lerp_Kind, <span class="hljs-comment">// how stream sampling blends this field (meaningful with .Interp)</span>
 	blend:  Blend_Proc, <span class="hljs-comment">// required iff lerp == .Custom</span>
-	wire:   Wire_Kind, <span class="hljs-comment">// how the field&#x27;s bytes are ENCODED in packets (default: raw)</span>
+	wire:   Wire_Kind, <span class="hljs-comment">// how the field&#x27;s bytes are encoded in packets (default: raw)</span>
 	codec:  Wire_Codec, <span class="hljs-comment">// required iff wire == .Custom</span>
 }
 
@@ -397,61 +401,60 @@ prediction and reconciliation. Put cross-entity work in the name-paired
 and any returned payload after the command applies on the authority. Two
 signatures are supported:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_half)</span> chest_take_then :: <span class="hljs-keyword">proc</span>(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: <span class="hljs-type">i32</span>, px: <span class="hljs-type">f32</span>, py: <span class="hljs-type">f32</span>, taken: kitems.Slot)
-<span class="hljs-meta">@(gd_half)</span> door_toggle_then :: <span class="hljs-keyword">proc</span>(self: ^Door, by: knet.Player_Id)   <span class="hljs-comment">// entity-local: no game param</span></code></pre></div><p><strong>Payload returns.</strong> A verb may return <code>(bool, payloads…)</code>: results after the
-applied bool are in-process values handed straight to the <code>_then</code> (they never
-cross the wire). Payload types are unconstrained, since the generated call site
-lets the compiler hold the <code>_then</code> signature to them.</p>
-<p><strong>Reading the issuer.</strong> When the predicate needs the issuing player (a trade
-window arbitrating which seat is confirming, a first-come claim recording its
-claimant), declare <code>by: knet.Player_Id</code> right after the receiver (after the
-wielder param in a composed block) and the framework fills it: <code>ctx.me</code> on the
-issuing peer&#39;s optimistic run, the resolved sender on the host; these are the
-same values the <code>_then</code> gets. It does not ride the wire, so it cannot be forged:
-a hostile client can&#39;t hand you a <code>side: u8</code> it flipped to confirm the <em>other</em>
-party&#39;s half of a trade, because the issuer is never a wire argument (the worked
-rewrite is the <a href="session.html#recipes-over-existing-pieces">trade recipe</a>).
-The name is reserved: a wire arg called <code>by</code> is a build error. A player the
-verb merely <em>targets</em> stays ordinary wire data under any other name (<code>who</code>,
-<code>target</code>).</p>
+<span class="hljs-meta">@(gd_half)</span> door_toggle_then :: <span class="hljs-keyword">proc</span>(self: ^Door, by: knet.Player_Id)   <span class="hljs-comment">// entity-local: no game param</span></code></pre></div><p>A command may return <code>(bool, payloads…)</code>. Results after the applied bool are
+in-process values passed directly to <code>_then</code>; they never cross the wire.
+Payload types are unconstrained, and the compiler checks them against the
+<code>_then</code> signature at the generated call site.</p>
+<p>When a predicate needs the issuing player, declare <code>by: knet.Player_Id</code> right
+after the receiver, or after the wielder parameter in a composed block. The
+framework supplies <code>ctx.me</code> during the issuing peer&#39;s optimistic run and the
+resolved sender on the host. <code>_then</code> receives the same value.</p>
+<p>Use this parameter when a trade needs to identify the confirming player or a
+first-come claim needs to record its claimant. The issuer is never a wire
+argument, so a client cannot forge it to confirm the other player&#39;s part of a
+trade by changing a supplied <code>side: u8</code> value. See the
+<a href="session.html#recipes-over-existing-pieces">trade recipe</a>. The name
+is reserved: a wire argument called <code>by</code> is a build error. A player the command
+targets remains ordinary wire data under another name, such as <code>who</code> or
+<code>target</code>.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-meta">@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)</span>
-trade_confirm :: <span class="hljs-keyword">proc</span>(self: ^Trade, by: knet.Player_Id) -&gt; (ok: <span class="hljs-type">bool</span>, sealed: <span class="hljs-type">bool</span>)</code></pre></div><p><strong>Delivery.</strong> A consequence fires once per applied command,
-including on the host&#39;s own issues (the wrapper&#39;s authority branch), and never
-on a client&#39;s optimistic run, a registry replay, a rejection, or a deduped
-retransmit. It runs before the result ships and before the tick&#39;s delta diff,
-so its mutations reach every peer in the same batch as the verb&#39;s own. The
+trade_confirm :: <span class="hljs-keyword">proc</span>(self: ^Trade, by: knet.Player_Id) -&gt; (ok: <span class="hljs-type">bool</span>, sealed: <span class="hljs-type">bool</span>)</code></pre></div><p>A consequence runs once per applied command, including commands issued by the
+host through the wrapper&#39;s authority branch. It never runs on a client&#39;s
+optimistic run, a registry replay, a rejection, or a deduped retransmit. It
+runs before the result is sent and before the tick&#39;s delta comparison,
+so its mutations reach every peer in the same batch as the command&#39;s own. The
 <code>game</code> parameter is the session game pointer installed through
 <code>session_set_factory</code>.</p>
-<p><strong>Composed verbs pair on the hoisted name.</strong> A block&#39;s command
-(<code>weapon: play.Gun</code> hoisting <code>gun_fire</code> as <code>runner_weapon_fire</code>) pairs with
-<code>runner_weapon_fire_then</code>: the block ships the verb and its state machine,
-the game keeps the consequence, and no index keying or entity-classifying
-switch ever appears. A composed verb&#39;s payload is the block&#39;s <em>offer</em>
-(&quot;a live round left the barrel&quot;); a game that does not consume it declares no
-<code>_then</code>.</p>
-<p><strong>Build-time contract.</strong> A mispaired consequence is a scriptgen error, not a
-proc that silently never fires: the shape (<code>[game,] self, by, wire args…, payload…</code>) is validated against the verb, and <strong>every half wears <code>@(gd_half)</code></strong>:
-the attribute declares that this proc is meant to pair, and a declared half
-that pairs with nothing is an error with the class&#39;s real pairing names spelled
-out beside it: rename it, or drop the attribute if it isn&#39;t a half.</p>
+<p>For an embedded block, pair the consequence with the generated command name.
+For example, <code>weapon: play.Gun</code> exposes <code>gun_fire</code> as <code>runner_weapon_fire</code>,
+which pairs with <code>runner_weapon_fire_then</code>. The block implements the target
+mutation and its state machine. The game handles accepted cross-entity changes
+in <code>_then</code>, without dispatching on a block index or entity type. The block can
+return a payload describing its result, such as a round being fired. A game
+that does not consume the payload declares no <code>_then</code>.</p>
+<p>Scriptgen validates a consequence&#39;s parameters (<code>[game,] self, by, wire args…, payload…</code>) against the command. Every half must carry <code>@(gd_half)</code> to declare
+that it is intended to pair. If it has no matching command, scriptgen reports
+an error and lists the class&#39;s valid pairing names. Rename the procedure, or
+remove the attribute if it is not intended as a half.</p>
 <p>The name decides <em>what</em> a half pairs with; the attribute declares only that
 pairing was intended. Both a wrong prefix (<code>chest_taek_then</code>) and a wrong suffix
 (<code>chest_take_after</code>) are build errors. A proc that merely <em>ends</em> in <code>_then</code> and
 never claimed to be a half is nothing special. A direct verb whose payload
-nobody consumes still warns. When something needs to react to commands
-<em>generically</em> (metrics, receipts, replays), the untyped
-<a href="session.html#command-hooks">command hook</a> remains
-underneath: <code>_then</code> is generated dispatch over the same authority path.</p>
-<p><strong>Multi-target commands.</strong> A command mutates one entity, not two (a trade
-touching both players&#39; bags). Spreading revert capture, reject-truth, and
-replay-reconcile across entity boundaries is not supported. Make the transaction
-itself the target: the <a href="session.html#recipes-over-existing-pieces">mediating-entity recipe</a>.</p>
+nobody consumes still produces a warning. For handlers that apply to commands
+regardless of their type, such as metrics, receipts, or replays, use the untyped
+<a href="session.html#command-hooks">command hook</a>. The generated <code>_then</code> dispatch runs
+through the same authority path.</p>
+<p>A command&#39;s prediction and reconciliation cover one target entity. They cannot
+capture, restore on rejection, or replay changes across multiple entities, such
+as a trade that modifies both players&#39; bags. Make the transaction itself the
+target; see the <a href="session.html#recipes-over-existing-pieces">mediating-entity recipe</a>.</p>
 <h2 id="composing-verbs-from-embedded-blocks">Composing verbs from embedded blocks<a class="heading-anchor" href="#composing-verbs-from-embedded-blocks" aria-label="Link to this section">#</a></h2>
-<p>Replicated fields compose through an embed: a <code>gd:&quot;replicate&quot;</code> field inside a sub-struct
-joins its wielder&#39;s descriptor via a composed offset, so a building block&#39;s state travels with
-it. <strong>Its commands compose the same way.</strong> A <code>@(gd_command)</code> proc whose receiver is an embedded
-sub-struct is hoisted onto whatever entity embeds it, generated onto <em>that</em> entity&#39;s command
-table, the dual of nested-field replication and what turns a plain struct into a true drop-in
-gameplay block.</p>
+<p>An entity can embed a struct containing replicated fields and commands. A
+<code>gd:&quot;replicate&quot;</code> field inside the embedded struct joins the containing entity&#39;s
+descriptor at the combined field offset. A <code>@(gd_command)</code> procedure whose
+receiver is the embedded struct joins that entity&#39;s generated command table.
+This lets the block define its state and target mutations while each game
+defines the cross-entity consequences.</p>
 <p>Both import spellings work: <code>import play &quot;godot:play&quot;</code> (the idiomatic alias) and a bare
 <code>import &quot;godot:play&quot;</code>: scriptgen resolves a bare import by reading the target&#39;s package
 clause, so the embed composes either way.</p>
@@ -462,10 +465,9 @@ clause, so the embed composes either way.</p>
 	reload_cd: <span class="hljs-type">u16</span> <span class="hljs-string">`gd:&quot;replicate&quot;`</span>,
 }
 
-<span class="hljs-comment">// The receiver is `^Gun` (the block), not the entity. An optional SECOND pointer param is the</span>
-<span class="hljs-comment">// WIELDER — scriptgen fills it with the embedding entity, so the block can read/write its holder</span>
-<span class="hljs-comment">// (stats, cooldowns) while staying reusable. A pointer can&#x27;t ride the wire, so it is never a</span>
-<span class="hljs-comment">// wire arg; the args after it are.</span>
+<span class="hljs-comment">// The receiver is the embedded Gun. An optional second pointer parameter</span>
+<span class="hljs-comment">// receives the containing entity for access to its stats or cooldowns.</span>
+<span class="hljs-comment">// This pointer is supplied locally; only the following arguments cross the wire.</span>
 <span class="hljs-meta">@(gd_command = knet.ACTION_OWNER_PREDICTED)</span>
 gun_fire :: <span class="hljs-keyword">proc</span>(g: ^Gun, owner: ^Runner, dx, dy: <span class="hljs-type">f32</span>) -&gt; <span class="hljs-type">bool</span> { ... }
 
@@ -473,153 +475,158 @@ Runner :: <span class="hljs-keyword">struct</span> {
 	owner:  gd.Node2d,
 	net_id: knet.Net_Id,
 	weapon: Gun,   <span class="hljs-comment">// -&gt; the entity gets `runner_weapon_fire`</span>
-}</code></pre></div><p>The entity&#39;s generated command is named by the <strong>field path</strong>, so two blocks of the same type
-never collide (<code>weapon: Gun</code> + <code>sidearm: Gun</code> → <code>runner_weapon_fire</code> + <code>runner_sidearm_fire</code>,
-distinct command IDs). Issue it exactly like a direct command
-(<code>runner_weapon_fire_cmd(&amp;boot, self, dx, dy)</code>); the owner is passed for you, so only the wire
-args appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block&#39;s
-replicated state because it is part of the entity&#39;s descriptor, and the block&#39;s
-cross-entity effects (spawning a projectile, applying damage) live in the game&#39;s
-<code>runner_weapon_fire_then</code> <a href="#command-consequences">consequence</a>, exactly as a direct command&#39;s
-do: the block ships the verb, the game keeps the &quot;and then&quot;.</p>
-<p>Owner threading is optional and detected by shape: write <code>^Runner</code> for a game-specific block, or
-<code>^$E</code> for a library block reused across entity types. A block imported from another <code>godot:</code>
-package works identically: the generated file imports and qualifies it (<code>play.gun_fire</code>).</p>
+}</code></pre></div><p>The entity&#39;s generated command name includes the field path. Two blocks of the
+same type therefore get distinct names and command IDs: <code>weapon: Gun</code> and
+<code>sidearm: Gun</code> become <code>runner_weapon_fire</code> and <code>runner_sidearm_fire</code>. Issue the
+command through <code>runner_weapon_fire_cmd(&amp;boot, self, dx, dy)</code>. The generated
+call supplies the containing entity, so the wrapper takes only the wire
+arguments after <code>self</code>.</p>
+<p>Prediction rollback and authoritative rejection snapshots cover the block&#39;s
+replicated state because it is part of the entity&#39;s descriptor. Put cross-entity
+effects, such as spawning a projectile or applying damage, in the game&#39;s
+<code>runner_weapon_fire_then</code> <a href="#command-consequences">consequence</a>.</p>
+<p>A block may optionally take a pointer to its containing entity as its second
+parameter. Scriptgen detects this from the signature: use <code>^Runner</code> for a
+game-specific block or <code>^$E</code> for a library block reused across entity types.
+For a block imported from another <code>godot:</code> package, the generated file imports
+that package and qualifies the call, such as <code>play.gun_fire</code>.</p>
+<p>Here <code>Runner</code> names the game&#39;s character script. The optional containing-entity
+pointer is separate from both its Godot node and its network entity owner.</p>
 <p><code>godot:play</code> provides composed <code>Gun</code>, <code>Ability</code>, <code>Channel</code>, <code>Health</code>, and
 <code>Telegraph</code> blocks. The block owns its replicated state and any declared
 command; the game owns cadence, world validation, presentation, and
 cross-entity effects where those cannot be generalized. See the
 <a href="play.html"><code>godot:play</code> reference</a> and the source headers under <code>play/</code> for each
 block&#39;s exact contract.</p>
-<p><strong>Engine-facing procs compose the same way.</strong> A block&#39;s <code>@(gd_method)</code> (or <code>@(gd_rpc)</code>) hoists
-onto the embedding entity&#39;s method table under the same path-prefixed name (<code>gear_level</code> on a
-<code>gear: Gear</code> field becomes <code>robot_gear_level</code>… registered as <code>gear_level</code>), the trampoline routed
-into <code>&amp;self.gear</code> and threading the owner if it asked. So a block can expose behavior to
-GDScript/the editor, not just to the command loop: the whole <code>//gd:</code> surface (state, commands,
-methods, rpcs) composes through an embed.</p>
+<p>A block&#39;s <code>@(gd_method)</code> or <code>@(gd_rpc)</code> procedure also joins the containing
+entity&#39;s method table. For example, <code>gear_level</code> on a <code>gear: Gear</code> field becomes
+<code>robot_gear_level</code> in generated code and is registered as <code>gear_level</code> with
+Godot. The generated trampoline passes <code>&amp;self.gear</code> and supplies the containing
+entity if the signature requests it. An embedded block can therefore expose
+state, commands, methods, and RPCs to the appropriate <code>//gd:</code> interfaces,
+including GDScript and the editor.</p>
 <h2 id="wire-codecs">Wire codecs<a class="heading-anchor" href="#wire-codecs" aria-label="Link to this section">#</a></h2>
-<p>A field may re-encode its bytes inside packets. The struct-side representation
-never changes: shadows, dirty diffing, prediction capture/restore, and stream
-rings all hold struct-layout bytes; wire bytes exist only between writer and
-reader, decoded at the packet edge. So a codec buys bandwidth (and lets the
-wire representation differ from the in-memory one) without touching any of the
-comparison/revert machinery.</p>
-<p><code>gd:&quot;replicate,...,wire=f16&quot;</code> ships f32 elements as half floats: half the
+<p>A field codec changes the packet representation while preserving the struct&#39;s
+in-memory representation. Shadows, change detection, prediction capture and
+restore, and stream rings all hold struct-layout bytes. The writer encodes
+them for transmission, and the reader decodes them before applying state. A
+smaller wire representation can reduce bandwidth without changing comparison
+or rollback behavior.</p>
+<p><code>gd:&quot;replicate,...,wire=f16&quot;</code> sends f32 elements as half floats: half the
 bytes, ~3 significant digits, integers exact to 2048. Cavecrawl&#39;s spelunker and
-relic positions cross this way. For everything else there&#39;s a fixed-size custom
-codec, declared like a blend proc:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hp: <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate,wire=spelunker_hp_codec&quot;`</span> <span class="hljs-comment">// 0..100 has no business in four bytes</span>
+relic positions use this encoding. For another representation, declare a
+fixed-size custom codec as you would a blend procedure:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">hp: <span class="hljs-type">i32</span> <span class="hljs-string">`gd:&quot;replicate,wire=spelunker_hp_codec&quot;`</span> <span class="hljs-comment">// encode the 0..100 range with the declared codec</span>
 
 spelunker_hp_codec :: knet.Wire_Codec {
 	size   = <span class="hljs-number">1</span>,
 	encode = <span class="hljs-keyword">proc</span>(wire, field: <span class="hljs-type">rawptr</span>) {(^<span class="hljs-type">u8</span>)(wire)^ = <span class="hljs-type">u8</span>(clamp((^<span class="hljs-type">i32</span>)(field)^, <span class="hljs-number">0</span>, <span class="hljs-number">255</span>))},
 	decode = <span class="hljs-keyword">proc</span>(field, wire: <span class="hljs-type">rawptr</span>) {(^<span class="hljs-type">i32</span>)(field)^ = <span class="hljs-type">i32</span>((^<span class="hljs-type">u8</span>)(wire)^)},
-}</code></pre></div><p>The wire size is FIXED per field, which is what frees the representation:
-quantize, bit-pack, or ship an <em>index</em> into a structure both sides grow
-deterministically (a shared-seed table means the wire only needs to name an
-entry, not carry it). Two codec requirements matter: <code>decode(encode(x))</code> should
-be stable (receivers hold decoded values; an unstable round trip makes confirmed
-predictions micro-snap), and dirtiness is still diffed on struct bytes: a change
-smaller than the wire precision still sends, so pick a precision at least as fine
-as gameplay cares about.</p>
+}</code></pre></div><p>Each field&#39;s encoded size must be fixed. Within that size, a codec can quantize
+values, pack bits, or send an index into a table that both peers build
+deterministically from a shared seed. The receiver can then reconstruct the
+entry without receiving its contents.</p>
+<p><code>decode(encode(x))</code> should be stable because receivers retain decoded values;
+an unstable round trip can produce small corrections when predictions are
+confirmed. Change detection still compares struct bytes, so a change smaller
+than the wire precision still causes a send. Choose enough precision to
+represent changes that affect gameplay.</p>
 <h2 id="dynamic-collections">Dynamic collections<a class="heading-anchor" href="#dynamic-collections" aria-label="Link to this section">#</a></h2>
-<p>A <code>[dynamic]T</code>, slice, or map tagged <code>gd:&quot;replicate&quot;</code> is a <strong>build error</strong>. The
-delta walk&#39;s whole contract is flat POD cells: a shadow memcmp per field, one
-bit in a u64 mask, a byte-identical apply on every peer. A dynamic&#39;s bytes are a
-header whose elements a memcpy would tear, and the deeper problem survives any
-encoding: <strong>byte-diffing has no element identity</strong>: insert one element at the
-front and every byte after it &quot;changed&quot;, so the diff ships the world for a
-one-item edit. Choose a representation according to the collection&#39;s size and update pattern:</p>
+<p>A <code>[dynamic]T</code>, slice, or map tagged <code>gd:&quot;replicate&quot;</code> is a build error.
+Replication compares each field&#39;s bytes with a shadow, records changes in one
+bit of a u64 mask, and copies the received bytes into the corresponding field.
+A dynamic container&#39;s header refers to separately allocated elements, so
+copying the header cannot replicate its contents. Byte comparison also has no
+element identity: inserting an element at the front of an encoded collection
+changes every following position. Choose a representation according to the
+collection&#39;s size and update pattern:</p>
 <ul>
-<li><strong>Bounded</strong> → a fixed array + count/sentinel: <code>bag: [6]kitems.Slot</code> with
-<code>ITEM_NONE</code> empties (cavecrawl). One field, one diff atom, edges and
-struct co-location work, prediction reverts are trivial. The cap is game
-design: a small-session game should choose and enforce its inventory bound.</li>
-<li><strong>Rare-change, genuinely unbounded</strong> (text, authored bytes) → an
-<a href="session.html#entity-blobs">entity blob</a>: author-dirtied, whole-value,
-reliable, and it rides every snapshot, so late joiners, backups, and saves
-get it free (cavecrawl&#39;s floor inscription).</li>
-<li><strong>A live collection of THINGS</strong> → each element is an <strong>entity</strong>. This is
-the one people reach past: the registry already IS a diffed dynamic
-collection: spawn is insert, despawn is remove, per-element state diffs
-field-by-field, interest management culls it, and late joiners get exactly
-the live set. Cavecrawl&#39;s floor pickups are the worked example: not
-<code>pickups: [dynamic]Pickup</code> on the level, but a Pickup entity per item on
-the ground, each with its own <code>x/y/item/count</code> (and its own typed
-<code>pickup_spawn</code>).</li>
+<li>For a bounded collection, use a fixed array with a count or sentinel, such as
+cavecrawl&#39;s <code>bag: [6]kitems.Slot</code> with <code>ITEM_NONE</code> for empty slots. The array
+is one replicated field, so change callbacks and prediction rollback cover
+the whole value. Choose and enforce the inventory bound in game code.</li>
+<li>For text or authored bytes that change rarely, use an
+<a href="session.html#entity-blobs">entity blob</a>. Game code marks it dirty, and the
+session reliably sends the whole value and includes it in snapshots. This
+supplies the value to late joiners and to backups and saves that include the
+entity. Cavecrawl&#39;s floor inscription is an example.</li>
+<li>For a live collection of independently changing objects, make each element
+an entity. Spawn inserts an element, despawn removes it, and replication
+compares each element&#39;s fields. Interest management selects which entities
+a peer receives, and late joiners receive the current relevant set.
+Cavecrawl represents each floor pickup as a Pickup entity with its own
+<code>x/y/item/count</code> and typed <code>pickup_spawn</code>, rather than storing
+<code>pickups: [dynamic]Pickup</code> on the level.</li>
 </ul>
-<p>The build error spells this fork out at the field. (<code>gd:&quot;backup&quot;</code> still
+<p>The build error lists these alternatives at the field. (<code>gd:&quot;backup&quot;</code> still
 accepts <code>[dynamic]</code>/map: the backup codec restores whole values on one
 peer; it never diffs across the wire.)</p>
 <h2 id="field-change-edges">Field-change edges<a class="heading-anchor" href="#field-change-edges" aria-label="Link to this section">#</a></h2>
-<p>Deltas carry values; one-shot reactions (the hurt flash, the goal horn, the
-floor fanfare) need the TRANSITION. Declare a plain proc named for the field
-(the proc is the subscription, no tag needed), and the session&#39;s per-frame pass
-hands it the net change:</p>
+<p>Deltas carry current values. To react to a change with a hurt flash, goal
+horn, or floor fanfare, declare a procedure named for the field and mark it
+<code>@(gd_half)</code>. The session&#39;s per-frame change comparison passes it the old and
+new values:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// ([game,] self, old, new: &lt;the field&#x27;s declared type&gt;) — no results</span>
 <span class="hljs-meta">@(gd_half)</span>
 gunner_hp_edge :: <span class="hljs-keyword">proc</span>(self: ^Gunner, old, new: <span class="hljs-type">i32</span>) {
 	<span class="hljs-keyword">if</span> new &lt; old {self.flash_ttl = <span class="hljs-number">0.25</span>}
-}</code></pre></div><p>The semantics:</p>
+}</code></pre></div><p>The change comparison follows these rules:</p>
 <ul>
-<li><strong>Net change per frame, never per apply.</strong> A predicting client legitimately
-writes a delta-lane field several times in one frame (optimistic apply,
-reject-truth, the replay reconcile); the half fires once on what actually
-changed since last frame, or not at all when the churn cancels.</li>
-<li><strong>The diff atom is the FIELD</strong>: a tagged POD struct or fixed array is
-one field. Fields that must edge <em>together</em> are co-located into one struct
-and receive one half with the whole old/new value, atomically (speedball&#39;s
-<code>score: Score</code>: l, r, and won as one value, one half, one fire per goal).
-The grouping knob is the data model, not a framework mode.</li>
-<li><strong>An EVENT must be bytes: equal values are indistinguishable from no
-event.</strong> The coalescing above means a 1→0→1 pulse inside one frame nets to
-nothing, and &quot;reset to level 1 <em>from</em> level 1&quot; changes no bytes at all; an
-edge cannot fire on a non-change. When you catch yourself wanting one to,
-the field is under-modeled: give the event bytes. The house form is a
-<strong>generation counter co-located in the diff atom</strong>:
-<code>stage: struct { run: u16, level: u8, reserved: u8 }</code>,
-where a reset bumps <code>run</code>, so same-level resets and within-frame round trips both
-land as real transitions (<code>old.run != new.run</code> is the cleanup branch), and a
-late joiner&#39;s silent seed correctly replays <em>zero</em> of them (they see
-<code>run = 5</code> as a baseline). It is the same move the kit makes everywhere state
-alone can&#39;t carry an occurrence: warp serials, spawn seqs, dedup windows.
-When the occurrence carries payload or must fire exactly-once under resim, it
-has outgrown edges: that&#39;s a <code>_then</code> consequence, a session event, a
-<a href="combat.html">Fire announcement</a>, or a sim-lane tick payload event.</li>
-<li><strong>First sight seeds; resync re-seeds silently.</strong> Spawn values are a
-baseline, not an edge; a wholesale catch-up (interest re-entry or a full
-snapshot) is history, not gameplay. Initial presentation belongs in a typed
-<code>&lt;entity&gt;_born</code> hook or the <code>Ev_Spawned</code> event after fields are applied. The
-census <code>_spawned</code> hook runs earlier and is for bookkeeping.</li>
-<li><strong>The host&#39;s own mutations edge the same way</strong>: the hurt flash needs no
-<code>is_host</code>, ever. (A host-side pulse within one net tick still never reaches
-clients: edges don&#39;t repeal &quot;deltas carry state&quot;; hold state a tick.)
-One timing note for authorities: the automatic pass runs inside
-<code>session_tick</code>, so a game tick that mutates AFTER the frame&#39;s pump edges a
-frame late. That matters when the half MOVES something the next tick&#39;s world
-reads. A coop game that declares its host pass with
-<a href="sim.html#discrete-verbs-on-the-lane"><code>@(gd_step = &quot;authority&quot;)</code></a> never sees
-this: the generated <code>&lt;snake&gt;_step(self, ticks)</code> runs the loop and the
-same-frame edge pass together. Hand-driven loops keep the manual fix: the
-pass is idempotent (diff-then-commit), so it is one call after the loop:
-<code>ksess.session_run_edges(&amp;ses)</code>.</li>
-<li><strong>Timing</strong>: the half fires wire-fresh, correct for row 4 of the
-<a href="#the-two-timelines-presenting-consequences">two-timelines table</a>
-(scoreboards, hp, inventories: never delay these). A row-2 consequence (a
-lid on the render clock) calls <code>session_present</code> inside the body.</li>
-<li><strong>Edges say &quot;it changed&quot;; events say &quot;it happened N times.&quot;</strong> Two hits
-coalescing into one net tick were always one delta: they are one edge.
-When multiplicity or arguments matter, use the sim lane&#39;s mine-form <code>_fx</code>,
-a declared <code>@(gd_event)</code>, or a verb&#39;s consequence.</li>
+<li>A half runs at most once per frame for the net change. A predicting client
+may write a reliable-delta field several times through optimistic execution,
+authoritative rejection state, and reconciliation replay. The half runs
+only if the final value differs from the previous frame&#39;s value.</li>
+<li>A tagged POD struct or fixed array counts as one field. Group values in one
+struct when the callback must receive them together. Speedball&#39;s
+<code>score: Score</code> groups l, r, and won, so one callback receives the complete
+old and new score for each goal.</li>
+<li>Equal values produce no callback. A 1→0→1 pulse inside one frame has no net
+change, and resetting from level 1 to level 1 changes no bytes. To represent
+a reset, include a generation counter in the same field:
+<code>stage: struct { run: u16, level: u8, reserved: u8 }</code>. Increment <code>run</code> on a
+reset and test <code>old.run != new.run</code> for cleanup. This records same-level
+resets and within-frame round trips. A late joiner receives <code>run = 5</code> as its
+initial value and replays zero previous resets. Warp serials, spawn sequences,
+and deduplication windows use the same principle of recording an occurrence
+separately from its resulting value. For occurrences that carry payloads or
+require exactly-once presentation under resimulation, use the appropriate
+<code>_then</code> consequence, session event, <a href="combat.html">Fire announcement</a>, or
+simulation-lane tick payload event.</li>
+<li>Spawn and resync values establish a baseline without firing edges. This
+includes interest re-entry and full snapshots. Put initial presentation in
+a typed <code>&lt;entity&gt;_born</code> hook or the <code>Ev_Spawned</code> event, which run after fields
+are applied. The census <code>_spawned</code> hook runs earlier for bookkeeping.</li>
+<li>Host mutations use the same change comparison, so a hurt flash needs no
+<code>is_host</code> branch. A host-side pulse that ends within one network tick still
+does not reach clients; retain the changed state for a tick. The automatic
+edge pass runs inside <code>session_tick</code>. If the authority changes state after
+that frame&#39;s session update, its edge runs a frame late, which can matter
+when the callback moves an object read by the next simulation tick. With
+<a href="sim.html#discrete-verbs-on-the-lane"><code>@(gd_step = &quot;authority&quot;)</code></a>, the generated
+<code>&lt;snake&gt;_step(self, ticks)</code> runs the authority loop and edge pass together in
+the same frame. For a manually driven loop, call
+<code>ksess.session_run_edges(&amp;ses)</code> after the loop. Comparing and then committing
+the values makes this pass idempotent.</li>
+<li>Edges run when the changed values are available. This is appropriate for
+scoreboards, hp, and inventories in row 4 of the
+<a href="#the-two-timelines-presenting-consequences">two-timelines table</a>. For spatial
+presentation that follows the render clock, such as a chest lid in row 2,
+call <code>session_present</code> inside the callback.</li>
+<li>Edges report a state change, so two hits combined into one network delta
+produce one edge. When the number of occurrences or their arguments matter,
+use the simulation lane&#39;s mine-form <code>_fx</code>, a declared <code>@(gd_event)</code>, or a
+command consequence.</li>
 </ul>
-<p>Delta lane only, held at build time: an <code>_edge</code> on a <code>predict</code> field errors
-toward the mine-form <code>_fx</code> (resims would scrub it), on an <code>owner</code> field toward
-dress-from-fields (it interpolates every frame). <code>play/edge</code> remains for
-NON-replicated local state, where this machinery can&#39;t see.</p>
+<p>Scriptgen permits <code>_edge</code> on reliable-delta fields and discrete owner fields.
+An edge on a <code>predict</code> field is a build error because resimulation would
+overwrite the change; use the mine-form <code>_fx</code>. An edge on an interpolated
+<code>owner</code> field is also a build error because the value interpolates every frame;
+derive presentation from the sampled fields instead. Use <code>play/edge</code> for
+local state that is not replicated.</p>
 <h2 id="advanced-registry-primitives">Advanced: registry primitives<a class="heading-anchor" href="#advanced-registry-primitives" aria-label="Link to this section">#</a></h2>
-<p>Normal games register and mutate entity lifetime through the generated Boot
-factory and typed <code>&lt;type&gt;_*</code> doors. These procedures are the engine-free
-registry layer beneath that surface.</p>
+<p>Game code normally creates and removes entities through the generated Boot
+factory and typed <code>&lt;type&gt;_*</code> procedures. The engine-independent registry
+procedures underlying them are:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">registry_spawn :: <span class="hljs-keyword">proc</span>(reg: ^Registry, entity: <span class="hljs-type">rawptr</span>, set: ^Command_Set, owner := PLAYER_ID_INVALID) -&gt; Net_Id
 registry_insert :: <span class="hljs-keyword">proc</span>(reg: ^Registry, id: Net_Id, entity: <span class="hljs-type">rawptr</span>, set: ^Command_Set, owner := PLAYER_ID_INVALID)
 registry_remove :: <span class="hljs-keyword">proc</span>(reg: ^Registry, id: Net_Id) -&gt; <span class="hljs-type">bool</span>
@@ -628,10 +635,9 @@ registry_teleport :: <span class="hljs-keyword">proc</span>(reg: ^Registry, id: 
 <code>registry_insert</code> under the id from the wire (which also keeps <code>next_id</code> ahead so a
 migrated host keeps allocating without collisions). Net ids are never reused within a
 session. If <code>Command_Set.net_id_offset</code> is nonzero, the assigned id is written back into
-the entity&#39;s <code>net_id</code> field so no spawn site ever forgets it. <code>registry_teleport</code> declares
-a discontinuity in the entity&#39;s streamed fields: the warp counter rides every snapshot,
-and receivers snap to the far side of the jump instead of interpolating a slide across the
-map.</p>
+the entity&#39;s <code>net_id</code> field. <code>registry_teleport</code> declares a discontinuity in the entity&#39;s
+streamed fields. Every snapshot includes the warp counter, so receivers snap
+to the destination rather than interpolating across the map.</p>
 <p>Game code normally keeps <code>Net_Ref(T)</code>, a generic POD wrapper around <code>Net_Id</code>,
 instead of a raw pointer. The generated census constructs it with <code>&lt;entity&gt;_ref</code>
 and accepts it in <code>&lt;entity&gt;_of</code>; the resolver checks liveness and the declared
@@ -647,7 +653,7 @@ registry_apply_deltas :: <span class="hljs-keyword">proc</span>(r: ^Reader, reg:
 registry_write_fulls :: <span class="hljs-keyword">proc</span>(w: ^Writer, reg: ^Registry) -&gt; <span class="hljs-type">int</span>
 registry_apply_fulls :: <span class="hljs-keyword">proc</span>(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = <span class="hljs-literal">nil</span>) -&gt; <span class="hljs-type">int</span>
 registry_commit_shadows :: <span class="hljs-keyword">proc</span>(reg: ^Registry)</code></pre></div><p>Pass the client&#39;s <code>ctx</code> to the apply procs so entities with in-flight predictions get the
-unwind→apply→replay reconcile; <code>nil</code> skips it (hosts, hand-driven tests). After applying an
+unwind→apply→replay reconciliation; <code>nil</code> skips it (hosts, manually driven tests). After applying an
 authoritative full snapshot, call <code>registry_commit_shadows</code> so the next local diff doesn&#39;t
 re-flag everything.</p>
 <p>Owner streams (unreliable channel), plus the once-per-frame sample:</p>
@@ -656,11 +662,11 @@ registry_stream_time :: <span class="hljs-keyword">proc</span>(r: ^Reader) -&gt;
 registry_apply_streams :: <span class="hljs-keyword">proc</span>(r: ^Reader, reg: ^Registry, me: Player_Id, stamp: <span class="hljs-type">f64</span>) -&gt; <span class="hljs-type">int</span>
 registry_sample_streams :: <span class="hljs-keyword">proc</span>(reg: ^Registry, t: <span class="hljs-type">f64</span>, me: Player_Id) -&gt; <span class="hljs-type">int</span></code></pre></div><p>Call <code>registry_sample_streams</code> once per <em>frame</em> (not per net tick) with
 <code>t = timeline_now - interp_delay</code>. Unknown ids in a stream batch are skipped by length
-rather than abandoning the batch: the next tick supersedes everything anyway.</p>
+rather than abandoning the batch; later ticks supply fresh samples.</p>
 <h2 id="advanced-the-command-loop-primitives">Advanced: the command-loop primitives<a class="heading-anchor" href="#advanced-the-command-loop-primitives" aria-label="Link to this section">#</a></h2>
-<p>Generated <code>&lt;verb&gt;_cmd</code> wrappers are the sole gameplay authoring surface. The
-procedures below are implementation primitives for a custom session shell; they
-do not provide an alternate boolean API.</p>
+<p>Issue gameplay commands through generated <code>&lt;verb&gt;_cmd</code> wrappers. The procedures
+below support custom session implementations and do not provide an alternate
+boolean API.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">command_ctx_make :: <span class="hljs-keyword">proc</span>(allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; Command_Ctx
 command_begin :: <span class="hljs-keyword">proc</span>(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id)
 command_issue :: <span class="hljs-keyword">proc</span>(ctx: ^Command_Ctx, entity: <span class="hljs-type">rawptr</span>, set: ^Command_Set, cmd: Cmd_Id) -&gt; Command_Issue_Result
@@ -668,48 +674,48 @@ registry_host_command :: <span class="hljs-keyword">proc</span>(reg: ^Registry, 
 registry_client_result :: <span class="hljs-keyword">proc</span>(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me := PLAYER_ID_INVALID) -&gt; Command_Result
 registry_expire_pending :: <span class="hljs-keyword">proc</span>(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: <span class="hljs-type">u64</span>, me := PLAYER_ID_INVALID, out: ^[<span class="hljs-keyword">dynamic</span>]Expired_Command = <span class="hljs-literal">nil</span>) -&gt; <span class="hljs-type">int</span></code></pre></div><p>The generated <code>&lt;proc&gt;_cmd</code> wrapper is the normal path
 (<code>chest_take_cmd(&amp;boot, chest, slot, px, py)</code>), and <a href="session.html">kit/session</a>
-installs the send hook and drives the host/client/expiry paths. Guarantees the loop owns:
-<code>false</code> really means &quot;no mutation&quot; (declared fields are captured before the run and
-restored on any rejection, on both peers; a command can never leave torn replicated
-state); a locally-rejected prediction is still <em>sent</em> (the client&#39;s copy may be stale, only
-the host may say no); and the host&#39;s per-peer <code>Dedup_Window</code> (64-command sliding window
-over intent sequences) makes execution exactly-once through retransmits and reconnect
+installs the send hook and handles host execution, client results, and expiry.
+The command loop captures declared fields before execution and restores them
+on rejection on both peers, so a command returning <code>false</code> leaves no partial
+mutation in those fields. A locally rejected prediction is still sent: the
+client&#39;s copy may be stale, and the host decides whether to accept it. The
+host&#39;s per-peer <code>Dedup_Window</code>, a 64-command sliding window over intent
+sequences, prevents duplicate execution through retransmits and reconnect
 replays.</p>
 <h2 id="typed-app-messages">Typed app messages<a class="heading-anchor" href="#typed-app-messages" aria-label="Link to this section">#</a></h2>
-<p>Almost everything is <em>state, not messages</em>: replicate a field, predict a
-<a href="#article">verb</a>, announce a presentation event. But a few things are genuinely
-message-shaped: a <strong>directed signal</strong> (a whisper, an emote to one peer), an
-<strong>out-of-band request/response</strong>, an <strong>app notification tied to no entity</strong>,
-where <em>&quot;if you weren&#39;t there, you don&#39;t get it&quot;</em> is the correct behavior, not a
-bug. That is what an app-message is for, and <code>@(gd_message)</code> is its declarative
-form. Annotate a handler with the <code>SES_APP</code> <a href="session.html#app-messages">tag</a> it
-rides (the game owns its tag budget: the kit holds comms 0, xfer 2, sim 3):</p>
+<p>Use replicated fields for persistent state, a <a href="#the-command-loop">command</a> for
+a requested mutation, and a presentation event for an effect. App messages
+serve transient communication: a whisper or emote directed to one peer, an
+out-of-band request/response, or a notification tied to no entity. They do not
+replay for peers that join later.</p>
+<p>Declare an app-message handler with <code>@(gd_message)</code> and the <code>SES_APP</code>
+<a href="session.html#app-messages">tag</a> used to route it. The game assigns its tags
+around Kit&#39;s reserved routes: comms 0, xfer 2, and sim 3.</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">Whisper :: <span class="hljs-keyword">struct</span> { spice: <span class="hljs-type">u16</span>, emote, reserved: <span class="hljs-type">u8</span> } <span class="hljs-comment">// canonical 4-byte payload</span>
 TAG_WHISPER :: <span class="hljs-type">u8</span>(<span class="hljs-number">4</span>)
 
 <span class="hljs-meta">@(gd_message = &quot;TAG_WHISPER&quot;)</span>
 game_whisper :: <span class="hljs-keyword">proc</span>(self: ^Game, from: knet.Player_Id, msg: Whisper) {
-    <span class="hljs-comment">// the DECODED payload; `from` is the sender (the host resolves it,</span>
-    <span class="hljs-comment">// PLAYER_ID_INVALID on a client — check on the authority when it matters)</span>
-}</code></pre></div><p>scriptgen generates the game-owned route, a <code>game_messages(self, &amp;ses)</code> you call
-once in <code>ready()</code> (one line, like <code>fire_listen</code>), and two send doors:</p>
+    <span class="hljs-comment">// Decoded payload. The authority resolves `from`; clients receive</span>
+    <span class="hljs-comment">// PLAYER_ID_INVALID. Perform sender-dependent validation on the authority.</span>
+}</code></pre></div><p>Scriptgen generates the route, a <code>game_messages(self, &amp;ses)</code> registration
+procedure to call once in <code>ready()</code> like <code>fire_listen</code>, and two send procedures:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">game_whisper_send(&amp;ses, msg, ksess.HOST_PEER)   <span class="hljs-comment">// to a peer, or ksess.BROADCAST_PEER</span>
-game_whisper_send_to(&amp;ses, player, msg)         <span class="hljs-comment">// to a PLAYER (seat resolved on the host)</span></code></pre></div><p>It wraps the runtime typed-route API
+game_whisper_send_to(&amp;ses, player, msg)         <span class="hljs-comment">// to a player; the host resolves its seat</span></code></pre></div><p>It wraps the runtime typed-route API
 (<a href="session.html#app-messages"><code>session_app_send_typed</code></a> / <code>session_app_listen</code>),
-which stays available for hand-rolled routing. The generated payload has a
-<strong>canonical raw ABI</strong>: fixed-width, recursively validated, padding-free bytes;
-frame strings and other variable data yourself on a bare <code>session_app_route</code>.
-Its full field layout folds into <code>NET_FINGERPRINT</code>, so a build that drifts the
-payload shape is refused at the join door like any other wire-contract skew.
+which remains available for custom routing. The generated payload has a
+canonical raw ABI: fixed-width, recursively validated, padding-free bytes.
+Frame strings and other variable data yourself on a bare <code>session_app_route</code>.
+The full field layout enters <code>NET_FINGERPRINT</code>, so peers reject a join when
+the builds disagree on the payload layout or another part of the wire schema.
 The declared tag must resolve to a package-level byte literal such as
 <code>TAG_WHISPER :: u8(4)</code>; its numeric route, not only the identifier, enters the
-schema. cavecrawl&#39;s arrival greeting is the worked example.</p>
-<p>The counter-rule, because it is the tempting mistake: <strong>don&#39;t send state as a
-message.</strong> &quot;Player X&#39;s score is now 5&quot; shipped as a message is lost to a peer who
-joins a second later, and gone forever on a dropped packet. Replicate the score
-instead so a snapshot can restore its current value. Use a message when you
-<em>want</em> the opposite of those guarantees: a fire-and-forget signal to whoever is
-listening right now.</p>
+schema. Cavecrawl&#39;s arrival greeting is an example.</p>
+<p>A message saying &quot;Player X&#39;s score is now 5&quot; does not supply that score to a
+peer who joins a second later. A dropped packet can also lose the update if
+the message uses unreliable delivery. Replicate the score so a snapshot can
+restore its current value. Reserve messages for signals addressed to peers
+that are listening when they are sent.</p>
 <h2 id="wire-tick-and-clocks">Wire, tick, and clocks<a class="heading-anchor" href="#wire-tick-and-clocks" aria-label="Link to this section">#</a></h2>
 <p><code>Writer</code>/<code>Reader</code> are a bounds-checked, little-endian, append/cursor pair: fixed-width
 fields, u16-length strings, no varints. The error model: a <code>Reader</code> that runs past its data
@@ -717,8 +723,8 @@ sets a sticky <code>err</code> and returns zero values from then on, so callers 
 after a decode block. A malformed packet can never read out of bounds or panic, since remote
 input is untrusted by default. <code>read_string</code>/<code>read_bytes</code> return zero-copy views into the
 packet; clone anything you keep.</p>
-<p>The integer prefix is not the allocation policy. Admission happens before a
-decoder loops, clones, or calls game code:</p>
+<p>Length prefixes describe the encoding; admission limits bound the work a
+decoder can perform before looping, cloning data, or calling game code:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -759,7 +765,7 @@ decoder loops, clones, or calls game code:</p>
 <td align="right">4 KiB</td>
 </tr>
 </tbody></table>
-</div><p>Outgoing session packets pass the same door, so the authority cannot announce
+</div><p>Outgoing session packets pass the same checks, so the authority cannot send
 a packet every receiver would reject. Delta and stream batches stop before the
 packet ceiling and leave unsent shadows dirty for a later tick. Use <code>kit/xfer</code>
 for bulk assets; its 8 KiB chunks remain ordinary bounded messages.
@@ -806,8 +812,7 @@ helper.</p>
 <p>An entity or visual state needed by a delayed effect must remain available
 until the effect can run. Use a despawn dwell or <code>session_present</code>&#39;s <code>extra</code>
 delay with a reaper callback when necessary.</p>
-<p>Every consequence classifies into one of five bins, each with an existing
-tool: when something looks mistimed, find its row:</p>
+<p>Choose a presentation method according to the consequence&#39;s cause:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -845,117 +850,109 @@ tool: when something looks mistimed, find its row:</p>
 </div><p>Classify each consequence independently. A looted chest can update the
 inventory UI immediately while delaying the lid animation to match a remote
 player&#39;s rendered interaction.</p>
-<p>Shrinking the gap globally (<code>interp_delay</code> down, <code>tick_hz</code> up via
-<code>session_configure</code>) trades smoothness under jitter for freshness: aligning
-presentation is almost always the better spend. One <code>interp_delay</code> can&#39;t be
-right for both a LAN and a 120ms link, though: set it for the LAN and remote
-motion samples past the last packet on a real link; set it for the link and the
-LAN renders needlessly stale. <code>cfg.interp_adapt</code> (off by default) makes the
-delay toward the worst active link&#39;s need (<code>rtt/2 + 2·jitter</code>, using the same
-clock data as the ping stat), growing promptly for headroom and shrinking
-slowly with hysteresis. A configured <code>interp_delay</code>
-becomes the floor; <code>session_interp_target</code> reads where the slew is headed.</p>
-<h3 id="if-you-drew-the-cause-yourself-you-own-its-clock">If you drew the cause yourself, you own its clock<a class="heading-anchor" href="#if-you-drew-the-cause-yourself-you-own-its-clock" aria-label="Link to this section">#</a></h3>
-<p>Row 3 (<em>each screen flies its own projectile</em>) hides a precondition that
-<code>session_present</code> cannot check for you. <code>session_present(mine=false)</code> delays
-its callback by <code>interp_delay</code> <strong>because the cause is rendered through the
-interpolated stream</strong>: the delay is what cancels the stream&#39;s transit so the
-effect lands on the rendered cause. That cancellation is only correct when the
-cause really is on the interpolated timeline.</p>
+<p>Reducing <code>interp_delay</code> or increasing <code>tick_hz</code> through <code>session_configure</code>
+reduces presentation delay but leaves less buffer for jitter. First align
+effects with their causes. A delay chosen for a LAN can leave a 120ms link
+without a newer motion sample to interpolate toward; a delay chosen for that
+link can make LAN presentation unnecessarily late.</p>
+<p><code>cfg.interp_adapt</code>, off by default, adjusts toward the delay required by the
+worst active link: <code>rtt/2 + 2·jitter</code>, using the same clock data as the ping
+stat. It grows promptly for headroom and shrinks slowly with hysteresis. The
+configured <code>interp_delay</code> becomes the floor, and <code>session_interp_target</code>
+returns the target delay.</p>
+<p><span id="if-you-drew-the-cause-yourself-you-own-its-clock"></span></p>
+<h3 id="game-controlled-presentation-clocks">Game-controlled presentation clocks<a class="heading-anchor" href="#game-controlled-presentation-clocks" aria-label="Link to this section">#</a></h3>
+<p>For row 3, where each screen moves its own projectile, the game must schedule
+effects on the projectile&#39;s clock. <code>session_present(mine=false)</code> delays its
+callback by <code>interp_delay</code> to align with a cause rendered through the
+interpolated stream. That alignment is correct only when the cause uses the
+interpolated timeline; <code>session_present</code> cannot check this condition.</p>
 <p>An entity the game already renders at <code>now - interp_delay</code> is already delayed.
 Passing its hit or splash through <code>session_present(mine = false)</code> delays the
 effect a second time. When the game owns the cause&#39;s clock, carry a timestamp
 and present the consequence on that clock. Use <code>session_present</code> for causes
 whose delayed rendering is owned by Kit&#39;s owner-stream interpolation.</p>
 <h3 id="projectiles-put-a-clock-in-the-spawn-tuple">Projectiles: put a clock in the spawn tuple<a class="heading-anchor" href="#projectiles-put-a-clock-in-the-spawn-tuple" aria-label="Link to this section">#</a></h3>
-<p>The classic row-3 mistake, worth stating outright because it <em>looks</em> correct
-and desyncs silently: replicating a projectile as a spawn-only tuple
-(<code>{origin, dir, speed}</code> with <strong>no time in it</strong>) and starting to integrate its
-motion from the moment the packet <em>arrives</em>. A peer that does this renders the
-projectile one network-transit behind <strong>forever</strong> (the error never decays; it
-is exactly this peer&#39;s ping to the shooter). Two peers at different pings see
-the same bullet in <em>different places</em>; a burst spawned in one host frame lands
-on timelines tens of ms apart. The tuple has no clock, so &quot;when did it spawn&quot;
-silently becomes &quot;when did my copy of the packet land.&quot;</p>
-<p>The fix is one more field and a closed form:</p>
+<p>If a projectile replicates only a spawn tuple (<code>{origin, dir, speed}</code>), each
+peer may start integrating motion when its packet arrives. That makes the
+local spawn time depend on packet transit. The resulting position offset
+persists for the projectile&#39;s lifetime: peers with different latency display
+the same bullet in different places, and projectiles spawned in one host frame
+can appear tens of ms apart.</p>
+<p>Include time in the tuple and evaluate position from it:</p>
+<ol>
+<li>Add the host&#39;s world-time at spawn (<code>Birth</code>) and a <code>DeadAt</code> timestamp,
+producing 5 fields rather than 3. Evaluate
+<code>pos(t) = origin + dir·speed·(t − Birth)</code> instead of integrating from arrival.</li>
+<li>Render at <code>now - interp_delay</code> to match the time used for other remote
+entities. Drawing the projectile at host-now while drawing its target in
+the past can make it appear to pass through a target that has not visibly
+reacted.</li>
+<li>Remove the projectile at <code>DeadAt</code> on that clock. Do not add another delay
+through <code>session_present</code>.</li>
+<li>For a bounce, replicate a new <code>origin</code>/<code>dir</code>/<code>Birth</code> tuple and a segment
+counter. Use the counter&#39;s edge for the bounce sound. Replicating the
+current segment lets a late joiner reconstruct it; a transient bounce
+event alone would leave that peer on the original segment.</li>
+</ol>
+<p>A live projectile needs no continuous motion updates once peers have its
+tuple. Spawn bursts dominate traffic in this model, so batch spawns when their
+volume becomes a problem. Interest management and <code>f16</code> packing do not reduce
+the number of spawn operations.</p>
+<p>A cosmetic row-3 visual can use a less precise clock. Cavecrawl&#39;s rock tracer
+(<a href="fx.html">kit/fx</a> <code>tracer_add</code>) integrates a spawn tuple from arrival and draws
+at <code>now</code>. The host keeps the damaging rock in its local <code>flying</code> array and
+tests hits there. A <code>Fire</code> announcement creates the visual; accepted damage
+reaches peers through replicated hp. The rock itself is not a replicated
+entity, and tracer positions can differ between peers. Use birth timestamps
+when a peer relies on the projectile&#39;s position to judge a hit, dodge, or block.</p>
+<p><span id="one-package-two-lanes"></span></p>
+<h2 id="shared-replication-and-simulation-primitives">Shared replication and simulation primitives<a class="heading-anchor" href="#shared-replication-and-simulation-primitives" aria-label="Link to this section">#</a></h2>
+<p><code>kit/net</code> provides the wire format, field descriptors and codecs, interpolation
+math, ticks, and clocks used by both session replication and <a href="sim.html">kit/sim</a>.
+Session replication adds commands and owner streams on top of those shared
+primitives. <code>kit/sim</code> adds server-authoritative simulation and resimulation in
+a separate package. Its documentation calls the shared primitives the
+substrate layer of <code>kit/net</code>. <code>Field_Desc</code> also carries simulation-only tuning
+fields (<code>slack</code>, <code>glide</code>, <code>cut</code>) that only the simulation lane reads.</p>
+<p>Three related names refer to different presentation operations.
+<code>session_present</code> queues one consequence for the render clock; see
+<a href="#the-two-timelines-presenting-consequences">the two timelines</a>.
+<code>lane_present</code> runs <a href="sim.html">kit/sim</a>&#39;s per-frame presentation update for
+watched and reconciled entities. <code>kit/sim/present.odin</code> implements the blending
+and error-correction math used by that update.</p>
+<p><span id="gotchas"></span></p>
+<h2 id="constraints-and-failure-cases">Constraints and failure cases<a class="heading-anchor" href="#constraints-and-failure-cases" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Stamp the birth.</strong> Put the host&#39;s world-time at spawn (<code>Birth</code>) and a
-<code>DeadAt</code> stamp <em>in the tuple</em> (5 fields, not 3). Evaluate position as a
-closed form of <code>Birth</code> (<code>pos(t) = origin + dir·speed·(t − Birth)</code>), not by
-integrating from arrival.</li>
-<li><strong>Draw it in the past, like everything else remote.</strong> Render at
-<code>now - interp_delay</code>, where every other remote entity already lives, and the
-bullet is wrong by the <em>same amount</em> as the enemy it flies toward, so the
-on-screen <em>relationship</em> is right. (Chasing absolute agreement with host-now
-is the wrong target: it renders bullets passing through enemies that haven&#39;t
-visibly reacted yet.) Holds flat across every speed and ping.</li>
-<li><strong>Kill on the <code>DeadAt</code> stamp, not on arrival</strong>, and <em>not</em> through
-<code>session_present</code> (you drew the cause; see above).</li>
-<li><strong>Bounces</strong> are a re-based tuple (new <code>origin</code>/<code>dir</code>/<code>Birth</code>), plus a
-replicated segment counter whose <em>edge</em> is the bounce sound, not a transient
-event, because a transient event leaves a late
-joiner flying the original segment.</li>
-</ul>
-<p>Steady-state cost is ~nil (a live projectile is a few bytes of tuple); the
-entire cost is the spawn <em>burst</em>, so interest-management and <code>f16</code> packing
-don&#39;t help projectile volume: <em>batching</em> the spawns does.</p>
-<p>Worth knowing where the line is: a <strong>cosmetic</strong> row-3 visual can skip all of
-this. cavecrawl&#39;s rock tracer (<a href="fx.html">kit/fx</a> <code>tracer_add</code>) is a
-naked spawn-tuple integrated from arrival and drawn at <code>now</code>, because it is a
-<em>non-authoritative follower</em>: the rock that actually hurts is a
-host-authoritative delta entity with a server-side hit test, and the tracer&#39;s
-announcement rides the same one-way path as the eventual hp delta, so the two
-visually coincide anyway. Per-peer position divergence on a purely cosmetic
-tracer is a non-issue. The birth-stamp discipline is for a projectile whose
-<em>position is load-bearing</em>: anything a peer will read to decide a hit, a
-dodge, or a block.</p>
-<h2 id="one-package-two-lanes">One package, two lanes<a class="heading-anchor" href="#one-package-two-lanes" aria-label="Link to this section">#</a></h2>
-<p><code>kit/net</code> bundles two things under one name. A shared <strong>replication substrate</strong>
-(the wire format, the field descriptors and codecs, the interpolation blend
-math, the tick and clock) is consumed by both the coop lane described on this
-page and by <a href="sim.html">kit/sim</a>, the server-authority resim lane that lives in its
-own package. The <strong>coop lane</strong> proper (the command + owned-streams model) is
-layered on top of that substrate. <a href="sim.html">kit/sim</a> calls the shared part the
-substrate <em>layer</em> of kit/net; this page calls the whole of it the coop
-replication core. <code>Field_Desc</code> carries sim-only tuning fields (<code>slack</code>,
-<code>glide</code>, <code>cut</code>) that only the sim lane reads.</p>
-<p>Three code paths share the word <em>present</em>: <code>session_present</code> queues ONE
-consequence for the render clock (see <a href="#the-two-timelines-presenting-consequences">the two
-timelines</a>); <code>lane_present</code> is
-<a href="sim.html">kit/sim</a>&#39;s per-frame presentation pump for watched/reconciled entities;
-and <code>kit/sim/present.odin</code> is the blend/error math that pump drives. They are
-distinct: don&#39;t conflate them.</p>
-<h2 id="gotchas">Gotchas<a class="heading-anchor" href="#gotchas" aria-label="Link to this section">#</a></h2>
-<ul>
-<li><strong>A client writing a host-lane field is caught, loudly.</strong> <code>self.score += 1</code>
-on a client compiles and looks right locally but never replicates. Every
-client re-purposes its shadow as &quot;the bytes the framework last put here&quot; and
-diffs against it once per net tick (the same memcmp walk the host pays to
-send): a delta-lane field that moved outside the framework asserts, naming
-the class, the field, and the fix (route it through a verb, or compute it on
-the authority). Coop speculation and the sim lane&#39;s in-flight verbs are exempt
-while pending: legal optimistic writes never trip it. Two build-time cousins
-guard the same doctrine: a direct call of a <code>@(gd_command)</code> proc is a
-scriptgen error pointing at the <code>&lt;verb&gt;_cmd</code> wrapper, and a gd-shaped tag
-under a typo&#39;d namespace (<code>gs:&quot;replicate&quot;</code>) is named instead of silently
-ignored. Development builds assert on a violation. Under <code>-disable-assert</code>, the
-session retains the walk and increments <code>session_guard_hits</code>; native builds
+<li>A client write to an authority-owned field, such as <code>self.score += 1</code>,
+changes the local value without replicating it. The write guard compares
+each client&#39;s reliable-delta fields with the values last applied by the
+framework once per network tick. It reports the class, field, and required
+fix: issue a command or compute the value on the authority. Pending
+cooperative predictions and simulation commands are exempt, so permitted
+optimistic writes do not trigger the guard. Scriptgen also rejects direct
+calls to <code>@(gd_command)</code> procedures and points to the <code>&lt;verb&gt;_cmd</code> wrapper.
+It diagnoses gd-shaped tags under a misspelled namespace, such as
+<code>gs:&quot;replicate&quot;</code>, rather than ignoring them. Development builds assert on a
+violation. Under <code>-disable-assert</code>, the session retains the comparison and
+increments <code>session_guard_hits</code>; native builds
 also log the first violation. See <a href="session.html#gotchas">session</a>.</li>
-<li><strong>Deltas carry STATE, not events.</strong> The walk memcmps entity-vs-shadow once per net tick;
-a replicated byte pulsed <code>1 → 0</code> <em>within</em> one tick equals its shadow when the diff runs
-and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl&#39;s
-<code>level.won</code> stays 1 until the next run), or use an explicit reliable message. The
-REACTION side is a <a href="#field-change-edges"><code>&lt;field&gt;_edge</code> half</a>:
-the pulse caveat is about what the wire carries, not how you observe it.</li>
+<li>Deltas compare entity bytes with their shadow once per network tick. A byte
+pulsed <code>1 → 0</code> within one tick can equal its shadow when the comparison runs,
+so no change is sent. Hold state for at least a tick, as cavecrawl does with
+<code>level.won</code> staying 1 until the next run, or use an explicit reliable message.
+A <a href="#field-change-edges"><code>&lt;field&gt;_edge</code> half</a> reacts to received changes; it
+cannot recover a pulse that replication did not send.</li>
 <li><strong>Owner-streamed fields are never written by network input on the owner&#39;s peer.</strong>
 <code>registry_apply_streams</code> skips entities owned by <code>me</code>; reject-truth, prediction reverts,
 and expiry all pass <code>skip_owner</code> for them; <code>diff_mask</code> keeps them out of deltas entirely.
-Otherwise every rejected cast would visibly yank a moving owner backwards onto the host&#39;s
-lagged echo. (Full snapshots at join/world-seed do write them: that is the seeding.)</li>
+This prevents a rejected cast from moving the entity owner back to the host&#39;s
+older position sample. Full snapshots at join or world seeding do write
+these fields to establish their initial values.</li>
 <li><strong><code>registry_get</code> returns a pointer into the registry</strong>, so mutations land in place with
 no store-back required. It stays valid only until the next insert/remove. Don&#39;t hold it
 across a spawn.</li>
-<li><strong>Channel ordering is load-bearing.</strong> A delta that already contains a command&#39;s effect
+<li>Reliable channel ordering is required. A delta that already contains a command&#39;s effect
 must arrive <em>after</em> that command&#39;s result, and a delta batch must never name an id the
 peer hasn&#39;t seen spawn (an unknown id abandons the batch: field sizes come from the
 descriptor the peer doesn&#39;t have). The session guarantees both by putting results, state
@@ -973,5 +970,5 @@ session.</li>
 which <a href="timelines.html">timelines</a> helps you choose), <a href="comms.html">kit/comms</a>, <a href="combat.html">kit/combat</a>,
 <a href="save.html">kit/save</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/net.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-mental-model" class="">The mental model</a><a href="#declaring-a-replicated-entity" class="">Declaring a replicated entity</a><a href="#command-consequences" class="">Command consequences</a><a href="#composing-verbs-from-embedded-blocks" class="">Composing verbs from embedded blocks</a><a href="#wire-codecs" class="">Wire codecs</a><a href="#dynamic-collections" class="">Dynamic collections</a><a href="#field-change-edges" class="">Field-change edges</a><a href="#advanced-registry-primitives" class="">Advanced: registry primitives</a><a href="#the-per-tick-walks" class="">The per-tick walks</a><a href="#advanced-the-command-loop-primitives" class="">Advanced: the command-loop primitives</a><a href="#typed-app-messages" class="">Typed app messages</a><a href="#wire-tick-and-clocks" class="">Wire, tick, and clocks</a><a href="#the-two-timelines-presenting-consequences" class="">The two timelines (presenting consequences)</a><a href="#one-package-two-lanes" class="">One package, two lanes</a><a href="#gotchas" class="">Gotchas</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/net.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="session.html"><span>kit/session: players, entities, and replication scheduling</span><span aria-hidden="true">→</span></a><a href="netgd.html"><span>kit/netgd — the Godot transport binding</span><span aria-hidden="true">→</span></a><a href="sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/net.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#replication-lanes" class="">Replication lanes</a><a href="#declaring-a-replicated-entity" class="">Declaring a replicated entity</a><a href="#command-consequences" class="">Command consequences</a><a href="#composing-verbs-from-embedded-blocks" class="">Composing verbs from embedded blocks</a><a href="#wire-codecs" class="">Wire codecs</a><a href="#dynamic-collections" class="">Dynamic collections</a><a href="#field-change-edges" class="">Field-change edges</a><a href="#advanced-registry-primitives" class="">Advanced: registry primitives</a><a href="#the-per-tick-walks" class="">The per-tick walks</a><a href="#advanced-the-command-loop-primitives" class="">Advanced: the command-loop primitives</a><a href="#typed-app-messages" class="">Typed app messages</a><a href="#wire-tick-and-clocks" class="">Wire, tick, and clocks</a><a href="#the-two-timelines-presenting-consequences" class="">The two timelines (presenting consequences)</a><a href="#shared-replication-and-simulation-primitives" class="">Shared replication and simulation primitives</a><a href="#constraints-and-failure-cases" class="">Constraints and failure cases</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/net.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

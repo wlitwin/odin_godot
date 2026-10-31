@@ -74,7 +74,7 @@ capturing/packaging a new checkpoint. The expensive work therefore starts with a
 refreshed lease rather than the remainder of the status round trip. Existing lease
 duration and fencing rules remain unchanged.
 
-Room now has one bounded control receiver that dispatches checkpoint and authority
+Room uses one bounded control receiver to dispatch checkpoint and authority
 RPC packets before pumping outgoing RPC work. The borrowed RPC transport copy has
 reads/polling temporarily disabled during that outgoing pump, then restored. It
 cannot drain checkpoint traffic accidentally. Existing control pause behavior is
@@ -93,15 +93,15 @@ default); browser launch parameters use `room_checkpoint_ms`. Solo/local save sl
 remain separate. The native party test verifies both the original host's publication
 and the successor's newer-epoch publication, then decodes the actual stored inventory.
 
-The browser party gate also exercises both publications through Room during real
-RTC play, alongside a second isolated room, migration and durable rejoin. It uses
+The browser party test exercises both publications through Room during
+RTC play, alongside a second isolated room, migration, and durable rejoin. It uses
 explicit loopback development WS. A fresh native reader validates the saved
 successor inventory; this is not production browser TLS/deployment evidence.
 
 These operations save simulation checkpoints and their declared packaged asset
-bytes. Personal profiles remain separate. Publication does not supply a restore grant or guarantee
-preservation after the reported saved tick. Room now separately drives
+bytes. Personal profiles remain separate. Publication does not supply a restore
+grant or guarantee preservation after the reported saved tick. Room separately drives
 [fresh-process party restoration](room_restore.md), with native/browser Cavecrawl
-acceptance. Broader asset profiles and other game acceptance remain part of M5. See the
+acceptance. Broader asset profiles and other games require separate acceptance. See the
 [service contract](../provision/checkpoints.md) and
 [checkpoint transport](../provision/checkpoint/README.md).

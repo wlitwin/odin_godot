@@ -3,7 +3,7 @@
 `run.sh` prepares a native game and typed Room service, builds/exports Web with
 speed optimization, runs the browser cases, independently reads the service's
 publications, and exercises native Party UI. Set `REPLAY_CLAIMBALL_ONLINE_OUT` to
-a fresh output directory. The existing native UI/profile gate is a prerequisite.
+a fresh output directory. The native UI/profile test is a prerequisite.
 
 For separate runs, use the build/execute scripts in this directory with prepared
 output paths. `RCB_ONLINE_MODES=planned` or `crash` selects one browser case.

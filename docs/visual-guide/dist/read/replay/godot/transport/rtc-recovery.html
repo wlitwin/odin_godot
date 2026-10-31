@@ -5,10 +5,10 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>RTC continuation during a gameplay reconnect</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/replay/godot/transport/rtc-recovery.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#relay-outage-evidence">Relay outage evidence</a><a href="#replacing-a-peer-connection-under-the-same-id">Replacing a peer connection under the same ID</a></nav></details>
 <article class="reading-body "><p>Use RTC continuation to preserve an authenticated signaling reservation when
-replacing a gameplay transport within the same authority term. <code>Rtc_Continuation</code>
-contains
-the existing logical peer ID, opaque room code, resume token and host/client role.
-It is in-memory transport state, not a membership credential, checkpoint or save.</p>
+replacing a gameplay transport within the same authority term.
+<code>Rtc_Continuation</code> stores the existing logical peer ID, opaque room code,
+resume token, and host/client role in memory. It is not a membership
+credential, checkpoint, or save.</p>
 <p><code>rtc_continuation</code> exports it only from a registered context without a terminal error,
 with authenticated resumption enabled. <code>Rtc_Config.continuation</code> accepts it only
 for the exact room and role, with a nonzero token and a valid peer ID. Opening
@@ -41,8 +41,8 @@ existing 10-second gameplay timeout and platform ICE failure detection still
 contribute to interruption.</p>
 <p>See <span class="local-reference" title="docs/replay/results/relay-outage-2026-09-07/README.md · available in the repository">recorded outage results</span>
 and <a href="../../../tests/replay_turn/README.html">TURN fixture commands</a>. Credential refresh,
-ICE restart, combined coordinator/relay outages, public deployment and other
-platform/browser envelopes remain separate work.</p>
+ICE restart, combined coordinator/relay outages, public deployment, and other
+platform/browser configurations remain separate work.</p>
 <h2 id="replacing-a-peer-connection-under-the-same-id">Replacing a peer connection under the same ID<a class="heading-anchor" href="#replacing-a-peer-connection-under-the-same-id" aria-label="Link to this section">#</a></h2>
 <p>The public and raw RTC transports expose the peer-connection serial as local
 connection-generation metadata. Fragment assembly/delivery state and outer Replay
@@ -57,5 +57,5 @@ ID 1 changes generation. Both reach the reference world with correct occurrences
 The admission service and fixed match remain alive; this does not elect another
 player to supply the missing creator&#39;s inputs or recover an incompatible archive.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_turn/README.html"><span>Actual TURN relay gates</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/rtc-recovery.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/replay_turn/README.html"><span>TURN relay tests with Coturn</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/transport/rtc-recovery.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#relay-outage-evidence" class="">Relay outage evidence</a><a href="#replacing-a-peer-connection-under-the-same-id" class="">Replacing a peer connection under the same ID</a></nav><div class="outline-actions"><a href="../../../../reference/replay/godot/transport/rtc-recovery.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

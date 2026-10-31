@@ -27,7 +27,7 @@ remain as documented in the main README. Content C3 (`0x52434c41494d4233`) expli
 distinguishes the new world/action/event schema from C1/C2; no automatic archive conversion
 is provided.
 
-[Party menus and browser sessions](online.md) now have local RTC acceptance. Steam
+[Party menus and browser sessions](online.md) have local RTC acceptance. Steam
 and public deployment remain work. Fixed native Room recovery is described in
 [migration.md](migration.md).
 See the [validation results](../../docs/replay/results/claimball-ui-2026-09-13/README.md)
@@ -75,14 +75,14 @@ Missing, damaged/incompatible, protected-policy and exhausted-epoch saves are
 refused before a session opens. The host identity must match the saved local seat.
 Existing files and identities are kept on rejection. Native file saves do not
 persist the cosmetic chat history; fresh sessions can exchange named chat again.
-Browser-local checkpoints now use a separate slot adapter. Provisioned Parties publish
+Browser-local checkpoints use a separate slot adapter. Provisioned Parties publish
 through their service; fixed native Rooms disable direct file save/resume.
 This adds no schema change beyond the existing C3 game version.
 
 Use `RCB_SAVE` to select a path at launch and `RCB_PROFILE` for the matching host
 identity/name profile. Each process can use a separate profile path. Resume solo
 and Resume host are the supported menu entry points; a dedicated-server resume
-front door is not part of this increment.
+menu entry point is not implemented here.
 
 ## Browser-local Solo saves
 

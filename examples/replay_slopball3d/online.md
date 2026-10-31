@@ -96,8 +96,8 @@ rolled-back ticks. Continuing play can publish a replacement checkpoint. Progres
 after publication and cosmetic chat history can be lost after total process loss;
 solver contact caches and joints are not serialized.
 
-The [native WSS gate](../../tests/replay_slopball3d_native_restore/README.md) and
-[browser RTC gate](../../tests/replay_slopball3d_party_restore/README.md) test both
+The [native WSS test](../../tests/replay_slopball3d_native_restore/README.md) and
+[browser RTC test](../../tests/replay_slopball3d_party_restore/README.md) test both
 returning-host choices, independently decode source and replacement publications,
 and compare the actual first solver seed before requiring another kick and goal.
 

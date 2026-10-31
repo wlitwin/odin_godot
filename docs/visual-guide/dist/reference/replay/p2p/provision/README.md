@@ -1,8 +1,9 @@
 # Fixed-roster P2P provisioning
 
-This package creates durable, invite-only membership for a deterministic P2P
-match. It composes `replay/provision` enrollment and authenticated registration
-with `replay/p2p/admission`. It never starts a simulation authority lease.
+This package durably enrolls invited members in a deterministic P2P match.
+It uses `replay/provision` for enrollment and authenticated process registration,
+then builds the roster and credentials required by `replay/p2p/admission`.
+It does not start a simulation authority lease.
 
 A room has a content ID, unique session ID and **durable player count (2–8)**.
 The first enrollee administers invitations and creates the signaling room; every
@@ -43,7 +44,7 @@ The commit callback must atomically compare the previous revision, persist the
 whole bundle, and reject a changed player count for an existing room. Do not store
 only `bundle.enrollment`: that would lose the fixed-roster contract.
 
-The native `sqlite` package implements that contract with FULL/WAL transactions,
+The native `sqlite` package persists the bundle with FULL/WAL transactions,
 private files, canonical codecs, a separate `replay_p2p_provision` table, bounded
 startup inventory and revision checks across service owners. Existing authority
 room databases are not converted into P2P rooms. Uncertain creation fences the
@@ -81,8 +82,8 @@ a simulation host, or let late joiners replace departed players.
 Run `tests/replay_p2p_provision/run.sh` for core/wire/client/provider tests and
 WASM checking, `tests/replay_p2p_provision_sqlite/run.sh` for storage plus process
 kills before/after commit, and `tests/replay_p2p_provision_service/run.sh` for the
-native Godot TLS service/client fixture. The fixture provisions three members
-through one client process; it is not a three-player gameplay or browser test.
+native Godot TLS service/client fixture. The fixture enrolls three members through one client process. Its results do
+not cover three-player gameplay or browser execution.
 
 The reusable [P2P party owner](../../godot/p2p_party.md) connects these APIs
 to Duel's browser and native create/join/rejoin flows. Local tests cover RTC and

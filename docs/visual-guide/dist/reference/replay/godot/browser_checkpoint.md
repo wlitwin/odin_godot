@@ -4,8 +4,9 @@ Use `Browser_Identity` to retain a player's Session credential across browser
 launches. It reads or creates a persistent 16-byte Session token through
 IndexedDB. Keep it at a stable address, poll it before opening a runner, and obtain
 the token through `browser_identity_token`. A token is published only in Ready.
-Missing records are created with CAS(0); a competing creator reads the winning
-record. Malformed data and storage failures never produce a volatile replacement.
+Missing records use a compare-and-swap write against revision zero, CAS(0),
+so competing creators read the winning record. Malformed data or storage
+failure does not create a temporary replacement identity.
 Explicit test tokens can bypass this helper; they are not account authentication.
 
 `Browser_Checkpoint(S,C,A,E,N)` owns a local self-contained authority archive and
@@ -31,8 +32,8 @@ already uses; they are not inferred from World.
 
 During play, call `browser_checkpoint_save(&slot, &session)` on a local authority.
 The function captures the complete frame and session ledgers once and submits an
-asynchronous write. A true return means submitted, not saved. Keep pumping the game
-and `browser_checkpoint_frame`. `receipt_serial` advances after a completed write
+asynchronous write. A true return reports submission; the write is still pending.
+Keep pumping the game and `browser_checkpoint_frame`. `receipt_serial` advances after a completed write
 attempt; `last_success`, `saved_tick`, `saved_hash` and `revision` report the result.
 The saved hash includes the frame tick. Storage and codec failures are reported
 separately. At most one write is outstanding in a slot.

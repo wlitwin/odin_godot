@@ -24,7 +24,7 @@ IndexedDB components. Native parties use the optional SQLite adapter; <code>RQ_R
 selects its database. <code>RQ_PROFILE</code> still selects the separate native personal profile.
 Native direct-address and file-save paths remain available when no service is configured.
 Browser direct ENet launch is refused with an explanation; use a configured party.
-Browser solo play shares the model and now has separate <a href="browser-saves.html">local save slots</a>
+Browser solo play shares the model and has separate <a href="browser-saves.html">local save slots</a>
 in the standalone menu. Party publication does not write those slots.</p>
 <p>Defaults require verified WSS. <code>RQ_ROOM_LOCAL=1</code> permits explicit loopback WS development.
 <code>RQ_ROOM_ADDRESS</code> and <code>RQ_PORT</code> define the advertised native endpoint. ICE settings
@@ -35,7 +35,7 @@ own acceptance; localhost success does not establish reachability across the int
 and supplies its typed checkpoint backend. A live online authority&#39;s Save/F5 publishes
 through Room rather than writing a local file. <code>RQ_ROOM_CHECKPOINT_MS</code> optionally sets
 the shared publication interval; zero keeps it manual. Native file resume still refuses
-coordinated archives. No gameplay content/schema change is introduced by this integration.</p>
+coordinated archives. This party integration uses the existing gameplay content and schema.</p>
 <p>Published checkpoints also support an abandoned party. A fresh trusted player uses
 Rejoin recent; if no authority remains, Room loads the saved publication and requests
 a guarded restore grant before creating a new session. The same published tick is
@@ -54,5 +54,5 @@ its existing database before restoring and republishing.</p>
 It distinguishes an approved backup from preparation, stale progress or uncertain
 control; a prior host change does not imply the next backup is ready.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="browser-saves.html"><span>Browser-local Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/room_backup.html"><span>Recovery-backup status</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/online.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="browser-saves.html"><span>Browser-local Quickdraw saves</span><span aria-hidden="true">→</span></a><a href="../../replay/godot/room_backup.html"><span>Recovery-backup status</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_quickdraw/online.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_quickdraw/online.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

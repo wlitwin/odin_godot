@@ -3,12 +3,13 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>Odin Survivors</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/survivors/README.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#the-loop">The loop</a><a href="#run-it">Run it</a><a href="#co-op--the-host-authoritative-variant">Co-op — the HOST-authoritative variant</a><a href="#verify-it-headless">Verify it (headless)</a><a href="#feature-map--which-odin_godot-feature-each-file-demonstrates">Feature map — which odin_godot feature each file demonstrates</a><a href="#files">Files</a><a href="#notes--scope">Notes / scope</a></nav></details>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#gameplay-loop">Gameplay loop</a><a href="#run-it">Run it</a><a href="#host-authoritative-co-op">Host-authoritative co-op</a><a href="#verify-it-headless">Verify it (headless)</a><a href="#sdk-features-by-script">SDK features by script</a><a href="#files">Files</a><a href="#notes--scope">Notes / scope</a></nav></details>
 <article class="reading-body "><p>This survival arena game uses compiled Odin scripts for gameplay. It demonstrates
 <a href="../../README.html">odin_godot</a> input, signals, custom Resources, and scene spawning
 through a move, fight, upgrade, and restart loop. The visuals use <code>Polygon2D</code>
 geometry without external art assets.</p>
-<h2 id="the-loop">The loop<a class="heading-anchor" href="#the-loop" aria-label="Link to this section">#</a></h2>
+<p><span id="the-loop"></span></p>
+<h2 id="gameplay-loop">Gameplay loop<a class="heading-anchor" href="#gameplay-loop" aria-label="Link to this section">#</a></h2>
 <p>Move with the arrow keys or WASD. Weapons attack nearby enemies automatically;
 defeated enemies drop XP gems. Collect gems to fill the XP bar.</p>
 <p>Each level-up pauses the game and offers three random upgrades. Pick a stat
@@ -25,11 +26,12 @@ nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hl
 <li>Walk over the green <strong>XP gems</strong> (they magnet toward you within pickup range).</li>
 <li>On <strong>LEVEL UP</strong>, click one of the three upgrade buttons.</li>
 <li>Four enemy types ramp in over time: <strong>swarmer</strong> (fast/weak), <strong>grunt</strong> (baseline), <strong>brute</strong>
-(tanky), <strong>tank</strong> (huge/slow) — each a different <code>EnemyConfig</code> <code>.tres</code>.</li>
+(high health), <strong>tank</strong> (large/slow). Each uses a different <code>EnemyConfig</code> <code>.tres</code>.</li>
 </ul>
 <p>The headless checks below verify the gameplay loop. Use a windowed run to assess
 pacing, feedback, and controls.</p>
-<h2 id="co-op--the-host-authoritative-variant">Co-op — the HOST-authoritative variant<a class="heading-anchor" href="#co-op--the-host-authoritative-variant" aria-label="Link to this section">#</a></h2>
+<p><span id="co-op--the-host-authoritative-variant"></span></p>
+<h2 id="host-authoritative-co-op">Host-authoritative co-op<a class="heading-anchor" href="#host-authoritative-co-op" aria-label="Link to this section">#</a></h2>
 <blockquote>
 <p>For peer-authoritative engine-native co-op, read
 <a href="../coop_arena/README.html"><code>examples/coop_arena</code></a>. It simulates player actions locally
@@ -47,13 +49,15 @@ open transport.</p>
 <code>coop_player.tscn</code>, and <code>coop_enemy.tscn</code>.</p>
 <p>Replication uses these Godot facilities:</p>
 <ul>
-<li><strong>MultiplayerSpawner</strong> — the host spawns <code>coop_enemy.tscn</code> into <code>Enemies</code>; the engine
-auto-instantiates (and auto-despawns) it on every client.</li>
-<li><strong>MultiplayerSynchronizer</strong> — streams continuous state from the authority: each player&#39;s
-<code>position</code> + Odin <code>@export hp</code> (authority = the owning peer), each enemy&#39;s <code>position</code>/<code>hp</code>/<code>id</code>
-(authority = host). Configs live in the <code>.tscn</code> (see the gotcha below).</li>
-<li><strong><code>@(gd_rpc)</code></strong> carries discrete events: player spawn (peer→authority), the client&#39;s
-<code>request_damage</code>, shared score, and per-player level-up XP grants.</li>
+<li><strong>MultiplayerSpawner</strong> creates <code>coop_enemy.tscn</code> under <code>Enemies</code> when the host
+spawns an enemy, then replicates creation and despawn to clients.</li>
+<li><strong>MultiplayerSynchronizer</strong> streams continuous state. Each player&#39;s owning
+peer supplies <code>position</code> and Odin <code>@export hp</code>; the host supplies each enemy&#39;s
+<code>position</code>/<code>hp</code>/<code>id</code>. Author the replication configuration in the <code>.tscn</code>, as
+described below.</li>
+<li><strong><code>@(gd_rpc)</code></strong> carries discrete events: player spawn requests from peers to
+the authority, the client&#39;s <code>request_damage</code>, shared score, and per-player
+level-up XP grants.</li>
 </ul>
 <p>The host owns enemies, waves, and enemy deaths. A client submits a
 <code>request_damage</code> RPC, which the host applies to its enemy state. Each player
@@ -70,12 +74,15 @@ errors <code>ERR_UNCONFIGURED</code>, so nothing syncs. See <code>tests/repl_spi
 <p>These checks exercise synchronization over native ENet and browser WebRTC.
 Use two interactive clients to assess the effect of latency on play.</p>
 <h2 id="verify-it-headless">Verify it (headless)<a class="heading-anchor" href="#verify-it-headless" aria-label="Link to this section">#</a></h2>
-<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash examples/survivors/run.sh&#x27;</span>   <span class="hljs-comment"># prints SURVIVORS_OK</span></code></pre></div><p><code>run.sh</code> runs four checks: (1) a headless <strong>editor-open</strong> smoke test (no crash / missing
-virtual), (2) a <strong>live <code>game.tscn</code></strong> run for 600 frames that must log no script/engine errors,
-(3) <code>test_survivors.gd</code>, which drives the <strong>real</strong> loop through actual physics overlaps +
-frame stepping, rather than manually emitting signals, and asserts each link; and (4) a <strong>unified
-single-mode</strong> smoke of <code>coop.tscn</code> (<code>COOP_ROLE=single</code>, host-with-no-net) that must boot + run
-clean (<code>SINGLE_DONE</code>):</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash -c <span class="hljs-string">&#x27;bash examples/survivors/run.sh&#x27;</span>   <span class="hljs-comment"># prints SURVIVORS_OK</span></code></pre></div><p><code>run.sh</code> runs four checks:</p>
+<ol>
+<li>Open the editor headlessly and check for crashes or missing virtual methods.</li>
+<li>Run <code>game.tscn</code> for 600 frames without script/engine errors.</li>
+<li>Run <code>test_survivors.gd</code> through physics overlaps and frame stepping, checking
+each gameplay milestone below.</li>
+<li>Run <code>coop.tscn</code> in single mode (<code>COOP_ROLE=single</code>, host with no network) and
+require successful startup and completion (<code>SINGLE_DONE</code>).</li>
+</ol>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -97,27 +104,27 @@ clean (<code>SINGLE_DONE</code>):</p>
 </tr>
 <tr>
 <td><code>kill+gem</code></td>
-<td>a real bullet overlap → typed <code>take_damage</code> → enemy dies → a <strong>kill</strong> is counted <strong>and</strong> an XP gem drops.</td>
+<td>a real bullet overlap → typed <code>take_damage</code> → enemy dies → a kill is counted and an XP gem drops.</td>
 </tr>
 <tr>
 <td><code>gem-xp</code></td>
-<td>the player overlaps the gem → shared <code>game_state</code> <strong>XP</strong> increases.</td>
+<td>the player overlaps the gem → shared <code>game_state</code> XP increases.</td>
 </tr>
 <tr>
 <td><code>levelup</code></td>
-<td>enough XP → <code>leveled_up</code> → the upgrade <strong>menu is visible</strong> and the <strong>tree is paused</strong>.</td>
+<td>enough XP → <code>leveled_up</code> → the upgrade menu is visible and the tree is paused.</td>
 </tr>
 <tr>
 <td><code>upgrade-applied</code></td>
-<td>invoking a menu button handler (as a click would) <strong>applies</strong> the upgrade (an observable player stat / weapon changes) and <strong>resumes</strong>.</td>
+<td>invoking a menu button handler (as a click would) applies the upgrade (an observable player stat / weapon changes) and resumes.</td>
 </tr>
 <tr>
 <td><code>difficulty</code></td>
-<td>the spawn interval <strong>shrinks</strong> as run-time grows.</td>
+<td>the spawn interval shrinks as run-time grows.</td>
 </tr>
 <tr>
 <td><code>game-over</code></td>
-<td>a real contact hit drops HP to 0 → <code>died</code> → <strong>GameOver</strong> state + the screen shows.</td>
+<td>a real contact hit drops HP to 0 → <code>died</code> → GameOver state + the screen shows.</td>
 </tr>
 <tr>
 <td><code>restart</code></td>
@@ -125,10 +132,12 @@ clean (<code>SINGLE_DONE</code>):</p>
 </tr>
 </tbody></table>
 </div><p>It is also wired into the repo-wide suite (<code>tests/run_all.sh</code>, as <code>survivors | SURVIVORS_OK</code>).</p>
-<h2 id="feature-map--which-odin_godot-feature-each-file-demonstrates">Feature map — which odin_godot feature each file demonstrates<a class="heading-anchor" href="#feature-map--which-odin_godot-feature-each-file-demonstrates" aria-label="Link to this section">#</a></h2>
-<p>Scripts live in <code>scripts/</code> (each a single authored <code>.odin</code>; its <code>*.gen.odin</code> sibling is
-generated boilerplate). <code>game_state.odin</code> / <code>util.odin</code> are shared <em>module</em> files without an attached
-Godot node or script-state owner.</p>
+<p><span id="feature-map--which-odin_godot-feature-each-file-demonstrates"></span></p>
+<h2 id="sdk-features-by-script">SDK features by script<a class="heading-anchor" href="#sdk-features-by-script" aria-label="Link to this section">#</a></h2>
+<p>Authored <code>.odin</code> scripts live in <code>scripts/</code>; builds also produce <code>*.gen.odin</code>
+registration code. <code>game_state.odin</code> and <code>util.odin</code> are shared package files
+without an attached Godot node or script-state owner. Here, shared package code
+runs in the same scripts library; it is not a separately compiled script module.</p>
 <h3 id="custom-resources-data-driven-gdextends-resource--tres-instances">Custom Resources (data-driven; <code>//gd:extends Resource</code> + <code>.tres</code> instances)<a class="heading-anchor" href="#custom-resources-data-driven-gdextends-resource--tres-instances" aria-label="Link to this section">#</a></h3>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -139,18 +148,19 @@ Godot node or script-state owner.</p>
 </thead>
 <tbody><tr>
 <td><strong><code>enemy_config.odin</code></strong> + <code>config/{swarmer,grunt,brute,tank}.tres</code></td>
-<td>custom Resource; <code>@export</code> of int / f32 (<code>range=</code> sliders) / <code>gd.Color</code>; global <code>class_name</code> so it type-filters a picker. hp, speed, damage, xp_value, points, radius, color.</td>
+<td>Defines a custom Resource with int / f32 <code>@export</code> fields (<code>range=</code> sliders), <code>gd.Color</code>, and a global <code>class_name</code> for typed Inspector pickers. Fields include hp, speed, damage, xp_value, points, radius, and color.</td>
 </tr>
 <tr>
 <td><strong><code>weapon_config.odin</code></strong> + <code>config/{pistol,orbit_blade,aura}.tres</code></td>
-<td>a custom Resource with an <code>enum=</code> int <code>@export</code> (<code>kind</code>: Projectile/Orbit/Aura) the <code>weapon</code> switch reads; many <code>range=</code> sliders; String name + Color.</td>
+<td>Defines a Resource with an <code>enum=</code> int <code>@export</code> (<code>kind</code>: Projectile/Orbit/Aura), <code>range=</code> sliders, String name, and Color. The <code>weapon</code> script selects behavior from <code>kind</code>.</td>
 </tr>
 <tr>
 <td><strong><code>upgrade_config.odin</code></strong> + <code>config/up_*.tres</code> (10)</td>
-<td>a Resource mixing a String name, a <code>multiline</code> String description, <strong>two</strong> <code>enum=</code> ints (kind + stat), an f32 amount, <strong>and</strong> a typed cross-resource picker (<code>resource=WeaponConfig</code>) — one custom resource referencing another.</td>
+<td>Defines String name and <code>multiline</code> description, two <code>enum=</code> ints (kind + stat), an f32 amount, and a typed cross-resource picker (<code>resource=WeaponConfig</code>). Demonstrates one custom Resource referencing another.</td>
 </tr>
 </tbody></table>
-</div><h3 id="modules-owner-less-shared-package-code">Modules (owner-less shared package code)<a class="heading-anchor" href="#modules-owner-less-shared-package-code" aria-label="Link to this section">#</a></h3>
+</div><p><span id="modules-owner-less-shared-package-code"></span></p>
+<h3 id="shared-package-code-without-a-node">Shared package code without a node<a class="heading-anchor" href="#shared-package-code-without-a-node" aria-label="Link to this section">#</a></h3>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -160,14 +170,16 @@ Godot node or script-state owner.</p>
 </thead>
 <tbody><tr>
 <td><strong><code>game_state.odin</code></strong></td>
-<td>the shared cross-script <strong>module</strong> pattern — run time, kills, score, level, the XP curve + <code>add_xp</code>/<code>add_kill</code>, the run state machine (Playing/LevelUp/GameOver), and <code>pending_levelups</code>. No owner struct, no Godot glue; every script shares these package globals.</td>
+<td>Stores package globals for run time, kills, score, level, the XP curve, <code>add_xp</code>/<code>add_kill</code>, Playing/LevelUp/GameOver state, and <code>pending_levelups</code>. Every script in the package shares them; no owner struct or Godot attachment is required.</td>
 </tr>
 <tr>
 <td><strong><code>util.odin</code></strong></td>
-<td><strong>groups</strong> as a decoupled &quot;find that kind of thing&quot; query (<code>find_player</code>/<code>find_game</code>/<code>nearest_enemy</code>); typed area damage (<code>damage_enemies_in_radius</code> calls <code>enemy_take_damage</code> typed); vector helpers.</td>
+<td>Queries Godot groups through <code>find_player</code>/<code>find_game</code>/<code>nearest_enemy</code>, applies typed area damage with <code>damage_enemies_in_radius</code> calling <code>enemy_take_damage</code>, and supplies vector helpers.</td>
 </tr>
 </tbody></table>
 </div><h3 id="node-scripts">Node scripts<a class="heading-anchor" href="#node-scripts" aria-label="Link to this section">#</a></h3>
+<p>For node scripts, <code>self</code> points to the Odin script data and <code>self.owner</code> holds
+the Godot node handle.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -177,46 +189,47 @@ Godot node or script-state owner.</p>
 </thead>
 <tbody><tr>
 <td><strong><code>game.odin</code></strong></td>
-<td>the root scene controller and state machine: <code>@onready</code> child refs; scene-tree pausing (<code>gd.scene_tree_set_pause</code>); the <strong>Input</strong> ergonomics (<code>gd.action_add_key</code>) to bind WASD onto the <code>ui_*</code> actions; typed cross-script <strong>connects</strong> (player <code>leveled_up</code>/<code>died</code>) + calls into the menus/player; <code>@(gd_method)</code> accessors so GDScript/the test can read the module&#39;s state.</td>
+<td>Controls the root scene and run state. Uses <code>@onready</code> child references, <code>gd.scene_tree_set_pause</code>, and <code>gd.action_add_key</code> to bind WASD to <code>ui_*</code> actions. Connects typed player <code>leveled_up</code>/<code>died</code> signals, calls menus/player scripts, and exposes module state through <code>@(gd_method)</code> accessors for GDScript/tests.</td>
 </tr>
 <tr>
 <td><strong><code>player.odin</code></strong></td>
-<td><strong>input</strong> axes; <code>@export</code> stats + combat <strong>multipliers</strong> (groups) that upgrades mutate; PackedScene + WeaponConfig slots; spawns Weapon children; XP/leveling (<code>player_gain_xp</code> → emits <code>leveled_up</code>); <code>@(gd_method) apply_upgrade</code> (the <code>Upgrade_Kind</code>/<code>Upgrade_Stat</code> switch — observable effect); signals <code>health_changed</code>/<code>leveled_up</code>/<code>died</code>; <code>@(gd_method) take_damage</code>.</td>
+<td>Reads input axes; exports stats, grouped combat multipliers, PackedScene, and WeaponConfig slots; spawns Weapon children. <code>player_gain_xp</code> emits <code>leveled_up</code>; <code>@(gd_method) apply_upgrade</code> uses <code>Upgrade_Kind</code>/<code>Upgrade_Stat</code>. Declares <code>health_changed</code>/<code>leveled_up</code>/<code>died</code> and exposes <code>@(gd_method) take_damage</code>.</td>
 </tr>
 <tr>
 <td><strong><code>weapon.odin</code></strong></td>
-<td><strong>one script, three behaviors</strong> switched on the WeaponConfig enum: Projectile (auto-fires bullets at the nearest in-range enemy, multishot fan), Orbit (runtime-built spinning blade <code>Polygon2D</code>s + area damage), Aura (periodic radius damage). Reads the WeaponConfig and the parent Player’s current multipliers for each shot; constructs nodes at runtime.</td>
+<td>Selects three behaviors from WeaponConfig: Projectile fires at the nearest in-range enemy with a multishot fan; Orbit creates spinning blade <code>Polygon2D</code>s and applies area damage; Aura applies periodic radius damage. Reads the parent Player’s current multipliers for each shot and constructs effect nodes at runtime.</td>
 </tr>
 <tr>
 <td><strong><code>bullet.odin</code></strong></td>
-<td><code>@export</code> damage/speed/<strong>pierce</strong>; <code>_physics_process</code>; <code>@(gd_connect=&quot;area_entered&quot;)</code>; typed cross-script (<code>rt.script_of → Enemy</code>) so it only damages enemies and pierces N before despawning.</td>
+<td>Exports damage/speed/pierce, moves in <code>_physics_process</code>, and receives <code>@(gd_connect=&quot;area_entered&quot;)</code>. Resolves <code>rt.script_of → Enemy</code> for typed cross-script damage, piercing N enemies before despawn.</td>
 </tr>
 <tr>
 <td><strong><code>enemy.odin</code></strong></td>
-<td><code>@export</code> of a custom-Resource slot <strong>and</strong> a PackedScene (gem); reads EnemyConfig; runtime restyle (<code>node2d_set_scale</code> + recolor from config); <code>_physics_process</code> chase; <code>@(gd_method) take_damage</code>; <code>@(gd_connect=&quot;body_entered&quot;)</code> contact; <strong><code>gd.add_child_deferred</code></strong> to drop the gem safely during a physics flush; the <code>died</code> signal field.</td>
+<td>Exports a custom-Resource slot and PackedScene for gems. Reads EnemyConfig, applies <code>node2d_set_scale</code> and config color, chases in <code>_physics_process</code>, and exposes <code>@(gd_method) take_damage</code>. Uses <code>@(gd_connect=&quot;body_entered&quot;)</code> for contact, <code>gd.add_child_deferred</code> for gem drops during physics flush, and a <code>died</code> signal field.</td>
 </tr>
 <tr>
 <td><strong><code>xp_gem.odin</code></strong></td>
-<td><code>@export value</code>; <code>_physics_process</code> magnet that reads the player&#39;s live <code>pickup_range</code> (typed); <code>@(gd_connect=&quot;body_entered&quot;)</code> collect → <code>player_gain_xp</code> (typed, may level up).</td>
+<td>Declares <code>@export value</code>, follows the player within its typed <code>pickup_range</code> in <code>_physics_process</code>, and collects through <code>@(gd_connect=&quot;body_entered&quot;)</code> calling <code>player_gain_xp</code>, which can trigger level-up.</td>
 </tr>
 <tr>
 <td><strong><code>spawner.odin</code></strong></td>
-<td><code>@export</code> PackedScene + four EnemyConfig slots; <strong>difficulty scaling</strong> (<code>interval_at(t)</code> + a time-shifted weighted type pick); writes the chosen config onto a fresh enemy before <code>add_child</code>; <code>@(gd_method) interval_at</code> exposed for the test.</td>
+<td>Exports a PackedScene and four EnemyConfig slots. Uses <code>interval_at(t)</code> and a time-shifted weighted type selection for difficulty. Sets the fresh enemy’s config before <code>add_child</code> and exposes <code>@(gd_method) interval_at</code> to tests.</td>
 </tr>
 <tr>
 <td><strong><code>hud.odin</code></strong></td>
-<td><code>@onready</code> auto-wired child refs (XP/Health <code>ProgressBar</code> + info <code>Label</code>); reads the shared module each frame; property helpers (<code>gd.set_float</code>/<code>gd.set_string</code>); typed cross-script signal <strong>connect</strong> to <code>health_changed</code>.</td>
+<td>Resolves XP/Health <code>ProgressBar</code> and info <code>Label</code> children through <code>@onready</code>, reads shared package state each frame, writes properties through <code>gd.set_float</code>/<code>gd.set_string</code>, and connects the typed <code>health_changed</code> signal.</td>
 </tr>
 <tr>
 <td><strong><code>levelup_menu.odin</code></strong></td>
-<td>a bank of 10 typed custom-resource <code>@export</code> slots (the pool); <code>@onready</code> button refs; <code>gd.connect_to</code> wiring each Button&#39;s <code>pressed</code> to a <code>@(gd_method)</code>; reading a resource&#39;s String fields generically (<code>gd.get_string</code>); typed calls into the player (<code>apply_upgrade</code>) and Game (<code>after_pick</code>). <code>process_mode=Always</code> keeps it live while paused.</td>
+<td>Holds 10 typed custom-resource <code>@export</code> slots and <code>@onready</code> buttons. Uses <code>gd.connect_to</code> to route Button <code>pressed</code> to <code>@(gd_method)</code>, reads Resource Strings through <code>gd.get_string</code>, and calls <code>apply_upgrade</code> and Game <code>after_pick</code>. <code>process_mode=Always</code> keeps the menu active while paused.</td>
 </tr>
 <tr>
 <td><strong><code>game_over.odin</code></strong></td>
-<td><code>@onready</code> refs; reads the module for the run summary; <code>gd.connect_to</code> on the Restart button; a typed call into <code>game_restart</code> (reload + reset).</td>
+<td>Uses <code>@onready</code> references, reads shared run-summary state, connects Restart through <code>gd.connect_to</code>, and calls typed <code>game_restart</code> to reload and reset.</td>
 </tr>
 </tbody></table>
-</div><h3 id="gd-ergonomic-helpers-used-throughout"><code>gd.*</code> ergonomic helpers used throughout<a class="heading-anchor" href="#gd-ergonomic-helpers-used-throughout" aria-label="Link to this section">#</a></h3>
+</div><p><span id="gd-ergonomic-helpers-used-throughout"></span></p>
+<h3 id="gd-helper-procedures"><code>gd.*</code> helper procedures<a class="heading-anchor" href="#gd-helper-procedures" aria-label="Link to this section">#</a></h3>
 <p><code>get_node</code> · <code>get_parent</code> · <code>get_tree</code> · <code>add_child</code> · <strong><code>add_child_deferred</code></strong> · <code>add_to_group</code>
 · <code>instantiate</code> · <code>load_scene</code> · <code>connect</code>/<code>connect_to</code> · <code>set_bool</code>/<code>set_float</code>/<code>set_string</code> ·
 <code>get_string</code> · <code>action_add_key</code> · <code>scene_tree_set_pause</code> · <code>scene_tree_reload_current_scene</code> ·
@@ -233,15 +246,16 @@ Godot node or script-state owner.</p>
   scripts/*.odin           # the authored scripts (+ generated *.gen.odin)
   run.sh test_survivors.gd # build + 4 headless checks</code></pre></div><h2 id="notes--scope">Notes / scope<a class="heading-anchor" href="#notes--scope" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Movement</strong> translates the <code>CharacterBody2D</code> directly (a kinematic position move) rather than
-<code>move_and_slide</code> — it keeps the input→movement point front-and-center.</li>
-<li><strong>Orbit / Aura</strong> weapons apply damage by a group + distance query (<code>damage_enemies_in_radius</code>)
-rather than per-blade <code>Area2D</code>s; the <strong>Projectile</strong> weapon uses real <code>Area2D</code> bullets, which is
-the physics path the headless test asserts the kill through.</li>
+<li><strong>Movement</strong> translates the <code>CharacterBody2D</code> directly instead of calling
+<code>move_and_slide</code>. The example demonstrates the input-to-position update
+without solver-based movement.</li>
+<li><strong>Orbit / Aura</strong> weapons use a group and distance query
+(<code>damage_enemies_in_radius</code>) for damage. <strong>Projectile</strong> weapons use <code>Area2D</code>
+bullets; the headless test checks kills through their physics overlaps.</li>
 <li>Spawn an XP gem with <code>gd.add_child_deferred</code> when handling a bullet’s
 <code>area_entered</code> signal. Godot cannot change collision monitoring while flushing
 physics queries.</li>
 </ul>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../README.html"><span>odin_godot</span><span aria-hidden="true">→</span></a><a href="../coop_arena/README.html"><span>Co-op Arena — the ENGINE-NATIVE multiplayer path, end to end</span><span aria-hidden="true">→</span></a><a href="../../docs/authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/survivors/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#the-loop" class="">The loop</a><a href="#run-it" class="">Run it</a><a href="#co-op--the-host-authoritative-variant" class="">Co-op — the HOST-authoritative variant</a><a href="#verify-it-headless" class="">Verify it (headless)</a><a href="#feature-map--which-odin_godot-feature-each-file-demonstrates" class="">Feature map — which odin_godot feature each file demonstrates</a><a href="#custom-resources-data-driven-gdextends-resource--tres-instances" class="subsection">Custom Resources (data-driven; //gd:extends Resource + .tres instances)</a><a href="#modules-owner-less-shared-package-code" class="subsection">Modules (owner-less shared package code)</a><a href="#node-scripts" class="subsection">Node scripts</a><a href="#gd-ergonomic-helpers-used-throughout" class="subsection">gd.* ergonomic helpers used throughout</a><a href="#files" class="">Files</a><a href="#notes--scope" class="">Notes / scope</a></nav><div class="outline-actions"><a href="../../../reference/examples/survivors/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../README.html"><span>odin_godot</span><span aria-hidden="true">→</span></a><a href="../coop_arena/README.html"><span>Co-op Arena — Godot engine multiplayer</span><span aria-hidden="true">→</span></a><a href="../../docs/authoring-guide.html"><span>Authoring guide — the Odin script feature reference</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/survivors/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#gameplay-loop" class="">Gameplay loop</a><a href="#run-it" class="">Run it</a><a href="#host-authoritative-co-op" class="">Host-authoritative co-op</a><a href="#verify-it-headless" class="">Verify it (headless)</a><a href="#sdk-features-by-script" class="">SDK features by script</a><a href="#custom-resources-data-driven-gdextends-resource--tres-instances" class="subsection">Custom Resources (data-driven; //gd:extends Resource + .tres instances)</a><a href="#shared-package-code-without-a-node" class="subsection">Shared package code without a node</a><a href="#node-scripts" class="subsection">Node scripts</a><a href="#gd-helper-procedures" class="subsection">gd.* helper procedures</a><a href="#files" class="">Files</a><a href="#notes--scope" class="">Notes / scope</a></nav><div class="outline-actions"><a href="../../../reference/examples/survivors/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

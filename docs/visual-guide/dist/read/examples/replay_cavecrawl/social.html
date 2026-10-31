@@ -11,8 +11,7 @@ unmeasured/stale rows show <code>--</code>. Observers receive measurements witho
 a player row. Departed player rows are hidden.</p>
 <p>The game initializes the optional shared <code>telemetry.Diagnostics</code> runtime, which
 collects local diagnostic measurements, and adds its application lane when opening
-Solo/Session/Room. It updates diagnostics after
-the outer session pump and reads the result only for presentation. Measurements
+Solo/Session/Room. It updates diagnostics after the outer session pump and reads the result only for presentation. Measurements
 are not world state, saved progress or host-migration data. Fencing and authority/
 connection changes invalidate them; the new authority measures again. Leaving a
 session clears readback before a new connection can use the same UI.</p>
@@ -26,8 +25,7 @@ They do not reappear as historical chat or after a late join.</p>
 and lobby Profile action path. This works while the lobby/menu is open during
 play. Invalid names preserve the previous choice and keep the field editing. Typing
 inside the name field captures social/gameplay shortcuts, including F. A valid
-submission releases field focus
-and consumes the Enter edge so it does not also trigger chat/gameplay. It introduces
+submission releases field focus and consumes the Enter edge so it does not also trigger chat/gameplay. It introduces
 no new simulation command, content revision or archive conversion.</p>
 <p>The <a href="../../tests/replay_cave_social/README.html">native and Chrome gate</a> covers measured
 values, literal rename attribution, marker expiry, observer/departed rows, rejoin,
@@ -35,5 +33,5 @@ and a real authority handoff with fresh measurements and early retirement of an
 old-epoch marker. This closes those social-presentation rows; broader private
 channels, director timing, visual review and full-game parity remain open.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_cave_social/README.html"><span>Cavecrawl social detail acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/social.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../tests/replay_cave_social/README.html"><span>Cavecrawl social detail acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/social.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/social.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

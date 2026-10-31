@@ -22,7 +22,7 @@ real game. Scrapbot bite remains zero: this is a defined hazard-exposure workloa
 not a measurement of natural incoming-hit rates. No HP or positions are written
 by the per-frame benchmark adapter. Kit uses its normal host status function;
 Replay uses its admitted development action path, including its action/fact
-bookkeeping. That plumbing cost difference remains part of the fixture.
+bookkeeping. These different call paths remain part of the fixture.
 
 Census/report gates require observed HP loss/recovery, burn/salve/surge exposure,
 ten executed dashes and repeated reload entries, alongside movement, casts,
@@ -65,8 +65,8 @@ retained as a failed comparison: remote casts were rejected as stale, and one ra
 case exceeded the unavailable-frame bound. Receipt scheduling is a declared
 cooperative semantic choice, not a retry added to hide rejected requests.
 
-Replay's prediction horizon now stalls forward prediction while retaining a
-readable world, instead of immediately discarding it for a Welcome. Reports retain
+At its prediction horizon, Replay stalls forward prediction and retains a
+readable world. Reports retain
 prediction-stall attempts, snapshot catch-ups, warmup/measurement/settling resyncs,
 and the largest observed tick-progress gap. A stall or old readable frame is not
 counted as evidence of fresh authority state. The gap for Kit's tick probe follows
@@ -75,7 +75,7 @@ progress.
 
 The [latest full matrix](../../docs/replay/results/receipt-resync-2026-09-09/README.md)
 passes all 24 process windows and 56 report-validation cases. Earlier raw-loss
-failures remain recorded. Receipt-mode actions now queue during a same-epoch
+failures remain recorded. Receipt-mode actions queue during a same-epoch
 resync, while scheduled input fencing and consumption receipts preserve their
 existing boundaries. A passing cohort is not a guarantee across arbitrary loss,
 latency, incoming-hit mixtures or platform behavior.
@@ -87,11 +87,11 @@ python3 tests/replay_endurance_comparison/verify_report.py /path/to/run delay
 python3 tests/replay_endurance_comparison/plot.py /path/to/run /path/to/figures --condition delay
 ```
 
-`assessment.json` labels the full matrix rejected and keeps failed-condition
-observations separate. `summary-delay.json` contains only the independently
-verified condition. The input audit fixes a proven obsolete-tick capture path. Wider timing-envelope
-validation remains open; the earlier Kit submission-refusal
-classification was a measurement error. Implementation-scoped report
+For the retained rejected cohort, `assessment.json` labels the full matrix
+rejected and keeps failed-condition observations separate. `summary-delay.json` contains only the independently
+verified condition. The input audit fixes a proven obsolete-tick capture path.
+Validation of broader timing configurations remains open. The earlier Kit
+submission-refusal classification was a measurement error. Implementation-scoped report
 selection requires `--allow-partial` and cannot produce full-matrix acceptance.
 
 Contract version 2 distinguishes Kit submission from local prediction. The
@@ -101,7 +101,7 @@ still sending the request for the authority to judge. The earlier classification
 of that result as a submission refusal was incorrect; the recorded authority
 cooldown edges and nova logs showed the casts executing.
 
-The isolated adapter now records the actual generated `Action_Outcome` while
+The isolated adapter records the actual generated `Action_Outcome` while
 preserving the original issue and presentation paths. Four immediate-model
 receipts must be observed. A client submission requires a nonzero sequence;
 an authority-local submission requires Applied. Local prediction rejection is

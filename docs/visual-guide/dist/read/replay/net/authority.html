@@ -5,22 +5,24 @@
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Recorded authority observations</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/replay/net/authority.md" download>Page source ↓</a></div></div>
 <details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#recovery-and-compatibility">Recovery and compatibility</a></nav></details>
 <article class="reading-body "><p>Use <code>Model.authority</code> when gameplay must react to a change in the authorized
-runner&#39;s local player seat, such as a host&#39;s carried item changing hands. It opts
-the game into a pure simulation policy driven by recorded observations:</p>
+runner&#39;s local player seat, such as transferring an item carried by a departed
+host. The runner records its local seat as simulation input, and the game&#39;s
+policy applies that observation during a step:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">authority = {id = <span class="hljs-number">1</span>, apply = observe_authority}</code></pre></div><p>The server records <code>Authority_Observation{known=true, seat=local_seat}</code> in each
 <code>Batch</code>. Seat zero identifies a dedicated authority with no local player. The
 policy runs after fresh-player resets and before the ordinary model step, under
 the same commit gate and rollback transaction. It may change state and emit game
 events, or abort the entire tick. The policy&#39;s nonzero identifier participates in
 the negotiated model/checkpoint contract; change it when its semantics change.</p>
-<p>The callback receives a recorded fact, not live process-role access. Keep the
-previous observed authority in the game state when you need a transition. That
-makes repeated observations idempotent and restores the previous identity with
-the rest of the world during correction. Cavecrawl uses this to adopt a departed
-host&#39;s carried relic while leaving avatars with their returning player identities.</p>
+<p>Store the previous observed authority in game state when the rule depends on
+a transition. The callback can then compare recorded observations without
+querying the process&#39;s live role. Repeated observations leave the result
+unchanged, and correction restores the prior identity with the rest of the
+world. Cavecrawl uses this to adopt a departed host&#39;s carried relic while
+preserving avatars&#39; returning player identities.</p>
 <p>Clients record an unknown observation and do not predict authority-policy calls.
-They receive the resulting world/effects through normal authoritative snapshots
-and facts. Gameplay packets expose no client-supplied authority observation. An
+They receive the resulting world through authority snapshots and gameplay
+occurrences through facts. Gameplay packets expose no client-supplied authority observation. An
 unknown observation must have seat zero; known observations require an enabled
 policy and an in-range seat. Recording preflight checks these rules before any
 simulation. Other simulation inputs continue predicting normally.</p>
@@ -47,5 +49,5 @@ and events. Verification remains separate from conversion. See
 all shared-authority object ownership, grant permission to host, or replace the
 lease/coordinator checks that authorize a runner to commit.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="recording.html"><span>Replaying recorded network simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/authority.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="recording.html"><span>Replaying recorded network simulation</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/net/authority.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#recovery-and-compatibility" class="">Recovery and compatibility</a></nav><div class="outline-actions"><a href="../../../reference/replay/net/authority.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -31,7 +31,7 @@ Cross-process observations use the same machine's system clock and are frame
 sampled. No total-process CPU, transport framing/retransmission or Internet latency
 claim follows. Probe and GDScript driver work is outside the timed callback.
 
-Both variants copy complete backups at a five-second cadence. Kit's automatic
+Both implementations copy complete backups at a five-second cadence. Kit's automatic
 succession metadata remains in its measured traffic; Replay does not run an external
 coordinator in this cohort. This does not compare equivalent migration services.
 

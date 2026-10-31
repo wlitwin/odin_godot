@@ -28,15 +28,17 @@ co.mark(&amp;chat, <span class="hljs-number">1</span>, {<span class="hljs-number
 <span class="hljs-keyword">for</span> {
     receipt, found := co.poll_result(&amp;chat)
     <span class="hljs-keyword">if</span> !found {<span class="hljs-keyword">break</span>}
-    <span class="hljs-comment">// receipt.submission identifies the local submission; value is owned by value.</span>
+    <span class="hljs-comment">// receipt.submission identifies the local submission; the payload is copied.</span>
     <span class="hljs-comment">// Present failures, and retain/repopulate the original text if desired.</span>
 }
 <span class="hljs-comment">// Render chat.lines[:chat.line_count] when chat.history_serial changes.</span>
 <span class="hljs-comment">// co.destroy(&amp;chat) before releasing its containing owner.</span></code></pre></div><p>The caller&#39;s text and marker positions are copied into value payloads. Text is
 clipped at a UTF-8 rune boundary to 240 bytes. Empty/malformed text and control or
 line-separator characters fail validation. The UI should render plain text; the
-Cavecrawl view explicitly disables BBCode. Each line stores the admitted seat, token hash and optional approved display name
-separately from text. There is no client-supplied speaker field. Display names, permissions and game-specific position checks remain application policy.
+Cavecrawl view explicitly disables BBCode.</p>
+<p>Each line stores the admitted seat, token hash, and optional approved display
+name separately from text. The client cannot supply a speaker identity.
+The application defines display-name, permission, and position-validation rules.
 Pass authority-observed <code>[]lobby.Name</code> values to <code>session_comms_frame</code> to stamp
 names at delivery creation. Existing lines keep their original name after a rename;
 changing display metadata does not reset connection retry/acknowledgement state.</p>
@@ -68,8 +70,9 @@ direction, payload and speaker rules. Checksums detect corruption; they are not
 cryptographic authentication. The authority is trusted to order and stamp messages.</p>
 <p>Comms gets an independent application lane through <code>recovery.link_add_application</code>.
 It can coexist with the original application lane used by Session assets. The
-router&#39;s total budget and gameplay reserve still apply. Version 2 adds stamped names and does not accept version-1 communications packets.
-Enable the same service on participating builds; optional service protocols are not negotiated with older
+router&#39;s total budget and gameplay reserve still apply. Version 2 adds stamped
+names and rejects version-1 communications packets. Enable the same service on
+participating builds; optional service protocols are not negotiated with older
 builds. Do not attach two consumers to the same route.</p>
 <p>The pure <code>configure</code>/<code>frame</code> API accepts an explicitly authenticated roster. The
 Godot facade derives that roster from live Session connections and checks the
@@ -117,5 +120,5 @@ new clients keep that behavior when an old server does not confirm support. Pack
 version 2 and its schema are unchanged: this uses the existing Entry.name field.
 Reconnect and authority replacement clear negotiation until the new handshake.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/comms/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/comms/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#bounds-and-transport" class="">Bounds and transport</a><a href="#recovery-semantics" class="">Recovery semantics</a><a href="#observer-display-names" class="">Observer display names</a></nav><div class="outline-actions"><a href="../../../reference/replay/comms/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

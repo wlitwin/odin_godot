@@ -3,12 +3,12 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Authoring a feature in Godot</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/editor-workflow.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#one-time-setup">One-time setup</a><a href="#the-accepted-first-milestone">The accepted first milestone</a><a href="#references-and-shared-extraction">References and shared extraction</a><a href="#create-a-draft">Create a draft</a><a href="#commands-and-boundaries">Commands and boundaries</a></nav></details>
-<article class="reading-body "><p>Replay Scrapyard now has an optional <strong>Replay</strong> editor dock and an F6 ability
-workbench. The first complete example is Salvefield: a placed zone with radius,
-duration, pulse timing and a referenced healing status. Its existing rules and
-stock balance are preserved; drafts exercise additions without entering the
-canonical catalog until reviewed. Baking validates the saved Resources and copies
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#one-time-setup">One-time setup</a><a href="#validate-and-test-salvefield">Validate and test Salvefield</a><a href="#references-and-shared-extraction">References and shared extraction</a><a href="#create-a-draft">Create a draft</a><a href="#commands-and-boundaries">Commands and boundaries</a></nav></details>
+<article class="reading-body "><p>Replay Scrapyard provides an optional <strong>Replay</strong> editor dock and an F6 ability
+workbench. Its Salvefield example exposes a placed zone&#39;s radius, duration, pulse
+timing, and referenced healing status. Drafts let you test additions before
+admitting them to the gameplay catalog; the example retains Salvefield&#39;s existing
+rules and stock balance. Baking validates the saved Resources and copies
 their gameplay values into the catalog used by runs and headless tests.</p>
 <h2 id="one-time-setup">One-time setup<a class="heading-anchor" href="#one-time-setup" aria-label="Link to this section">#</a></h2>
 <p>Build/import the project normally. <code>replay_authoring.json</code> opts into installation
@@ -17,9 +17,10 @@ The worker needs Python plus the Odin development toolchain; Nix is a fallback
 when Odin is not on PATH. The editor shows job progress while remaining responsive.
 Native authoring/testing jobs target macOS/Linux; they are development tools, not
 browser gameplay services.</p>
-<h2 id="the-accepted-first-milestone">The accepted first milestone<a class="heading-anchor" href="#the-accepted-first-milestone" aria-label="Link to this section">#</a></h2>
+<p><span id="the-accepted-first-milestone"></span></p>
+<h2 id="validate-and-test-salvefield">Validate and test Salvefield<a class="heading-anchor" href="#validate-and-test-salvefield" aria-label="Link to this section">#</a></h2>
 <ol>
-<li>Open <code>data/abilities/salvefield.tres</code> in the Inspector. <code>status</code> is now a
+<li>Open <code>data/abilities/salvefield.tres</code> in the Inspector. <code>status</code> is a
 <strong>StatusDef Resource picker</strong>. Choose a status by Resource instead of remembering
 its numeric ID. The bake validates type/path/membership and stores the stable ID.</li>
 <li>Change radius, duration or pulse timing. <strong>Save &amp; Validate Content</strong> checks the
@@ -51,11 +52,11 @@ through the same extractor. The dock shows current/stale status. Save other
 independently edited Resources first; the buttons save open scenes and the
 selected saved Resource. Failed validation/baking preserves the last valid files.</li>
 </ol>
-<p>The milestone was exercised through the actual editor plugin and running workbench,
-not only through equivalent CLI commands. <span class="local-reference" title="docs/replay/results/editor-workflow-2026-09-21/README.md · available in the repository">Acceptance evidence</span>
+<p>These steps were exercised through the actual editor plugin and running
+workbench, in addition to the CLI commands. <span class="local-reference" title="docs/replay/results/editor-workflow-2026-09-21/README.md · available in the repository">Acceptance evidence</span>
 records the exact checks and limits.</p>
 <h2 id="references-and-shared-extraction">References and shared extraction<a class="heading-anchor" href="#references-and-shared-extraction" aria-label="Link to this section">#</a></h2>
-<p>Ability <code>status</code>, mob <code>boom_status</code>, and combo <code>present</code>/<code>incoming</code>/<code>output</code> now
+<p>Ability <code>status</code>, mob <code>boom_status</code>, and combo <code>present</code>/<code>incoming</code>/<code>output</code>
 reference StatusDef Resources. Optional missing references bake to ID 0. Required
 ones fail validation. Referenced statuses must be catalog resources under
 <code>data/status</code>; duplicate/missing IDs and invalid values are rejected.</p>
@@ -63,9 +64,10 @@ ones fail validation. Referenced statuses must be catalog resources under
 one explicit mapping each. Catalog admission, export, validation, preview and
 isolated authoring scenarios reuse them. Inspector hints do not define game rules.
 The old catalog&#39;s canonical bytes are unchanged by this migration.</p>
-<p>Runner appearances are now an Inspector array of <code>ScrapRunnerStyle</code> Resources,
-with stable look IDs and idle/run textures. Swapping or reorganizing styles needs
-no Becca/Joe/unknown fields in the view script. The three existing gameplay look
+<p>Player-character appearances use an Inspector array of <code>ScrapRunnerStyle</code>
+Resources with stable look IDs and idle/run textures. Swapping or reorganizing
+styles changes the array rather than hard-coded Becca/Joe/unknown fields in the
+view script. The three existing gameplay look
 IDs/capacity remain an explicit game contract; duplicate/missing styles reject.</p>
 <h2 id="create-a-draft">Create a draft<a class="heading-anchor" href="#create-a-draft" aria-label="Link to this section">#</a></h2>
 <p>Choose a source definition, a kind and a lower-case name in the Replay dock, then
@@ -96,5 +98,5 @@ It adds startup validation and development processes; it makes no frame-time
 improvement claim. Kit and the original sibling Scrapyard remain independently
 runnable, with their source unchanged.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/editor-workflow.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#one-time-setup" class="">One-time setup</a><a href="#the-accepted-first-milestone" class="">The accepted first milestone</a><a href="#references-and-shared-extraction" class="">References and shared extraction</a><a href="#create-a-draft" class="">Create a draft</a><a href="#commands-and-boundaries" class="">Commands and boundaries</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/editor-workflow.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/editor-workflow.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#one-time-setup" class="">One-time setup</a><a href="#validate-and-test-salvefield" class="">Validate and test Salvefield</a><a href="#references-and-shared-extraction" class="">References and shared extraction</a><a href="#create-a-draft" class="">Create a draft</a><a href="#commands-and-boundaries" class="">Commands and boundaries</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/editor-workflow.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -2,13 +2,13 @@
 
 Claimball can run through Replay's existing authenticated Room lifecycle. A trusted
 connected player receives complete authority checkpoints and can become host after
-planned handoff or loss of the current host. Prediction remains local-avatar-plus-ball; the
-checkpoint is the complete authority world, including remote players excluded
+planned handoff or loss of the current host. Clients continue predicting their
+local avatar and the ball. The checkpoint is the complete authority world, including remote players excluded
 from each client's prediction group.
 
 The fixed-coordinator entry point below remains useful for development.
-[Party menus and browser RTC](online.md) now provide a provisioned Room path and
-durable publication as well. Whole-party restore now has native WSS/browser
+[Party menus and browser RTC](online.md) provide a provisioned Room path and
+durable publication as well. Whole-party restore has native WSS/browser
 acceptance through that path. Public deployment, Steam and broader recovery still
 require further acceptance.
 Ordinary Solo/Host/Join/Watch launches with `RCB_COORD_PORT=0` keep the standalone

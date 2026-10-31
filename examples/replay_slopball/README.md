@@ -2,8 +2,8 @@
 
 Run this [Slopball](../slopball/README.md) port to use Godot physics with Replay.
 Kickers use CharacterBody2D nodes and the ball uses a RigidBody2D. The entity owner
-is the player permitted to submit that body's pose and momentum observations. Kit and all original
-projects remain intact. Reused scenes and modifications are recorded in [assets](assets.md).
+is the player permitted to submit that body's pose and momentum observations.
+Kit and all original projects remain intact. Reused scenes and modifications are recorded in [assets](assets.md).
 
 ```sh
 nix develop --command bash examples/replay_slopball/play.sh
@@ -28,30 +28,33 @@ scripts and project state.
 
 Player samples and ball samples use Replay's negotiated latest-observation policy.
 The authority coalesces them into the next gameplay tick, validates sender/ownership
-scope and records accepted values. The game reducer contains joins/leaves, ownership
-arbitration, score and kickoff decisions; it never calls Godot. Owner scopes, pending
+scope, and records accepted values. The simulation step handles joins/leaves,
+ownership arbitration, score, and kickoff decisions without calling Godot. Owner scopes, pending
 offers, sample frontiers and full pose/momentum are part of the saved world.
 
 The shared Body2 adapter connects a Godot physics body to these recorded
-observations. The local solver prepares an authority-issued handoff before its first valid sample
-commits the reserved revision. The old revision then loses admission. Local possession
+observations. The local solver prepares an authority-issued handoff before
+its first valid sample commits the reserved revision. Samples under the old
+revision are then rejected. Local possession
 preview, authoritative reseeding, observer freezing and skin smoothing are handled
 by that adapter. Goals use a persistent confirmed event policy, including
 after Welcome/resync/recovery journal reconstruction. The initial 2D solo, normal
 three-process and jitter/loss/duplication gates pass with one goal occurrence per
 screen. The separate solver probe checks nonzero linear/angular velocity at handoff.
 
-This is initial gameplay coverage, not full parity. Ownership intent now uses accepted displacement at arbitration passes, matching
-the original measure and threshold.
+This is initial gameplay coverage, not full parity. Ownership intent uses
+accepted displacement at arbitration passes, matching the original measure
+and threshold.
 Ownership uses a prepare/commit protocol rather than an immediate SETOWNER. Native
-lobby, names, chat, scoreboard and leave/rejoin now have acceptance. Netgraph UX, dedicated-server parity,
-multi-goal/reconnect scenarios, broader migration timing, moving contests, precise common-tick view
-comparisons and human feel review remain pending. The fault gate compares settled
+lobby, names, chat, scoreboard, and leave/rejoin have acceptance. Netgraph UX,
+dedicated-server parity, multi-goal/reconnect scenarios, broader migration
+timing, moving contests, precise common-tick view comparisons, and human feel
+review remain pending. The fault gate compares settled
 positions near tick 600 within four pixels; it does not prove arbitrary dynamic
 same-tick visual agreement. The separate [3D port](../replay_slopball3d/README.md)
-now has initial solver, network and migration coverage.
+has initial solver, network and migration coverage.
 
-The Room migration gate now runs a coordinator, host, trusted successor and guest.
+The Room migration gate runs a coordinator, host, trusted successor and guest.
 It starts a moving-ball handoff or kills the host, compares the exact approved
 checkpoint with the installed world, validates the new solver's momentum seed,
 continues with new successor kicks and a goal for its team, and compares surviving

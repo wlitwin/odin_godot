@@ -87,21 +87,22 @@ files are not preview output paths. The scene is intended for native editor F6;
 its code passes WASM checking, but browser workbench execution is not claimed.</p>
 <h2 id="checks-and-current-scope">Checks and current scope<a class="heading-anchor" href="#checks-and-current-scope" aria-label="Link to this section">#</a></h2>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/workbench_run.sh
-nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard/development_run.sh</code></pre></div><p>The first gate exercises the panels/status/jam preview, a boss that prevents clear,
+nix develop --<span class="hljs-built_in">command</span> bash tests/replay_scrapyard/development_run.sh</code></pre></div><p>The first test exercises the panels/status/jam preview, a boss that prevents clear,
 and a normal wipe. It checks action confirmation, UI content, key transitions,
 continued simulation with blocked movement, status refresh, environment restoration
 and clean shutdown. A rendered capture is retained in the
 <span class="local-reference" title="docs/replay/results/workbench-2026-09-07/README.md · available in the repository">workbench evidence</span>.
-The second gate rejects all six edits from a real client, accepts the host&#39;s grants
+The second test rejects all six edits from a real client, accepts the host&#39;s grants
 to that client and compares both complete world hashes afterward.</p>
-<p>These additions advance editor/UI parity. The <a href="audio.html">audio/settings layer</a> now supplies volume, shake, fullscreen and
+<p>The <a href="audio.html">audio/settings layer</a> supplies volume, shake, fullscreen, and
 spray-preview controls. Full visual/listening parity and paired human review remain
 required work. This is not a claim of full Scrapyard feature parity.</p>
-<p>The action extension introduced content <code>...3043</code>; audio event details advance the
-version to <code>...3044</code>; <a href="cast_paths.html">cast paths</a> advanced it to <code>...3046</code>, followed by <a href="controls.html">dash actions</a> at <code>...3047</code>. Gameplay protocol 7 and checkpoint layout 4 are
-unchanged. The explicit <a href="saves.html#converting-a-protocol-6-run">save importer</a> maps
+<p>The action extension introduced content <code>...3043</code>; audio event details
+introduced <code>...3044</code>; <a href="cast_paths.html">cast paths</a> introduced <code>...3046</code>, followed
+by <a href="controls.html">dash actions</a> at <code>...3047</code>. Gameplay protocol 7 and checkpoint
+layout 4 were unchanged by these transitions. The explicit <a href="saves.html#converting-a-protocol-6-run">save importer</a> maps
 content-42/43/44/45 archives, including pending accepted/refused requests, while preserving
 the complete world and image payloads.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="menu.html"><span>Escape menu and tally</span><span aria-hidden="true">→</span></a><a href="audio.html"><span>Audio and local settings</span><span aria-hidden="true">→</span></a><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/workbench.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="menu.html"><span>Escape menu and tally</span><span aria-hidden="true">→</span></a><a href="audio.html"><span>Audio and local settings</span><span aria-hidden="true">→</span></a><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/workbench.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#development-boundary" class="">Development boundary</a><a href="#checks-and-current-scope" class="">Checks and current scope</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/workbench.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

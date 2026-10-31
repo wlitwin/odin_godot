@@ -27,7 +27,7 @@ the local prediction group. Physics, claim thresholds and remote presentation
 remain as documented in the main README. Content C3 (<code>0x52434c41494d4233</code>) explicitly
 distinguishes the new world/action/event schema from C1/C2; no automatic archive conversion
 is provided.</p>
-<p><a href="online.html">Party menus and browser sessions</a> now have local RTC acceptance. Steam
+<p><a href="online.html">Party menus and browser sessions</a> have local RTC acceptance. Steam
 and public deployment remain work. Fixed native Room recovery is described in
 <a href="migration.html">migration.md</a>.
 See the <span class="local-reference" title="docs/replay/results/claimball-ui-2026-09-13/README.md · available in the repository">validation results</span>
@@ -67,13 +67,13 @@ coordinated host migration.</p>
 refused before a session opens. The host identity must match the saved local seat.
 Existing files and identities are kept on rejection. Native file saves do not
 persist the cosmetic chat history; fresh sessions can exchange named chat again.
-Browser-local checkpoints now use a separate slot adapter. Provisioned Parties publish
+Browser-local checkpoints use a separate slot adapter. Provisioned Parties publish
 through their service; fixed native Rooms disable direct file save/resume.
 This adds no schema change beyond the existing C3 game version.</p>
 <p>Use <code>RCB_SAVE</code> to select a path at launch and <code>RCB_PROFILE</code> for the matching host
 identity/name profile. Each process can use a separate profile path. Resume solo
 and Resume host are the supported menu entry points; a dedicated-server resume
-front door is not part of this increment.</p>
+menu entry point is not implemented here.</p>
 <h2 id="browser-local-solo-saves">Browser-local Solo saves<a class="heading-anchor" href="#browser-local-solo-saves" aria-label="Link to this section">#</a></h2>
 <p>Without a Party service, the browser menu offers Solo, a named save slot and Resume
 solo. <code>save_slot=pitch</code> is the default query setting. Labels contain 1–48 letters,
@@ -92,5 +92,5 @@ lifetime of locally stored data.</p>
 slot. Browser-local saves, native files and Party publications are separate stores.
 All use the existing C3 model; this integration does not change its wire schema.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Claimball Parties and browser play</span><span aria-hidden="true">→</span></a><a href="migration.html"><span>Claimball native host migration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/session-ui.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="online.html"><span>Claimball Parties and browser play</span><span aria-hidden="true">→</span></a><a href="migration.html"><span>Claimball native host migration</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_claimball/session-ui.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#play-again" class="">Play again</a><a href="#native-match-saves" class="">Native match saves</a><a href="#browser-local-solo-saves" class="">Browser-local Solo saves</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_claimball/session-ui.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

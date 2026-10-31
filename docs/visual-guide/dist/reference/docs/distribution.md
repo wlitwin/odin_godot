@@ -1,8 +1,9 @@
 # Distribution — shipping odin_godot as a drop-in addon
 
-This page covers **building the distributable addon** (`nix build`), **what's in it**, and
-**how a user installs it** into a Godot project, compiles their scripts, and exports for
-all platforms. For the export pipeline internals see [exporting.md](exporting.md).
+Build the distributable addon with `nix build`, install it in a Godot project,
+and compile that project's scripts using the bundled sources and build tools.
+This page describes the addon layout and the verification available for each
+export target. See [exporting.md](exporting.md) for the export procedure.
 
 > **Platform verification status** (this repo is developed on macOS):
 >
@@ -21,21 +22,22 @@ all platforms. For the export pipeline internals see [exporting.md](exporting.md
 
 ## The two-dll model
 
-odin_godot is a **stable CORE dll** (`libodin_godot.<ext>`, a pure-C-ABI
-`ScriptLanguageExtension`, entry `odin_godot_init`) that at runtime loads a **SCRIPTS dll**
-(`libodinscripts.<ext>`) containing your `.odin` files compiled against the odin_godot Odin
-collection. The core is shipped prebuilt in the addon; **you compile the scripts dll** for
-each project, because they are your code. (On web, core + binding + scripts are AOT-linked
-into one Emscripten `SIDE_MODULE` instead.)
+On native platforms, odin_godot uses two libraries. The addon supplies a
+prebuilt core, `libodin_godot.<ext>`, which implements
+`ScriptLanguageExtension` through a C ABI with entry `odin_godot_init`. At
+runtime it loads `libodinscripts.<ext>`, containing the project's `.odin`
+files compiled against the odin_godot Odin collection. Compile this scripts
+library for each project. On web, core, binding, and scripts are linked ahead
+of time into one Emscripten `SIDE_MODULE` instead.
 
-So the addon must contain both the prebuilt core **and** everything needed to compile a
-scripts dll: the `godot:` Odin collection, the `scriptgen` codegen preprocessor, and the
-build scripts.
+The addon therefore includes the prebuilt core and the inputs needed to compile
+a scripts library: the `godot:` Odin collection, the `scriptgen` code
+generator, and build scripts.
 
 ## Build the distributable
 
 ```sh
-# macOS core only (always works with the nixpkgs `odin`):
+# macOS core only (uses the nixpkgs `odin`):
 nix build                 # -> ./result/addons/odin_godot/
 
 # macOS + Linux + Windows cores (pulls the pinned cross gcc wrappers from cache.nixos.org):
@@ -65,7 +67,8 @@ The addon root mirrors the repo's collection layout, so the bundled build script
 Replay ships as an experimental source collection beside Kit, with a separate
 `template/replay/` project and a download-oriented `docs/replay.md` guide. Source
 collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
-compiler still resolves imports from them. The default Hello starter is unchanged.
+compiler still resolves imports from them. The default Hello starter does not
+use Replay.
 
 The [Replay distribution gate](../tests/replay_distribution/README.md) builds an
 isolated source snapshot, installs the Nix-produced addon into an external project,
@@ -77,7 +80,8 @@ tag or bypass the release runbook.
 
 ## Cross-compiling directly (without nix build)
 
-`build/build_cross.sh` is the engine `nix build .#dist-cross` uses. It works standalone:
+`nix build .#dist-cross` calls `build/build_cross.sh`. You can also run it
+directly:
 
 ```sh
 # core + scripts for a project, into <project>/bin/<target>/:
@@ -88,14 +92,15 @@ nix develop .#cross --command bash -c 'bash build/build_cross.sh windows tests/p
 nix develop .#cross --command bash -c 'CORE_ONLY=1 bash build/build_cross.sh linux "" out/bin/linux'
 ```
 
-**How it works.** Odin's own linker driver refuses to *cross-link* a dll
+Odin's linker driver refuses to cross-link a library
 (`Linking for cross compilation … not yet supported`). So `build_cross.sh` emits a single
 relocatable object with Odin (`-build-mode:obj -use-single-module -target:<t>`) and links it
 with a Nix cross **gcc wrapper** (`pkgsCross.gnu64` / `pkgsCross.mingwW64`), which supplies
 the target glibc / mingw sysroot. The cross compilers are exposed by the `.#cross` dev shell
 as `ODIN_CROSS_LINUX_CC` / `ODIN_CROSS_WINDOWS_CC` (triple-prefixed, kept **off** `PATH` so
 the native `cc`/`clang` is never shadowed). If a toolchain is absent the script exits **3**
-(a SKIP sentinel), so callers gate on it like the browser-gated web tests.
+(a SKIP sentinel), allowing callers to distinguish an unavailable toolchain
+from a failed build, as the browser-gated web tests do.
 
 ### Build-verification evidence
 
@@ -142,41 +147,46 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
    `SKIP_CORE=1` skips rebuilding the core (you already have the prebuilt one). Re-run this
    whenever you change a script (the editor's reload-on-save does it automatically in-repo).
 
-You need an `odin` compiler on `PATH` to compile scripts. That is the one host tool a
-consumer project needs. The bundled release is recommended, not required by string identity:
-the native loader admits another compiler release only when its semantic ABI generation and
-complete layout fingerprint match. See [Native core ↔ scripts boundary](design/native-boundary.md).
+Compiling scripts requires an `odin` compiler on `PATH`. Use the bundled
+release by default. The native loader can accept a different compiler release
+when both its semantic ABI generation and complete layout fingerprint match;
+it does not decide compatibility from the release-name string alone. See
+[Native core ↔ scripts boundary](design/native-boundary.md).
 
-This **split layout** (core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
-`res://bin/`) is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
-semantics are strictest: the scripts dll is self-contained, so the core's location doesn't
-matter). If a scripts-dll load fails, the core prints the OS loader's own
-reason (`odin: loader error: …`) next to the path.
+The suite's `splitaddon` test on macOS verifies the split layout: the core is
+in `addons/odin_godot/bin/<platform>/` and scripts are in `res://bin/`.
+The scripts library is self-contained and can load independently of the core's
+directory. If loading fails, the core prints the OS loader's reason
+(`odin: loader error: …`) next to the path.
 
-> **Known engine quirk (Godot 4.6–4.7, still on master):** a headless `godot --import` of a
-> project containing *any* GDExtension can crash **at exit, after the import succeeded**
+> **Engine issue observed with Godot 4.6–4.7:** a headless `godot --import` of a
+> project containing a GDExtension can crash at exit after the import succeeded
 > (`EditorHelp::_gen_extensions_docs` is queued as a deferred call; when the quit wins the
 > race it flushes during `Main::cleanup`, after `~EditorNode` nulled EditorHelp's `doc`).
-> Harmless but scary: the `.godot/` artifacts are complete. In CI, don't gate on
-> `--import`'s exit code. Check for the artifacts, or use `--editor --quit-after 30`
-> instead (frames flush the deferred while everything is alive).
+> For this failure, the `.godot/` artifacts are complete despite the exit
+> error. In CI, verify the artifacts rather than using only `--import`'s exit
+> code, or use `--editor --quit-after 30` so frames flush the deferred call
+> before editor cleanup.
 
 ## Export your game
 
-Exporting is unchanged from [exporting.md](exporting.md): the editor's `OdinExportPlugin`
-compiles the scripts dll for the **target** platform at export and bundles it beside the
-core. For **cross-target desktop exports** (e.g. a Windows build from macOS) the export host
-needs the matching cross toolchain on `PATH` (the same `ODIN_CROSS_*_CC` the `.#cross`
-shell provides); otherwise prebuild with `build/build_cross.sh` and bundle manually.
+As described in [exporting.md](exporting.md), the editor's `OdinExportPlugin`
+compiles scripts for the target platform and bundles them beside the core.
+Cross-target desktop exports, such as a Windows build from macOS, require the
+matching cross compiler configured through `ODIN_CROSS_*_CC`, as provided by
+the `.#cross` shell. Otherwise, prebuild with `build/build_cross.sh` and bundle
+manually.
 
 - **macOS / Web**: fully automated + verified (see exporting.md).
 - **Linux / Windows**: the scripts dll cross-compiles (verified); run the export from a host
   with the cross toolchain, or prebuild the scripts dll with `build_cross.sh`.
 
-## Runtime-confirming Linux / Windows
+<a id="runtime-confirming-linux--windows"></a>
 
-The binaries are build-verified here but **not run** on Linux/Windows. To close the gap on a
-real host or in CI:
+## Verify runtime behavior on Linux / Windows
+
+Build verification does not establish runtime behavior on Linux/Windows.
+Run the following checks on a target host or in CI:
 
 **Linux** (e.g. GitHub Actions `ubuntu-latest`):
 1. Install the matching Godot 4.7.1 **Linux** export templates + editor.
@@ -188,14 +198,15 @@ real host or in CI:
 4. For an exported game: `godot --headless --export-release "Linux/X11" out/game` then run
    `out/game --headless` and assert the sentinel.
 
-**Windows** (e.g. GitHub Actions `windows-latest`) follows the same shape: install Godot 4.7.1
+**Windows** (e.g. GitHub Actions `windows-latest`) uses the same procedure: install Godot 4.7.1
 and the Windows templates, build the scripts dll (natively with `odin -target:windows_amd64`,
 or use the prebuilt cross dll), drop in the addon, and run `godot.exe --headless --path …`.
 
-Because the gdext C-ABI boundary and the loader logic (`dladdr`/sibling-dll lookup, with the
-`LoadLibrary` path already present for Windows in `core:dynlib`) are platform-generic and the
-macOS + web runtimes are verified, the residual risk is platform-specific link/loader detail,
-not the extension design.
+These checks exercise target-specific linking and library loading in addition
+to the shared GDExtension C ABI. The loader uses `dladdr`/sibling-library
+lookup on supported native systems and the `LoadLibrary` path in
+`core:dynlib` on Windows. Successful macOS and web runs do not replace testing
+those target-specific paths.
 
 ## Troubleshooting: `failed to load scripts dll` / `No loader found`
 

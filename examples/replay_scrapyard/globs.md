@@ -36,7 +36,7 @@ its commands choose the loadout during staging, submit Cast actions and create
 one spitter through the existing development action. Migration acceptance checks
 that the promoted host draws the restored in-flight lob.
 
-[Area effects](areas.md) now cover nova/buff/reaction/zone presentation.
+[Area effects](areas.md) cover nova/buff/reaction/zone presentation.
 Remaining cone/spread presentation details, broader browser/device
 coverage, audio listening and paired playtests remain requirements. See the
 [port ledger](roadmap.md) and [evidence](../../docs/replay/results/scrapyard-globs-2026-09-08/README.md).

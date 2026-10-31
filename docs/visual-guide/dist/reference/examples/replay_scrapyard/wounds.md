@@ -1,6 +1,6 @@
 # Directional wounds
 
-The local player now receives the original red wound chevron, 30 pixels toward
+The local player receives the original red wound chevron, 30 pixels toward
 the hit origin, fading over 0.55 seconds. It stays at the location of that hit as
 the player moves. Spectators and other players do not receive that personal cue.
 
@@ -10,8 +10,9 @@ checks both current and recorded generations. Missing/expired history or a repla
 body suppresses the historical effect; self-origin damage supplies no direction.
 This avoids inventing a bearing from later positions.
 
-The same geometry now places the hurt burst and spatial sound at the victim.
-The earlier feedback/audio mapping had treated the origin as the victim position.
+The same geometry places the hurt burst and spatial sound at the victim.
+The linked evidence records the fix for an earlier mapping that treated the
+damage origin as the victim's position.
 No gameplay, event, content or checkpoint schema changed. Direction nodes share
 the feedback ledger and scope cleanup, with a cap of 32 active indicators.
 

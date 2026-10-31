@@ -18,7 +18,8 @@ error = replaygd.room_frame(&amp;room, delta_seconds, controls)</code></pre></di
 substituted for missing, corrupt, disallowed or too-old saved progress.</p>
 <h2 id="lifecycle">Lifecycle<a class="heading-anchor" href="#lifecycle" aria-label="Link to this section">#</a></h2>
 <p>After fresh process registration and an authenticated view with no live authority,
-Room computes its schema/config contract without creating a simulation timeline.
+Room computes the schema and configuration needed to validate the saved state
+without creating a simulation timeline.
 It reads publication status, downloads the selected revision, decodes the complete
 typed checkpoint and verifies the stable token&#39;s playable reservation. Dedicated
 authority uses local seat zero.</p>
@@ -43,7 +44,7 @@ view still reports this actor&#39;s reservation. It does not request another Res
 or install a runtime using the expired permit. A successful correlated renewal
 can make the same epoch usable. If the coordinator has also expired or replaced
 the reservation, renewal is refused and normal recovery/join rules apply.</p>
-<p>Current request retries cannot change the service&#39;s policy result. <code>Busy</code> during
+<p>Retrying a request does not override the service&#39;s policy decision. <code>Busy</code> during
 status/download means another bounded transfer is in progress; Room retries a new
 status request after backoff instead of showing a terminal recovery error. <code>Busy</code>
 on an authority request retains the prepared bytes for a later new attempt. Stale
@@ -72,11 +73,11 @@ This is a known rollback distance from that view, not proof about unreported wor
 grant lost across service restarts. Installation/interruption timing remains
 available through the existing recovery metrics.</p>
 <h2 id="acceptance-and-remaining-work">Acceptance and remaining work<a class="heading-anchor" href="#acceptance-and-remaining-work" aria-label="Link to this section">#</a></h2>
-<p>Cavecrawl&#39;s <strong>Rejoin recent party</strong> now resumes stored progress after the original
+<p>Cavecrawl&#39;s <strong>Rejoin recent party</strong> resumes stored progress after the original
 game process exits and the service is killed/restarted. Native verified-TLS and
 fresh-browser/RTC tests restore the exact saved tick with three gems in epoch 2,
 accept a new guest and its loot action, then publish the continued game again.
-The browser gate uses explicit loopback development WS. Separate database readers
+The browser test uses explicit loopback development WS. Separate database readers
 validate the final saved inventories. The original live handoff/rejoin gate still
 passes with publication enabled.</p>
 <p>Competing-return fixtures retain the same published checkpoint in two fresh
@@ -86,11 +87,12 @@ tests cover both possible owner seats and verify one epoch advance plus conserve
 loot in the next durable publication. A browser RTC race exercises the same
 transition. Temporary Busy responses must not strand a participant before it can
 reach that transition.</p>
-<p>This completes that Cavecrawl recovery path. Bounded atomic asset packages now also
-support Scrapyard sprays and its native/browser cold-cache restoration. Broader
-asset profiles, other game UI/state acceptance, public
-deployment and broader recovery/failure policy cases remain roadmap work. See the
+<p>The tested recovery path covers Cavecrawl under these conditions. Bounded
+atomic asset packages also support Scrapyard sprays and native/browser
+restoration with an empty asset cache. Broader asset profiles, acceptance of
+other games&#39; UI/state, public deployment, and broader recovery/failure policies
+remain outside this coverage. See the
 <a href="../provision/checkpoint/restore.html">guarded service decision</a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room_restore.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../provision/checkpoint/restore.html"><span>Restoring a published checkpoint</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/godot/room_restore.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#lifecycle" class="">Lifecycle</a><a href="#recovery-semantics" class="">Recovery semantics</a><a href="#acceptance-and-remaining-work" class="">Acceptance and remaining work</a></nav><div class="outline-actions"><a href="../../../reference/replay/godot/room_restore.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

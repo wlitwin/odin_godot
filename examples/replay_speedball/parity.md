@@ -11,7 +11,7 @@ comparison.
 | Contested whole-pitch prediction; local kick/spike response | Separate complete-state pitch; core, solo and four-process network gates |
 | Pitch, ball/player movement, contact, goal/reset/hold rules | Preserved with explicit seat-order contacts; pure model tests |
 | Dedicated first client's spawn/team mapping | Preserved one-seat offset; network gate requires right-side winner |
-| Host/join/name/port/start front door | Scene-authored menu; match-leader manual start, editable address/port and validated names |
+| Host/join/name/port/start menu | Scene-authored menu; match-leader manual start, editable address/port and validated names |
 | Scripted auto-start and solo launch | Existing role/bot environment paths retained |
 | Enter chat / Escape release / gameplay input capture | Replay comms channel; three-process UI gate checks literal markup and captured movement/spike input |
 | Tab score overlay, named roster, ping, departed rows | Authoritative names/team/score with optional telemetry; departed rows retained |

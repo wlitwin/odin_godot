@@ -19,13 +19,13 @@ the new Welcome and authority verdict arrive. Both worlds must include the actio
 once, and the facade must expose exactly one confirmed result. The earlier input
 capture/catch-up checks remain required.
 
-The model now uses a versioned per-action schedule: amount 3 is receipt-time;
+The model uses a versioned per-action schedule: amount 3 is receipt-time;
 amounts 1 and 2 remain scheduled. During resync, the facade must reject a scheduled
 request without adding a queue entry, then admit the receipt-time request and
 expose its single settled result. `REPLAY_MIXED_ACTION_SESSION_OK` is required in
 addition to the earlier control-capture and receipt-resync markers.
 
-The action now uses the reusable intent helper. The fixture filters predicted,
+The action uses the reusable intent helper. The fixture filters predicted,
 cancelled, foreign-seat and foreign-epoch changes and verifies duplicate results
 do not settle twice. A second phase captures a real server checkpoint and client
 recovery report, promotes the retained request into a Room authority, retires the

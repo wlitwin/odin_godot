@@ -4,16 +4,18 @@
 REPLAY_CLAIMBALL_PARTY_RESTORE_OUT=/absolute/fresh/output nix develop --command bash tests/replay_claimball_party_restore/run.sh
 ```
 
-The fixture creates three browser players and an observer, publishes during scored
-moving play, kills every browser process and the service, and reopens the existing
-service database with creation disabled. An independent reader verifies publication
-one's complete world, motion, score, names, tick and digest before service shutdown.
+The fixture starts three browser players and an observer, then publishes a
+checkpoint while the scored match and ball motion continue. Before shutdown, an
+independent reader checks the first publication's complete world, motion, score,
+names, tick, and digest. The fixture then kills every browser process and the
+service and reopens the existing database with creation disabled.
 
 The observer registers first without becoming authority. The returning owner must
 restore the published tick/digest in epoch two with its personal identity and seat
-intact. Other players reclaim seats two/three, preserve one-avatar prediction,
-execute two new spikes and exchange named observer chat. Publication two is decoded
-independently, and all peers compare a common authoritative world after recovery.
+intact. Other players reclaim seats two/three and each continues predicting only
+its own avatar. They execute two new spikes and exchange named observer chat.
+An independent reader decodes the second publication, and all peers compare the
+authority world at a common tick after recovery.
 RTC traffic, graphics-buffer conflicts, control layout and absence of browser-local
 save slots are checked.
 

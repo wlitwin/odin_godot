@@ -10,7 +10,7 @@ declared local faults; their network and performance scopes are stated below.</p
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">REPLAY_LOADED_OUT=/absolute/fresh/planned REPLAY_LOADED_MODE=planned \
   nix develop --<span class="hljs-built_in">command</span> bash tests/replay_loaded_migration/run.sh
 REPLAY_LOADED_MODE=crash nix develop --<span class="hljs-built_in">command</span> bash \
-  tests/replay_loaded_migration/execute.sh /absolute/fresh/planned /absolute/fresh/crash</code></pre></div><p>Builds an isolated Scrapyard Replay copy and runs the existing twenty-second,
+  tests/replay_loaded_migration/execute.sh /absolute/fresh/planned /absolute/fresh/crash</code></pre></div><p>The fixture builds an isolated Scrapyard Replay copy and runs the existing twenty-second,
 forty-mob jam workload in two Chrome processes. The report reuses the native
 workload&#39;s gameplay/observation gates unchanged. Controlled RTC message faults
 apply 40±10 ms delay and 5% unreliable loss/duplication with bounded queues and
@@ -34,7 +34,8 @@ validates the initial gameplay work and rejects altered receipts through
 <code>assert</code>; the initial fixture mistake and its timeout are retained as failed
 harness evidence. <code>execute.sh</code> reuses a built fixture and writes a fresh runtime
 directory. Original Kit and original Scrapyard projects remain separately runnable.</p>
-<p>The trigger now records a fresh population census and shots spent by both players;
+<p>At the trigger, the fixture records a fresh population census and shots spent
+by both players;
 32–44 mobs must be alive and both players must have fired during the resumed load.
 Browser startup is bounded to 120 seconds and the browser is tracked before page
 creation, so a stalled startup can be cleaned up without leaking an owned process.</p>
@@ -57,7 +58,7 @@ freshness; the regular Session/Link scheduling remains in place.</p>
 selected by the sender and fully validated by the receiver before the trigger.
 The capture observer recognizes both ordinary compressed and schema-grouped
 checkpoint offers, retaining the layout fingerprint for the latter. The analyzer&#39;s
-input remains an ordinary compressed capture; it now also sends that decoded
+input remains an ordinary compressed capture; the analyzer also sends that decoded
 checkpoint through the real typed schema-aware transfer and compares the restored
 canonical bytes. The separate <code>tests/replay_transfer/layout_corpus/run.sh</code> executes
 layout transfer, fallback and plan rejection in native and WASM builds.</p>
@@ -85,7 +86,7 @@ workload and migration receipts. <code>reliable_hold_test.mjs</code> checks copi
 transparent unreliable traffic, one-shot/late arming and rejected configurations.
 <code>verify_report.py</code> rejects missing, mistimed or stale held-transfer observations.</p>
 <h2 id="real-udp-turn-traffic">Real UDP TURN traffic<a class="heading-anchor" href="#real-udp-turn-traffic" aria-label="Link to this section">#</a></h2>
-<p><code>build.sh OUTPUT</code> now prepares both an isolated game export and an isolated
+<p><code>build.sh OUTPUT</code> prepares both an isolated game export and an isolated
 coordinator. <code>run.sh</code> builds in <code>REPLAY_LOADED_OUT</code> and executes into its <code>run/</code>
 subdirectory; <code>execute.sh BUILD FRESH_RUN</code> reuses the recorded artifacts. Native
 and Web binary hashes are verified before execution. Original Kit and Scrapyard
@@ -168,5 +169,5 @@ validates canonical decoding, scope/IDs and baseline digest, then roundtrips the
 existing sparse/LZ4/grouped codecs and lists changed fields. Supply the prepared
 model using <code>-collection:sample=BUILD/replay/project/shared</code>. It enables no new codec.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_turn_faults/README.html"><span>Browser UDP TURN fault gate</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_loaded_migration/README.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../replay_turn_faults/README.html"><span>Browser UDP TURN fault gate</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_loaded_migration/README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#real-udp-turn-traffic" class="">Real UDP TURN traffic</a><a href="#snapshot-path-diagnostics" class="">Snapshot-path diagnostics</a><a href="#public-history-projection-and-adaptive-codec-coverage" class="">Public history projection and adaptive codec coverage</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay_loaded_migration/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

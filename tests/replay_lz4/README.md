@@ -14,7 +14,8 @@ agree on the encoded/mutation fingerprint. Round trips preserve every target byt
 Short outputs, truncations, malformed mutations and disallowed aliases must retain
 transactional output on failure. The workspace cannot overlap either input/output.
 
-The native LZ4 reference decoder reads our standard blocks as XOR bytes, and our
-codec reads reference-compressed XOR blocks. Selected mutated blocks accepted by
-our decoder must also decode to the same result in the reference implementation.
+The native LZ4 reference decoder reads Replay's standard blocks as XOR bytes,
+and Replay's codec reads reference-compressed XOR blocks. Selected mutated
+blocks accepted by Replay's decoder must also produce the same result in the
+reference implementation.
 No reference library is linked into production, Godot or the WASM corpus.

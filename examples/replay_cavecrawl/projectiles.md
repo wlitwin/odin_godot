@@ -1,6 +1,6 @@
 # Rock presentation
 
-Rock views now move between Cavecrawl's 20 Hz simulation ticks. The renderer reads
+Rock views move between Cavecrawl's 20 Hz simulation ticks. The renderer reads
 each live rock's current position and per-tick velocity, then previews up to one
 tick (12 pixels) ahead using `view.Tick_Phase`. It stops the preview at the nearest
 currently visible living body, excluding the shooter and corpses. This query is

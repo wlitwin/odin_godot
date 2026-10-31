@@ -4,7 +4,7 @@
 REPLAY_RECORDING_OUT=/absolute/fresh/output nix develop --command bash tests/replay_recording/run.sh [additional.rplrec ...]
 ```
 
-Runs diagnostic unit tests and WASM checking, builds the Hello verifier and a
+The gate runs diagnostic unit tests and WASM checking, builds the Hello verifier and a
 headless recording fixture, then replays the same archives in native Odin and
 freestanding WASM with no imported runtime functions. It compares range, completed
 steps, event count, epoch and final gameplay values. Each target must reject a

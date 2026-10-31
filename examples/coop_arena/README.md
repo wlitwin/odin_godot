@@ -1,10 +1,11 @@
-# Co-op Arena — the ENGINE-NATIVE multiplayer path, end to end
+<a id="co-op-arena--the-engine-native-multiplayer-path-end-to-end"></a>
 
-> **Building a co-op game? Use the [Kit multiplayer toolkit](../../docs/kit/index.md)
-> instead** — `examples/cavecrawl` and `examples/slopball` are its references.
-> Use this example to study Godot's engine APIs directly:
-> `MultiplayerSynchronizer`, `@(gd_rpc)`, and ~1,100 lines of networking code
-> that Kit supplies for its examples.
+# Co-op Arena — Godot engine multiplayer
+
+> For the [Kit multiplayer toolkit](../../docs/kit/index.md), start with
+> `examples/cavecrawl` or `examples/slopball`. Co-op Arena demonstrates direct
+> use of Godot's `MultiplayerSynchronizer` and `@(gd_rpc)` APIs in ~1,100 lines
+> of networking code. Kit supplies corresponding integration for its examples.
 
 This pure-Odin / Polygon2D survivors game runs in three modes: single-player,
 native ENet co-op, and browser WebRTC co-op. Each player simulates their own pawn
@@ -12,8 +13,8 @@ and projectiles locally, so movement and firing do not wait for a host round-tri
 Peers trust the firing player's damage reports.
 
 `examples/survivors` remains the single-player gameplay reference; its co-op layer is
-retained as the *host-authoritative* engine-native variant + the regression tests for the
-engine replication interop (see its README).
+retained as the host-authoritative engine-native variant and as regression
+coverage for engine replication interop; see its README.
 
 ```
 nix develop --command bash -c 'bash examples/coop_arena/run.sh'              # single-player  -> ARENA_SINGLE_OK
@@ -30,47 +31,51 @@ The same `arena_player.odin`,
 `arena_bullet.odin`, `arena_enemy.odin` and the `ArenaGame` orchestrator (`arena.odin`) run in
 all three modes:
 
-- **Single-player == host-with-no-peers.** Single mode opens no transport at all; the
-  authoritative simulation runs exactly as the host's does, the broadcasts have no remote recipients.
+- **Single-player uses the host simulation.** It opens no transport, and
+  broadcasts have no remote recipients.
 - **Transport is chosen at compile time by platform**: native builds use ENet (`gd.host` /
   `gd.join`); the web build uses WebRTC (`gd.webrtc_host` / `gd.webrtc_join` / `gd.webrtc_poll`).
   The same `@(gd_rpc)` methods and `gd.rpc` calls work over either, once connected.
-- A headless **scripted session** (`COOP_ROLE` env on native, `?role=` query on web) drives the
-  deterministic proofs the tests assert; with no role it shows the windowed start screen.
+- A scripted session, selected by native `COOP_ROLE` or the web `?role=` query,
+  drives the headless test scenario. With no role, the game shows its start screen.
 
-## The authority model (the whole point)
+<a id="the-authority-model-the-whole-point"></a>
 
-**Pawns are OWNER-authoritative.** Each player's pawn has its multiplayer authority set to the
-owning peer (recursively, so the child `MultiplayerSynchronizer` streams *from* the owner). The
-owner simulates its OWN pawn locally every frame — movement (with momentum) and auto-fire — with
-**zero round-trip**. Other peers render the synchronized transform instead of simulating that pawn's
-input. Your pawn therefore answers input in the same frame while remote screens
-receive its updated position. (See the gate in `arena_player.odin`:
-`if !node_is_multiplayer_authority(owner) { return }`.)
+## Authority and damage rules
 
-**Projectiles are OWNER-authoritative + deterministic-local.** When a peer auto-fires, it spawns
-its bullet **locally, immediately** (it sees its own shot with no network delay) and *then*
-broadcasts `fired(origin, dir)`; every other peer spawns a matching **ghost** bullet that flies
-the same path. Only the firing peer's own bullet resolves hits — when it overlaps an enemy it
-authoritatively applies + **broadcasts** the damage/kill (`damage`, `call_local`), and peers
-**trust it** (no anti-cheat — by design). This policy favors local response and trusts peers; it does not validate hits
-on the host.
+Each player's pawn has its multiplayer authority assigned to the owning peer,
+including its child `MultiplayerSynchronizer`. The owner simulates movement and
+auto-fire locally each frame; other peers display its synchronized transform.
+Local input therefore does not wait for a host round-trip. The check in
+`arena_player.odin` is `if !node_is_multiplayer_authority(owner) { return }`.
 
-**Enemies are a shared horde: HOST-authoritative spawn + movement, PEER-authoritative damage.**
-The host spawns enemies through a `MultiplayerSpawner` (auto-instantiated on every client) and
-moves them toward the nearest pawn; a `MultiplayerSynchronizer` streams the host's `position` +
-the spawn-once `id`. Because a horde isn't something a player *inputs*, host authority there is
-not perceived as input lag. **Damage/death is peer-authoritative**: `hp` is tracked locally on
-every peer and decremented by the broadcast `damage` RPC (whoever's bullet hit), so both peers
-agree on every death; the host, which controls the enemy's multiplayer authority, frees the node and the spawner replicates the
-despawn. `hp` is therefore deliberately *not* in the synchronizer config.
+When a peer fires, it creates its bullet locally and broadcasts
+`fired(origin, dir)`. Other peers create visual ghost bullets with the same path.
+Only the firing peer's bullet resolves hits. It applies and broadcasts damage
+through the `damage` RPC with `call_local`, and peers trust those reports.
+The host does not validate hits; this cooperative policy provides no anti-cheat
+protection against a dishonest firing peer.
 
-> Scaling note: for hundreds of enemies you'd switch to *deterministic-local* enemies (host
-> broadcasts spawn seeds; every peer simulates the horde identically, only deaths are broadcast)
-> to remove per-enemy position streaming. Host-authoritative positions are fine at this scale and
-> keep the example simple.
+The host creates enemies through `MultiplayerSpawner` and moves them toward the
+nearest pawn. Each client's spawner instantiates the matching scene, and
+`MultiplayerSynchronizer` sends the host's `position` and spawn-once `id`.
+Enemies have no player input awaiting a local response, so their movement can
+follow the host.
 
-## Replication gotchas honored (from `tests/repl_spike`)
+Damage remains peer-authoritative. Each peer stores enemy `hp` locally and
+subtracts the broadcast damage from the firing player. The host owns the enemy's
+multiplayer authority and frees dead enemies; the spawner replicates despawn.
+`hp` is deliberately excluded from the synchronizer configuration because damage
+RPCs update it.
+
+> A possible scaling change for hundreds of enemies is to broadcast spawn seeds
+> and simulate the horde locally on each peer, sending only deaths afterward.
+> That would require deterministic enemy simulation. This example instead
+> streams host positions; it does not benchmark the alternative's capacity.
+
+<a id="replication-gotchas-honored-from-testsrepl_spike"></a>
+
+## Scene replication requirements from `tests/repl_spike`
 
 - `SceneReplicationConfig` is configured **in the `.tscn`** (a `SubResource` referenced by the
   `MultiplayerSynchronizer`), never built in `_ready`. See `arena_player.tscn` / `arena_enemy.tscn`.
@@ -79,32 +84,34 @@ despawn. `hp` is therefore deliberately *not* in the synchronizer config.
 - The host's `queue_free` of an enemy is **not** paired with an explicit despawn RPC — the
   spawner replicates the despawn; an explicit RPC would double-free (`ERR_UNAUTHORIZED`).
 
-## What the headless tests prove
+<a id="what-the-headless-tests-prove"></a>
+
+## Headless test coverage
 
 | mode | sentinel | proves |
 |------|----------|--------|
 | single | `ARENA_SINGLE_OK` | unified codebase solo: move, auto-fire kills, XP/level, contact death |
-| native (ENet) | `ARENA_NATIVE_OK` | connection; both owner-auth pawns on both peers; **owner-local move replication**; spawner enemy + position sync; **OWNER-LOCAL bullet immediacy** (`BULLET_LOCAL` on the firer the same tick + `BULLET_REMOTE` on the other peer — local-first, no host round-trip); **peer-authoritative kill agreed by BOTH peers**, credited to the firer; despawn replication; XP to the firer |
-| web (WebRTC) | `ARENA_WEB_OK` | the same owner-auth guarantees, in two real browsers over a browser-native WebRTC data channel (gated: `ARENA_WEB_BUNDLED` skip when no Chrome/puppeteer) |
+| native (ENet) | `ARENA_NATIVE_OK` | Connection, both owner-authoritative pawns visible on both peers, owner movement replication, enemy spawn/position sync, local bullet on the firing tick (`BULLET_LOCAL`) followed by the remote bullet (`BULLET_REMOTE`), matching peer-authoritative kill/credit, despawn replication, and firing player's XP |
+| web (WebRTC) | `ARENA_WEB_OK` | The same owner-authoritative cases in two browsers over WebRTC; `ARENA_WEB_BUNDLED` records a skip when Chrome/puppeteer is unavailable |
 
-The "OWNER-LOCAL IMMEDIACY" check observes when the shot appears: the firer (the **client**, to make the strongest
-case) logs `BULLET_LOCAL` the same frame its local auto-fire timer fires — a direct local spawn,
-not a request sent to the host — and the host only later logs `BULLET_REMOTE` when the broadcast
-arrives. No round-trip gates the owner seeing its own shot.
+The "OWNER-LOCAL IMMEDIACY" check uses a firing client. It logs `BULLET_LOCAL`
+on the frame its auto-fire timer fires; the host logs `BULLET_REMOTE` after the
+broadcast arrives. This checks that the local bullet appears before a round-trip
+to the host could complete.
 
 ## Deploying internet co-op (room-code lobby)
 
 The web build pairs two players through a **room-code lobby**. To use it across
 networks, provide a signaling server reachable by both players:
 
-1. **Stand up a signaling relay** reachable by both players at a public `wss://HOST/rtc`. ANY
-   server speaking the small JSON wire protocol below works; a Node reference implementation
-   ships at `tests/webrtc/signal_server.mjs` (the maintainer runs an Elixir implementation of
-   the same protocol in production).
-2. **Host** opens the page, sets the signaling URL, presses **Host**, and gets a short **ROOM
-   CODE** (e.g. `WATR`) displayed to share (text it to your friend).
-3. **Friend** opens the page, types that code into the room field, presses **Join**. Both jump
-   straight into the arena once the WebRTC data channel comes up.
+1. Run a signaling relay reachable by both players at `wss://HOST/rtc` and
+   implementing the JSON protocol below. A Node reference is provided at
+   `tests/webrtc/signal_server.mjs`; the original deployment notes also report
+   an Elixir implementation of the same protocol in production.
+2. The host opens the page, sets the signaling URL, presses **Host**, and shares
+   the displayed room code, such as `WATR`.
+3. The other player opens the page, enters the code, and presses **Join**.
+   Both enter the arena when the WebRTC data channel connects.
 
 The signaling URL is configurable: the lobby's URL field, or on web the `?url=` query
 (`?url=wss://HOST/rtc`); the join code is the room field or `?room=CODE`. Single-player is
@@ -135,14 +142,20 @@ For **symmetric-NAT** pairs that STUN can't punch, add a **TURN** relay (with cr
 `_ICE_CONFIG_JSON` `iceServers` array — there's a documented slot. Localhost (host candidates)
 needs neither, which is why the headless tests don't require STUN.
 
-## What still needs a human
+<a id="what-still-needs-a-human"></a>
 
-The architecture + the room-code signaling are proven headless (local-first immediacy +
-replication + owner-auth kills, all three modes; host `create`→code→`join`→WebRTC RPC across two
-real browsers — `WEBRTC_OK` / `ARENA_WEB_OK`). What still needs a **real deploy + a person**:
-**play-feel under real latency, and cross-NAT traversal** — two machines on different networks, a
-public `wss://HOST/rtc` relay, and (for symmetric NAT) a TURN server. Localhost needs none of that,
-so the tests prove the PROTOCOL + lobby but not internet NAT punching.
+## Deployment and playtesting limits
+
+Headless tests cover local bullet response, replication, and peer-authoritative
+kills in all three modes. The browser tests exercise host `create`, code sharing,
+`join`, and WebRTC RPC across two local browsers (`WEBRTC_OK` / `ARENA_WEB_OK`).
+They do not establish internet NAT traversal or play quality under real latency.
+
+Those checks require two machines on different networks, a public
+`wss://HOST/rtc` relay, and a TURN server for symmetric NAT. Localhost tests do
+not exercise those paths. Playtesting must also assess response and presentation
+on the deployed connection.
+
 
 ## Files
 

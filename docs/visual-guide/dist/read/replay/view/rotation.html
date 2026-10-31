@@ -7,11 +7,11 @@
 <article class="reading-body "><p>Use <code>Smoother2</code> and <code>Smoother3</code> to ease displayed poses toward same-tick
 corrections. They retain rotational correction error as local presentation state,
 alongside positional error. Read complete detached poses:</p>
-<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// before and after belong to the SAME simulation tick.</span>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">// before and after belong to the same simulation tick.</span>
 view.smooth_correct_pose(&amp;smoother2, before2, after2)
 view.smooth3_correct_pose(&amp;smoother3, before3, after3)
 
-<span class="hljs-comment">// Ordinary movement/rotation proceeds in truth; only correction error decays.</span>
+<span class="hljs-comment">// The current pose includes ordinary movement/rotation; only correction error decays.</span>
 shown2 := view.smooth_present(&amp;smoother2, current2, render_dt)
 shown3 := view.smooth3_present(&amp;smoother3, current3, render_dt)</code></pre></div><p>The correction calls return false on invalid inputs without changing the
 smoother. Initialize by presenting a valid pose before applying corrections.
@@ -26,7 +26,7 @@ clears the complete pose error. Existing position-only correction calls remain
 available and clear angular error on their explicit/large cuts too.
 <code>smooth_rebase</code> additionally preserves the displayed 2D angle when rebasing a
 whole displayed pose; its existing position cut remains 48.</p>
-<p>A finite nonpositive half-life disables smoothing. Invalid truth, render duration
+<p>A finite nonpositive half-life disables smoothing. An invalid current pose, render duration
 or nonfinite half-life holds the previous shown pose and leaves state unchanged.
 Correction poses/cut parameters must be finite; 3D rotations must be nonzero.
 At the exactly-180-degree ambiguity a canonical quaternion sign chooses a stable
@@ -45,5 +45,5 @@ and browser fixture, ownership transfers and both Slopball network games. These
 checks do not establish perceptual quality on every device or support arbitrary
 scaled/sheared hierarchies, contacts or deterministic Godot solver rollback.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/scene/body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="../godot/scene/body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/view/rotation.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../godot/scene/body2.html"><span>Owner-streamed Godot bodies</span><span aria-hidden="true">→</span></a><a href="../godot/scene/body3.html"><span>Owner-streamed 3D bodies</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/view/rotation.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/replay/view/rotation.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

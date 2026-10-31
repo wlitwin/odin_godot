@@ -15,13 +15,15 @@ wire := trace.capture(&capture, &log, existing_transport)
 trace.mark(&log, 1, now_ms)
 ```
 
-Limits bound retained event count and payload storage (default one million events
-and 64 MiB). Capacity or allocation failure stops recording; it does not change
-underlying sends, receives or return values. Such logs cannot encode or replay as
-complete records. The wrapper adds allocations/copying and is not performance-neutral.
-Destroying the log frees only its storage; a close through the wrapper forwards to
-the endpoint. The caller owns the capture/log lifetime and must stop using borrowed
-handles before destroying them.
+The default limits retain up to one million events and 64 MiB of payloads.
+Reaching capacity or failing an allocation stops recording without changing
+underlying sends, receives, or return values. The resulting incomplete log
+cannot be encoded or replayed as a complete record. Recording adds allocation
+and copy work, so account for that cost when measuring the wrapped system.
+
+Destroying the log releases its storage only; closing through the wrapper
+forwards to the endpoint. The caller controls capture/log lifetime and must
+stop using borrowed handles before destroying them.
 
 `encode` writes a versioned canonical representation, independent of native padding
 and endianness. `decode` checks limits before allocation, validates entry/payload
@@ -30,17 +32,19 @@ is not authentication. Packet payloads can contain credentials or private game d
 Treat recordings accordingly and share only authorized test data.
 
 `replay` exposes the same callback presence and returns recorded observations.
-It checks operation order, destinations/channels, outbound bytes and receive buffer
-capacity. The first mismatch is sticky and identifies the cursor/error; `finished`
-requires full consumption without error. User marks can describe pump times and
-configuration; `next_mark` looks ahead and `read_mark` consumes one. Do not mutate
-or destroy a log while replay borrows it.
+It checks operation order, destinations/channels, outbound bytes, and receive
+buffer capacity. On a mismatch, it retains the first error and its cursor
+position. `finished` requires the entire record to be consumed without error.
+User marks can describe pump times and configuration; `next_mark` looks ahead
+and `read_mark` consumes one. Do not mutate or destroy a log while replay
+borrows it.
 
-A transport recording alone does not reproduce its caller. The caller must restore
-its configuration, model, clocks, local inputs and other external decisions. Strict
-replay verifies the captured call sequence; it is not a counterfactual server that
-reacts to changed outbound traffic. Broader replay can deliberately use a different
-input-only harness, but must state that distinction.
+To reproduce a caller, restore its configuration, model, clocks, local inputs,
+and other external decisions alongside the transport log. Strict replay returns
+recorded observations and checks that the caller makes the same calls; it does
+not compute new server responses when outbound traffic changes. A different
+harness can replay only incoming data, but that does not establish the same
+call-sequence agreement.
 
 The Claimball observer fixture uses marks for client configuration and each actual
 pump time, then checks state/effect hashes against a standalone replay. This keeps

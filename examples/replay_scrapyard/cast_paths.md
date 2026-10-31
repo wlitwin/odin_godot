@@ -1,6 +1,7 @@
 # Igniter tongues and spread bolts
 
-The igniter now draws the original ASCII `*` tongues: five on the caster's
+The igniter draws flame trails using the original ASCII `*` glyphs, called
+tongues here: five on the caster's
 predicted view at −0.5, −0.25, 0, 0.25 and 0.5 radians, one on remote observed
 views. Each starts 18 pixels from the origin, advances 10 pixels per displayed
 simulation tick and expires after 15 ticks. Those fixed visual constants match
@@ -10,7 +11,7 @@ to retire contacted tongues; the instantaneous cone's damage/status rule is
 unchanged. Original contact bursts/flashes and exact frame-time feel still need
 paired evaluation.
 
-Spread reactions now record an explicit `Flash.Arc` before each target re-enters
+Spread reactions record an explicit `Flash.Arc` before each target re-enters
 the status rulebook. It stores the actual source/destination, carried status and
 credit in the existing bounded flash pool. The renderer uses the original four-
 point kink with a seven-pixel displacement and two-pixel half-width, yielding an
@@ -60,7 +61,7 @@ paired feel/authoring/runtime comparisons remain requirements. See [evidence](..
 and the [port ledger](roadmap.md).
 
 
-The renderer now uses immutable ArrayMesh instances for procedural polygons.
+The renderer uses immutable ArrayMesh instances for procedural polygons.
 Color/alpha use instance self modulation; arcs reuse one unit polygon and an affine
 basis that preserves the existing kink, width and recorded endpoints. Node pools,
 visibility, lifetimes and simulation formats remain unchanged. This avoids the

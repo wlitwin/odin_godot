@@ -2,10 +2,9 @@
 
 This is an explicit cooperative motion profile beside the original Kit game and
 the server-simulated [Replay Cavecrawl](../replay_cavecrawl/README.md). It reuses
-that port's gameplay reducer—the function that applies inputs to world state—
-along with its scenes and interface. A local pose producer samples the player's
-locally simulated avatar and carried relic; authenticated, versioned pose samples become values in
-the authoritative replayable world. Inventory, combat, AI, progression and room
+that port's simulation rules, scenes, and interface. A local pose producer
+samples the player's locally simulated avatar and carried relic. The authority
+records accepted, authenticated, versioned pose samples in the replayable world. Inventory, combat, AI, progression and room
 authority remain server decisions.
 
 ```sh
@@ -76,7 +75,7 @@ the relic. Pure model tests check stale/foreign/recycled samples, exact checkpoi
 installation, epoch rebinding, inventory retention and life/floor cuts. The existing
 shared reducer and native solo/network gates remain passing.
 
-Three real Chrome instances now pass planned carried-relic handoff; abrupt host
+Three real Chrome instances pass planned carried-relic handoff; abrupt host
 loss passes with the two survivors. Owner epochs/revisions, fresh samples, social
 state, RTC traffic and profile reload are checked. Browser solo saves pass exact
 restore after a killed browser, continued actions, stale-writer rejection and
@@ -88,8 +87,8 @@ REPLAY_CAVE_OWNER_WEB_OUT=/absolute/fresh/browser nix develop --command bash tes
 
 See [browser evidence and limits](../../docs/replay/results/cave-owner-browser-2026-09-19/README.md).
 This is a new profile, not full original-game parity. Broader browsers and public
-network deployment, richer fault/recovery cases, remote presentation and paired gameplay/performance/ergonomics comparisons remain
-acceptance work.
+network deployment, richer fault/recovery cases, remote presentation, and paired
+gameplay/performance/ergonomics comparisons remain acceptance work.
 
 ## Action-time context and O1 saves
 

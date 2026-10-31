@@ -2,12 +2,14 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Debugging Odin scripts · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="authoring-guide.html">Script API</a><a href="events.html">Signals and events</a><a href="workflow.html">Editor workflow</a><a href="modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="kit/timelines.html">Prediction and timelines</a><a href="kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="exporting.html">Export reference</a><a href="debugging.html" aria-current="page">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Debugging Odin scripts</h1><div class="reader-meta"><span>11 min read</span><span>Odin × Godot</span><a href="../../reference/docs/debugging.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#mental-model-native-code-no-interpreter">Mental model: native code, no interpreter</a><a href="#what-you-see-when-a-script-crashes-from-the-editor">What you see when a script crashes (from the editor)</a><a href="#launching-the-debugger-from-the-editor-macos--linux">Launching the debugger from the editor (macOS + Linux)</a><a href="#1-logging-and-errors-gdprint--gderror--gdwarn">1. Logging and errors: gd.print / gd.error / gd.warn</a><a href="#2-native-debugging-with-lldb">2. Native debugging with lldb</a><a href="#3-reading-a-crash-backtrace-signal-11">3. Reading a crash backtrace (signal 11)</a><a href="#4-native-stack-info-_debug_get_current_stack_info">4. Native stack info: _debug_get_current_stack_info</a><a href="#5-web--wasm-builds">5. Web / wasm builds</a><a href="#verification">Verification</a></nav></details>
-<article class="reading-body "><h2 id="mental-model-native-code-no-interpreter">Mental model: native code, no interpreter<a class="heading-anchor" href="#mental-model-native-code-no-interpreter" aria-label="Link to this section">#</a></h2>
-<p>Odin scripts in odin_godot are <strong>AOT-compiled native code</strong> (a <code>.dylib</code>/<code>.so</code>/<code>.dll</code>),
-loaded by the engine through the GDExtension boundary. There is <strong>no interpreter</strong>. That
-determines which tools can inspect them:</p>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Debugging Odin scripts</h1><div class="reader-meta"><span>10 min read</span><span>Odin × Godot</span><a href="../../reference/docs/debugging.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#native-code-and-supported-debugging-tools">Native code and supported debugging tools</a><a href="#crash-reports-in-the-editor">Crash reports in the editor</a><a href="#launching-the-debugger-from-the-editor-macos--linux">Launching the debugger from the editor (macOS + Linux)</a><a href="#1-logging-and-errors-gdprint--gderror--gdwarn">1. Logging and errors: gd.print / gd.error / gd.warn</a><a href="#2-native-debugging-with-lldb">2. Native debugging with lldb</a><a href="#3-reading-a-crash-backtrace-signal-11">3. Reading a crash backtrace (signal 11)</a><a href="#4-native-stack-info-_debug_get_current_stack_info">4. Native stack info: _debug_get_current_stack_info</a><a href="#5-web--wasm-builds">5. Web / wasm builds</a><a href="#verification">Verification</a></nav></details>
+<article class="reading-body "><p><span id="mental-model-native-code-no-interpreter"></span></p>
+<h2 id="native-code-and-supported-debugging-tools">Native code and supported debugging tools<a class="heading-anchor" href="#native-code-and-supported-debugging-tools" aria-label="Link to this section">#</a></h2>
+<p>odin_godot compiles Odin scripts ahead of time into a native library
+(<code>.dylib</code>/<code>.so</code>/<code>.dll</code>) loaded through GDExtension. Inspect script execution
+with logging and a native debugger. Godot&#39;s script-line debugger does not
+interpret or step through this code:</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
 <tr>
@@ -33,32 +35,33 @@ determines which tools can inspect them:</p>
 </tr>
 <tr>
 <td><code>gd.print</code> / <code>gd.error</code> / <code>gd.warn</code> logging</td>
-<td>✅ Yes, your bread and butter</td>
+<td>✅ Yes; output appears in the terminal and editor as described below</td>
 </tr>
 <tr>
 <td><strong>native <code>lldb</code></strong> (line breakpoints, stepping, <code>bt</code>, <code>frame variable</code>)</td>
-<td>✅ Yes, full power; this is the real debugger</td>
+<td>✅ Yes; inspects compiled script execution</td>
 </tr>
 <tr>
 <td><strong>crash backtraces</strong> (signal 11) with Odin proc names</td>
 <td>✅ Yes, built with <code>-debug</code>, symbols present</td>
 </tr>
 </tbody></table>
-</div><p>The Godot debugger panel is built around GDScript&#39;s bytecode VM. Your Odin proc is a
-compiled C-ABI function the engine calls through a function pointer; the VM never sees it.
-So the workflow is <strong>logging + lldb + reading crash backtraces</strong>, exactly like debugging a
-native C library, because that is what a script dll is.</p>
-<h2 id="what-you-see-when-a-script-crashes-from-the-editor">What you see when a script crashes (from the editor)<a class="heading-anchor" href="#what-you-see-when-a-script-crashes-from-the-editor" aria-label="Link to this section">#</a></h2>
-<p>When a script crashes in a game launched from the editor, it reports what went wrong and
-where. Two facts about where the report lands: the editor&#39;s Output dock shows the child
-game&#39;s output over Godot&#39;s debugger channel (push_error/print over TCP), <em>not</em> piped
-stderr, so anything that only reaches stderr is invisible in the Output dock, and a
-Finder-launched editor&#39;s stderr goes nowhere at all. Two failure shapes report themselves:</p>
+</div><p>The engine calls an Odin procedure through a compiled C-ABI function pointer,
+outside GDScript&#39;s bytecode VM. Use logging to trace behavior, lldb to inspect
+live execution, and native backtraces to locate crashes.</p>
+<p><span id="what-you-see-when-a-script-crashes-from-the-editor"></span></p>
+<h2 id="crash-reports-in-the-editor">Crash reports in the editor<a class="heading-anchor" href="#crash-reports-in-the-editor" aria-label="Link to this section">#</a></h2>
+<p>The editor&#39;s Output dock receives the child game&#39;s <code>push_error</code>/<code>print</code>
+messages over Godot&#39;s TCP debugger channel. It does not capture the child&#39;s
+stderr. Launch the editor from a terminal to see stderr reports; an editor
+launched from Finder has no visible terminal for them. odin_godot reports
+panics and fatal signals through different paths:</p>
 <ul>
-<li><p><strong>Odin <code>panic</code> / failed <code>assert</code></strong> (incl. failed type assertions): the script context&#39;s
+<li><p><strong>Odin <code>panic</code> / failed <code>assert</code></strong> (including failed type assertions): the script context&#39;s
 assertion proc (<a href="../runtime/panic_native.odin.html"><code>runtime/panic_native.odin</code></a>) prints
-<code>ODIN_SCRIPT_PANIC &lt;prefix&gt;: &lt;message&gt; (file:line:col)</code> to stderr <strong>and</strong> push_errors the
-same line, so the <strong>editor Output shows it red</strong>, with the exact script location:</p>
+<code>ODIN_SCRIPT_PANIC &lt;prefix&gt;: &lt;message&gt; (file:line:col)</code> to stderr and sends it
+through <code>push_error</code>. The editor Output displays that line in red with the
+script location:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">ERROR: ODIN_SCRIPT_PANIC panic: no Hud attached (res://scripts/hud.odin:41:2)</code></pre></div></li>
 <li><p><strong>Fatal signal</strong> (SIGSEGV/SIGBUS/SIGILL/SIGFPE, typically from calling an engine method on
 a nil object handle): a crash reporter (<a href="../core/crash.odin.html"><code>core/crash.odin</code></a>,
@@ -70,73 +73,75 @@ ODIN_GODOT_CRASH backtrace (backtrace_symbols_fd):
 0   libodin_godot.dylib   0x… core::[crash.odin]::crash_handler + 496
 1   libodinscripts.dylib  0x… my_scripts::[odin_godot_scripts.gen.odin]::_enemy_m_on_hit + 172
 2   Godot                 0x… _ZN6Object5callpE… + 184
-…</code></pre></div><p>The <code>at pc</code> line <strong>names the faulting Odin proc</strong>, recovered from the signal context
-(the stack walkers lose that frame across the signal trampoline). After reporting, it
-best-effort push_errors ONE red line toward the editor Output (&quot;Odin: the game CRASHED
-in native code (SIGSEGV …)&quot;) and re-raises into <strong>Godot&#39;s own crash handler</strong>, whose
-engine backtrace still prints.</p>
+…</code></pre></div><p>The <code>at pc</code> line identifies the faulting Odin procedure from the signal
+context, since stack walkers lose that frame across the signal trampoline.
+The reporter then attempts to send one red summary to the editor Output
+(&quot;Odin: the game CRASHED in native code (SIGSEGV …)&quot;) and re-raises the
+signal for Godot&#39;s crash handler, which prints the engine backtrace.</p>
 </li>
 </ul>
-<p>Where to look for the stderr report: launch the editor from a terminal (the child game
-inherits its stderr), or run the game headless, where test harnesses capture it directly.
-The push_error lines are what you see inside the editor GUI.</p>
-<p><strong>Symbolizing</strong> a bare <code>module + offset</code> line: the build keeps a <code>.dSYM</code> beside the dll:</p>
+<p>The child game inherits stderr from a terminal-launched editor. Headless test
+harnesses can capture it directly. Within the editor GUI, use the
+<code>push_error</code> lines for the summary and script location.</p>
+<p>To resolve a bare <code>module + offset</code> line to source, use the <code>.dSYM</code> kept beside
+the library:</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">atos -o bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dylib \
      -l &lt;module load address&gt; &lt;pc address&gt;</code></pre></div><p>(on Linux: <code>addr2line -f -e bin/libodinscripts.so &lt;offset&gt;</code>). This is usually unnecessary,
 since the Odin frames come out symbolized already, as above.</p>
-<h3 id="other-crash-shapes">Other crash shapes<a class="heading-anchor" href="#other-crash-shapes" aria-label="Link to this section">#</a></h3>
-<p>The report covers the hard cases too. <strong>Stack overflows</strong> report (the handler runs on a
-<code>sigaltstack</code>; Windows: <code>SetThreadStackGuarantee</code>). The post-panic/assert/<strong>bounds-check
-trap</strong> is a handled signal (SIGTRAP/SIGILL; Windows: <code>EXCEPTION_BREAKPOINT</code>), so those
-never die silently. A bounds-check failure&#39;s own index/range message goes to stderr only,
-so the report hints to rerun from a terminal (or under lldb) to see it. <strong>Exported games</strong>
-leave the report at <code>user://odin_crash.log</code>, a post-mortem a player can send in.
-<strong>Windows</strong> has an SEH twin of the reporter (<code>core/crash_windows.odin</code>, DbgHelp
-symbolization against the build&#39;s <code>.pdb</code>s; compile-verified, awaiting a real-Windows run).</p>
-<p>One limit: the mid-crash push_error may not survive to the editor if the debugger link
-dies first. The stderr output and the crash file always carry the full report.</p>
+<p><span id="other-crash-shapes"></span></p>
+<h3 id="stack-overflows-traps-and-exported-crash-logs">Stack overflows, traps, and exported crash logs<a class="heading-anchor" href="#stack-overflows-traps-and-exported-crash-logs" aria-label="Link to this section">#</a></h3>
+<p>The crash handler uses <code>sigaltstack</code> to report stack overflows; Windows uses
+<code>SetThreadStackGuarantee</code>. It also handles traps after panic, assert, and bounds
+failures (SIGTRAP/SIGILL; Windows: <code>EXCEPTION_BREAKPOINT</code>). A bounds failure&#39;s
+index/range message goes only to stderr, so rerun from a terminal or under
+lldb to read it. Exported games write the report to <code>user://odin_crash.log</code>
+for post-mortem diagnosis. The Windows SEH reporter in
+<code>core/crash_windows.odin</code> uses DbgHelp with the build&#39;s <code>.pdb</code>s; it is
+compile-verified and still requires a run on Windows.</p>
+<p>The mid-crash <code>push_error</code> may not reach the editor if the debugger link closes
+first. Use stderr or the crash file for the full report.</p>
 <p>Verified end-to-end by <code>tests/crash/run.sh</code> (sentinel <code>CRASH_TEST_OK</code>): panic, segv,
 stack overflow, editor surfacing, and a real exported-.app crash.</p>
 <h2 id="launching-the-debugger-from-the-editor-macos--linux">Launching the debugger from the editor (macOS + Linux)<a class="heading-anchor" href="#launching-the-debugger-from-the-editor-macos--linux" aria-label="Link to this section">#</a></h2>
 <p>Three items under <strong>Project &gt; Tools</strong> configure common lldb launch tasks,
 including paths, SIP re-signing, and breakpoint syntax:</p>
 <ul>
-<li><strong>Debug Game (LLDB)</strong>: opens a terminal window running the game under lldb (the
-game starts immediately). A script <code>panic</code>/failed <code>assert</code> <strong>freezes the session at
-the panic site</strong> with the whole stack inspectable, and any hard crash (SIGSEGV on a
-nil handle, the classic) stops lldb at the exact faulting instruction, which is
-strictly better than reading a post-mortem crash log.</li>
+<li><strong>Debug Game (LLDB)</strong>: opens a terminal running the game under lldb and starts
+it immediately. Script <code>panic</code>/failed <code>assert</code> stops at the panic site with
+the stack available for inspection. A hard crash, such as SIGSEGV from a
+nil handle, stops at the faulting instruction.</li>
 <li><strong>Debug Game (Break at Cursor)</strong>: put the caret on a line in an <code>.odin</code> script,
-click, and the game runs until it reaches that line, then halts there with locals
-live. (The engine&#39;s gutter-dot breakpoints only drive the GDScript VM; this is the
-native equivalent.)</li>
+choose this item, and the game stops when it reaches the line, with locals
+available. This sets a native breakpoint; engine gutter dots apply to the
+GDScript VM.</li>
 <li><strong>Generate VS Code Debug Config</strong>: writes <code>.vscode/launch.json</code> + <code>tasks.json</code> so
 F5 in VS Code (with the CodeLLDB extension) debugs the game with clickable
 breakpoints, stepping, and a live Variables pane, directly in your <code>.odin</code> files.</li>
 </ul>
-<p>All three shell out to <code>addons/odin_godot/build/debug_game.sh</code>, which also works
-standalone (see §2). The Godot binary being debugged is the editor&#39;s own executable, so
-what you debug is exactly what Play runs. On <strong>Windows</strong>, the terminal-lldb items don&#39;t
-exist, but <strong>Generate VS Code Debug Config</strong> does: it writes a <code>cppvsdbg</code> launch.json
+<p>All three use <code>addons/odin_godot/build/debug_game.sh</code>, which also works
+standalone (see §2), and select the same Godot executable as the editor&#39;s Play
+command. On Windows, only <strong>Generate VS Code Debug Config</strong> is available. It
+writes a <code>cppvsdbg</code> launch.json
 (the standard C/C++ extension) that debugs the editor&#39;s binary directly against the
 <code>.pdb</code>s the builds emit; no re-signing needed there.</p>
 <h3 id="jetbrains-ides-rider-clion-idea-ultimate-">JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)<a class="heading-anchor" href="#jetbrains-ides-rider-clion-idea-ultimate-" aria-label="Link to this section">#</a></h3>
-<p>The <a href="https://plugins.jetbrains.com/plugin/22933-odin-support" rel="noreferrer">Odin Support plugin</a>
-makes JetBrains IDEs first-class for <strong>editing</strong>: run <strong>Project &gt; Tools &gt; Generate
-ols.json (IDE Completion)</strong> in Godot, then in the IDE right-click the generated
-<code>ols.json</code> and use the plugin&#39;s import action: it configures the <code>godot</code> collection
+<p>For editing in JetBrains IDEs, install the
+<a href="https://plugins.jetbrains.com/plugin/22933-odin-support" rel="noreferrer">Odin Support plugin</a>.
+Run <strong>Project &gt; Tools &gt; Generate ols.json (IDE Completion)</strong> in Godot, then
+right-click the generated <code>ols.json</code> in the IDE and use the plugin&#39;s import
+action. It configures the <code>godot</code> collection
 (the addon), the Odin core collections, and the checker args that keep <code>@(gd_method)</code>
-markers from being flagged. (The same file makes any ols-based editor, such as Neovim,
-Zed, Sublime, or Helix, work out of the box.)</p>
-<p><strong>Debugging</strong> is split by IDE:</p>
+markers from being flagged. Editors using ols, such as Neovim, Zed, Sublime,
+or Helix, can use the same file.</p>
+<p>Debugging support depends on the IDE:</p>
 <ul>
 <li><strong>Rider</strong>: the Odin plugin does <em>not</em> support debugging on Rider ≥ 2025.2, and
 Rider&#39;s own Native Executable run configurations run but cannot debug native code.
 Edit in Rider; debug via the Godot menu items above (terminal lldb) or the VS Code
 config.</li>
 <li><strong>CLion / IDEA Ultimate / GoLand / RustRover</strong> (+ the <em>Native Debugging Support</em>
-plugin where applicable): the Odin plugin debugs through LLDB (out of the box on
-macOS/Linux). Point a run configuration at the <strong>debuggable Godot copy</strong> (get its
+plugin where applicable): the Odin plugin uses LLDB on macOS/Linux. Point a
+run configuration at the debuggable Godot copy (get its
 path with <code>build/debug_game.sh --prepare-only</code>; macOS needs this re-signed copy
 because SIP blocks debugging the stock binary), with program arguments
 <code>--path /path/to/your/project</code>. Breakpoints in <code>.odin</code> files then bind normally.
@@ -145,9 +150,10 @@ debugger does not load them.</li>
 </ul>
 <hr>
 <h2 id="1-logging-and-errors-gdprint--gderror--gdwarn">1. Logging and errors: <code>gd.print</code> / <code>gd.error</code> / <code>gd.warn</code><a class="heading-anchor" href="#1-logging-and-errors-gdprint--gderror--gdwarn" aria-label="Link to this section">#</a></h2>
-<p>Hand-written ergonomic helpers live in <a href="../godot/Ergonomics_Debug.odin.html"><code>godot/Ergonomics_Debug.odin</code></a>
-(mirrored in <code>bindgen/upstream/godot/</code> so they survive binding regeneration). They collapse
-the <code>cstring -&gt; String -&gt; Variant -&gt; gd_*</code> dance into one call:</p>
+<p>Logging helpers live in
+<a href="../godot/Ergonomics_Debug.odin.html"><code>godot/Ergonomics_Debug.odin</code></a>, mirrored in
+<code>bindgen/upstream/godot/</code> so they survive binding regeneration. They convert
+<code>cstring -&gt; String -&gt; Variant -&gt; gd_*</code> in a single call:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 
 gd.print(<span class="hljs-string">&quot;player ready&quot;</span>)          <span class="hljs-comment">// -&gt; stdout + the editor Output panel</span>
@@ -157,13 +163,13 @@ gd.print_bool(on_floor)           <span class="hljs-comment">// bool</span>
 gd.print_value(some_variant)      <span class="hljs-comment">// any Variant, stringified like GDScript print()</span>
 
 gd.warn(<span class="hljs-string">&quot;coin value was 0, defaulting to 1&quot;</span>)   <span class="hljs-comment">// yellow, non-fatal (push_warning)</span>
-gd.error(<span class="hljs-string">&quot;Hud node missing&quot;</span>)      <span class="hljs-comment">// RED in Output/Debugger, WITH script context (push_error)</span></code></pre></div><p><code>gd.error</code> routes through Godot&#39;s <code>push_error</code>, so it shows in red in the editor Output and
+gd.error(<span class="hljs-string">&quot;Hud node missing&quot;</span>)      <span class="hljs-comment">// red in Output/Debugger, with script context (push_error)</span></code></pre></div><p><code>gd.error</code> routes through Godot&#39;s <code>push_error</code>, so it shows in red in the editor Output and
 Debugger <strong>with the originating context</strong>, and is delivered to any attached debugger. Use it
 for genuine fault conditions; use <code>gd.print</code> for tracing.</p>
 <h3 id="formatted-output">Formatted output<a class="heading-anchor" href="#formatted-output" aria-label="Link to this section">#</a></h3>
-<p>The helpers are tiny and <code>contextless</code>, and do <strong>not</strong> pull in <code>core:fmt</code> (which keeps the
-wasm/web footprint small). For formatted output, format with Odin&#39;s <code>core:fmt</code> first, then
-print:</p>
+<p>The helpers are <code>contextless</code> and do not import <code>core:fmt</code>, avoiding that
+dependency in wasm/web builds that do not need formatting. For formatted
+output, call Odin&#39;s <code>core:fmt</code> first, then print:</p>
 <div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
 <span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
 
@@ -173,13 +179,14 @@ which is exactly what <code>gd.print</code> wants. <code>tprintf</code> returns 
 to <code>gd.print_str</code> / <code>gd.error_str</code> / <code>gd.warn_str</code>.</p>
 <hr>
 <h2 id="2-native-debugging-with-lldb">2. Native debugging with <code>lldb</code><a class="heading-anchor" href="#2-native-debugging-with-lldb" aria-label="Link to this section">#</a></h2>
-<p>The script dll is built <code>-debug -use-single-module</code> (see <code>atomic_odin_dll</code> in
-<code>build/common.sh</code>), so every Odin proc is a real, named symbol with <strong>complete DWARF</strong>:
-line tables, typed arguments, struct layouts. The <code>-use-single-module</code> flag is what gives
-line info: with Odin&#39;s default separate-modules debug build, macOS <code>ld</code> emits a broken
-one-entry debug map and <code>dsymutil</code> produces a near-empty <code>.dSYM</code> (symbols work, but no
-line breakpoints, no stepping, no <code>frame variable</code>). One build unit gives lldb everything.</p>
-<p>So lldb debugs Odin scripts like any C library, complete with source lines. Use the launcher
+<p>The script library uses <code>-debug -use-single-module</code> (see <code>atomic_odin_dll</code> in
+<code>build/common.sh</code>) to provide named procedure symbols and DWARF data for line
+tables, typed arguments, and struct layouts. With Odin&#39;s default
+separate-modules debug build, macOS <code>ld</code> emits a one-entry debug map and
+<code>dsymutil</code> produces a near-empty <code>.dSYM</code>: procedure symbols remain, but line
+breakpoints, stepping, and <code>frame variable</code> do not work. The single-module
+build provides the debug information those operations require.</p>
+<p>Use the launcher to debug Odin procedures with source lines
 (the same one the Project &gt; Tools menu items run; <code>--break</code> accepts <code>file.odin:LINE</code>
 or a symbol regex, repeatable, and implies auto-run):</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-bash">build/debug_game.sh tests/showcase                                <span class="hljs-comment"># interactive (lldb) prompt</span>
@@ -188,8 +195,9 @@ build/debug_game.sh --<span class="hljs-built_in">break</span> coin_collect test
 to inspect. The launcher also auto-loads <code>build/godot_lldb.py</code> (lldb type summaries so
 <code>godot.String</code> / <code>String_Name</code> / <code>Variant</code> display their live values instead of an
 opaque pointer) and pre-sets a breakpoint on the script assertion proc, so a script
-<code>panic(&quot;...&quot;)</code> freezes the session at the panic site rather than printing and dying.</p>
-<h3 id="two-macos-gotchas-the-launcher-handles-for-you">Two macOS gotchas the launcher handles for you<a class="heading-anchor" href="#two-macos-gotchas-the-launcher-handles-for-you" aria-label="Link to this section">#</a></h3>
+<code>panic(&quot;...&quot;)</code> stops execution at the panic site for inspection.</p>
+<p><span id="two-macos-gotchas-the-launcher-handles-for-you"></span></p>
+<h3 id="macos-breakpoint-matching-and-debugger-permissions">macOS breakpoint matching and debugger permissions<a class="heading-anchor" href="#macos-breakpoint-matching-and-debugger-permissions" aria-label="Link to this section">#</a></h3>
 <ol>
 <li><p><strong>Breakpoint syntax: use a regex, not the qualified name.</strong> lldb parses <code>::</code> as a C++
 qualified name and <em>fails to bind</em> <code>b showcase_scripts::coin_collect</code> (it stays &quot;pending,
@@ -205,15 +213,15 @@ install): make a copy of the Godot binary and ad-hoc re-sign it with <code>get-t
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-bash"><span class="hljs-built_in">cp</span> /Applications/Godot.app/Contents/MacOS/Godot /tmp/Godot-dbg
 codesign --remove-signature /tmp/Godot-dbg
 codesign --force --sign - --entitlements get-task-allow.entitlements /tmp/Godot-dbg</code></pre></div><p>where the entitlements plist sets <code>com.apple.security.get-task-allow</code> to <code>true</code>. The
-re-signed binary runs the project fine headless and is debuggable. (Inside the Nix shell,
+re-signed binary can run the project headless under the debugger. (Inside the Nix shell,
 <code>/usr/bin/lldb</code> is an xcrun shim that breaks because Nix points <code>DEVELOPER_DIR</code> at an SDK
 with no lldb; the launcher resets <code>DEVELOPER_DIR</code> to a real Xcode/CLT install.)</p>
 </li>
 </ol>
 <h3 id="example-a-breakpoint-hit">Example: a breakpoint hit<a class="heading-anchor" href="#example-a-breakpoint-hit" aria-label="Link to this section">#</a></h3>
-<p>Running the showcase with a <strong>line breakpoint</strong> and driving a real physics coin collect,
-the process halts at that exact source line, with the source listed, the full native call
-chain, and the proc&#39;s arguments <strong>named and valued</strong> in the frame:</p>
+<p>In the showcase, a line breakpoint stops execution during a physics coin
+collection. lldb lists the source line, native call chain, and named procedure
+arguments with their current values:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">(lldb) breakpoint set -f coin.odin -l 50
 Breakpoint 1: no locations (pending).        # normal: the dll isn't dlopen'd yet
 (lldb) run
@@ -239,9 +247,10 @@ Odin&#39;s <code>self^</code>) for the whole live script struct:</p>
 (lldb) frame variable *self
 (showcase_scripts::Player) *self = (owner = …, speed = 500)
 (lldb) target variable left_name          # file-scope globals: `target variable`
-(godot::String_Name) left_name = StringName(&quot;ui_left&quot;)   # &lt;- godot_lldb.py summary</code></pre></div><p>Mid-body locals materialize once their declaration line has executed (<code>next</code> past it).
-If a value ever looks unavailable (heavily optimized frame, prologue stop), the raw
-fallback still works: arm64 passes the first integer args in <code>x0</code>/<code>x1</code>, so use <code>register read x0</code>, then <code>memory read</code> on the pointer.</p>
+(godot::String_Name) left_name = StringName(&quot;ui_left&quot;)   # &lt;- godot_lldb.py summary</code></pre></div><p>Locals become available after their declarations execute; use <code>next</code> to step
+past them. If a value is unavailable because execution stopped in the prologue
+or an optimized frame, inspect registers and memory. arm64 passes the first
+integer arguments in <code>x0</code>/<code>x1</code>, so use <code>register read x0</code>, then <code>memory read</code> on the pointer.</p>
 <hr>
 <h2 id="3-reading-a-crash-backtrace-signal-11">3. Reading a crash backtrace (signal 11)<a class="heading-anchor" href="#3-reading-a-crash-backtrace-signal-11" aria-label="Link to this section">#</a></h2>
 <p>When an Odin script segfaults, the process dies with <strong>SIGSEGV (signal 11)</strong>. Because the
@@ -264,45 +273,43 @@ backtrace to stderr that includes these symbol names. Grep it for your package n
 <code>libodinscripts.dylib  &lt;pkg&gt;::&lt;proc&gt; + &lt;off&gt;</code> lines.</p>
 <hr>
 <h2 id="4-native-stack-info-_debug_get_current_stack_info">4. Native stack info: <code>_debug_get_current_stack_info</code><a class="heading-anchor" href="#4-native-stack-info-_debug_get_current_stack_info" aria-label="Link to this section">#</a></h2>
-<p><code>OdinLanguage</code> implements the <code>_debug_get_current_stack_info</code> script-language virtual with a
-<strong>real native backtrace</strong> (<a href="../core/debug.odin.html"><code>core/debug.odin</code></a>), not an empty stub. When
-called it:</p>
+<p><code>OdinLanguage</code> implements the <code>_debug_get_current_stack_info</code> script-language
+virtual by capturing a native backtrace
+(<a href="../core/debug.odin.html"><code>core/debug.odin</code></a>). When called, it:</p>
 <ol>
 <li>Walks the native stack with libunwind&#39;s <strong><code>_Unwind_Backtrace</code></strong>.</li>
 <li>Resolves each return address with <strong><code>dladdr</code></strong> → <code>dli_sname</code> (e.g.
 <code>showcase_scripts::coin_collect</code>) + <code>dli_fname</code> (the dll path).</li>
-<li>Keeps only frames that belong to the scripts dll, and returns Godot&#39;s expected shape:
+<li>Keeps frames from the scripts library and returns Godot&#39;s expected structure:
 <code>Array[ Dictionary{ &quot;function&quot;: String, &quot;line&quot;: int, &quot;source&quot;: String } ]</code>.</li>
 </ol>
 <h3 id="full-backtraces-with-omitted-frame-pointers">Full backtraces with omitted frame pointers<a class="heading-anchor" href="#full-backtraces-with-omitted-frame-pointers" aria-label="Link to this section">#</a></h3>
-<p>Odin <strong>omits frame pointers</strong> and has no flag to keep them, so execinfo&#39;s classic
-frame-pointer <code>backtrace()</code> returns only the <em>innermost</em> frame here. <code>_Unwind_Backtrace</code>
-walks the DWARF/compact-unwind tables (the same info lldb uses) and recovers the <strong>full</strong>
-chain even with frame pointers omitted. This is verified in <code>tests/debug/bt_probe.odin</code>
+<p>Odin omits frame pointers and has no flag to retain them. In the test below,
+execinfo&#39;s frame-pointer <code>backtrace()</code> therefore returns only the innermost
+frame. <code>_Unwind_Backtrace</code> uses DWARF/compact-unwind tables, as lldb does, to
+recover the call chain without frame pointers. <code>tests/debug/bt_probe.odin</code>
+verifies this difference
 (<code>backtrace()</code> = 1 frame vs <code>_Unwind_Backtrace</code> = the whole chain).</p>
 <h3 id="line-numbers-are-0">Line numbers are 0<a class="heading-anchor" href="#line-numbers-are-0" aria-label="Link to this section">#</a></h3>
 <p>Mapping an address to a source line needs DWARF line-table resolution at runtime (an
-<code>addr2line</code>/<code>libdwarf</code> step), which is out of scope. We report <code>&quot;line&quot;: 0</code> and use the dll
-path as <code>&quot;source&quot;</code>. The <strong>function name</strong> is accurate; the line is not. (lldb, by contrast,
-<em>does</em> resolve lines; use it when you need them.)</p>
-<h3 id="when-this-surfaces">When this surfaces<a class="heading-anchor" href="#when-this-surfaces" aria-label="Link to this section">#</a></h3>
-<p>The native capture is <strong>proven to work</strong> (see &quot;Verification&quot; below): called mid-script it
-yields the real Odin frames, e.g. <code>showcase_scripts::coin_collect</code>. <strong>But</strong> Godot only
-<em>invokes</em> <code>_debug_get_current_stack_info</code> during an <strong>active remote-debug session</strong>: when
-<code>EngineDebugger</code> is live and reporting an error/breakpoint to a connected debugger.</p>
-<p>In a normal headless or editor-play run, the engine <strong>does not call it</strong>, so the Odin stack
-does <strong>not</strong> automatically appear in the editor Output on a <code>gd.error</code>. We measured this
-directly (<code>tests/debug/run.sh</code> part C runs the showcase with <code>ODIN_DEBUG_STACK_DUMP=1</code> and
-observes that the virtual is never called):</p>
+<code>addr2line</code>/<code>libdwarf</code> step), which this implementation does not provide. It
+reports <code>&quot;line&quot;: 0</code> and uses the library path as <code>&quot;source&quot;</code>. Function names
+are resolved; source lines are unavailable. Use lldb for source-line resolution.</p>
+<p><span id="when-this-surfaces"></span></p>
+<h3 id="when-godot-requests-stack-information">When Godot requests stack information<a class="heading-anchor" href="#when-godot-requests-stack-information" aria-label="Link to this section">#</a></h3>
+<p>When called mid-script, native capture returns Odin frames such as
+<code>showcase_scripts::coin_collect</code>, as tested under &quot;Verification&quot; below.
+Godot invokes <code>_debug_get_current_stack_info</code> during an active remote-debug
+session, when <code>EngineDebugger</code> reports an error or breakpoint to a connected
+debugger.</p>
+<p>A plain <code>gd.error</code> does not automatically add the Odin stack to editor Output.
+In <code>tests/debug/run.sh</code> part C, the showcase runs headless with
+<code>ODIN_DEBUG_STACK_DUMP=1</code>; the engine does not call the virtual:</p>
 <div class="code-block"><div class="code-title"><span>Code</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-">== (C) integration: does Godot invoke _debug_get_current_stack_info in a normal run? ==
-  RESULT: Godot did NOT call _debug_get_current_stack_info in this headless run.</code></pre></div><p>In summary:</p>
-<ul>
-<li>✅ The native capture <strong>works</strong> and returns the correct Odin call chain when invoked.</li>
-<li>✅ The virtual is wired, correctly typed, and returns a well-formed Array (no log spam).</li>
-<li>❌ It does <strong>not</strong> surface a script-line stack in the editor on a plain error/crash,
-because the engine doesn&#39;t request it outside a remote-debug session. <strong>Do not</strong> rely on
-it as your day-to-day stack view; use <strong>lldb <code>bt</code></strong> (section 2/3), which always works.</li>
-</ul>
+  RESULT: Godot did NOT call _debug_get_current_stack_info in this headless run.</code></pre></div><p>The virtual returns a well-formed Array containing the Odin call chain when
+invoked. It does not provide an automatic script-line stack for plain
+errors or crashes in the editor. Use lldb <code>bt</code> (section 2/3) for routine stack
+inspection.</p>
 <p><code>backtrace()</code>/<code>dladdr</code> are POSIX-ish and present on darwin/linux. Windows and the web/wasm
 build use a stub that returns an empty Array (<a href="../core/debug_other.odin.html"><code>core/debug_other.odin</code></a>).</p>
 <hr>
@@ -312,20 +319,20 @@ with <strong>logging</strong> (<code>gd.print</code> → the JS console) and the
 stack-info capture is stubbed to empty on wasm. See <a href="exporting.html"><code>docs/exporting.md</code></a>.</p>
 <hr>
 <h2 id="verification">Verification<a class="heading-anchor" href="#verification" aria-label="Link to this section">#</a></h2>
-<p>Everything above is exercised by <code>tests/debug/run.sh</code> (wired into <code>tests/run_all.sh</code>,
-sentinel <code>DEBUG_OK</code>):</p>
+<p><code>tests/debug/run.sh</code>, included in <code>tests/run_all.sh</code> with sentinel <code>DEBUG_OK</code>,
+checks native capture, lldb integration, and whether Godot requests stack info:</p>
 <ul>
 <li><strong>(A) unit</strong>: <code>tests/debug/bt_probe.odin</code> runs <code>_Unwind_Backtrace</code> + <code>dladdr</code> + the
 scripts-dll filter over its own call chain (prints <code>bt_probe::sim_coin_collect | …</code>) and
-<code>dlopen</code>s the <strong>real</strong> showcase dll to confirm <code>dladdr</code> reports
+<code>dlopen</code>s the showcase library to confirm <code>dladdr</code> reports
 <code>dli_sname=showcase_scripts::coin_collect</code>, <code>dli_fname=…/libodinscripts.dylib</code>. → <code>BTPROBE_OK</code>.</li>
-<li><strong>(B) lldb</strong>: launches the real Godot under lldb, breaks on <code>coin_collect</code>, drives a real
-physics collect so the breakpoint <strong>fires</strong>, asserts <code>stop reason = breakpoint</code> + the
+<li><strong>(B) lldb</strong>: launches Godot under lldb, breaks on <code>coin_collect</code>, triggers a
+physics collection, and asserts <code>stop reason = breakpoint</code> plus the
 function in <code>bt</code>. → <code>DEBUG_LLDB_OK</code>. (Gated: skipped if lldb is unavailable.)</li>
 <li><strong>(C) integration</strong>: runs the showcase with <code>ODIN_DEBUG_STACK_DUMP=1</code> and reports
 whether Godot actually called the virtual (it does not, outside remote-debug).</li>
 </ul>
 <p>Run it: <code>nix develop --command bash -c &#39;bash tests/debug/run.sh&#39;</code>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/debugging.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#mental-model-native-code-no-interpreter" class="">Mental model: native code, no interpreter</a><a href="#what-you-see-when-a-script-crashes-from-the-editor" class="">What you see when a script crashes (from the editor)</a><a href="#other-crash-shapes" class="subsection">Other crash shapes</a><a href="#launching-the-debugger-from-the-editor-macos--linux" class="">Launching the debugger from the editor (macOS + Linux)</a><a href="#jetbrains-ides-rider-clion-idea-ultimate-" class="subsection">JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)</a><a href="#1-logging-and-errors-gdprint--gderror--gdwarn" class="">1. Logging and errors: gd.print / gd.error / gd.warn</a><a href="#formatted-output" class="subsection">Formatted output</a><a href="#2-native-debugging-with-lldb" class="">2. Native debugging with lldb</a><a href="#two-macos-gotchas-the-launcher-handles-for-you" class="subsection">Two macOS gotchas the launcher handles for you</a><a href="#example-a-breakpoint-hit" class="subsection">Example: a breakpoint hit</a><a href="#inspecting-self-arguments-locals" class="subsection">Inspecting self, arguments, locals</a><a href="#3-reading-a-crash-backtrace-signal-11" class="">3. Reading a crash backtrace (signal 11)</a><a href="#4-native-stack-info-_debug_get_current_stack_info" class="">4. Native stack info: _debug_get_current_stack_info</a><a href="#full-backtraces-with-omitted-frame-pointers" class="subsection">Full backtraces with omitted frame pointers</a><a href="#line-numbers-are-0" class="subsection">Line numbers are 0</a><a href="#when-this-surfaces" class="subsection">When this surfaces</a><a href="#5-web--wasm-builds" class="">5. Web / wasm builds</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../reference/docs/debugging.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="exporting.html"><span>Exporting — shipping your game</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/debugging.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#native-code-and-supported-debugging-tools" class="">Native code and supported debugging tools</a><a href="#crash-reports-in-the-editor" class="">Crash reports in the editor</a><a href="#stack-overflows-traps-and-exported-crash-logs" class="subsection">Stack overflows, traps, and exported crash logs</a><a href="#launching-the-debugger-from-the-editor-macos--linux" class="">Launching the debugger from the editor (macOS + Linux)</a><a href="#jetbrains-ides-rider-clion-idea-ultimate-" class="subsection">JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)</a><a href="#1-logging-and-errors-gdprint--gderror--gdwarn" class="">1. Logging and errors: gd.print / gd.error / gd.warn</a><a href="#formatted-output" class="subsection">Formatted output</a><a href="#2-native-debugging-with-lldb" class="">2. Native debugging with lldb</a><a href="#macos-breakpoint-matching-and-debugger-permissions" class="subsection">macOS breakpoint matching and debugger permissions</a><a href="#example-a-breakpoint-hit" class="subsection">Example: a breakpoint hit</a><a href="#inspecting-self-arguments-locals" class="subsection">Inspecting self, arguments, locals</a><a href="#3-reading-a-crash-backtrace-signal-11" class="">3. Reading a crash backtrace (signal 11)</a><a href="#4-native-stack-info-_debug_get_current_stack_info" class="">4. Native stack info: _debug_get_current_stack_info</a><a href="#full-backtraces-with-omitted-frame-pointers" class="subsection">Full backtraces with omitted frame pointers</a><a href="#line-numbers-are-0" class="subsection">Line numbers are 0</a><a href="#when-godot-requests-stack-information" class="subsection">When Godot requests stack information</a><a href="#5-web--wasm-builds" class="">5. Web / wasm builds</a><a href="#verification" class="">Verification</a></nav><div class="outline-actions"><a href="../../reference/docs/debugging.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

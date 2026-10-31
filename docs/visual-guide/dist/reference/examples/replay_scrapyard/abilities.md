@@ -1,12 +1,12 @@
 # Player abilities
 
-Staging selects two abilities. Q sends a world point; E sends a direction. Both
-become reliable `Action.Cast` requests with an explicit slot and aim convention.
-The tick reducer checks the live player, slot, catalog ID and cooldown, then applies
-all consequences to the ordinary world. Client prediction uses the same reducer.
-Rejection restores the candidate state and feedback; a full lob/zone pool refuses
-the cast without starting its cooldown. No claimed caster position is needed because
-the authority simulates movement.
+Select two abilities in staging. Q sends a world point and E sends a direction
+through reliable `Action.Cast` requests with an explicit slot and aim convention.
+The tick reducer validates the player, slot, catalog ID, and cooldown, then applies
+the cast to World. Client prediction runs the same reducer. Rejection restores
+both candidate state and feedback; a full lob/zone pool rejects the cast before
+starting its cooldown. The authority derives the cast origin from its simulated
+movement, so the request needs no claimed caster position.
 
 All six stock resources load through Godot into the saved catalog: slime lob,
 igniter cone, frostwave nova, battlecry buff, salvefield zone and sparkjar lob.
@@ -25,7 +25,7 @@ The five delivery families preserve the selected original rules:
   reactions can hurt the crew even though those primary deliveries target mobs.
 - Buff selects self or the nearest living friend according to the row, with self
   fallback. Stable seat order resolves equal-distance candidates.
-- Zone clamps its placement to range and stamps the cast's scaled wound. It pulses
+- Zone clamps its placement to range and records the cast's scaled damage. It pulses
   damage/status onto mobs and crew, including its caster. Its remaining lifetime
   decrements before the modulo pulse test; expiry removes it without a final pulse.
 
@@ -39,10 +39,11 @@ Own lobs/cones use predicted presentation. Nova/buff flashes and zones use obser
 state, matching the original presentation policy. Zones are ordinary observed
 entities, so a late spectator receives the existing patch and its remaining time.
 [Glob discs](globs.md) restore the original shapes, payload colors and pulse.
-The original uses straight flights without an arc or trail; earlier wording here
-was inaccurate. [Area discs and buff bursts](areas.md) restore nova/reaction
-fills, constant standing-zone fill and once-only wearer bursts. [Cast paths](cast_paths.md) restore local/remote cone tongues and recorded spread
-bolts. Launch/contact feedback, audio listening and feel remain review work.
+Flights follow the original straight path without an arc or trail.
+[Area discs and buff bursts](areas.md) provide nova/reaction fills, constant
+standing-zone fill, and once-only wearer bursts. [Cast paths](cast_paths.md)
+provide local/remote cone tongues and recorded spread bolts. Launch/contact
+feedback, audio listening, and feel remain review work.
 
 The original's owner-streamed origins and frame timing differ from this fixed-tick,
 server-authoritative version. Requests execute after the tick's ordinary simulation;
@@ -58,8 +59,9 @@ generation-aware credit, regeneration, eleven zone pulses and expiry. It compare
 the complete world at a shared authoritative tick. These controlled encounters do
 not establish full original-game parity, profile persistence or run progression.
 
-`storm_run.sh` assigns slime/frost to one runner and spark/ignite to another,
-verifying that the second runner owns shatter damage and later shock damage.
+`storm_run.sh` assigns slime/frost to one player character (called a runner)
+and spark/ignite to another, verifying that the second receives credit for
+shatter damage and later shock damage.
 It also burns/douses both targets and explicitly observes the support runner's
 friendly surge. Observation receipts delay each test's next consuming action until
 all participants have seen its prerequisite; ordinary gameplay does not use those

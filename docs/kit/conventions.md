@@ -6,7 +6,7 @@ to memorize it before using the quickstarts.
 
 ## Event delivery
 
-Kit chooses an event shape according to the lifetime of the data and whether the
+Kit chooses an event representation according to the lifetime of the data and whether the
 caller can wait until the next frame.
 
 ### Queued events
@@ -25,7 +25,7 @@ for {
 so normal game reactions run from the game's frame loop, after Kit has completed
 the operation that produced them.
 
-When a package has one queue shape, the poll proc returns a tuple instead of a
+When a package queues one event type, the poll proc returns a tuple instead of a
 one-variant union. `album_poll` and `fire_poll` follow this rule.
 
 ### Current state
@@ -41,8 +41,8 @@ Boot calls it for games using the generated frame loop.
 
 ### Synchronous callbacks
 
-A callback is synchronous only when Kit cannot finish an operation without an
-answer. Examples include:
+A callback runs synchronously when Kit needs its result to finish an operation
+or when it must use temporary operation state. Examples include:
 
 - entity factory create/free procedures;
 - the interest-management locator;
@@ -62,7 +62,7 @@ There are two useful categories:
 Do not retain pointers into temporary readers or re-enter the owning subsystem
 from an atomic hook unless that API explicitly permits it. If a game reaction
 can wait until the next frame, queue it instead. `ksess.App_Queue` provides this
-file-and-drain pattern for application messages.
+queue-and-poll storage for application messages.
 
 The full session-specific classification is in
 [Three tiers of entry into your code](session.md#three-tiers-of-entry-into-your-code).
@@ -137,7 +137,7 @@ name. Their naming rules are documented in [kit/net](net.md),
 
 ## Package boundaries
 
-The dependency direction is intentional:
+Packages depend on lower-level mechanisms in this order:
 
 - `kit/net`, `kit/session`, and `kit/sim` are engine-independent mechanisms.
 - `kit/netgd`, `kit/steamgd`, `kit/ui`, and `kit/fx` adapt those mechanisms to

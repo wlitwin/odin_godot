@@ -4,7 +4,7 @@
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Area effects and buff bursts</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/areas.md" download>Page source ↓</a></div></div>
 
-<article class="reading-body "><p>Novas, reaction/lob-impact flashes and grenade blasts now use filled 24-point
+<article class="reading-body "><p>Novas, reaction/lob-impact flashes and grenade blasts use filled 24-point
 discs at depth 8, with their existing radius and payload RGB. Nova base alpha is
 0.5; reaction/blast base alpha is 0.45. Over the displayed flash lifetime they
 expand from 0.92 to 1.06 times the radius while fading to zero. Late observations
@@ -13,8 +13,8 @@ start partway through that curve, and expiration/correction removes the view.</p
 existing 17-tick flash lifetime (about 0.283 seconds at 60 Hz), deriving progress
 from displayed state. Nova and reaction discs use observed state; grenade blasts
 retain predicted local / observed remote selection. Separate bounded banks keep
-those worlds&#39; lifetimes independent. This is presentation metadata only: the
-simulation&#39;s flash, action/event, content and checkpoint formats are unchanged.</p>
+predicted and observed effect lifetimes independent. This is presentation
+metadata only: the simulation&#39;s flash, action/event, content and checkpoint formats are unchanged.</p>
 <p>Standing zones are filled 24-point discs, radius from their catalog row and alpha
 0.22. Payload RGB is used when its tint is visible; otherwise the original ember
 fallback applies. They keep their scale, position and alpha until the simulated
@@ -25,8 +25,8 @@ without a separate launch event.</p>
 in the cast flash. A forward-observation tracker produces it once per new cast;
 initial observations, epoch/run/floor replacement and rewind/replay stay silent.
 It retains its highest observed tick so rewinding cannot replay an old burst.
-Existing view-reset/floor/epoch cleanup retires the particles. A flash entirely
-missed between displayed observations produces no invented historical burst.
+Existing view-reset/floor/epoch cleanup retires the particles. If a flash begins
+and expires between displayed observations, no burst is emitted afterward.
 The existing bounded feedback pool owns and retires the emitter.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/area_view_run.sh
 REPLAY_PREBUILT=1 RSY_HEADED_HOST=1 RSY_AUDIO_DRIVER=Dummy \
@@ -40,12 +40,12 @@ host, alongside the existing restored-lob and continued-combat requirements.</p>
 Remaining impact details, broader devices,
 audio listening and paired timing/feel evaluation remain work. See <span class="local-reference" title="docs/replay/results/scrapyard-areas-2026-09-08/README.md · available in the repository">evidence</span>
 and the <a href="roadmap.html">port ledger</a>.</p>
-<p>The renderer now uses immutable ArrayMesh instances for procedural polygons.
+<p>The renderer uses immutable ArrayMesh instances for procedural polygons.
 Color/alpha use instance self modulation; arcs reuse one unit polygon and an affine
 basis that preserves the existing kink, width and recorded endpoints. Node pools,
 visibility, lifetimes and simulation formats remain unchanged. This avoids the
 stock web renderer&#39;s Polygon2D index-update path, including during viewport resize.
 See the <span class="local-reference" title="docs/replay/results/immutable-polygons-2026-09-13/README.md · available in the repository">rendering audit</span>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="roadmap.html"><span>Scrapyard port ledger</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/areas.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="cast_paths.html"><span>Igniter tongues and spread bolts</span><span aria-hidden="true">→</span></a><a href="roadmap.html"><span>Scrapyard port ledger</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/areas.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/areas.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

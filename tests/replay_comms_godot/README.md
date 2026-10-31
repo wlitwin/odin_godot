@@ -2,12 +2,12 @@
 
 Run `nix develop --command bash tests/replay_comms_godot/run.sh`.
 
-The real Godot adapter pumps a reliable in-memory connection and recovery-router
-application lane. The fixture supplies valid admitted client metadata, then changes
-the gameplay phase from Running to Resyncing and back. It verifies that an already
-queued request, incoming host line, ordered sender echo and subsequent request all
-survive the resync. Fenced, rejected and unadmitted clients remain disabled. The runner also checks
-the fixture package for WASM compilation.
+The fixture runs the Godot adapter over a reliable in-memory connection and a
+recovery-router application lane. It supplies valid admitted-client metadata,
+then changes gameplay phase from Running to Resyncing and back. The checks
+require a queued request, incoming host line, ordered sender echo, and subsequent
+request to survive the resync. Fenced, rejected, and unadmitted clients remain
+disabled. The runner also compiles the fixture package for WASM.
 
 This isolates the adapter from gameplay scheduling: it supplies phase metadata
 instead of manufacturing a full gameplay-history overflow. Before the fix,

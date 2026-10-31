@@ -151,7 +151,9 @@ The tested boundary is process crash/restart on native macOS. Power-loss durabil
 directory fsync behavior, concurrent writers, and browser persistence are not
 established by these tests.
 
-## Verified gates
+<a id="verified-gates"></a>
+
+## Initial archive and save verification
 
 ```sh
 nix develop --command bash tests/replay_net/run.sh
@@ -159,8 +161,8 @@ nix develop --command bash examples/replay_cavecrawl/save_run.sh
 nix develop --command bash examples/replay_cavecrawl/recovery_run.sh
 ```
 
-The runner has 24 native tests with allocator tracking and an instantiated WASM
-type-check. Seven checkpoint scenarios cover canonical roundtrip, hidden authority
+The initial runner gate recorded 24 native tests with allocator tracking and an
+instantiated WASM type-check. Seven checkpoint scenarios cover canonical roundtrip, hidden authority
 fields, promotion, pending actions, malformed/count/content/contract failures,
 policy and ban restoration, new-epoch rejection, and fresh clients reclaiming
 reserved seats without resetting loot. A local host credential cannot reserve a
@@ -175,7 +177,12 @@ the guest's looted world, kills/replaces the processes, and checks guest identit
 inventory conservation, door state, and continued actions under epoch 2. It
 supplies the new epoch explicitly. These gates are registered in `tests/run_all.sh`.
 
-## Next M5 implementation sequence
+<a id="next-m5-implementation-sequence"></a>
+
+## Original M5 implementation sequence
+
+This sequence records the work planned after the initial archive/save gates.
+The implementation and test counts below describe that stage.
 
 1. **Bounded checkpoint transfer — implemented component:** explicit trusted-peer
    scope, indexed chunks, duplicate/reorder handling, complete validation,
@@ -207,6 +214,8 @@ supplies the new epoch explicitly. These gates are registered in `tests/run_all.
    then a competitive replayed example. Record interruption, rollback distance,
    checkpoint age and size, restore cost, and responsiveness after recovery.
 
-Checkpoint-plus-log recovery, service outboxes, and broader schema upgrades follow
-this snapshot-based acceptance. M5 remains incomplete until the driver, fencing,
-partition policy, and real successor takeover gates exist.
+The initial sequence deferred checkpoint-plus-log recovery, service outboxes,
+and broader schema upgrades until after snapshot-based acceptance. It left M5
+open until the driver, fencing, partition policy, and real successor takeover
+gates existed. The [framework audit](framework-audit.md) records the later
+implemented recovery paths and their remaining limits.

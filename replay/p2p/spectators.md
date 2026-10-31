@@ -1,9 +1,9 @@
 # Confirmed P2P spectators
 
 Use `Watch(State, Input, Event, Seats)` to show a P2P match without joining its
-player roster. It consumes confirmed history from an admitted
-source participant. It never occupies a player slot, samples an input, or contributes
-to the players' confirmation frontier. One `Watch_Source` serves one spectator;
+player roster. It consumes history already confirmed by the player protocol, sent by an
+admitted source participant. The watcher occupies no player slot, samples no
+input, and does not advance the players' confirmation frontier. One `Watch_Source` serves one spectator;
 applications can provision several bounded source streams. The source borrows its
 participant Runner and a separate transport lane or connection.
 
@@ -71,7 +71,7 @@ view indicator. `watch_current` retains the last valid world when transport is l
 
 ## Trust and scope
 
-The initial contract gates configuration, ordered roster, content and schemas;
+The watcher validates configuration, ordered roster, content, and schemas;
 the transport/admission layer must authenticate the selected source and binding.
 A late spectator accepts a rolling anchor for history it never executed. It trusts
 that source for the initial world: these hashes do not prove agreement of all
@@ -81,14 +81,14 @@ recipient filtering need an explicit viewing policy.
 
 Spectators can change admitted sources within a fixed-epoch match using the
 continuity API below. Automatic spectator restoration after process restart,
-match recording playback UX and delayed anti-coaching feeds remain follow-through
-work. Browser viewing exists; its provider integration for source failover remains
-separate from the native gate.
-The current whole-frame base and two staged value runtimes prioritize correctness;
-input-only incremental records and memory/codec reuse should follow measured costs.
+match-recording playback UI and delayed anti-coaching feeds remain application
+work. Browser viewing is implemented; browser provider integration for source
+failover still needs work beyond the native test. The implementation uses
+a whole-frame base and two staged value runtimes. Measure their memory and
+codec costs before changing to input-only incremental records or storage reuse.
 
 See [Replay Duel](../../examples/replay_duel/README.md) for the separate three-process
-late-join/blackout gate. The spectator fixture uses the same deterministic model
+late-join/blackout test. The spectator fixture uses the same deterministic model
 and Godot views as the participating players.
 
 ## Changing the source without discarding the world

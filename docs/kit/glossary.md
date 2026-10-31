@@ -15,12 +15,12 @@ authority without a player avatar.
 
 ## Boot
 
-`kboot.Boot` connects the common Godot-facing parts of a Kit game: lobby and HUD
-widgets, `netgd` transport, session, comms, generated entity factory, frame pump,
-and an optional simulation lane. For the conventional direct-field shell,
-scriptgen emits `<game>_net_attach`, the normal `<game>_net_frame`, and
-`<game>_net_detach`. `<game>_net_pump` and component-level `boot_*` procedures
-are the custom-order primitives underneath.
+`kboot.Boot` connects the Godot-facing parts of a Kit game: lobby and HUD
+widgets, `netgd` transport, session, comms, generated entity factory, frame
+processing, and an optional simulation lane. When these components are direct
+fields of the game script, scriptgen emits `<game>_net_attach`,
+`<game>_net_frame`, and `<game>_net_detach` to manage them together. Use
+`<game>_net_pump` and component-level `boot_*` procedures for custom ordering.
 
 `boot_phase` reports `.Menu`, `.Connecting`, `.Lobby`, or `.Playing` from the
 current session state.
@@ -36,7 +36,7 @@ pointer, owner, and ID. The census avoids maintaining a second game map that can
 drift from the session registry.
 
 The generated `<entity>_spawned` and `<entity>_freed` hooks run when census
-bookkeeping changes. Spawn fields are not yet the presentation baseline in the
+bookkeeping changes. Received spawn fields have not yet been applied in the
 `_spawned` hook; use the later typed `<entity>_born` hook or the session's
 `<game>_entity_spawned` event when initialization depends on received fields.
 
@@ -44,7 +44,7 @@ bookkeeping changes. Spawn fields are not yet the presentation baseline in the
 
 A player-requested action declared with `@(gd_command)`. A generated
 `<verb>_cmd` proc uses the same call site on a client and on the authority.
-Its typed `Action_Policy` decides who may ask, whether the issuing client may
+Its typed `Action_Policy` decides who may issue it, whether the issuing client may
 predict, and the encoded argument limit. The command body validates current
 game state and applies a single-entity mutation.
 
@@ -63,7 +63,7 @@ halves.
 ## Consequence (`_then`)
 
 The authority-only half paired with a command, tick, or generated event. A
-command body should mutate its target entity. Its `<verb>_then` consequence
+command body may mutate only its target entity. Its `<verb>_then` consequence
 performs game-level work such as spawning another entity, crediting a player, or
 transferring ownership after the command succeeds.
 
@@ -71,14 +71,14 @@ transferring ownership after the command succeeds.
 
 The reliable, host-authoritative replication path selected by
 `gd:"replicate"`. At each network tick, the registry compares fields with a
-shadow copy and encodes only changed values. A full entity record provides the
+stored comparison copy and encodes only changed values. A full entity record provides the
 baseline for spawning, late join, and resynchronization.
 
 ## Edge
 
 A transition in a replicated field. A generated
 `<class>_<field>_edge(game, entity, old, new)` half runs when an applied network
-change crosses that field. Initial state and full resynchronization establish a
+change updates that field. Initial state and full resynchronization establish a
 baseline without replaying historical edge effects.
 
 ## Entity
@@ -94,9 +94,10 @@ a persistent save identity.
 ## Presentation event
 
 A one-shot presentation occurrence declared with `@(gd_event)`. Scriptgen
-generates a suffix-free `^Boot` announce proc from its `_fx` declaration. Its
-entity anchor selects the existing session or simulation presentation timeline,
-supplies `mine`, and supports `everyone`, `owner`, or `observers` audiences.
+generates a suffix-free `^Boot` announce proc from its `_fx` declaration. The
+anchor is the entity whose session or simulation clock schedules presentation.
+It also supplies `mine`, indicating local ownership. Events support
+`everyone`, `owner`, or `observers` audiences.
 With one entity parameter the anchor is inferred; several require
 `anchor=PARAM`.
 
@@ -138,7 +139,8 @@ that the proc runs on every role.
 
 ## Owner stream
 
-The unreliable, freshness-oriented replication path selected by `gd:"owner"`.
+The unreliable replication path selected by `gd:"owner"`, where each new sample
+supersedes earlier samples.
 The entity's current owner writes the fields. The host verifies the sender's
 ownership, relays accepted samples, and other peers interpolate them.
 
@@ -148,12 +150,12 @@ cheat-resistant position channel.
 
 ## Network profile
 
-A named, fully materialized `Session_Config` and `Lane_Config` pair selected
+A named `Session_Config` and `Lane_Config` pair with all settings resolved, selected
 with `kboot.network_profile`: `.Friends_Coop`, `.Listen_Server_Action`, or
 `.Dedicated_Competitive`. The generated `<game>_net_attach` validates the pair
-and installs both halves before the stack starts. A profile records timing and
-trust assumptions; only the actual authority deployment creates the trust
-boundary.
+and installs both configurations before networking starts. A profile records
+timing and trust assumptions. The deployment must still place the authority on
+a machine trusted to decide gameplay results.
 
 ## Player, peer, and seat
 
@@ -190,7 +192,7 @@ snapshots. It is transport-independent and does not import Godot.
 The `kit/sim` fixed-tick path selected by `gd:"predict"`. Clients send input
 windows to one authority. The authority simulates and sends tick-stamped
 snapshots; owning clients predict and reconcile, while watching clients
-interpolate remote truth.
+interpolate remote authority state.
 
 ## Tick
 
@@ -223,12 +225,12 @@ the event tick, not immediately when the packet arrives.
 
 ## Net schema
 
-The generated package-level `NET_SCHEMA` value: structured, allocation-free
-metadata for the same canonical wire contract hashed into the session
+The generated package-level `NET_SCHEMA` value contains structured metadata
+that requires no runtime allocation. It describes the same wire schema hashed into the session
 fingerprint. It lists entity kinds and fields, recursive types, input classes
 and constraints, actions and policies, presentation events, profiles, and messages. Runtime
 callbacks remain in their execution descriptors; the net schema is the stable
-read-only view for diagnostics and tooling.
+read-only representation for diagnostics and tooling.
 
 ## Wire fingerprint
 

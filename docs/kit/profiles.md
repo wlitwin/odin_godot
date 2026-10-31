@@ -1,9 +1,9 @@
 # Network profiles
 
-Kit's named network profiles configure the session and simulation lane as one
-validated unit. They are starting points, not hidden modes: a profile returns an
-ordinary `kboot.Network_Config`, so the game can inspect and override every
-field before attaching.
+A named network profile returns a `kboot.Network_Config` containing session and
+simulation-lane settings. Choose a profile for the authority model, inspect or
+override its fields, then pass the complete value to the generated attach procedure.
+Attachment validates the session and lane configuration together.
 
 ```odin
 cfg := kboot.network_profile(.Listen_Server_Action)
@@ -17,15 +17,14 @@ my_game_net_attach(self, kboot.Options{
 }, cfg)
 ```
 
-`rewind_max` is an absolute gameplay ceiling, not automatic credit granted to
-every client. For each shooter the authority derives a tighter live envelope
-from its measured RTT/jitter, input margin, snapshot cadence, and configured
-watch delay (with one cadence of interpolation-phase slack). Until that clock
-sample is warm, competitive rewind judges live.
+`rewind_max` caps historical rewind for hit judgment. For each shooter, the
+authority computes a tighter window from measured RTT and jitter, input margin,
+snapshot cadence, and configured watch delay, with one cadence of
+interpolation-phase slack. Until clock sampling is established, competitive
+rewind judges the current state.
 
-Omitting the third argument is exactly `.Friends_Coop`. Prefer naming the
-profile in production game code because it records the intended trust and
-latency model where the stack is attached.
+Omitting the third argument selects `.Friends_Coop`. Name the profile in game
+code so the authority and timing choice is visible at the attachment call.
 
 ## Choose by authority model
 
@@ -35,11 +34,10 @@ latency model where the stack is attached.
 | `.Listen_Server_Action` | Player-hosted action games using server simulation and prediction | Clients send inputs; the listen host decides outcomes. The hosting player still controls the authority process. |
 | `.Dedicated_Competitive` | An action game refereed by an avatarless server | Clients are adversarial and the authority runs on infrastructure they do not control. Every simulation input class must use `@(gd_input)` constraints or a semantic validator. |
 
-A profile does not create a trust boundary. `.Dedicated_Competitive` only has
-that meaning when the authority is actually started with `kboot.boot_serve` on
-a trusted machine. Running the same configuration through `boot_host` is still
-a listen server. Encryption, account identity, moderation, deployment policy,
-and game-specific command predicates remain application responsibilities.
+Run `.Dedicated_Competitive` with `kboot.boot_serve` on trusted infrastructure.
+Using that profile with `boot_host` still gives authority to the hosting player.
+The application supplies encryption, account identity, moderation, deployment
+policy, and game-specific command predicates.
 
 The generated attach knows whether the game has a simulation lane and whether
 all of its input classes have generated `@(gd_input)` constraints or an
@@ -58,12 +56,13 @@ player_sample :: proc(self: ^Game, tick: u64, input: ^Player_Input) {
 }
 ```
 
-Structural decoding only proves that bytes fit `Player_Input`; the generated
-sanitizer proves that their values obey the declared input language. Add the
-sample validator hook as well when legality depends on multiple fields or game
-state.
+Decoding reconstructs `Player_Input`; the generated sanitizer applies its
+declared value constraints. Add a sample validator when validity depends on
+several fields or game state.
 
-## Defaults at a glance
+<a id="defaults-at-a-glance"></a>
+
+## Default timing and traffic budgets
 
 All three profiles use bounded admission and the generated wire fingerprint
 gate. Their main timing choices are:
@@ -96,11 +95,14 @@ owned/stale rows and force a full row after deferral or AOI re-entry. Public
 games should still install AOI. `traffic.stream` is the distinct bounded
 client-to-authority ingress shown above.
 
-## Supported starting envelopes
+<a id="supported-starting-envelopes"></a>
 
-`network_profile_envelope(profile)` publishes the scale limits verified by the
-engine-free benchmark gate. These are framework envelopes, not promises about
-your game logic, physics, engine nodes, transport overhead, or hosting machine:
+## Measured framework limits
+
+`network_profile_envelope(profile)` reports the framework limits exercised by
+the engine-free benchmark gate. Measure the complete game before treating these
+limits as a deployment capacity: game logic, physics, engine nodes, transport
+overhead, and hardware contribute additional cost.
 
 | Profile | Players | Persistent replicated entities | Hot entities per recipient/tick | Predicted entities/client | Forced replay |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -111,18 +113,20 @@ your game logic, physics, engine nodes, transport overhead, or hosting machine:
 `tests/kitstress` measures server CPU, application egress bytes, session
 resident/peak allocation, join/snapshot/resume cost, per-recipient AOI fanout,
 and reconciliation cost at increasing sizes. Its optimized native reference
-run exercises 2/100, 4/500, and 8/2,000 player/entity fanout shapes plus
-32/128/512 predicted entities. The test uses generous complexity tripwires;
-repeat it on deployment hardware and add the engine/game frame before raising
-an envelope. “Hot” means dirty and inside one recipient's AOI in the same tick;
+run exercises 2/100, 4/500, and 8/2,000 player/entity fanout cases plus
+32/128/512 predicted entities. Its thresholds detect large cost regressions.
+Repeat the measurement on deployment hardware and include the engine/game frame
+before increasing the supported limits. “Hot” means dirty and inside one recipient's AOI in the same tick;
 unchanged and out-of-interest entities are sparse and do not consume snapshot
 rows.
 
-## Overrides remain ordinary fields
+<a id="overrides-remain-ordinary-fields"></a>
 
-`network_profile` materializes every timing field, including booleans. That
-means an override never has to fight the lower-level "zero means default"
-convention:
+## Override profile values
+
+`network_profile` fills every timing field, including booleans. Assign an
+override on that returned value rather than relying on a lower-level
+“zero means default” convention:
 
 ```odin
 cfg := kboot.network_profile(.Listen_Server_Action)
@@ -144,10 +148,13 @@ Build overrides by editing a value returned from `network_profile`. A partial
 `Network_Config{...}` literal is rejected rather than silently combining two
 different default systems.
 
-## Hand-wired stacks
+<a id="hand-wired-stacks"></a>
 
-The generated facade is the normal path. A game using the lower-level lifecycle
-can apply the same contract directly:
+## Direct component setup
+
+The generated `<game>_net_attach` wrapper is the usual entry point. A game
+managing component lifetimes directly can configure the same settings before
+attachment:
 
 ```odin
 cfg := kboot.network_configure(
@@ -165,4 +172,4 @@ kboot.boot_lane(&self.boot, &self.lane)
 
 `godot:kit/netcfg` contains the engine-free implementation and can be imported
 directly for tooling or tests. `kit/boot` re-exports its game-facing types and
-procedures so normal scripts need only `kboot`.
+procedures so game scripts can use the `kboot` import for that setup.

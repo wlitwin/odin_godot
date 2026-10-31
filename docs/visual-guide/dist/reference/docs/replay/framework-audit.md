@@ -1,7 +1,8 @@
 # Framework acceptance audit — 2026-09-20
 
-This audits the eight [framework completion gates](framework-completion.md).
-It reuses existing integration evidence and runs focused current checks. The
+This 2026-09-20 audit assesses the eight
+[framework completion gates](framework-completion.md) using existing integration
+evidence and focused checks. The
 [final assessment](release-assessment.md) closes the revised framework-first scope;
 it does not require every game to become a complete remake or claim unverified
 public/platform support.
@@ -15,9 +16,9 @@ public/platform support.
 | Server, co-op and competitive policies | `net/types.odin`, `groups.odin`, replication policy, `owned`, Body2/Body3 adapters | Current network/interest/owned suites exercise correction, authored footprints, hidden-state projection, ownership scope and reliable action context. This is explicit cooperative ownership coordinated by an authority, not arbitrary simultaneous writers or deterministic Godot physics. Representative game integrations already exist. |
 | Deterministic P2P | `p2p/runner.odin`, archives, spectator/watch/rebind and provisioning | Current units and complete default/optimized native/WASM archive, rejoin and spectator-failover corpora pass. The audit exposed an arm64 compiler miscompile in an inlined test-model factory; a fixture-only no-inline workaround and callback-owner assertions preserve the original acceptance checks. Runner semantics are unchanged. |
 | Reusable setup and identity | Party/Room, durable enrollment, registration, P2P party/pair service and native links | [Native P2P](results/native-p2p-2026-09-20/README.md) and browser receipts cover persisted create/join/rejoin, current incarnations, authenticated connection generations and returned endpoints. The two-peer native owner now separates bind and advertised endpoints, with a real forwarded-port recovery gate. |
-| Session recovery | Authority records/leases, complete checkpoints, bounded transfer, Room transitions/publication/restore | Current authority/recovery suites plus [browser failure matrix](results/browser-failure-matrix-2026-09-06/README.md), [transition expiry](results/room-transition-expiry-2026-09-13/README.md), dedicated and recent native/browser migration evidence establish the documented local envelopes. Cold restore and pending-command classification are implemented. Arbitrary partitions/outages and live Steam are not universally validated. |
-| Transport/resource stabilization | Common Transport/Router, ENet/RTC, generation fences, canonical codecs, budgets and profiling | Current schema/network tests cover malformed inputs, channel/packet limits, transactional decode, baseline recovery and bounded work. Existing native/browser/TURN evidence is scoped. [Cavecrawl comparison](results/cave-profile-comparison-2026-09-20/README.md) records higher Replay costs; later compression results address measured traffic overhead only. The consolidated supported-envelope/release assessment records these tradeoffs. |
-| Delivery and compatibility | Package docs, runnable examples, versioned schemas/content, explicit checkpoint converters | Obsolete capability/version claims were corrected. Consolidated onboarding, compatibility policy, native/WASM checked API recipes and a bounded framework smoke command now exist. The supported-envelope/release assessment and isolated addon gate complete the delivery assessment. |
+| Session recovery | Authority records/leases, complete checkpoints, bounded transfer, Room transitions/publication/restore | Current authority/recovery suites plus [browser failure matrix](results/browser-failure-matrix-2026-09-06/README.md), [transition expiry](results/room-transition-expiry-2026-09-13/README.md), dedicated and recent native/browser migration evidence establish the documented local configurations. Cold restore and pending-command classification are implemented. Arbitrary partitions/outages and live Steam are not universally validated. |
+| Transport/resource stabilization | Common Transport/Router, ENet/RTC, generation fences, canonical codecs, budgets and profiling | Current schema/network tests cover malformed inputs, channel/packet limits, transactional decode, baseline recovery and bounded work. Existing native/browser/TURN evidence is scoped. [Cavecrawl comparison](results/cave-profile-comparison-2026-09-20/README.md) records higher Replay costs; later compression results address measured traffic overhead only. The consolidated support/release assessment records these tradeoffs. |
+| Delivery and compatibility | Package docs, runnable examples, versioned schemas/content, explicit checkpoint converters | Obsolete capability/version claims were corrected. Consolidated onboarding, compatibility policy, native/WASM checked API recipes and a bounded framework smoke command now exist. The support/release assessment and isolated addon gate complete the delivery assessment. |
 
 The source paths above refer to current implementation, not planned package names.
 There is no missing `replay/session` package to scaffold: its responsibilities are
@@ -34,22 +35,27 @@ same 5,669-frame / 28,085-operation trace and reject corruption.
 This verifies the current retained-effect/rebase contract. The older C2 case that
 lost four effects has no failing delivery trace; its cause remains unestablished.
 The [prior investigation](results/claimball-c2-recording-2026-09-14/README.md) already
-failed to reproduce it in seven captured schedules. Treat it as a historical,
-unreproduced report rather than indefinitely rerunning full games or declaring an
-invented fix. A new failing trace reopens a concrete shared defect.
+failed to reproduce it in seven captured schedules. The older case remains a historical, unreproduced report. Preserve it without
+claiming a fix. Further full-game reruns should be driven by a failing trace,
+which would reopen the shared defect.
 
-## Concrete closure work
+<a id="concrete-closure-work"></a>
 
-No implementation item remains in the framework-first closure queue. The
-[support envelope](../../replay/support.md) and [release assessment](release-assessment.md)
+## Framework completion status
+
+At this assessment, no implementation item remained in the framework-first
+completion queue. The
+[supported configurations](../../replay/support.md) and [release assessment](release-assessment.md)
 classify the modes, limits, comparisons, distribution and P2P control-loss behavior.
 
-No new game-content or visual parity task is implied by this list.
+This assessment did not add game-content or visual-parity requirements.
 
-Endpoint separation and setup/compatibility delivery are now verified in the
+Endpoint separation and setup/compatibility delivery were verified in the
 [delivery increment](results/framework-delivery-2026-09-20/README.md).
 
-## Current verification
+<a id="current-verification"></a>
+
+## Verification performed for this audit
 
 The audit ran 30 core, 24 view, 182 network, 7 interest, 11 owner-stream,
 36 authority, 11 recovery, 33 P2P and 28 schema unit tests: **362 tests**.
@@ -66,7 +72,9 @@ not fix it; none of those experiments changed shipping runtime sources. The fina
 P2P command passes with its direct `model()` calls and all original world/hash
 checks. See [receipts and assembly excerpt](results/framework-audit-2026-09-20/README.md).
 
-## Explicit nonclaims
+<a id="explicit-nonclaims"></a>
+
+## Unsupported features and validation limits
 
 Managed variable-size simulation collections, multiple independent prediction
 timelines per client, static schema code generation, and exactly-once external

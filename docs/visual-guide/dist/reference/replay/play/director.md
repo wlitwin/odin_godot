@@ -22,8 +22,8 @@ world.director = next
 `Channel` is a tick-owned sustained hold. `channel_tick` restarts when its target
 identity changes, clears on target zero, and returns true once at completion.
 The game must validate continuing range, liveness and input eligibility every tick.
-Use a lifetime-qualified target key. This has a different authority contract from
-the old owner-streamed channel/claim: it can enforce duration in the simulation.
+Use a lifetime-qualified target key. The simulation advances the duration, so
+the authority can enforce it rather than accepting owner-streamed progress.
 
 Fifty 400-tick director traces match the original procedures compiled in isolation.
 Native tests cover storage backpressure, rest/completion and interrupted/retargeted

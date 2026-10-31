@@ -6,8 +6,8 @@ individual receipts below retain their original workloads and failures.
 
 Original repository: `../../../scrapyard`, revision
 `6bdef4f437d9a4e2c98f1d49472f840879301ccf`. Its project, source, saves and run commands
-remain independent. This project is a reimplementation against Replay, not a renamed
-Kit shell. The full [Replay roadmap](../../docs/replay/roadmap.md) records the
+remain independent. This project reimplements the game against Replay while
+retaining the original Kit version. The full [Replay roadmap](../../docs/replay/roadmap.md) records the
 original parity scope. The later [framework completion plan](../../docs/replay/framework-completion.md)
 defers exhaustive game parity and governs the framework's release scope.
 
@@ -185,8 +185,8 @@ movement gates do not establish full-game completion or framework superiority.
 Identity policy under review: the original `doppelganger` act assigns a live duplicate
 token a fresh seat. Replay currently rejects a duplicate live identity, preserving
 one token-to-seat binding and requiring a separate identity for a second player.
-The user has been asked whether the new game should retain that rule or create a
-fresh guest identity for the duplicate. This row is not an agreed parity waiver.
+This ledger records an unresolved choice between retaining that rule and creating
+a fresh guest identity for the duplicate. No parity waiver is recorded.
 
 The [content-49 succession result](../../docs/replay/results/scrapyard-succession-2026-09-19/README.md)
 reproduces the original attack/director timer reset on the first committed takeover

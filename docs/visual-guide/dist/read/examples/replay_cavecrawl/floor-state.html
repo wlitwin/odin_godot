@@ -62,7 +62,7 @@ resets director/den state, while avatar fields follow the corresponding rule:</p
 or effects. Its <code>cave_restart</code> restores vitals and clears bags/cooldowns but leaves
 active effects alone. The owner-side depth edge changes position. Replay keeps
 its existing seat-based spawn positions and authoritative movement policy; the
-field-preservation behavior now follows those original rules.</p>
+field-preservation behavior follows those original rules.</p>
 <p>The descent tick still performs ordinary cooldown/chill decay and stamina
 regeneration first. Preserving state does not freeze those clocks. A reserved
 player who left while dead retains the respawn deadline; returning after it
@@ -96,9 +96,10 @@ Godot gate reads the actual retained frame immediately after descent/restart.</p
 updates, restart effects/ledger, a disconnected respawn, corrected descent inputs,
 conversion, and complete normal/faulted campaigns. Browser handoff and durable
 checkpoint publication/restart have separate regression evidence.</p>
-<p>This closes the avatar-vitals/cooldown descent gap. Other correspondence work
-remains, including spawn-position policy, owner-streamed motion, and broader
-visual/human comparisons. C6 separately corrects relic descent/restart behavior.</p>
+<p>The comparison above covers avatar vitals and cooldowns across descent.
+Spawn-position policy, owner-streamed motion, and broader visual/human
+comparisons require separate work. C6 separately corrects relic
+descent/restart behavior.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="relic.html"><span>Relic lifetime</span><span aria-hidden="true">→</span></a><a href="authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_cave_floor/README.html"><span>Cavecrawl floor-state acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/floor-state.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="relic.html"><span>Relic lifetime</span><span aria-hidden="true">→</span></a><a href="authoring.html"><span>Authoring captured floors</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_cave_floor/README.html"><span>Cavecrawl floor-state acceptance</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_cavecrawl/floor-state.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#compatibility" class="">Compatibility</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_cavecrawl/floor-state.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

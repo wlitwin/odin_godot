@@ -3,8 +3,8 @@
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="contributor-guide.html">Contributor guide</a><a href="code-guide.html">Code guide</a><a href="shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
 <main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Stormcaller: a Replay-only feature exercise</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_scrapyard/stormcaller.md" download>Page source ↓</a></div></div>
-<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#try-it">Try it</a><a href="#where-the-feature-lives">Where the feature lives</a><a href="#compatibility">Compatibility</a><a href="#what-this-authoring-exercise-revealed">What this authoring exercise revealed</a><a href="#validation">Validation</a></nav></details>
-<article class="reading-body "><p>The Stormcaller is a new enemy archetype (kind 6). It closes on a living target,
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#try-it">Try it</a><a href="#where-the-feature-lives">Where the feature lives</a><a href="#compatibility">Compatibility</a><a href="#recorded-implementation-constraints">Recorded implementation constraints</a><a href="#validation">Validation</a></nav></details>
+<article class="reading-body "><p>The Stormcaller is an enemy archetype (kind 6). It closes on a living target,
 plants its feet, shows its complete danger radius, charges an electrical core and
 pulses damage around itself. Step outside the ring or kill it during the wind-up.
 The ordinary no-living-target pause behavior remains shared with the other brains.</p>
@@ -22,7 +22,8 @@ independent cosmetic preview of the composed charge view.</p>
 <div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">RSY_ROLE=solo RSY_RUN=0 RSY_ENCOUNTER=stormcaller \
   nix develop --<span class="hljs-built_in">command</span> bash examples/replay_scrapyard/play.sh</code></pre></div><p>Choose Ready/Start in the lobby. This training setup fixes starting positions and
 holds enemy movement at zero; ordinary waves/workbench use its authored movement.
-All network participants need the matching content-50/J build.</p>
+All network participants need matching builds. The recorded feature tests used
+content-50/J.</p>
 <h2 id="where-the-feature-lives">Where the feature lives<a class="heading-anchor" href="#where-the-feature-lives" aria-label="Link to this section">#</a></h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
 <thead>
@@ -76,27 +77,30 @@ completed attack. Cooldown/grace remains ordinary saved state.</p>
 <p>No transport, rollback, journal or view-pool implementation needed a feature-specific
 change. No Kit or original-game implementation was changed.</p>
 <h2 id="compatibility">Compatibility<a class="heading-anchor" href="#compatibility" aria-label="Link to this section">#</a></h2>
-<p>This changes the catalog schema: each mob definition gains a bounded Pulse_Def.
-The semantic content ID advances from 49/I to <strong>50/J</strong> (<code>0x525343524150304a</code>);
-network protocol 7 is unchanged. Old peers cannot silently share the new contract.</p>
-<p>The offline converter now accepts content 49 as well as older supported saves.
+<p>The Stormcaller addition changed the catalog schema by adding a bounded
+Pulse_Def to each mob definition. It advanced semantic content from 49/I to
+<strong>50/J</strong> (<code>0x525343524150304a</code>), with network protocol 7 unchanged. Old peers cannot silently share the new contract.</p>
+<p>The offline converter accepts content 49 as well as older supported saves.
 Historical Mob/Catalog shapes are frozen rather than aliasing today&#39;s live structs.
 Conversion fills the new component with zeros, preserving the prior catalog and
 behavior. It does not add enemies or retrofit new balance settings into an old run.
-The source-49 checkpoint fixture was captured with the old code before this edit.
+The source-49 checkpoint fixture was captured with the code from before the
+Stormcaller addition.
 See <a href="saves.html">save conversion</a> for the existing offline command and identity
 requirements; write to a new destination. The recording verifier also exposes <code>--content49</code> for the retained historical model.</p>
-<h2 id="what-this-authoring-exercise-revealed">What this authoring exercise revealed<a class="heading-anchor" href="#what-this-authoring-exercise-revealed" aria-label="Link to this section">#</a></h2>
+<p><span id="what-this-authoring-exercise-revealed"></span></p>
+<h2 id="recorded-implementation-constraints">Recorded implementation constraints<a class="heading-anchor" href="#recorded-implementation-constraints" aria-label="Link to this section">#</a></h2>
 <p>The replay/network behavior required ordinary game code and data, with no custom
 correction or recovery hook. Scene composition worked: an authored child handles
 charge animation and the existing binding handles entity lifetime.</p>
-<p>The largest friction was compatibility: old archive types referenced the live
-catalog, and tests assumed that adding an epoch was the only schema change. Those
-were made explicit/frozen, keeping byte-preservation checks for every old field.</p>
+<p>The recorded compatibility problems came from old archive types referencing
+the live catalog and tests assuming that adding an epoch was the only schema
+change. Freezing the historical types and making those assumptions explicit
+retained byte-preservation checks for every old field.</p>
 <p>That exercise led to the <a href="authoring-tools.html">authoring tools workflow</a>. Visual
-registration now lives in a typed <code>ScrapEnemyArchetype</code> Resource, and the enemy view
+registration lives in a typed <code>ScrapEnemyArchetype</code> Resource, and the enemy view
 has one appearance input. Godot and headless code share a canonical bake instead
-of separate nested-Resource parsing. The actual historical catalog now has fully
+of separate nested-Resource parsing. The historical catalog has fully
 frozen type dependencies, and the feature tests use shared correction/takeover and
 native/WASM/peer helpers. The linked feature receipt below remains the historical
 record of the original feature implementation.</p>
@@ -116,5 +120,5 @@ Existing 108 model tests and the older offline save CLI checks pass.</p>
 records the exact scope and initial harness failures. This does not claim new public
 server deployment, full browser gameplay or a complete re-run of every old game gate.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="authoring-tools.html"><span>Adding and evolving a Replay feature</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/stormcaller.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
-<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#try-it" class="">Try it</a><a href="#where-the-feature-lives" class="">Where the feature lives</a><a href="#compatibility" class="">Compatibility</a><a href="#what-this-authoring-exercise-revealed" class="">What this authoring exercise revealed</a><a href="#validation" class="">Validation</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/stormcaller.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="saves.html"><span>Complete run saves</span><span aria-hidden="true">→</span></a><a href="authoring-tools.html"><span>Adding and evolving a Replay feature</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/stormcaller.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#try-it" class="">Try it</a><a href="#where-the-feature-lives" class="">Where the feature lives</a><a href="#compatibility" class="">Compatibility</a><a href="#recorded-implementation-constraints" class="">Recorded implementation constraints</a><a href="#validation" class="">Validation</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_scrapyard/stormcaller.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

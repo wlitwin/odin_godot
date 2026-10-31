@@ -14,12 +14,12 @@ authoritative for <code>predict</code> fields.</p>
 <p>A listen server is both an authority and a player. A dedicated server is an
 authority without a player avatar.</p>
 <h2 id="boot">Boot<a class="heading-anchor" href="#boot" aria-label="Link to this section">#</a></h2>
-<p><code>kboot.Boot</code> connects the common Godot-facing parts of a Kit game: lobby and HUD
-widgets, <code>netgd</code> transport, session, comms, generated entity factory, frame pump,
-and an optional simulation lane. For the conventional direct-field shell,
-scriptgen emits <code>&lt;game&gt;_net_attach</code>, the normal <code>&lt;game&gt;_net_frame</code>, and
-<code>&lt;game&gt;_net_detach</code>. <code>&lt;game&gt;_net_pump</code> and component-level <code>boot_*</code> procedures
-are the custom-order primitives underneath.</p>
+<p><code>kboot.Boot</code> connects the Godot-facing parts of a Kit game: lobby and HUD
+widgets, <code>netgd</code> transport, session, comms, generated entity factory, frame
+processing, and an optional simulation lane. When these components are direct
+fields of the game script, scriptgen emits <code>&lt;game&gt;_net_attach</code>,
+<code>&lt;game&gt;_net_frame</code>, and <code>&lt;game&gt;_net_detach</code> to manage them together. Use
+<code>&lt;game&gt;_net_pump</code> and component-level <code>boot_*</code> procedures for custom ordering.</p>
 <p><code>boot_phase</code> reports <code>.Menu</code>, <code>.Connecting</code>, <code>.Lobby</code>, or <code>.Playing</code> from the
 current session state.</p>
 <h2 id="census">Census<a class="heading-anchor" href="#census" aria-label="Link to this section">#</a></h2>
@@ -31,13 +31,13 @@ pointer-free value to retain;
 pointer, owner, and ID. The census avoids maintaining a second game map that can
 drift from the session registry.</p>
 <p>The generated <code>&lt;entity&gt;_spawned</code> and <code>&lt;entity&gt;_freed</code> hooks run when census
-bookkeeping changes. Spawn fields are not yet the presentation baseline in the
+bookkeeping changes. Received spawn fields have not yet been applied in the
 <code>_spawned</code> hook; use the later typed <code>&lt;entity&gt;_born</code> hook or the session&#39;s
 <code>&lt;game&gt;_entity_spawned</code> event when initialization depends on received fields.</p>
 <h2 id="command">Command<a class="heading-anchor" href="#command" aria-label="Link to this section">#</a></h2>
 <p>A player-requested action declared with <code>@(gd_command)</code>. A generated
 <code>&lt;verb&gt;_cmd</code> proc uses the same call site on a client and on the authority.
-Its typed <code>Action_Policy</code> decides who may ask, whether the issuing client may
+Its typed <code>Action_Policy</code> decides who may issue it, whether the issuing client may
 predict, and the encoded argument limit. The command body validates current
 game state and applies a single-entity mutation.</p>
 <p>An optimistic command runs locally before the authority replies. Confirmation
@@ -52,18 +52,18 @@ share <code>Action_Reject_Reason</code> (<code>Access</code>, <code>Rate</code>,
 halves.</p>
 <h2 id="consequence-_then">Consequence (<code>_then</code>)<a class="heading-anchor" href="#consequence-_then" aria-label="Link to this section">#</a></h2>
 <p>The authority-only half paired with a command, tick, or generated event. A
-command body should mutate its target entity. Its <code>&lt;verb&gt;_then</code> consequence
+command body may mutate only its target entity. Its <code>&lt;verb&gt;_then</code> consequence
 performs game-level work such as spawning another entity, crediting a player, or
 transferring ownership after the command succeeds.</p>
 <h2 id="delta-lane">Delta lane<a class="heading-anchor" href="#delta-lane" aria-label="Link to this section">#</a></h2>
 <p>The reliable, host-authoritative replication path selected by
 <code>gd:&quot;replicate&quot;</code>. At each network tick, the registry compares fields with a
-shadow copy and encodes only changed values. A full entity record provides the
+stored comparison copy and encodes only changed values. A full entity record provides the
 baseline for spawning, late join, and resynchronization.</p>
 <h2 id="edge">Edge<a class="heading-anchor" href="#edge" aria-label="Link to this section">#</a></h2>
 <p>A transition in a replicated field. A generated
 <code>&lt;class&gt;_&lt;field&gt;_edge(game, entity, old, new)</code> half runs when an applied network
-change crosses that field. Initial state and full resynchronization establish a
+change updates that field. Initial state and full resynchronization establish a
 baseline without replaying historical edge effects.</p>
 <h2 id="entity">Entity<a class="heading-anchor" href="#entity" aria-label="Link to this section">#</a></h2>
 <p>A network-tracked struct with a <code>knet.Net_Id</code>, a stable wire type, an owner, and
@@ -74,9 +74,10 @@ peer.</p>
 a persistent save identity.</p>
 <h2 id="presentation-event">Presentation event<a class="heading-anchor" href="#presentation-event" aria-label="Link to this section">#</a></h2>
 <p>A one-shot presentation occurrence declared with <code>@(gd_event)</code>. Scriptgen
-generates a suffix-free <code>^Boot</code> announce proc from its <code>_fx</code> declaration. Its
-entity anchor selects the existing session or simulation presentation timeline,
-supplies <code>mine</code>, and supports <code>everyone</code>, <code>owner</code>, or <code>observers</code> audiences.
+generates a suffix-free <code>^Boot</code> announce proc from its <code>_fx</code> declaration. The
+anchor is the entity whose session or simulation clock schedules presentation.
+It also supplies <code>mine</code>, indicating local ownership. Events support
+<code>everyone</code>, <code>owner</code>, or <code>observers</code> audiences.
 With one entity parameter the anchor is inferred; several require
 <code>anchor=PARAM</code>.</p>
 <p>Events do not mutate authoritative state and are not replayed to joiners. Kit
@@ -108,19 +109,20 @@ examples are:</p>
 <p>The term describes one side of generated code plus game code; it does not imply
 that the proc runs on every role.</p>
 <h2 id="owner-stream">Owner stream<a class="heading-anchor" href="#owner-stream" aria-label="Link to this section">#</a></h2>
-<p>The unreliable, freshness-oriented replication path selected by <code>gd:&quot;owner&quot;</code>.
+<p>The unreliable replication path selected by <code>gd:&quot;owner&quot;</code>, where each new sample
+supersedes earlier samples.
 The entity&#39;s current owner writes the fields. The host verifies the sender&#39;s
 ownership, relays accepted samples, and other peers interpolate them.</p>
 <p>An owner stream is suitable when occasional loss can be replaced by the next
 sample. It trusts the owner to supply the value and is therefore not a
 cheat-resistant position channel.</p>
 <h2 id="network-profile">Network profile<a class="heading-anchor" href="#network-profile" aria-label="Link to this section">#</a></h2>
-<p>A named, fully materialized <code>Session_Config</code> and <code>Lane_Config</code> pair selected
+<p>A named <code>Session_Config</code> and <code>Lane_Config</code> pair with all settings resolved, selected
 with <code>kboot.network_profile</code>: <code>.Friends_Coop</code>, <code>.Listen_Server_Action</code>, or
 <code>.Dedicated_Competitive</code>. The generated <code>&lt;game&gt;_net_attach</code> validates the pair
-and installs both halves before the stack starts. A profile records timing and
-trust assumptions; only the actual authority deployment creates the trust
-boundary.</p>
+and installs both configurations before networking starts. A profile records
+timing and trust assumptions. The deployment must still place the authority on
+a machine trusted to decide gameplay results.</p>
 <h2 id="player-peer-and-seat">Player, peer, and seat<a class="heading-anchor" href="#player-peer-and-seat" aria-label="Link to this section">#</a></h2>
 <p><code>knet.Player_Id</code> is the stable identity used by gameplay. A reconnect token can
 reclaim the same player ID, stats, and owned entities after the transport
@@ -145,7 +147,7 @@ snapshots. It is transport-independent and does not import Godot.</p>
 <p>The <code>kit/sim</code> fixed-tick path selected by <code>gd:&quot;predict&quot;</code>. Clients send input
 windows to one authority. The authority simulates and sends tick-stamped
 snapshots; owning clients predict and reconcile, while watching clients
-interpolate remote truth.</p>
+interpolate remote authority state.</p>
 <h2 id="tick">Tick<a class="heading-anchor" href="#tick" aria-label="Link to this section">#</a></h2>
 <p>A fixed simulation or network step. Session replication normally mutates
 gameplay at frame rate while the network tick schedules replication. Simulation
@@ -167,17 +169,17 @@ is <em>watched</em>.</p>
 <p>Presentation events from watched entities should run when that entity reaches
 the event tick, not immediately when the packet arrives.</p>
 <h2 id="net-schema">Net schema<a class="heading-anchor" href="#net-schema" aria-label="Link to this section">#</a></h2>
-<p>The generated package-level <code>NET_SCHEMA</code> value: structured, allocation-free
-metadata for the same canonical wire contract hashed into the session
+<p>The generated package-level <code>NET_SCHEMA</code> value contains structured metadata
+that requires no runtime allocation. It describes the same wire schema hashed into the session
 fingerprint. It lists entity kinds and fields, recursive types, input classes
 and constraints, actions and policies, presentation events, profiles, and messages. Runtime
 callbacks remain in their execution descriptors; the net schema is the stable
-read-only view for diagnostics and tooling.</p>
+read-only representation for diagnostics and tooling.</p>
 <h2 id="wire-fingerprint">Wire fingerprint<a class="heading-anchor" href="#wire-fingerprint" aria-label="Link to this section">#</a></h2>
 <p>A generated identifier for the game&#39;s network schema. Peers with incompatible
 fingerprints are refused during the session handshake instead of interpreting
 the same bytes as different entity fields, commands, inputs, or messages. The
 fingerprint is a compatibility check, not authentication.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/glossary.md · source 3fedd3153072.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/kit/glossary.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#authority" class="">Authority</a><a href="#boot" class="">Boot</a><a href="#census" class="">Census</a><a href="#command" class="">Command</a><a href="#consequence-_then" class="">Consequence (_then)</a><a href="#delta-lane" class="">Delta lane</a><a href="#edge" class="">Edge</a><a href="#entity" class="">Entity</a><a href="#presentation-event" class="">Presentation event</a><a href="#tick-payload-event" class="">Tick payload event</a><a href="#factory" class="">Factory</a><a href="#half" class="">Half</a><a href="#owner-stream" class="">Owner stream</a><a href="#network-profile" class="">Network profile</a><a href="#player-peer-and-seat" class="">Player, peer, and seat</a><a href="#prediction-reconciliation-and-resimulation" class="">Prediction, reconciliation, and resimulation</a><a href="#session" class="">Session</a><a href="#simulation-lane" class="">Simulation lane</a><a href="#tick" class="">Tick</a><a href="#transport" class="">Transport</a><a href="#watched-entity" class="">Watched entity</a><a href="#net-schema" class="">Net schema</a><a href="#wire-fingerprint" class="">Wire fingerprint</a></nav><div class="outline-actions"><a href="../../../reference/docs/kit/glossary.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
