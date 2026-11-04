@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Box3D offline: tower knockdown · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Examples</a><span>/</span><span>Guide</span></div><p class="eyebrow">Examples</p><h1>Box3D offline: tower knockdown</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/box3d_offline/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#run-it">Run it</a><a href="#put-it-on-itchio">Put it on itch.io</a><a href="#how-it-works">How it works</a><a href="#going-further">Going further</a></nav></details>
+<article class="reading-body "><p>A single-player Box3D example with no Kit, no Replay and no network: one script
+owns a Box3D world and steps it itself. Start here if you want Box3D physics in an
+offline game.</p>
+<p>A pyramid of 15 boxes stands on the ground. The HUD counts the boxes knocked down.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Left click or Space</td>
+<td>Launch a ball from the camera toward the mouse</td>
+</tr>
+<tr>
+<td>Hold right mouse button and drag</td>
+<td>Orbit the camera around the middle of the stack</td>
+</tr>
+<tr>
+<td>W / S (or Up / Down)</td>
+<td>Move the camera in and out</td>
+</tr>
+<tr>
+<td>R</td>
+<td>Rebuild the tower</td>
+</tr>
+</tbody></table>
+</div><h2 id="run-it">Run it<a class="heading-anchor" href="#run-it" aria-label="Link to this section">#</a></h2>
+<p>From the repository root:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/box3d_offline/play.sh</code></pre></div><p><code>play.sh</code> builds the Box3D native library into the ignored <code>.box3d-cache</code> (about
+15 seconds the first time), builds the scripts, and opens the game. To use a native
+library you already built, set <code>BOX3D_NATIVE_LIBRARY</code> to its <code>libogb3.dylib</code> or
+<code>libogb3.so</code>. The build copies that library into <code>bin/</code> next to the SDK core, which
+loads it at startup.</p>
+<p>To work on it in the Godot editor, pass <code>-e</code>; other arguments go to Godot as well:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/box3d_offline/play.sh -e</code></pre></div><p>The editor rebuilds the scripts whenever you save an <code>.odin</code> file, and that rebuild
+needs <code>BOX3D_NATIVE_LIBRARY</code>, which <code>play.sh</code> sets for you. If you open the project
+another way, such as from Godot&#39;s Project Manager, it still runs, but saving a
+script fails to link Box3D and keeps the previous build until you run <code>play.sh</code> again.</p>
+<h2 id="put-it-on-itchio">Put it on itch.io<a class="heading-anchor" href="#put-it-on-itchio" aria-label="Link to this section">#</a></h2>
+<p>Build the browser version and the zip itch.io expects:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash examples/box3d_offline/export_web.sh</code></pre></div><p>This writes <code>out/web/</code> and <code>out/box3d-offline-web.zip</code> (about 12 MB, <code>index.html</code> at
+its root). It builds Box3D for WebAssembly, links it into the game&#39;s single wasm
+module, and runs Godot&#39;s Web export with the preset in <code>export_presets.cfg</code>. Try it
+locally before uploading; <code>serve.sh</code> adds the headers the browser build needs:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash build/serve.sh examples/box3d_offline/out/web</code></pre></div><p>Then open <a href="http://localhost:8099/" rel="noreferrer">http://localhost:8099/</a>. On itch.io:</p>
+<ol>
+<li>Create a new project and set <strong>Kind of project</strong> to <strong>HTML</strong>.</li>
+<li>Upload <code>out/box3d-offline-web.zip</code> and tick <strong>This file will be played in the
+browser</strong>.</li>
+<li>Under <strong>Embed options</strong>, set the viewport to 1280 × 720 (or enable the fullscreen
+button), and tick <strong>SharedArrayBuffer support</strong>. The build uses threads, which
+need it; without it the page stays blank.</li>
+<li>Save and view the page.</li>
+</ol>
+<p>For repeated uploads, itch&#39;s <code>butler</code> command-line tool can push the zip:
+<code>butler push examples/box3d_offline/out/box3d-offline-web.zip USER/GAME:html5</code>.</p>
+<h2 id="how-it-works">How it works<a class="heading-anchor" href="#how-it-works" aria-label="Link to this section">#</a></h2>
+<p>Everything is in <a href="scripts/tower.odin.html"><code>scripts/tower.odin</code></a>:</p>
+<ul>
+<li><strong>Building the world.</strong> <code>build_world</code> calls <code>world_create</code>, then <code>body_create</code>
+and <code>shape_box</code> for the static ground and each dynamic box. A reset destroys the
+world, which destroys every body in it, and builds a fresh one.</li>
+<li><strong>Stepping.</strong> <code>box_tower_physics_process</code> calls <code>world_step_fixed</code> once per Godot
+physics frame. That call always advances 1/60 s, so <code>project.godot</code> keeps the
+physics rate at 60 Hz.</li>
+<li><strong>Launching.</strong> <code>launch_ball</code> turns the mouse position into a camera ray and creates
+a dynamic sphere with that starting velocity. <code>is_bullet</code> turns on continuous
+collision so a fast ball cannot pass through a box. Up to eight balls exist at
+once; the ninth recycles the oldest.</li>
+<li><strong>Camera.</strong> <code>box_tower_process</code> runs every rendered frame, separately from the
+physics. While the right button is held it turns mouse movement into yaw and
+pitch around the stack, and the zoom keys scale the distance; <code>place_camera</code>
+then positions the camera and points it at the stack. Launching uses the camera&#39;s
+ray, so it aims correctly from any angle.</li>
+<li><strong>Drawing.</strong> Each body has an ordinary <code>MeshInstance3D</code>. After every step,
+<code>sync_nodes</code> copies each body&#39;s pose onto its node. The nodes never feed back into
+the simulation.</li>
+<li><strong>Cleanup.</strong> <code>box_tower_exit_tree</code> destroys the world when the scene closes.</li>
+</ul>
+<p>Densities are in kg/m³, and Box3D&#39;s default is 1000 (water). The boxes use 250 and
+the ball 4000, so each box weighs about 128 kg and the ball about 450 kg. Set
+densities explicitly: with the default, a small ball barely moves a large box.</p>
+<h2 id="going-further">Going further<a class="heading-anchor" href="#going-further" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Add interpolation if you render faster than 60 Hz: the nodes currently move only
+on physics frames.</li>
+<li>For editor-authored worlds, saved checkpoints, rollback or multiplayer, use the
+<a href="../../docs/design/box3d/samples.html">Kit and Replay samples</a>. The raw API is
+described in <a href="../../box3d/README.html">box3d/README.md</a>.</li>
+</ul>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/design/box3d/samples.html"><span>Authored Box3D samples: Kit and Replay</span><span aria-hidden="true">→</span></a><a href="../../box3d/README.html"><span>Box3D native backend</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/box3d_offline/README.md · source 3ae291fb456c.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#run-it" class="">Run it</a><a href="#put-it-on-itchio" class="">Put it on itch.io</a><a href="#how-it-works" class="">How it works</a><a href="#going-further" class="">Going further</a></nav><div class="outline-actions"><a href="../../../reference/examples/box3d_offline/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

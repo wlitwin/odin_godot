@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>tower.odin · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Examples</a><span>/</span><span>Source</span></div><p class="eyebrow">Examples</p><h1>tower.odin</h1><div class="reader-meta"><span>449 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/box3d_offline/scripts/tower.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node3D</span>
+<span class="hljs-keyword">package</span> scripts
+
+<span class="hljs-comment">// Offline Box3D: this script owns one Box3D world and steps it itself, once per</span>
+<span class="hljs-comment">// Godot physics frame. There is no Kit, no Replay and no network.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// A pyramid of boxes stands on the ground. Click (or press Space) to launch a ball</span>
+<span class="hljs-comment">// from the camera toward the mouse; press R to rebuild the tower. Hold the right mouse</span>
+<span class="hljs-comment">// button and drag to orbit around the stack; W/S (or Up/Down) move the camera in and out.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// The Godot side is ordinary nodes: each body gets a MeshInstance3D whose transform</span>
+<span class="hljs-comment">// is copied from the body&#x27;s pose after every step. The nodes never feed back into</span>
+<span class="hljs-comment">// the simulation.</span>
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:fmt&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:math&quot;</span>
+<span class="hljs-keyword">import</span> b <span class="hljs-string">&quot;godot:box3d&quot;</span>
+<span class="hljs-keyword">import</span> gd <span class="hljs-string">&quot;godot:godot&quot;</span>
+
+ROWS :: <span class="hljs-number">5</span> <span class="hljs-comment">// pyramid rows; the bottom row has ROWS boxes</span>
+BOX_COUNT :: ROWS * (ROWS + <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>
+BALL_SLOTS :: <span class="hljs-number">8</span> <span class="hljs-comment">// launching a ninth ball recycles the oldest one</span>
+BOX_HALF :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.4</span>)
+BOX_GAP :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.02</span>)
+BALL_RADIUS :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.3</span>)
+<span class="hljs-comment">// Densities are kg/m³; Box3D&#x27;s default is 1000 (water). Light crates and a heavy</span>
+<span class="hljs-comment">// ball: each box is ~128 kg and the ball ~450 kg, so a hit carries through the stack.</span>
+BOX_DENSITY :: <span class="hljs-type">f32</span>(<span class="hljs-number">250</span>)
+BALL_DENSITY :: <span class="hljs-type">f32</span>(<span class="hljs-number">4000</span>)
+LAUNCH_SPEED :: <span class="hljs-type">f32</span>(<span class="hljs-number">20</span>) <span class="hljs-comment">// meters per second</span>
+GROUND_HALF :: b.Vec3{<span class="hljs-number">12</span>, <span class="hljs-number">0.5</span>, <span class="hljs-number">12</span>}
+LOST_HEIGHT :: <span class="hljs-type">f32</span>(<span class="hljs-number">-20</span>) <span class="hljs-comment">// balls that fall off the ground are removed here</span>
+
+<span class="hljs-comment">// The camera orbits CAMERA_TARGET, the middle of the stack. Yaw and pitch are in</span>
+<span class="hljs-comment">// radians; pitch stays above the ground and short of straight down.</span>
+CAMERA_TARGET :: gd.Vector3{<span class="hljs-number">0</span>, <span class="hljs-number">1.6</span>, <span class="hljs-number">0</span>}
+ORBIT_PER_PIXEL :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.008</span>)
+PITCH_MIN :: <span class="hljs-type">f32</span>(<span class="hljs-number">0.05</span>)
+PITCH_MAX :: <span class="hljs-type">f32</span>(<span class="hljs-number">1.4</span>)
+DISTANCE_MIN :: <span class="hljs-type">f32</span>(<span class="hljs-number">4</span>)
+DISTANCE_MAX :: <span class="hljs-type">f32</span>(<span class="hljs-number">25</span>)
+ZOOM_RATE :: <span class="hljs-type">f32</span>(<span class="hljs-number">1.5</span>) <span class="hljs-comment">// distance changes by a factor of e^1.5 per second held</span>
+
+LAUNCH_ACTION :: <span class="hljs-string">&quot;box_tower_launch&quot;</span>
+RESET_ACTION :: <span class="hljs-string">&quot;box_tower_reset&quot;</span>
+ZOOM_IN_ACTION :: <span class="hljs-string">&quot;box_tower_zoom_in&quot;</span>
+ZOOM_OUT_ACTION :: <span class="hljs-string">&quot;box_tower_zoom_out&quot;</span>
+
+Box_Tower :: <span class="hljs-keyword">struct</span> {
+	owner:      gd.Node3d,
+	camera:     gd.Camera3d <span class="hljs-string">`gd:&quot;onready=Camera&quot;`</span>,
+	status:     gd.Label <span class="hljs-string">`gd:&quot;onready=HUD/Status&quot;`</span>,
+	world:      b.World,
+	boxes:      [BOX_COUNT]b.Body,
+	box_start:  [BOX_COUNT]<span class="hljs-type">f32</span>, <span class="hljs-comment">// resting height, to count knocked-down boxes</span>
+	balls:      [BALL_SLOTS]b.Body,
+	box_nodes:  [BOX_COUNT]gd.Mesh_Instance3d,
+	ball_nodes: [BALL_SLOTS]gd.Mesh_Instance3d,
+	next_ball:  <span class="hljs-type">int</span>,
+	launched:   <span class="hljs-type">int</span>,
+	fallen:     <span class="hljs-type">int</span>,
+	failed:     <span class="hljs-type">bool</span>,
+	text:       [<span class="hljs-number">256</span>]<span class="hljs-type">u8</span>, <span class="hljs-comment">// HUD text; rewritten only when the numbers change</span>
+	yaw:        <span class="hljs-type">f32</span>,
+	pitch:      <span class="hljs-type">f32</span>,
+	distance:   <span class="hljs-type">f32</span>,
+	last_mouse: gd.Vector2,
+	orbiting:   <span class="hljs-type">bool</span>, <span class="hljs-comment">// right button held since the previous frame</span>
+}
+
+box_tower_ready :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	bind_actions()
+	make_nodes(self)
+	self.pitch = <span class="hljs-number">0.14</span>
+	self.distance = <span class="hljs-number">10</span>
+	place_camera(self)
+
+	<span class="hljs-keyword">if</span> build_world(self) {
+		show_status(self)
+	}
+}
+
+box_tower_physics_process :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower, delta: <span class="hljs-type">f64</span>) {
+	<span class="hljs-keyword">if</span> self.failed {
+		<span class="hljs-keyword">return</span>
+	}
+
+	launched, fallen := self.launched, self.fallen
+
+	<span class="hljs-keyword">if</span> gd.is_action_just_pressed(RESET_ACTION) {
+		destroy_world(self)
+
+		<span class="hljs-keyword">if</span> !build_world(self) {
+			<span class="hljs-keyword">return</span>
+		}
+	}
+
+	<span class="hljs-keyword">if</span> gd.is_action_just_pressed(LAUNCH_ACTION) &amp;&amp; !launch_ball(self) {
+		<span class="hljs-keyword">return</span>
+	}
+
+	<span class="hljs-comment">// world_step_fixed advances exactly 1/60 s (four substeps), matching the</span>
+	<span class="hljs-comment">// 60 Hz physics rate in project.godot, so one step per physics frame is real time.</span>
+	<span class="hljs-keyword">if</span> status := b.world_step_fixed(self.world); status != .Ok {
+		fail(self, <span class="hljs-string">&quot;world_step_fixed&quot;</span>, status)
+		<span class="hljs-keyword">return</span>
+	}
+
+	<span class="hljs-keyword">if</span> !sync_nodes(self) {
+		<span class="hljs-keyword">return</span>
+	}
+
+	<span class="hljs-keyword">if</span> self.launched != launched || self.fallen != fallen {
+		show_status(self)
+	}
+}
+
+<span class="hljs-comment">// Camera controls run every rendered frame, independent of the physics.</span>
+box_tower_process :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower, delta: <span class="hljs-type">f64</span>) {
+	mouse := gd.viewport_get_mouse_position(gd.node_get_viewport(self.owner))
+
+	<span class="hljs-keyword">if</span> gd.input_is_mouse_button_pressed(gd.singleton_input(), .Right) {
+		<span class="hljs-keyword">if</span> self.orbiting {
+			moved := mouse - self.last_mouse
+			self.yaw -= moved.x * ORBIT_PER_PIXEL
+			self.pitch = clamp(self.pitch + moved.y * ORBIT_PER_PIXEL, PITCH_MIN, PITCH_MAX)
+		}
+
+		self.orbiting = <span class="hljs-literal">true</span>
+	} <span class="hljs-keyword">else</span> {
+		self.orbiting = <span class="hljs-literal">false</span>
+	}
+
+	self.last_mouse = mouse
+	zoom := <span class="hljs-type">f32</span>(gd.get_axis(ZOOM_IN_ACTION, ZOOM_OUT_ACTION))
+
+	<span class="hljs-keyword">if</span> zoom != <span class="hljs-number">0</span> {
+		self.distance = clamp(
+			self.distance * math.exp(zoom * ZOOM_RATE * <span class="hljs-type">f32</span>(delta)),
+			DISTANCE_MIN,
+			DISTANCE_MAX,
+		)
+	}
+
+	place_camera(self)
+}
+
+box_tower_exit_tree :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	destroy_world(self)
+}
+
+place_camera :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	flat := math.cos(self.pitch) * self.distance
+	offset := gd.Vector3 {
+		math.sin(self.yaw) * flat,
+		math.sin(self.pitch) * self.distance,
+		math.cos(self.yaw) * flat,
+	}
+	camera := <span class="hljs-keyword">cast</span>(gd.Node3d)self.camera
+	gd.node3d_set_position(camera, CAMERA_TARGET + offset)
+	gd.node3d_look_at(camera, CAMERA_TARGET, {<span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, <span class="hljs-literal">false</span>)
+}
+
+bind_actions :: <span class="hljs-keyword">proc</span>() {
+	<span class="hljs-keyword">if</span> !gd.has_action(LAUNCH_ACTION) {
+		gd.add_action(LAUNCH_ACTION)
+		gd.action_add_mouse_button(LAUNCH_ACTION, <span class="hljs-type">i64</span>(gd.Mouse_Button.Left))
+		gd.action_add_key(LAUNCH_ACTION, <span class="hljs-type">i64</span>(gd.Key.Space))
+	}
+
+	<span class="hljs-keyword">if</span> !gd.has_action(RESET_ACTION) {
+		gd.add_action(RESET_ACTION)
+		gd.action_add_key(RESET_ACTION, <span class="hljs-type">i64</span>(<span class="hljs-string">&#x27;R&#x27;</span>))
+	}
+
+	<span class="hljs-keyword">if</span> !gd.has_action(ZOOM_IN_ACTION) {
+		gd.add_action(ZOOM_IN_ACTION)
+		gd.action_add_key(ZOOM_IN_ACTION, <span class="hljs-type">i64</span>(<span class="hljs-string">&#x27;W&#x27;</span>))
+		gd.action_add_key(ZOOM_IN_ACTION, <span class="hljs-type">i64</span>(gd.Key.Up))
+	}
+
+	<span class="hljs-keyword">if</span> !gd.has_action(ZOOM_OUT_ACTION) {
+		gd.add_action(ZOOM_OUT_ACTION)
+		gd.action_add_key(ZOOM_OUT_ACTION, <span class="hljs-type">i64</span>(<span class="hljs-string">&#x27;S&#x27;</span>))
+		gd.action_add_key(ZOOM_OUT_ACTION, <span class="hljs-type">i64</span>(gd.Key.Down))
+	}
+}
+
+<span class="hljs-comment">// Create the ground, box and ball nodes once. A reset rebuilds only the physics.</span>
+make_nodes :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	ground_mesh := gd.new_box_mesh()
+	gd.ref_counted_init_ref(ground_mesh)
+	gd.box_mesh_set_size(ground_mesh, {<span class="hljs-number">2</span> * GROUND_HALF.x, <span class="hljs-number">2</span> * GROUND_HALF.y, <span class="hljs-number">2</span> * GROUND_HALF.z})
+	ground := mesh_node(self, <span class="hljs-keyword">cast</span>(gd.Mesh)ground_mesh, {<span class="hljs-number">0.18</span>, <span class="hljs-number">0.21</span>, <span class="hljs-number">0.27</span>, <span class="hljs-number">1</span>})
+	gd.release_ref(ground_mesh)
+	gd.node3d_set_position(<span class="hljs-keyword">cast</span>(gd.Node3d)ground, {<span class="hljs-number">0</span>, -GROUND_HALF.y, <span class="hljs-number">0</span>})
+
+	box_mesh := gd.new_box_mesh()
+	gd.ref_counted_init_ref(box_mesh)
+	gd.box_mesh_set_size(box_mesh, {<span class="hljs-number">2</span> * BOX_HALF, <span class="hljs-number">2</span> * BOX_HALF, <span class="hljs-number">2</span> * BOX_HALF})
+	index := <span class="hljs-number">0</span>
+
+	<span class="hljs-keyword">for</span> row <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; ROWS {
+		shade := <span class="hljs-type">f32</span>(row) / <span class="hljs-type">f32</span>(ROWS)
+
+		<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; ROWS - row {
+			color := gd.Color{<span class="hljs-number">0.85</span> - <span class="hljs-number">0.25</span> * shade, <span class="hljs-number">0.45</span> + <span class="hljs-number">0.3</span> * shade, <span class="hljs-number">0.2</span> + <span class="hljs-number">0.1</span> * shade, <span class="hljs-number">1</span>}
+			self.box_nodes[index] = mesh_node(self, <span class="hljs-keyword">cast</span>(gd.Mesh)box_mesh, color)
+			index += <span class="hljs-number">1</span>
+		}
+	}
+
+	gd.release_ref(box_mesh)
+
+	ball_mesh := gd.new_sphere_mesh()
+	gd.ref_counted_init_ref(ball_mesh)
+	gd.sphere_mesh_set_radius(ball_mesh, <span class="hljs-type">f64</span>(BALL_RADIUS))
+	gd.sphere_mesh_set_height(ball_mesh, <span class="hljs-type">f64</span>(<span class="hljs-number">2</span> * BALL_RADIUS))
+
+	<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; BALL_SLOTS {
+		self.ball_nodes[i] = mesh_node(self, <span class="hljs-keyword">cast</span>(gd.Mesh)ball_mesh, {<span class="hljs-number">0.3</span>, <span class="hljs-number">0.75</span>, <span class="hljs-number">0.95</span>, <span class="hljs-number">1</span>})
+		gd.node3d_set_visible(<span class="hljs-keyword">cast</span>(gd.Node3d)self.ball_nodes[i], <span class="hljs-literal">false</span>)
+	}
+
+	gd.release_ref(ball_mesh)
+}
+
+mesh_node :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower, mesh: gd.Mesh, color: gd.Color) -&gt; gd.Mesh_Instance3d {
+	node := gd.new_mesh_instance3d()
+	gd.mesh_instance3d_set_mesh(node, mesh)
+	material := gd.new_standard_material3d()
+	gd.ref_counted_init_ref(material)
+	gd.base_material3d_set_albedo(<span class="hljs-keyword">cast</span>(gd.Base_Material3d)material, color)
+	gd.geometry_instance3d_set_material_override(
+		<span class="hljs-keyword">cast</span>(gd.Geometry_Instance3d)node,
+		<span class="hljs-keyword">cast</span>(gd.Material)material,
+	)
+	gd.release_ref(material)
+	gd.add_child(self.owner, node)
+	<span class="hljs-keyword">return</span> node
+}
+
+<span class="hljs-comment">// A fresh world: static ground plus the box pyramid, all asleep until hit.</span>
+build_world :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) -&gt; <span class="hljs-type">bool</span> {
+	world, status := b.world_create(b.world_def_default())
+
+	<span class="hljs-keyword">if</span> status != .Ok {
+		<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;world_create&quot;</span>, status)
+	}
+
+	self.world = world
+	ground_def := b.body_def_default()
+	ground_def.type = .Static
+	ground_def.pose.position = {<span class="hljs-number">0</span>, -GROUND_HALF.y, <span class="hljs-number">0</span>}
+	ground, ground_status := b.body_create(world, ground_def)
+
+	<span class="hljs-keyword">if</span> ground_status != .Ok {
+		<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_create (ground)&quot;</span>, ground_status)
+	}
+
+	<span class="hljs-keyword">if</span> _, shape_status := b.shape_box(ground, b.shape_def_default(), GROUND_HALF);
+	   shape_status != .Ok {
+		<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;shape_box (ground)&quot;</span>, shape_status)
+	}
+
+	step := <span class="hljs-number">2</span> * BOX_HALF + BOX_GAP
+	index := <span class="hljs-number">0</span>
+
+	<span class="hljs-keyword">for</span> row <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; ROWS {
+		count := ROWS - row
+
+		<span class="hljs-keyword">for</span> column <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; count {
+			def := b.body_def_default()
+			def.type = .Dynamic
+			x := (<span class="hljs-type">f32</span>(column) - <span class="hljs-type">f32</span>(count - <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>) * step
+			y := BOX_HALF + <span class="hljs-type">f32</span>(row) * <span class="hljs-number">2</span> * BOX_HALF
+			def.pose.position = {x, y, <span class="hljs-number">0</span>}
+			body, body_status := b.body_create(world, def)
+
+			<span class="hljs-keyword">if</span> body_status != .Ok {
+				<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_create (box)&quot;</span>, body_status)
+			}
+
+			self.boxes[index] = body
+			box_shape := b.shape_def_default()
+			box_shape.density = BOX_DENSITY
+
+			<span class="hljs-keyword">if</span> _, shape_status := b.shape_box(body, box_shape, {BOX_HALF, BOX_HALF, BOX_HALF});
+			   shape_status != .Ok {
+				<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;shape_box (box)&quot;</span>, shape_status)
+			}
+
+			self.box_start[index] = y
+			index += <span class="hljs-number">1</span>
+		}
+	}
+
+	self.next_ball = <span class="hljs-number">0</span>
+	self.launched = <span class="hljs-number">0</span>
+	self.fallen = <span class="hljs-number">0</span>
+	<span class="hljs-keyword">return</span> sync_nodes(self)
+}
+
+<span class="hljs-comment">// Destroying the world destroys every body and shape in it; clear the handles.</span>
+destroy_world :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	<span class="hljs-keyword">if</span> self.world != <span class="hljs-number">0</span> {
+		<span class="hljs-keyword">if</span> status := b.world_destroy(&amp;self.world); status != .Ok {
+			gd.error(fmt.ctprintf(<span class="hljs-string">&quot;Box3D world_destroy failed: %v&quot;</span>, status))
+		}
+	}
+
+	self.world = <span class="hljs-number">0</span>
+	self.boxes = {}
+	self.balls = {}
+
+	<span class="hljs-keyword">for</span> node <span class="hljs-keyword">in</span> self.ball_nodes {
+		gd.node3d_set_visible(<span class="hljs-keyword">cast</span>(gd.Node3d)node, <span class="hljs-literal">false</span>)
+	}
+}
+
+launch_ball :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) -&gt; <span class="hljs-type">bool</span> {
+	mouse := gd.viewport_get_mouse_position(gd.node_get_viewport(self.owner))
+	origin := gd.camera3d_project_ray_origin(self.camera, mouse)
+	direction := gd.camera3d_project_ray_normal(self.camera, mouse)
+	slot := self.next_ball
+
+	<span class="hljs-keyword">if</span> self.balls[slot] != <span class="hljs-number">0</span> {
+		<span class="hljs-keyword">if</span> status := b.body_destroy(&amp;self.balls[slot]); status != .Ok {
+			<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_destroy (ball)&quot;</span>, status)
+		}
+	}
+
+	def := b.body_def_default()
+	def.type = .Dynamic
+	def.is_bullet = <span class="hljs-number">1</span> <span class="hljs-comment">// continuous collision, so a fast ball cannot tunnel through a box</span>
+	start := origin + direction * <span class="hljs-number">0.5</span>
+	velocity := direction * LAUNCH_SPEED
+	def.pose.position = {start.x, start.y, start.z}
+	def.linear_velocity = {velocity.x, velocity.y, velocity.z}
+	body, status := b.body_create(self.world, def)
+
+	<span class="hljs-keyword">if</span> status != .Ok {
+		<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_create (ball)&quot;</span>, status)
+	}
+
+	shape_def := b.shape_def_default()
+	shape_def.density = BALL_DENSITY
+
+	<span class="hljs-keyword">if</span> _, shape_status := b.shape_sphere(body, shape_def, BALL_RADIUS); shape_status != .Ok {
+		_ = b.body_destroy(&amp;body)
+		<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;shape_sphere (ball)&quot;</span>, shape_status)
+	}
+
+	self.balls[slot] = body
+	self.next_ball = (slot + <span class="hljs-number">1</span>) % BALL_SLOTS
+	self.launched += <span class="hljs-number">1</span>
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+<span class="hljs-comment">// Copy every body&#x27;s pose onto its node, drop lost balls and count fallen boxes.</span>
+sync_nodes :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) -&gt; <span class="hljs-type">bool</span> {
+	fallen := <span class="hljs-number">0</span>
+
+	<span class="hljs-keyword">for</span> body, i <span class="hljs-keyword">in</span> self.boxes {
+		pose, status := b.body_get_pose(body)
+
+		<span class="hljs-keyword">if</span> status != .Ok {
+			<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_get_pose (box)&quot;</span>, status)
+		}
+
+		place(self.box_nodes[i], pose)
+
+		<span class="hljs-keyword">if</span> pose.position.y &lt; self.box_start[i] - BOX_HALF {
+			fallen += <span class="hljs-number">1</span>
+		}
+	}
+
+	<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; BALL_SLOTS {
+		node := <span class="hljs-keyword">cast</span>(gd.Node3d)self.ball_nodes[i]
+
+		<span class="hljs-keyword">if</span> self.balls[i] == <span class="hljs-number">0</span> {
+			gd.node3d_set_visible(node, <span class="hljs-literal">false</span>)
+			<span class="hljs-keyword">continue</span>
+		}
+
+		pose, status := b.body_get_pose(self.balls[i])
+
+		<span class="hljs-keyword">if</span> status != .Ok {
+			<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_get_pose (ball)&quot;</span>, status)
+		}
+
+		<span class="hljs-keyword">if</span> pose.position.y &lt; LOST_HEIGHT {
+			<span class="hljs-keyword">if</span> destroy_status := b.body_destroy(&amp;self.balls[i]); destroy_status != .Ok {
+				<span class="hljs-keyword">return</span> fail(self, <span class="hljs-string">&quot;body_destroy (lost ball)&quot;</span>, destroy_status)
+			}
+
+			gd.node3d_set_visible(node, <span class="hljs-literal">false</span>)
+			<span class="hljs-keyword">continue</span>
+		}
+
+		place(self.ball_nodes[i], pose)
+		gd.node3d_set_visible(node, <span class="hljs-literal">true</span>)
+	}
+
+	self.fallen = fallen
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+}
+
+place :: <span class="hljs-keyword">proc</span>(node: gd.Mesh_Instance3d, pose: b.Pose) {
+	node3d := <span class="hljs-keyword">cast</span>(gd.Node3d)node
+	gd.node3d_set_position(node3d, <span class="hljs-keyword">transmute</span>(gd.Vector3)pose.position)
+	gd.node3d_set_quaternion(node3d, <span class="hljs-keyword">transmute</span>(gd.Quaternion)pose.rotation)
+}
+
+show_status :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower) {
+	text := fmt.bprintf(
+		self.text[:len(self.text) - <span class="hljs-number">1</span>],
+		<span class="hljs-string">&quot;Boxes down: %d / %d    Balls launched: %d\nClick or Space: launch    Right-drag: orbit    W/S: zoom    R: reset&quot;</span>,
+		self.fallen,
+		BOX_COUNT,
+		self.launched,
+	)
+	self.text[len(text)] = <span class="hljs-number">0</span>
+	gd.set_text(<span class="hljs-keyword">cast</span>(gd.Object)self.status, <span class="hljs-type">cstring</span>(raw_data(self.text[:])))
+}
+
+<span class="hljs-comment">// Report once, show the reason on screen and stop stepping.</span>
+fail :: <span class="hljs-keyword">proc</span>(self: ^Box_Tower, what: <span class="hljs-type">string</span>, status: b.Status) -&gt; <span class="hljs-type">bool</span> {
+	hint := <span class="hljs-string">&quot;&quot;</span>
+
+	<span class="hljs-keyword">if</span> status == .Incompatible {
+		hint = <span class="hljs-string">&quot;\nThe Box3D library did not load: build with BOX3D_NATIVE_LIBRARY set (see README.md).&quot;</span>
+	}
+
+	message := fmt.bprintf(
+		self.text[:len(self.text) - <span class="hljs-number">1</span>],
+		<span class="hljs-string">&quot;Box3D %s failed: %v%s&quot;</span>,
+		what,
+		status,
+		hint,
+	)
+	self.text[len(message)] = <span class="hljs-number">0</span>
+	gd.error(<span class="hljs-type">cstring</span>(raw_data(self.text[:])))
+	gd.set_text(<span class="hljs-keyword">cast</span>(gd.Object)self.status, <span class="hljs-type">cstring</span>(raw_data(self.text[:])))
+	self.failed = <span class="hljs-literal">true</span>
+	<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+}
+
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/box3d_offline/scripts/tower.odin · source 3ae291fb456c.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/box3d_offline/scripts/tower.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>
