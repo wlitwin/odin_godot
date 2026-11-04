@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "status": "FROZEN_TEST_ONLY_FOR_ROOT_CONTROLLER_INTEGRATION",
+  "source_hashes": {
+    "tests/box3d_soak/shared/rolling.py": "2f2f1185c15da3116a638a58505105eecab3a8ae8d1d6b4d242108bb8e39f2d7",
+    "tests/box3d_soak/shared/rolling-api-v1.md": "9f46982a2ef0492d2676c1aa25b9712f130e5a73c17a9bd1e644c0470f9e225d",
+    "tests/box3d_soak/audit/test_rolling.py": "5e1059de0509d593804396b22a4b1796616d82921904670d07b11a0c5db32769",
+    "tests/box3d_soak/audit/check_saved_case.py": "153d74315af66d47f8076f807f373925d524dde6623f0fa530ba08c026c86d5e"
+  },
+  "api": {
+    "frame_policy_default": "all_exports_required",
+    "frame_policy_optin": "all_follower_exports_required",
+    "decision_coverage_default": "all_registered",
+    "decision_coverage_optin": "after_admission_baseline",
+    "raw_required_for_reference_optin": "canonical_archive",
+    "same_register_frame": true,
+    "authority_retire_state": "reference_archived",
+    "all_follower_exports_and_final_tails_required": true
+  },
+  "synthetic_control_groups": 26,
+  "saved_strict_original": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/rolling-saved-replay-integration-v1/report.json",
+    "sha256": "e7664ea63bbf8f78374e4d551b4632659dbb4069323854c8d0d62ff472eaeb24",
+    "result": "FAIL_preserved"
+  },
+  "saved_optional_versioned": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/rolling-saved-replay-reference-optin-v2/report.json",
+    "sha256": "2ad1d987799a4013326d803b875a02ad6d3fea29ad073de201135b2f41e23f11",
+    "result": "PASS",
+    "actual_counts": {
+      "authority_export_count": 241,
+      "unmatched_authority_references": 17,
+      "authority_archived_reference_count": 241,
+      "required_follower_exports": 224,
+      "required_follower_matches": 224,
+      "unmatched_required_frames": 0,
+      "final_tail_missing": 0,
+      "decision_outside_admission_count": 2,
+      "decision_missing": 0,
+      "fx_missing": 0,
+      "fx_changed": 0,
+      "fx_extra": 0,
+      "retained_canonical_frames": 241
+    },
+    "actual_phases": {
+      "host": {
+        "Begin": 13
+      },
+      "client": {
+        "Begin": 10,
+        "Update": 1,
+        "Confirm": 9,
+        "Cancel": 1
+      }
+    }
+  },
+  "scope": "purePython storage/audit only, no new runtime/profile/soak/Native/production work",
+  "owner": "Root box3d-gate-b/t12 revision10 verified; support only, no helper claim/finish",
+  "runtime_or_timing_jobs": 0
+}

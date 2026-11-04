@@ -1,0 +1,7 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://main.gd" id="main"]
+[ext_resource type="Script" path="res://modules/kit_probe/probe.odin" id="probe"]
+[node name="KitCompatibility" type="Node"]
+script = ExtResource("main")
+[node name="Probe" type="Node" parent="."]
+script = ExtResource("probe")

@@ -1,0 +1,29 @@
+--- a/src/block_allocator.c
++++ b/src/block_allocator.c
+@@ -4,6 +4,8 @@
+ #include "block_allocator.h"
+ 
+ #include "core.h"
++
++#include <string.h>
+ 
+ b3BlockAllocator b3CreateBlockAllocator( int elementSize, int initialCount )
+ {
+@@ -51,7 +53,8 @@
+ 	if ( allocator->freeList != NULL )
+ 	{
+ 		void* element = allocator->freeList;
+-		allocator->freeList = *(void**)element;
++		// Element strides need not preserve pointer alignment.
++		memcpy( &allocator->freeList, element, sizeof( allocator->freeList ) );
+ 		return element;
+ 	}
+ 
+@@ -85,6 +88,6 @@
+ 	allocator->allocationCount -= 1;
+ 
+ 	// Push onto free list
+-	*(void**)element = allocator->freeList;
++	memcpy( element, &allocator->freeList, sizeof( allocator->freeList ) );
+ 	allocator->freeList = element;
+ }

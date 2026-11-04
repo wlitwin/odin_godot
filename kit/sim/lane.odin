@@ -233,6 +233,7 @@ Tracked :: struct {
 }
 
 Lane :: struct {
+	world:                 ^World_History, // nil keeps the legacy engine-free/value-only path
 	ses:                   ^ksess.Session,
 	tag:                   u8,
 	snap_every:            int,
@@ -399,6 +400,7 @@ Fact_Desc :: struct {
 // Install the package's declared-fact table — generated wiring, alongside
 // lane_set_sim. Hand-built lanes (tests) may pass their own.
 lane_set_facts :: proc(l: ^Lane, table: []Fact_Desc) {
+	if lane_world_refuse(l) {return}
 	l.fact_set = table
 }
 
@@ -603,6 +605,7 @@ lane_add_input_class :: proc(
 	sample: Sample_Proc,
 	allocator := mem.Allocator{},
 ) {
+	if lane_world_refuse(l) {return}
 	assert(id != 0, "class 0 is lane_init's primary input — pass its size to lane_init")
 	assert(size > 0, "an input class needs a non-zero size (inputless entities take no class)")
 	lane_class_add(l, id, size, sample, allocator)
@@ -616,6 +619,7 @@ lane_add_input_class :: proc(
 // is a separate stamp rather than an argument on lane_init/lane_add_input_class
 // — and keeping it separate leaves the teaching signatures of those two clean.
 lane_class_set_type :: proc(l: ^Lane, id: u16, type: typeid) {
+	if lane_world_refuse(l) {return}
 	ic := lane_class(l, id)
 	assert(ic != nil, "lane_class_set_type: no input class with this id — register it first")
 	// Two classes claiming one type is no better a key than the size it replaced
@@ -631,6 +635,7 @@ lane_class_set_type :: proc(l: ^Lane, id: u16, type: typeid) {
 // Install semantic admission for one input class. Generated lane wiring calls
 // this for `@(gd_sample="validate")`; hand-built lanes can use it directly.
 lane_class_set_validate :: proc(l: ^Lane, id: u16, validate: Input_Validate_Proc) {
+	if lane_world_refuse(l) {return}
 	ic := lane_class(l, id)
 	assert(ic != nil, "lane_class_set_validate: no input class with this id — register it first")
 	ic.validate = validate
@@ -644,6 +649,7 @@ lane_class_add :: proc(
 	sample: Sample_Proc,
 	allocator := mem.Allocator{},
 ) {
+	if lane_world_refuse(l) {return}
 	// Zero allocator (the default at every layer) = the LANE'S — these
 	// containers free in lane_destroy under l.allocator, and an ambient
 	// default here silently mismatched them for custom-allocator lanes.
@@ -723,7 +729,7 @@ peer_snap_ack_valid :: proc(l: ^Lane, p: ^Lane_Peer, ack: u64) -> bool {
 	return p.snap_last - ack <= max_age
 }
 
-@(private = "file")
+@(private)
 lane_class :: proc(l: ^Lane, id: u16) -> ^Input_Class {
 	for &ic in l.inputs {
 		if ic.id == id {
@@ -774,9 +780,12 @@ class_for_type :: proc(l: ^Lane, type: typeid, size: int) -> u16 {
 }
 
 lane_destroy :: proc(l: ^Lane) {
-	if l.allocator.procedure != nil {
-		context.allocator = l.allocator // free under what allocated (a zero lane keeps ambient)
-	}
+	if lane_world_busy(l) {lane_world_refuse(l); return}
+	if l.world != nil {_ = lane_world_detach(l)}
+	// Context overrides are lexical: keep this selection in the whole cleanup
+	// scope. A temporary if-block would restore the caller's allocator before
+	// the history/container frees below. A zero Lane keeps the ambient allocator.
+	context.allocator = l.allocator.procedure != nil ? l.allocator : context.allocator
 	if l.ses != nil {
 		ksess.session_app_route(l.ses, l.tag, nil, nil)
 	}
@@ -852,6 +861,7 @@ lane_set_sim :: proc(
 	step: Step_Proc = nil,
 	step_auth: Step_Proc = nil,
 ) {
+	if lane_world_refuse(l) {return}
 	l.user = user
 	l.step = step
 	l.step_auth = step_auth
@@ -884,6 +894,7 @@ lane_track :: proc(
 	owner: knet.Player_Id,
 	allocator := mem.Allocator{},
 ) {
+	if lane_world_refuse(l) {return}
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(
 		!l.rewound,
@@ -948,6 +959,7 @@ lane_track_set :: proc(
 	owner: knet.Player_Id,
 	allocator := mem.Allocator{},
 ) {
+	if lane_world_refuse(l) {return}
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(set.tick != nil, "lane_track_set: a Sim_Set carries the tick entry point")
 	if set.input_size > 0 {
@@ -958,8 +970,14 @@ lane_track_set :: proc(
 		)
 	}
 	for &cmd in set.commands {
-		assert(cmd.action.model == .Scheduled, "lane_track_set: sim actions declare model=.Scheduled")
-		assert(knet.action_desc_valid(cmd.action, .Scheduled), "lane_track_set: invalid scheduled action descriptor")
+		assert(
+			cmd.action.model == .Scheduled,
+			"lane_track_set: sim actions declare model=.Scheduled",
+		)
+		assert(
+			knet.action_desc_valid(cmd.action, .Scheduled),
+			"lane_track_set: invalid scheduled action descriptor",
+		)
 		assert(cmd.exec != nil, "lane_track_set: each action needs one typed exec thunk")
 	}
 	lane_track(l, id, entity, set.entity_desc, owner, allocator)
@@ -992,6 +1010,7 @@ lane_track_set :: proc(
 // net.md's "did MY simulation cause this?" boolean — the one fact the lane
 // cannot derive — asked continuously.
 lane_claim :: proc(l: ^Lane, id: knet.Net_Id) {
+	if lane_world_refuse(l) {return}
 	for &tr in l.tracked {
 		if tr.id == id {
 			tr.claim = 1
@@ -1045,6 +1064,7 @@ lane_claimed :: proc(l: ^Lane, id: knet.Net_Id) -> f32 {
 // AUTHORITY pass instead of the everywhere pass — l.in_auth includes them by the
 // rule above. That is the knob, not a flag on this call.
 lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
+	if lane_world_refuse(l) {return}
 	assert(
 		l.ses.is_host,
 		"facts broadcast from the authority — the generated thunk holds this gate",
@@ -1113,6 +1133,7 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 }
 
 lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
+	if lane_world_refuse(l) {return false}
 	assert(
 		!l.rewound,
 		"lane_untrack inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first",
@@ -1221,6 +1242,8 @@ lane_set_owner :: proc(
 // moves); hand-driven sessions call it from their own handler — skipping it
 // leaks a few KB per departed seat and keeps popping their buffers per tick.
 lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
+	if lane_world_refuse(l) {return}
+	if lane_world_refuse(l) {return}
 	context.allocator = l.allocator
 	cmd_forget_player(l, player)
 	if p, ok := l.peers[player]; ok {
@@ -1242,6 +1265,7 @@ lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
 // a held gap on the host (the returned bytes then repeat their last real
 // input). `class` defaults to 0, the single-input lane's only class.
 lane_input :: proc(l: ^Lane, player: knet.Player_Id, class: u16 = 0) -> (input: []u8, ok: bool) {
+	if l.world != nil && l.world.network != nil {return world_net_input(l, player, class)}
 	if player == l.ses.me {
 		if ic := lane_class(l, class); ic != nil && ic.size > 0 {
 			return input_read(&ic.ring, l.step_tick)
@@ -1316,6 +1340,7 @@ lane_me :: proc(l: ^Lane) -> knet.Player_Id {
 // under a spike. Zero on the host (it IS the server) and before the first
 // batch anchors the client. A netgraph datum — see kit/ui/netgraph.
 lane_lead :: proc(l: ^Lane) -> int {
+	if l.world != nil {return l.ses.is_host ? 0 : int(l.world.head - l.world.confirmed)}
 	if l.ses.is_host || l.input_ack == 0 {
 		return 0
 	}
@@ -1326,21 +1351,21 @@ lane_lead :: proc(l: ^Lane) -> int {
 // It deliberately aggregates private per-seat rings here so applications do
 // not need to understand Lane_Peer or duplicate host/client interpretations.
 Lane_Net_Stats :: struct {
-	lead:              int,
-	input_gaps:        u64,
-	ack_age:           int,
-	rewind_depth:      int,
-	resim_ticks:       int,
-	resim_seconds:     f64,
-	command_queue:     int,
-	command_rejected:  int,
-	snapshot_rows:     int,
-	snapshot_full:     int,
-	snapshot_delta:    int,
+	lead:                int,
+	input_gaps:          u64,
+	ack_age:             int,
+	rewind_depth:        int,
+	resim_ticks:         int,
+	resim_seconds:       f64,
+	command_queue:       int,
+	command_rejected:    int,
+	snapshot_rows:       int,
+	snapshot_full:       int,
+	snapshot_delta:      int,
 	snapshot_suppressed: int,
-	snapshot_deferred: int,
-	aoi_culled:        int,
-	snapshot_bytes:    int,
+	snapshot_deferred:   int,
+	aoi_culled:          int,
+	snapshot_bytes:      int,
 }
 
 lane_net_stats :: proc(l: ^Lane) -> Lane_Net_Stats {
@@ -1381,7 +1406,7 @@ lane_net_stats :: proc(l: ^Lane) -> Lane_Net_Stats {
 // generated thunk holds this gate); inline presentation in a tick body or a
 // world pass (@(gd_step)) reads it here — never the raw field.
 lane_live :: proc(l: ^Lane) -> bool {
-	return !l.resimming
+	return l.world != nil && l.world.presenting ? true : !l.resimming && !lane_world_busy(l)
 }
 
 // ---------------------------------------------------------------------------
@@ -1392,6 +1417,7 @@ lane_live :: proc(l: ^Lane) -> bool {
 // the server's timeline.
 lane_frame :: proc(l: ^Lane, dt: f64) -> int {
 	context.allocator = l.allocator // lane work rides the lane's allocator (see the field)
+	if l.world != nil {return world_frame(l, dt)}
 	if l.ses.is_host {
 		return host_frame(l, dt)
 	}
@@ -1403,7 +1429,7 @@ lane_frame :: proc(l: ^Lane, dt: f64) -> int {
 // behave differently between a prediction and its replay. Entity thunks
 // first (track order — deterministic per peer because spawns ride the
 // reliable ordered channel), then the game's world pass.
-@(private = "file")
+@(private)
 run_tick :: proc(l: ^Lane, t: u64) {
 	l.step_tick = t
 	// Index-based, re-fetching each iteration: a tick's _fx/_then may SPAWN a
@@ -1445,6 +1471,15 @@ run_tick :: proc(l: ^Lane, t: u64) {
 	if l.step != nil {
 		l.step(l.user, t)
 	}
+	if l.world != nil {
+		w := l.world
+		if w.status != .Ok {return}
+		w.status = world_admit(l, w.candidate, 0, 0, 0, 0, true)
+		if w.status != .Ok {return}
+		w.status = w.provider.step(w.provider.user, w.candidate, t)
+		if w.status != .Ok {return}
+		if w.config.settle != nil {w.config.settle(l.user, t)}
+	}
 	if l.step_auth != nil && l.ses.is_host {
 		l.in_auth = true
 		l.step_auth(l.user, t)
@@ -1457,7 +1492,7 @@ run_tick :: proc(l: ^Lane, t: u64) {
 // both the host (for its own avatar) and the client. A class the seat doesn't
 // actually drive still samples harmlessly (neutral bytes drive nothing), which
 // keeps the wire shape identical on every peer.
-@(private = "file")
+@(private)
 sample_inputs :: proc(l: ^Lane, t: u64) {
 	for &ic in l.inputs {
 		if ic.sample != nil && ic.size > 0 {
@@ -1734,6 +1769,8 @@ render_off8 :: proc(l: ^Lane) -> u8 {
 // predicted set, land watched truth, and bend the clock off the ack echo.
 @(private = "file")
 client_ingest :: proc(l: ^Lane) {
+	if l.world !=
+	   nil {if len(l.pending) != 0 {l.world.status = .Missing_Attachment; l.world.resync = true}; return}
 	if len(l.pending) == 0 {
 		return
 	}
@@ -2072,6 +2109,7 @@ lane_rewound :: proc(
 	user: rawptr,
 	query: Rewound_Query,
 ) -> u64 {
+	if lane_world_refuse(l) {return 0}
 	judged := lane_rewound_begin(l, shooter)
 	query(user)
 	lane_rewound_end(l)
@@ -2091,6 +2129,7 @@ lane_rewound :: proc(
 // the temp allocator), never nest, and nothing may track/untrack lane
 // entities in between (the restore holds pointers into the track list).
 lane_rewound_begin :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
+	if lane_world_refuse(l) {return 0}
 	assert(
 		!l.rewound,
 		"lane_rewound_begin: the world is already rewound — pair every begin with lane_rewound_end",
@@ -2129,6 +2168,7 @@ lane_rewound_begin :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
 }
 
 lane_rewound_end :: proc(l: ^Lane) {
+	if lane_world_refuse(l) {return}
 	assert(l.rewound, "lane_rewound_end without a begin")
 	l.rewound = false
 	for w in l.wound {
@@ -2152,6 +2192,7 @@ lane_rewound_end :: proc(l: ^Lane) {
 // freshness is the whole point of prediction.
 
 lane_present :: proc(l: ^Lane, dt: f64) {
+	if lane_world_busy(l) {lane_world_refuse(l); return}
 	context.allocator = l.allocator // same rule as lane_frame
 	l.presented = true // the presenter owns watched fields from here (see watched_fallback)
 	if l.ses.is_host || !l.anchored || l.rx.applied_count == 0 {
@@ -2328,6 +2369,7 @@ lane_handle :: proc(
 	r: ^knet.Reader,
 ) {
 	l := cast(^Lane)user
+	if l.world != nil {world_network_receive(l, from, from_peer, r); return}
 	context.allocator = l.allocator // handler-side allocs must free under the same allocator later
 	kind := knet.read_u8(r)
 	if r.err {

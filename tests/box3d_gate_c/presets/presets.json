@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "scope": "Source preset contract; not export or runtime evidence",
+  "presets": {
+    "macos-arm64": {
+      "name": "macOS arm64",
+      "platform": "macOS",
+      "architecture": "universal",
+      "minimum_macos": "11.0",
+      "signing": "Godot built-in ad-hoc",
+      "notarization": false,
+      "launcher_architecture": "universal",
+      "required_launcher_slice": "arm64",
+      "required_sdk_architecture": "arm64",
+      "required_runtime_architecture": "arm64",
+      "scope_qualification": "Preset display name denotes ARM64 SDK consumers and actual ARM64 execution; universal Godot launcher does not certify universal SDK or Intel execution."
+    },
+    "linux-x86_64": {
+      "name": "Linux x86_64",
+      "platform": "Linux",
+      "architecture": "x86_64",
+      "execution_scope": "Root/q must record actual translated or native execution"
+    }
+  },
+  "frameworks": {
+    "kit": {
+      "project": "examples/kit_box3d_authoring",
+      "bundle_identifier": "org.odingodot.box3d.kitauthoring",
+      "macos_output": "exports/KitBox3DAuthoring.app",
+      "linux_output": "exports/kit-box3d-authoring.x86_64"
+    },
+    "replay": {
+      "project": "examples/replay_box3d_authoring",
+      "bundle_identifier": "org.odingodot.box3d.replayauthoring",
+      "macos_output": "exports/ReplayBox3DAuthoring.app",
+      "linux_output": "exports/replay-box3d-authoring.x86_64"
+    }
+  }
+}

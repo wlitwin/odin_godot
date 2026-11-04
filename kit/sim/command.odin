@@ -261,6 +261,7 @@ lane_command :: proc(
 	cmd: Cmd_Id,
 	args: []u8,
 ) -> Lane_Command_Result {
+	if lane_world_refuse(l) {return {reason=.Malformed}}
 	context.allocator = l.allocator // the owned arg copies free under lane roots later
 	tr := cmd_tracked(l, id)
 	if tr == nil || tr.cmds == nil {

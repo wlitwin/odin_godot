@@ -328,6 +328,74 @@ EOF
     fi
 }
 
+# Optional shared Box3D SDK profile. Native input comes from the verified C
+# driver, while every consumer resolves the ONE copy beside the SDK core. The
+# strict script define is always present: an accidental archive import in an
+# ordinary SDK build must require a host handshake rather than create another
+# engine domain. Packages without Box3D never register a physics profile.
+_ODIN_GD_BOX3D_FLAGS=()
+_ODIN_GD_BOX3D_RUNTIME=""
+_ODIN_GD_BOX3D_TARGET=""
+odin_gd_box3d_prepare() {
+    local pkg="$1" out="$2" target="$3" state value
+    _ODIN_GD_BOX3D_FLAGS=()
+    _ODIN_GD_BOX3D_RUNTIME=""
+    _ODIN_GD_BOX3D_TARGET="$target"
+    if [[ "$pkg" != "$ROOT/core" ]]; then
+        _ODIN_GD_BOX3D_FLAGS+=(-define:BOX3D_REQUIRE_DOMAIN=true)
+    fi
+    [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]] || return 0
+    state="$(mktemp)"
+    odin_gd_cleanup_on_exit "$state"
+    local runtime_dir="${BOX3D_RUNTIME_DIR:-$(dirname "$out")}" replace=()
+    [[ "${BOX3D_REPLACE_RUNTIME:-0}" != "1" ]] || replace=(--replace)
+    python3 "$ROOT/build/box3d_profile.py" \
+        --native "$BOX3D_NATIVE_LIBRARY" --runtime-dir "$runtime_dir" \
+        --repo "$ROOT" --target "$target" --state "$state" \
+        ${replace[@]+"${replace[@]}"} || return $?
+    local fields=()
+    while IFS= read -r value; do fields+=("$value"); done < <(
+        python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["deployed_library"]); print(d["domain"]["build"]); print(d["domain"]["target"])' "$state"
+    )
+    [[ "${#fields[@]}" == "3" ]] || { echo "Box3D SDK profile: invalid deployment result" >&2; return 1; }
+    _ODIN_GD_BOX3D_RUNTIME="$(dirname "${fields[0]}")"
+    # An unprefixed digest beginning with e.g. 9e41 is inferred as a numeric
+    # -define value by Odin. The explicit scheme forces a string on every target.
+    _ODIN_GD_BOX3D_FLAGS+=("-define:BOX3D_EXPECTED_BUILD=sha256:${fields[1]}" "-define:BOX3D_EXPECTED_TARGET=sha256:${fields[2]}")
+    if [[ "$pkg" == "$ROOT/core" ]]; then
+        _ODIN_GD_BOX3D_FLAGS+=(-define:BOX3D_HOST_ENABLED=true)
+    elif [[ "$target" == "linux" ]]; then
+        # Odin's Linux driver turns a system:absolute import into -l:/absolute,
+        # which GNU ld and lld cannot resolve. Name the already-verified staged
+        # library exactly and supply that same directory below.
+        _ODIN_GD_BOX3D_FLAGS+=("-define:BOX3D_LIBRARY=system:libogb3.so")
+    else
+        _ODIN_GD_BOX3D_FLAGS+=("-define:BOX3D_LIBRARY=${fields[0]}")
+    fi
+}
+
+# Return one correctly quoted linker option string; Odin parses this string
+# into arguments. Quoting protects project paths with spaces, and $ORIGIN stays
+# literal rather than being expanded by the shell.
+odin_gd_dll_link_options() {
+    python3 - "$1" "$2" "$_ODIN_GD_BOX3D_RUNTIME" <<'PY'
+import os, shlex, sys
+out, extension, runtime = sys.argv[1:]
+options = []
+if extension == 'dylib':
+    options.append('-Wl,-install_name,' + out)
+if runtime and extension in ('dylib', 'so'):
+    if extension == 'so':
+        options.append('-L' + runtime)
+    origin = '@loader_path' if extension == 'dylib' else '$ORIGIN'
+    options.append('-Wl,-rpath,' + origin)
+    relative = os.path.relpath(os.path.realpath(runtime), os.path.realpath(os.path.dirname(out)))
+    if relative != '.':
+        options.append('-Wl,-rpath,' + origin + '/' + relative)
+print(' '.join(shlex.quote(option) for option in options))
+PY
+}
+
 # ----------------------------------------------------------------------------
 # atomic_odin_dll <pkg_dir> <out_lib> [extra odin flags...]
 #
@@ -367,10 +435,16 @@ atomic_odin_dll() {
     tmp="$stage/$leaf"
     odin_gd_cleanup_on_exit "$stage"
 
-    local link_flags=()
-    if [[ "$ext" == "dylib" ]]; then
-        link_flags=(-extra-linker-flags:"-Wl,-install_name,$out")
-    fi
+    local target link_flags=() linker_options
+    case "$ext" in
+        dylib) target=macos ;;
+        so) target=linux ;;
+        dll) target=windows ;;
+        *) echo "unsupported SDK library extension: $ext" >&2; return 1 ;;
+    esac
+    odin_gd_box3d_prepare "$pkg" "$out" "$target" || return $?
+    linker_options="$(odin_gd_dll_link_options "$out" "$ext")" || return $?
+    [[ -z "$linker_options" ]] || link_flags=("-extra-linker-flags:$linker_options")
 
     # -use-single-module: REQUIRED for usable debug info on macOS. Odin's default for
     # -o:none/-o:minimal is separate modules (one .o per package), and ld then emits a
@@ -389,10 +463,14 @@ atomic_odin_dll() {
         -use-single-module \
         -out:"$tmp" \
         ${link_flags[@]+"${link_flags[@]}"} \
-        "$@" || build_rc=$?
+        "$@" \
+        ${_ODIN_GD_BOX3D_FLAGS[@]+"${_ODIN_GD_BOX3D_FLAGS[@]}"} || build_rc=$?
     if [[ "$build_rc" != "0" ]]; then
         rm -rf "$stage"
         return "$build_rc"         # caller runs under set -e — abort exactly as before
+    fi
+    if [[ -n "$_ODIN_GD_BOX3D_RUNTIME" && "$pkg" != "$ROOT/core" ]]; then
+        python3 "$ROOT/build/box3d_profile.py" --inspect-consumer "$tmp" --target "$target" || { rm -rf "$stage"; return 1; }
     fi
     # Reached only if the build succeeded (callers run under set -e). Publish the primary
     # library first, then replace/remove its .dSYM so stale symbols never survive a

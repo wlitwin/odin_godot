@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "result": "SHORT_ROOM_CODE_AND_BROWSER_PASTE_REVIEW",
+  "release_admitted": false,
+  "goal_complete": false,
+  "artifact": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/export-v2/report.json",
+    "sha256": "7e01d39813a5a8293f337321655ad4e322be347c43d6264e5c0eb2472c1f4032"
+  },
+  "deployed_service": {
+    "url": "wss://mc.laserturtle.net:62127/replay-room/dockyard",
+    "report": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/online/public-deployment-report.json",
+      "sha256": "58dc419e5b29939da77a6924c4fec041bcf200e1310e9c4b0e74a594e6c1d2a1"
+    }
+  },
+  "cohort": "58a43f78f7481773",
+  "scope": "Five-character casual Player room-code format v1 and browser-native text entry. Existing service wire, full creator/member credentials, budgets, and long-ticket acceptance retained. Public origin clipboard restrictions tested; public endpoint game tested from reference network only.",
+  "validation": {
+    "provision_native_and_wasm": {
+      "tests": 15,
+      "terminal": "t1px",
+      "result": "PASS"
+    },
+    "short_party_collision_permissions_and_rejoin": {
+      "tests": 3,
+      "terminal": "t1qf",
+      "result": "PASS"
+    },
+    "default_enrollment_native_and_wasm": {
+      "tests": 12,
+      "terminal": "t1q4",
+      "result": "PASS"
+    },
+    "packaging_and_out_exclusion": {
+      "tests": 17,
+      "terminal": "t1pw",
+      "result": "PASS"
+    },
+    "restricted_iframe_clipboard": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/browser-text-v7/report.json",
+      "sha256": "0ecbe6e8f0520ee8f8772eadaf0ac7d762182c4d730833b9c70cd513cbb13f3f",
+      "result": "PASS"
+    },
+    "public_pair": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/public-pair-v2/report.json",
+      "sha256": "6f3ed66dca257d74304bceb722caa9f2f46f3db8de6c939ddf3eb2de187cce43",
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "typed_sdk_cleanup_zero": true
+    },
+    "public_observer": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/public-observer-v1/report.json",
+      "sha256": "d9a052211aa7208b20ffd313ad95bea21dfe5ec0897c53d4a6dbe72a1d30be28",
+      "result": "FAIL",
+      "enrollment_and_receive_only_role_observed": true,
+      "all_three_full_engine_exits": true,
+      "terminal_audit_error": [
+        "accepted.input_history Missing_Input tick=1791 epoch=1 baseline=1023 generation=2 serial=1 cursor=1790 newest=1801"
+      ]
+    },
+    "native_menu": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/native-menu-v2/report.json",
+      "sha256": "d0e252a705898aa966a742621b9002630b8012d81de9bb9956010ed0c7dcf0b5",
+      "result": "PASS",
+      "observed_invite_characters": 5
+    }
+  },
+  "historical_qualification": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/online/current-handoff-status.json",
+    "sha256": "d0db5e125a7b7eefad07086e3b2b549ec919458531b10fa41bbef2f6685af4f6"
+  },
+  "open_gates": [
+    {
+      "id": "Q1",
+      "requirement": "Original repair8 maximum25ms",
+      "status": "REJECTED",
+      "observed_max_ms": 45.92,
+      "observed_p95_ms": 8.599,
+      "observed_p99_ms": 9.64,
+      "count": 3968,
+      "outliers_over_25ms": 1,
+      "cause": "UNESTABLISHED",
+      "decision": "User question pending. Original limit remains unchanged."
+    },
+    {
+      "id": "N1",
+      "requirement": "Independent outside-network acceptance",
+      "status": "NOT_OBSERVED",
+      "available": "Actual public WSS route deployed, valid standardTLS, sameWAN fullgame/forcedrelay/observer/reconnect/credentialrefusal/cleanup passes. STUN-only direct notestablished onreferenceNetwork; failure retained."
+    },
+    {
+      "id": "P1",
+      "requirement": "Two-human cooperative play feedback",
+      "status": "NOT_OBSERVED",
+      "available": "Actual rendered/audio/settings/readability and scripted cooperative rounds; automation is not human feedback."
+    },
+    {
+      "id": "observer-scripted-terminal-audit",
+      "status": "FAILED",
+      "detail": "Late observer enrolled with short room code and received the world, but terminal input-history audit could not materialize tick1791 after snapshot catchups through1801. No waiver or speculative protocol change."
+    }
+  ],
+  "public_upload_performed": false,
+  "ordinary_export_unchanged": true,
+  "known_failed_fixtures": [
+    "Initial clipboard driver sent keyboard/mouse actions to the parent frame; child-context native keys fixed the fixture. One dialog close/reopen race was fixed before the current export.",
+    "Initial public pair caught an async Writing_Request being mistaken for a creator collision; guard fixed to compare committed Pending/Ready records only.",
+    "Old native service fixture lacked its GDExtension configuration. Fresh current SDK service and actual Native menu/Room pair passed with a five-character invite."
+  ],
+  "delivery": {
+    "zip": {
+      "path": "/Users/walter/data/code/odin/odin_godot/examples/replay_dockyard/out/itch-af932a8ee899be1f/Dockyard-Duo-html5.zip",
+      "sha256": "aec377d07da1251b13b707b9823c2a2c514b5c1a559335f3b863b2d78f8dacfb"
+    },
+    "bytes": 13006403,
+    "candidate": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/candidate-v1",
+    "candidate_manifest": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/candidate-v1/manifest.json",
+      "sha256": "bafbe9cae9c2837f93ce5876d4506d363fd8732d10bfd6f70dce5aff52091709"
+    },
+    "zip_boot": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/invite-usability-v1/itch-boot-v1/browser/report.json",
+      "sha256": "fdffc860e16440d37d19197373a1196c144dec449c1e4363189fdd0c831cea24",
+      "result": "PASS",
+      "full_engine_exit": true
+    },
+    "uploaded": false,
+    "new_rooms_use_five_characters": true,
+    "old_long_ticket_rooms_remain_usable": true
+  }
+}

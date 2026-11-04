@@ -1,0 +1,12 @@
+--- a/src/broad_phase.c
++++ b/src/broad_phase.c
+@@ -403,6 +403,9 @@
+ 
+ 	if ( moveCount == 0 )
+ 	{
++		// Destroying the last buffered proxy can leave enlarged ancestors in the trees.
++		// Tree maintenance is still required even when there are no pairs to query.
++		b3UpdateTreesTask( world );
+ 		return;
+ 	}
+ 

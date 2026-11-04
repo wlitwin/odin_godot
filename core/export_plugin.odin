@@ -694,6 +694,25 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     // dll is missing is an export ERROR naming the module — an exported game must never
     // silently ship without its module classes.
     bundle_export_modules(self, proj, ext)
+
+    // The optional build profile writes its verified shared backend beside all
+    // consumer modules. Bundle that ONE image beside the exported core too.
+    // No profile record means the ordinary native-free export path.
+    native_record := fmt.tprintf("%s/.export_build/box3d-runtime.json", proj)
+    if os.is_file(native_record) {
+        native_leaf := fmt.tprintf("libogb3%s", ext)
+        if target == "windows" {native_leaf = "ogb3.dll"}
+        native_path := fmt.tprintf("%s/.export_build/%s", proj, native_leaf)
+        if !os.is_file(native_path) {
+            export_error(fmt.tprintf("odin export: verified Box3D profile is missing %s", native_path))
+            return
+        }
+        native_string := godot.new_string_odin(native_path)
+        godot.editor_export_plugin_add_shared_object(
+            cast(godot.Editor_Export_Plugin)self.object, native_string, tags, tgt,
+        )
+        export_log(fmt.tprintf("odin export: bundled shared Box3D backend %s", native_path))
+    }
 }
 
 // Enumerate <proj>/modules/* and add_shared_object each module's freshly built export

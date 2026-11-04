@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "task": "t_69f6b98e09fe4b32",
+  "revision": 5,
+  "result": "P6_6_EVALUATION_COMPLETE_NEW_TARGETS_DEFERRED",
+  "evaluation_complete": true,
+  "new_targets_qualified": [],
+  "whole_goal_complete": false,
+  "scope": "Feasibility/admission evaluation after stable scoped desktop evidence, not implementation or shipment of browser/Android/iOS ports. Each new target remains explicitly unqualified with solver/snapshot costs unavailable.",
+  "targets": {
+    "browser-wasm32": {
+      "decision": "DEFER_PRODUCTION_ADMISSION",
+      "feasibility": "Positive current C header LLVM, Kit/Replay physics Odin typechecks and native-free protocol WASM execution. No engine impossibility claim.",
+      "actual_public_abi": {
+        "values": {
+          "pointer_bits": 32,
+          "float_bytes": 4,
+          "float_radix": 2,
+          "float_mantissa_bits": 24,
+          "world_handle_bytes": 4,
+          "body_handle_bytes": 8,
+          "shape_handle_bytes": 8,
+          "joint_handle_bytes": 8,
+          "vec3_bytes": 12,
+          "pose_bytes": 28,
+          "asset_v2_bytes": 64,
+          "asset_v2_align": 4,
+          "asset_vertices_offset": 48,
+          "asset_indices_offset": 52,
+          "asset_vertex_count_offset": 56,
+          "asset_triangle_count_offset": 60,
+          "motion_joint_def_bytes": 360
+        },
+        "target_triple": "wasm32-unknown-emscripten",
+        "llvm_sha256": "8ba5f1c533be3792940016ac8ca9fe4078bfdcd45c79cfdfc57df260390a8788",
+        "scope": "C header-only compiler constants; not a linked Native ABI roundtrip or runtime/snapshot result"
+      },
+      "kit": {
+        "typecheck_exit": 0,
+        "runtime": "UNAVAILABLE",
+        "gap": "Web AOT link currently has no selected Box3D wasm Native archive/profile/domain artifact; Kit transport capability alone is not the physics integration."
+      },
+      "replay": {
+        "typecheck_exit": 0,
+        "runtime": "UNAVAILABLE",
+        "gap": "Same missing backend/domain deployment; existing RTC/WebSocket transports do not establish complete-physics Timeline/snapshot/recovery."
+      },
+      "snapshot_and_determinism": {
+        "status": "UNAVAILABLE",
+        "bytes": null,
+        "capture_ns": null,
+        "restore_ns": null,
+        "whole_entry_ns": null,
+        "determinism_result": null,
+        "reason": "No admitted complete Box3D backend/deployment artifact and per-target solver/adapter runtime was built/executed; header/type/vector probes cannot provide these measurements."
+      },
+      "next_proof": "Separate bounded wasm backend/domain integration with actual C/Odin layout roundtrip, complete5/canonical/source-free ownership and independent-instance deterministic/cost corpus, then each existing adapter exported recovery suite."
+    },
+    "android-arm64": {
+      "decision": "DEFER_PRODUCTION_ADMISSION",
+      "feasibility": "Freestanding C header target emits arm64 ABI constants; Android Odin authoring preflight stopped because ODIN_ANDROID_NDK is not set. This is not a full NDK build or platform impossibility result.",
+      "actual_public_abi": {
+        "values": {
+          "pointer_bits": 64,
+          "float_bytes": 4,
+          "float_radix": 2,
+          "float_mantissa_bits": 24,
+          "world_handle_bytes": 4,
+          "body_handle_bytes": 8,
+          "shape_handle_bytes": 8,
+          "joint_handle_bytes": 8,
+          "vec3_bytes": 12,
+          "pose_bytes": 28,
+          "asset_v2_bytes": 72,
+          "asset_v2_align": 8,
+          "asset_vertices_offset": 48,
+          "asset_indices_offset": 56,
+          "asset_vertex_count_offset": 64,
+          "asset_triangle_count_offset": 68,
+          "motion_joint_def_bytes": 360
+        },
+        "target_triple": "aarch64-unknown-linux-android",
+        "llvm_sha256": "2d6303e05b5e8077af1653a0ec4057742911e0fa9fe60737b55f4d7319f50d7c",
+        "scope": "C header-only compiler constants; not a linked Native ABI roundtrip or runtime/snapshot result"
+      },
+      "odin_authoring": {
+        "actual_exit": 1,
+        "error": "ODIN_ANDROID_NDK not set",
+        "log": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-mobile-probes-v1/android-authoring-typecheck.log",
+          "sha256": "eb5fa367bcf64abc65a177941982840a1d529af1f0d46fe54d08c1d8993747e7"
+        }
+      },
+      "kit": {
+        "runtime": "UNAVAILABLE",
+        "gap": "No selected NDK-backed Native target identity/shared-domain deployment, authored SDK export or device full5/recovery proof."
+      },
+      "replay": {
+        "runtime": "UNAVAILABLE",
+        "gap": "Same Native/mobile export gap; existing generic framework/transport support is separate from complete-physics runtime qualification."
+      },
+      "snapshot_and_determinism": {
+        "status": "UNAVAILABLE",
+        "bytes": null,
+        "capture_ns": null,
+        "restore_ns": null,
+        "whole_entry_ns": null,
+        "determinism_result": null,
+        "reason": "No admitted complete Box3D backend/deployment artifact and per-target solver/adapter runtime was built/executed; header/type/vector probes cannot provide these measurements."
+      },
+      "next_proof": "Explicit NDK/toolchain and own build/target/FP/SIMD identity, mobile Native/Core/consumer packaging and one-domain code/data ownership; real device both-adapter complete5/canonical/soak/recovery/bounds and snapshot-cost results."
+    },
+    "ios-arm64": {
+      "decision": "DEFER_PRODUCTION_ADMISSION",
+      "feasibility": "Actual Apple iPhoneOS18.2 SDK/clang emits selected arm64-apple-ios14.0.0 public-header LLVM; Odin darwin_arm64+iphone authoring typecheck passes. No linked Native, export, signing or device execution proof.",
+      "actual_public_abi": {
+        "pointer_bits": 64,
+        "float_bytes": 4,
+        "float_radix": 2,
+        "float_mantissa_bits": 24,
+        "world_handle_bytes": 4,
+        "body_handle_bytes": 8,
+        "shape_handle_bytes": 8,
+        "joint_handle_bytes": 8,
+        "vec3_bytes": 12,
+        "pose_bytes": 28,
+        "asset_v2_bytes": 72,
+        "asset_v2_align": 8,
+        "asset_vertices_offset": 48,
+        "asset_indices_offset": 56,
+        "asset_vertex_count_offset": 64,
+        "asset_triangle_count_offset": 68,
+        "motion_joint_def_bytes": 360
+      },
+      "actual_triple": "arm64-apple-ios14.0.0",
+      "actual_sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.2.sdk",
+      "odin_authoring_exit": 0,
+      "kit": {
+        "runtime": "UNAVAILABLE",
+        "gap": "Current Box3D profile/manifests admit desktop only; iOS Native/framework loading/signing/ownership and actual Kit physics export remain unqualified."
+      },
+      "replay": {
+        "runtime": "UNAVAILABLE",
+        "gap": "Same mobile Native/Core/package gap; actual complete-physics Session/Timeline recovery and device cost/equality not run."
+      },
+      "snapshot_and_determinism": {
+        "status": "UNAVAILABLE",
+        "bytes": null,
+        "capture_ns": null,
+        "restore_ns": null,
+        "whole_entry_ns": null,
+        "determinism_result": null,
+        "reason": "No admitted complete Box3D backend/deployment artifact and per-target solver/adapter runtime was built/executed; header/type/vector probes cannot provide these measurements."
+      },
+      "next_proof": "Target-specific Native build and compatible signing/loading/profile identity, single backend and typed code/data/allocator leases, actual device full5/source-free canonical/suffix/cost/bounds evidence for both adapters. Probe deployment14.0 is not a new OS support claim."
+    }
+  },
+  "readiness": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-tool-readiness-v1/report.json",
+    "sha256": "84fa00db98464d70aeaaf989e1e056d0e190f855a315bb82251dd19b2bc20d6f"
+  },
+  "actual_target_probes": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/report.json",
+    "sha256": "577b41ce0aa71cf87534e6d45313b9010aa29ed87a060f96c5495eb517166436"
+  },
+  "actual_mobile_probes": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-mobile-probes-v1/report.json",
+    "sha256": "6ba156b0edb6103a55f4512747a0f0f56a3af5b71676037b186aeb3f43d7a1ab"
+  },
+  "actual_log_fences": true,
+  "source_fences": true,
+  "native_free_vectors": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/golden.json",
+    "sha256": "c16078146649efc7aa4163df970f1c5ab48a61d5355818e75f7791ed1d068749",
+    "literal_result": {
+      "status": "BOX3D_PROTOCOL_GOLDEN_OK",
+      "artifacts": {
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/native/signature.bin": {
+          "bytes": 480,
+          "sha256": "2d1457923205353af2b29ea3c235a57269401fae04ed632d96123c068af1997b"
+        },
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/native/trace.bin": {
+          "bytes": 1325,
+          "sha256": "ed6cd02395e2aa0a46cc7f0cf4ece28b04a11ad86be11146da3ad209fb860588"
+        },
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/native/descriptor.bin": {
+          "bytes": 32,
+          "sha256": "aef1f43ec1b8ce7e1e5c5ade7d65ea5d5f35edea51c7a52c1e825b0cdd90c859"
+        },
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/wasm/signature.bin": {
+          "bytes": 480,
+          "sha256": "2d1457923205353af2b29ea3c235a57269401fae04ed632d96123c068af1997b"
+        },
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/wasm/trace.bin": {
+          "bytes": 1325,
+          "sha256": "ed6cd02395e2aa0a46cc7f0cf4ece28b04a11ad86be11146da3ad209fb860588"
+        },
+        "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes-v1/protocol/wasm/descriptor.bin": {
+          "bytes": 32,
+          "sha256": "aef1f43ec1b8ce7e1e5c5ade7d65ea5d5f35edea51c7a52c1e825b0cdd90c859"
+        }
+      }
+    }
+  },
+  "native_free_vector_scope": "Synthetic signature480/trace1325/descriptor32 agree between native/freestandingWASM/Python; zero imports and verify0. No Native engine/solver snapshot or gameplay/determinism measurement.",
+  "environment_distinction": {
+    "preserved_nix_apple_sdk_lookup_exit": 255,
+    "actual_apple_sdk_lookup_exit": 0,
+    "controlled_child_selection": {
+      "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer",
+      "SDKROOT": "unset for these child processes only"
+    },
+    "meaning": "Nix development-shell SDK lookup failure is not absence of the installed Apple SDK. No global environment/SDK/resource change."
+  },
+  "deployed_backend_source_findings": {
+    "browser": "build/build_web.sh links existing Odin AOT side module; build/box3d_profile.py supports macos/linux/windows and supplies no wasm Native profile/domain selection.",
+    "mobile": "build/build_cross.sh and shared profile directory handling are desktop, authored gdextension manifests have macos/linux entries only; generated mobile Godot API bindings are not platform qualification.",
+    "abi": "Fixed32 world/64 body-shape-joint handles differ from pointer width; actual sizeof/alignment/offset queries and C/Odin call tests required for each target.",
+    "ownership": "One backend image/domain plus checked code/data/allocator ownership must be re-proved; copied desktop DSOs and LP64 similarity are not mobile/browser deployment.",
+    "recovery": "Local images remain exact build; canonical recovery binds exact build/target/profile/assets/schema/version before reconstruction/reencode. No mixed-target solver equality inherited."
+  },
+  "production_unchanged": {
+    "checked_files": 428,
+    "changed": [],
+    "anchor": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_recovery_flows/report.json",
+      "sha256": "6d175e3e5006fabfbbb1643699960adf5afdb350725164614360eee9ed49b072"
+    }
+  },
+  "protected_driver_checker_unchanged": {
+    "checked_files": 20,
+    "changed": []
+  },
+  "source_artifacts": {
+    "tests/box3d_targets/public_abi_probe.c": "defa584b5db0e0653b1374bc1d30c605c201c8861c172170df437c795ea71a54",
+    "tests/box3d_targets/README.md": "63e94cadfce1a60bc6f9b8175772dad3806f5ac975172122c671862618d5a0fe",
+    "docs/design/box3d/web-mobile-evaluation.md": "bc20fcc1f52a8e17c8e3a84558f33601e54759ce37e26e41758330e64a8c9ac3"
+  },
+  "root_probe_runners": [
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-target-probes.py",
+      "sha256": "7f1cdf5aaa66490a39952930f2f752ebed02d17107590dd0b1085cca2c2d4af8"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-mobile-probes.py",
+      "sha256": "1dc4d3a4c1710b95dab31696f38395899223313a6669d0357c4311f358b165ec"
+    }
+  ],
+  "local_links_checked": 13,
+  "retained_failure_scope": [
+    "Android Odin check EXIT1/NDK not set, not rewritten as PASS.",
+    "Nix-scoped Apple SDK lookup255 preserved; separately selected actual Apple SDK succeeds.",
+    "Prior8.894ms and strict Replay SDK observer failures retain original scope/verdict; no general performance or unsupported-platform waiver."
+  ],
+  "desktop_baselines": {
+    "GateC": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_gate_c/report.json",
+      "sha256": "066df8b4a4ecbd8d97d505f06d3eeed6ebe044d5207b144016ba0a6a1dbac9ca"
+    },
+    "production": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_production/report.json",
+      "sha256": "e693817894e8ea5ec88d95cd1febb7b01ae8ca7ccea38eb85825ead12a2a42dd"
+    },
+    "bounds": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_bounds/report.json",
+      "sha256": "f3938c87eb5dc0737b94caf65f87f07ada86fc4299dd6af71a6689072de96066"
+    },
+    "recovery": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_recovery_flows/report.json",
+      "sha256": "6d175e3e5006fabfbbb1643699960adf5afdb350725164614360eee9ed49b072"
+    },
+    "diagnostics": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_diagnostics/report.json",
+      "sha256": "8610a09ac1b4a655364403e8b28468d919ff4ec14fd10033783370b99e81582d"
+    }
+  },
+  "recommendation": "Keep admitted desktop support unchanged. New target fragments justify only a separately scoped feasibility/port effort after explicit build/domain/SDK ownership design and complete-state/cost proof; they do not authorize a production target or demonstrate engine impossibility.",
+  "new_native_core_protocol_or_dependency_changes": false,
+  "download_jobs_started": 0,
+  "jobs_remaining_for_card": 0
+}

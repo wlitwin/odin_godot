@@ -35,23 +35,71 @@ seed_checkpoint_events :: proc(t: ^Timeline($S, $I, $E), events: []Occurrence(E)
 // Replace a speculative suffix from recorded/received decisions without
 // advancing confirmation. P2P input arrival is not authority state correction.
 revise_inputs :: proc(t: ^Timeline($State, $Input, $Event), first: u64, rewrite: Input_Rewrite(Input)) -> Result {
+	check: Revision_Check(State, Event)
+	return revise_inputs_impl(t, first, rewrite, check, false)
+}
+
+// The callback borrows a complete independently owned clone at exactly tick.
+// Core destroys that clone after return. Do not modify/consume/destroy the borrow;
+// explicitly complete_checkpoint_clone it to retain another owner. User is an
+// operation-local context and is never retained in Timeline or provider state.
+Revision_Check :: struct($State, $Event: typeid) {
+	tick: u64,
+	user: rawptr,
+	check: proc(user: rawptr, checkpoint: ^Complete_Checkpoint(State, Event)) -> Error,
+}
+
+revise_inputs_checked :: proc(t: ^Timeline($State, $Input, $Event), first: u64,
+                              rewrite: Input_Rewrite(Input), check: Revision_Check(State, Event)) -> Result {
+	return revise_inputs_impl(t, first, rewrite, check, true)
+}
+
+@(private)
+revise_inputs_impl :: proc(t: ^Timeline($State, $Input, $Event), first: u64, rewrite: Input_Rewrite(Input),
+                            check: Revision_Check(State, Event), checked: bool) -> Result {
 	if err := available(t); err != .None {return {error = err, tick = first}}
+	if checked && (check.check == nil || check.tick < first || check.tick > t.head || !external_enabled(t)) {return {error = .Invalid_Config, tick = check.tick}}
+	if checked {
+		check_record := record_at(t, check.tick)
+		if check_record == nil || !check_record.has_input {return {error = .History_Missing, tick = check.tick}}
+	}
 	if first <= t.confirmed {return {error = .Committed, tick = first}}
 	if first > t.head || rewrite.apply == nil {return {error = .History_Missing, tick = first}}
 	base := record_at(t, first - 1)
 	if base == nil {return {error = .History_Missing, tick = first - 1}}
 	n := int(t.head - first + 1)
 	t.busy = true; defer t.busy = false
+	if err := external_begin(t, base.image, .Revision, u64(n)); err != .None {return {error = err, tick = first}}
+	defer external_finish(t)
 	before := base.frame
+	checks := 0
 	for i in 0 ..< n {
 		tick := first + u64(i)
 		original := record_at(t, tick)
 		if original == nil || !original.has_input {return {error = .History_Missing, steps = i, tick = tick}}
 		input := rewrite.apply(rewrite.user, tick, original.input)
 		if err := simulate(t, &t.staged[i], before, input); err != .None {return {error = err, steps = i, tick = tick}}
+		if checked && tick == check.tick {
+			owned, clone_error := clone_record_complete(&t.staged[i], t.external, t.epoch, t.allocator)
+			if clone_error != .None {return {error = clone_error, steps = i + 1, tick = tick}}
+			if owned._image_bytes > max(u64) - owned._owned_bytes {complete_checkpoint_destroy(&owned); return {error = .Resource_Limit, steps = i + 1, tick = tick}}
+			usage := t.run.usage
+			t.run.usage.image_bytes = t.image_bytes
+			t.run.usage.savepoint_bytes = owned._image_bytes + owned._owned_bytes
+			admission_error := external_usage_check(&t.run, .Revision)
+			t.run.usage = usage
+			if admission_error != .None {complete_checkpoint_destroy(&owned); return {error = admission_error, steps = i + 1, tick = tick}}
+			checks += 1
+			callback_error := check.check(check.user, &owned)
+			complete_checkpoint_destroy(&owned)
+			if callback_error != .None {return {error = callback_error, steps = i + 1, tick = tick}}
+		}
 		before = t.staged[i].frame
 	}
+	if checked && checks != 1 {return {error = .Invalid_Config, steps = n, tick = check.tick}}
+	if err := external_prepare(t); err != .None {return {error = err, steps = n, tick = t.head}}
 	for i in 0 ..< n {commit(t, &t.staged[i])}
+	external_publish(t)
 	return {steps = n, tick = t.head}
 }
 
@@ -96,8 +144,12 @@ correction_bytes_equal :: proc(a:^$T,b:^T)->bool {
 }
 
 @(private)
-correct_impl :: proc(t:^Timeline($State,$Input,$Event),truth:Frame(State),events:[]Occurrence(Event),rewrite:Input_Rewrite(Input),reuse_count:^int)->Result {
+correct_impl :: proc(t:^Timeline($State,$Input,$Event),truth:Frame(State),events:[]Occurrence(Event),rewrite:Input_Rewrite(Input),reuse_count:^int, truth_image:rawptr=nil, truth_bytes:u64=0, complete:bool=false)->Result {
 	if err := available(t); err != .None {return {error = err, tick = truth.tick}}
+	if external_enabled(t) {
+		if reuse_count != nil {return {error = .Reuse_Disabled, tick = truth.tick}}
+		if !complete || truth_image == nil {return {error = .Incomplete_State, tick = truth.tick}}
+	}
 	if truth.tick < t.confirmed {return {error = .Committed, tick = truth.tick}}
 	base := record_at(t, truth.tick)
 	if base == nil {return {error = .History_Missing, tick = truth.tick}}
@@ -115,11 +167,27 @@ correct_impl :: proc(t:^Timeline($State,$Input,$Event),truth:Frame(State),events
 		   !reflect.equal(base.events[:base.count], events, true) {
 			return {error = .Committed, tick = truth.tick}
 		}
+		if external_enabled(t) {
+			equal, err := t.external.equal(base.image, truth_image)
+			if err != .None {return {error = err, tick = truth.tick}}
+			if !equal {return {error = .Committed, tick = truth.tick}}
+		}
 		return {tick = truth.tick} // identical replay of a settled checkpoint
 	}
 	t.busy = true
 	defer t.busy = false
+	if err := external_begin(t, truth_image, .Revision, t.head - truth.tick); err != .None {return {error = err, tick = truth.tick}}
+	defer external_finish(t)
 	checkpoint := &t.staged[0]
+	external_release_record(t, checkpoint)
+	if external_enabled(t) {
+		image, err := t.external.clone(truth_image)
+		if err != .None {if image != nil {t.external.release(image)}; return {error = err, tick = truth.tick}}
+		if image == nil {return {error = .External_State, tick = truth.tick}}
+		if truth_bytes > max(u64) - t.image_bytes {t.external.release(image); return {error = .Resource_Limit, tick = truth.tick}}
+		checkpoint.image, checkpoint.image_bytes = image, truth_bytes
+		t.image_bytes += truth_bytes
+	}
 	checkpoint.valid = true
 	checkpoint.has_input = false // the generating authority input is not known here
 	checkpoint.input = {}
@@ -151,7 +219,9 @@ correct_impl :: proc(t:^Timeline($State,$Input,$Event),truth:Frame(State),events
 			before=&dst.frame
 		}
 	}
+	if err := external_prepare(t); err != .None {return {error = err, steps = n, tick = t.head}}
 	for i in 0 ..= n {if t.staged[i].valid {commit(t, &t.staged[i])}}
+	external_publish(t)
 	if reuse_count!=nil {reuse_count^=reused}
 	t.confirmed = truth.tick
 	return {steps = n, tick = t.head}
@@ -163,6 +233,7 @@ correct_impl :: proc(t:^Timeline($State,$Input,$Event),truth:Frame(State),events
 // An epoch counter alone does not establish legitimate authority.
 reset_checkpoint :: proc(t: ^Timeline($State, $Input, $Event), frame: Frame(State), epoch: u64) -> Error {
 	if err := available(t); err != .None {return err}
+	if external_enabled(t) {return .Incomplete_State}
 	if epoch == 0 || epoch < t.epoch {return .Invalid_Epoch}
 	if epoch == t.epoch && frame.tick < t.confirmed {return .Committed}
 	for &record in t.records {record.valid = false; record.count = 0}

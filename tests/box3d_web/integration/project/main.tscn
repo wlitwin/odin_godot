@@ -1,0 +1,12 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://main.gd" id="main"]
+[ext_resource type="Script" path="res://modules/web_probe/probe.odin" id="probe"]
+[ext_resource type="Script" path="res://modules/web_probe/keeper.odin" id="keeper"]
+[ext_resource type="PackedScene" path="res://content/world.tscn" id="world"]
+[node name="Integration" type="Node3D"]
+script = ExtResource("main")
+[node name="Probe" type="Node" parent="."]
+script = ExtResource("probe")
+[node name="AuthoredWorld" parent="Probe" instance=ExtResource("world")]
+[node name="Keeper" type="Node" parent="."]
+script = ExtResource("keeper")

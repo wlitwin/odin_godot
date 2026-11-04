@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-03T23:07:30.721560+00:00",
+  "result": "CPU_TRIGGER_WINDOW_RETAINED_SCHEDULING_CAUSE_UNRESOLVED",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "release_admitted": false,
+  "scope": "Local diagnostics using the existing ordinary game export. No game, backend, physics or net runtime change; no unprofiled qualification inferred.",
+  "contract": {
+    "path": "tests/box3d_web/contract.json",
+    "sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124"
+  },
+  "thresholds_changed": false,
+  "prior_strict_failure": {
+    "path": "tests/replay_dockyard/qualification/telemetry-report.json",
+    "sha256": "d605bf9bfc8c063fd8cc897b4f6e706b9d41b7754d0a1b71e5f57ffbbd540549"
+  },
+  "cpu_trace": {
+    "runtime": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/triggered-firefox-profile-v1/report.json",
+      "sha256": "192581feb03047c5ad1b4d7948f57bcf02caec3737f0469f695202ff759326be"
+    },
+    "binding": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/triggered-firefox-profile-v1/export-binding.json",
+      "sha256": "d416f7015b073376f9808a1880f206af6d199db58c8f9b12a362a09cc31409b6"
+    },
+    "summary": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/triggered-firefox-profile-v1/trigger-summary.json",
+      "sha256": "074b9ccb37223c9617b880b788e181eabfdfc77bc915899df828696905d923a7"
+    },
+    "raw_profile": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/triggered-firefox-profile-v1/host/gecko-profile.json",
+      "sha256": "778558ec0dd95959c3aaa804ed3b48eb9f233452f02e0f23b09b3c1e027cbdf6",
+      "bytes": 37783512
+    },
+    "trigger_us": 12660,
+    "head_after": 1352,
+    "estimated_window_retained": true,
+    "node_minus_browser_marker_ms": 1.380126953125,
+    "main_thread_largest_sample_gap": {
+      "start_offset_ms": -12.328125,
+      "end_offset_ms": -1.3134765625,
+      "wall_gap_ms": 11.014624999996158,
+      "next_cpu_delta_raw": 1125
+    },
+    "cpu_delta_unit": "\u00b5s",
+    "threads_with_gap_at_least9ms": 23,
+    "interpretation": "The retained sampled interval has aligned gaps across23 Firefox threads. The game-thread gap is11.0146ms with1125us recorded CPU delta. This does not identify an OS, browser-wait or profiler cause, and no wall time is subtracted."
+  },
+  "format_validation": {
+    "command": "python3 -B tests/replay_dockyard/qualification/trigger_summary_test.py",
+    "tests": 4,
+    "actual_exit": 0,
+    "source": "https://github.com/firefox-devtools/profiler/blob/main/src/types/profile.ts"
+  },
+  "system_trace_attempts": [
+    {
+      "case": "v1",
+      "outcome": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v1/recorder-outcome.json",
+        "sha256": "0da017a50abff69c65c6895001cfcbe687d1650cac5d3cd34af2a0bd78615712"
+      },
+      "result": "READ_FAILED_MALFORMED",
+      "read_actual_exit": 10
+    },
+    {
+      "case": "v2",
+      "runtime": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v2/report.json",
+        "sha256": "d22bafbfaea89df414634100be12df408d15359b2c347fc794f6c938412caaa7"
+      },
+      "recorder": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v2/system-trace-record.json",
+        "sha256": "5aab7c10c10cd04cbfc690996bded8160e040ac46408a4e09e0b6d8d84e87393"
+      },
+      "exports": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v2/system-export-report.json",
+        "sha256": "1a8761866f42c77976e3f2f309a0d63f390712ef2e26f76dec2cb8dec77faa6b"
+      },
+      "relative_range": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v2/time-range-preliminary.json",
+        "sha256": "0d95ce1cdf66e21074d0812e091784f4f561e8bf528ec0e13f6f315af9a8a25f"
+      },
+      "result": "READABLE_BUT_LOST_EVENTS_AND_CLOCK_ALIGNMENT_UNRESOLVED",
+      "qualification": false
+    },
+    {
+      "case": "v3",
+      "calibration": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/thread-state-clock-v1/report.json",
+        "sha256": "f239b2bf5880fa7c1a7ee9997f13f288c3666f5bb5eeb06f59499046fa577725"
+      },
+      "plan": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-trace-v3/plan.json",
+        "sha256": "99d694590d84449d5fd10f8eefa2f0f3873da3c518c192d86a5883400269c196"
+      },
+      "result": "NO_TRIGGER_IN180s_WINDOW_RECORDER_SAVE_FAILED",
+      "controller": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v3/report.json",
+        "sha256": "f7b076abe806ab14764d44e3d02d1a29474cc4770aa7ee3bcaad4b70085edb4b"
+      },
+      "owned_recorder_process_observed": [],
+      "live_hc_handle": null,
+      "limitation": "Recorder reached its200s limit, later exited17 CannotSave; controller wait limit elapsed, browsers exited after both clean Engine shutdowns. No readable trace or cause claim. Broad kernel recording is retired from active runner.",
+      "recorder": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/system-firefox-trace-v3/system-trace-record.json",
+        "sha256": "9b90768d327424eebed4781583cda09a8755ccdeb924843e63b7e8f493db0dbb"
+      },
+      "recorder_actual_exit": 17
+    }
+  ],
+  "remaining_external_gates": [
+    "Public WSS/TURN endpoint selection and actual Internet evidence",
+    "Two-human cooperative play feedback"
+  ],
+  "memory_correlation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-firefox-sustained-v1/memory-correlation.json",
+    "sha256": "d44520d71968068a7c03e4225fe9586362aa8b3ec107e0a15d3251089ad54c0a"
+  },
+  "process_observer": {
+    "path": "tests/replay_dockyard/qualification/process-observer-report.json",
+    "sha256": "93d0c7255a8a81ae14082b722c34864e24fb111e69728f631e108fb9e60b924c"
+  },
+  "thread_name_probe": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-thread-firefox-v1/thread-state-controller-report.json",
+    "sha256": "d13a1f053f885c6377138e813f92480bc774721053267cddbcc66a5477ac3901"
+  },
+  "updated_utc": "2026-11-03T23:53:26.003585+00:00",
+  "process_repeated_observer": {
+    "path": "tests/replay_dockyard/qualification/process-repeated-report.json",
+    "sha256": "0d03ff93891b662924a4a4c3484d14fbe6e399657d684b929bc5c8c53fda37a9"
+  }
+}

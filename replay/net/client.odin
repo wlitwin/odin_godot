@@ -11,24 +11,49 @@ import delta "godot:replay/delta"
 client_init :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats),
                     model: Model(State, Control, Action, Event, Seats), wire: tr.Transport, token: Token,
                     spectator: bool = false, authority: tr.Peer_Id = 1, cfg := DEFAULT_CONFIG,
-                    allocator := context.allocator, permit: Permit = {}, incarnation: u64 = 0) -> Error {
+                    allocator := context.allocator, permit: Permit = {}, incarnation: u64 = 0, ownership:Runner_Ownership={}) -> Error {
 	#assert(Seats >= 1 && Seats <= 8)
-	if c.initialized || !config_valid(cfg) || authority == 0 || !token_valid(token) {return .Invalid_Config}
+	if model.complete_state && !complete_codec_valid(model.complete_codec) {return .Incomplete_State}
+	if model.complete_state && !physics_config_valid(model,cfg) {return .Invalid_Config}
+	if c.owner_cleanup || c.initialized || !config_valid(cfg) || authority == 0 || !token_valid(token) {return .Invalid_Config}
 	if cfg.require_permit && permit.allow == nil {return .Fenced}
+ if error:=runner_context_check(ownership,allocator,&c.model,model.complete_state);error!=.None{return error}
+ if error:=model_context_check(model,runner_managed(ownership));error!=.None{return error}
+ if error:=owned_context_check(ownership.wire,wire.user,runner_managed(ownership));error!=.None{return error}
+ if error:=owned_context_check(ownership.permit,permit.user,runner_managed(ownership));error!=.None{return error}
+ c.ownership=ownership;c.allocator=allocator;c.model=model;c.wire=wire;c.permit=permit
+ if error:=client_access(c);error!=.None{c^={};return error}
+ if error:=runner_retain(&c.owner_retains,ownership,&c.model);error!=.None{client_destroy(c);return error}
+ committed:=false;defer if !committed {client_destroy(c)}
 	if (model.step == nil && model.step_view == nil) || model.control_valid == nil || model.hold == nil || model.state_valid == nil || !group_config_valid(model.group) || !replication_config_valid(model.replication) || model.control_timing > .Latest_Observation || model.action_timing > .Receipt || !action_schedule_valid(model.action_schedule) || !authority_policy_valid(model.authority) {return .Invalid_Model}
 	if model.replication.id!=0 && !spectator && model.group.id==0 {return .Invalid_Model}
 	c.allocator, c.model, c.cfg, c.wire, c.token, c.spectator, c.authority = allocator, model, cfg, wire, token, spectator, authority
 	c.permit = permit
 	c.incarnation = incarnation
-	if !codecs_init(&c.codecs, State, Control, Action, Event, Seats, allocator,model.replication.id!=0) {client_destroy(c); return .Invalid_Model}
-	if !spectator && c.codecs.state.excluded_fields != 0 && model.replication.id==0 {client_destroy(c); return .Invalid_Model}
+	if model.complete_state {
+		if model.complete_codec.acquire!=nil {if error:=model.complete_codec.acquire(model.complete_codec.catalog);error!=.None{return error};c.complete_lease=true}
+		payload:=physics_client_payload(State,Control,Action,Event,Seats)
+		if payload>8*1024*1024{return .Capacity}
+		bytes:=payload+PHYSICS_SCHEMA_RESERVE
+		if error:=model.complete_codec.reserve(model.complete_codec.catalog,bytes);error!=.None{return error}
+		c.complete_charge=bytes
+	}
+	if !codecs_init(&c.codecs, State, Control, Action, Event, Seats, allocator,model.replication.id!=0) { return .Invalid_Model}
+	if !spectator && c.codecs.state.excluded_fields != 0 && model.replication.id==0 { return .Invalid_Model}
 	c.contract = contract_hash(&c.codecs, cfg, Seats, model.control_timing, replication=model.replication.id,action_timing=model.action_timing,action_schedule=model.action_schedule.id,authority_policy=model.authority.id)
 	thunk := proc(state: ^State, input: Batch(Control, Action, Seats), ctx: ^r.Step(Net_Event(Event))) {network_step(state, input, ctx)}
-	if r.init(&c.timeline, r.Frame(State){}, thunk, cfg = {cfg.history, WIRE_EVENTS}, epoch = cfg.epoch,
-	          allocator = allocator, user = &c.model) != .None {client_destroy(c); return .Invalid_Model}
+	if model.complete_state {
+		if c.codecs.state.excluded_fields!=0 {return .Invalid_Model}
+		if error:=client_physics_init(c);error!=.None {return error}
+		c.contract=physics_contract(c.contract,model.complete_codec.identity)
+		metadata:=physics_codecs_bytes(&c.codecs)+physics_schemas_bytes(&c.physics.schemas)
+		if metadata>PHYSICS_SCHEMA_RESERVE {return .Capacity}
+		model.complete_codec.release(model.complete_codec.catalog,PHYSICS_SCHEMA_RESERVE-metadata)
+		c.complete_charge-=PHYSICS_SCHEMA_RESERVE-metadata
+	} else if r.init(&c.timeline,r.Frame(State){},thunk,{cfg.history,WIRE_EVENTS},cfg.epoch,allocator,&c.model)!=.None {return .Invalid_Model}
 	if view.journal_init(&c.journal, epoch = cfg.epoch,
 	                      cfg = {cfg.history, WIRE_EVENTS, cfg.history * WIRE_EVENTS * 2}, allocator = allocator) != .None {
-		client_destroy(c); return .Invalid_Model
+		 return .Invalid_Model
 	}
 	client_install_policy(c)
 	c.facts = make([]Facts_Packet(Event), cfg.history, allocator)
@@ -39,20 +64,30 @@ client_init :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats),
 	c.txb = make([]u8, tr.MAX_PACKET_BYTES, allocator)
 	c.input_scratch=make([]u8,c.codecs.inputs.wire_size,allocator)
 	c.input_sent=make([]Input_Sent,cfg.history,allocator)
-	if !delta.cache_init(&c.snapshot_rx, c.codecs.snapshot.wire_size, cfg.snapshot_history, allocator) {client_destroy(c); return .Invalid_Config}
-	c.snapshot_scratch = make([]u8, c.codecs.snapshot.wire_size, allocator)
-	c.snapshot_ticks = make([]u64, cfg.snapshot_history, allocator)
+	if !model.complete_state {
+		if !delta.cache_init(&c.snapshot_rx,c.codecs.snapshot.wire_size,cfg.snapshot_history,allocator) {return .Invalid_Config}
+		c.snapshot_scratch=make([]u8,c.codecs.snapshot.wire_size,allocator)
+		c.snapshot_ticks=make([]u64,cfg.snapshot_history,allocator)
+	}
 	c.snapshot_parts_enabled, c.lz4_snapshots_enabled, c.fact_repair_enabled, c.snapshot_erasure_enabled, c.snapshot_shuffle_enabled, c.action_copies_enabled = true, true, true, true, true, true
 	c.compact_observations_enabled=true;c.compact_recent_facts_enabled=true
 	c.phase, c.initialized = .Joining, true
+ committed=true
 	c.lead_ticks, c.clock_scale = cfg.lead, 1
 	for &held in c.held {held = model.neutral}
 	return .None
 }
 
-client_destroy :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) {
+client_destroy :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) ->Error {
+ if error:=client_access(c,.Read);error!=.None{return error}
+ if c.owner_cleanup {
+  retains:=c.owner_retains;c^={}
+  if error:=runner_drop(&retains);error!=.None{c.owner_retains=retains;c.owner_cleanup=true;return error}
+  return .None
+ }
+	client_physics_destroy(c)
 	client_parts_reset(c)
-	r.destroy(&c.timeline)
+ if r.destroy(&c.timeline)!=.None{return .Invalid_Model}
 	view.journal_destroy(&c.journal)
 	codecs_destroy(&c.codecs)
 	delete(c.facts, c.allocator)
@@ -67,20 +102,74 @@ client_destroy :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) {
 	delete(c.snapshot_scratch, c.allocator)
 	delete(c.shuffle_workspace,c.allocator)
 	delete(c.snapshot_ticks, c.allocator)
-	c^ = {}
+	if c.complete_charge!=0 {c.model.complete_codec.release(c.model.complete_codec.catalog,c.complete_charge)}
+	if c.complete_lease {c.model.complete_codec.drop(c.model.complete_codec.catalog)}
+ retains:=c.owner_retains
+ c^={}
+ if error:=runner_drop(&retains);error!=.None{c.owner_retains=retains;c.owner_cleanup=true;return error}
+ return .None
+}
+
+// Operation-local owner replacement. On success retired owns the old full
+// table; close its old connection, then release/retry these handles. A failed
+// candidate preserves Client/Timeline; retired can contain only failed-candidate
+// cleanup handles when a decline prevents immediate cleanup. Never discard it.
+Context_Replacement :: struct {wire,permit:Owned_Context,retired:r.Owner_Retains}
+@(private)
+context_replacement_prepare :: proc(c:^Client($S,$C,$A,$E,$N),replacement:^Context_Replacement,wire:tr.Transport,permit:Permit,replace_permit:bool)->(Runner_Ownership,Runner_Retains,Error){
+ candidate:=c.ownership
+ if replacement!=nil {
+  if replacement.retired.count!=0{return {},{},.Wrong_Phase}
+  for owner in replacement.retired.owners{if !r.owner_is_nil(owner){return {},{},.Wrong_Phase}}
+  candidate.wire=replacement.wire
+  if replace_permit{candidate.permit=replacement.permit}
+ }
+ if error:=runner_context_check(candidate,c.allocator,&c.model,c.model.complete_state);error!=.None{return {},{},error}
+ managed:=runner_managed(candidate)
+ if error:=owned_context_check(candidate.wire,wire.user,managed);error!=.None{return {},{},error}
+ if error:=owned_context_check(candidate.permit,permit.user,managed);error!=.None{return {},{},error}
+ retained:Runner_Retains
+ if replacement!=nil {
+  if error:=runner_retain(&retained,candidate,&c.model);error!=.None{
+   if r.owner_retains_drop(&retained)!=.None{replacement.retired=retained}
+   return {},{},error
+  }
+ }
+ return candidate,retained,.None
+}
+@(private)
+context_replacement_commit :: proc(c:^Client($S,$C,$A,$E,$N),replacement:^Context_Replacement,candidate:Runner_Ownership,retained:Runner_Retains){
+ if replacement==nil{return}
+ replacement.retired=c.owner_retains
+ c.ownership=candidate;c.owner_retains=retained
 }
 
 // Reuse the stable token and outstanding action IDs on a new connection.
-client_reconnect :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), wire: tr.Transport) -> Error {
+client_reconnect :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), wire: tr.Transport,replacement:^Context_Replacement=nil,new_permit:^Permit=nil) -> Error {
+ if error:=client_access(c);error!=.None{return error}
 	if !c.initialized {return .Not_Initialized}
+	permit:=c.permit
+ if new_permit!=nil{
+  permit=new_permit^
+  if c.cfg.require_permit && permit.allow==nil{return .Fenced}
+ }
+ candidate,retained,error:=context_replacement_prepare(c,replacement,wire,permit,new_permit!=nil);if error!=.None{return error}
+ if new_permit!=nil && permit.allow!=nil && !permit.allow(permit.user,c.cfg.epoch){
+  if replacement!=nil && r.owner_retains_drop(&retained)!=.None{replacement.retired=retained}
+  return .Fenced
+ }
+	client_physics_reset_transient(c)
 	c.wire, c.phase, c.hello_sent, c.time_set = wire, .Joining, false, false
+ if new_permit!=nil{c.permit=permit}
 	c.rejection = .None
  c.observer_names_negotiated=false;c.compact_observations_negotiated=false
 	client_timing_reset(c)
+ context_replacement_commit(c,replacement,candidate,retained)
 	return .None
 }
 
 client_issue :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), action: Action) -> (sequence: u64, error: Error) {
+ if error:=client_access(c);error!=.None{return 0,error}
 	// A receipt-time request has no authority execution tick to miss. During a
 	// same-epoch resync, retain it in the existing bounded action queue and wait
 	// for Welcome to rebind delivery. Joining/migration still need a new identity.
@@ -108,7 +197,10 @@ client_issue :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), acti
 }
 
 client_step :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), control: Control) -> Error {
+ if error:=client_access(c);error!=.None{return error}
+	if (c.model.complete_state&&c.physics==nil) || (!c.model.complete_state&&r.external_enabled(&c.timeline)) {return .Incomplete_State}
 	if !c.initialized || c.phase != .Running || c.spectator {return .Wrong_Phase}
+	if c.physics!=nil && c.physics.waiting_tick!=0 {return .Capacity}
 	if !permitted(c.cfg.require_permit, c.permit, c.cfg.epoch) {return .Fenced}
 	if !c.model.control_valid(control) {return .Invalid_Input}
 	if c.timeline.head - c.timeline.confirmed >= u64(c.cfg.max_prediction) ||
@@ -148,7 +240,11 @@ client_step :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), contr
 		if predicted_index >= 0 {c.actions[predicted_index].predicted = false}
 		return .Fenced
 	}
-	if result.error != .None {c.phase = .Failed; return .Simulation}
+	if result.error != .None {
+		if predicted_index>=0 {c.actions[predicted_index].predicted=false}
+		if c.physics!=nil{c.physics.last_frame_error=result.error;if result.error==.Resource_Limit{return .Capacity}}
+		c.phase = .Failed; return .Simulation
+	}
 	c.held = batch.controls
 	if err := client_sync_predicted(c, tick); err != .None {return err}
 	client_send_inputs(c)
@@ -156,7 +252,9 @@ client_step :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), contr
 }
 
 client_pump :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), now_ms: u64) -> Error {
+ if error:=client_access(c);error!=.None{return error}
 	if !c.initialized {return .Not_Initialized}
+	physics_catchups := c.stats.snapshot_catchups
 	started, timed := profile_start(c.profile_clock)
 	defer profile_finish(&c.profile_metrics, .Pump, c.profile_clock, started, timed, c.profile_user, c.profile_sample)
 	if !permitted(c.cfg.require_permit, c.permit, c.cfg.epoch) {tr.poll(&c.wire); return .Fenced}
@@ -204,6 +302,12 @@ client_pump :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), now_m
 		client_parts_expire(c)
 		client_request_facts(c)
 		if err := client_present_snapshot(c, dt); err != .None {return err}
+		// Complete snapshots or signed facts can confirm during packet processing above.
+		// Mature the existing journal before restoring held prediction lead.
+		// A later Welcome may already have bootstrapped this same pump.
+		if c.physics != nil && !c.spectator && (c.stats.snapshot_catchups != physics_catchups || c.facts_contiguous > c.timeline.confirmed) && c.timeline.head == c.timeline.confirmed {
+			if err := client_bootstrap(c); err != .None {return err}
+		}
 		client_recent_actions(c)
 		if c.now - c.last_action_send >= 500 {client_send_actions(c, true); c.last_action_send = c.now}
 		if c.now - c.last_heartbeat >= 500 {
@@ -221,6 +325,8 @@ client_pump :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), now_m
 // presentation clock by its elapsed duration only once, after packet delivery.
 @(private)
 client_present_snapshot :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), dt: f64) -> Error {
+ if error:=client_access(c);error!=.None{return error}
+	if c.physics!=nil {return client_physics_present(c,dt)}
 	catchups := c.stats.snapshot_catchups
 	if err := client_apply_snapshot(c); err != .None {return err}
 	latest := c.authority_frame.tick
@@ -249,6 +355,7 @@ client_present_snapshot :: proc(c: ^Client($State, $Control, $Action, $Event, $S
 }
 
 client_outcomes :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), dst: []Action_Outcome, recovered: []bool = nil) -> int {
+ if error:=client_access(c);error!=.None{return 0}
 	n := min(len(dst), c.outcome_count)
 	for i in 0 ..< n {index := (c.outcome_head + i) % ACTION_CAPACITY; dst[i] = c.outcomes[index]; if i < len(recovered) {recovered[i] = c.outcome_recovered[index]}}
 	c.outcome_head = (c.outcome_head + n) % ACTION_CAPACITY
@@ -259,6 +366,7 @@ client_outcomes :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), d
 // Authoritative sparse frames for watched views. Never use predicted history as
 // an opponent's observed truth; interpolation stays entirely in presentation.
 client_observed :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) -> (a, b: r.Frame(State), alpha: f32, ok: bool) {
+ if error:=client_access(c);error!=.None{return {},{},0,false}
 	if c.phase != .Running {return}
 	lower, upper := -1, -1
 	for frame, i in c.observed {
@@ -277,11 +385,13 @@ client_observed :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) -
 
 @(private)
 client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), bytes: []u8) -> (error: Error) {
+ if error:=client_access(c);error!=.None{return error}
 	meta, _, report := sc.inspect(bytes)
 	if report.error != .None {c.stats.rejected_packets += 1; return}
 	if meta.kind==u16(Kind.Epoch_Reply) {client_epoch_reply(c,bytes,meta);return}
 	if c.epoch_query_pending {c.stats.rejected_packets+=1;return}
 	expected := sc.Envelope_Meta{kind = meta.kind, epoch = c.cfg.epoch, content = c.cfg.content}
+	if c.physics!=nil && Kind(meta.kind)!=.Reject && Kind(meta.kind)!=.Removed && Kind(meta.kind)!=.Physics_Part && Kind(meta.kind)!=.Physics_Facts {c.stats.rejected_packets+=1;return}
 	#partial switch Kind(meta.kind) {
 	case .Reject:
 		if c.phase != .Joining {return}
@@ -302,6 +412,12 @@ client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), by
 		_, report = sc.unpack(&c.codecs.removed, &packet, bytes, expected)
 		if report.error != .None || packet.generation != c.generation || packet.serial != c.serial {c.stats.rejected_packets += 1; return}
 		c.phase, c.rejection = .Rejected, packet.reason
+	case .Physics_Part:
+		if c.physics==nil {c.stats.rejected_packets+=1;return}
+		return client_physics_part(c,bytes,expected)
+	case .Physics_Facts:
+		if c.physics==nil {c.stats.rejected_packets+=1;return}
+		return client_physics_fact(c,bytes,expected)
 	case .Features:
 		client_features_reply(c,bytes,expected)
 	case .Recent_Facts_Compact:
@@ -331,6 +447,14 @@ client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), by
 
 @(private)
 client_welcome :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), packet: Welcome_Packet(State, Control, Seats)) {
+ if error:=client_access(c);error!=.None{return}
+ checkpoint:^r.Complete_Checkpoint(State,Net_Event(Event))
+ client_welcome_core(c,packet,checkpoint)
+}
+
+@(private)
+client_welcome_core :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), packet: Welcome_Packet(State, Control, Seats), complete:^r.Complete_Checkpoint(State,Net_Event(Event))) {
+ if error:=client_access(c);error!=.None{return}
 	packet := packet
 	changing_epoch := c.recovering
 	had_world := c.has_world
@@ -350,7 +474,12 @@ client_welcome :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), pa
 	}
 	prediction, projected := group_frame(c.model, packet.frame, packet.seat, c.spectator)
 	if !projected {c.phase = .Failed; return}
-	if r.reset_checkpoint(&c.timeline, prediction, c.cfg.epoch) != .None {c.stats.rejected_packets += 1; return}
+	if c.physics!=nil {
+		if complete==nil {c.stats.rejected_packets+=1;return}
+		error:r.Error
+		if c.has_world {error=r.reset_complete(&c.timeline,complete,c.cfg.epoch)} else {error=r.init_complete(&c.timeline,complete,model_callback(State,Control,Action,Event,Seats),{c.cfg.history,WIRE_EVENTS},c.allocator,user=&c.model,user_owner=c.ownership.model.owner,user_data=c.ownership.model.data)}
+		if error!=.None {c.stats.rejected_packets+=1;return}
+	} else if r.reset_checkpoint(&c.timeline,prediction,c.cfg.epoch)!=.None {c.stats.rejected_packets+=1;return}
 	if changing_epoch {client_reconcile_actions(c, packet)} else {
 		for outcome in packet.completed[:packet.completed_count] {client_outcome(c, outcome, true)}
 		client_retire(c, packet.action_settled)
@@ -403,6 +532,7 @@ client_welcome :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), pa
 
 @(private)
 client_bootstrap :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) -> Error {
+ if error:=client_access(c);error!=.None{return error}
 	if c.spectator {return .None}
 	for _ in 0 ..< c.lead_ticks {
 		batch := Batch(Control, Action, Seats){controls = c.held}
@@ -421,6 +551,8 @@ client_bootstrap :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) 
 
 @(private)
 client_apply_snapshot :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) -> Error {
+ if error:=client_access(c);error!=.None{return error}
+	if c.model.complete_state || r.external_enabled(&c.timeline) {return .Incomplete_State}
 	// Facts may arrive in a burst after several snapshots have decoded. Always
 	// choose the newest usable truth, even when an older pending one is usable.
 	// A future pending snapshot is retained if no cached correction can apply.
@@ -507,6 +639,7 @@ Remote_Forecast :: struct($C: typeid, $N: int) {held: [N]C, seat: u16, hold: pro
 
 @(private)
 client_sync_predicted :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), tick: u64) -> Error {
+ if error:=client_access(c);error!=.None{return error}
 	storage: [WIRE_EVENTS]r.Occurrence(Net_Event(Event))
 	n, err := r.copy_events(&c.timeline, tick, storage[:])
 	if err != .None {return .Simulation}
@@ -516,6 +649,7 @@ client_sync_predicted :: proc(c: ^Client($State, $Control, $Action, $Event, $Sea
 
 @(private)
 client_send_inputs :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)) {
+ if error:=client_access(c);error!=.None{return}
 	if c.model.control_timing == .Latest_Observation {
 		if input, ok := r.read_input(&c.timeline, c.timeline.head); ok {
 			packet := Observation_Packet(Control){c.generation, c.serial, {c.timeline.head, input.controls[c.seat - 1], input.stamps[c.seat - 1]}}
@@ -537,6 +671,7 @@ client_send_inputs :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)
 
 @(private)
 client_send_input_packet :: proc(c:^Client($S,$C,$A,$E,$N),packet:Inputs_Packet(C)) {
+ if error:=client_access(c);error!=.None{return}
 	if !permitted(c.cfg.require_permit,c.permit,c.cfg.epoch) {return}
 	if sc.encode(&c.codecs.inputs,packet,c.input_scratch).error!=.None {return}
 	meta:=sc.Envelope_Meta{kind=u16(Kind.Inputs_Compact),epoch=c.cfg.epoch,tick=c.timeline.head,content=c.cfg.content}
@@ -554,6 +689,7 @@ client_send_input_packet :: proc(c:^Client($S,$C,$A,$E,$N),packet:Inputs_Packet(
 
 @(private)
 client_send_actions :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), retry: bool) {
+ if error:=client_access(c);error!=.None{return}
 	if c.phase != .Running {return}
 	for &action in c.actions[:c.action_count] {
 		if action.sent && !retry {continue}
@@ -564,6 +700,7 @@ client_send_actions :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats
 
 @(private)
 client_send :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), schema: ^sc.Schema, kind: Kind, value: $Packet, tick: u64, channel: tr.Channel) -> tr.Send_Result {
+ if error:=client_access(c);error!=.None{return .Disconnected}
 	if !permitted(c.cfg.require_permit, c.permit, c.cfg.epoch) {return .Backpressure}
 	meta := sc.Envelope_Meta{kind = u16(kind), epoch = c.cfg.epoch, tick = tick, content = c.cfg.content}
 	if sc.pack(schema, value, meta, c.txb).error != .None {return .Invalid}
@@ -575,7 +712,9 @@ client_send :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), schem
 
 @(private)
 client_resync :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), reason: Resync_Reason, incoming_tick: u64) {
+ if error:=client_access(c);error!=.None{return}
 	if c.phase == .Resyncing {return}
+	client_physics_reset_transient(c)
 	c.phase, c.hello_sent, c.has_pending = .Resyncing, false, false
 	c.request_sequence += 1
 	c.stats.resyncs += 1
@@ -584,6 +723,7 @@ client_resync :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), rea
 
 @(private)
 client_note_observed :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), frame: r.Frame(State), id: u64 = 0) {
+ if error:=client_access(c);error!=.None{return}
 	index := int(frame.tick % u64(c.cfg.history))
 	c.observed[index] = frame
 	c.observed_valid[index] = true
@@ -592,6 +732,7 @@ client_note_observed :: proc(c: ^Client($State, $Control, $Action, $Event, $Seat
 
 @(private)
 client_retire :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), through: u64) {
+ if error:=client_access(c);error!=.None{return}
 	kept := 0
 	for action in c.actions[:c.action_count] {if action.sequence > through {c.actions[kept] = action; kept += 1}}
 	c.action_count = kept
@@ -599,6 +740,7 @@ client_retire :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), thr
 
 @(private)
 client_outcome :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), outcome: Action_Outcome, recovered: bool = false) {
+ if error:=client_access(c);error!=.None{return}
 	if outcome.sequence <= c.last_outcome {return}
 	wanted := false
 	for action in c.actions[:c.action_count] {if action.sequence == outcome.sequence {wanted = true; break}}
@@ -620,12 +762,14 @@ set_observer_policy :: proc(j: ^view.Journal(Net_Event($Event))) {
 // Local effects answer prediction; remote effects mature at the same observed
 // clock used by client_present. Gameplay ownership comes from Model.event_owner.
 client_remote_observed :: proc(c: ^Client($S, $C, $A, $E, $N)) {
+ if error:=client_access(c);error!=.None{return}
 	c.mixed_presentation = true
 	client_install_policy(c)
 }
 
 @(private)
 client_install_policy :: proc(c: ^Client($S, $C, $A, $E, $N)) {
+ if error:=client_access(c);error!=.None{return}
 	c.journal.policy, c.journal.context_policy, c.journal.policy_user = nil, nil, nil
 	if c.model.event_policy == nil && !c.mixed_presentation {
 		if c.spectator {set_observer_policy(&c.journal)}
@@ -634,6 +778,7 @@ client_install_policy :: proc(c: ^Client($S, $C, $A, $E, $N)) {
 	c.journal.policy_user = c
 	c.journal.context_policy = proc(user: rawptr, event: Net_Event(E)) -> view.Policy {
 		client := cast(^Client(S, C, A, E, N))user
+  if client_access(client)!=.None{return .Watched}
 		if client.spectator {return .Watched}
 		policy := view.Policy.Speculative
 		if event.kind == .Gameplay && client.model.event_policy != nil {policy = client.model.event_policy(event.value)}
@@ -644,6 +789,7 @@ client_install_policy :: proc(c: ^Client($S, $C, $A, $E, $N)) {
 
 @(private)
 client_presentation_failure :: proc(c:^Client($S,$C,$A,$E,$N),stage:Presentation_Stage,tick:u64,err:view.Error)->Error {
+ if error:=client_access(c);error!=.None{return error}
  j:=&c.journal
  c.presentation_failure={serial=c.presentation_failure.serial+1,stage=stage,error=err,
   epoch=j.epoch,tick=tick,head=c.timeline.head,confirmed=j.confirmed,watch_tick=j.watch_tick,queue_count=j.queue_count}
@@ -656,6 +802,7 @@ client_presentation_failure :: proc(c:^Client($S,$C,$A,$E,$N),stage:Presentation
 
 @(private)
 client_accept_facts :: proc(c:^Client($S,$C,$A,$E,$N),packet:Facts_Packet(E)) -> (error:Error) {
+ if error:=client_access(c);error!=.None{return error}
  if c.phase!=.Running {return}
  packet:=packet
 	if packet.tick <= c.baseline || packet.tick <= c.journal.confirmed {return}
@@ -682,4 +829,21 @@ client_accept_facts :: proc(c:^Client($S,$C,$A,$E,$N),packet:Facts_Packet(E)) ->
 	}
 	c.last_received = c.now
  return
+}
+
+@(private)
+client_access :: proc(c:^Client($S,$C,$A,$E,$N),access:r.Owner_Access=.Execute)->Error {
+ if c==nil{return .Invalid_Model}
+ if c.owner_cleanup {
+  for owner in c.owner_retains.owners[:c.owner_retains.count] {if r.owner_access(owner,.Read)!=.None{return .Invalid_Model}}
+  return access==.Read?Error.None:Error.Invalid_Model
+ }
+ if error:=runner_context_check(c.ownership,c.allocator,&c.model,c.model.complete_state,access);error!=.None{return error}
+ managed:=runner_managed(c.ownership)
+ if error:=model_context_check(c.model,managed,access);error!=.None{return error}
+ if error:=owned_context_check(c.ownership.wire,c.wire.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(c.ownership.permit,c.permit.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(c.ownership.profile_clock,c.profile_clock.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(c.ownership.profile_sample,c.profile_user,managed,access);error!=.None{return error}
+ return .None
 }

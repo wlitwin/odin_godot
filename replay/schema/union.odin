@@ -1,8 +1,6 @@
 package replay_schema
 
-import "core:fmt"
 import "core:reflect"
-import "core:strings"
 
 Union_Guard :: struct {parent,layout:int,tag:u64}
 Union_Layout :: struct {
@@ -18,13 +16,15 @@ union_layout :: proc(s:^Schema,base:^reflect.Type_Info,info:reflect.Type_Info_Un
 	width:=info.tag_type.size
 	if width!=1 && width!=2 && width!=4 && width!=8 {fail(s,.Unsupported_Type,path);return}
 	if int(info.tag_offset)+width>base.size {fail(s,.Unsupported_Type,path);return}
-	names:=make([]string,len(info.variants),s.allocator)
+	names:=metadata_slice(s,string,len(info.variants))
+	if s.problem.error!=.None{return}
 	owned:=false;defer if !owned {for name in names {delete(name,s.allocator)};delete(names,s.allocator)}
 	for variant,i in info.variants {
-		if named,ok:=variant.variant.(reflect.Type_Info_Named);ok {names[i]=fmt.aprintf("%s.%s",named.pkg,named.name)} else {names[i]=fmt.aprintf("%v",variant.id)}
+		if named,ok:=variant.variant.(reflect.Type_Info_Named);ok {names[i]=metadata_format(s,"%s.%s",named.pkg,named.name)} else {names[i]=metadata_format(s,"%v",variant.id)}
+		if s.problem.error!=.None{return}
 		if len(names[i])>1024 {fail(s,.Limit,path);return}
 	}
-	text:=fmt.aprintf("union:no_nil=%d:variants=%d{",int(info.no_nil),len(info.variants));append_text(s,text);delete(text,s.allocator)
+	text:=metadata_format(s,"union:no_nil=%d:variants=%d{",int(info.no_nil),len(info.variants));append_text(s,text);delete(text,s.allocator)
 	visible:=store && !(hidden && s.options.projection==.Public)
 	layout_index:=-1;payload_start:=s.wire_size
 	if visible {
@@ -32,18 +32,18 @@ union_layout :: proc(s:^Schema,base:^reflect.Type_Info,info:reflect.Type_Info_Un
 		layout_index=len(s.unions)
 		layout:=Union_Layout{field=len(s.fields),guard=guard,offset=offset,size=base.size,
 			tag_offset=offset+int(info.tag_offset),tag_width=width,wire_offset=s.wire_size,no_nil=info.no_nil,
-			variant_sizes=make([]int,len(info.variants),s.allocator),variant_names=names}
-		append(&s.unions,layout);owned=true
-		field:=Field{path=strings.clone(fmt.tprintf("%s.$tag",path),s.allocator),offset=layout.tag_offset,wire_offset=s.wire_size,width=4,kind=.Union_Tag,guard=guard,union_index=layout_index}
-		append(&s.fields,field);s.wire_size+=4;payload_start=s.wire_size
+			variant_sizes=metadata_slice(s,int,len(info.variants)),variant_names=names}
+		if !metadata_append(s,&s.unions,layout){delete(layout.variant_sizes,s.allocator);return};owned=true
+		field:=Field{path=metadata_format(s,"%s.$tag",path),offset=layout.tag_offset,wire_offset=s.wire_size,width=4,kind=.Union_Tag,guard=guard,union_index=layout_index}
+		if !metadata_append(s,&s.fields,field){delete(field.path,s.allocator);return};s.wire_size+=4;payload_start=s.wire_size
 	} else if store {s.excluded_fields+=1}
 	maximum:=0
 	for variant,i in info.variants {
-		description:=fmt.aprintf("%d:%s:",len(names[i]),names[i]);append_text(s,description);delete(description,s.allocator)
-		child_path:=fmt.aprintf("%s<%d:%s>",path,i+1,names[i]);defer delete(child_path,s.allocator)
+		description:=metadata_format(s,"%d:%s:",len(names[i]),names[i]);append_text(s,description);delete(description,s.allocator)
+		child_path:=metadata_format(s,"%s<%d:%s>",path,i+1,names[i]);defer delete(child_path,s.allocator)
 		child_guard:=guard
 		if visible {
-			child_guard=len(s.guards);append(&s.guards,Union_Guard{guard,layout_index,u64(i+1)})
+			child_guard=len(s.guards);if !metadata_append(s,&s.guards,Union_Guard{guard,layout_index,u64(i+1)}){return}
 			s.wire_size=payload_start
 		}
 		walk(s,variant,offset,child_path,hidden,depth+1,store,child_guard)

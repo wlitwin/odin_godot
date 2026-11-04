@@ -1,0 +1,16 @@
+{
+	admin off
+	auto_https off
+}
+
+{$DOCKYARD_HTTPS_ADDRESS} {
+	tls {$DOCKYARD_TLS_CERT} {$DOCKYARD_TLS_KEY}
+	root * {$DOCKYARD_WEB_ROOT}
+	header {
+		Cross-Origin-Opener-Policy same-origin
+		Cross-Origin-Embedder-Policy require-corp
+		Cross-Origin-Resource-Policy same-origin
+	}
+	encode gzip
+	file_server
+}

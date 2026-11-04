@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "result": "RENDERED_AUDIO_FUNCTIONAL_PASS_HUMAN_PENDING",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "actual_cases": {
+    "render-audio-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/render-audio-v1/report.json",
+      "sha256": "7b6e64be7074808f52a5b428484657e5c2eb7ccca861dbdb265cb5ec791cf580",
+      "binding_sha256": "4dd3d6dad985d2e46f3e56bfba17fcf821bfbb5ba41fe5046dc4428fe712c1c9",
+      "helper_source_fence": true,
+      "ticks": 6000,
+      "scope": "Actual headed rendered Chrome production play, browser recording and real WebAudio signal, same-artifact complete physics pair. No hardware frame-budget or human-playtest qualification.",
+      "graphics": {
+        "host": {
+          "available": true,
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+          "vendor": "Google Inc. (Apple)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "width": 1280,
+          "height": 720,
+          "dpr": 1
+        },
+        "client": {
+          "available": true,
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+          "vendor": "Google Inc. (Apple)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "width": 1280,
+          "height": 720,
+          "dpr": 1
+        }
+      },
+      "audio": {
+        "host": [
+          {
+            "samples": 3180,
+            "active_samples": 48,
+            "max_rms": 0.16863759325665775,
+            "state": "closed"
+          }
+        ],
+        "client": [
+          {
+            "samples": 3046,
+            "active_samples": 50,
+            "max_rms": 0.24846959908710256,
+            "state": "closed"
+          }
+        ]
+      },
+      "artifacts": {
+        "play.png": {
+          "sha256": "bbe80aeb8e19d05aa99d59ef61277f89d6e84dabd2823b78d648a03b5b82ff61",
+          "bytes": 143206
+        },
+        "settings.png": {
+          "sha256": "4c44f39db8da060ff3e6d3ad9a2c296e936d440b7689b08f5a6a575a7852f74e",
+          "bytes": 147331
+        },
+        "play.webm": {
+          "sha256": "2eecde5bbf208a6afe42a6ff3d5a76dc58cc5569013bba3e984e5aef68fcfd21",
+          "bytes": 33416712
+        }
+      }
+    },
+    "render-audio-v2": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/render-audio-v2/report.json",
+      "sha256": "f9d68aa5017b83cd25a9442b5c4d314137062e97616969619ce6f93f6cd4d81b",
+      "binding_sha256": "59de74ae50acd1acbb8f2761f4f2b91e6f59125f073199d26713fe2222a4057c",
+      "helper_source_fence": true,
+      "ticks": 1200,
+      "scope": "Actual headed rendered Chrome production play, browser recording and real WebAudio signal, same-artifact complete physics pair. No hardware frame-budget or human-playtest qualification.",
+      "graphics": {
+        "host": {
+          "available": true,
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+          "vendor": "Google Inc. (Apple)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "width": 1280,
+          "height": 720,
+          "dpr": 1
+        },
+        "client": {
+          "available": true,
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+          "vendor": "Google Inc. (Apple)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "width": 1280,
+          "height": 720,
+          "dpr": 1
+        }
+      },
+      "audio": {
+        "host": [
+          {
+            "samples": 769,
+            "active_samples": 20,
+            "max_rms": 0.24894076288347416,
+            "state": "closed"
+          }
+        ],
+        "client": [
+          {
+            "samples": 697,
+            "active_samples": 21,
+            "max_rms": 0.24894076288347416,
+            "state": "closed"
+          }
+        ]
+      },
+      "artifacts": {
+        "play.png": {
+          "sha256": "0e6537e854af71cc7134ee0b6edc67e35fbebd9dd9050baf1ea7bf502c5b0b27",
+          "bytes": 140178
+        },
+        "settings.png": {
+          "sha256": "42eea4214c79a811b4285b91197acac5530b5f0b7b12d46c000857c7a110f95a",
+          "bytes": 143185
+        },
+        "play.webm": {
+          "sha256": "44f1d87e5fffd943a4d325fe2d5097b8921128680551f2133e5fce7a8652a54b",
+          "bytes": 5805917
+        }
+      }
+    }
+  },
+  "physics_model_controller_round_unchanged": {
+    "model.odin": true,
+    "controller.odin": true,
+    "round.odin": true
+  },
+  "authoritative_content_byteexact": true,
+  "profile": {
+    "bodies": 19,
+    "shapes": 19,
+    "geometries": 8,
+    "joints": 1
+  },
+  "audio_assets": {
+    "boost.wav": {
+      "sha256": "4e5137b6674a69c56dee501923a24476d108e010fe0edfbdfbcf87392c305211",
+      "bytes": 22094,
+      "channels": 1,
+      "sample_rate": 44100,
+      "sample_width": 2,
+      "frames": 11025
+    },
+    "latch_score.wav": {
+      "sha256": "aa33ae28b8ba6976c111c5e48d18c921021fa8371f3fe6c8c78309b27647dc1d",
+      "bytes": 63548,
+      "channels": 1,
+      "sample_rate": 44100,
+      "sample_width": 2,
+      "frames": 31752
+    }
+  },
+  "sources_sha256": {
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/view.gd": "0bf725b55d7ff57d3cc20689865a2858aafe861c74f182e99d14a129663b8fa0",
+    "examples/replay_dockyard/README.md": "f80d111bd4c494931a24676874a2d4e24fc1902f724e2da0468050d0c898d3a0",
+    "examples/replay_dockyard/launch.py": "266ba66413c7aae5b2eae1cc3c81a30c7f31e881964adecc81ba4d5e0898f852",
+    "examples/replay_dockyard/CONTRIBUTING.md": "c7b8e591aca77019cdeb67516b1bc9caa776ab872eed84848e55e646cf8314b3",
+    "examples/replay_dockyard/odin_godot.gdextension": "88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/export_presets.cfg": "23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4",
+    "examples/replay_dockyard/feedback.gd": "cf9d60fc8072b73d39fd87855f7153b37cf2f8e4eac2f7ceca7e9d25c6f4add2",
+    "examples/replay_dockyard/prepare.py": "2feab6ca84f5471fbcc7c8801824468f3a35d1c27bf7ab9666f373ac28a5c1e7",
+    "examples/replay_dockyard/deploy/turnserver.conf.template": "aa3f9634e88070fc3e49c41068b2b00b75d656bd96944f9cd031ef80d3420f69",
+    "examples/replay_dockyard/deploy/README.md": "ebc01f0c1564c912f1fafa9b18d4fac5a173d625ddadcdde0d5132c0b400e89f",
+    "examples/replay_dockyard/deploy/Caddyfile": "21bb872dc97f89a03aa4147d1250011b7b7d33a5022a2754680e19aaddf0a357",
+    "examples/replay_dockyard/deploy/service.env.example": "d877e58ac12d7dc1643b42bcd1dfc295869e4dca0e7a60becc8c6e1f6adddef5",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/delivery.tres": "9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/ramp.tres": "08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/robot.tres": "36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9",
+    "examples/replay_dockyard/content/world.tscn": "164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/barge.tres": "28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b",
+    "examples/replay_dockyard/audio/boost.wav": "4e5137b6674a69c56dee501923a24476d108e010fe0edfbdfbcf87392c305211",
+    "examples/replay_dockyard/audio/PROVENANCE.md": "292bace6d2306829e2fc49855ea2b05b33788bfcf0a71f53f3584feb4601e93d",
+    "examples/replay_dockyard/audio/latch_score.wav": "aa33ae28b8ba6976c111c5e48d18c921021fa8371f3fe6c8c78309b27647dc1d",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/online.odin": "c5d4f712149af837a0482938a673ac0dd4a8ec8543504d999a9b5c0df8420a58",
+    "examples/replay_dockyard/modules/dockyard/controller.odin": "67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "1363e842752e689aad606036f4901657777f9229a8fcc49522a7c3318e7b18a3",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "74b42e7e11e5bb7766b365db6d903ad93abc653731c1efcc19b49ca1c87f7750",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "93eab4969a63c4a0baa07933ecbec3daf6ab0a322d42357d97f1421e2a9eb24c",
+    "examples/replay_dockyard/modules/dockyard/online_web.odin": "4bfbe438239d11dc02cd6e3691e92d62a2843f76822bb4cff46a511a6feb9101",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "2648d4761fedc22b698cc5afcf2bce90831534ff25facbc4c397178004221054",
+    "examples/replay_dockyard/modules/dockyard/launch.odin": "85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "c347102fe21d4b879a8382040e161c392eb6ed988eb1139856dffeaebd29a40e",
+    "examples/replay_dockyard/modules/dockyard/round.odin": "f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/online_native.odin": "2376ed53709d043d99e7f90ebe56ae61af5c5549ff0d7e5e527b9cc340fa0577",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "1efea61273f1c12e86d1a08f108c8a5b070bf64c0f6199c23cacb894a1de7872",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "tests/replay_dockyard/presentation/run.py": "e9a8499b186fcba00abd53a59c593058041fd3b84fb71a3bb1d7daa8525cb0d5",
+    "tests/replay_dockyard/presentation/drive.mjs": "f84126143ef930165af5385412a9a493a1ffdda5ea3e8b68d973d867079ef181",
+    "tests/replay_dockyard/presentation/serve.py": "37520facf1443215e46ddc980669f1453a0c38d24a315e61a7022ab08babbfe4",
+    "tests/replay_dockyard/presentation/make_audio.py": "08e6debaea5facc01719739b203014cc6efefa0fadfefda89d3d513c9092d2fe",
+    "tests/replay_dockyard/presentation/README.md": "325e6564771decb11dee16a697d1a488025cbe77c42c5ee81ff3966d3ee476ae",
+    "tests/replay_dockyard/online/run.py": "7f63d7e3e96cbafeb87147e9e758c775dd2fef5aebc03ffc64a5c227b420323a",
+    "tests/replay_dockyard/online/drive.mjs": "c84f0417e87de5efafb2e1170b09307786735de794d178af30586b4a7c4092e1"
+  },
+  "presentation": "Bounded confirmed Cue_Route FIFO16, four voices and four16-instance cosmetic burst pools; local sound/camera/reduced-effects settings; readable labels/light and onboarding. No event inferred from score/head and no Native contact-stream claim.",
+  "human_feedback": {
+    "status": "NOT_OBSERVED",
+    "two_person_coop_review": "PENDING",
+    "async_question_presented": true,
+    "interactive_server": {
+      "terminal": "t1fd",
+      "record": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/human-play-v1/interactive.json",
+      "public_internet_claim": false
+    },
+    "automated_agents_or_screenshots_substituted_for_humans": false
+  },
+  "limits": [
+    "Actual AppleM3 GPU, viewport1280x720/DPR1 observed; no frame-time/memory/load contract qualification inferred.",
+    "WebM output is recorder30FPS, not measured gameFPS.",
+    "Nonzero actual WebAudio output is an electrical signal observation, not human hearing/fun/usability feedback.",
+    "The first6000-tick capture and the shorter readability capture are different frozen source versions; exact scopes/hashes retained.",
+    "N1 public Internet acceptance remains blocked; current interactive server is private loopback only."
+  ]
+}

@@ -1,7 +1,11 @@
 #+build darwin, linux
 package replay_authority_sqlite
 
-foreign import sqlite "system:sqlite3"
+// Explicit static archives let strict native SDKs retain the existing dependency
+// admission policy. The ordinary dynamic default remains unchanged.
+SQLITE_LIBRARY :: #config(REPLAY_SQLITE_LIBRARY, "system:sqlite3")
+SQLITE_LINK_LIBRARY :: "system:"+SQLITE_LIBRARY when len(SQLITE_LIBRARY)>0&&SQLITE_LIBRARY[0]=='/' else SQLITE_LIBRARY
+foreign import sqlite {SQLITE_LINK_LIBRARY}
 DB :: distinct rawptr
 Statement :: distinct rawptr
 foreign sqlite {

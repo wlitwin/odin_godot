@@ -1,0 +1,129 @@
+name: Box3D native C ABI
+on:
+  push:
+    paths: ['box3d/**', 'tests/box3d_native/**', 'tests/box3d_upgrade/**', 'tests/box3d_recovery/**', 'tests/box3d_modules/native/**', 'tests/box3d_authoring/native/**', 'tests/box3d_motion/native/**', 'tests/box3d_soak/native_observe/**', 'tests/box3d_desktop/**', 'build/build_box3d.sh', 'build/box3d_ci.py', '.github/workflows/box3d.yml']
+  pull_request:
+    paths: ['box3d/**', 'tests/box3d_native/**', 'tests/box3d_upgrade/**', 'tests/box3d_recovery/**', 'tests/box3d_modules/native/**', 'tests/box3d_authoring/native/**', 'tests/box3d_motion/native/**', 'tests/box3d_soak/native_observe/**', 'tests/box3d_desktop/**', 'build/build_box3d.sh', 'build/box3d_ci.py', '.github/workflows/box3d.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+        configuration: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Archive identity (exact source pin, portable across targets)
+        id: archive
+        shell: bash
+        run: |
+          python3 build/box3d_ci.py identity > "$RUNNER_TEMP/archive-identity.json"
+          python3 - "$RUNNER_TEMP/archive-identity.json" >> "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          print('key='+json.load(open(sys.argv[1]))['key'])
+          PY
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ runner.temp }}/box3d-source-archives
+          key: ${{ steps.archive.outputs.key }}
+          enableCrossOsArchive: true
+      - name: Verify and restore archive only (corruption fails, MISS is explicit)
+        shell: bash
+        run: python3 build/box3d_ci.py restore --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --native-cache "$RUNNER_TEMP/ogb3"
+      - name: Pure cache/planner controls
+        run: python3 -B -m unittest discover -s tests/box3d_desktop -p '*_test.py' -v
+      - name: Build exact sources and run static/shared and lifecycle tests
+        shell: bash
+        env:
+          CC: clang
+          JOBS: '4'
+        run: bash build/build_box3d.sh '${{ matrix.configuration }}' "$RUNNER_TEMP/ogb3"
+      - name: Publish verified immutable source archive (never build outputs/verdicts)
+        shell: bash
+        run: python3 build/box3d_ci.py store --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --archive "$RUNNER_TEMP/ogb3/box3d.tar"
+      - name: Require the actual registered thirteen-test matrix
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/ogb3/build/${{ matrix.configuration }}/build-manifest.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          assert d['ctest']=='passed' and set(d['test_names'])==expected,d
+          PY
+      - name: Inspect exported flat API and C-only dependencies
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/ogb3/build/${{ matrix.configuration }}" <<'PY'
+          import pathlib,subprocess,sys
+          b=pathlib.Path(sys.argv[1]);lib=next(iter(b.glob('libogb3.dylib')),None) or b/'libogb3.so'
+          symbols=subprocess.check_output(['nm','-gU',str(lib)] if sys.platform=='darwin' else ['nm','-D','--defined-only',str(lib)],text=True)
+          exported=[line.split()[-1].lstrip('_') for line in symbols.splitlines() if line.split()]
+          assert all(name.startswith('ogb3_') for name in exported),exported
+          for name in ['ogb3_world_create','ogb3_body_create','ogb3_snapshot_capture','ogb3_state_digest']:
+              assert name in symbols,name
+          output=subprocess.check_output(['otool','-L',str(lib)] if sys.platform=='darwin' else ['ldd',str(lib)],text=True)
+          print(output)
+          assert not any(s in output.lower() for s in ['godot','libc++','libstdc++'])
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ogb3-${{ matrix.os }}-${{ matrix.configuration }}
+          path: |
+            ${{ runner.temp }}/ogb3/build/${{ matrix.configuration }}/build-manifest.json
+            ${{ runner.temp }}/ogb3/build/${{ matrix.configuration }}/compile_commands.json
+            ${{ runner.temp }}/ogb3/build/${{ matrix.configuration }}/CMakeCache.txt
+            ${{ runner.temp }}/ogb3/build/${{ matrix.configuration }}/Testing/Temporary/LastTest.log
+            box3d/native/THIRD_PARTY_NOTICES.txt
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Archive identity
+        id: archive
+        shell: bash
+        run: |
+          python3 build/box3d_ci.py identity > "$RUNNER_TEMP/archive-identity.json"
+          python3 - "$RUNNER_TEMP/archive-identity.json" >> "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          print('key='+json.load(open(sys.argv[1]))['key'])
+          PY
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ runner.temp }}/box3d-source-archives
+          key: ${{ steps.archive.outputs.key }}
+          enableCrossOsArchive: true
+      - name: Restore checked source archive only
+        run: python3 build/box3d_ci.py restore --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --native-cache "$RUNNER_TEMP/ogb3-sanitizers"
+      - name: Debug address and undefined behavior sanitizer gate (no exclusions)
+        shell: bash
+        env:
+          CC: clang
+          JOBS: '4'
+          CMAKE_ARGS: '["-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer", "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined", "-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined"]'
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: bash build/build_box3d.sh Debug "$RUNNER_TEMP/ogb3-sanitizers"
+      - name: Store immutable checked archive
+        run: python3 build/box3d_ci.py store --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --archive "$RUNNER_TEMP/ogb3-sanitizers/box3d.tar"
+      - name: Require all thirteen sanitizer tests
+        run: |
+          python3 - "$RUNNER_TEMP/ogb3-sanitizers/build/Debug/build-manifest.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          assert d['ctest']=='passed' and set(d['test_names'])==expected,d
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ogb3-linux-sanitizers
+          path: |
+            ${{ runner.temp }}/ogb3-sanitizers/build/Debug/build-manifest.json
+            ${{ runner.temp }}/ogb3-sanitizers/build/Debug/compile_commands.json
+            ${{ runner.temp }}/ogb3-sanitizers/build/Debug/Testing/Temporary/LastTest.log

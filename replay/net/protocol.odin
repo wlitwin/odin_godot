@@ -5,7 +5,7 @@ import r "godot:replay"
 import sc "godot:replay/schema"
 
 @(private)
-Kind :: enum u16 {Hello = 1, Welcome, Reject, Inputs, Action, Facts, Snapshot, Resync, Heartbeat, Snapshot_Delta, Snapshot_Ack, Baseline_Miss, Removed, Observation, Inputs_Compact, Features, Snapshot_Part, Snapshot_Delta_Lz4, Recent_Facts, Epoch_Query, Epoch_Reply, Facts_Request, Snapshot_Parity, Snapshot_Delta_Shuffled, Recent_Actions, Observation_Compact, Recent_Facts_Compact}
+Kind :: enum u16 {Hello = 1, Welcome, Reject, Inputs, Action, Facts, Snapshot, Resync, Heartbeat, Snapshot_Delta, Snapshot_Ack, Baseline_Miss, Removed, Observation, Inputs_Compact, Features, Snapshot_Part, Snapshot_Delta_Lz4, Recent_Facts, Epoch_Query, Epoch_Reply, Facts_Request, Snapshot_Parity, Snapshot_Delta_Shuffled, Recent_Actions, Observation_Compact, Recent_Facts_Compact, Physics_Part, Physics_Ack, Physics_Facts, Physics_Request}
 
 @(private)
 Hello_Packet :: struct {contract: u64, token: Token, spectator: bool, sent_ms, incarnation: u64}

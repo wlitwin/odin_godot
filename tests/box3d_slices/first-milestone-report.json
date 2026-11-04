@@ -1,0 +1,750 @@
+{
+  "result": "PASS first small4 independent actual Godot ENet milestone for BOTH siblings",
+  "scope": "P4.2 root card support only; not whole task/board completion",
+  "task": "t_1b345a977988442b",
+  "root_worker": "box3d-slices",
+  "helper_terminal": "t1q",
+  "own_edits": [
+    "tests/box3d_slices/run.py",
+    "tests/box3d_slices/harness/"
+  ],
+  "cases": [
+    {
+      "framework": "kit",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-kit-v2/report.json",
+      "sha256": "37a78b5103df1fdd8eee35ab2c2847beb9e507db431f8720b0a481bcb31e526d",
+      "bytes": 10211,
+      "source_inventory": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-kit-v2/kit/sources-before.json",
+        "sha256": "51835ad2fe1c38bb88c58f45845ec1e0aaca0ced4eebf568cf6c08436e22f8e7",
+        "count": 508
+      },
+      "source_fence_unchanged": true,
+      "native": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.dylib",
+        "sha256": "454a18577ad73b003291b826647c7972d0afc5f66b76c70bed29f804bd9b41bd"
+      },
+      "binaries": {
+        "bin/.box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bin/box3d-runtime.json": "4fc1ea9088be47a2a68846837ebbd2317c23467185970f87886931491813b113",
+        "bin/libodin_godot.dylib": "0897d68df5af1f9dabaf14aa5fb6c2729ee4c884d748143f5855c84d93e8ff9a",
+        "bin/libodinscripts.dylib": "0d9755e7a3c9c7f6cc24cf19cf2074c11e19a81d549cb2dc66d9a13e5de84c08",
+        "bin/libogb3.dylib": "f17d514184a03066c23533b17737577070fe960cc6bcc9e83d0db7ab63722ba8"
+      },
+      "processes": [
+        {
+          "role": "host",
+          "pid": 11223,
+          "command": [
+            "/Applications/Godot.app/Contents/MacOS/Godot",
+            "--headless",
+            "--max-fps",
+            "60",
+            "--path",
+            "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-kit-v2/kit/project"
+          ],
+          "exit_code": 0,
+          "log_sha256": "7515eff99b5483806f8fa1ef7a600a639b94527848296ee2e33c6b1eed36aee4",
+          "log_bytes": 4977,
+          "ready": {
+            "event": "READY",
+            "framework": "kit",
+            "role": "host",
+            "seat": 1,
+            "me": 1,
+            "players": [
+              1,
+              2
+            ],
+            "baseline": 0,
+            "target": 240,
+            "initial": 4,
+            "seed": 1
+          },
+          "result": {
+            "event": "RESULT",
+            "framework": "kit",
+            "role": "host",
+            "tick": 240,
+            "ok": true,
+            "errors": 0,
+            "engine_live": 0,
+            "wrapper_live": 0,
+            "meter_live": 0,
+            "cleanup_errors": 0,
+            "native_stats_ok": true
+          },
+          "observed_frames": 8,
+          "events": 30
+        },
+        {
+          "role": "client",
+          "pid": 11224,
+          "command": [
+            "/Applications/Godot.app/Contents/MacOS/Godot",
+            "--headless",
+            "--max-fps",
+            "60",
+            "--path",
+            "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-kit-v2/kit/project"
+          ],
+          "exit_code": 0,
+          "log_sha256": "e12695d99076bbcdc33d989ff6c3e20e150c716119992c76bdf78c29e63f3c91",
+          "log_bytes": 5031,
+          "ready": {
+            "event": "READY",
+            "framework": "kit",
+            "role": "client",
+            "seat": 2,
+            "me": 2,
+            "players": [
+              1,
+              2
+            ],
+            "baseline": 0,
+            "target": 240,
+            "initial": 4,
+            "seed": 1
+          },
+          "result": {
+            "event": "RESULT",
+            "framework": "kit",
+            "role": "client",
+            "tick": 240,
+            "ok": true,
+            "errors": 0,
+            "engine_live": 0,
+            "wrapper_live": 0,
+            "meter_live": 0,
+            "cleanup_errors": 0,
+            "native_stats_ok": true
+          },
+          "observed_frames": 8,
+          "events": 30
+        }
+      ],
+      "cleanup": [
+        {
+          "engine": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "cleanup_errors": 0,
+          "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed"
+        },
+        {
+          "engine": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "cleanup_errors": 0,
+          "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed"
+        }
+      ],
+      "agreement": {
+        "epoch": 1,
+        "welcome_baseline": 0,
+        "confirmed_end": 240,
+        "compared_confirmed_frames": 8,
+        "actual_verdicts": {
+          "Spawn": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 40,
+              "seat": 1,
+              "kind": 1,
+              "applied": true,
+              "origin": 3,
+              "sequence": 40,
+              "accepted": true
+            }
+          ],
+          "Remove": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 56,
+              "seat": 1,
+              "kind": 2,
+              "applied": true,
+              "origin": 3,
+              "sequence": 56,
+              "accepted": true
+            }
+          ],
+          "Motor": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 80,
+              "seat": 1,
+              "kind": 3,
+              "applied": true,
+              "origin": 3,
+              "sequence": 80,
+              "accepted": true
+            }
+          ],
+          "Sleep": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 120,
+              "seat": 1,
+              "kind": 4,
+              "applied": true,
+              "origin": 3,
+              "sequence": 120,
+              "accepted": true
+            }
+          ],
+          "Wake": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 136,
+              "seat": 1,
+              "kind": 5,
+              "applied": true,
+              "origin": 3,
+              "sequence": 136,
+              "accepted": true
+            }
+          ],
+          "Query": [
+            {
+              "event": "APPLIED",
+              "framework": "kit",
+              "epoch": 1,
+              "tick": 160,
+              "seat": 2,
+              "kind": 6,
+              "applied": true,
+              "origin": 1,
+              "sequence": 160,
+              "accepted": true
+            }
+          ]
+        },
+        "rejected_second_spawn": [
+          {
+            "event": "APPLIED",
+            "framework": "kit",
+            "epoch": 1,
+            "tick": 40,
+            "seat": 2,
+            "kind": 1,
+            "applied": false,
+            "origin": 1,
+            "sequence": 40,
+            "accepted": true
+          }
+        ],
+        "overlapping_decisions": 7,
+        "reconciled_effects": 12,
+        "recovery": []
+      }
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v6/report.json",
+      "sha256": "caa9c1dbfd6c089e8d163bf9f432a1508f1adca95f627f5226a36bb99f5e039b",
+      "bytes": 26907,
+      "source_inventory": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-replay-v6/replay/sources-before.json",
+        "sha256": "9aa8a0d0b9f5cc025bd820995be22357c764229dd0b233a519baf6d57f2c298f",
+        "count": 508
+      },
+      "source_fence_unchanged": true,
+      "native": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.dylib",
+        "sha256": "454a18577ad73b003291b826647c7972d0afc5f66b76c70bed29f804bd9b41bd"
+      },
+      "binaries": {
+        "bin/.box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bin/box3d-runtime.json": "52022d0979554f73c87e0dad237b84f695ee72de368259e318d1da6d0db1e54c",
+        "bin/libodin_godot.dylib": "7673240967a0a6177e9def20e8e4e1bd563baddbd84d4fbf1115f5e4c8f5fc7c",
+        "bin/libodinscripts.dylib": "b0ed430f829ef50e595e8a68b3e0a36e06c290d0c61e554406163163674864aa",
+        "bin/libogb3.dylib": "f17d514184a03066c23533b17737577070fe960cc6bcc9e83d0db7ab63722ba8"
+      },
+      "processes": [
+        {
+          "role": "host",
+          "pid": 17706,
+          "command": [
+            "/Applications/Godot.app/Contents/MacOS/Godot",
+            "--headless",
+            "--max-fps",
+            "60",
+            "--path",
+            "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-replay-v6/replay/project"
+          ],
+          "exit_code": 0,
+          "log_sha256": "439777ec2b3e69bc4fa0c3c36a9bed34be8f958eb624903a76a9c1051e80161b",
+          "log_bytes": 116143,
+          "ready": {
+            "role": "host",
+            "epoch": 1,
+            "seat": 1,
+            "stage": "complete_welcome",
+            "baseline": 1,
+            "target": 241,
+            "snapshot_every": 1
+          },
+          "result": {
+            "role": "host",
+            "cleanup": "None",
+            "engine_live": 0,
+            "wrapper_live": 0,
+            "meter_live": 0,
+            "owners_live": 0,
+            "managed_callbacks_live": 0,
+            "callback_status": 0,
+            "ok": true,
+            "tick": 241,
+            "fx": 12
+          },
+          "observed_frames": 241,
+          "events": 755
+        },
+        {
+          "role": "client",
+          "pid": 17707,
+          "command": [
+            "/Applications/Godot.app/Contents/MacOS/Godot",
+            "--headless",
+            "--max-fps",
+            "60",
+            "--path",
+            "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/slices-first-replay-v6/replay/project"
+          ],
+          "exit_code": 0,
+          "log_sha256": "76c394e88eb392bc3e2c10f2aeb72c7e71834d82e06de1695fc0edd0dd2b1e32",
+          "log_bytes": 114185,
+          "ready": {
+            "role": "client",
+            "epoch": 1,
+            "seat": 2,
+            "stage": "complete_welcome",
+            "baseline": 1,
+            "target": 241,
+            "snapshot_every": 1
+          },
+          "result": {
+            "role": "client",
+            "cleanup": "None",
+            "engine_live": 0,
+            "wrapper_live": 0,
+            "meter_live": 0,
+            "owners_live": 0,
+            "managed_callbacks_live": 0,
+            "callback_status": 0,
+            "ok": true,
+            "tick": 241,
+            "fx": 17
+          },
+          "observed_frames": 229,
+          "events": 742
+        }
+      ],
+      "cleanup": [
+        {
+          "engine": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "managed_callbacks": 0,
+          "owners": 0
+        },
+        {
+          "engine": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "managed_callbacks": 0,
+          "owners": 0
+        }
+      ],
+      "agreement": {
+        "epoch": 1,
+        "welcome_baseline": 1,
+        "confirmed_end": 241,
+        "compared_confirmed_frames": 229,
+        "actual_verdicts": {
+          "Spawn": [
+            {
+              "epoch": 1,
+              "tick": 40,
+              "seat": 1,
+              "kind": "Spawn",
+              "applied": true,
+              "sequence": 1,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ],
+          "Remove": [
+            {
+              "epoch": 1,
+              "tick": 56,
+              "seat": 1,
+              "kind": "Remove",
+              "applied": true,
+              "sequence": 2,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ],
+          "Motor": [
+            {
+              "epoch": 1,
+              "tick": 80,
+              "seat": 1,
+              "kind": "Motor",
+              "applied": true,
+              "sequence": 3,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ],
+          "Sleep": [
+            {
+              "epoch": 1,
+              "tick": 120,
+              "seat": 1,
+              "kind": "Sleep",
+              "applied": true,
+              "sequence": 4,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ],
+          "Wake": [
+            {
+              "epoch": 1,
+              "tick": 136,
+              "seat": 1,
+              "kind": "Wake",
+              "applied": true,
+              "sequence": 5,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ],
+          "Query": [
+            {
+              "epoch": 1,
+              "tick": 160,
+              "seat": 2,
+              "kind": "Query",
+              "applied": true,
+              "sequence": 2,
+              "reason": "None",
+              "origin": "Sample",
+              "generation": 1,
+              "serial": 1,
+              "incarnation": 0,
+              "accepted": true
+            }
+          ]
+        },
+        "rejected_second_spawn": [
+          {
+            "epoch": 1,
+            "tick": 40,
+            "seat": 2,
+            "kind": "Spawn",
+            "applied": false,
+            "sequence": 1,
+            "reason": "Predicate",
+            "origin": "Sample",
+            "generation": 1,
+            "serial": 1,
+            "incarnation": 0,
+            "accepted": true
+          }
+        ],
+        "overlapping_decisions": 7,
+        "reconciled_effects": 8,
+        "recovery": [],
+        "intent_causality": [
+          {
+            "role": "host",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 40,
+              "original_requested_tick": 40,
+              "sampled_head": 39,
+              "sampled_tick": 40,
+              "submitted_tick": 40,
+              "seat": 1,
+              "kind": "Spawn",
+              "sequence": 1,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 40,
+              "seat": 1,
+              "kind": "Spawn",
+              "applied": true,
+              "sequence": 1,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "host",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 56,
+              "original_requested_tick": 56,
+              "sampled_head": 55,
+              "sampled_tick": 56,
+              "submitted_tick": 56,
+              "seat": 1,
+              "kind": "Remove",
+              "sequence": 2,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 56,
+              "seat": 1,
+              "kind": "Remove",
+              "applied": true,
+              "sequence": 2,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "host",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 80,
+              "original_requested_tick": 80,
+              "sampled_head": 79,
+              "sampled_tick": 80,
+              "submitted_tick": 80,
+              "seat": 1,
+              "kind": "Motor",
+              "sequence": 3,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 80,
+              "seat": 1,
+              "kind": "Motor",
+              "applied": true,
+              "sequence": 3,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "host",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 120,
+              "original_requested_tick": 120,
+              "sampled_head": 119,
+              "sampled_tick": 120,
+              "submitted_tick": 120,
+              "seat": 1,
+              "kind": "Sleep",
+              "sequence": 4,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 120,
+              "seat": 1,
+              "kind": "Sleep",
+              "applied": true,
+              "sequence": 4,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "host",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 136,
+              "original_requested_tick": 136,
+              "sampled_head": 135,
+              "sampled_tick": 136,
+              "submitted_tick": 136,
+              "seat": 1,
+              "kind": "Wake",
+              "sequence": 5,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 136,
+              "seat": 1,
+              "kind": "Wake",
+              "applied": true,
+              "sequence": 5,
+              "reason": "None",
+              "origin": "Local",
+              "generation": 0,
+              "serial": 0,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "client",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 40,
+              "original_requested_tick": 40,
+              "sampled_head": 39,
+              "sampled_tick": 40,
+              "submitted_tick": 40,
+              "seat": 2,
+              "kind": "Spawn",
+              "sequence": 1,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 40,
+              "seat": 2,
+              "kind": "Spawn",
+              "applied": false,
+              "sequence": 1,
+              "reason": "Predicate",
+              "origin": "Sample",
+              "generation": 1,
+              "serial": 1,
+              "incarnation": 0,
+              "accepted": true
+            }
+          },
+          {
+            "role": "client",
+            "issued": {
+              "epoch": 1,
+              "requested_tick": 160,
+              "original_requested_tick": 160,
+              "sampled_head": 159,
+              "sampled_tick": 160,
+              "submitted_tick": 160,
+              "seat": 2,
+              "kind": "Query",
+              "sequence": 2,
+              "rebased_before_sampling": false,
+              "recovery_serial": 0
+            },
+            "published": {
+              "epoch": 1,
+              "tick": 160,
+              "seat": 2,
+              "kind": "Query",
+              "applied": true,
+              "sequence": 2,
+              "reason": "None",
+              "origin": "Sample",
+              "generation": 1,
+              "serial": 1,
+              "incarnation": 0,
+              "accepted": true
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "kit_pending_end_audit": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-kit-v2/pending-end-audit.json",
+  "no_truth_injection": true,
+  "test_path": "Normal existing framework Session/transport/runner/Timeline or Lane and official Godot independent OS processes; no mock transport or replacement simulation. Existing P4.1 SDK Native deployment/preflight/helpers reused.",
+  "limitations": [
+    "Mac Release small4 only; no Linux or other configuration claimed for these new cases.",
+    "Kit recovery code exists but no episode observed in passing case; not exercised evidence.",
+    "Replay canonical-rebase intent exception exists but zero rebased intents observed in passing case; not exercised evidence.",
+    "Native images are exact same build/target within sibling; no mixed Mac/Linux exact-physics claim.",
+    "Source snapshots differ between historical case attempts; each immutable case retains exact compiled binaries/logs/source before/after inventory.",
+    "Whole-call4ms and remaining GateB/long-soak/P4.2 staged roles/envelope/rejoin remain open."
+  ],
+  "historical_failures": [
+    {
+      "framework": "kit",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-kit-v1",
+      "reason": "actual RepairLimit7 athead22 confirmed18; failed, never relabeled"
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v1",
+      "reason": "authority exited241 without actualclienttarget acknowledgement; client239 timeout"
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v2",
+      "reason": "sample attempted unavailable crossed-anchor complete checkpoint"
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v3",
+      "reason": "bootstrap FRAME exported before actualcompleteREADY"
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v4",
+      "reason": "bothruntime241/exits0 but unstructuredTAIL diagnostics rejected byreader; failedreportunchanged"
+    },
+    {
+      "framework": "replay",
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/slices-first-replay-v5",
+      "reason": "sample guard conflated unsampled threshold age with input age aftercanonicalrebase; failed, approvedfreshintent semantics only inlatercase"
+    }
+  ]
+}

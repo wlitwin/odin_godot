@@ -8,6 +8,9 @@ import auth "godot:replay/authority"
 import gd "godot:godot"
 import "godot:gdext"
 import tr "godot:replay/transport"
+import r "godot:replay"
+import bg "godot:box3d/godot"
+import rt "godot:runtime"
 
 // Raw WebRTC data channels. Owns all Godot objects; never installs MultiplayerAPI.
 // Keep Rtc at a stable address from rtc_open until rtc_close. The signaling relay
@@ -37,6 +40,10 @@ Rtc_Config :: struct {
  continuation: Rtc_Continuation,
 }
 Rtc :: struct {
+ ownership:Rtc_Ownership,
+ retained:r.Owner_Retains,
+ cleanup:bool,
+ callback_depth:u32,
  ready, registered, announced, ever_connected, challenged: bool,
  failed_peers,connection_serial: u64,
  allocator: mem.Allocator,
@@ -66,6 +73,7 @@ Rtc_Peer :: struct {
  conn: gd.Web_Rtc_Peer_Connection,
  channels: [3]gd.Web_Rtc_Data_Channel,
  calls: [2]gd.Callable,
+ managed:[2]rt.Managed_Callable,
  callbacks: [2]^Rtc_Callback,
  watching: [2]bool,
  local_offer, remote_set, remote_ready, failed: bool,
@@ -81,7 +89,7 @@ Rtc_Ice :: struct {media, name: string, index: i64}
 Rtc_Callback :: struct {active:bool,peer:^Rtc_Peer,allocator:mem.Allocator}
 
 rtc_open :: proc(r:^Rtc,cfg:Rtc_Config,allocator:=context.allocator)->bool {
- if r.ready {return false}
+ if r.ready||r.cleanup {return false}
  if (cfg.resume_signaling || cfg.require_identity) && cfg.authorize==nil {r.error=.Configuration;return false}
  if !rtc_continuation_valid(cfg.continuation,cfg) {r.error=.Configuration;return false}
  when ODIN_ARCH!=.wasm32 && ODIN_ARCH!=.wasm64p32 {
@@ -95,6 +103,7 @@ rtc_open :: proc(r:^Rtc,cfg:Rtc_Config,allocator:=context.allocator)->bool {
   capacity:=gd.project_settings_get_setting(gd.singleton_project_settings(),setting,value);defer gd.variant_destroy(&capacity)
   if gd.variant_to_int(&capacity)<64 {r.error=.Configuration;return false}
  }
+ if !rtc_ownership_open(r,cfg,allocator){r.error=.Configuration;return false}
  r.allocator=allocator;r.config=cfg
  r.config.url=strings.clone(cfg.url,allocator);r.config.room=strings.clone(cfg.room,allocator)
  r.config.ice_json=strings.clone(len(cfg.ice_json)==0 ? `{"iceServers":[]}` : cfg.ice_json,allocator)
@@ -117,14 +126,8 @@ rtc_transport :: proc(r:^Rtc)->tr.Transport {
  wire.user=r;wire.send=rtc_send;wire.receive=rtc_receive;wire.poll=rtc_poll;wire.status=rtc_status;wire.connected=rtc_connected;wire.generation=rtc_generation;wire.close=rtc_transport_close
  return wire
 }
-rtc_close :: proc(r:^Rtc) {
- if !r.ready {return}
- tr.fragments_destroy(&r.fragments)
- for &peer in r.slots {rtc_peer_close(&peer)}
- if r.ws!=nil {gd.web_socket_peer_close(r.ws,1000,gd.string_empty());rtc_unref(r.ws)}
- delete(r.config.url,r.allocator);delete(r.config.room,r.allocator);delete(r.config.ice_json,r.allocator);delete(r.room,r.allocator);delete(r.resume_token,r.allocator)
- r^={}
-}
+rtc_close :: proc(r:^Rtc) {_=rtc_try_close(r)}
+
 @(private)
 rtc_clock :: proc(user:rawptr)->u64 {return u64(gd.time_get_ticks_msec(gd.singleton_time()))}
 @(private)
@@ -242,18 +245,23 @@ rtc_raw_poll :: proc(user:rawptr) {
  }
 }
 @(private)
-rtc_peer_close :: proc(peer:^Rtc_Peer) {
- if peer.conn==nil {return}
+rtc_peer_close :: proc(peer:^Rtc_Peer) {_=rtc_peer_try_close(peer)}
+@(private)
+rtc_peer_try_close :: proc(peer:^Rtc_Peer)->bg.Status {
+ if peer.conn==nil{return bg.OK}
+ managed:=rtc_managed(peer.owner)
+ if managed{stats,status:=rt.managed_callable_stats();if status!=bg.OK{return status};if stats.inflight_calls!=0{return rt.MANAGED_CALLABLE_BUSY}}
  for cb in peer.callbacks {if cb!=nil {cb.active=false}}
  names:=[2]cstring{"session_description_created","ice_candidate_created"}
  for call,i in peer.calls {
-  if peer.watching[i] {gd.object_disconnect(cast(gd.Object)peer.conn,gd.new_string_name_cstring(names[i],true),call)}
-  if peer.callbacks[i]!=nil {gd.free_callable(call)}
+  if peer.watching[i]{gd.object_disconnect(cast(gd.Object)peer.conn,gd.new_string_name_cstring(names[i],true),call);peer.watching[i]=false}
+  if managed{status:=rt.managed_callable_close(&peer.managed[i]);if status!=bg.OK{return status}}
+  else if peer.callbacks[i]!=nil{gd.free_callable(call);peer.callbacks[i]=nil}
  }
  for channel in peer.channels {if channel!=nil {gd.web_rtc_data_channel_close(channel);rtc_unref(channel)}}
  gd.web_rtc_peer_connection_close(peer.conn);rtc_unref(peer.conn)
  for ice in peer.ice {delete(ice.media,peer.owner.allocator);delete(ice.name,peer.owner.allocator)};delete(peer.ice)
- peer^={}
+ peer^={};return bg.OK
 }
 
 // At most 16 unacknowledged data packets per physical channel. Godot's JS

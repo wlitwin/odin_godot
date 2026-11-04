@@ -1,0 +1,26 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://modules/authoring_demo/demo.odin" id="driver"]
+[ext_resource type="PackedScene" path="res://content/world.tscn" id="world"]
+[ext_resource type="Script" path="res://view.gd" id="view"]
+[ext_resource type="PackedScene" path="res://shared/visuals.tscn" id="visuals"]
+[sub_resource type="Environment" id="environment"]
+background_mode = 1
+background_color = Color(0.055,0.065,0.085,1)
+ambient_light_source = 3
+ambient_light_color = Color(0.7,0.8,1,1)
+ambient_light_energy = 0.65
+[node name="Sample" type="Node3D"]
+script = ExtResource("driver")
+[node name="AuthoredWorld" parent="." instance=ExtResource("world")]
+[node name="View" type="Node3D" parent="."]
+script = ExtResource("view")
+[node name="Visuals" parent="View" instance=ExtResource("visuals")]
+[node name="Camera3D" type="Camera3D" parent="View"]
+position = Vector3(8,6,9)
+current = true
+[node name="Sun" type="DirectionalLight3D" parent="View"]
+rotation_degrees = Vector3(-50,-25,0)
+light_energy = 1.1
+shadow_enabled = true
+[node name="Environment" type="WorldEnvironment" parent="View"]
+environment = SubResource("environment")

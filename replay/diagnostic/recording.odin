@@ -52,6 +52,7 @@ recording_capture :: proc(a:^Recording($S,$I,$E),t:^r.Timeline(S,I,E),identity:R
  if !recording_empty(a) {return {error=.Occupied}}
  if !recording_context_valid(identity) || max_ticks<1 || max_ticks>4095 {return {error=.Invalid}}
  if t==nil {return {error=.History,replay={error=.Not_Initialized}}}
+ if r.external_enabled(t) {return {error=.Context,replay={error=.Incomplete_State}}}
  cfg,config_error:=r.timeline_config(t);if config_error!=.None {return {error=.History,replay={error=config_error}}}
  from,to,error:=r.audit_window(t,max_ticks)
  if error!=.Initial_Frame && error!=.None {return {error=.History,replay={error=error,tick=to}}}

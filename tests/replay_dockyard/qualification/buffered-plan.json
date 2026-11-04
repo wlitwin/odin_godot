@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "declared_before_measurement": true,
+  "mode": "profile=2; Q1_BUFFERED=1",
+  "purpose": "Measure whole public Room.frame calls without serializing operation telemetry during live play.",
+  "operation_population": "Same clock, classifications and limits as plan.json. Retain all bootstrap, error, replacement, pump, normal and repair rows without subtraction.",
+  "storage": "At most 65536 rows in an SDK-metered allocation. Capacity exhaustion fails the run. The default game has no allocation; profile=1 keeps periodic output.",
+  "emission": "Emit one SAMPLE_OPERATION_END before closing Room/Session. After successful Room/Session close, emit every stored row in sequence, then release the allocation before checked final resource statistics.",
+  "presentation": "Retain all raw requestAnimationFrame intervals. Assess intervals ending no later than the browser-observed SAMPLE_OPERATION_END. Report the retained teardown interval count separately.",
+  "duration": "Measure first GO to SAMPLE_OPERATION_END, before teardown serialization. Buffered emission time is never counted as play time.",
+  "admission": "All contract.json thresholds remain unchanged. A short case checks instrumentation and ownership only; sustained admission still requires at least 600 seconds and the declared sample counts."
+}

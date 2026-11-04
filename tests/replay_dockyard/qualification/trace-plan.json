@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "classification": "CPU_PROFILER_DIAGNOSTIC_NOT_ADMISSION",
+  "artifact_policy": "Use an existing ordinary export without game/backend changes.",
+  "settings": "Q1_TRACE_FIRST_SLOW=1, Q1_GECKO_PROFILE=1, Q1_BUFFERED=0; actual Firefox authority, Chrome client; at most 10800 ticks.",
+  "trigger": "First emitted host advance1 row with zero repair delta, valid clock and elapsed_us >10000. Retain every earlier row, bootstrap event, error and outlier.",
+  "retention": "Immediately request checked Engine shutdown for both owned actors, then close the owned Firefox normally so its four-million-entry 1ms startup sampling ring retains the triggering operation.",
+  "correlation": "Browser performance.timeOrigin+performance.now and Node arrival Date.now are correlated with each profiler process meta.startTime. Console-delivery uncertainty remains explicit.",
+  "limits": "A trigger is diagnostic evidence, not an unprofiled performance result or proof of cause. Early stop does not claim complete-round/full5 agreement. Missing profiles and cleanup failures stay explicit. No unchanged automatic retry if the bounded window has no trigger."
+}

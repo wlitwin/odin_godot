@@ -68,6 +68,32 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     exit 1
 fi
 
+# Optional real Box3D AOT profile. A desktop DSO is never substituted for a Wasm
+# archive. Core and every compiled script share this one checked backend/domain.
+BOX3D_WEB_FLAGS=()
+BOX3D_WEB_FIELDS=()
+if [ -n "${BOX3D_WEB_ARCHIVE:-}" ]; then
+    BOX3D_WEB_PROFILE_DIR="$(mktemp -d)"
+    odin_gd_cleanup_on_exit "$BOX3D_WEB_PROFILE_DIR"
+    python3 "$ROOT/build/box3d_profile.py" --web-archive "$BOX3D_WEB_ARCHIVE" \
+        --repo "$ROOT" --state "$BOX3D_WEB_PROFILE_DIR/input.json"
+    while IFS= read -r field; do BOX3D_WEB_FIELDS+=("$field"); done < <(
+        python3 - "$BOX3D_WEB_PROFILE_DIR/input.json" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1]))
+for name in ['source_archive','build','backend_target']: print(d[name])
+PY
+    )
+    if [ "${#BOX3D_WEB_FIELDS[@]}" -ne 3 ]; then
+        echo 'build_web.sh: invalid Box3D profile fields' >&2
+        exit 1
+    fi
+    BOX3D_WEB_FLAGS=(-target-features:atomics,bulk-memory -define:BOX3D_HOST_ENABLED=true -define:BOX3D_REQUIRE_DOMAIN=true
+        "-define:BOX3D_LIBRARY=${BOX3D_WEB_FIELDS[0]}"
+        "-define:BOX3D_EXPECTED_BUILD=sha256:${BOX3D_WEB_FIELDS[1]}"
+        "-define:BOX3D_EXPECTED_TARGET=sha256:${BOX3D_WEB_FIELDS[2]}")
+fi
+
 # Preflight: catch imports of core packages that do NOT exist on the wasm target BEFORE
 # the compiler spews cryptic "Undeclared name: _read_directory_iterator"-style errors
 # from inside Odin's own core library. Each hit is reported file:line with the portable
@@ -171,6 +197,7 @@ ODIN_OBJ="$OBJ_DIR/$(basename "${OUT%.wasm}").wasm.o"
     -no-entry-point \
     -reloc-mode:pic \
     -define:ODIN_GODOT_WEB=true \
+    ${BOX3D_WEB_FLAGS[@]+"${BOX3D_WEB_FLAGS[@]}"} \
     ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
     -out:"$ODIN_OBJ" \
     ${SCRIPT_BUILD_FLAGS:-}
@@ -184,11 +211,18 @@ odin_gd_prune_stale_stages "$(dirname "$OUT")" "$WASM_BASE"
 WASM_STAGE="$(mktemp -d "$(dirname "$OUT")/.$WASM_BASE.build.$$.XXXXXX")"
 TMP_WASM="$WASM_STAGE/$(basename "$OUT")"
 odin_gd_cleanup_on_exit "$WASM_STAGE"
-"$EMCC" "$ODIN_OBJ" \
-    -sSIDE_MODULE=1 \
-    -sSUPPORT_LONGJMP=wasm \
-    -O2 \
-    -o "$TMP_WASM"
+if [ "${#BOX3D_WEB_FLAGS[@]}" -ne 0 ]; then
+    python3 "$ROOT/build/box3d_web_link.py" --emcc "$EMCC" --object "$ODIN_OBJ" \
+        --archive "${BOX3D_WEB_FIELDS[0]}" \
+        --manifest "$(dirname "${BOX3D_WEB_FIELDS[0]}")/build-manifest.json" --out "$TMP_WASM"
+    mv -f "${TMP_WASM%.wasm}.box3d-link.json" "${OUT%.wasm}.box3d-link.json"
+else
+    "$EMCC" "$ODIN_OBJ" \
+        -sSIDE_MODULE=1 \
+        -sSUPPORT_LONGJMP=wasm \
+        -O2 \
+        -o "$TMP_WASM"
+fi
 mv -f "$TMP_WASM" "$OUT"
 rm -rf "$WASM_STAGE"
 

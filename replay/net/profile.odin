@@ -5,7 +5,7 @@ import r "godot:replay"
 // Optional monotonic microsecond clock. Runtime diagnostics only: never part of
 // gameplay, recorded inputs, checkpoints or the wire contract.
 Profile_Clock :: r.Profile_Clock
-Profile_Metric :: enum {Advance, Pump, Snapshot, Replay, Snapshot_Encode, Snapshot_Delta, Snapshot_Hash, Snapshot_Cache, Snapshot_Validate, Snapshot_Send}
+Profile_Metric :: enum {Advance, Pump, Snapshot, Replay, Snapshot_Encode, Snapshot_Delta, Snapshot_Hash, Snapshot_Cache, Snapshot_Validate, Snapshot_Send, Physics_Inspect, Physics_Decode, Physics_Repair, Physics_Compare}
 
 // Adjacent subphases use one clock read per boundary. They are included in the
 // outer Snapshot/Pump measurements, not additional independent frame costs.

@@ -1,0 +1,12 @@
+config_version=5
+[application]
+config/name="Kit Box3D — contested bodies"
+run/main_scene="res://kit_box3d.tscn"
+run/max_fps=60
+config/features=PackedStringArray("4.7", "GL Compatibility")
+[display]
+window/size/viewport_width=1000
+window/size/viewport_height=700
+[rendering]
+renderer/rendering_method="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.04,0.055,0.08,1)

@@ -2,6 +2,7 @@ package core
 
 import "godot:gdext"
 import "godot:godot"
+import bg "godot:box3d/godot"
 
 // GDExtension entry point. Referenced as `entry_symbol` in odin_godot.gdextension.
 @(export)
@@ -91,4 +92,23 @@ uninitialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializa
     // are walked by the editor's deferred doc generation AFTER extension shutdown
     // during Main::cleanup — a guaranteed `--import` exit crash. See common.odin.
     unregister_extension_classes(.Scene)
+    when WEB {
+        had_backend:=box3d_web_image.alive
+        if status:=managed_callable_shutdown();status!=bg.OK {
+            godot.print_str("ODIN_MANAGED_CALLABLE_SHUTDOWN_NOT_EMPTY web callbacks must be closed")
+        } else if status:=box3d_host_shutdown();status!=bg.OK {
+            godot.print_str("ODIN_BOX3D_SHUTDOWN_NOT_EMPTY web physics owners must be closed")
+        } else {
+            web_temporary_shutdown()
+            if had_backend {godot.print_str("ODIN_BOX3D_WEB_SHUTDOWN_OK")}
+        }
+    } else {
+        // The host refuses to force-release retained producer/native owners.
+        // Current script images may still hold ordinary loader references.
+        if status := managed_callable_shutdown(); status != bg.OK {
+            gdext_print("ODIN_MANAGED_CALLABLE_SHUTDOWN_NOT_EMPTY", "managed callbacks must be closed before extension shutdown")
+        } else if status := box3d_host_shutdown(); status != bg.OK {
+            gdext_print("ODIN_BOX3D_SHUTDOWN_NOT_EMPTY", "physics owners must be released before extension shutdown")
+        }
+    }
 }

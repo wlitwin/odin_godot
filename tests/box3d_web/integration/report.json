@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "result": "PASS",
+  "scope": "W2 actual one-domain Godot Web SDK, layout/ownership/source-free backend integration; no framework multiplayer or final game qualification",
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-03T11:30:58.850078+00:00",
+  "task": "t_1c594991d1ac4423",
+  "board": "b_c14f6d2a88d84dbe",
+  "backend": "WebSIMD production archive in backend/report.json",
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/integration-v12/report.json",
+    "sha256": "a466de059bbdf1daf8ce8471c2cbe76f9340454fc28895f2d6c222881ffb4df0"
+  },
+  "actual_browser": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/browser-v7/report.json",
+    "sha256": "94da642c39a8f222ece3b9bf0a2af8f8784d4cb5ff3ea3ef1d62b03d44bc3527"
+  },
+  "actual_console": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/browser-v7/console.json",
+    "sha256": "67c60deb2555ac74d618f59f586b5e14f75fbf2cd6428e6dc1c8d4b00807eb44"
+  },
+  "immutable_export_binding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/browser-v7/export-binding.json",
+    "sha256": "ea27201b0ce33c6f80b78049329f8f086ebfece34dafe79a4a8892239d026a5e"
+  },
+  "actual_values": {
+    "actual_source_free": true,
+    "native": {
+      "asset_align": 4,
+      "asset_bytes": 64,
+      "canonical_bytes": 5258,
+      "native_live": 0,
+      "ok": true,
+      "pointer_bits": 32,
+      "source_free_steps": 16,
+      "wrapper_live": 0
+    },
+    "origins_rejected": true,
+    "owner_churn": 70000,
+    "temp_after": [
+      0,
+      4194304,
+      1
+    ],
+    "temp_before": [
+      0,
+      4194304,
+      1
+    ],
+    "temp_middle": [
+      0,
+      4194304,
+      1
+    ],
+    "weak_source_freed": true
+  },
+  "actual_engine_shutdown": true,
+  "link": {
+    "receipt": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/integration-v12/project/bin/libodin_godot.box3d-link.json",
+      "sha256": "fec5acf5fba50c9cd2bffb27f5fb174417ec75e8266c15490dc0d3f1d5815a44"
+    },
+    "function_table_size": 248,
+    "backend_function_imports": 0,
+    "own_exported_function_pointer_relocations": [
+      {
+        "module": "GOT.func",
+        "name": "ogb3_engine_allocation_stats",
+        "kind": 3
+      },
+      {
+        "module": "GOT.func",
+        "name": "ogb3_snapshot_allocation_stats",
+        "kind": 3
+      },
+      {
+        "module": "GOT.func",
+        "name": "ogb3_host_owner_open",
+        "kind": 3
+      },
+      {
+        "module": "GOT.func",
+        "name": "ogb3_host_owner_set",
+        "kind": 3
+      },
+      {
+        "module": "GOT.func",
+        "name": "ogb3_host_owner_close",
+        "kind": 3
+      },
+      {
+        "module": "GOT.func",
+        "name": "ogb3_host_ledger_get",
+        "kind": 3
+      }
+    ],
+    "one_AOT_image": true
+  },
+  "architecture": [
+    "Actual existing host registry and service in permanent AOT image",
+    "Actual engine allocator/Meter accounting with validated stateless AOT backing",
+    "Actual thread affinity, weak instance liveness, owner/capsule/code pins and origin gates",
+    "Callback code addresses checked against actual table-base relocation plus final verified dylink.0 span",
+    "Nested-safe outer callback temporary arena after return conversion",
+    "32bit pointer-token generations retire before truncation; Native64 unchanged"
+  ],
+  "native_compatibility": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/native-integration-v1/report.json",
+    "sha256": "74a854513ac2cc100239bb8e5daee45c26a1485eb48cbbb1d4436a76041defc9"
+  },
+  "native_free_web_compatibility": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/native-free-browser-v1/report.json",
+    "sha256": "bf689d2629f42d62c5abc08fe8594470bdd8fa881553c82b352e9b6f65af2447"
+  },
+  "native_free_fixture_derivation": "Original tests/web main arithmetic/lifecycle source unchanged. Task-only staging adds native editor library tags and standard boot so import/export can be checked without suppressing old web-only editor errors.",
+  "retained_harness_finding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W2/release-assertion-harness-finding-v1.json",
+    "sha256": "843ef3919f72d7f677b47c494b9c26a03cf88e826e25580990b3c3ed7a65b1ed"
+  },
+  "earlier_internal_owner_result": "browser-v4 PASS is explicitly unqualified for stripped GDScript assertion subtests; not reused as owner/churn/weak proof. Original bytes retained.",
+  "actual_counter_evidence": "Final explicit GDScript calls execute in release; churn returns completed operations, browser checks actual returned anchors/counters and real engine shutdown.",
+  "source_sha256": {
+    "build/build_web.sh": "b5282eed45f219bb919b0092ecc36404da190b2f8ac20747b896aedbbd0e1b42",
+    "build/box3d_profile.py": "299720a19fbc41a947c86a2b16d3d92c0f1434456f0bcce691f14c37f19250ff",
+    "build/box3d_web_link.py": "6e2e5b0af51d394a1054be8daf1d227b4f5ddcbe0440429f3735a8bda233f903",
+    "build/box3d_web_bridge.c": "349005796b424c47c88430745590ea89e12f745aba286f02b3ca0c62ac811d5b",
+    "build/box3d_web_image.s": "d6d2419ffeabd0f582db06c6436412acec80b39239c271fad81f72259e1a5c2e",
+    "core/box3d_native_web.odin": "14485f6d01cf7db608e350184d851656372a44736e3639c45855ff5fdbd39f3d",
+    "core/scripts_web.odin": "c61c8276183b71b1190e62ec592f8567adc6f1bed05bb4e2102d919fda8d1080",
+    "core/reload_gate_web.odin": "c8d7782ccdfe2321b79eda19cc66be0b096722f1e7a12ffe34d32346223036d6",
+    "core/instance.odin": "b5ba7d06f71bbaee15ff2399cc32f02ac78a971c66e68565d4b55d50085d1854",
+    "core/main.odin": "38fe25a72cb4876675824382e583c0efca2b867770be8061176b321471af0bb8",
+    "box3d/bindings.odin": "146878c104b14109aaa8991386fe8153a1bcc02c9e54030dd973c6c87085fab9",
+    "box3d/godot/host/registry.odin": "b40a2b3c874979beb7d1b22bcd6e5a0b8fb8a835b4ccba7482d2d0ff4ecaefa7",
+    "box3d/godot/meter/meter.odin": "0ef305828b53e1c1dc6d3fee88b4824cf040368eb2298f47219ed42bfb07a8e7"
+  },
+  "fixture_source_sha256": {
+    "main.tscn": "89997755a2a3c78def783dbcefb5302109608116ee9b580521be96afc298efc6",
+    "main.gd": "e2f649a6db8061df5ca8104169cd538bcbcfa83ce50fbce68e6aa661c2318ecb",
+    "odin_godot.gdextension": "1c5c2d08a0c8d6404b9149d779805bd30ce8792a553e92d96a6a152d36787446",
+    "project.godot": "f3dfcd99594e4b184e5ff97e532438d86ebfe3a14f5b1982d44c49eff24afc22",
+    "export_presets.cfg": "0bf4bef7ca4466768dc845e6a055d0aa6858a2391a78ae5bb48d57795e95bea2",
+    "content/ground.tres": "c72e1a308d609ea03ac4e1263ee4adc4867fef71b36da7c40cf1c6db0790ca5f",
+    "content/sensor.tres": "d2396cd0cce900041056a4619f07beacdf7cdf3419acbaca077efd72e4860643",
+    "content/player.tres": "be0341ac2e9b8aa588fdb9dd618f4b78010b973a2e78d21c90c4802ac2483359",
+    "content/world.tscn": "a1b8ce7db7f289d330936b1f0f3ed8ba7407138c61e706ff84057e322b74d3bd",
+    "content/hinge.tres": "b242e2f58fa01d351a5c5d1713d5139c60a89df7b25f4ab616e116b7b2bc824e",
+    "content/pendulum.tres": "10031c686b838ae027487ba2a35bc00c6bfebaf3677fc517a06ac75f12c51795",
+    "scripts/boot.odin": "a9bc0434886bc1f450d0c49275ab6db1a16a5511e7b5a6abc554549efbb3ddb2",
+    "modules/web_probe/keeper.odin": "1994003a99531bec052cdad0857437518a8410d6586d73cfa8ce1f7b608629f4",
+    "modules/web_probe/probe.odin": "4164305e66b0f7412c8be7b855344ad1ea812af6967bc634d932535dc66f3bb8"
+  },
+  "limits": [
+    "Chrome156 functional/GPU-software path only; Firefox/Safari physics admission pending",
+    "No Replay/Kit browser pair or game round proof yet",
+    "No browser frame/CPU/long/Internet acceptance inferred",
+    "No native/browser or cross-target peer compatibility promised",
+    "No public deployment or remote fork",
+    "Old native demo copies, historical reports and t9y VM/user shell unchanged"
+  ]
+}

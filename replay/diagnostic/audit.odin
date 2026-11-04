@@ -12,6 +12,8 @@ audit_text :: proc(result:r.Result,capture:^r.Audit_Capture($S,$I,$E),limit:int=
 	builder:strings.Builder;strings.builder_init(&builder,allocator);defer strings.builder_destroy(&builder)
 	fmt.sbprintf(&builder,"Audit: %v | tick %d | steps %d\n",result.error,result.tick,result.steps)
 	if capture==nil || !capture.ready {return strings.clone(strings.to_string(builder),allocator)}
+	if result.error==.Diverged_External {fmt.sbprintf(&builder,"Managed state differs; owned expected/actual images retain provider diagnostics.\n")}
+	if capture.external_error!=.None {fmt.sbprintf(&builder,"Managed mismatch capture: %v\n",capture.external_error)}
 	if limit<1 || limit>256 {fmt.sbprintf(&builder,"Invalid display limit (1..256).\n");return strings.clone(strings.to_string(builder),allocator)}
 	fmt.sbprintf(&builder,"Input recorded at tick %d; parent frame %d\n",capture.expected.tick,capture.parent.tick)
 	state,event:sc.Schema;defer sc.destroy(&state);defer sc.destroy(&event)

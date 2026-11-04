@@ -1,5 +1,6 @@
 package replay_recovery
 
+import r "godot:replay"
 import net "godot:replay/net"
 import tf "godot:replay/transfer"
 import tr "godot:replay/transport"
@@ -23,8 +24,17 @@ Stats :: tf.Stats
 Sender :: tf.Sender
 Blob_Receiver :: tf.Blob_Receiver
 
+Receiver_Ownership :: struct {
+ transfer:tf.Ownership,
+ model,policy:r.Owned_Context,
+ codec:net.Container_Ownership,
+}
+
 Receiver :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	using transfer: tf.Blob_Receiver,
+ receiver_ownership:Receiver_Ownership,
+ receiver_retains:r.Owner_Retains,
+ receiver_cleanup:bool,
 	model: net.Model(State, Control, Action, Event, Seats),
 	policy_user: rawptr,
 	policy_valid: proc(user: rawptr, id: u64, bytes: []u8) -> bool,

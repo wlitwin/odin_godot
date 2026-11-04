@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Box3DBoxShape3D" format=3]
+[ext_resource type="Script" path="res://addons/box3d_authoring/box_shape_3d.gd" id="1"]
+[resource]
+script = ExtResource("1")
+stable_key = "dockyard.delivery"
+half_extents = Vector3(3.4,1.1,2.9)
+density = 1
+friction = 0.12
+restitution = 0.04

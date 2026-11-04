@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "status": "SOURCE_STABLE_UNCOMPILED_UNRUN",
+  "task": "t_6d1ea94bc14540f1",
+  "revision": 139,
+  "claim": "[redacted local task claim]",
+  "changed_paths": {
+    "tests/box3d_soak/replay/hello_idempotency/hello_idempotency_test.odin": "b36be578295252b6fd31d7392a005b16478b5f871e9c2d23bdfe632d4b063040",
+    "tests/box3d_soak/replay/hello_idempotency/run.py": "947f2a3a047a748fdcc24e8a513533d34f790bede8c7fee4a42d2d34a9c565ec"
+  },
+  "read_only_dependency_hashes": {
+    "tests/box3d_soak/replay/action_scope_case_a/case_a_test.odin": "237a389cfc055a6a05e3956ec81210d78047c813ff9367944b10fb06d3851e7a",
+    "tests/box3d_soak/replay/action_retire/action_retire_test.odin": "2c26102fd5dd9762c3c4256e97b7e8a41d96c1d3c9a91df084f57453d597a580",
+    "tests/replay_physics_net/fixture/fixture.odin": "cfa0ca8c7fc945e1aef24610d4c6a3b7bbc9fdb25beccd3a2d43e30baaa43481",
+    "replay/net/server.odin": "9bdbc4a68c87c75a6b7eac6400607477a2f5c2c22a53db75af62a4b40a57619e",
+    "replay/net/client.odin": "261a4c54da6a16a9d9516ffbde3cffe316ec7d792af3f7551f8a950d0dc4e14f",
+    "replay/net/physics_packets.odin": "ddbae17a433699fb02fdbb0f95759af7332af7cb88cf8d1560e43a46382596c7",
+    "replay/net/physics_receive.odin": "cdab16e882d36e7d0b915d93598a2197ae767c000130ab152e577d17d309656c",
+    "replay/net/physics_pending.odin": "734abc6e3234170296571e5da55c7cc3b05c9912bcd21ccae43a6a7e6e7ad69c",
+    "replay/net/input_timing.odin": "03978944bca23fe8b8567c501c600c2d6d8880d6020f55f943ed2e49a31dc460",
+    "replay/transport/memory.odin": "d73ffc35e7b41d57c0be3bbf3f798f7bb50e02872352c094b822579c9b6434e1",
+    "replay/recovery/link.odin": "689e3c378ea2bd9601326dc1585f89ec0727b6db41df42fd5a36d33d083c94ad"
+  },
+  "original_failure_preserved": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/lifecycle-replay-reconnect-seed42-v2/report.json",
+    "sha256": "faef9b435a4e9467261c5f0173872cf6070ead749922bad680b15bc0de6d1dd0"
+  },
+  "setup": "Unchanged CaseA.open: genuine generic4 completeCodec Server/Client/Link/Memory, first serialized Hello captured below Link, real Welcome ACK and Running, no active transfer. Exact saved Hello sent once from original Memory endpoint, actual receive captured, normal public pumps and actual ACK completion.",
+  "expected_sole_RED": "After real initial Welcome ACK, exact Hello retry must preserve server+client generation/serial and client baseline/view_reset. Current behavior may install another Welcome scope.",
+  "controls": [
+    "same actual connection/token/incarnation",
+    "original/retry byte equality+SHA256",
+    "real initial/final ACK completion",
+    "actual confirmed complete full5/signatures before and after",
+    "actual Native/provider/Odin cleanup0",
+    "all captured packet files/hashes and Memory trace preserved"
+  ],
+  "exclusions": [
+    "No ENet or historic-case-cause claim",
+    "No active-transfer retransmission/fresh-incarnation/rejoin/explicit-Resync coverage; no production bypasses",
+    "No fake packet/private Hello type/schema/parser/model copy/head or readiness setter",
+    "nilOwner/static OFFddff; no actual-Core/SDK32/managed-owner claim"
+  ],
+  "staged_argv": [
+    "nix",
+    "develop",
+    "--command",
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "/Users/walter/data/code/odin/odin_godot/tests/box3d_soak/replay/hello_idempotency/run.py",
+    "/tmp/odin-box3d-goal-t4jbbj4v/replay-hello-idempotency-baseline-v1"
+  ],
+  "native_archive_expected_sha256": "2be61c6e0344c3449ba97d5ef2078dfbd6fb4772167d00695b12ac44a141f432",
+  "execution": "NOT_AUTHORIZED: no compiler, test, import or runtime started; hold after checkpoint"
+}

@@ -1,0 +1,384 @@
+{
+  "version": 1,
+  "task": "G2",
+  "result": "PASS",
+  "whole_goal_complete": false,
+  "evidence": {
+    "rules5": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/round-rules-v25/report.json",
+      "sha256": "823ad3a165ea64a4ea468f52dadcedb0c3b930f35d0bff9964b297a6a412776f"
+    },
+    "native_matrix": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-type-matrix-v1/report.json",
+      "sha256": "0875d3dd73014833679ca0265b816582d92ff3b43a49db189b846944bcb6152e"
+    },
+    "wasm_corpus": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/type-corpus-simd-v1/report.json",
+      "sha256": "9df23ce21072cb8bda85cf5098581718691cef0a068e52c6d0a37104b6771987"
+    },
+    "export": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/game-export-v2/report.json",
+      "sha256": "c63aab110085d8fdf1de76883e74918a09c85eb3f5632a87fadb9c8c465e0969"
+    },
+    "native_pair": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-round-pair-v3/report.json",
+      "sha256": "4775fd67ee0f9909a5019ac1c64d74e9c3b5eb1c1072200cf1e71e2c5e417c74"
+    },
+    "native_game": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-round-assessment-v3/report.json",
+      "sha256": "e99069fe4c3d295fa8747e55ea3eacfd9005ea2e211b380db22200f60eecc492"
+    },
+    "web_pair": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-pair-v3/report.json",
+      "sha256": "ad781fc7414314be7bafc5f2106fd0296b2a5178ad0a6ef07aa604d292620a3a"
+    },
+    "web_binding": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-pair-v3/export-binding.json",
+      "sha256": "19b90bb34774787875d7c5d5f691e782743fcf3dc51112e1a6266690616dc12b"
+    },
+    "web_game": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-assessment-v3/report.json",
+      "sha256": "ad7438e478b1c5ea6e73ab57fc525918a2baa47cb1000fa22ec6787135b342dc"
+    },
+    "actual_next_button": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/next-button-pair-v2/game-assessment.json",
+      "sha256": "61aefaaae611af197f51ac8cf9bdb2553dc40491cbf9bda6efdbba568de0b83e"
+    },
+    "actual_next_button_controller": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/next-button-pair-v2/report.json",
+      "sha256": "1ebdf5e81e33d7d079bb008bea5e9550b407ce02cfcd3728add566ca0dce817e"
+    },
+    "visual": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/visual-v1/report.json",
+      "sha256": "79f5c68bdf5470c10ba06b99e26d612b9b79946a23b9e8a2c2f772341a9a2def"
+    },
+    "screenshot": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/visual-v1/dockyard.png",
+      "sha256": "dbacb648c569b93b644dacbbfc8be686312f49fa7862b62e32a3b1b98e21e33c"
+    },
+    "negative_controls": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/assessor-controls-v1/report.json",
+      "sha256": "a70892a11ca0db24e2e8c03b9afd30ed94433008f9a48469460d92c0cd3a5b48"
+    }
+  },
+  "sources": {
+    "box3d/bindings.odin": "e0b28c4ac73c25e04324c0657915a17fedaa055027572a0823914c979404e1df",
+    "box3d/body.odin": "47cd6b44e9915d067cc062ab4a7165668dc8fd947e844703abbb9cabfb4848e2",
+    "box3d/native/api.c": "40c7fb97ba8de4baf47097016aeef6241563e96880f9abaec8e99574e089360f",
+    "box3d/native/api.h": "72a9738dd423acc4277067b75e82cd4c2480360fa2078083cbd1fe71d920484e",
+    "box3d/native/api_smoke.c": "1e33914b4c81102db21c8b18a3c5dbe222facc2952dc1dc4afc2ed559282b2f0",
+    "examples/replay_dockyard/README.md": "948d191be11013234dc641ca85953f1a2237eda28a2bc2448eb4cb8120b9ffa8",
+    "examples/replay_dockyard/content/barge.tres": "28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/delivery.tres": "9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/ramp.tres": "08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb",
+    "examples/replay_dockyard/content/robot.tres": "36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9",
+    "examples/replay_dockyard/content/world.tscn": "164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935",
+    "examples/replay_dockyard/export_presets.cfg": "23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4",
+    "examples/replay_dockyard/launch.py": "3468e7e253e26b1799151323ea8d016d97b644513b85cae7e967a86e6f39481b",
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "examples/replay_dockyard/modules/dockyard/controller.odin": "67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "0854d14fbd94e5178178071de28ec3a035a993652f4a926b8696f4e6e44ed4b7",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "b64f22de4c8e29da9870de256fa1b60779c0c290b5277effbe5cae29d0391c2a",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/launch.odin": "85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "ec4962121803dd4445f2b696156082aa513af0ceec722a207adba6948157d02a",
+    "examples/replay_dockyard/modules/dockyard/round.odin": "f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "6d37cf72a9dc186271347eb18e010a70ade30189ddadea663df6306ca10cf91f",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "8c17c35ee97eddb2a82174f99ad5356085b09bd2a7444bbc2d7ab4358b44c4f1",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "018196551b3204363c4083e00bb92aad8cc243ac6b7dff58b03cf93392f66f5e",
+    "examples/replay_dockyard/odin_godot.gdextension": "88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18",
+    "examples/replay_dockyard/prepare.py": "7fca36d9ec256bdf76b1c07ccdebd61023eaef9957b45d75fa1e9c5997e11194",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/view.gd": "51c8c636214fd003ee3123a8e7299427e2212ff1629838248065c4aabb60f643",
+    "replay/physics/README.md": "66521c1bb7c4dbcf980e968a0f3ece57518ee95d22ba5c69a5d51a803b71f7e0",
+    "replay/physics/commands.odin": "e6bb61b42bbe85b11072ca094e7f9cea978ba070e7051b3cabd7defa98c284d1",
+    "replay/physics/provider.odin": "c98ddbeb9655d9d671ea11ee487bb192f9161f2d9951b745783a88754266feba",
+    "tests/replay_dockyard/rounds/README.md": "80cf2e954b6e3c548d7c273d1c8d965a378ca9384245d6464628b86765dd7a62",
+    "tests/replay_dockyard/rounds/assess_pair.py": "696a61c12bb03d27964d9b13b32854a7b4fa95fb19f2021932e4df57a5557698",
+    "tests/replay_dockyard/rounds/assessor_controls.py": "93ede67d4d37e384723bb4366b4f9ed25cf41379d6e48572145a0a51b56748e9",
+    "tests/replay_dockyard/rounds/extract.gd": "176214b5b21cf4e6875b3ef9c321a0786f1aea4a254a434e1be6002753ef2319",
+    "tests/replay_dockyard/rounds/legacy_provider/authoring.odin": "ebd2316cc0f5c346c9af25f060a5b5f03d1a95afa76ca5cce739c73cbc5260e6",
+    "tests/replay_dockyard/rounds/legacy_provider/commands.odin": "189ba9d5e554b04fe1d18552de52fb244e819ee0c9026f854c682e29d9a264a1",
+    "tests/replay_dockyard/rounds/legacy_provider/motion.odin": "bf4eeca7f88b2b90eabadfdd76591ea1bb34115d4c818c0f5229b243e1e17ec1",
+    "tests/replay_dockyard/rounds/legacy_provider/network_codec.odin": "5d07734b6aa8b2f0a217644d66eded0a52de17f74c8f2781a9adaef888a497e3",
+    "tests/replay_dockyard/rounds/legacy_provider/provider.odin": "ee3b254c8330b64a2d2c580970884b2395c220f33c075304c30c369ead79b4c5",
+    "tests/replay_dockyard/rounds/provider_abi_test.odin": "ecabb10d7acf703489389992f27912ac512779a611d3e4ba23476f6e28150be7",
+    "tests/replay_dockyard/rounds/retry.gd": "9fde37298b9128f865dd517107b7d616ef8660283b2aa59f4d64c58f6f9517bd",
+    "tests/replay_dockyard/rounds/retry.py": "620a9b33b6f3b08feb8c5f5b3efbc26518e88188625a63f6e66812ebb79e2a4c",
+    "tests/replay_dockyard/rounds/round_test.odin": "7c3167f1322ff24dcb038475ba8d7ef5384cf2417887650df0ee964a6970d504",
+    "tests/replay_dockyard/rounds/run.py": "33bbb9a92e0228ae94be24d8d47ac1a70ed7a6d325257763265dc70794699cf9",
+    "tests/replay_dockyard/rounds/visual.gd": "bae46dc5baf01eb5adc72e8b6198f17d7ea09f0cd6c17359d1d313fc4d550843"
+  },
+  "game": {
+    "bodies": 19,
+    "shapes": 19,
+    "geometry_assets": 8,
+    "joints": 1,
+    "deadline_ticks": 9000,
+    "hz": 60,
+    "substeps": 4,
+    "jobs": 3,
+    "rules": "same reducer/authoring/bake across native and Web; bounded surface-point magnets, actual sensor/bay dwell120, Native kinematic latches, Native departure, payout, robot recovery and lost-load recreation",
+    "native_complete_round": {
+      "host": {
+        "role": "host",
+        "tick": 3600,
+        "score": 3,
+        "delivered": [
+          true,
+          true,
+          true
+        ],
+        "inside": [
+          true,
+          true,
+          true
+        ],
+        "dwell": [
+          120,
+          120,
+          120
+        ],
+        "cargo_positions": [
+          [
+            4.20688486,
+            1.19966626,
+            4.20792818
+          ],
+          [
+            7.07658958,
+            1.19966543,
+            4.25743914
+          ],
+          [
+            5.85412598,
+            1.14961278,
+            2.70264769
+          ]
+        ],
+        "eligible_delivery_cues": 3,
+        "game_sha256": "d2d81fdb06ea1e6547739269d334fafa3a5265cadb426f2c6be0690046c1fd8d",
+        "round": 1,
+        "layout": 0,
+        "phase": "Results",
+        "round_ticks": 2845,
+        "payout": 1404,
+        "lost": [
+          false,
+          false,
+          false
+        ],
+        "recovered": [
+          0,
+          0
+        ],
+        "event": "SAMPLE_GAME"
+      },
+      "client": {
+        "role": "client",
+        "tick": 3600,
+        "score": 3,
+        "delivered": [
+          true,
+          true,
+          true
+        ],
+        "inside": [
+          true,
+          true,
+          true
+        ],
+        "dwell": [
+          120,
+          120,
+          120
+        ],
+        "cargo_positions": [
+          [
+            4.20688486,
+            1.19966626,
+            4.20792818
+          ],
+          [
+            7.07658958,
+            1.19966543,
+            4.25743914
+          ],
+          [
+            5.85412598,
+            1.14961278,
+            2.70264769
+          ]
+        ],
+        "eligible_delivery_cues": 3,
+        "game_sha256": "d2d81fdb06ea1e6547739269d334fafa3a5265cadb426f2c6be0690046c1fd8d",
+        "round": 1,
+        "layout": 0,
+        "phase": "Results",
+        "round_ticks": 2845,
+        "payout": 1404,
+        "lost": [
+          false,
+          false,
+          false
+        ],
+        "recovered": [
+          0,
+          0
+        ],
+        "event": "SAMPLE_GAME"
+      }
+    },
+    "browser_complete_round": {
+      "host": {
+        "role": "host",
+        "tick": 6600,
+        "score": 3,
+        "delivered": [
+          true,
+          true,
+          true
+        ],
+        "inside": [
+          true,
+          true,
+          true
+        ],
+        "dwell": [
+          120,
+          120,
+          120
+        ],
+        "cargo_positions": [
+          [
+            4.31212091,
+            1.19966555,
+            4.26630354
+          ],
+          [
+            7.38850546,
+            1.19966602,
+            4.21294308
+          ],
+          [
+            5.84469604,
+            1.14961135,
+            2.65660787
+          ]
+        ],
+        "eligible_delivery_cues": 3,
+        "game_sha256": "435e6648f160580603eb486efef4f5f9faa9225293f7c1e707efb501a0557e38",
+        "round": 1,
+        "layout": 0,
+        "phase": "Results",
+        "round_ticks": 4906,
+        "payout": 1336,
+        "lost": [
+          false,
+          false,
+          false
+        ],
+        "recovered": [
+          0,
+          0
+        ],
+        "event": "SAMPLE_GAME"
+      },
+      "client": {
+        "role": "client",
+        "tick": 6600,
+        "score": 3,
+        "delivered": [
+          true,
+          true,
+          true
+        ],
+        "inside": [
+          true,
+          true,
+          true
+        ],
+        "dwell": [
+          120,
+          120,
+          120
+        ],
+        "cargo_positions": [
+          [
+            4.31212091,
+            1.19966555,
+            4.26630354
+          ],
+          [
+            7.38850546,
+            1.19966602,
+            4.21294308
+          ],
+          [
+            5.84469604,
+            1.14961135,
+            2.65660787
+          ]
+        ],
+        "eligible_delivery_cues": 3,
+        "game_sha256": "435e6648f160580603eb486efef4f5f9faa9225293f7c1e707efb501a0557e38",
+        "round": 1,
+        "layout": 0,
+        "phase": "Results",
+        "round_ticks": 4906,
+        "payout": 1336,
+        "lost": [
+          false,
+          false,
+          false
+        ],
+        "recovered": [
+          0,
+          0
+        ],
+        "event": "SAMPLE_GAME"
+      }
+    }
+  },
+  "validation": {
+    "native_rules_groups": 5,
+    "three_layouts": "actual physical carrying, three cues, departure/results/next-job; source Timeline destroyed, complete CP restored with all5 byte equality and continued work",
+    "hazards": "actual driven robot fall recovers once; separately configured Native load falls, body count18, real retry creates new key/stable gameplay identity",
+    "negative": "invalid staged pose preserves all5; actual legacy ABI1 producer/current helper refused before table access, new context refuses legacy identity then advances; corrupted evidence controls rejected",
+    "native": "current private ABI2 actual native pair3600/full5/ACK/cleanup +actual NEXT JOB button same-session action bothround2/layout1",
+    "web": "same artifact independent Chrome RTC pair6600, finished at roundtick4906, all3/cues3/payout1336/full5/ACK/zero observed teardown; functional softwareGL with3D disabled/local-IP flag",
+    "visual": "actual native GPU viewport19bodies/Sphere surfaces/bay+clamp surfaces +checkedclose. Screenshot before private ABI marker only; renderer/game code unchanged."
+  },
+  "shared_changes": {
+    "flat_api": "compatible ogb3_body_set_type addition; invalid enum and unsupported compound/height/Mesh refuse before upstream setter; immediate capture, source-free restore, stable key and dynamic mass return tested in existing static/shared API cases",
+    "replay": "private providerREPLB3D2, identity included in configuration contract; original command order retained/extensions trail; actual owner-checked staged pose/type/point impulse and velocity reads",
+    "versions": "Native C ABI1/POD layouts/logical4/resource2/canonical versions unchanged; C source fingerprint/build changed; private Odin provider identity deliberately versioned2",
+    "native_library": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-type-cache/build/Release/libogb3.dylib",
+    "web_archive": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-type-cache/build/WebSIMD/017c4bbf03ac1d43252338686f55f391807ea4b2d9b1ee7fa0ac551cbf6d48e8/libogb3.a"
+  },
+  "retained_failures": [
+    "round-rules-v1 shared library relocation missing in standalone output; corrected by exact-byte sibling staging",
+    "v2..v20 physical/controller failures retained: rigid box transitions, ramp toe/end face, insufficient workspace, unlatched loads and unstable stateless routes. Current rounded equal-mass robots, overlapping ramp, working space, Native latches and local staged input controller satisfy the unchanged win/deadline criteria.",
+    "v13 descriptor tag order panic; v21 both test bodies exit0 but wrapper receipt attempted to hash an auto-deleted executable; -keep-executable corrected",
+    "v24 duplicate Odin package name in copied legacy ABI fixture, only namespace renamed",
+    "native-round-pair-v2 actors succeeded but project fence rejected unrelated extractor23704 module copy from Root concurrent same-project checks. Exclusivev3 passed with exact source/binaries; oldFAIL unchanged.",
+    "web-round-pair-v2 generic networkPASS but game assessment at3600 remainedWorking/score1. Distinct longer6600 case completed within declared9000deadline. No unchanged automatic retry or relabel."
+  ],
+  "limits": [
+    "Human playtesting NOT_OBSERVED. Automated input reads copied poses and never assigns solver poses, scores, heads or protocol state.",
+    "No native/browser cross-play or cross-target deterministic equality claim. Native and browser cases are separate qualified cohorts.",
+    "Chrome functional localhost with3D disabled/local-IP discovery flag; Internet/forced relay, other browsers, foreground budgets and final600s are later cards.",
+    "Current Native C addition is tested on macOS ARM64 and Wasm. Later whole-goal validation must rebuild/recheck Linux; earlier Linux reports are build-specific.",
+    "Rooms/invitations/security/rejoin/observers/host-loss UX, audio/polish and deploy-ready final package remain N1/R1/P1/Q1/D1."
+  ]
+}

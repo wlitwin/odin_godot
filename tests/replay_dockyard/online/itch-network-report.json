@@ -1,0 +1,170 @@
+{
+  "result": "ITCH_ORIGIN_LOCAL_DNS_FAILURE_REPRODUCED_PUBLIC_DNS_CONNECTIONS_PASS",
+  "status": "User confirmed hosted connectivity works before the separate paste/short-code follow-up. No DNS or proxy configuration was changed by this investigation.",
+  "scope": "Native browser WebSocket handshakes from the actual hosted itch iframe, engine JS/Wasm/PCK deliberately blocked; no room creation/gameplay or off-network qualification from these probes.",
+  "dns": {
+    "system_resolver": "192.168.1.4",
+    "hostname": "mc.laserturtle.net",
+    "system_address": "10.0.0.10",
+    "public_resolver": "1.1.1.1",
+    "public_address": "71.212.157.159"
+  },
+  "paths": [
+    "/replay-room/dockyard",
+    "/rtc"
+  ],
+  "chrome": {
+    "scope": "Actual itch iframe WebSocket reachability; engine assets intentionally blocked. Public-DNS override is diagnostic only; no browser protection disabled.",
+    "cases": [
+      {
+        "kind": "system-dns",
+        "browser": "Chrome/156.0.8078.80",
+        "iframe": {
+          "origin": "https://html.itch.zone",
+          "allow": "autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share",
+          "sandbox": null
+        },
+        "context": {
+          "origin": "https://html.itch.zone",
+          "isolated": true,
+          "network_features": [
+            {
+              "name": "local-network",
+              "allowed": false
+            },
+            {
+              "name": "local-network-access",
+              "allowed": false
+            },
+            {
+              "name": "loopback-network",
+              "allowed": false
+            }
+          ]
+        },
+        "sockets": [
+          {
+            "path": "/replay-room/dockyard",
+            "result": "ERROR"
+          },
+          {
+            "path": "/rtc",
+            "result": "ERROR"
+          }
+        ]
+      },
+      {
+        "kind": "public-dns",
+        "browser": "Chrome/156.0.8078.80",
+        "iframe": {
+          "origin": "https://html.itch.zone",
+          "allow": "autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share",
+          "sandbox": null
+        },
+        "context": {
+          "origin": "https://html.itch.zone",
+          "isolated": true,
+          "network_features": [
+            {
+              "name": "local-network",
+              "allowed": false
+            },
+            {
+              "name": "local-network-access",
+              "allowed": false
+            },
+            {
+              "name": "loopback-network",
+              "allowed": false
+            }
+          ]
+        },
+        "sockets": [
+          {
+            "path": "/replay-room/dockyard",
+            "result": "OPEN"
+          },
+          {
+            "path": "/rtc",
+            "result": "OPEN"
+          }
+        ]
+      }
+    ]
+  },
+  "firefox_system_dns": {
+    "kind": "firefox-system-dns",
+    "browser": "firefox/159.0.1",
+    "iframe": {
+      "origin": "https://html.itch.zone",
+      "allow": "autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share",
+      "sandbox": null
+    },
+    "context": {
+      "origin": "https://html.itch.zone",
+      "isolated": true,
+      "network_features": []
+    },
+    "sockets": [
+      {
+        "path": "/replay-room/dockyard",
+        "result": "ERROR"
+      },
+      {
+        "path": "/rtc",
+        "result": "ERROR"
+      }
+    ]
+  },
+  "firefox_public_doh": {
+    "kind": "firefox-public-dns-doh",
+    "browser": "firefox/159.0.1",
+    "iframe": {
+      "origin": "https://html.itch.zone",
+      "allow": "autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated; web-share",
+      "sandbox": null
+    },
+    "context": {
+      "origin": "https://html.itch.zone",
+      "isolated": true,
+      "network_features": []
+    },
+    "sockets": [
+      {
+        "path": "/replay-room/dockyard",
+        "result": "OPEN"
+      },
+      {
+        "path": "/rtc",
+        "result": "OPEN"
+      }
+    ]
+  },
+  "invalid_diagnostic_preserved": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/itch-network-v1/firefox-report.json",
+    "case": "firefox-public-dns",
+    "reason": "The initial forceResolve diagnostic applied the address globally, including the itch page itself. Its certificate failure is a fixture error, not evidence about the game endpoint. Replaced by ordinary Firefox DoH-only configuration in an isolated profile."
+  },
+  "raw_reports": [
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/itch-network-v1/report.json",
+      "sha256": "9feb055b56f8dba2925a630d8c429db3c14d4c3974ae2bd8c726f797c7badff4"
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/itch-network-v1/firefox-report.json",
+      "sha256": "5214b7b49dc425e0c5f922cb121cc2d8a02dbbb5f92326fea1991460e18ad10f"
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/itch-firefox-doh-v2/firefox-report.json",
+      "sha256": "10a922102cafcf7c6804fc80b78038f7ce2cd0a7372a6a6e59f0a37ceb636d97"
+    }
+  ],
+  "backend_checks": {
+    "services": "Room and nginx active with unchanged PIDs",
+    "tls_and_upgrade": "101 Switching Protocols via both LAN and public addresses, with both itch iframe origins",
+    "new_ports_required": false
+  },
+  "private_page_url_omitted": true,
+  "public_deployment_changed": false,
+  "release_admitted": false
+}

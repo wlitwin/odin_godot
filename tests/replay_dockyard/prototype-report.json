@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "result": "NATIVE_PROTOTYPE_READY",
+  "whole_goal_complete": false,
+  "scope": "G1 first native co-op carrying puzzle and rendered prototype; later G2/P1/N1/R1/Q1/D1 work remains",
+  "task": "t_ad352dea131b4474",
+  "board": "b_c14f6d2a88d84dbe",
+  "build": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/build-v9/report.json",
+    "sha256": "d410bcc7d7d4cfb9508e5308467b983704caa98e3d5ca3ce8e5ce81dd6d0217c"
+  },
+  "gameplay": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/final-gameplay-assessment-v1/report.json",
+    "sha256": "4c07f1ba543fb00a43352402946d9862a3aca1ba01edb977e8fbf5195955d309"
+  },
+  "actual_case_original": {
+    "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/cargo-pair-v4/report.json",
+    "sha256": "909fc6d7b08af5659aa9f44e77a357d33249405e8577a6b36161e21d004157a4"
+  },
+  "original_case_result_retained": "FAIL",
+  "direct_input_correction": "Direct committed nonzero_by_seat proof replaces nonzero-total > all-local-row-count inference; stopping after delivery is allowed.",
+  "both_roles_cargo_delivered": true,
+  "both_roles_confirmed_delivery_cues": 1,
+  "all_five_byte_equal": true,
+  "clean_teardown": true,
+  "body_shape_count": 14,
+  "geometry_assets": 8,
+  "joints": 1,
+  "visual": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/visual-final-v1/report.json",
+    "sha256": "aa7ebc17a5d605bd42e403e1e415fc8aa4fff91c1e4b0a9ece4772c88c11f196",
+    "screenshot": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/visual-final-v1/dockyard.png",
+    "screenshot_sha256": "fde0646121a02d160aa6de675d66744f9c20f5b175a965b12c7a4fe9f8263522",
+    "checked_close": true
+  },
+  "assessor_negative_controls": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/assessor-controls-v1/report.json",
+    "sha256": "56a14d4728fca24fd0f243a45e076f03d7e3d8f311876b1208ade59b8ad2c05d",
+    "rejected_cases": 4
+  },
+  "authored_route_fix": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/ramp-continuity-decision.json",
+    "sha256": "38e5ed91e9f109a50f1f4006599372089a1ae5bdf0f7ac0ca098db046c41c09b"
+  },
+  "prior_unmet_gameplay": [
+    "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/cargo-pair-v1/gameplay-assessment.json",
+    "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G1/cargo-pair-v2/gameplay-assessment.json"
+  ],
+  "prepared_launchers": {
+    "client.sh": "/tmp/odin-dockyard-duo-play/client.sh",
+    "host.sh": "/tmp/odin-dockyard-duo-play/host.sh",
+    "practice.sh": "/tmp/odin-dockyard-duo-play/practice.sh"
+  },
+  "source_sha256": {
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/view.gd": "eea1ede1acac39ff7f1e10b94014e3127645b384530757aabbf253127992c97d",
+    "examples/replay_dockyard/README.md": "8326e0f4aaae1671d2043f281da3897b6e8bb86ec0ffeac5c474d1ccabc860a0",
+    "examples/replay_dockyard/launch.py": "3468e7e253e26b1799151323ea8d016d97b644513b85cae7e967a86e6f39481b",
+    "examples/replay_dockyard/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/export_presets.cfg": "e9f30c9fc88411f457df6b331707de5646dcc48505cd248f708264fac08eee74",
+    "examples/replay_dockyard/prepare.py": "7fca36d9ec256bdf76b1c07ccdebd61023eaef9957b45d75fa1e9c5997e11194",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/delivery.tres": "8de9737d7ddfaebf072eaf8d18ab2d66dc888b1b24bab2fd08e2181a3e8d24b0",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/robot.tres": "9b3b6a6ac44a2be408c76f7fc754126441d7f4fc84921c182b4c8a7cbd5cd7b8",
+    "examples/replay_dockyard/content/world.tscn": "d0dffd4642a15d48a099fc09a21f84d0fb863269dc4d26ca4202384998bfc3f3",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/barge.tres": "395aabfa2687079bfffeafe874f6be586f3a5f591e2b8d5e296c15a3f15b1a7d",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "e4f386fc0041d83d27704bcabf089c88e9fc3428938ad39f7dbd5a8c6f0a81ba",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "18b52f4471f5a2eb064c7810f9f9efb2b2301e750a1f9eb04b757a79a78b27ca",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "587fc3188757a5a0562447d2530f8ec15c02437834793443cf42db3fc6b64cd5",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "332d05628c75ed96682d466571025458b5755a9a7a9900c941303b7718adf2bc",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "018196551b3204363c4083e00bb92aad8cc243ac6b7dff58b03cf93392f66f5e",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "d12bb3aae327c71417d92a71e98f60ca1f0e73c26d7a8e40827c80b88a80f667",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "8c17c35ee97eddb2a82174f99ad5356085b09bd2a7444bbc2d7ab4358b44c4f1",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "tests/replay_dockyard/visual_smoke.gd": "0d8c29fabd4a78deb904a9e397d907b98c447dd18cb9bec95865746c32d33ef1",
+    "tests/replay_dockyard/README.md": "b5b5a17f8688df548fbb29955426272cf58467f05907cb195fb7a86026572e1e",
+    "tests/replay_dockyard/assess.py": "dfdec957c0b873dd89dddb371318165984f038293e3bcbf8496baf44db4503fc"
+  },
+  "human_playtest": "NOT_OBSERVED; request feedback using concrete native launchers while web integration continues",
+  "network_scope": "actual localhost native Host/Client; configurable LAN destination implemented but independent LAN/Internet reachability not claimed",
+  "remaining": [
+    "Three complete timed jobs/round retry (G2)",
+    "Audio/art/onboarding polish and human gameplay feedback (P1)",
+    "Godot web service/AOT integration (W2) and browser framework pair (W3)",
+    "Party/Internet/recovery and fixed final qualification",
+    "No native/browser or differing-target cross-play claim"
+  ]
+}

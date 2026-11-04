@@ -1,0 +1,1005 @@
+{
+  "schema": 1,
+  "task": "t_710653584d574403",
+  "task_revision": 11,
+  "board": "b_cdde1cdfea104035",
+  "result": "BOUNDED_ABUSE_VALIDATION_PASS",
+  "recorded_utc": "2026-11-03T02:00:28.780546+00:00",
+  "scope": "P6.3 bounded input/history/recovery/count/authoritative-state enforcement for the shared Box3D backend and distinct Kit/Replay adapters on native macOS arm64 and translated Linux x86_64. Root owns final audit, stored result and task completion.",
+  "requirements": {
+    "input_history": {
+      "result": "PASS",
+      "kit": "Genuine revision2 INPUT8, current bootstrap, count9, first/count overflow, final-row invalid application Action, foreign scope, transactional no-row/no-receipt admission; actual H128 lower edge and one tick outside, valid resume.",
+      "replay": "Complete Snapshot held control is structurally valid i16 but invalid under the real model; existing replica_valid checks it before pending/publication. Existing affected Replay physics suites also pass.",
+      "evidence": [
+        "standalone.macos",
+        "standalone.linux_translated",
+        "existing_regressions"
+      ]
+    },
+    "recovery_snapshots": {
+      "result": "PASS",
+      "kit": "Real dense32 public Reset CHUNKs: actual sender authority, size/index, exact/conflicting duplicate, bounded ownership; unchanged complete5 and effects before complete valid retransmission/resume.",
+      "replay": "Actual public complete codec/Memory recovery with correct canonical integrity and unchanged Native image, invalid metadata/Game rejected with original complete5/frontiers/effects preserved; fresh valid complete recovery and resume.",
+      "native": "Existing bounded canonical decoder semantic/reference/reencode coverage reused, no Native code change.",
+      "evidence": [
+        "standalone.macos",
+        "standalone.linux_translated",
+        "preserved_public_reds"
+      ]
+    },
+    "body_spawn_counts": {
+      "result": "PASS",
+      "native": "Real35 admit+roundtrip; independent36-body and36-shape candidates return Capacity on admission/query/fill without output/publication change; remove extra then resume/canonical/step/cleanup. Raw factories remain trusted, not a claimed remote publication gate.",
+      "common": "Real initial4/32 trajectories cover valid extra-slot spawn/remove through33 dynamics/35 total, retained inactive lifetime, retirement expiry and coherent key/lifetime/alive state.",
+      "evidence": [
+        "standalone.macos",
+        "standalone.linux_translated"
+      ]
+    },
+    "authoritative_state": {
+      "result": "PASS",
+      "shared": "One pure common.game_valid structural/safety predicate, with bounded retirement count/entries, coherent unique nonzero keys/lifetimes/alive representation; no Native key-bit or parser/business-rule inference.",
+      "kit": "Typed Network(Side).side_valid is configured before unchanged network_attach; retained owner EXECUTE checked; decoded local value rejected before SDK reservation, Native read/allocation or publication. Optional nil remains generic structural-only behavior.",
+      "replay": "Existing state_valid delegates shared invariant; complete Snapshot uses full existing replica_valid including held controls.",
+      "evidence": [
+        "preserved_public_reds",
+        "standalone.macos",
+        "standalone.linux_translated",
+        "sdk_pairs"
+      ]
+    }
+  },
+  "standalone": {
+    "macos": {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/report.json",
+        "sha256": "e68d09b24abe0d25a4e63c1731865d657fea7f9d5804b77f3e0744e8de8654a6"
+      },
+      "result": "PASS",
+      "target": "native-macos-arm64",
+      "groups": {
+        "native": 2,
+        "common": 3,
+        "kit": 4,
+        "replay": 2,
+        "total": 11
+      },
+      "steps": [
+        {
+          "suite": "native-build",
+          "actual_exit": 0,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/native-build.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "native",
+          "actual_exit": 0,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/native.log",
+          "log_sha256": "8f61ba1b26f89c59e862621d0309beb4482c274b7fb60aa97c4dd625711c0e98"
+        },
+        {
+          "suite": "common",
+          "actual_exit": 0,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/common.log",
+          "log_sha256": "8f53c89e4d72a4fbea4520e7fdae9365d4aa74f8b8713b4c425cd129432e64e4"
+        },
+        {
+          "suite": "kit",
+          "actual_exit": 0,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/kit.log",
+          "log_sha256": "79b37d16e2a7a439a7ec9457c156cc345bc9485208e2bc136c31135533b70116"
+        },
+        {
+          "suite": "replay",
+          "actual_exit": 0,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v4/replay.log",
+          "log_sha256": "206b7912c3d886546e86b9f4e1e09ecd083eb14693794fa9c3cc4f4db635e9d6"
+        }
+      ],
+      "fences": {
+        "source_fence_unchanged": true,
+        "native_fence_unchanged": true,
+        "compiler_fence_unchanged": true,
+        "c_compiler_fence_unchanged": true
+      },
+      "native": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/libogb3.a",
+        "sha256": "6c57e7cd9ea1f95d5195d92e7145fc4f25272360020afce479b2bf4b15e79a1c",
+        "manifest": "/tmp/odin-box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/build-manifest.json",
+        "manifest_sha256": "cbeab7d86f2155449d6bc11f9ea4c1078489286394dcf2101a3cbe21373af909"
+      },
+      "toolchain": {
+        "compiler": "/nix/store/bp9vf6k9bsawaf0yvds0zbwadr22j3pf-odin-dev-2026-04/bin/odin",
+        "compiler_sha256": "ccdbd934fc1e42bd856cb1a05991d01e8e748b0174a1671cffc99c7812e386f2",
+        "c_compiler": "/nix/store/rwsbw420hcq148hifv7fga6r4g0k1dw8-clang-wrapper-21.1.8/bin/clang",
+        "c_compiler_sha256": "02050c2cd663f2a00b757f9134d65b38352676283171070e8babc829c34aa6e1"
+      },
+      "scope": "public standalone Native/Kit/Replay bounds; static/nil-owner fixtures, not SDK Host quota or hardware/performance proof",
+      "source_map_entries": 480
+    },
+    "linux_translated": {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-all-after-linux-v1/report.json",
+        "sha256": "64c41a978df46efe955be53681e44e9d80b3403752d3d123261334ce1e5667a2"
+      },
+      "result": "PASS",
+      "target": "translated-linux-x86_64",
+      "groups": {
+        "native": 2,
+        "common": 3,
+        "kit": 4,
+        "replay": 2,
+        "total": 11
+      },
+      "steps": [
+        {
+          "suite": "native-build",
+          "actual_exit": 0,
+          "log": "/out/p6-bounds-all-after-linux-v1/native-build.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "native",
+          "actual_exit": 0,
+          "log": "/out/p6-bounds-all-after-linux-v1/native.log",
+          "log_sha256": "8f61ba1b26f89c59e862621d0309beb4482c274b7fb60aa97c4dd625711c0e98"
+        },
+        {
+          "suite": "common",
+          "actual_exit": 0,
+          "log": "/out/p6-bounds-all-after-linux-v1/common.log",
+          "log_sha256": "a3638a5f93c784f56be197a55e2be4c713365d9dae51313c4183c0784180912e"
+        },
+        {
+          "suite": "kit",
+          "actual_exit": 0,
+          "log": "/out/p6-bounds-all-after-linux-v1/kit.log",
+          "log_sha256": "0e52e877b5f8048b3ae29428d0acdc7ea742f190f57fbbbb3188156e3d68d1a2"
+        },
+        {
+          "suite": "replay",
+          "actual_exit": 0,
+          "log": "/out/p6-bounds-all-after-linux-v1/replay.log",
+          "log_sha256": "558b07c104c47ba8b3f869db8c04bfe7efc93d90fb16ebe35e62afa3b62497ea"
+        }
+      ],
+      "fences": {
+        "source_fence_unchanged": true,
+        "native_fence_unchanged": true,
+        "compiler_fence_unchanged": true,
+        "c_compiler_fence_unchanged": true
+      },
+      "native": {
+        "path": "/work/native-v1/native-cache/build/Release/libogb3.a",
+        "sha256": "0521940f764ef8cb35c7048e22fe8497dcb6be53f334cf07e598969b2a710aa3",
+        "manifest": "/work/native-v1/native-cache/build/Release/build-manifest.json",
+        "manifest_sha256": "35cd509da071442bd2f49c6616a31a979cf10658248e15f00a7de3b076fd1014"
+      },
+      "toolchain": {
+        "compiler": "/work/tools/odin/odin",
+        "compiler_sha256": "d93c2d69f3acf1b6985de41b4eef49b58b1b29f88b42c0941bcc7c969aff3259",
+        "c_compiler": "/usr/bin/clang",
+        "c_compiler_sha256": "71b0de1b06b1ffe3a68f1b15f3bfff1f80ba3351ac679be346fb515327494157"
+      },
+      "scope": "public standalone Native/Kit/Replay bounds; static/nil-owner fixtures, not SDK Host quota or hardware/performance proof",
+      "source_map_entries": 480
+    }
+  },
+  "preserved_public_reds": {
+    "kit": {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-kit-baseline-v2/report.json",
+        "sha256": "83c2a6c4737dca6eadcfb05cc792e783f461facfb72183efa01d45e1ecd65808"
+      },
+      "result": "FAIL",
+      "classification": "PUBLIC_SEMANTIC_RED_PRESERVED",
+      "actual_exit": 1,
+      "log": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-kit-baseline-v2/kit.log",
+        "sha256": "79d977f200e280826005820019202c5399f0bb663ecc5fef60844bef8bab32a6"
+      },
+      "observations": [
+        "KIT_COMMON_SIDE count=9 observed=true rejected=false preserved_full5=false ready=true scope=2"
+      ],
+      "fences": {
+        "source_fence_unchanged": true,
+        "native_fence_unchanged": true,
+        "compiler_fence_unchanged": true
+      },
+      "change_to_oracles": false
+    },
+    "replay": {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v5/report.json",
+        "sha256": "295468545332517a9461fba76c37b39710e7b1bb2a055cf9400b1affad84c76f"
+      },
+      "result": "FAIL",
+      "classification": "PUBLIC_SEMANTIC_RED_PRESERVED",
+      "actual_exit": 1,
+      "log": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v5/replay.log",
+        "sha256": "0571e3390dc0423abe5896652c4fa07c82c30cef41bd3bdf21c289cfc655987e"
+      },
+      "observations": [
+        "REPLAY_BOUNDS_REJECTION rejected_delta=0 published_same=false original5_same=false head=2 cf=2 phase=Running",
+        "REPLAY_BOUNDS_CLEANUP native=0 wrapper=0 provider=0 admitted=0 owners=0",
+        "REPLAY_BOUNDS_REJECTION rejected_delta=0 published_same=false original5_same=false head=2 cf=2 phase=Running",
+        "REPLAY_BOUNDS_CLEANUP native=0 wrapper=0 provider=0 admitted=0 owners=0",
+        "REPLAY_BOUNDS_REJECTION rejected_delta=0 published_same=false original5_same=false head=2 cf=2 phase=Running",
+        "REPLAY_BOUNDS_CLEANUP native=0 wrapper=0 provider=0 admitted=0 owners=0"
+      ],
+      "fences": {
+        "source_fence_unchanged": true,
+        "native_fence_unchanged": true,
+        "compiler_fence_unchanged": true
+      },
+      "change_to_oracles": false
+    }
+  },
+  "sdk_pairs": [
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-kit-sdk-short-v1/report.json",
+        "sha256": "623403347ff054eaca007f02cc2b67c6c390365231b84c69646283033aaf35d8"
+      },
+      "result": "CONTROLLER_SMOKE_PASS",
+      "target": "native-macos-arm64",
+      "framework": "kit",
+      "build_record": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-kit-sdk-build-v1/build-record.json",
+        "sha256": "2c0e241ab5fc235b646f44ca4321cc891f2bf0f8bb0c6650b084e02d09059005"
+      },
+      "required_ticks": 300,
+      "end_tick": 300,
+      "seed": 42,
+      "bodies": 32,
+      "latency_ms": 0,
+      "jitter_ms": 0,
+      "loss": 0,
+      "full5_matches": 10,
+      "confirmed_end": 300,
+      "effects": {
+        "excluded_authority": [],
+        "full_stream_actual_count": 17,
+        "full_stream_authority_count": 17,
+        "gaps": [],
+        "matched": 17,
+        "post_recovery_matched_effects": []
+      },
+      "recovery": [],
+      "rolling": {
+        "result": "PASS",
+        "decision_missing": 0,
+        "decision_changed": 0,
+        "decision_extra": 0,
+        "decision_outside_admission_count": 0,
+        "fx_missing": 0,
+        "fx_changed": 0,
+        "fx_extra": 0,
+        "fx_outside_scope": 0,
+        "final_tail_missing": 0,
+        "unmatched_required_frames": 0,
+        "unmatched_authority_references": 0,
+        "authority_export_count": 10,
+        "required_follower_exports": 10,
+        "required_follower_matches": 10,
+        "findings": []
+      },
+      "exits": {
+        "client": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 1195,
+          "records_consumed": 1195,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 357106,
+            "bytes_retained": 357106,
+            "log_sha256": "0b2262104b0d5228aa476ad789f27180434818db65b9f402f266746a8351f4c2",
+            "index_sha256": "59f5a5f4e1ed210d85224c06104ea78e7d4980b8eda0073c29b0147fadd85d5f"
+          }
+        },
+        "host": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 1287,
+          "records_consumed": 1287,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 391689,
+            "bytes_retained": 391689,
+            "log_sha256": "d1cc7a10a5c9a0b198db284eaa8ab2e7744c9afba2f3f0e095270ef988ed5adf",
+            "index_sha256": "3061a9e935d0fd1bc210442fd34e0a9ec193ba730031ef36951acdc38faac61b"
+          }
+        }
+      },
+      "fences": {
+        "source_unchanged": true,
+        "driver_changes": [],
+        "project_bound_by_record": true,
+        "consumed_example_source_copy_verified": true
+      },
+      "source_manifest_sha256": "f379cb6cdcdd697ceda7143e4d96dc97a3b62e3b5ba70eaa5f18a39232f2b1bc",
+      "project_binaries": {
+        "bin/libodin_godot.dylib": "f6faa98df22c5c3b7d225998fdb7331b9175461147f486dabbe7fc267ea0eebd",
+        "bin/libodin_godot.dylib.dSYM/Contents/Resources/DWARF/libodin_godot.dylib": "0f2fd406a6bfc692d84be0d5fd99761956f746665645d787b67d24de7e787437",
+        "bin/libodinscripts.dylib": "ae92ccda86377b8263224a44bc073ba9ee87be3bb54683cf48c3916efe7fe397",
+        "bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dylib": "5dd266f0310b604b3164e9444eba70d7adb793f851b4fafbf6f9bf8e87742b9b",
+        "bin/libogb3.dylib": "77f64d7ce5dc228f45454f1b6259193626020f4ef6f1c73503ff21ccf07e52ef"
+      },
+      "supplied_native": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/libogb3.dylib",
+        "sha256": "ed2c5fcfa8e0cbba5ee835c8cd9c73c35b6c3e03b4ac4ae1628a1fb946559371"
+      },
+      "scope": "Normal current Core/SDK legacy32 pair, short functional regression; no new long, CPU, hardware or cross-target equality claim."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-sdk-short-v2/report.json",
+        "sha256": "b270943c9706d365dbdc1f737f8fd60a631f88bf700a01d0cb862e683ce8a164"
+      },
+      "result": "CONTROLLER_SMOKE_PASS",
+      "target": "native-macos-arm64",
+      "framework": "replay",
+      "build_record": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-bounds-replay-sdk-build-v1/build-record.json",
+        "sha256": "87be47349e359d323288ff7d128fd0216007af8710876f282142068ff3eb5f64"
+      },
+      "required_ticks": 300,
+      "end_tick": 600,
+      "seed": 42,
+      "bodies": 32,
+      "latency_ms": 0,
+      "jitter_ms": 0,
+      "loss": 0,
+      "full5_matches": 159,
+      "confirmed_end": 600,
+      "effects": {
+        "excluded_authority": [],
+        "full_stream_actual_count": 23,
+        "full_stream_authority_count": 23,
+        "gaps": [],
+        "matched": 23,
+        "post_recovery_matched_effects": []
+      },
+      "recovery": [],
+      "rolling": {
+        "result": "PASS",
+        "decision_missing": 0,
+        "decision_changed": 0,
+        "decision_extra": 0,
+        "decision_outside_admission_count": 2,
+        "fx_missing": 0,
+        "fx_changed": 0,
+        "fx_extra": 0,
+        "fx_outside_scope": 4,
+        "final_tail_missing": 0,
+        "unmatched_required_frames": 0,
+        "unmatched_authority_references": 441,
+        "authority_export_count": 600,
+        "required_follower_exports": 159,
+        "required_follower_matches": 159,
+        "findings": []
+      },
+      "exits": {
+        "client": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 1789,
+          "records_consumed": 1789,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 320381,
+            "bytes_retained": 320381,
+            "log_sha256": "fe419488f868fc3cbbd1985c7203d249746ed67a3a85e4b31e90764b66ec8327",
+            "index_sha256": "9b4c9497b69a8d119526b8f958e8201d2dee75325dd06bf80dba09b14fafd15a"
+          }
+        },
+        "host": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 3092,
+          "records_consumed": 3092,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 726286,
+            "bytes_retained": 726286,
+            "log_sha256": "85c958a7132343ffcb0511b416178c0ba5b40c48070deb7c02a312ac01b8d603",
+            "index_sha256": "cfe90ab1ce0dd3bc2b447ac4cdfb2abe18b3b0ab803281d30a83df3de4a92a0b"
+          }
+        }
+      },
+      "fences": {
+        "source_unchanged": true,
+        "driver_changes": [],
+        "project_bound_by_record": true,
+        "consumed_example_source_copy_verified": true
+      },
+      "source_manifest_sha256": "f379cb6cdcdd697ceda7143e4d96dc97a3b62e3b5ba70eaa5f18a39232f2b1bc",
+      "project_binaries": {
+        "bin/libodin_godot.dylib": "874802b7c2d4b3e9ae992cb355c690e99fba1b95d10e149fa7880423a90617fd",
+        "bin/libodin_godot.dylib.dSYM/Contents/Resources/DWARF/libodin_godot.dylib": "a9309d0748cf0be3cbf59679f5294a6a639ad839f936a34a113e8f0b9d298d6f",
+        "bin/libodinscripts.dylib": "67dfec297da7f37c6224643c6a9c67d941b08133cefc166f2f3fe05faaa425e7",
+        "bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dylib": "87ed6baab1dbe3ea3d79d78b37f4d7187088bcfac66df34371da33e63f5c8c4c",
+        "bin/libogb3.dylib": "77f64d7ce5dc228f45454f1b6259193626020f4ef6f1c73503ff21ccf07e52ef"
+      },
+      "supplied_native": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/libogb3.dylib",
+        "sha256": "ed2c5fcfa8e0cbba5ee835c8cd9c73c35b6c3e03b4ac4ae1628a1fb946559371"
+      },
+      "scope": "Normal current Core/SDK legacy32 pair, short functional regression; no new long, CPU, hardware or cross-target equality claim."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-linux-sdk-v1/kit-runtime/report.json",
+        "sha256": "2d9e70e0ea055e2e286431c0e1b1deb3afe692a32819b0b5e636819532c8e356"
+      },
+      "result": "CONTROLLER_SMOKE_PASS",
+      "target": "translated-linux-x86_64",
+      "framework": "kit",
+      "build_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-linux-sdk-v1/kit-build/build-record.json",
+        "sha256": "92ca409e59845c8ad16ba40c6d5fcee5efe3af3f2490bbd2aba447fd6dba54bc"
+      },
+      "required_ticks": 300,
+      "end_tick": 600,
+      "seed": 42,
+      "bodies": 32,
+      "latency_ms": 0,
+      "jitter_ms": 0,
+      "loss": 0,
+      "full5_matches": 20,
+      "confirmed_end": 600,
+      "effects": {
+        "excluded_authority": [],
+        "full_stream_actual_count": 27,
+        "full_stream_authority_count": 27,
+        "gaps": [],
+        "matched": 27,
+        "post_recovery_matched_effects": []
+      },
+      "recovery": [],
+      "rolling": {
+        "result": "PASS",
+        "decision_missing": 0,
+        "decision_changed": 0,
+        "decision_extra": 0,
+        "decision_outside_admission_count": 0,
+        "fx_missing": 0,
+        "fx_changed": 0,
+        "fx_extra": 0,
+        "fx_outside_scope": 0,
+        "final_tail_missing": 0,
+        "unmatched_required_frames": 0,
+        "unmatched_authority_references": 0,
+        "authority_export_count": 20,
+        "required_follower_exports": 20,
+        "required_follower_matches": 20,
+        "findings": []
+      },
+      "exits": {
+        "client": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 2413,
+          "records_consumed": 2413,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 727140,
+            "bytes_retained": 727140,
+            "log_sha256": "a956276db9befd87ffa2bb99a8f2dfbdc1bc49d56d78bd90e312efdccceb89e0",
+            "index_sha256": "c7e0ca1f7279ad8690c82ca1dc8c35d7c9e61321efc31e62466de7331a4567eb"
+          }
+        },
+        "host": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 2545,
+          "records_consumed": 2545,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 774829,
+            "bytes_retained": 774829,
+            "log_sha256": "e61af940bcf95b3891ce608aacf698c451d3d50de48e70703e944e9221ca3167",
+            "index_sha256": "45eaba0958ba5e577cc78597b5b21d4447a31c73b1ce3851b2e585618979cb14"
+          }
+        }
+      },
+      "fences": {
+        "source_unchanged": true,
+        "driver_changes": [],
+        "project_bound_by_record": true,
+        "consumed_example_source_copy_verified": true
+      },
+      "source_manifest_sha256": "f379cb6cdcdd697ceda7143e4d96dc97a3b62e3b5ba70eaa5f18a39232f2b1bc",
+      "project_binaries": {
+        "bin/libodin_godot.so": "5cb8e9b39d59b1643ee64e90b12a4c909120247bc3fd7f8e71e460ddc48e1945",
+        "bin/libodinscripts.so": "e438eee6a5c5063643a41dca57a26792d0ac7bf4bb8274fb405d6b8deceadf39",
+        "bin/libogb3.so": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a"
+      },
+      "supplied_native": {
+        "path": "/work/native-v1/native-cache/build/Release/libogb3.so",
+        "sha256": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a"
+      },
+      "scope": "Normal current Core/SDK legacy32 pair, short functional regression; no new long, CPU, hardware or cross-target equality claim."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-linux-sdk-v1/replay-runtime/report.json",
+        "sha256": "7e47deb400b9a9abe9936a44d5acfca31b5b411572f133664bcabdb3dd61d7ec"
+      },
+      "result": "CONTROLLER_SMOKE_PASS",
+      "target": "translated-linux-x86_64",
+      "framework": "replay",
+      "build_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-linux-sdk-v1/replay-build/build-record.json",
+        "sha256": "b7fb2e66c9989fb06c8755a5aff52148c20f1d9f84af765d39c2b4bc88d73070"
+      },
+      "required_ticks": 300,
+      "end_tick": 600,
+      "seed": 42,
+      "bodies": 32,
+      "latency_ms": 0,
+      "jitter_ms": 0,
+      "loss": 0,
+      "full5_matches": 209,
+      "confirmed_end": 600,
+      "effects": {
+        "excluded_authority": [],
+        "full_stream_actual_count": 23,
+        "full_stream_authority_count": 23,
+        "gaps": [],
+        "matched": 23,
+        "post_recovery_matched_effects": []
+      },
+      "recovery": [],
+      "rolling": {
+        "result": "PASS",
+        "decision_missing": 0,
+        "decision_changed": 0,
+        "decision_extra": 0,
+        "decision_outside_admission_count": 2,
+        "fx_missing": 0,
+        "fx_changed": 0,
+        "fx_extra": 0,
+        "fx_outside_scope": 4,
+        "final_tail_missing": 0,
+        "unmatched_required_frames": 0,
+        "unmatched_authority_references": 391,
+        "authority_export_count": 600,
+        "required_follower_exports": 209,
+        "required_follower_matches": 209,
+        "findings": []
+      },
+      "exits": {
+        "client": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 1943,
+          "records_consumed": 1943,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 354336,
+            "bytes_retained": 354336,
+            "log_sha256": "8c848e1845c89a730057994782d470a17ccb66d077396dc90c635272acff5fe4",
+            "index_sha256": "936191aa407e01ea12b4ad1c61859eac49333c2a36e7a5e9629fde8b209ce7ef"
+          }
+        },
+        "host": {
+          "exit_code": 0,
+          "natural": true,
+          "reader_eof": true,
+          "pending_events": 0,
+          "reader_error": null,
+          "records_seen": 3092,
+          "records_consumed": 3092,
+          "cleanup": {
+            "ok": true,
+            "all_explicit_drops_ok": true,
+            "core_shutdown_clean": true,
+            "native_live_bytes": 0,
+            "snapshot_live_bytes": 0,
+            "host_application_live_bytes": 0
+          },
+          "intake": {
+            "consumer_closed": true,
+            "writer_closed": true,
+            "final_flush_fsync_ok": true,
+            "integrity_error": null,
+            "bytes_seen": 687889,
+            "bytes_retained": 687889,
+            "log_sha256": "a5db09b95801b8f93489481d3320d5eb036ebd4e115e17b97cfac05c4e9e6b97",
+            "index_sha256": "b1b526f77955f6ea0bff28abdb57ed4c1a66f94eb5b4fb7df77ee780d31eda4a"
+          }
+        }
+      },
+      "fences": {
+        "source_unchanged": true,
+        "driver_changes": [],
+        "project_bound_by_record": true,
+        "consumed_example_source_copy_verified": true
+      },
+      "source_manifest_sha256": "f379cb6cdcdd697ceda7143e4d96dc97a3b62e3b5ba70eaa5f18a39232f2b1bc",
+      "project_binaries": {
+        "bin/libodin_godot.so": "4be9621a1df307f7577aadea7e2969d792263b861ca23e9b634a3f72ccc82e0b",
+        "bin/libodinscripts.so": "11315fa6d7ab6dff38e3cb4360df71a7eeb49b0783dbafa526b01a6cda063f89",
+        "bin/libogb3.so": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a"
+      },
+      "supplied_native": {
+        "path": "/work/native-v1/native-cache/build/Release/libogb3.so",
+        "sha256": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a"
+      },
+      "scope": "Normal current Core/SDK legacy32 pair, short functional regression; no new long, CPU, hardware or cross-target equality claim."
+    }
+  ],
+  "linux_sdk_aggregate": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-bounds-linux-sdk-v1/report.json",
+    "sha256": "a7553b850e3071fa696035b2c0791c0eed7a28d8dc108bbfe52402869f60dc4c",
+    "result": "PASS",
+    "source_native_fence": true,
+    "execution_mode": "translated-linux-x86_64"
+  },
+  "existing_regressions": [
+    {
+      "package": "tests/kit_world_protocol",
+      "result": "PASS",
+      "kind": "TEST_SUITE",
+      "groups": 8,
+      "actual_exit": 0,
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v1/report.json",
+        "sha256": "2b516d0dea3e74aa52f65e730d5e66797d5fe39ff41dc76ebd6893ee2a123dbc"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v1/suite-0.log",
+        "sha256": "bfbc8e0851011c7373fb56de1da2dd292397557a1bcec796588c805f6bcb8bac"
+      },
+      "source_native_compiler_fence": true
+    },
+    {
+      "package": "tests/replay_physics_net",
+      "result": "PASS",
+      "kind": "TEST_SUITE",
+      "groups": 8,
+      "actual_exit": 0,
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/report.json",
+        "sha256": "00d8198a4b322d4593e99a8c22b629bd31d56e81d418e4eac2eeea740a5e9994"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/suite-0.log",
+        "sha256": "9d7d84cc3fac1892a6887f8fa193804eefa99f2ed37282f8bbe22b3cb92be308"
+      },
+      "source_native_compiler_fence": true
+    },
+    {
+      "package": "tests/replay_physics",
+      "result": "PASS",
+      "kind": "TEST_SUITE",
+      "groups": 6,
+      "actual_exit": 0,
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/report.json",
+        "sha256": "00d8198a4b322d4593e99a8c22b629bd31d56e81d418e4eac2eeea740a5e9994"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/suite-1.log",
+        "sha256": "2c2747f3d335c4b3cb872558f4b416e37de031aa823e5e506745119313cf5150"
+      },
+      "source_native_compiler_fence": true
+    },
+    {
+      "package": "tests/box3d_slices/common",
+      "result": "PASS",
+      "kind": "COMPILE_ONLY_NO_TEST_COUNT",
+      "groups": null,
+      "actual_exit": 0,
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/report.json",
+        "sha256": "00d8198a4b322d4593e99a8c22b629bd31d56e81d418e4eac2eeea740a5e9994"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v2/suite-2.log",
+        "sha256": "3f18ff96427d7b0c5e617fb1d9b3af98fe30bcf1975d6a3ea8bfc0dd2220170b"
+      },
+      "source_native_compiler_fence": true
+    }
+  ],
+  "legacy_kit_net": {
+    "result": "FAIL_PRESERVED_PREEXISTING",
+    "groups": 14,
+    "failed_groups": 6,
+    "same_failure_identities": [
+      "kit_box3d_net_test.accepted_controls_actions_replace_guesses_through_session",
+      "kit_box3d_net_test.failed_revision_preserves_pair_and_explicit_resync_repairs_hold",
+      "kit_box3d_net_test.primitive32_history128_real_eight_tick_transaction_and_teardown",
+      "kit_box3d_net_test.recovery_backlog_one_shot_reset_after_queued_corrections",
+      "kit_box3d_net_test.source_epoch_sequence_duplicate_conflict_and_bounds_precede_effects",
+      "kit_box3d_net_test.stale_epoch_accepted_packet_is_fully_validated_then_ignored"
+    ],
+    "before_record": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-old-kit-baseline-v1/report.json",
+      "sha256": "81591e8bb59ba7497dc64a3b41ef99ee39f2752d498bd18ba5f9504cdb46bc17"
+    },
+    "before_log": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-old-kit-baseline-v1/test.log",
+      "sha256": "62fb32c8ce0cf676fc1deea69ad705e901dc033ac1944c82b69dd912af220b1e"
+    },
+    "after_record": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v1/report.json",
+      "sha256": "2b516d0dea3e74aa52f65e730d5e66797d5fe39ff41dc76ebd6893ee2a123dbc"
+    },
+    "after_log": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-existing-regressions-v1/suite-1.log",
+      "sha256": "a07326a3724a2236a661e96346666e656a9cf2fa939368391a303744117fe13d"
+    },
+    "prechange_network_sha256": "eb144f2f8645022d11fb120b9c87dfb571d4bd26c8016ae876a2404e880ba47b",
+    "source_native_fence_before": true,
+    "source_native_compiler_fence_after": true,
+    "followup": "P6.4: migrate applicable tests to current World2 invariants and archive genuinely superseded assumptions. No old test or assertion was changed, no FAIL relabelled PASS."
+  },
+  "implementation": {
+    "shared_game_invariant": "examples/box3d_common/rules.odin::game_valid",
+    "replay": [
+      "replay/net/physics_receive.odin::client_physics_part existing replica_valid gate",
+      "examples/replay_box3d/shared/adapter/model.odin::model state_valid delegate"
+    ],
+    "kit": [
+      "kit/physics/network.odin::Network(Side).side_valid configuration field and decode gate",
+      "examples/kit_box3d/scripts/model.odin::side_valid",
+      "examples/kit_box3d/scripts/runtime.odin::network field configured before unchanged network_attach"
+    ],
+    "input_validate_proc_reused": false,
+    "native_core_wire_schema_limit_changes": false,
+    "generic_side_reflection": false,
+    "wire_layout_or_version_changes": false,
+    "game_rules_identity": "Existing rules descriptors bind shared and adapter source; actual new source identities are recorded, not old-case reinterpretation."
+  },
+  "bounds": {
+    "world_history": 128,
+    "prediction_ticks": 8,
+    "ordinary_repair_ticks": 8,
+    "total_bodies": 35,
+    "total_shapes": 35,
+    "initial_dynamics": 32,
+    "joints": 1,
+    "native_assets": 8,
+    "tracked_bytes": 67108864,
+    "kit_complete_bytes": 1048576,
+    "kit_chunk_bytes": 32768,
+    "kit_max_chunks": 32
+  },
+  "completion_source_hashes": {
+    "examples/box3d_common/rules.odin": "229e429546077c238db0894634bf0cef0821f310050de365842fb1df823ca97e",
+    "examples/replay_box3d/shared/adapter/model.odin": "f2dc73d899cd51804296ff78592ef28bec16dcfc9250c53d655fee67a11c55a5",
+    "replay/net/physics_receive.odin": "1fb1643e82deb88c5fdf1ba06516c9e5394e3f54fe45f7c2aa003e9986ef3459",
+    "kit/physics/network.odin": "fb3afe02cfbf73cf373cf137df01a16456dcc3c60fe0f2493808ed80955615c7",
+    "examples/kit_box3d/scripts/model.odin": "74369067e1ed0a98a7821b3a94a57ea4e9045babcc5003706d78fb96753154da",
+    "examples/kit_box3d/scripts/runtime.odin": "5ea5d0d31c71e76f2caaca2c1064ec3b701a01e165006076e4be83323562320e"
+  },
+  "new_corpus_source_hashes": {
+    "tests/box3d_bounds/run.py": "5edecbfd408a849c994e1b24258c22f1fe7f38ecd1f14dd6fd9ad79e010f1bb6",
+    "tests/box3d_bounds/native/profile_edges.c": "26ff69b0b27e3d61809b063784cacc64e889a2c92cf329f8de418b41a849a56e",
+    "tests/box3d_bounds/kit/chunk_test.odin": "06919e063f2baba3c13a3fc3231fd9fe06bdbf8f2c866176265187db262c4d33",
+    "tests/box3d_bounds/kit/input_test.odin": "4815b2f07a56bd1467421cbc15ac7bdd50b4b727deaab6f70ae9d7e38448e714",
+    "tests/box3d_bounds/kit/common_side_test.odin": "421ddc99b771249e4da6bc7e60dd79ce64bcc812cb2afc65681416637322a5d0",
+    "tests/box3d_bounds/common/game_valid_test.odin": "44502ceeae6d996982a5ff6496be3261f272263505e46cc4065dfbe152d1a35c",
+    "tests/box3d_bounds/replay/fixture.odin": "53cb1000b55d528ed99b050f116b6fd9f0b7ba4f5a2c4f519816f69e861c1a2f",
+    "tests/box3d_bounds/replay/bounds_test.odin": "1fc8546dd0ab41a6d8f7bfc31b265c2e5c2f4ffc12358483808de34abff66a32"
+  },
+  "source_hash_scope": "Selected authored production changes and new corpus/readers at reporting time, matched to actual macOS execution source map. Full executed source/tool/Native/project/driver maps and logs remain in referenced immutable run records; not exact compiler import tracing. Report/docs written after runtime fences closed.",
+  "prior_coverage_references": {
+    "native_malformed_corpus": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_native/report.json",
+      "sha256": "e71f827ac00bb2589c432ac868c15ae1940df2e7c714144590c0f60cb5500086"
+    },
+    "authoring": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_authoring/report.json",
+      "sha256": "a5457d36649b2b85bbf0ef61bfd78f18bc4a5cb63ef2b86a53e7fff6366cdc20"
+    },
+    "motion": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_motion/report.json",
+      "sha256": "3f67f2fee26d678b3d61cfd29cf6d6ac8442c907903ffb6995410d6cc4a98f3c"
+    },
+    "production_quota_and_soak": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_production/report.json",
+      "sha256": "e693817894e8ea5ec88d95cd1febb7b01ae8ca7ccea38eb85825ead12a2a42dd"
+    }
+  },
+  "prior_coverage_scope": "Existing malformed/rechecksummed Native recovery, authoring and motion coverage is retained supporting evidence, not a newly rerun matrix. P6.3 did not change production Native C/Core or rebuild the backend. P6.2 SDK quota/long evidence is separate, not inherited as a new P6.3 run.",
+  "preserved_earlier_attempts": [
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-kit-baseline-v1/report.json",
+        "sha256": "ca77c135f1dbdeeafba409a495a9654f034c88874f84fe0b3548d4859b4498aa"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: kit')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v1/report.json",
+        "sha256": "50b050694a96c4f6c18adf9f562687988e8ad348acc08a8c5ce12388deadc7d5"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: replay')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v2/report.json",
+        "sha256": "7c809465cae42542cc54ce4830bfe089a905e73e5ecc9a889a0af9a846ef89e1"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: replay')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v3/report.json",
+        "sha256": "84c7c89b0e5c967a1bb5fef40fa08859247fe94886e4d662747f1027a1a56056"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: replay')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-baseline-v4/report.json",
+        "sha256": "e52a54fd632fe9d55ff323f3981c3237be94cea4f035bf216c77b9de4ff5b54f"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: replay')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v1/report.json",
+        "sha256": "759b15cbcf8db76eca52e51ed7887d3db6d9f0c42eb0cda36f094bdd1cd5758d"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: common')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v2/report.json",
+        "sha256": "dd895f0d5efae50443a377cda1fcb1a0c7a62791edb9903cbdd5718a08a4e812"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: kit')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-all-after-macos-v3/report.json",
+        "sha256": "6b4fcf7ff4edb653e712d748fee83cae7fe6985ad50acd331d7857d59fbc16c9"
+      },
+      "result": "FAIL",
+      "error": "RuntimeError('actual bounds suite failed: kit')",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    },
+    {
+      "record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-bounds-replay-sdk-short-v1/report.json",
+        "sha256": "87cb5b9f98fd3a4f306af8c6e29413abd1ad67510eb0f0eafc4ce123c1a61cc4"
+      },
+      "result": "FAIL",
+      "error": "EvidenceError(\"('scene reported failure', 'host', {'message': 'baseline target bound'})\")",
+      "classification": "Preserved earlier compiler/fixture/declaration attempt; not used as the final public semantic RED or acceptance PASS."
+    }
+  ],
+  "material_limits": [
+    "Standalone bounds fixtures are actual Native-backed static/nil-owner tests, not managed Core/Host shared-quota evidence.",
+    "SDK32 pairs are short normal functional regressions; full5 counts are actual follower exports compared within each pair, not every authority reference and not cross-target equality.",
+    "Six old KitNet failures remain explicit and require the separate P6.4 migration/archive work.",
+    "No new long-soak, CPU, profiling, hardware-CI/native-Linux-hardware, universal architecture or general-security/exhaustive-fuzz qualification.",
+    "No cryptographic sender-authentication claim; transport authority and scope checks are distinct from integrity.",
+    "Whole project/release goal and remaining queued work are not complete."
+  ],
+  "whole_goal_complete": false,
+  "documentation": {
+    "path": "docs/design/box3d/bounds.md",
+    "sha256": "a34860da019275572c61e1fd81be0712be44fae149b0e62f41d3121d18bdbe98"
+  }
+}

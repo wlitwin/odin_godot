@@ -2,16 +2,20 @@ package replay_net
 
 import r "godot:replay"
 import "core:crypto/sha2"
+import "core:mem"
 
 @(private)
 network_step :: proc(state: ^$State, input: Batch($Control, $Action, $Seats), ctx: ^r.Step(Net_Event($Event))) {
 	model := cast(^Model(State, Control, Action, Event, Seats))ctx.user
+ if model==nil || model_context_check(model^, #config(BOX3D_REQUIRE_DOMAIN,false) && model.complete_state)!=.None {ctx.error=.External_State;return}
 	if !authority_observation_valid(model.authority,input.authority,Seats) {r.abort(ctx); return}
 	if (input.prediction_group == 0) != (input.prediction_seat == 0) {r.abort(ctx); return}
 	if input.prediction_group != 0 && (input.prediction_group != model.group.id || input.prediction_seat == 0 || int(input.prediction_seat) > Seats) {r.abort(ctx); return}
 	for control in input.controls {if !model.control_valid(control) {r.abort(ctx); return}}
 	storage: [GAME_EVENTS]r.Occurrence(Event)
-	game_ctx := r.Step(Event){tick = ctx.tick, epoch = ctx.epoch, events = storage[:], user = model.user}
+	game_ctx := r.Step(Event){tick = ctx.tick, epoch = ctx.epoch, events = storage[:], user = model.user, execution = ctx.execution}
+	managed := r.execution_identity(ctx.execution) != 0
+	if model.complete_state && !managed {ctx.error = .Incomplete_State; return}
 	if model.reset_player != nil {
 		for i in 0 ..< Seats {
 			if input.fresh & (u64(1) << uint(i)) != 0 {model.reset_player(state, u16(i + 1), &game_ctx)}
@@ -22,6 +26,8 @@ network_step :: proc(state: ^$State, input: Batch($Control, $Action, $Seats), ct
 	if model.step_view != nil {model.step_view(state, input.controls, input.views, input.joins, input.leaves, &game_ctx)} else {
 		model.step(state, input.controls, input.joins, input.leaves, &game_ctx)
 	}
+	if managed {if error:=r.execution_status(ctx.execution);error!=.None{ctx.error=error;return}}
+	if game_ctx.error!=.None{ctx.error=game_ctx.error;return}
 	for present, i in input.has_action {
 		if !present {continue}
 		applied := false
@@ -30,8 +36,21 @@ network_step :: proc(state: ^$State, input: Batch($Control, $Action, $Seats), ct
 			before := state^
 			count := game_ctx.count
 			before_events := storage
+			point: r.External_Savepoint
+			if managed {
+				var_err: r.Error
+				point, var_err = r.execution_savepoint(ctx.execution)
+				if var_err != .None {ctx.error = var_err; return}
+			}
 			applied = model.action(state, u16(i + 1), input.actions[i], &game_ctx)
-			if !applied {state^ = before; storage = before_events; game_ctx.count = count; reason = .Predicate}
+			if !applied {
+				if managed {
+					err := r.execution_savepoint_restore(ctx.execution, &point)
+					if err != .None {r.execution_savepoint_release(&point); ctx.error = err; return}
+				}
+				state^ = before; storage = before_events; game_ctx.count = count; reason = .Predicate
+			}
+			if managed {r.execution_savepoint_release(&point);if error:=r.execution_status(ctx.execution);error!=.None{ctx.error=error;return}}
 		}
 		// Gameplay source zero is reserved for protocol action verdicts.
 		r.emit(ctx, 0, input.sequences[i] << 8 | u64(i + 1), Net_Event(Event){
@@ -78,4 +97,61 @@ token_digest :: proc(token: Token) -> [32]u8 {
 	digest: [32]u8
 	sha2.final(&ctx, digest[:])
 	return digest
+}
+
+// No native backend dependency. A nonnil owner opts into exact context checks;
+// strict complete mode additionally requires explicit allocator/model owners.
+@(private)
+owned_context_check :: proc(binding:Owned_Context,data:rawptr,managed:bool,access:r.Owner_Access=.Execute)->Error {
+ if error:=r.owner_access(binding.owner,access);error!=.None{return .Invalid_Model}
+ if (data!=nil && !r.owner_is_nil(binding.owner) && binding.data!=data) ||
+    (managed && data!=nil && r.owner_is_nil(binding.owner)){return .Invalid_Model}
+ return .None
+}
+@(private)
+model_context_check :: proc(model:Model($S,$C,$A,$E,$N),managed:bool,access:r.Owner_Access=.Execute)->Error {
+ if model.complete_state && complete_codec_owner_check(model.complete_codec)!=.None{return .Invalid_Model}
+ if error:=owned_context_check(model.user_context,model.user,managed,access);error!=.None{return error}
+ return owned_context_check(model.action_admission_context,model.action_admission_user,managed,access)
+}
+@(private)
+runner_managed :: proc(ownership:Runner_Ownership)->bool {
+ return !r.owner_is_nil(ownership.allocator.owner) || !r.owner_is_nil(ownership.model.owner)
+}
+@(private)
+runner_context_check :: proc(ownership:Runner_Ownership,allocator:mem.Allocator,model:rawptr,complete:bool,access:r.Owner_Access=.Execute)->Error {
+ managed:=runner_managed(ownership)
+ when #config(BOX3D_REQUIRE_DOMAIN,false) {if complete && !managed{return .Invalid_Model}}
+ if !managed{return .None}
+ if r.owner_is_nil(ownership.allocator.owner) || r.owner_is_nil(ownership.model.owner){return .Invalid_Model}
+ external:=r.External{owner=ownership.allocator.owner,owner_allocator_data=ownership.allocator.data}
+ if error:=r.owner_contexts_check(external,allocator);error!=.None{return .Invalid_Model}
+ if error:=r.owner_access(ownership.allocator.owner,access);error!=.None{return .Invalid_Model}
+ return owned_context_check(ownership.model,model,true,access)
+}
+// The model block is retained last and released last. It may be a declared
+// subfield of the very Server/Client allocation being destroyed.
+@(private)
+runner_retain :: proc(retains:^Runner_Retains,ownership:Runner_Ownership,model:^Model($S,$C,$A,$E,$N))->Error {
+ owners:=[?]r.Owner{ownership.allocator.owner,model.user_context.owner,model.action_admission_context.owner,
+  ownership.wire.owner,ownership.permit.owner,ownership.profile_clock.owner,ownership.profile_sample.owner,
+  ownership.identity.owner,ownership.admission.owner,ownership.model.owner}
+ for owner in owners {
+  if r.owner_is_nil(owner){continue}
+  if error:=r.owner_retain(owner);error!=.None{return .Invalid_Model}
+  retains.owners[retains.count]=owner;retains.count+=1
+ }
+ return .None
+}
+@(private)
+runner_drop :: proc(retains:^Runner_Retains)->Error {
+ return r.owner_retains_drop(retains)==.None?Error.None:Error.Invalid_Model
+}
+
+// Operation/owner adapters may retain these explicit raw application contexts;
+// code/allocator ownership does not imply either context is owned.
+model_ownership_check :: proc(model:Model($S,$C,$A,$E,$N),managed:bool,access:r.Owner_Access=.Execute)->Error{return model_context_check(model,managed,access)}
+model_ownership_retain :: proc(retains:^r.Owner_Retains,model:Model($S,$C,$A,$E,$N))->Error {
+ owners:=[?]r.Owner{model.user_context.owner,model.action_admission_context.owner}
+ return r.owner_retains_acquire(retains,owners[:])==.None?Error.None:Error.Invalid_Model
 }

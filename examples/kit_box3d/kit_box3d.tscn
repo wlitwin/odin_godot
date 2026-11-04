@@ -1,0 +1,380 @@
+[gd_scene load_steps=10 format=3]
+[ext_resource type="Script" path="res://scripts/kitslice.odin" id="1_script"]
+[sub_resource type="BoxMesh" id="FloorMesh"]
+size=Vector3(14,2,14)
+[sub_resource type="StandardMaterial3D" id="FloorMaterial"]
+albedo_color=Color(0.14,0.21,0.28,1)
+[sub_resource type="BoxMesh" id="SensorMesh"]
+size=Vector3(3,0.02,3)
+[sub_resource type="SphereMesh" id="PlayerMesh"]
+radius=0.25
+height=0.5
+[sub_resource type="BoxMesh" id="CrateMesh"]
+size=Vector3(0.5,0.5,0.5)
+[sub_resource type="CapsuleMesh" id="CapsuleMesh"]
+radius=0.2
+height=0.8
+[sub_resource type="StandardMaterial3D" id="LeftMaterial"]
+albedo_color=Color(0.15,0.55,1,1)
+[sub_resource type="StandardMaterial3D" id="RightMaterial"]
+albedo_color=Color(1,0.4,0.15,1)
+[node name="KitSlice" type="Node3D"]
+script=ExtResource("1_script")
+[node name="Floor" type="MeshInstance3D" parent="."]
+position=Vector3(0,-1,0)
+mesh=SubResource("FloorMesh")
+material_override=SubResource("FloorMaterial")
+[node name="SensorFootprint" type="MeshInstance3D" parent="."]
+position=Vector3(0,0.01,0)
+mesh=SubResource("SensorMesh")
+[node name="Camera" type="Camera3D" parent="."]
+position=Vector3(8,7,10)
+rotation_degrees=Vector3(-30,38,0)
+current=true
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees=Vector3(-55,-25,0)
+light_energy=1.4
+[node name="Bodies" type="Node3D" parent="."]
+[node name="B0" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B0"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("LeftMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B0"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B0"]
+mesh=SubResource("CapsuleMesh")
+[node name="B1" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B1"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B1"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B1"]
+mesh=SubResource("CapsuleMesh")
+[node name="B2" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B2"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B2"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B2"]
+mesh=SubResource("CapsuleMesh")
+[node name="B3" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B3"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B3"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B3"]
+mesh=SubResource("CapsuleMesh")
+[node name="B4" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B4"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B4"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B4"]
+mesh=SubResource("CapsuleMesh")
+[node name="B5" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B5"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B5"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B5"]
+mesh=SubResource("CapsuleMesh")
+[node name="B6" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B6"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B6"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B6"]
+mesh=SubResource("CapsuleMesh")
+[node name="B7" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B7"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B7"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B7"]
+mesh=SubResource("CapsuleMesh")
+[node name="B8" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B8"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B8"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B8"]
+mesh=SubResource("CapsuleMesh")
+[node name="B9" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B9"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B9"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B9"]
+mesh=SubResource("CapsuleMesh")
+[node name="B10" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B10"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B10"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B10"]
+mesh=SubResource("CapsuleMesh")
+[node name="B11" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B11"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B11"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B11"]
+mesh=SubResource("CapsuleMesh")
+[node name="B12" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B12"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B12"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B12"]
+mesh=SubResource("CapsuleMesh")
+[node name="B13" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B13"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B13"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B13"]
+mesh=SubResource("CapsuleMesh")
+[node name="B14" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B14"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B14"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B14"]
+mesh=SubResource("CapsuleMesh")
+[node name="B15" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B15"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B15"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B15"]
+mesh=SubResource("CapsuleMesh")
+[node name="B16" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B16"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B16"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B16"]
+mesh=SubResource("CapsuleMesh")
+[node name="B17" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B17"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B17"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B17"]
+mesh=SubResource("CapsuleMesh")
+[node name="B18" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B18"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B18"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B18"]
+mesh=SubResource("CapsuleMesh")
+[node name="B19" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B19"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B19"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B19"]
+mesh=SubResource("CapsuleMesh")
+[node name="B20" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B20"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B20"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B20"]
+mesh=SubResource("CapsuleMesh")
+[node name="B21" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B21"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B21"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B21"]
+mesh=SubResource("CapsuleMesh")
+[node name="B22" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B22"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B22"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B22"]
+mesh=SubResource("CapsuleMesh")
+[node name="B23" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B23"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B23"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B23"]
+mesh=SubResource("CapsuleMesh")
+[node name="B24" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B24"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B24"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B24"]
+mesh=SubResource("CapsuleMesh")
+[node name="B25" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B25"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B25"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B25"]
+mesh=SubResource("CapsuleMesh")
+[node name="B26" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B26"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B26"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B26"]
+mesh=SubResource("CapsuleMesh")
+[node name="B27" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B27"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B27"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B27"]
+mesh=SubResource("CapsuleMesh")
+[node name="B28" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B28"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B28"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B28"]
+mesh=SubResource("CapsuleMesh")
+[node name="B29" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B29"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B29"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B29"]
+mesh=SubResource("CapsuleMesh")
+[node name="B30" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B30"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B30"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B30"]
+mesh=SubResource("CapsuleMesh")
+[node name="B31" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B31"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B31"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B31"]
+mesh=SubResource("CapsuleMesh")
+[node name="B32" type="Node3D" parent="Bodies"]
+visible=false
+[node name="Sphere" type="MeshInstance3D" parent="Bodies/B32"]
+mesh=SubResource("PlayerMesh")
+material_override=SubResource("RightMaterial")
+[node name="Crate" type="MeshInstance3D" parent="Bodies/B32"]
+mesh=SubResource("CrateMesh")
+[node name="Capsule" type="MeshInstance3D" parent="Bodies/B32"]
+mesh=SubResource("CapsuleMesh")
+[node name="HUD" type="CanvasLayer" parent="."]
+[node name="Status" type="Label" parent="HUD"]
+offset_left=20.0
+offset_top=18.0
+offset_right=980.0
+offset_bottom=250.0
+theme_override_font_sizes/font_size=14
+text="KIT BOX3D — Host or Join"
+[node name="Instructions" type="Label" parent="HUD"]
+offset_left=20.0
+offset_top=565.0
+offset_right=980.0
+offset_bottom=600.0
+text="Arrow keys move · Space spawn · R remove · M motor · F sleep · G wake · Q query"
+[node name="Host" type="Button" parent="HUD"]
+offset_left=20.0
+offset_top=620.0
+offset_right=140.0
+offset_bottom=660.0
+text="Host"
+focus_mode=0
+[node name="Join" type="Button" parent="HUD"]
+offset_left=155.0
+offset_top=620.0
+offset_right=275.0
+offset_bottom=660.0
+text="Join localhost"
+focus_mode=0
+[node name="Reset" type="Button" parent="HUD"]
+offset_left=290.0
+offset_top=620.0
+offset_right=410.0
+offset_bottom=660.0
+text="Request reset"
+focus_mode=0
+[node name="Reconnect" type="Button" parent="HUD"]
+offset_left=425.0
+offset_top=620.0
+offset_right=545.0
+offset_bottom=660.0
+text="Reconnect"
+focus_mode=0
+[connection signal="pressed" from="HUD/Host" to="." method="on_host"]
+[connection signal="pressed" from="HUD/Join" to="." method="on_join"]
+[connection signal="pressed" from="HUD/Reset" to="." method="on_reset"]
+[connection signal="pressed" from="HUD/Reconnect" to="." method="on_reconnect"]

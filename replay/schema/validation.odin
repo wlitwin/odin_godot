@@ -16,7 +16,8 @@ Validation_Block :: struct {first,count:int,offset,wire_offset,size:int}
 @(private)
 compile_validation :: proc(s:^Schema) {
 	if len(s.unions)>0 {return} // guarded unions retain the general validator
-	s.validation=make([dynamic]Check,0,len(s.checks),s.allocator)
+	s.validation=metadata_array(s,Check,len(s.checks))
+	if s.problem.error!=.None{return}
 	for index in s.checks {
 		field:=s.fields[index]
 		check:=Check{offset=field.offset,wire_offset=u32(field.wire_offset),field=u32(index),width=u8(field.width),big_endian=field.big_endian}
@@ -36,7 +37,7 @@ compile_validation :: proc(s:^Schema) {
 			}
 		case:continue
 		}
-		append(&s.validation,check)
+		if !metadata_append(s,&s.validation,check){return}
 	}
 	compile_validation_blocks(s)
 }
@@ -113,7 +114,7 @@ zero_valid :: proc(s:^Schema,check:Check)->bool {
 // reads compiler padding, hidden fields, reversed scalars or union storage.
 @(private)
 compile_validation_blocks :: proc(s:^Schema) {
-	s.validation_blocks=make([dynamic]Validation_Block,0,0,s.allocator)
+	s.validation_blocks=metadata_array(s,Validation_Block,0)
 	span_index:=0
 	for first:=0;first<len(s.validation); {
 		check:=s.validation[first]
@@ -127,7 +128,7 @@ compile_validation_blocks :: proc(s:^Schema) {
 				block.count+=1;block.size=end-block.wire_offset
 			}
 		}
-		append(&s.validation_blocks,block);first+=block.count
+		if !metadata_append(s,&s.validation_blocks,block){return};first+=block.count
 	}
 }
 

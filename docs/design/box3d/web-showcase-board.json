@@ -1,0 +1,200 @@
+{
+  "status": "IMPLEMENTATION_STARTED",
+  "project_id": "p_36d6855c53c249de",
+  "board_id": "b_c14f6d2a88d84dbe",
+  "board_name": "Replay Box3D Web Showcase",
+  "paused": false,
+  "tasks": [
+    {
+      "code": "W0",
+      "id": "t_ceeb4031c185401f",
+      "title": "W0 Refresh Box3D and rebase the focused patch set",
+      "status": "done",
+      "prerequisites": [],
+      "files": [
+        "box3d/dependency.json",
+        "box3d/native/",
+        "build/build_box3d.sh",
+        "tests/box3d_native/",
+        "tests/box3d_recovery/",
+        "docs/design/box3d/upgrade.md"
+      ]
+    },
+    {
+      "code": "S0",
+      "id": "t_c68ba86899f64d6d",
+      "title": "S0 Set the game and browser execution contract",
+      "status": "working",
+      "prerequisites": [],
+      "files": [
+        "docs/design/box3d/replay-showcase-game.md",
+        "docs/design/box3d/web-showcase-roadmap.md"
+      ]
+    },
+    {
+      "code": "W1",
+      "id": "t_530ac12389c748a9",
+      "title": "W1 Run the complete Box3D backend under WebAssembly",
+      "status": "queued",
+      "prerequisites": [
+        "W0",
+        "S0"
+      ],
+      "files": [
+        "build/build_box3d.sh",
+        "box3d/native/",
+        "tests/box3d_web/backend/"
+      ]
+    },
+    {
+      "code": "G1",
+      "id": "t_ad352dea131b4474",
+      "title": "G1 Prototype the native two-player cargo heist",
+      "status": "queued",
+      "prerequisites": [
+        "S0"
+      ],
+      "files": [
+        "examples/replay_dockyard/",
+        "tests/replay_dockyard/"
+      ]
+    },
+    {
+      "code": "W2",
+      "id": "t_1c594991d1ac4423",
+      "title": "W2 Integrate one Box3D domain into a Godot web export",
+      "status": "queued",
+      "prerequisites": [
+        "W1"
+      ],
+      "files": [
+        "build/build_web.sh",
+        "build/box3d_profile.py",
+        "core/box3d_native.odin",
+        "box3d/",
+        "tests/box3d_web/integration/"
+      ]
+    },
+    {
+      "code": "W3",
+      "id": "t_d4455755f70445bb",
+      "title": "W3 Run Replay complete physics between browser players",
+      "status": "queued",
+      "prerequisites": [
+        "W2"
+      ],
+      "files": [
+        "tests/box3d_web/replay/",
+        "tests/box3d_web/kit/",
+        "examples/replay_dockyard/"
+      ]
+    },
+    {
+      "code": "G2",
+      "id": "t_617b394337c54717",
+      "title": "G2 Complete the first playable Dockyard Duo jobs",
+      "status": "queued",
+      "prerequisites": [
+        "G1",
+        "W0"
+      ],
+      "files": [
+        "examples/replay_dockyard/",
+        "tests/replay_dockyard/"
+      ]
+    },
+    {
+      "code": "N1",
+      "id": "t_5dcf5b109cc34cb6",
+      "title": "N1 Add party invitations and real browser reachability",
+      "status": "queued",
+      "prerequisites": [
+        "W3",
+        "G2"
+      ],
+      "files": [
+        "examples/replay_dockyard/",
+        "tests/replay_dockyard/online/",
+        "replay/godot/party.md"
+      ]
+    },
+    {
+      "code": "R1",
+      "id": "t_1812405969704921",
+      "title": "R1 Finish physics rejoin spectators and host-loss behavior",
+      "status": "queued",
+      "prerequisites": [
+        "N1"
+      ],
+      "files": [
+        "examples/replay_dockyard/",
+        "tests/replay_dockyard/recovery/"
+      ]
+    },
+    {
+      "code": "P1",
+      "id": "t_8d9575e0e67943f5",
+      "title": "P1 Polish the game and its editor-first content",
+      "status": "queued",
+      "prerequisites": [
+        "G2"
+      ],
+      "files": [
+        "examples/replay_dockyard/",
+        "tests/replay_dockyard/presentation/"
+      ]
+    },
+    {
+      "code": "Q1",
+      "id": "t_c60a7e2d429f4445",
+      "title": "Q1 Qualify one frozen browser game profile",
+      "status": "queued",
+      "prerequisites": [
+        "W2",
+        "W3",
+        "G2",
+        "N1",
+        "R1",
+        "P1"
+      ],
+      "files": [
+        "tests/box3d_web/",
+        "tests/replay_dockyard/",
+        "docs/design/box3d/desktop-compatibility.md"
+      ]
+    },
+    {
+      "code": "D1",
+      "id": "t_677fbeb9dc40475c",
+      "title": "D1 Package the showcase and maintainer handoff",
+      "status": "queued",
+      "prerequisites": [
+        "Q1"
+      ],
+      "files": [
+        "examples/replay_dockyard/README.md",
+        "docs/design/box3d/",
+        "tests/replay_dockyard/report.json",
+        "tests/box3d_web/report.json"
+      ]
+    }
+  ],
+  "goal_started": true,
+  "implementation_jobs_started": true,
+  "upstream_pin_changed": true,
+  "fork_created": false,
+  "game_direction": "User selected co-op physics heist; Dockyard Duo is a proposed working title.",
+  "roadmap": "docs/design/box3d/web-showcase-roadmap.md",
+  "game_proposal": "docs/design/box3d/replay-showcase-game.md",
+  "upstream_freshness": "docs/design/box3d/web-showcase-upstream.json",
+  "current_scratch": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89",
+  "current_task": "t_c68ba86899f64d6d",
+  "execution_status": "ACTIVE",
+  "completed_tasks": [
+    "W0"
+  ],
+  "execution_contract": "tests/box3d_web/contract.json",
+  "selected_box3d_commit": "336263320469e5e9febfe18697ab562488f7e97a",
+  "note": "Planning task list snapshot; live statuses and claims are authoritative in herdr-tasks board b_c14f6d2a88d84dbe.",
+  "current_task_code": "S0"
+}

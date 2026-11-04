@@ -35,6 +35,7 @@ Snapshot_Assembly :: struct {
 
 @(private)
 client_features :: proc(c:^Client($S,$C,$A,$E,$N)) {
+ if c.physics!=nil {c.features_sent=true;return}
  if c.features_sent {return}
  if !c.snapshot_parts_enabled {c.features_sent=true;return}
  features:=SNAPSHOT_PARTS_FEATURE|RECENT_FACTS_FEATURE|CHECKPOINT_COMPRESSION_FEATURE|CHECKPOINT_SHUFFLE_FEATURE|CHECKPOINT_RELIABLE_FEATURE|OBSERVER_NAMES_FEATURE

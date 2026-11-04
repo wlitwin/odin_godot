@@ -33,12 +33,43 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
 import "core:strings"
+import "core:mem"
+import bg "godot:box3d/godot"
+import bm "godot:box3d/godot/meter"
+
+WIRE_QUEUE_PACKETS :: 128
+WIRE_QUEUE_BYTES :: u64(2*1024*1024)
+WIRE_QUEUE_PEERS :: 8
+Wire_Error :: enum {Ok,Invalid,Busy,Owner,Unsupported,Allocation_Failed,Capacity,Transport}
+Wire_Config :: struct {
+	allocator:mem.Allocator,
+	owner,allocator_owner:bg.Owner,
+	user_data,allocator_data:rawptr,
+	max_delayed_packets:int,
+	max_delayed_bytes:u64,
+	max_peers:int,
+	seed:u64,
+}
+Wire_Status :: struct {
+	error:Wire_Error,
+	peer:ksess.Peer_Id,
+	channel:ksess.Channel,
+	queued_packets:int,
+	queued_bytes,stream_drops,reliable_refusals,retired_packets,unavailable_recipients:u64,
+}
+@(private)
+Wire_Sender :: struct {used:bool,peer:ksess.Peer_Id,lossy:bool,last_due:f64}
 
 // One session's transport binding. Lives in the game's script struct (no
 // package globals); `latency`/`jitter`/`loss` are the built-in acid-test
 // shim — see wire_set_latency. `gauge` tallies every framed byte by session
 // message kind — see wire_traffic.
 Session_Wire :: struct {
+	owned:bool,
+	config:Wire_Config,
+	fault:Wire_Status,
+	senders:[WIRE_QUEUE_PEERS]Wire_Sender,
+	app_in_acc,app_out_acc,app_in_rate,app_out_rate:[ksess.MAX_APP_TAGS+1]int,
 	node:     gd.Node,
 	ses:      ^ksess.Session,
 	transport: ^Transport, // which control plane opened this wire (nil = the raw path; reads as ENet — see transport_of)
@@ -58,6 +89,64 @@ Session_Wire :: struct {
 	delayed:  [dynamic]Wire_Delayed,
 	dropping: [dynamic]Wire_Drop, // sockets scheduled to close (kicks)
 	gauge:    Wire_Gauge,
+}
+
+@(private)
+wire_owner_empty :: proc "contextless"(owner:bg.Owner)->bool {return owner==bg.Owner{}}
+@(private)
+wire_owner_check :: proc "contextless"(owner:bg.Owner,access:u32)->Wire_Error {
+	if wire_owner_empty(owner) {return .Ok}
+	service:=bg.service_get()
+	if owner.realm==0 || owner.realm!=service.realm || owner.reserved!=0 || owner.user==nil || owner.check==nil || owner.retain==nil || owner.drop==nil || owner.context_caps & bg.MANAGED_DATA==0 {return .Owner}
+	return owner.check(owner.user,access)==bg.OK?.Ok:.Owner
+}
+@(private)
+wire_access :: proc "contextless"(wire:^Session_Wire,access:u32)->Wire_Error {
+	if wire==nil {return .Invalid}
+	if !wire.owned {return .Ok}
+	if e:=wire_owner_check(wire.config.owner,access);e!=.Ok {return e}
+	return wire_owner_check(wire.config.allocator_owner,bg.READ)
+}
+// Optional bounded/owned mode. Configure BEFORE wire_attach/open/signals. Zero
+// legacy wires keep their existing behavior and do not activate a native profile.
+wire_configure :: proc(wire:^Session_Wire,options:Wire_Config)->Wire_Error {
+	if wire==nil {return .Invalid}
+	if wire.owned || wire.ses!=nil || wire.node!=nil || len(wire.delayed)!=0 || len(wire.dropping)!=0 {return .Busy}
+	cfg:=options
+	if cfg.allocator.procedure==nil {return .Invalid}
+	if cfg.max_delayed_packets==0 {cfg.max_delayed_packets=WIRE_QUEUE_PACKETS}
+	if cfg.max_delayed_bytes==0 {cfg.max_delayed_bytes=WIRE_QUEUE_BYTES}
+	if cfg.max_peers==0 {cfg.max_peers=WIRE_QUEUE_PEERS}
+	if cfg.seed==0 {cfg.seed=1}
+	if cfg.max_delayed_packets<1 || cfg.max_delayed_packets>WIRE_QUEUE_PACKETS || cfg.max_delayed_bytes<1 || cfg.max_delayed_bytes>WIRE_QUEUE_BYTES || cfg.max_peers<1 || cfg.max_peers>WIRE_QUEUE_PEERS {return .Capacity}
+	when #config(BOX3D_REQUIRE_DOMAIN,false) {
+		if bg.module_profile()!=0 {
+			if wire_owner_empty(cfg.owner) || wire_owner_empty(cfg.allocator_owner) || !bm.is_allocator(cfg.allocator) || cfg.owner.context_caps & bg.WEAK_INSTANCE==0 {return .Unsupported}
+		}
+	}
+	if (!wire_owner_empty(cfg.owner) && cfg.user_data!=rawptr(wire)) || (!wire_owner_empty(cfg.allocator_owner) && cfg.allocator_data!=cfg.allocator.data) {return .Owner}
+	if e:=wire_owner_check(cfg.owner,bg.EXECUTE);e!=.Ok {return e}
+	if e:=wire_owner_check(cfg.allocator_owner,bg.READ);e!=.Ok {return e}
+	if !wire_owner_empty(cfg.owner) && cfg.owner.retain(cfg.owner.user)!=bg.OK {return .Owner}
+	retained:=!wire_owner_empty(cfg.owner)
+	if !wire_owner_empty(cfg.allocator_owner) && cfg.allocator_owner.retain(cfg.allocator_owner.user)!=bg.OK {if retained {_=cfg.owner.drop(cfg.owner.user)};return .Owner}
+	queue,error:=make([dynamic]Wire_Delayed,0,cfg.max_delayed_packets,cfg.allocator)
+	if error!=nil {if !wire_owner_empty(cfg.allocator_owner) {_=cfg.allocator_owner.drop(cfg.allocator_owner.user)};if retained {_=cfg.owner.drop(cfg.owner.user)};return .Allocation_Failed}
+	drops,drop_error:=make([dynamic]Wire_Drop,0,cfg.max_peers,cfg.allocator)
+	if drop_error!=nil {delete(queue);if !wire_owner_empty(cfg.allocator_owner) {_=cfg.allocator_owner.drop(cfg.allocator_owner.user)};if retained {_=cfg.owner.drop(cfg.owner.user)};return .Allocation_Failed}
+	wire.config=cfg;wire.delayed=queue;wire.dropping=drops;wire.rng=cfg.seed;wire.owned=true
+	return .Ok
+}
+wire_status :: proc "contextless"(wire:^Session_Wire)->Wire_Status {
+	if e:=wire_access(wire,bg.READ);e!=.Ok {return {error=e}}
+	result:=wire.fault;result.queued_packets=len(wire.delayed)
+	return result
+}
+@(private)
+wire_fail :: proc(wire:^Session_Wire,error:Wire_Error,peer:ksess.Peer_Id,channel:ksess.Channel)->Wire_Error {
+	if wire.fault.error==.Ok {wire.fault.error=error;wire.fault.peer=peer;wire.fault.channel=channel}
+	if channel==.Reliable {wire.fault.reliable_refusals+=1}
+	return error
 }
 
 @(private)
@@ -129,6 +218,27 @@ gauge_count :: proc(g: ^Wire_Gauge, out: bool, ses_kind: u8, app_tag: u8, size: 
 		if ses_kind == ksess.SES_APP {g.app_in_acc[app_tag] += size}
 	}
 }
+@(private)
+wire_gauge_count :: proc(wire:^Session_Wire,out:bool,kind,tag:u8,size:int) {
+	if !wire.owned {gauge_count(&wire.gauge,out,kind,tag,size);return}
+	g:=&wire.gauge;k:=min(int(kind),WIRE_KINDS-1)
+	if out {g.out_acc[k]+=size;g.packets_out_acc+=1}else{g.in_acc[k]+=size;g.packets_in_acc+=1}
+	if kind==ksess.SES_APP {
+		i:=min(int(tag),ksess.MAX_APP_TAGS)
+		if out {wire.app_out_acc[i]+=size}else{wire.app_in_acc[i]+=size}
+	}
+}
+@(private)
+wire_gauge_roll :: proc(wire:^Session_Wire,now:f64) {
+	if wire.owned && wire.gauge.window!=0 && now-wire.gauge.window>=1 {
+		dt:=now-wire.gauge.window
+		for i in 0..<len(wire.app_in_acc) {
+			wire.app_in_rate[i]=int(f64(wire.app_in_acc[i])/dt);wire.app_in_acc[i]=0
+			wire.app_out_rate[i]=int(f64(wire.app_out_acc[i])/dt);wire.app_out_acc[i]=0
+		}
+	}
+	gauge_roll(&wire.gauge,now)
+}
 
 @(private = "file")
 gauge_roll :: proc(g: ^Wire_Gauge, now: f64) {
@@ -195,6 +305,7 @@ Wire_Drop :: struct {
 // Survives session_host_start / session_client_start / session_host_resume —
 // call once in ready().
 wire_attach :: proc(wire: ^Session_Wire, node: gd.Node, ses: ^ksess.Session, kind: u8) {
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return}
 	wire.node = node
 	wire.ses = ses
 	wire.kind = kind
@@ -232,7 +343,14 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 // unregister the session's transport — the session pointer is the game's, and
 // a re-host re-runs wire_attach (which re-registers) — it just returns the
 // wire to its zero value.
-wire_detach :: proc(wire: ^Session_Wire) {
+wire_detach :: proc(wire: ^Session_Wire)->Wire_Error {
+	if e:=wire_access(wire,bg.READ);e!=.Ok {return e}
+	context.allocator=wire.owned?wire.config.allocator:context.allocator
+	owned,cfg:=wire.owned,wire.config
+	if owned && wire.ses!=nil && wire.ses.send_user==rawptr(wire) {
+		ksess.session_set_transport(wire.ses,nil,nil)
+		ksess.session_set_peer_drop(wire.ses,nil,nil)
+	}
 	wire_unlisten(wire)
 	// The bad-link shim's still-queued receives each own a copied byte slice.
 	for d in wire.delayed {
@@ -248,10 +366,25 @@ wire_detach :: proc(wire: ^Session_Wire) {
 	delete(wire.gauge.app_out_acc)
 	delete(wire.gauge.app_in_rate)
 	delete(wire.gauge.app_out_rate)
+	// An owned ENet close uses retained MultiplayerAPI/peer references. Never
+	// dereference a now-expired source Node while retiring the binding.
+	if owned {wire.node=nil}
 	if wire.transport != nil || wire.installed_mp != nil {
 		transport_close(wire)
 	}
-	wire^ = {}
+	wire^ = {owned=owned,config=cfg}
+	if !wire_owner_empty(cfg.allocator_owner) {
+		if cfg.allocator_owner.drop(cfg.allocator_owner.user)!=bg.OK {return .Owner}
+		wire.config.allocator_owner={}
+	}
+	wire^={}
+	// Dropping this final exact block lease may free the Wire itself. Return
+	// without another read/write after success. A declining drop keeps its data
+	// valid and leaves a cleanup-only owner for an explicit retry.
+	if !wire_owner_empty(cfg.owner) && cfg.owner.drop(cfg.owner.user)!=bg.OK {
+		wire.owned=owned;wire.config=cfg;wire.config.allocator_owner={};return .Owner
+	}
+	return .Ok
 }
 
 // The frame byte's high bit marks a STREAM-channel packet — the sender is
@@ -279,15 +412,53 @@ wire_engine_peer :: proc(to_peer: ksess.Peer_Id) -> (engine_peer: int, ok: bool)
 
 @(private = "file")
 wire_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
+	wire := cast(^Session_Wire)user
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return}
+	context.allocator=wire.owned?wire.config.allocator:context.allocator
+	if wire.owned && wire.fault.error!=.Ok {return}
 	assert(to_peer != ksess.NO_PEER, "send to NO_PEER — a disconnected seat's peer reached the transport (check p.connected before sending)")
 	engine_peer, peer_ok := wire_engine_peer(to_peer)
 	if !peer_ok {
 		return
 	}
-	wire := cast(^Session_Wire)user
 	if len(bytes) > 0 {
 		tag := len(bytes) > 1 ? bytes[1] : 0
-		gauge_count(&wire.gauge, true, bytes[0], tag, len(bytes) + 1)
+		wire_gauge_count(wire, true, bytes[0], tag, len(bytes) + 1)
+	}
+	if wire.owned {
+		if len(bytes)>knet.MAX_PACKET_BYTES {_=wire_fail(wire,.Capacity,to_peer,channel);return}
+		// SceneMultiplayer can still list a peer during its disconnect signal.
+		// Check the actual ENet endpoint, not the server's listening status or
+		// that transient Scene roster. Broadcasts expand only to connected peers.
+		mp:=gd.node_get_multiplayer(wire.node);defer gd.release_ref(mp)
+		if mp==nil {_=wire_fail(wire,.Transport,to_peer,channel);return}
+		transport:=gd.multiplayer_api_get_multiplayer_peer(mp);defer gd.release_ref(transport)
+		if transport==nil || !gd.object_is_class(cast(gd.Object)transport,gd.e_net_multiplayer_peer_name()) {_=wire_fail(wire,.Unsupported,to_peer,channel);return}
+		peers:=gd.multiplayer_api_get_peers(mp);defer gd.free_packed_int32_array(peers)
+		count:=int(gd.packed_int32_array_size(&peers))
+		if count>wire.config.max_peers {_=wire_fail(wire,.Capacity,to_peer,channel);return}
+		recipients:[WIRE_QUEUE_PEERS]int;available:=0
+		for i in 0..<count {
+			id:=int(gd.packed_int32_array_get(&peers,gd.Int(i)))
+			if engine_peer!=0 && id!=engine_peer {continue}
+			// ENet clients have only their server as a physical recipient.
+			if !gd.multiplayer_api_is_server(mp) && id!=int(ksess.HOST_PEER) {wire.fault.unavailable_recipients+=1;continue}
+			endpoint:=gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)transport,gd.Int(id))
+			connected:=endpoint!=nil && gd.e_net_packet_peer_is_active(endpoint) && gd.e_net_packet_peer_get_state(endpoint)==.State_Connected
+			gd.release_ref(endpoint)
+			if !connected {wire.fault.unavailable_recipients+=1;continue}
+			recipients[available]=id;available+=1
+		}
+		if available==0 {wire.fault.unavailable_recipients+=1;return}
+		framed,error:=make([]u8,len(bytes)+1,wire.config.allocator)
+		if error!=nil || len(framed)!=len(bytes)+1 {_=wire_fail(wire,.Allocation_Failed,to_peer,channel);return}
+		defer delete(framed,wire.config.allocator)
+		framed[0]=channel==.Stream?wire.kind|WIRE_STREAM_BIT:wire.kind;copy(framed[1:],bytes)
+		for recipient in recipients[:available] {
+			status:=channel==.Stream?send_stream(wire.node,recipient,framed):send_reliable(wire.node,recipient,framed)
+			if status!=.Ok {_=wire_fail(wire,.Transport,ksess.Peer_Id(recipient),channel);return}
+		}
+		return
 	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
@@ -310,6 +481,7 @@ wire_listen :: proc "contextless" (
 	on_net_up: cstring = "",
 	on_net_down: cstring = "",
 ) -> gd.Error {
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return .Failed}
 	wire_unlisten(wire)
 	mp := gd.node_get_multiplayer(wire.node)
 	if cast(rawptr)mp == nil {return .Failed}
@@ -358,9 +530,64 @@ wire_unlisten :: proc "contextless" (wire: ^Session_Wire) {
 // Route one received packet: strip the kind byte (other kinds are not ours —
 // the game routes those itself before calling this) and hand the rest to the
 // session; with a latency shim active, buffer instead and wire_pump delivers.
-wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Array) {
-	packet := packet
-	view := pba_view(&packet)
+wire_receive :: proc(wire:^Session_Wire,id:gd.Int,packet:gd.Packed_Byte_Array) {
+ packet:=packet
+ _=wire_receive_bytes(wire,ksess.Peer_Id(id),pba_view(&packet),knet.now_s())
+}
+// Same framed-byte ingress used by Godot's PackedByteArray signal adapter.
+// The bounded mode owns every delayed copy; immediate delivery borrows bytes
+// only for the synchronous Session parser. No simulation is executed here.
+wire_receive_bytes :: proc(wire:^Session_Wire,from:ksess.Peer_Id,view:[]u8,now:f64)->Wire_Error {
+ if e:=wire_access(wire,bg.EXECUTE);e!=.Ok {return e}
+ if !wire.owned {wire_receive_legacy(wire,gd.Int(from),view);return .Ok}
+ context.allocator=wire.config.allocator
+ if wire.fault.error!=.Ok {return wire.fault.error}
+ if len(view)==0 || view[0]&~WIRE_STREAM_BIT!=wire.kind {return .Ok}
+ channel:=view[0]&WIRE_STREAM_BIT!=0?ksess.Channel.Stream:.Reliable
+ if len(view)-1>knet.MAX_PACKET_BYTES {return wire_fail(wire,.Capacity,from,channel)}
+ kind:=len(view)>1?view[1]:0;tag:=len(view)>2?view[2]:0
+ wire_gauge_count(wire,false,kind,tag,len(view))
+ if wire.ses==nil {return wire_fail(wire,.Invalid,from,channel)}
+ if wire.latency<=0 && wire.jitter<=0 && wire.loss<=0 && wire.bandwidth<=0 {
+  r:=knet.reader_make(view[1:]);ksess.session_handle_packet(wire.ses,from,&r,channel);return .Ok
+ }
+ sender:^Wire_Sender
+ for &candidate in wire.senders[:wire.config.max_peers] {if candidate.used && candidate.peer==from {sender=&candidate;break}}
+ if sender==nil {for &candidate in wire.senders[:wire.config.max_peers] {if !candidate.used {sender=&candidate;break}}}
+ if sender==nil {if channel==.Stream {wire.fault.stream_drops+=1;return .Ok};return wire_fail(wire,.Capacity,from,channel)}
+ delay:=wire.latency+wire.jitter*wire_rand01(wire)
+ pipe:=wire.pipe_free
+ if wire.bandwidth>0 {pipe=max(now,pipe)+f64(len(view))/f64(wire.bandwidth);delay+=pipe-now}
+ lossy:=sender.used && sender.lossy;lost:=false
+ if wire.loss>0 {
+  if wire.burst>1 {
+   if lossy {lost=true;if wire_rand01(wire)<1.0/wire.burst {lossy=false}}
+   else if wire_rand01(wire)<(wire.loss/(1-wire.loss))/wire.burst {lossy=true;lost=true}
+  }else{lost=wire_rand01(wire)<wire.loss}
+ }
+ if lost && channel==.Stream {wire.fault.stream_drops+=1;sender^={used=true,peer=from,lossy=lossy,last_due=sender.last_due};wire.pipe_free=pipe;return .Ok}
+ if lost {delay+=2*wire.latency}
+ due:=now+delay
+ if channel==.Reliable && sender.used {due=max(due,sender.last_due)}
+ bytes:=u64(len(view)-1)
+ if len(wire.delayed)>=wire.config.max_delayed_packets || bytes>wire.config.max_delayed_bytes-wire.fault.queued_bytes {
+  if channel==.Stream {wire.fault.stream_drops+=1;return .Ok}
+  return wire_fail(wire,.Capacity,from,channel)
+ }
+ data,error:=make([]u8,int(bytes),wire.config.allocator)
+ if error!=nil || len(data)!=int(bytes) {return wire_fail(wire,.Allocation_Failed,from,channel)}
+ copy(data,view[1:])
+ // Capacity was reserved at configure; append cannot grow while below the cap.
+ append(&wire.delayed,Wire_Delayed{due=due,from=from,channel=channel,data=data})
+ wire.fault.queued_bytes+=bytes
+ sender.used=true;sender.peer=from;sender.lossy=lossy
+ if channel==.Reliable {sender.last_due=due}
+ wire.pipe_free=pipe
+ return .Ok
+}
+
+@(private)
+wire_receive_legacy :: proc(wire:^Session_Wire,id:gd.Int,view:[]u8) {
 	if len(view) == 0 || view[0] & ~WIRE_STREAM_BIT != wire.kind {
 		return
 	}
@@ -465,7 +692,10 @@ wire_rand01 :: proc(wire: ^Session_Wire) -> f64 {
 // no-op — still call it; the shim is how you acid-test YOUR game's feel
 // under real round trips: netgd.wire_set_latency(&wire, 120).)
 wire_pump :: proc(wire: ^Session_Wire, now: f64) {
-	gauge_roll(&wire.gauge, now)
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return}
+	context.allocator=wire.owned?wire.config.allocator:context.allocator
+	if wire.owned && wire.fault.error!=.Ok {return}
+	wire_gauge_roll(wire,now)
 	// Deliver in ARRIVAL order, not due order: with jitter the dues aren't
 	// globally sorted, but each sender's are monotone (the receive clamp), so
 	// an in-order scan keeps every peer's packets FIFO.
@@ -476,6 +706,7 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 		}
 		pkt := wire.delayed[i]
 		ordered_remove(&wire.delayed, i)
+		if wire.owned {wire.fault.queued_bytes-=u64(len(pkt.data))}
 		r := knet.reader_make(pkt.data)
 		ksess.session_handle_packet(wire.ses, pkt.from, &r, pkt.channel)
 		delete(pkt.data)
@@ -498,7 +729,28 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 // reliable queue flush and ack; the session already ignores the unseated
 // peer, so nothing it sends in the gap matters.
 wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return}
+	context.allocator=wire.owned?wire.config.allocator:context.allocator
+	if wire.owned {
+		if wire.fault.error!=.Ok {return}
+		for &pending in wire.dropping {if pending.peer==peer {pending.due=min(pending.due,knet.now_s()+after);return}}
+		if len(wire.dropping)>=wire.config.max_peers {_=wire_fail(wire,.Capacity,peer,.Reliable);return}
+	}
 	append(&wire.dropping, Wire_Drop{due = knet.now_s() + after, peer = peer})
+}
+// An actual transport disconnect ends that peer's delivery promise. Retire its
+// queued copies explicitly and release its bounded sender slot for reconnect.
+wire_peer_left :: proc(wire:^Session_Wire,peer:ksess.Peer_Id)->Wire_Error {
+	if e:=wire_access(wire,bg.EXECUTE);e!=.Ok {return e}
+	if !wire.owned {return .Ok}
+	for i:=0;i<len(wire.delayed); {
+		if wire.delayed[i].from!=peer {i+=1;continue}
+		data:=wire.delayed[i].data;wire.fault.queued_bytes-=u64(len(data));wire.fault.retired_packets+=1
+		delete(data,wire.config.allocator);ordered_remove(&wire.delayed,i)
+	}
+	for &sender in wire.senders {if sender.used && sender.peer==peer {sender={}}}
+	for i:=0;i<len(wire.dropping); {if wire.dropping[i].peer==peer {ordered_remove(&wire.dropping,i)}else{i+=1}}
+	return .Ok
 }
 
 // Inject one-way receive latency (milliseconds; 0 disables), plus optional
@@ -521,6 +773,7 @@ wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
 // shared pipe for all senders; past it, packets queue and delay GROWS
 // (bufferbloat), which is what a narrow link really does before it drops.
 wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0, burst := 1, bandwidth_bps := 0) {
+	if wire_access(wire,bg.EXECUTE)!=.Ok {return}
 	wire.latency = f64(ms) / 1000.0
 	wire.jitter = f64(jitter_ms) / 1000.0
 	wire.loss = clamp(f64(loss_pct) / 100.0, 0, 0.95)
@@ -550,7 +803,7 @@ wire_traffic :: proc(wire: ^Session_Wire, allocator := context.temp_allocator) -
 		return ""
 	}
 	b := strings.builder_make(allocator)
-	dir :: proc(b: ^strings.Builder, label: string, total: int, rates: [WIRE_KINDS]int, app: map[u8]int) {
+	dir :: proc(b: ^strings.Builder, label: string, total: int, rates: [WIRE_KINDS]int, app: map[u8]int,fixed:[]int) {
 		fmt.sbprintf(b, "%s %.1fk", label, f64(total) / 1024.0)
 		// The top three kinds carry the story; the rest is noise.
 		shown := 0
@@ -565,21 +818,24 @@ wire_traffic :: proc(wire: ^Session_Wire, allocator := context.temp_allocator) -
 			if best_k < 0 || best == 0 {break}
 			used[best_k] = true
 			shown += 1
-			if best_k == int(ksess.SES_APP) && len(app) > 0 {
+			if best_k == int(ksess.SES_APP) && (len(app) > 0 || len(fixed)>0) {
 				// Name the heaviest tag instead of the opaque bucket.
 				bt, bb := u8(0), 0
 				for tag, bytes in app {
 					if bytes > bb {bt, bb = tag, bytes}
 				}
+				for bytes,tag in fixed {if bytes>bb {bt,bb=u8(tag),bytes}}
 				fmt.sbprintf(b, " app%d %.1f", bt, f64(best) / 1024.0)
 			} else {
 				fmt.sbprintf(b, " %s %.1f", WIRE_KIND_NAMES[best_k], f64(best) / 1024.0)
 			}
 		}
 	}
-	dir(&b, "rx", total_in, g.in_rate, g.app_in_rate)
+	in_fixed,out_fixed:[]int
+	if wire.owned {in_fixed=wire.app_in_rate[:];out_fixed=wire.app_out_rate[:]}
+	dir(&b, "rx", total_in, g.in_rate, g.app_in_rate,in_fixed)
 	strings.write_string(&b, " · ")
-	dir(&b, "tx", total_out, g.out_rate, g.app_out_rate)
+	dir(&b, "tx", total_out, g.out_rate, g.app_out_rate,out_fixed)
 	return strings.to_string(b)
 }
 

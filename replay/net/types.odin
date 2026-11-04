@@ -21,6 +21,7 @@ Error :: enum {
 	Invalid_Schema, Invalid_Frame,
 	Invalid_Checkpoint, Checkpoint_Contract, Checkpoint_Policy,
 	Fenced,
+	Incomplete_State,
 }
 
 // A coordinator/lease adapter supplies a fresh authorization check. This callback
@@ -63,7 +64,18 @@ Batch :: struct($Control, $Action: typeid, $Seats: int) {
 	rejections: [Seats]Action_Reason,
 }
 
+// Process-local lifetime declarations; never encoded or included in schemas.
+// Each nonnil data pointer names the EXACT context retained by this owner.
+Owned_Context :: r.Owned_Context
+Runner_Ownership :: struct {
+ allocator,model,wire,permit,profile_clock,profile_sample,identity,admission:Owned_Context,
+}
+@(private)
+Runner_Retains :: r.Owner_Retains
+
 Model :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
+	complete_state: bool, // managed mode requires complete transactions and an explicit codec
+	complete_codec: Complete_Codec(State, Net_Event(Event)),
 	authority: Authority_Policy(State, Event),
 	control_timing: Control_Timing,
 	action_timing: Action_Timing, // opt-in receipt scheduling; predicted actions still reconcile
@@ -86,6 +98,7 @@ Model :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	neutral: Control,
 	reset_player: proc(state: ^State, seat: u16, ctx: ^r.Step(Event)),
 	user: rawptr, // immutable assets/configuration, never role or live scene state
+	user_context,action_admission_context:Owned_Context, // optional runtime ownership only
 }
 
 Config :: struct {
@@ -206,6 +219,9 @@ Peer :: struct($Action: typeid) {
 Input_Slot :: struct($Control: typeid) {tick: u64, value: Control, view: View_Time}
 
 Server :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
+ ownership:Runner_Ownership, // guard before typed containers/callbacks
+ owner_retains:Runner_Retains,
+ owner_cleanup:bool,
  compact_recent_facts_disabled:bool, // set before feature negotiation
  compact_observations_disabled:bool, // set before feature negotiation
 	epoch_discovery: bool, // opt-in direct-session query, never a lease replacement
@@ -217,6 +233,9 @@ Server :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	profile_sample: proc(user: rawptr, metric: Profile_Metric, elapsed_us: u64),
 	allocator: mem.Allocator,
 	initialized: bool,
+	complete_charge:u64,
+	complete_lease:bool,
+	physics: ^Server_Physics(State, Control, Action, Event, Seats),
 	permit: Permit,
 	identity_user: rawptr,
 	identity_check: proc(user: rawptr, token_hash: [32]u8, incarnation: u64) -> bool,
@@ -263,6 +282,9 @@ Presentation_Failure :: struct {
 }
 
 Client :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
+ ownership:Runner_Ownership, // guard before typed containers/callbacks
+ owner_retains:Runner_Retains,
+ owner_cleanup:bool,
  compact_observations_enabled,compact_observations_negotiated:bool,
  compact_recent_facts_enabled:bool,
 	reuse_equal_corrections:bool, // opt-in deterministic state/input reuse; never used by audit
@@ -284,6 +306,9 @@ Client :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	profile_sample: proc(user: rawptr, metric: Profile_Metric, elapsed_us: u64),
 	allocator: mem.Allocator,
 	initialized: bool,
+	complete_charge:u64,
+	complete_lease:bool,
+	physics: ^Client_Physics(State, Control, Action, Event, Seats),
 	permit: Permit,
 	model: Model(State, Control, Action, Event, Seats),
 	cfg: Config,
@@ -338,4 +363,29 @@ Client :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
 	snapshot_ticks: []u64,
 	snapshot_latest, snapshot_latest_hash: u64,
 	baseline_request_id, baseline_request_hash, baseline_request_time: u64,
+}
+
+// Whole-owned value/codec buffers. context is an explicit retained codec or
+// container allocation; it never implies ownership of arbitrary child pointers.
+Container_Ownership :: struct {allocator,data_context:Owned_Context}
+@(private)
+Container_Lifetime :: struct {ownership:Container_Ownership,retains:r.Owner_Retains,cleanup:bool}
+@(private)
+container_acquire :: proc(life:^Container_Lifetime,ownership:Container_Ownership,allocator:mem.Allocator,context_data:rawptr=nil,required:bool=false)->Error {
+ if required && r.owner_is_nil(ownership.allocator.owner){return .Invalid_Model}
+ if r.owner_contexts_check({owner=ownership.allocator.owner,owner_allocator_data=ownership.allocator.data},allocator)!=.None{return .Invalid_Model}
+ if error:=owned_context_check(ownership.data_context,context_data,required);error!=.None{return error}
+ life.ownership=ownership
+ owners:=[?]r.Owner{ownership.allocator.owner,ownership.data_context.owner}
+ return r.owner_retains_acquire(&life.retains,owners[:])==.None?Error.None:Error.Invalid_Model
+}
+@(private)
+container_access :: proc(life:^Container_Lifetime,access:r.Owner_Access=.Read)->Error {
+ if r.owner_access(life.ownership.allocator.owner,access)!=.None || r.owner_access(life.ownership.data_context.owner,access)!=.None{return .Invalid_Model}
+ if r.owner_retains_access(&life.retains,access)!=.None{return .Invalid_Model}
+ return .None
+}
+@(private)
+container_drop :: proc(life:^Container_Lifetime)->Error {
+ return r.owner_retains_drop(&life.retains)==.None?Error.None:Error.Invalid_Model
 }

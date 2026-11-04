@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "result": "BROWSER_RUNTIME_PROVEN_STRICT_QUALIFICATION_REJECTED",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "release_admitted": false,
+  "backend": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/backend/report.json",
+    "sha256": "73bcbf36df55e0717b2c87541bd92539cfb54f0a0ed717ac158af7f214dd7758",
+    "result": "PASS"
+  },
+  "core": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/integration/report.json",
+    "sha256": "6f8a7fc0d9b48949b0a7d2d49d0c96d6fbbc3a736de4906d24b59c701d212918",
+    "result": "PASS"
+  },
+  "replay": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/replay/report.json",
+    "sha256": "7f9f9825a9c1ce3106689b5ec23590a368bd7bfe8ee3eb6b85709f7a8d44d2b7",
+    "result": "PASS"
+  },
+  "current_qualification": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/qualification/report.json",
+    "sha256": "65bd7a3ffe1f1fa9ff72972a1ad52e027e9a0a02b22e7f196400d338fc3818f7",
+    "result": "FUNCTIONAL_MATRIX_PASS_STRICT_HOST_MAX_REJECTED"
+  },
+  "candidate_handoff": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/report.json",
+    "sha256": "48402f5227e4f4525da0c6a34203b1c730326ef44f8d60143f5433a32b0dd7cc",
+    "result": "REVIEW_CANDIDATE_PACKAGED_RELEASE_GATES_OPEN"
+  },
+  "scope": "Actual wasm32 C/Core/Replay runtime, native-free compatibility and current mixed-browser gameplay are separate from the rejected Firefox authority maximum and missing public/human gates. No old headless/Node vector is relabeled hardware admission.",
+  "open_gates": [
+    "Q1: original10ms Firefox authority maximum rejected at10.601/12.94ms; no timing normalization or threshold waiver.",
+    "N1: actual public Internet endpoints/trust/remote route acceptance not provided; local relay is separate proof.",
+    "P1: two-human co-op feedback is unobserved.",
+    "Actual Safari remote automation is disabled; Safari is not admitted.",
+    "Native/Web crossplay, mobile, Windows, Intel SDK and current Linux hardware performance are unqualified."
+  ]
+}

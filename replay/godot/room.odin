@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:strings"
 import gd "godot:godot"
+import meter "godot:box3d/godot/meter"
 import r "godot:replay"
 import net "godot:replay/net"
 import rec "godot:replay/recovery"
@@ -90,9 +91,17 @@ Room :: struct($S, $C, $A, $E: typeid, $N: int) {
 	save: Room_Save,
 	restore: Room_Restore,
 	checkpoint_codec:net.Checkpoint_Codec,
+ ownership:Room_Ownership,
+ retained:r.Owner_Retains,
+ aliases:[2]r.Owned_Context,
+ initial_complete:r.Complete_Checkpoint(S,net.Net_Event(E)),
+ complete_initial,codec_retained,cleanup:bool,
+ rpc_meter:^meter.Context,
+ rpc_allocator:mem.Allocator,
 }
 
 room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: net.Model(S, C, A, E, N), options: Room_Options) -> net.Error {
+ if session_sdk_physics(model)&&(!room_managed(room)||!room.complete_initial){return .Invalid_Config}
 	if options.control_backend > .Websocket || room.ready || options.room == 0 || (options.control_backend == .Enet && options.control_port == 0) || len(options.coordinator) == 0 || !auth.identity_valid(options.identity) {return .Invalid_Config}
 	if options.session.backend == .Rtc && (options.control_backend != .Websocket || len(options.session.rtc.url)==0) {return .Invalid_Config}
 	if options.checkpoint_interval_ms!=0 && (options.control_backend!=.Websocket || options.checkpoint_interval_ms<1000 || options.checkpoint_interval_ms>120000) {return .Invalid_Config}
@@ -108,7 +117,8 @@ room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: n
   if options.registration_endpoint!=(auth.Endpoint{}) && options.registration_endpoint!=endpoint {return .Invalid_Config}
   options.registration_endpoint=endpoint
  }
-	room.allocator = context.allocator
+	if !room_managed(room){room.allocator = context.allocator}
+	context.allocator=room.allocator
 	room.options = options
 	if options.control_tls != nil {gd.ref_counted_reference(options.control_tls)}
 	room.initial = initial
@@ -122,12 +132,12 @@ room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: n
 		if net.checkpoint_codec_init(&room.checkpoint_codec,S,C,A,E,N,allocator=room.allocator)!=.None {room_close(room);return .Invalid_Schema}
 	}
 	when gd.IS_WEB {room.clock = browser_lease_clock(&room.browser_clock)} else {room.clock = auth.native_clock()}
-	if auth.lease_init(&room.lease, options.identity, options.room, options.session.network.content, room.clock, false) != .None {room_close(room); return .Invalid_Config}
+	if error:=auth.lease_init(&room.lease, options.identity, options.room, options.session.network.content, room.clock, false);error != .None {gd.print_str(fmt.tprintf("REPLAY_ROOM_OPEN_FAIL stage=lease error=%v",error));room_close(room); return .Invalid_Config}
 	if !room_control_connect(room) {room_close(room); return .Transport}
 	nonce: auth.Nonce
 	ok := true
 	when gd.IS_WEB {nonce = auth.Nonce(storagegd.session_token())} else {nonce, ok = auth.rpc_nonce()}
-	if !ok || !auth.rpc_client_init(&room.rpc, &room.lease, options.key, nonce, room.control_wire) {room_close(room); return .Invalid_Config}
+	if !ok || !auth.rpc_client_init(&room.rpc, &room.lease, options.key, nonce, room.control_wire,allocator=room_managed(room)?room.rpc_allocator:room.allocator) {gd.print_str(fmt.tprintf("REPLAY_ROOM_OPEN_FAIL stage=rpc entropy_ok=%v nonce_present=%v key_present=%v lease_ready=%v",ok,nonce!=(auth.Nonce{}),options.key!=(auth.Key{}),room.lease.ready));room_close(room); return .Invalid_Config}
 	room.ready, room.phase = true, .Connecting
 	room.registered = options.provisioned_incarnation
 	if room.registered {room.options.session.incarnation = options.identity.incarnation}
@@ -135,6 +145,11 @@ room_open :: proc(room: ^Room($S, $C, $A, $E, $N), initial: r.Frame(S), model: n
 }
 
 room_close :: proc(room: ^Room($S, $C, $A, $E, $N)) {
+ if room_managed(room){_=room_try_close(room);return}
+ room_close_legacy(room)
+}
+@(private)
+room_close_legacy :: proc(room: ^Room($S, $C, $A, $E, $N)) {
 	net.checkpoint_codec_destroy(&room.checkpoint_codec)
 	room_restore_destroy(&room.restore)
 	room_save_destroy(&room.save)
@@ -150,8 +165,8 @@ room_close :: proc(room: ^Room($S, $C, $A, $E, $N)) {
 }
 
 room_handoff :: proc(room: ^Room($S, $C, $A, $E, $N)) -> net.Error {
-	if !room.ready || room.removal.phase==.Queued || room.removal.phase==.Waiting || room.phase != .Hosting || !room.session.link.outgoing.ready {return .Wrong_Phase}
-	_, live := net.server_connection(&room.session.server, room.session.link.outgoing.target)
+	if !room.ready || room.removal.phase==.Queued || room.removal.phase==.Waiting || room.phase != .Hosting || !session_link(&room.session)^.outgoing.ready {return .Wrong_Phase}
+	_, live := net.server_connection(&room.session.server, session_link(&room.session)^.outgoing.target)
 	if !live {return .Invalid_Input}
 	room.handoff_requested = true
 	return .None
@@ -165,6 +180,8 @@ room_issue :: proc(room: ^Room($S, $C, $A, $E, $N), action: A) -> (u64, net.Erro
 room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.Error {
 	room.session.control_consumed = false
 	if !room.ready {return .Not_Initialized}
+ if room_managed(room)&&r.owner_retains_access(&room.retained,.Execute)!=.None{return .Invalid_Model}
+ context.allocator=room.allocator
 	if room.phase == .Failed {return room.error}
 	now, ok := room.clock.read(room.clock.user)
 	if !ok {room_fail(room, .Fenced); return room.error}
@@ -232,7 +249,7 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 				options.network.epoch, options.network.require_permit, options.permit = grant.epoch, true, room_permit(room)
 				options.role, options.port, options.replication.room = room.options.session.role==.Server ? .Server : .Host, grant.endpoint.port, room.options.room
 				if !room.session.ready && grant.epoch == 1 && room.options.bootstrap {
-					if err := session_open(&room.session, room.initial, room.model, options); err != .None {room_fail(room, err); return err}
+					if err := room_session_open(room, options); err != .None {room_fail(room, err); return err}
 				} else if !room.session.ready && room.restore.prepared.ready && room.restore.prepared.point==grant.recovered && room.restore.phase==.Granted && room.restore.renewed_epoch==grant.epoch {
 					if err:=room_restore_install(room,options,now);err!=.None {return room_transition_error(room,err)}
 				} else if room.session.ready && room.prepared.ready && room.prepared.point == grant.recovered {
@@ -259,10 +276,10 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 					options.address = fmt.ctprintf("%s", string(cast(cstring)&grant.endpoint.host[0]))
 					options.network.epoch, options.network.require_permit, options.permit = grant.epoch, true, room_permit(room)
 					options.replication.room = room.options.room
-					if err := session_open(&room.session, room.initial, room.model, options); err != .None {room_fail(room, err); return err}
+					if err := room_session_open(room, options); err != .None {room_fail(room, err); return err}
 					room.phase, room.active_epoch = .Following, grant.epoch
 				} else if grant.epoch > current && now - room.last_game_reconnect >= 300 {
-					err := room.session.authority ? session_rejoin(&room.session, &room.lease, &target) : session_redirect(&room.session, &room.lease, &target)
+					err := room.session.authority ? session_rejoin(&room.session, &room.lease, &target) : room_redirect(room,&target)
 					room.last_game_reconnect = now
 					if err != .None && err != .Presentation && err != .Transport {return room_transition_error(room,err)}
 					if err == .None {
@@ -272,20 +289,21 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 					}
 				} else if !room.session.authority && (room.session.client.phase == .Disconnected ||
 				          (room.session.client.phase == .Rejected && room.session.client.rejection == .Denied)) && now - room.last_game_reconnect >= 300 {
-					session_redirect(&room.session, &room.lease, &target); room.last_game_reconnect = now
+					err:=room_redirect(room,&target); room.last_game_reconnect = now
+     if err!=.None&&err!=.Presentation&&err!=.Transport&&err!=.Wrong_Phase{return room_transition_error(room,err)}
 				}
 			}
 		}
 	}
 	if room.session.ready {
-		if room.session.authority && room.session.link.outgoing.ready {
-			connection, connected := net.server_connection(&room.session.server, room.session.link.outgoing.target)
+		if room.session.authority && session_link(&room.session)^.outgoing.ready {
+			connection, connected := net.server_connection(&room.session.server, session_link(&room.session)^.outgoing.target)
 			allowed := false
 			for member in room.members {
 				if connected && member.enabled && member.can_host && member.trusted_authority && (!connection.spectator || member.infrastructure) && member.identity != room.options.identity &&
 				   (grant.policy.mode != .Dedicated || member.infrastructure) && member.game_token_hash == connection.token_hash && member.identity.incarnation == connection.incarnation {allowed = true; break}
 			}
-			if connected && !allowed {rec.link_untarget(&room.session.link)}
+			if connected && !allowed {rec.link_untarget(session_link(&room.session))}
 		}
 		// Role changes can rebuild Session with a lease-only permit. Reinstall
 		// the phase gate so a later handoff also freezes the restored authority.
@@ -306,9 +324,9 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 		// can retire and release the exact prepared final point.
 		if room.phase == .Freezing || room.phase == .Releasing {
 			if err := net.server_drain_fenced(&room.session.server); err != .None {room_fail(room, err); return err}
-			rec.link_server(&room.session.link, &room.session.server, u64(gd.time_get_ticks_msec(gd.singleton_time())))
-			_, live := net.server_connection(&room.session.server, room.session.link.outgoing.target)
-			if !live || room.session.link.outgoing.phase == .Failed {
+			rec.link_server(session_link(&room.session), &room.session.server, u64(gd.time_get_ticks_msec(gd.singleton_time())))
+			_, live := net.server_connection(&room.session.server, session_link(&room.session)^.outgoing.target)
+			if !live || session_link(&room.session)^.outgoing.phase == .Failed {
 				room.retired, room.control_error = auth.lease_retire(&room.lease)
 				auth.prepared_destroy(&room.prepared)
 				room.control_error = auth.prepared_capture(&room.prepared, &room.session.server, room.options.room, room.options.identity.incarnation)
@@ -353,7 +371,7 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 		live = live && auth.identity_valid(successor) && successor != room.options.identity
 		if room.handoff_requested && !live {room.handoff_requested = false; room.control_error = .No_Checkpoint}
 		if live {
-			if !room.session.link.outgoing.ready || room.session.link.outgoing.target != connection.peer || room.session.link.outgoing.scope.binding != connection.generation {
+			if !session_link(&room.session)^.outgoing.ready || session_link(&room.session)^.outgoing.target != connection.peer || session_link(&room.session)^.outgoing.scope.binding != connection.generation {
 				if err := session_backup_peer(&room.session, connection.peer, max(room.session.server.cfg.hz / 2, 1)); err != .None {room_fail(room, err); return err}
 			}
 			if room.rpc.reply.nominee != successor || room.rpc.reply.binding != connection.generation {
@@ -366,15 +384,15 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 		if room.handoff_requested && !local_pending && live && room.rpc.reply.nominee == successor && room.rpc.reply.binding == connection.generation {
 			room.frozen_tick, room.phase = room.session.server.timeline.head, .Freezing
 			room.interruption_start = now
-			rec.sender_cancel(&room.session.link.outgoing); room.session.link.publish_now = true
+			rec.sender_cancel(&session_link(&room.session)^.outgoing); session_link(&room.session)^.publish_now = true
 			command = {verb = .Renew, epoch = grant.epoch, tick = room.frozen_tick}
 		}
 	}
 	if room.phase == .Following && room.session.ready && room.rpc.reply.nominee == room.options.identity {
 		if !room.candidate.ready {
-			receipt, valid := rec.receiver_latest(&room.session.link.incoming)
+			receipt, valid := rec.receiver_latest(&session_link(&room.session)^.incoming)
 			if valid && (!room.prepared.ready || receipt.archive.sequence > room.prepared.point.archive.sequence) {
-				room.control_error = auth.prepared_copy(&room.candidate, &room.session.link.incoming, receipt.archive)
+				room.control_error = auth.prepared_copy(&room.candidate, &session_link(&room.session)^.incoming, receipt.archive)
 			}
 		}
 		can_prepare := room.candidate.ready && (room.options.preparation_ready == nil ||
@@ -383,10 +401,10 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 			// Do not remain pinned to an obsolete incomplete candidate while the
 			// source continues producing newer checkpoints. The approved older
 			// point remains separately retained throughout this replacement.
-			latest, valid := rec.receiver_latest(&room.session.link.incoming)
+			latest, valid := rec.receiver_latest(&session_link(&room.session)^.incoming)
 			if valid && latest.archive.sequence > room.candidate.point.archive.sequence {
 				next: auth.Prepared
-				if err := auth.prepared_copy(&next, &room.session.link.incoming, latest.archive); err == .None {
+				if err := auth.prepared_copy(&next, &session_link(&room.session)^.incoming, latest.archive); err == .None {
 					auth.prepared_destroy(&room.candidate); room.candidate, next = next, {}
 					can_prepare = room.options.preparation_ready(room.options.preparation_user, room.candidate.point, room.candidate.bytes)
 				} else {room.control_error = err}
@@ -411,9 +429,9 @@ room_frame :: proc(room: ^Room($S, $C, $A, $E, $N), dt: f64, control: C) -> net.
 	}
 	if room.phase == .Freezing || room.phase == .Releasing {
 		if room.phase == .Freezing {command = {verb = .Renew, epoch = grant.epoch, tick = room.frozen_tick}}
-		ack := room.session.link.outgoing.acknowledged.archive
+		ack := session_link(&room.session)^.outgoing.acknowledged.archive
 		if ack.sequence != 0 && ack.tick == room.frozen_tick && room.rpc.reply.prepared && room.rpc.reply.point.archive == ack &&
-		   room.rpc.reply.point.scope == room.session.link.outgoing.scope {
+		   room.rpc.reply.point.scope == session_link(&room.session)^.outgoing.scope {
 			if room.phase == .Freezing {room.retired, room.control_error = auth.lease_retire(&room.lease)}
 			if room.control_error == .None {command = {verb = .Release, retired = room.retired, point = room.rpc.reply.point}; room.phase = .Releasing}
 		}

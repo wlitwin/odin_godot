@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "DECLARED_BEFORE_OPERATION_TIMING",
+  "contract": "tests/box3d_web/contract.json",
+  "candidate": "P1 complete toy-warehouse profile: 19 bodies/shapes, 8 geometries, 1 hinge",
+  "operation": "one entire public Room.frame call, including coordinator/control pump, owned Session frame, transport, complete physics/model and any corrections; direct Session.frame uses a separate label",
+  "whole_game_frame": "browser requestAnimationFrame intervals measured separately; operation timing does not claim to include other script getters, rendering or external recorder work",
+  "clock": "actual Godot monotonic microsecond clock around the operation; browser performance.now resolution recorded separately; no phase subtraction or timer-overhead correction",
+  "samples": {
+    "maximum_operation_rows_per_actor": 65536,
+    "batch_size": 128,
+    "all_selected_rows_retained": true,
+    "no_cold_error_outlier_filter": true,
+    "classes": ["bootstrap", "error", "replacement", "repair", "advance1", "advance_many", "pump"],
+    "normal_budget_population": "advance1 with zero actual repair delta; head/confirmed/scope deltas and error retained",
+    "repair8_budget_population": "exactly one observed repair in the entire operation, actual planned depth8 and actual executed steps8; multiple repairs and other depths retained with their own category",
+    "minimum_normal_rows": 1000,
+    "minimum_repair8_rows": 128,
+    "selection_is_declared_not_posthoc": true
+  },
+  "browser": "actual installed Chrome and Firefox; actual Safari evaluation before admission. Software GL/headless scopes remain functional only.",
+  "environment": "reference Apple M3 Mac15,13 on AC, 24GiB, viewport1280x720/DPR1, visible foreground with no CPU throttling; actual GPU/browser/tool/Wasm/source hashes recorded",
+  "remaining_external_gates": ["N1 actual public Internet endpoints not selected", "P1 human two-person co-op feedback not observed"],
+  "sustained": "final relevant frozen candidate only, real foreground pair duration>=600s; preserve real producer GO/duration anchors and every error/outlier",
+  "budgets_unchanged": true
+}

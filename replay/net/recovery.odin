@@ -6,16 +6,19 @@ import v "godot:replay/view"
 
 Departing_Host :: struct($S, $C, $A: typeid, $N: int) {
 	frame: r.Frame(S), held: [N]C,
-	epoch, received, settled: u64,
+	epoch, received, settled,contract: u64,
 	seat: u16,
 	count: int,
+	complete_required:bool,
 	actions: [ACTION_CAPACITY]Queued_Action(A),
 }
 
 server_departing :: proc(s: ^Server($S, $C, $A, $E, $N)) -> Departing_Host(S, C, A, N) {
 	h: Departing_Host(S, C, A, N)
-	h.frame, _ = r.current(&s.timeline)
+	h.complete_required=s.model.complete_state
+	h.frame, _ = r.current_values(&s.timeline)
 	h.epoch, h.seat, h.held = s.cfg.epoch, s.local_seat, s.held
+	h.contract=s.contract
 	for peer in s.peers {
 		if !peer.local {continue}
 		h.received, h.settled, h.count = peer.action_received, peer.action_settled, peer.action_count
@@ -25,6 +28,7 @@ server_departing :: proc(s: ^Server($S, $C, $A, $E, $N)) -> Departing_Host(S, C,
 }
 
 client_seed_departing :: proc(c: ^Client($S, $C, $A, $E, $N), h: Departing_Host(S, C, A, N)) -> Error {
+	if c.model.complete_state || h.complete_required{return .Incomplete_State}
 	if !c.initialized || c.has_world || c.cfg.epoch != h.epoch || !c.model.state_valid(h.frame.state) {return .Wrong_Phase}
 	if h.count < 0 || h.count > ACTION_CAPACITY || int(h.seat) > N || (h.seat == 0) != c.spectator ||
 	   h.settled > h.received || h.received - h.settled != u64(h.count) {return .Invalid_Input}
@@ -47,14 +51,17 @@ client_seed_departing :: proc(c: ^Client($S, $C, $A, $E, $N), h: Departing_Host(
 // Pending old-epoch actions are quarantined until the new authority's Welcome
 // resolves its durable frontiers. No old command is blindly resubmitted.
 client_authority :: proc(c: ^Client($S, $C, $A, $E, $N), epoch: u64, wire: tr.Transport,
-                         authority: tr.Peer_Id = 1, permit: Permit = {}) -> Error {
+                         authority: tr.Peer_Id = 1, permit: Permit = {},replacement:^Context_Replacement=nil) -> Error {
+ if error:=client_access(c);error!=.None{return error}
 	if !c.initialized || epoch <= c.cfg.epoch || authority == 0 {return .Invalid_Config}
 	if c.cfg.require_permit && permit.allow == nil {return .Fenced}
 	if c.recovery_ready || c.outcome_count != 0 || c.journal.queue_count != 0 {return .Presentation}
+ candidate,retained,error:=context_replacement_prepare(c,replacement,wire,permit,true);if error!=.None{return error}
 	if !c.recovering {
 		c.recovery = {from_epoch = c.cfg.epoch, previous_confirmed = c.timeline.confirmed,
 		              previous_head = c.timeline.head, old_seat = c.seat}
 	}
+	client_physics_reset_transient(c)
 	c.recovery.to_epoch = epoch
 	c.cfg.epoch, c.wire, c.authority, c.permit = epoch, wire, authority, permit
 	c.generation, c.serial, c.request_sequence = 0, 0, 0
@@ -62,6 +69,7 @@ client_authority :: proc(c: ^Client($S, $C, $A, $E, $N), epoch: u64, wire: tr.Tr
  c.observer_names_negotiated=false
 	c.time_set, c.hello_sent, c.has_pending = false, false, false
 	client_timing_reset(c)
+ context_replacement_commit(c,replacement,candidate,retained)
 	return .None
 }
 
@@ -135,4 +143,38 @@ recovery_actions :: proc(initial: Client_Recovery, actions: []Queued_Action($A),
 		report.actions[i] = entry
 	}
 	return report
+}
+
+// Explicit owning handoff for an old authority rejoining the existing client.
+// Copying aliases checkpoint ownership; destroy exactly once after seeding.
+Complete_Departing_Host :: struct($S,$C,$A,$E:typeid,$N:int){
+	metadata:Departing_Host(S,C,A,N),
+	checkpoint:r.Complete_Checkpoint(S,Net_Event(E)),
+}
+server_departing_complete :: proc(s:^Server($S,$C,$A,$E,$N))->(Complete_Departing_Host(S,C,A,E,N),Error){
+ if error:=server_access(s);error!=.None{return {},error}
+	if !s.initialized || s.physics==nil{return {},.Incomplete_State}
+	checkpoint,error:=r.capture_complete(&s.timeline,s.timeline.head,s.allocator)
+	if error!=.None{return {},.Simulation}
+	return {server_departing(s),checkpoint},.None
+}
+complete_departing_destroy :: proc(owner:^Complete_Departing_Host($S,$C,$A,$E,$N)){
+	r.complete_checkpoint_destroy(&owner.checkpoint);owner^={}
+}
+client_seed_departing_complete :: proc(c:^Client($S,$C,$A,$E,$N),owner:^Complete_Departing_Host(S,C,A,E,N))->Error{
+ if error:=client_access(c);error!=.None{return error}
+	if !c.initialized || c.physics==nil || c.has_world || owner==nil{return .Wrong_Phase}
+	h:=owner.metadata
+	if !h.complete_required || c.cfg.epoch!=h.epoch || c.contract!=h.contract || !c.model.state_valid(h.frame.state) ||
+	   h.count<0 || h.count>ACTION_CAPACITY || int(h.seat)>N || (h.seat==0)!=c.spectator || h.settled>h.received || h.received-h.settled!=u64(h.count) ||
+	   owner.checkpoint.epoch!=h.epoch || owner.checkpoint.frame.tick!=h.frame.tick{return .Invalid_Input}
+	thunk:=model_callback(S,C,A,E,N)
+	if error:=r.init_complete(&c.timeline,&owner.checkpoint,thunk,{c.cfg.history,WIRE_EVENTS},c.allocator,&c.model,user_owner=c.ownership.model.owner,user_data=c.ownership.model.data);error!=.None{return .Invalid_Frame}
+	c.actions,c.action_count,c.next_action,c.last_outcome=h.actions,h.count,h.received,h.settled
+	c.seat,c.held,c.has_world=h.seat,h.held,true
+	v.journal_destroy(&c.journal)
+	if v.journal_init(&c.journal,epoch=h.epoch,baseline=h.frame.tick,cfg={c.cfg.history,WIRE_EVENTS,c.cfg.history*WIRE_EVENTS*2},allocator=c.allocator)!=.None{return .Presentation}
+	client_install_policy(c)
+	c.physics.accepted.baseline=h.frame.tick;c.physics.accepted.newest=h.frame.tick;c.facts_contiguous=h.frame.tick
+	return .None
 }

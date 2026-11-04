@@ -1,0 +1,137 @@
+{
+  "task": "t_7f69d1f269ae48db",
+  "board": "b_cdde1cdfea104035",
+  "worker": "box3d-contract",
+  "date": "2026-10-30",
+  "host": "macOS-15.8-arm64-arm-64bit",
+  "snapshot_version": 1,
+  "normalized_version": 2,
+  "coverage": "ogb3-d421e45c-solver-v2",
+  "state_dump_sha_unchanged": "a8eea34b83fadd953f7eeff91bd08f0de0921ef59371d58c29bcef0f5ba219c0",
+  "source_pins_and_three_patches_unchanged": true,
+  "helpers": [
+    "typed world-independent allocation keys",
+    "checked live resolution",
+    "actual counters",
+    "immutable bounded accounted body cache",
+    "retired sensor shape decoder",
+    "stage owner lifecycle",
+    "detached resource admission",
+    "clock observations without runtime rejection"
+  ],
+  "results": {
+    "macos_Debug_native_pass": 3,
+    "macos_Release_native_pass": 3,
+    "full_ASan_UBSan_native_pass": 3,
+    "macos_Debug_Odin_pass": 9,
+    "macos_Release_Odin_pass": 9,
+    "Linux_Debug_native_pass": 3,
+    "Linux_Release_native_pass": 3,
+    "Linux_Debug_Odin_pass": 9,
+    "Linux_Release_Odin_pass": 9,
+    "pure_Kit_pass": 56,
+    "pure_Replay_pass": 33,
+    "pure_Replay_schema_pass": 28,
+    "native_and_wrapper_live_final": 0,
+    "macos_leaks": 0,
+    "declared_exports_exact": 74,
+    "Kit_concrete_Debug_smoke_pass": 3
+  },
+  "Linux_context": "Debian Clang14 x86-64 via Podman/Rosetta on Apple arm64; no native throughput certification",
+  "Linux_harness_note": "First CTest stalled with already-exited0 zombie child; direct binary and coherent timeout-bounded retries passed",
+  "clock_policy": "4ms over-target flags only, no wall-clock simulation/admission rejection",
+  "cache_capacity": 65536,
+  "cache_entry_size_64bit": 80,
+  "cache_payload_35_times_128": 358400,
+  "remaining": [
+    "actual Kit/Replay adapter correctness and integrated resource/timing verification are sibling/root cards",
+    "actual shared Godot DSO two-module/unload/reload validation not implemented by this standalone task",
+    "requested resource checks are admission/observations, not allocator-level recoverable OOM guarantees",
+    "extra allocator/runtime overhead must be measured separately"
+  ],
+  "scratch": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract",
+  "sources": {
+    "docs/design/box3d/framework-contract.md": "4bfae5df32a07e43db8586054188d78fb74e1f2c118a7792d2a523b83e11c649",
+    "box3d/native/api.c": "f52c5dfa914b3bd2696cd77dc7df417e545522040ae261f44661da548d9c930d",
+    "box3d/native/api.h": "e443a3e655874bbaf296d226338d88a3d72528007fd272cef77b9d90735e82e9",
+    "box3d/native/owned_snapshot.c": "c8e6aa4a45df63be58b8f381a598d8d889739981dd042b151a921e84b42bb15f",
+    "box3d/native/owned_snapshot.h": "b00058a9af010ff7f468725f6eccb0d8ba1dc077eeffae05f6f7c2b1ecf93a09",
+    "box3d/bindings.odin": "b5fe819af30869f8452b04e3410afab839a1bf7dd76a4cb9f5b8838f667af279",
+    "box3d/body.odin": "ef968b86fcf1f7e89f0bb86bfb12b2ff529dbd20c08465d1d64e0ea25ab292c9",
+    "box3d/world.odin": "dc086913eb2cd42d85cec62e3c75ad3ebc5d0def326a1f14a969b9698a15e3ae",
+    "box3d/snapshot.odin": "e213423fd313eac1600a9c25d82385a7d2ab3d39266dfca22b4d01bbdfbb5de6",
+    "tests/box3d_native/lifecycle.c": "af80e8aaed5c754e050951ec9696135245b2f24dfef951e3b3d78d4f6f281ef0",
+    "tests/box3d/lifecycle_test.odin": "a76be05ebedf01c434889343ef6ad9eef4c77ef5336591e79cd23e831e519a3a"
+  },
+  "artifacts": {
+    "final-debug.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/final-debug.log",
+      "sha256": "44d04239995b8494c4f01c05b369285307be4146b62ec128fd3df79f7fbbd29b"
+    },
+    "final-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/final-release.log",
+      "sha256": "f419b07ff8027863b62774c50984b28aa5cffe44b0f545f55c013475e643a529"
+    },
+    "asan-final-build.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/asan-final-build.log",
+      "sha256": "757d463d139f2c26ab2b078165dc888a64e86f033458fe14d1eb170b2e067c93"
+    },
+    "asan-final-ctest.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/asan-final-ctest.log",
+      "sha256": "2b6c858fa8917354b72dbb25fb7a7dd2302b5b589ef216759a976305dd785e30"
+    },
+    "final-odin-debug.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/final-odin-debug.log",
+      "sha256": "11427c049009eb62767146ca6364e80c0fc5a8794e314fe43474d5931bea5f46"
+    },
+    "final-odin-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/final-odin-release.log",
+      "sha256": "7b347c359706cf79f46a18ea7eadde76add1afb1731a292f45896b69e9ddddb3"
+    },
+    "pure-kit.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pure-kit.log",
+      "sha256": "6b62cf8d99966c2d72affaa0c0c1f285eb5c80040464268e0ecbee9e50c43e7f"
+    },
+    "pure-replay.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pure-replay.log",
+      "sha256": "e9c063e1a3d0ae8d46b59c8f60b16114e9dbeebf7a32b638848e999e082718a2"
+    },
+    "pure-schema.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pure-schema.log",
+      "sha256": "a1ac99e5c7b2c99104d913c281668fb7206f48d4a460c3d8d5ba53e459495827"
+    },
+    "linux-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/linux-final.log",
+      "sha256": "40d5d7e4d3ebf108cf49e273a74cd500c6ab682512f47f5a5ec2cd3e3a2f3c5a"
+    },
+    "linux-direct.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/linux-direct.log",
+      "sha256": "fc4a2a5f559bbca1bb75bc31ff8fc984b39ea209653092a7cc2d3116c4965a01"
+    },
+    "final-leaks.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/final-leaks.log",
+      "sha256": "ee359b9a86a07fb4217d2110e23685b4ff868d41d0a00a4d3d785d3ac117d319"
+    },
+    "kit-integration.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/kit-integration.log",
+      "sha256": "476bd3aec3a336b38bfafbf76027122a6750d6f71d84cd4c7e0484b72cc98cc8"
+    },
+    "linux-debug-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/linux-debug-manifest.json",
+      "sha256": "9822ee6248bf4256e757e066d7831ea02239b925b1a1d2c7eb2b0459160003a6"
+    },
+    "linux-release-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/linux-release-manifest.json",
+      "sha256": "184aa101309c8757cda27659ff31fae253a695875817965ede03ea4daacbff13"
+    },
+    "cache/build/Debug/build-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/cache/build/Debug/build-manifest.json",
+      "sha256": "4e629a64a8ef88f99646ec7b86fd91a698709021d2221d505a85cea972ccfe75"
+    },
+    "cache/build/Release/build-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/cache/build/Release/build-manifest.json",
+      "sha256": "14e6f613d785cb8979c69f46f494fdd0006905beb7915b5e6654ab8c1812d573"
+    }
+  },
+  "sibling_scope_note": "Kit real smoke3/3 recorded; further Kit/Replay integration and P2.4 acceptance remain their owners, no inferred completion"
+}

@@ -3,11 +3,13 @@ package replay_net
 import "core:mem"
 import r "godot:replay"
 import sc "godot:replay/schema"
+import bd "godot:box3d/diagnostics"
 
 // Reusable immutable schema programs. Own by pointer and destroy once. It caches
 // type metadata only: content, frame, policy, and protocol checks still run for
 // every archive. No state or allocator from an archive is retained here.
 Checkpoint_Codec :: struct {
+ lifetime:Container_Lifetime,
 	ready, network_ready: bool,
 	types: [4]typeid,
 	seats: int,
@@ -16,9 +18,16 @@ Checkpoint_Codec :: struct {
 }
 
 checkpoint_codec_init :: proc(c: ^Checkpoint_Codec, $S, $C, $A, $E: typeid, $N: int,
-                             network: bool = true, allocator := context.allocator) -> Error {
-	if c.ready {return .Wrong_Phase}
+                             network: bool = true, allocator := context.allocator,ownership:Container_Ownership={}) -> Error {
+ return checkpoint_codec_init_owned(c,S,C,A,E,N,network,allocator,ownership,false)
+}
+@(private)
+checkpoint_codec_init_owned :: proc(c:^Checkpoint_Codec,$S,$C,$A,$E:typeid,$N:int,network:bool,allocator:mem.Allocator,ownership:Container_Ownership,temporary:bool)->Error {
+ if error:=container_access(&c.lifetime);error!=.None{return error}
+	if c.lifetime.cleanup || c.ready {return .Wrong_Phase}
 	if N < 1 || N > 8 {return .Invalid_Config}
+ if error:=container_acquire(&c.lifetime,ownership,allocator,temporary?nil:rawptr(c),#config(BOX3D_REQUIRE_DOMAIN,false));error!=.None{checkpoint_codec_destroy(c);return error}
+
 	if !checkpoint_codecs_init(&c.archive, S, C, A, N, allocator) {checkpoint_codec_destroy(c); return .Invalid_Schema}
 	if network && !codecs_init(&c.network, S, C, A, E, N, allocator) {checkpoint_codec_destroy(c); return .Invalid_Schema}
 	c.types, c.seats, c.ready, c.network_ready = {S, C, A, E}, N, true, network
@@ -28,19 +37,22 @@ checkpoint_codec_init :: proc(c: ^Checkpoint_Codec, $S, $C, $A, $E: typeid, $N: 
 // Borrow the immutable Frame schema and canonical section offset. The codec
 // must remain at a stable address for the borrow's lifetime.
 checkpoint_frame_layout :: proc(c:^Checkpoint_Codec)->(schema:^sc.Schema,offset:int,ok:bool) {
- if c==nil || !c.ready {return}
+ if c==nil || container_access(&c.lifetime)!=.None || !c.ready {return}
  return &c.archive.parts[.Frame],sc.HEADER_BYTES+c.archive.parts[.Header].wire_size+c.archive.parts[.Settings].wire_size,true
 }
 
-checkpoint_codec_destroy :: proc(c: ^Checkpoint_Codec) {
-	checkpoint_codecs_destroy(&c.archive)
-	codecs_destroy(&c.network)
-	c^ = {}
+checkpoint_codec_destroy :: proc(c: ^Checkpoint_Codec)->Error {
+ if error:=container_access(&c.lifetime);error!=.None{return error}
+ life:=c.lifetime
+ if !life.cleanup{checkpoint_codecs_destroy(&c.archive);codecs_destroy(&c.network)}
+ c^={}
+ if error:=container_drop(&life);error!=.None{life.cleanup=true;c.lifetime=life;return error}
+ return .None
 }
 
 @(private)
 checkpoint_codec_matches :: proc(c: ^Checkpoint_Codec, $S, $C, $A, $E: typeid, $N: int) -> bool {
-	return c != nil && c.ready && c.seats == N && c.types[0] == S && c.types[1] == C && c.types[2] == A && c.types[3] == E
+	return c != nil && container_access(&c.lifetime)==.None && c.ready && c.seats == N && c.types[0] == S && c.types[1] == C && c.types[2] == A && c.types[3] == E
 }
 
 // Owned canonical archive bytes. All sections use authority projection, including
@@ -48,12 +60,15 @@ checkpoint_codec_matches :: proc(c: ^Checkpoint_Codec, $S, $C, $A, $E: typeid, $
 // only be disclosed to an authority trusted to read the entire world.
 checkpoint_encode :: proc(cp: ^Checkpoint($S, $C, $A, $N), model: Model(S, C, A, $E, N),
                           allocator := context.allocator, codec: ^Checkpoint_Codec = nil) -> (bytes: []u8, error: Error) {
+ if error:=container_access(&cp.lifetime);error!=.None{return nil,error}
+ if r.owner_contexts_check({owner=cp.lifetime.ownership.allocator.owner,owner_allocator_data=cp.lifetime.ownership.allocator.data},allocator)!=.None{return nil,.Invalid_Model}
+	if model.complete_state {return checkpoint_encode_physics(cp,model,allocator,codec)}
 	if !checkpoint_valid(cp, model) {return nil, .Invalid_Checkpoint}
 	temporary: Checkpoint_Codec
 	defer checkpoint_codec_destroy(&temporary)
 	active := codec
 	if active == nil {
-		if err := checkpoint_codec_init(&temporary, S, C, A, E, N, false, allocator); err != .None {return nil, err}
+		if err := checkpoint_codec_init_owned(&temporary,S,C,A,E,N,false,allocator,{allocator=cp.lifetime.ownership.allocator},true); err != .None {return nil, err}
 		active = &temporary
 	}
 	if !checkpoint_codec_matches(active, S, C, A, E, N) {return nil, .Invalid_Schema}
@@ -87,13 +102,17 @@ checkpoint_encode :: proc(cp: ^Checkpoint($S, $C, $A, $N), model: Model(S, C, A,
 // must supply their expected content ID; archives cannot choose game definitions.
 checkpoint_decode :: proc(cp: ^Checkpoint($S, $C, $A, $N), bytes: []u8,
                           model: Model(S, C, A, $E, N), content: u64,
-                          allocator := context.allocator, codec: ^Checkpoint_Codec = nil) -> Error {
-	return checkpoint_decode_protocol(cp,bytes,model,content,PROTOCOL_VERSION,allocator,codec)
+                          allocator := context.allocator, codec: ^Checkpoint_Codec = nil,ownership:Container_Ownership={}) -> Error {
+ ownership:=ownership
+ if model.complete_state{ownership=model.complete_codec.ownership}
+	if model.complete_state {return checkpoint_decode_physics(cp,bytes,model,content,allocator,codec,ownership)}
+	return checkpoint_decode_protocol(cp,bytes,model,content,PROTOCOL_VERSION,allocator,codec,ownership=ownership)
 }
 
 @(private)
 checkpoint_decode_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),bytes:[]u8,model:Model(S,C,A,$E,N),content,protocol:u64,
-                                  allocator:mem.Allocator,codec:^Checkpoint_Codec)->Error {
+                                  allocator:mem.Allocator,codec:^Checkpoint_Codec,complete_identity:^bd.Identity=nil,ownership:Container_Ownership={})->Error {
+ if error:=container_access(&cp.lifetime);error!=.None{return error}
 	if !checkpoint_empty(cp) {return .Wrong_Phase}
 	if len(bytes) > MAX_CHECKPOINT_BYTES || content == 0 {return .Invalid_Checkpoint}
 	meta, _, report := sc.inspect(bytes)
@@ -102,7 +121,7 @@ checkpoint_decode_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),bytes:[]u8,model:
 	defer checkpoint_codec_destroy(&temporary)
 	active := codec
 	if active == nil {
-		if err := checkpoint_codec_init(&temporary, S, C, A, E, N, true, allocator); err != .None {return err}
+		if err := checkpoint_codec_init_owned(&temporary,S,C,A,E,N,true,allocator,{allocator=ownership.allocator},true); err != .None {return err}
 		active = &temporary
 	}
 	if !checkpoint_codec_matches(active, S, C, A, E, N) {return .Invalid_Schema}
@@ -116,6 +135,7 @@ checkpoint_decode_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),bytes:[]u8,model:
 	if checked.error != .None {return .Invalid_Checkpoint}
 	tmp: Checkpoint(S, C, A, N)
 	tmp.allocator = allocator
+ if error:=container_acquire(&tmp.lifetime,ownership,allocator,ownership.data_context.data,#config(BOX3D_REQUIRE_DOMAIN,false));error!=.None{checkpoint_destroy(&tmp);return error}
 	committed := false
 	defer if !committed {checkpoint_destroy(&tmp)}
 	cursor := Checkpoint_Cursor{bytes = body}
@@ -148,7 +168,9 @@ checkpoint_decode_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),bytes:[]u8,model:
 	network_codecs := &active.network
 	maximum := max(network_codecs.welcome.wire_size, max(network_codecs.snapshot.wire_size, network_codecs.facts.wire_size)) + sc.HEADER_BYTES
 	if int(tmp.settings.egress_bytes_per_pump) < maximum {return .Invalid_Checkpoint}
-	if contract_hash(network_codecs, checkpoint_config(tmp.header, tmp.settings), N, model.control_timing,protocol,model.replication.id,model.action_timing,model.action_schedule.id,model.authority.id) != tmp.header.contract {return .Checkpoint_Contract}
+	contract:=contract_hash(network_codecs,checkpoint_config(tmp.header,tmp.settings),N,model.control_timing,protocol,model.replication.id,model.action_timing,model.action_schedule.id,model.authority.id)
+	if complete_identity!=nil {contract=physics_contract(contract,complete_identity^)}
+	if contract!=tmp.header.contract{return .Checkpoint_Contract}
 	cp^ = tmp // ownership transfer, never an initialized server or aliased owner
 	committed = true
 	return .None
@@ -210,4 +232,13 @@ checkpoint_get :: proc(c: ^Checkpoint_Cursor, schema: ^sc.Schema, value: ^$T) {
 	if schema.wire_size > len(c.bytes) - c.offset {c.failed = true; return}
 	c.failed = sc.decode(schema, value, c.bytes[c.offset:c.offset + schema.wire_size]).error != .None
 	c.offset += schema.wire_size
+}
+
+// Requested bytes retained by this immutable schema cache. Compiler-owned type
+// information and allocator headers/rounding are separate host overhead.
+checkpoint_codec_owned_bytes :: proc(c:^Checkpoint_Codec)->u64 {
+	if c==nil{return 0}
+	bytes:=u64(size_of(Checkpoint_Codec))+physics_codecs_bytes(&c.network)
+	for &schema in c.archive.parts {bytes+=complete_schema_owned_bytes(&schema)}
+	return bytes
 }

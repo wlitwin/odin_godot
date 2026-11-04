@@ -1,0 +1,697 @@
+{
+  "schema_version": 1,
+  "result": "LOCAL_LIFECYCLE_PASS",
+  "task_complete": true,
+  "whole_goal_complete": false,
+  "cases": {
+    "late-observer-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/late-observer-v1/report.json",
+      "sha256": "905e9f28844fba79e1de51df2d6072f392c95438e5cec8b2fece16caebcbaa76",
+      "result": "PASS",
+      "exact_scope": "Progressed late Observer; no seat/input/prediction/old boost effects.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/late-observer-v1/export-binding.json",
+        "sha256": "030e1d83a083d333baab9b21e90ce56ec0b2bb043ea798fffaed56fbafc523d4",
+        "helper_source_fence": null,
+        "export_record_sha256": "68744e3dbe332940c05f53281da76477b1a6cb5003dc1d4dd66509f6eaf43c03"
+      },
+      "before_observer": {
+        "head": 303,
+        "confirmed": 303
+      },
+      "all_five_byte_equal": true,
+      "observer_receive_only": true
+    },
+    "pending-reconnect-v4": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/pending-reconnect-v4/report.json",
+      "sha256": "58eed252e165d63b06c19c2d18d999e9ab25a82635d30f4c3eb1c2d205e7531a",
+      "result": "PASS",
+      "exact_scope": "Original pending sequence1 retained across actual RTC replacement and settled once without reissue.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/pending-reconnect-v4/export-binding.json",
+        "sha256": "2ce51f8be8ae0ad9f3580f7d1725b9bb9c7a949a24fb9610305b7dd78eafa44d",
+        "helper_source_fence": null,
+        "export_record_sha256": "910d5d8f0f31133988ef4fde7c26c246a32974137c7417959f96fa8db1c9f8fa"
+      },
+      "before_fault": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 415,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 0,
+        "sensor_events": 11,
+        "pulses": 0,
+        "accepted_rows": 0,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 0,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          0,
+          0
+        ],
+        "nonzero_by_seat": [
+          0,
+          0
+        ],
+        "native_observed": false,
+        "meter_observed": false,
+        "recovery_available": true,
+        "issued_sequence": 0,
+        "pending_actions": 0,
+        "action_outcomes": [
+          0,
+          0
+        ],
+        "action_applied": [
+          0,
+          0
+        ],
+        "head": 7,
+        "confirmed": 1,
+        "epoch": 1,
+        "native_live_bytes": null,
+        "wrapper_live_bytes": null,
+        "host_live_bytes": null,
+        "reserved_bytes": null,
+        "admitted_bytes": null,
+        "limit_bytes": null,
+        "owner_count": null,
+        "meter_live_bytes": null,
+        "native_sampled_frame": null,
+        "meter_sampled_frame": null,
+        "recoveries": 0,
+        "recovery_serial": 1,
+        "baseline": 1,
+        "recovery_generation": 1,
+        "recovery_epoch": 1
+      },
+      "pending_before_close": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 476,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 11,
+        "pulses": 1,
+        "accepted_rows": 118,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 118,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          59,
+          59
+        ],
+        "nonzero_by_seat": [
+          59,
+          53
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": true,
+        "issued_sequence": 1,
+        "pending_actions": 1,
+        "action_outcomes": [
+          1,
+          0
+        ],
+        "action_applied": [
+          1,
+          0
+        ],
+        "head": 66,
+        "confirmed": 61,
+        "epoch": 1,
+        "native_live_bytes": 6987616,
+        "wrapper_live_bytes": 2032761,
+        "host_live_bytes": 7326860,
+        "reserved_bytes": 0,
+        "admitted_bytes": 16347237,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 7072636,
+        "native_sampled_frame": 476,
+        "meter_sampled_frame": 476,
+        "recoveries": 0,
+        "recovery_serial": 1,
+        "baseline": 1,
+        "recovery_generation": 1,
+        "recovery_epoch": 1
+      },
+      "fault": {
+        "active": true,
+        "packets": 3,
+        "bytes": 394,
+        "closed": 2
+      },
+      "after_reconnect": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 537,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 12,
+        "pulses": 1,
+        "accepted_rows": 216,
+        "accepted_history_unavailable": true,
+        "origin_coverage_complete": true,
+        "origin_observed": 216,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          108,
+          108
+        ],
+        "nonzero_by_seat": [
+          108,
+          90
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": true,
+        "issued_sequence": 1,
+        "pending_actions": 0,
+        "action_outcomes": [
+          1,
+          1
+        ],
+        "action_applied": [
+          1,
+          0
+        ],
+        "head": 125,
+        "confirmed": 121,
+        "epoch": 1,
+        "native_live_bytes": 5289184,
+        "wrapper_live_bytes": 1590499,
+        "host_live_bytes": 7289103,
+        "reserved_bytes": 0,
+        "admitted_bytes": 14168786,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 7034879,
+        "native_sampled_frame": 537,
+        "meter_sampled_frame": 537,
+        "recoveries": 1,
+        "recovery_serial": 2,
+        "baseline": 74,
+        "recovery_generation": 2,
+        "recovery_epoch": 1
+      },
+      "original_attempt_outcome": {
+        "sequence": 1,
+        "client_applied": 0,
+        "host_applied": 0
+      },
+      "all_five_byte_equal": true
+    },
+    "gap-v2": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/gap-v2/report.json",
+      "sha256": "e3009258a204c199fea563667075f958b83ef9d54b00c4509a5d40e0d01b7dde",
+      "result": "PASS",
+      "exact_scope": "Actual game-channel discard beyond H128 then correlated complete Welcome after connection replacement.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/gap-v2/export-binding.json",
+        "sha256": "6149d4093e734279f5e36f52f6bc47945950dca2a5bfae3f9a622e757b3a2459",
+        "helper_source_fence": true,
+        "export_record_sha256": "910d5d8f0f31133988ef4fde7c26c246a32974137c7417959f96fa8db1c9f8fa"
+      },
+      "before_impairment": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 716,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 14,
+        "pulses": 2,
+        "accepted_rows": 600,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 600,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          300,
+          300
+        ],
+        "nonzero_by_seat": [
+          300,
+          294
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": true,
+        "issued_sequence": 1,
+        "pending_actions": 0,
+        "action_outcomes": [
+          1,
+          1
+        ],
+        "action_applied": [
+          1,
+          1
+        ],
+        "head": 308,
+        "confirmed": 301,
+        "epoch": 1,
+        "native_live_bytes": 12421120,
+        "wrapper_live_bytes": 3930831,
+        "host_live_bytes": 7526918,
+        "reserved_bytes": 0,
+        "admitted_bytes": 23878869,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 7272694,
+        "native_sampled_frame": 716,
+        "meter_sampled_frame": 716,
+        "recoveries": 0,
+        "recovery_serial": 1,
+        "baseline": 1,
+        "recovery_generation": 1,
+        "recovery_epoch": 1
+      },
+      "authority_at_replacement": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "host",
+        "phase": "Host",
+        "go": true,
+        "frames": 1247,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 17,
+        "pulses": 2,
+        "accepted_rows": 964,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 964,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          482,
+          482
+        ],
+        "nonzero_by_seat": [
+          481,
+          475
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": false,
+        "issued_sequence": 1,
+        "pending_actions": 0,
+        "action_outcomes": [
+          1,
+          1
+        ],
+        "action_applied": [
+          1,
+          1
+        ],
+        "head": 483,
+        "confirmed": 483,
+        "epoch": 1,
+        "native_live_bytes": 12803200,
+        "wrapper_live_bytes": 3869439,
+        "host_live_bytes": 6143506,
+        "reserved_bytes": 0,
+        "admitted_bytes": 22816145,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 5889282,
+        "native_sampled_frame": 1247,
+        "meter_sampled_frame": 1247,
+        "recoveries": null,
+        "recovery_serial": null,
+        "baseline": null,
+        "recovery_generation": null,
+        "recovery_epoch": null
+      },
+      "gap_fault": {
+        "active": true,
+        "packets": 16,
+        "bytes": 18530,
+        "closed": 2
+      },
+      "after_impairment": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 960,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 17,
+        "pulses": 2,
+        "accepted_rows": 710,
+        "accepted_history_unavailable": true,
+        "origin_coverage_complete": true,
+        "origin_observed": 710,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          355,
+          355
+        ],
+        "nonzero_by_seat": [
+          355,
+          337
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": true,
+        "issued_sequence": 1,
+        "pending_actions": 0,
+        "action_outcomes": [
+          1,
+          1
+        ],
+        "action_applied": [
+          1,
+          1
+        ],
+        "head": 552,
+        "confirmed": 546,
+        "epoch": 1,
+        "native_live_bytes": 5920992,
+        "wrapper_live_bytes": 1732202,
+        "host_live_bytes": 7302609,
+        "reserved_bytes": 0,
+        "admitted_bytes": 14955803,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 7048385,
+        "native_sampled_frame": 960,
+        "meter_sampled_frame": 960,
+        "recoveries": 1,
+        "recovery_serial": 2,
+        "baseline": 496,
+        "recovery_generation": 2,
+        "recovery_epoch": 1
+      },
+      "all_five_byte_equal": true
+    },
+    "frozen-v2": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/frozen-v2/report.json",
+      "sha256": "112b6da83a6d1f2fe7029a392062e8857b5e7ddbec441c3ee8c7f8ad1ff957dc",
+      "result": "PASS",
+      "exact_scope": "Hidden/frozen Client with expected lifecycle socket closure and eventual matching complete state.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/frozen-v2/export-binding.json",
+        "sha256": "12d6be406b798de51a736267a94af75958334ebf09308301681626dfbdcd7d3e",
+        "helper_source_fence": null,
+        "export_record_sha256": "910d5d8f0f31133988ef4fde7c26c246a32974137c7417959f96fa8db1c9f8fa"
+      },
+      "before_impairment": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 836,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 2,
+        "sensor_events": 16,
+        "pulses": 1,
+        "accepted_rows": 716,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 716,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          358,
+          358
+        ],
+        "nonzero_by_seat": [
+          358,
+          352
+        ],
+        "native_observed": true,
+        "meter_observed": true,
+        "recovery_available": true,
+        "issued_sequence": 1,
+        "pending_actions": 0,
+        "action_outcomes": [
+          1,
+          1
+        ],
+        "action_applied": [
+          1,
+          0
+        ],
+        "head": 366,
+        "confirmed": 359,
+        "epoch": 1,
+        "native_live_bytes": 12619712,
+        "wrapper_live_bytes": 3934832,
+        "host_live_bytes": 7566338,
+        "reserved_bytes": 0,
+        "admitted_bytes": 24120882,
+        "limit_bytes": 67108864,
+        "owner_count": 3,
+        "meter_live_bytes": 7312114,
+        "native_sampled_frame": 836,
+        "meter_sampled_frame": 836,
+        "recoveries": 0,
+        "recovery_serial": 1,
+        "baseline": 1,
+        "recovery_generation": 1,
+        "recovery_epoch": 1
+      },
+      "suspension": {
+        "visibility_before": "hidden",
+        "visibility_after": "visible",
+        "elapsed_ms": 1019.0505000000012,
+        "authority_before": 362,
+        "authority_during": 423
+      },
+      "all_five_byte_equal": true
+    },
+    "cold-return-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/cold-return-v1/report.json",
+      "sha256": "b2611f2b53f19e0acda7740f1a7f67de1db05f5c9aa4e1f2833e6ab59211f8d8",
+      "result": "PASS",
+      "exact_scope": "Checked leave/restart, stored member/new incarnation, no old action or boost-effect replay.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/cold-return-v1/export-binding.json",
+        "sha256": "9449b60084e7c9871938350caeb1490ad826f3fc428a49e2f6961141f72a7495",
+        "helper_source_fence": true,
+        "export_record_sha256": "7a414c3700c5b6868de7bd80455f7c165252b94af14744adfcb54f064b2c05d7"
+      },
+      "original_client": {
+        "checked_leave": true,
+        "shutdown": true,
+        "member": "0000000000000002",
+        "incarnation": "0000000000000002"
+      },
+      "after_cold_return": {
+        "version": 1,
+        "framework": "Replay",
+        "role": "client",
+        "phase": "Running",
+        "go": true,
+        "frames": 96,
+        "error": "",
+        "reset_supported": false,
+        "content_sha256": "8ddc13df1c391d99f0ea01dfdb12477b4c433fb1faf9be8eca2bc0626032c0de",
+        "queries": 0,
+        "sensor_events": 18,
+        "pulses": 2,
+        "accepted_rows": 20,
+        "accepted_history_unavailable": false,
+        "origin_coverage_complete": true,
+        "origin_observed": 20,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          10,
+          10
+        ],
+        "nonzero_by_seat": [
+          10,
+          0
+        ],
+        "native_observed": false,
+        "meter_observed": false,
+        "recovery_available": true,
+        "issued_sequence": 0,
+        "pending_actions": 0,
+        "action_outcomes": [
+          0,
+          0
+        ],
+        "action_applied": [
+          0,
+          0
+        ],
+        "member": "0000000000000002",
+        "incarnation": "0000000000000003",
+        "head": 755,
+        "confirmed": 753,
+        "epoch": 1,
+        "native_live_bytes": null,
+        "wrapper_live_bytes": null,
+        "host_live_bytes": null,
+        "reserved_bytes": null,
+        "admitted_bytes": null,
+        "limit_bytes": null,
+        "owner_count": null,
+        "meter_live_bytes": null,
+        "native_sampled_frame": null,
+        "meter_sampled_frame": null,
+        "recoveries": 0,
+        "recovery_serial": 2,
+        "baseline": 743,
+        "recovery_generation": 2,
+        "recovery_epoch": 1
+      },
+      "all_five_byte_equal": true,
+      "cold_membership_return": true
+    },
+    "hostloss-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/hostloss-v1/report.json",
+      "sha256": "63a020c487f9f7af9fc1511da367255b059aa16abb2f0852da896f84614df67f",
+      "result": "PASS",
+      "exact_scope": "Authority browser closure, stopped preserved checkpoint, actual new-crew UI and fresh room.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/hostloss-v1/export-binding.json",
+        "sha256": "269383bb5dcb34c894586e9c5d8a75a819f2485c04d8cbc70aaa9dc4177a5c0a",
+        "helper_source_fence": true,
+        "export_record_sha256": "f5a0a84cd2bfbe6a48a5a9a749b10d38efe124651bdfc5f1b880120a830748e4"
+      },
+      "actual_new_crew": true,
+      "all_five_byte_equal": true,
+      "stopped_checkpoint": {
+        "tick": 362,
+        "rehost_tick": 362,
+        "all_parts_preserved": true
+      }
+    },
+    "host-frozen-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/host-frozen-v1/report.json",
+      "sha256": "d60ccd57daab712d25c4f4a4f0e15cf44b55f506578e1649c8ab10a8d4e6b5e3",
+      "result": "PASS",
+      "exact_scope": "Hidden/frozen authority, hosting permission fencing, checked stop and new crew.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/host-frozen-v1/export-binding.json",
+        "sha256": "7237e981f3065dba8188cae8b40046aad57f5f22766b76e1af233f17c4376718",
+        "helper_source_fence": true,
+        "export_record_sha256": "2960e9b517198fff461075bc73b6c3192d9ab299364cf16fe5d7d124298c32ca"
+      },
+      "authority_suspension": {
+        "visibility_before": "hidden",
+        "visibility_after": "visible",
+        "elapsed_ms": 3014.6718330000003
+      },
+      "actual_new_crew": true,
+      "all_five_byte_equal": true,
+      "stopped_checkpoint": {
+        "tick": 301,
+        "rehost_tick": 301,
+        "all_parts_preserved": true
+      }
+    },
+    "native-regression-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/R1/native-regression-v1/report.json",
+      "sha256": "30ca5507a6c920228019c762c5a19877edeca49a4cc6bce171703048e36172a4",
+      "result": "PASS",
+      "exact_scope": "Local Native direct Host/Client complete-state regression."
+    }
+  },
+  "sources_sha256": {
+    "examples/replay_dockyard/README.md": "f906661dd67543a5659789889de6d98e5f4a8f305f04c8cef643d493b5fe7e4d",
+    "examples/replay_dockyard/content/barge.tres": "28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/delivery.tres": "9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/ramp.tres": "08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb",
+    "examples/replay_dockyard/content/robot.tres": "36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9",
+    "examples/replay_dockyard/content/world.tscn": "164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935",
+    "examples/replay_dockyard/deploy/Caddyfile": "21bb872dc97f89a03aa4147d1250011b7b7d33a5022a2754680e19aaddf0a357",
+    "examples/replay_dockyard/deploy/README.md": "ebc01f0c1564c912f1fafa9b18d4fac5a173d625ddadcdde0d5132c0b400e89f",
+    "examples/replay_dockyard/deploy/service.env.example": "d877e58ac12d7dc1643b42bcd1dfc295869e4dca0e7a60becc8c6e1f6adddef5",
+    "examples/replay_dockyard/deploy/turnserver.conf.template": "aa3f9634e88070fc3e49c41068b2b00b75d656bd96944f9cd031ef80d3420f69",
+    "examples/replay_dockyard/export_presets.cfg": "23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4",
+    "examples/replay_dockyard/launch.py": "266ba66413c7aae5b2eae1cc3c81a30c7f31e881964adecc81ba4d5e0898f852",
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "examples/replay_dockyard/modules/dockyard/controller.odin": "67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "33e9da359cc448824f7b082c224183d9efe888a1d7b3c30cd82d3a2e2b787118",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "e34e58685557816471a54d0ad7ed1e1f40d37e1fa50d8d419a65a1d9188b8197",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/launch.odin": "85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340",
+    "examples/replay_dockyard/modules/dockyard/online.odin": "c5d4f712149af837a0482938a673ac0dd4a8ec8543504d999a9b5c0df8420a58",
+    "examples/replay_dockyard/modules/dockyard/online_native.odin": "2376ed53709d043d99e7f90ebe56ae61af5c5549ff0d7e5e527b9cc340fa0577",
+    "examples/replay_dockyard/modules/dockyard/online_web.odin": "4bfbe438239d11dc02cd6e3691e92d62a2843f76822bb4cff46a511a6feb9101",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "7cdee6e49bb6d5a5be336a3166a62c1bee92e781262c30757c39a7945d0d098b",
+    "examples/replay_dockyard/modules/dockyard/round.odin": "f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "74b42e7e11e5bb7766b365db6d903ad93abc653731c1efcc19b49ca1c87f7750",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "1efea61273f1c12e86d1a08f108c8a5b070bf64c0f6199c23cacb894a1de7872",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "2648d4761fedc22b698cc5afcf2bce90831534ff25facbc4c397178004221054",
+    "examples/replay_dockyard/odin_godot.gdextension": "88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18",
+    "examples/replay_dockyard/prepare.py": "2feab6ca84f5471fbcc7c8801824468f3a35d1c27bf7ab9666f373ac28a5c1e7",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/view.gd": "be7d628724fa6c8efc72abc6d3a6b1f378d36d78b736b1bd714465255722fa6b",
+    "tests/replay_dockyard/recovery/README.md": "3e00e7d294798bc2da3633dfdbe451202ec45a88e663f8ccf5a8e07d64ba32e1",
+    "tests/replay_dockyard/recovery/drive.mjs": "fb71b389547b004c01688a46cfbfaa86ec0e5db9b5304129d2bcf2872969c92d",
+    "tests/replay_dockyard/recovery/run.py": "e7882ae8646a4555e5aa8cc6cd54413db2c9f4d4476cdba8da882e975e94abe8",
+    "tests/replay_dockyard/online/run.py": "9a0f5649b65c70efd988d3982efb7d843057bc5d4cc08e40295328dbda73b4ff",
+    "tests/replay_dockyard/online/drive.mjs": "0ab125c68f21e308c0d19a2968f43858c8deab313b34f8b7f2df016028cf8119",
+    "tests/replay_dockyard/online/native_menu.gd": "d65154930bdff8602d7ca946de830d67a5b7a64b6cc4d77812007991076f7a4d",
+    "replay/godot/migration.odin": "cb26e928a21646cee5a55d9ee454b0fd76cfa1aa8b72566182516758c49c16f3",
+    "replay/godot/room.odin": "35390db33f264f2b758ed07be194c62d75a8a2fd458b280b73a23ddaf2a1ba13",
+    "replay/godot/room_complete.odin": "9769e449b68097d9b3450c56c305e66b3496ce942f037b1816eac8d5d983261f"
+  },
+  "implementation": [
+    "One Room.Session; actual Observer role separate from provision membership role; fresh creator invite index1.",
+    "Managed redirect preserves the existing phase-aware permit and its exact retained owner. Legacy redirect defaults remain unchanged.",
+    "Application protocol3 readiness/ack explicitly binds accepted peer generation and app version is included in service cohort.",
+    "Cold process return observes the validated action watermark without recording old attempts as local new issues.",
+    "Host crash or hosting permission loss ends the job; checked close precedes fresh scene/new crew. No automatic managed authority takeover."
+  ],
+  "limits": [
+    "All browser cases are local, same-artifact functional proofs with software GL/3D drawing disabled. No public Internet, GPU/frame budget or human-playtest inference.",
+    "Cases are build-specific; final Q1/release checklist must use the final frozen candidate after P1.",
+    "The original gap-v1 controller/runtime PASS has a separate INCOMPLETE provenance sidecar because its shared helper changed during execution; the final gap-v2 has before/after helper fences.",
+    "Early cases preceding the helper-fence addition record their helper hash without a before/after assertion; original raw results and scope remain unchanged.",
+    "Cold return drains the original action before process exit; pending-attempt preservation is established by the separate live-Client transient case, not arbitrary process persistence.",
+    "N1 public endpoint acceptance remains blocked and is not closed by this card.",
+    "Authority browser-close case claims no typed shutdown for the deliberately lost authority; surviving/new actors require checked teardown."
+  ],
+  "retained_failures": [
+    "pending-reconnect-v1: managed permit owner/data mismatch caused stalled replacement.",
+    "pending-reconnect-v2/v3: complete-state replacement/outcome succeeded but strict final application generation acknowledgement failed.",
+    "frozen-v1: harness treated the explicitly injected browser BFCache socket event as an unclassified runtime error.",
+    "gap-v1: successful runtime result retained, source provenance incomplete; corrected fenced gap-v2 is separate."
+  ]
+}

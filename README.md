@@ -66,6 +66,7 @@ helpers wrap common engine calls and their argument conversions:
 | **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)); [named profiles](docs/kit/profiles.md) validate coherent co-op, listen-server, or dedicated settings. `@(gd_rpc)` remains available for Godot's engine-native path. |
 | **Build and export** | hot reload on save, native desktop export, WebAssembly export |
 | **Script modules** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules |
+| **Box3D** | [Authored worlds, shapes, characters and joints](docs/box3d-authoring.md), one explicitly stepped backend with distinct Kit/Replay complete-state adapters, and optional editor/debug tools; reference-platform limits are stated in the linked reports |
 
 Odin compiles ahead of time, so scripts have no `eval`/REPL or Godot script-line
 breakpoints; use `lldb` for native debugging. Changing `@export` declarations
@@ -113,6 +114,7 @@ to browse every published guide, reference page, example, and source listing by 
 | **[Getting Started](docs/getting-started.md)** | Install the toolchain, add the extension to a project, write + attach your first script |
 | **[Authoring Guide](docs/authoring-guide.md)** | The feature reference: struct convention, `//gd:` markers, `@export` (all types/hints/groups/defaults), lifecycle, methods, signals, `@(gd_connect)`, `@(gd_rpc)`, `@onready`, resources, autoloads, cross-script, the `gd.*` helper catalog, editor tooling |
 | **[Workflow](docs/workflow.md)** | The development loop: build, reload on save, editor validation/completion/highlighting, debugging (`gd.print`, `lldb`, crash backtraces), and AOT limitations |
+| **[Box3D authoring](docs/box3d-authoring.md)** | Separate authored Kit/Replay samples, editor and bake workflow, complete-state ownership, migration and unsupported operations |
 | **[Exporting](docs/exporting.md)** | Shipping: native desktop export and web/WASM export (COOP/COEP) |
 | **[Distribution](docs/distribution.md)** | Building the drop-in addon (`nix build`), cross-compiling the core for Linux/Windows, the consumer install workflow, per-platform status |
 | **[Debugging](docs/debugging.md)** | The full `lldb` + crash-backtrace reference |

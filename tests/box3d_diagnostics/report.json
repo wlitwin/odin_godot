@@ -1,0 +1,486 @@
+{
+  "version": 1,
+  "task": "t_9ea595c933f74511",
+  "revision": 5,
+  "result": "P6_5_SCOPED_DIAGNOSTICS_AND_RELEASE_PASS",
+  "card_complete": true,
+  "whole_goal_complete": false,
+  "scope": "Bounded offline diagnostic collection/integrity/Trace inspection plus actual existing telemetry/marker documentation and release/sample maintenance. Distinct Kit/Replay historical runtime evidence; no new physics, performance, distributed-release or platform qualification.",
+  "implementation": {
+    "cli": "e334758201623ca3e837a97b0978026943970271be4db5a51749d5326c368f62",
+    "actions": [
+      "collect",
+      "verify",
+      "inspect"
+    ],
+    "success_results": [
+      "BUNDLE_COLLECTED",
+      "BUNDLE_VALID",
+      "TRACE_INSPECTED"
+    ],
+    "run_verdict": "NOT_INFERRED",
+    "limits": {
+      "total_files": 32,
+      "file_bytes": 16777216,
+      "aggregate_bytes": 67108864,
+      "trace_bytes": 9437184,
+      "manifest_bytes": 262144,
+      "inspector_output_bytes_per_stream": 65536,
+      "inspector_seconds": 30
+    },
+    "properties": [
+      "No Trace parser added; existing native-free inspector is explicitly pinned by caller SHA.",
+      "Exact labelled bytes, source/tool observed-change checks, bounded regular-file/no-symlink reads.",
+      "New-only staged validation and atomic exclusive publication on macOS/Linux, no existing bundle replacement.",
+      "Verify is readonly and starts no process; inspect runs only selected pinned compatible local inspector and rechecks copied input/bundle.",
+      "Different legitimate Mac/Linux inspector SHAs retained separately, not interpreted as physics compatibility.",
+      "Original opaque report verdicts never normalized or inferred."
+    ]
+  },
+  "actual_runs": {
+    "native-macos-arm64": {
+      "result": "PASS",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-diagnostics-bundles-macos-v1/report.json",
+        "sha256": "ba13fe5c4d621f514a79232cd94ebef09dcad969fe283e4673954e955161cef4"
+      },
+      "actions": [
+        {
+          "name": "collect-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "ae2823b40b8650ed032e1bedbf7f68348bd117cbecd3336fafd1f237b83bab13",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "verify-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "5d6f8694a817efefac1db7a7ffaad07a678871d255e65aa2f6e52df541ce1542",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "inspect-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "15dbdd03546b48a81bbf72fe7def8e04d8595c5761c90d70d3de402f77877d4d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "collect-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "c72c982f968a3ac6505f5ac055301acf15f1a79e274ae5a706cf496c008e617b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "verify-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "3e84fa6fe2589c46fbaf5c0934f515f9fc6ecce78cb4447c1169af6a8cb45da7",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "inspect-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "97c6ec3afd6b03ec3a4a197a3ff30a140ab05d7d785075752e0d27f1b4ed1c17",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "actual-corrupt-rejection",
+          "actual_exit": 2,
+          "expected_exit": 2,
+          "stdout_sha256": "ac692868ce0be69173963040a2cf473241c24083f5938b765865d6b96aba9046",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "bundles": {
+        "kit": {
+          "manifest_sha256": "3de2ca493d04421dfed61c3217c61ebffec4539241cd10cd94d73dcdc455e29f",
+          "files": {
+            "attachments/log-client": "82308dee1360d232a1769779fdf6cb7cae44078451af3063dfc60d860f1c5953",
+            "attachments/report-case": "baab3795fdba8fed7d4b3d13beffdb882fcf9d99eb904e5d1700c05066ba6904",
+            "attachments/report-retained-failure": "a64cdb9d5f2906cf85477f376c12225e90d658f715b4f2c8c75b4ad376e876fa",
+            "attachments/source-copy-binding": "b3ca2906912021ed447950af725ffbebe1fd889b3664048078a0183bc1d07860",
+            "attachments/source-failure-binding": "55796ff50ef2e6146192dd3a5fa3a2cdad21a2e55c89235749d29b7e889dcda1",
+            "attachments/source-run": "c783bb20093ba448c64cf0b3609542a46e00212104ae9bb664fb57f46c890b26",
+            "inspector.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "inspector.stdout": "77152ac147d7b06b76b5aad8feb5cd5d59b7deb521d3c7533e5ee10edf926630",
+            "manifest.json": "3de2ca493d04421dfed61c3217c61ebffec4539241cd10cd94d73dcdc455e29f",
+            "trace.bin": "cf1d476e78c1cdb793645faa8132610aa2611a4d5c30ee7354a79fa20583968e"
+          },
+          "read_only_after_verify_inspect": true,
+          "historical_case_success_preserved": true,
+          "separate_historical_failure_still_FAIL": true
+        },
+        "replay": {
+          "manifest_sha256": "85d843fb69cc49f405f624f4fae555a626e6cf0709fc49bb76ca9f29a2cf804e",
+          "files": {
+            "attachments/log-client": "c20a660d4344d2f01c4f25a31a33c7252da2255ef690912180cdf6a7fee9e84a",
+            "attachments/report-case": "49d6ffd8f4d81d97c94053739460ace9d22c32e072d6c81b1cbb3ac3a1280bc6",
+            "attachments/report-retained-failure": "cb44a2724a150c795c8f29594d2754f736c3b1c059b1152771e9b14e770d9139",
+            "attachments/source-copy-binding": "b3ca2906912021ed447950af725ffbebe1fd889b3664048078a0183bc1d07860",
+            "attachments/source-failure-binding": "55796ff50ef2e6146192dd3a5fa3a2cdad21a2e55c89235749d29b7e889dcda1",
+            "attachments/source-run": "0191fb32df2f38b80d50880b994afc6b7db882a9502d5766360d0d0614ab4b15",
+            "inspector.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "inspector.stdout": "75d1e6a1285b522073ec9fa7f4f91865f440d1e102fec20322ee01542b8b9a23",
+            "manifest.json": "85d843fb69cc49f405f624f4fae555a626e6cf0709fc49bb76ca9f29a2cf804e",
+            "trace.bin": "a67f2fbf80af2cd0d02ef6f51b8a2f817539fc4a14cd5e2a3fec20b37f7ad647"
+          },
+          "read_only_after_verify_inspect": true,
+          "historical_case_success_preserved": true,
+          "separate_historical_failure_still_FAIL": true
+        }
+      },
+      "cross_bundles": {},
+      "all_inputs_helper_inspector_fences": true,
+      "corrupt_trace_rejected_without_published_bundle": true
+    },
+    "translated-linux-x86_64": {
+      "result": "PASS",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-diagnostics-bundles-linux-v1/report.json",
+        "sha256": "7e79a9a3c04092bba1fcd5e662995ce23236d725787a6fafd944b50ce93ae1c8"
+      },
+      "actions": [
+        {
+          "name": "collect-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "ffced2a98c5b8ad803d31699fdd89a678e23010f2d4559b1af5b5b4fa9d2e885",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "verify-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "1d07135e328527cfb5deed199ce770605c2ea9f8b985605f17f4df3c019dfcff",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "inspect-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "de9c0ae49d7b55f9321ffad66f14ff96ef043adbafd705014cdfb72ae7ba87b2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "collect-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "70f5cc5c962e728f2765019b1f5c6722e87d45a91c6787e38b31fae8875019ca",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "verify-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "ec5ec0590e9b34d6185b1c28afdaed5e0bb763881d74aac8d7815e5cdc5b082d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "inspect-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "4d0f027abcb03ece985610cc2f547174243b958e6a3bef8f8e574e2358c496a9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "cross-verify-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "0da97fd74523c417bf578653506337688f8fc1050ee65b9225dc30c18d922234",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "cross-inspect-kit",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "c11f80ad40b4a98c4d799a4ce22aa999692b715e0df2966fd5a2556301dc6940",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "cross-verify-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "17a5d7f860a5927dbf29f26436c07159d697de0ab211d235f02bf8a8025e6c91",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "cross-inspect-replay",
+          "actual_exit": 0,
+          "expected_exit": 0,
+          "stdout_sha256": "ca4c681b76cb9e77119eb635bd311b6efb0d05d6aa60d1ad50fa237c2de65a39",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "actual-corrupt-rejection",
+          "actual_exit": 2,
+          "expected_exit": 2,
+          "stdout_sha256": "ac692868ce0be69173963040a2cf473241c24083f5938b765865d6b96aba9046",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "bundles": {
+        "kit": {
+          "manifest_sha256": "07bcb866ea3174a75a551c4763eda54db0d0105b72fe8b6bb854718226e80b76",
+          "files": {
+            "attachments/log-client": "82308dee1360d232a1769779fdf6cb7cae44078451af3063dfc60d860f1c5953",
+            "attachments/report-case": "baab3795fdba8fed7d4b3d13beffdb882fcf9d99eb904e5d1700c05066ba6904",
+            "attachments/report-retained-failure": "a64cdb9d5f2906cf85477f376c12225e90d658f715b4f2c8c75b4ad376e876fa",
+            "attachments/source-copy-binding": "b3ca2906912021ed447950af725ffbebe1fd889b3664048078a0183bc1d07860",
+            "attachments/source-failure-binding": "55796ff50ef2e6146192dd3a5fa3a2cdad21a2e55c89235749d29b7e889dcda1",
+            "attachments/source-run": "c783bb20093ba448c64cf0b3609542a46e00212104ae9bb664fb57f46c890b26",
+            "inspector.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "inspector.stdout": "77152ac147d7b06b76b5aad8feb5cd5d59b7deb521d3c7533e5ee10edf926630",
+            "manifest.json": "07bcb866ea3174a75a551c4763eda54db0d0105b72fe8b6bb854718226e80b76",
+            "trace.bin": "cf1d476e78c1cdb793645faa8132610aa2611a4d5c30ee7354a79fa20583968e"
+          },
+          "read_only_after_verify_inspect": true,
+          "historical_case_success_preserved": true,
+          "separate_historical_failure_still_FAIL": true
+        },
+        "replay": {
+          "manifest_sha256": "5fc854d7fd65758ec0bb4c07ceb3620ff47492a4000dc765d643235c0ae7affb",
+          "files": {
+            "attachments/log-client": "c20a660d4344d2f01c4f25a31a33c7252da2255ef690912180cdf6a7fee9e84a",
+            "attachments/report-case": "49d6ffd8f4d81d97c94053739460ace9d22c32e072d6c81b1cbb3ac3a1280bc6",
+            "attachments/report-retained-failure": "cb44a2724a150c795c8f29594d2754f736c3b1c059b1152771e9b14e770d9139",
+            "attachments/source-copy-binding": "b3ca2906912021ed447950af725ffbebe1fd889b3664048078a0183bc1d07860",
+            "attachments/source-failure-binding": "55796ff50ef2e6146192dd3a5fa3a2cdad21a2e55c89235749d29b7e889dcda1",
+            "attachments/source-run": "0191fb32df2f38b80d50880b994afc6b7db882a9502d5766360d0d0614ab4b15",
+            "inspector.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "inspector.stdout": "75d1e6a1285b522073ec9fa7f4f91865f440d1e102fec20322ee01542b8b9a23",
+            "manifest.json": "5fc854d7fd65758ec0bb4c07ceb3620ff47492a4000dc765d643235c0ae7affb",
+            "trace.bin": "a67f2fbf80af2cd0d02ef6f51b8a2f817539fc4a14cd5e2a3fec20b37f7ad647"
+          },
+          "read_only_after_verify_inspect": true,
+          "historical_case_success_preserved": true,
+          "separate_historical_failure_still_FAIL": true
+        }
+      },
+      "cross_bundles": {
+        "kit": {
+          "manifest_sha256": "3de2ca493d04421dfed61c3217c61ebffec4539241cd10cd94d73dcdc455e29f",
+          "read_only": true,
+          "scope": "same diagnostic container/Trace bytes inspected by explicit different target binary, not physics determinism"
+        },
+        "replay": {
+          "manifest_sha256": "85d843fb69cc49f405f624f4fae555a626e6cf0709fc49bb76ca9f29a2cf804e",
+          "read_only": true,
+          "scope": "same diagnostic container/Trace bytes inspected by explicit different target binary, not physics determinism"
+        }
+      },
+      "all_inputs_helper_inspector_fences": true,
+      "corrupt_trace_rejected_without_published_bundle": true
+    }
+  },
+  "actual_inspector_builds": {
+    "native-macos-arm64": {
+      "result": "PASS",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-diagnostics-inspector-macos-v1/report.json",
+        "sha256": "9b1caf0f0888b2c0d650825a23e4027997a25be6d566922e1250f8055d58cbbb"
+      },
+      "inspector": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-diagnostics-inspector-macos-v1/inspect-trace",
+        "sha256": "c441a43260a3413066aaa028c17efdb11937ddd4aa1e89f8c21fae35afb9a412"
+      },
+      "traces": {
+        "kit": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-process-validation/frozen-final/macos/matrix/Release-kit-fault-1/role2-generation1/first.trace",
+          "sha256": "cf1d476e78c1cdb793645faa8132610aa2611a4d5c30ee7354a79fa20583968e",
+          "bytes": 170040,
+          "inspection_summary": "Complete physics mismatch: Solver; first component byte 10",
+          "inspection_proof": "BOX3D_TRACE_INSPECT_OK bytes=170040 expected_solver_bytes=79184 actual_solver_bytes=79184 accepted_input_bytes=261 predicted_input_bytes=261"
+        },
+        "replay": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-process-validation/frozen-final/macos/matrix/Release-replay-fault-1/role2-generation1/first.trace",
+          "sha256": "a67f2fbf80af2cd0d02ef6f51b8a2f817539fc4a14cd5e2a3fec20b37f7ad647",
+          "bytes": 161472,
+          "inspection_summary": "Complete physics mismatch: Solver; first component byte 10",
+          "inspection_proof": "BOX3D_TRACE_INSPECT_OK bytes=161472 expected_solver_bytes=79216 actual_solver_bytes=79216 accepted_input_bytes=253 predicted_input_bytes=253"
+        }
+      },
+      "source_before": {
+        "box3d/diagnostics/descriptor.odin": "f473b007675574ea650946fd68a14be473ccfabac1ca14d027c415a533c74ae9",
+        "box3d/diagnostics/diagnostics.odin": "48536729c43e3d4c5e67938ab3917fe8c8fff6ee59b1ae721579b84f63777e8a",
+        "box3d/diagnostics/trace.odin": "b70d4f1a4621a17a9de5ef3e4a3dc1a5c25937289a9f0e2a3102f18c1f2e35cd",
+        "tests/box3d_protocol/inspect/main.odin": "0172482be4a9a045ad02aba2784dfa14ad7517c7f5a682ef39d1f7ae21090e7f"
+      }
+    },
+    "translated-linux-x86_64": {
+      "result": "PASS",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-diagnostics-inspector-linux-v1/report.json",
+        "sha256": "062ea40685258d984f1dbc3fed4f115d5fa151bce2b0c6321015b723ae38d55e"
+      },
+      "inspector": {
+        "path": "/out/p6-diagnostics-inspector-linux-v1/inspect-trace",
+        "sha256": "4e6675279ad0e497c1b453a5e2f4adb3c17af0e4bce557546d2808afe5996660"
+      },
+      "traces": {
+        "kit": {
+          "path": "/out/p6-diagnostics-inputs-v1/kit/first.trace",
+          "sha256": "cf1d476e78c1cdb793645faa8132610aa2611a4d5c30ee7354a79fa20583968e",
+          "bytes": 170040,
+          "inspection_summary": "Complete physics mismatch: Solver; first component byte 10",
+          "inspection_proof": "BOX3D_TRACE_INSPECT_OK bytes=170040 expected_solver_bytes=79184 actual_solver_bytes=79184 accepted_input_bytes=261 predicted_input_bytes=261"
+        },
+        "replay": {
+          "path": "/out/p6-diagnostics-inputs-v1/replay/first.trace",
+          "sha256": "a67f2fbf80af2cd0d02ef6f51b8a2f817539fc4a14cd5e2a3fec20b37f7ad647",
+          "bytes": 161472,
+          "inspection_summary": "Complete physics mismatch: Solver; first component byte 10",
+          "inspection_proof": "BOX3D_TRACE_INSPECT_OK bytes=161472 expected_solver_bytes=79216 actual_solver_bytes=79216 accepted_input_bytes=253 predicted_input_bytes=253"
+        }
+      },
+      "source_before": {
+        "box3d/diagnostics/descriptor.odin": "f473b007675574ea650946fd68a14be473ccfabac1ca14d027c415a533c74ae9",
+        "box3d/diagnostics/diagnostics.odin": "48536729c43e3d4c5e67938ab3917fe8c8fff6ee59b1ae721579b84f63777e8a",
+        "box3d/diagnostics/trace.odin": "b70d4f1a4621a17a9de5ef3e4a3dc1a5c25937289a9f0e2a3102f18c1f2e35cd",
+        "tests/box3d_protocol/inspect/main.odin": "0172482be4a9a045ad02aba2784dfa14ad7517c7f5a682ef39d1f7ae21090e7f"
+      }
+    }
+  },
+  "actual_cross_container_inspection": "Mac-created Kit/Replay bundles verified and inspected read-only on translated Linux with its explicitly different pinned inspector. Pure diagnostic format/container interoperability, not cross-target solver determinism.",
+  "supporting_synthetic_checks": {
+    "groups": 8,
+    "actual_exit": 0,
+    "source": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_diagnostics/bundle_test.py",
+      "sha256": "5622e17520e25a2d8bb1e6bf81eb9b2f6ebdd9ecb60fd5d090ac4eb2415e3cca"
+    },
+    "provenance": "Implementation worker t1p reported actual focused pure unittest run; synthetic opaque bytes/Python stubs only. Primary real-artifact acceptance is separately recorded above.",
+    "scope": "copying/opaque verdict preservation/local-tool pins/caps/path/atomic/corruption/source change/child limits/readonly verification; not actual Trace or Native proof"
+  },
+  "telemetry_reuse": {
+    "kit": {
+      "source_log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/client/godot.log",
+        "sha256": "67fcd1e17374cc6d3e1ce7e8220bcda68556deceb637b1e57093100f784b394e"
+      },
+      "status_rows": 1800,
+      "first_go_native_meter_observed": [
+        false,
+        false
+      ],
+      "first_cache_frames": [
+        null,
+        null
+      ],
+      "last_logged_head_confirmed": [
+        108600,
+        108600
+      ],
+      "last_observed_limit_owner_count": [
+        67108864,
+        4
+      ],
+      "scope": "Bounded saved read of prior P6.2 accepted logs; not a new cadence/run/CPU measurement and last status is not substituted for terminal evidence"
+    },
+    "replay": {
+      "source_log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/client/godot.log",
+        "sha256": "cb8fa9de8f42ce5a05e33d2e85d21350f10dd2b4fdc49f699843b231fa3ec9bb"
+      },
+      "status_rows": 1799,
+      "first_go_native_meter_observed": [
+        false,
+        false
+      ],
+      "first_cache_frames": [
+        null,
+        null
+      ],
+      "last_logged_head_confirmed": [
+        108555,
+        108551
+      ],
+      "last_observed_limit_owner_count": [
+        67108864,
+        4
+      ],
+      "scope": "Bounded saved read of prior P6.2 accepted logs; not a new cadence/run/CPU measurement and last status is not substituted for terminal evidence"
+    }
+  },
+  "documentation": {
+    "source_hashes": {
+      "tests/box3d_diagnostics/README.md": "4934e5231601826f979bce5ddb4edce00e0454131185c963d3510f00ad2701f4",
+      "docs/design/box3d/production-diagnostics.md": "18159e60cb626a4e3ba95980b814260dbcab00ab36fb748d967a6bc921181d4e",
+      "docs/design/box3d/release.md": "423545cb51dc9d0d46788a2ee748a4d96f37b1fe6a706aa6633e64c474f99c9f",
+      "examples/kit_box3d_authoring/README.md": "a2ea606474d7d2e8221f4979d35f1f776a758dc9159eb520c11eb2bdfb9eeb13",
+      "examples/replay_box3d_authoring/README.md": "e71c6d43f7915b1f9fba79ffff97d23e55655e897f85dabbf8d6ddae1f165bbe"
+    },
+    "local_links_checked": 48,
+    "broken_local_links": [],
+    "coverage": [
+      "existing whole-call and nested operation markers/units/inclusion/availability",
+      "live frontiers versus cached1Hz Native/Meter/frame/null semantics and real GO observation",
+      "RSS/cgroup versus tracked64MiB/owner baseline/terminal ACK/exit proof distinctions",
+      "complete5+accepted/predicted context ownership/format/build/target/rules identity and checksum-not-authentication",
+      "inspection versus compatible full gameplay reproduction prerequisites",
+      "exact release/export/cache/upgrade evidence and both authored samples maintenance",
+      "nativeMac ARM64 SDK/min14 versus universal launcher; translatedLinux and unqualified hardware/distribution/platform limits"
+    ]
+  },
+  "historical_artifact_provenance": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-diagnostics-inputs-v1/input-binding.json",
+    "sha256": "b3ca2906912021ed447950af725ffbebe1fd889b3664048078a0183bc1d07860"
+  },
+  "separate_failure_attachment_provenance": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-diagnostics-inputs-v1/failure-attachment-binding.json",
+    "sha256": "55796ff50ef2e6146192dd3a5fa3a2cdad21a2e55c89235749d29b7e889dcda1"
+  },
+  "verdict_preservation": "Selected intentional P3.5 divergence case reports remain success:true; separately attached real Kit legacy and Replay observer reports remain FAIL. They are separate scopes and are not retroactively requalified.",
+  "source_hashes": {
+    "tools/box3d_diagnostics.py": "e334758201623ca3e837a97b0978026943970271be4db5a51749d5326c368f62",
+    "tests/box3d_diagnostics/bundle_test.py": "5622e17520e25a2d8bb1e6bf81eb9b2f6ebdd9ecb60fd5d090ac4eb2415e3cca",
+    "tests/box3d_diagnostics/README.md": "4934e5231601826f979bce5ddb4edce00e0454131185c963d3510f00ad2701f4",
+    "docs/design/box3d/production-diagnostics.md": "18159e60cb626a4e3ba95980b814260dbcab00ab36fb748d967a6bc921181d4e",
+    "docs/design/box3d/release.md": "423545cb51dc9d0d46788a2ee748a4d96f37b1fe6a706aa6633e64c474f99c9f",
+    "examples/kit_box3d_authoring/README.md": "a2ea606474d7d2e8221f4979d35f1f776a758dc9159eb520c11eb2bdfb9eeb13",
+    "examples/replay_box3d_authoring/README.md": "e71c6d43f7915b1f9fba79ffff97d23e55655e897f85dabbf8d6ddae1f165bbe"
+  },
+  "actual_runner": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-diagnostics-bundles-actual.py",
+    "sha256": "0bb0232103dc04efd4680700e145156b7f0b9fd619b355d90b4c0fb86145c9ba"
+  },
+  "build_runner": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-diagnostics-inspector-build.py",
+    "sha256": "bbfe0d19736c006e7620fa58c0b033a5bf56fb142fb87d704b6ee0e7095bd42b"
+  },
+  "production_unchanged": {
+    "checked_files": 428,
+    "changed": [],
+    "anchor": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_recovery_flows/report.json",
+      "sha256": "6d175e3e5006fabfbbb1643699960adf5afdb350725164614360eee9ed49b072"
+    }
+  },
+  "protected_driver_checker_unchanged": {
+    "checked_files": 20,
+    "changed": []
+  },
+  "prior_production": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_production/report.json",
+    "sha256": "e693817894e8ea5ec88d95cd1febb7b01ae8ca7ccea38eb85825ead12a2a42dd"
+  },
+  "prior_bounds": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_bounds/report.json",
+    "sha256": "f3938c87eb5dc0737b94caf65f87f07ada86fc4299dd6af71a6689072de96066"
+  },
+  "prior_recovery": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_recovery_flows/report.json",
+    "sha256": "6d175e3e5006fabfbbb1643699960adf5afdb350725164614360eee9ed49b072"
+  },
+  "limitations": [
+    "No game simulation/recovery/Native backend import is performed by the offline inspector.",
+    "Historic Trace build/target/physics identities remain historic; current inspector success does not make old solver images compatible.",
+    "Diagnostic hashes do not authenticate senders or prove arbitrary attached reports.",
+    "No global profiler/Core/Native/adapter changes, no additional long or CPU gate, no remote hardware/Windows/web/mobile/distributed signing certification.",
+    "The earlier8.894ms CPU failure and strict Replay SDK observer action-conflict failure remain FAIL with unknown performance cause/unexercised conflict respectively."
+  ],
+  "jobs_remaining_for_card": 0
+}

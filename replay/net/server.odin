@@ -1,36 +1,93 @@
 package replay_net
 
 import "core:reflect"
+import "core:mem"
 import r "godot:replay"
+import bd "godot:box3d/diagnostics"
 import sc "godot:replay/schema"
 import tr "godot:replay/transport"
 
 server_init :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), initial: r.Frame(State),
                     model: Model(State, Control, Action, Event, Seats), wire: tr.Transport,
-                    cfg := DEFAULT_CONFIG, local_seat: u16 = 0, allocator := context.allocator, permit: Permit = {}, incarnation: u64 = 0) -> Error {
+                    cfg := DEFAULT_CONFIG, local_seat: u16 = 0, allocator := context.allocator, permit: Permit = {}, incarnation: u64 = 0, ownership:Runner_Ownership={}) -> Error {
+ if model.complete_state {return .Incomplete_State}
+ checkpoint: ^r.Complete_Checkpoint(State, Net_Event(Event))
+ return server_init_core(s,initial,model,wire,cfg,local_seat,allocator,permit,incarnation,checkpoint,ownership)
+}
+
+server_init_complete :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), initial: ^r.Complete_Checkpoint(State, Net_Event(Event)),
+                              model: Model(State, Control, Action, Event, Seats), wire: tr.Transport,
+                              cfg := DEFAULT_CONFIG, local_seat: u16 = 0, allocator := context.allocator, permit: Permit = {}, incarnation: u64 = 0, ownership:Runner_Ownership={}) -> Error {
+ if initial==nil || !model.complete_state || !complete_codec_valid(model.complete_codec) {return .Incomplete_State}
+ if r.owner_access(initial.owner,.Execute)!=.None{return .Invalid_Frame}
+ if initial.epoch!=cfg.epoch {return .Invalid_Config}
+ return server_init_core(s,initial.frame,model,wire,cfg,local_seat,allocator,permit,incarnation,initial,ownership)
+}
+
+@(private)
+server_init_core :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), initial: r.Frame(State),
+                         model: Model(State, Control, Action, Event, Seats), wire: tr.Transport,
+                         cfg:Config,local_seat:u16,allocator:mem.Allocator,permit:Permit,incarnation:u64,
+                         initial_complete:^r.Complete_Checkpoint(State,Net_Event(Event)),ownership:Runner_Ownership) -> Error {
+ initial_complete:=initial_complete
 	#assert(Seats >= 1 && Seats <= 8)
-	if s.initialized || !config_valid(cfg) || int(local_seat) > Seats {return .Invalid_Config}
+	if model.complete_state && (!physics_config_valid(model,cfg) || initial_complete==nil) {return .Invalid_Config}
+	if s.owner_cleanup || s.initialized || !config_valid(cfg) || int(local_seat) > Seats {return .Invalid_Config}
 	if cfg.require_permit && permit.allow == nil {return .Fenced}
+ if error:=runner_context_check(ownership,allocator,&s.model,model.complete_state);error!=.None{return error}
+ if error:=model_context_check(model,runner_managed(ownership));error!=.None{return error}
+ if error:=owned_context_check(ownership.wire,wire.user,runner_managed(ownership));error!=.None{return error}
+ if error:=owned_context_check(ownership.permit,permit.user,runner_managed(ownership));error!=.None{return error}
+ s.ownership=ownership;s.allocator=allocator;s.model=model;s.wire=wire;s.permit=permit
+ if error:=server_access(s);error!=.None{s^={};return error}
+ if error:=runner_retain(&s.owner_retains,ownership,&s.model);error!=.None{server_destroy(s);return error}
+ committed:=false;defer if !committed {server_destroy(s)}
 	if (model.step == nil && model.step_view == nil) || model.control_valid == nil || model.hold == nil || model.state_valid == nil ||
 	   !model.control_valid(model.neutral) || !model.state_valid(initial.state) || !group_config_valid(model.group) || !replication_config_valid(model.replication) || model.control_timing > .Latest_Observation || model.action_timing > .Receipt || !action_schedule_valid(model.action_schedule) || !authority_policy_valid(model.authority) {return .Invalid_Model}
 	s.allocator, s.model, s.cfg, s.wire, s.local_seat = allocator, model, cfg, wire, local_seat
 	s.permit = permit
-	if !codecs_init(&s.codecs, State, Control, Action, Event, Seats, allocator,model.replication.id!=0) {server_destroy(s); return .Invalid_Schema}
+	if model.complete_state {
+		if model.complete_codec.acquire!=nil {if error:=model.complete_codec.acquire(model.complete_codec.catalog);error!=.None{return error};s.complete_lease=true}
+		payload:=physics_server_payload(State,Control,Action,Event,Seats)
+		if payload>8*1024*1024 {return .Capacity}
+		bytes:=payload+PHYSICS_SCHEMA_RESERVE
+		if error:=model.complete_codec.reserve(model.complete_codec.catalog,bytes);error!=.None{return error}
+		s.complete_charge=bytes
+	}
+ bound:r.Complete_Checkpoint(State,Net_Event(Event))
+ defer if r.complete_checkpoint_identity(&bound)!=0 {r.complete_checkpoint_destroy(&bound)}
+ if model.complete_state && model.complete_codec.attach!=nil {
+  var_error:Error
+  bound,var_error=model.complete_codec.attach(model.complete_codec.catalog,initial_complete)
+  if var_error!=.None{return var_error}
+  initial_complete=&bound
+ }
+	if !codecs_init(&s.codecs, State, Control, Action, Event, Seats, allocator,model.replication.id!=0) { return .Invalid_Schema}
 	s.contract = contract_hash(&s.codecs, cfg, Seats, model.control_timing, replication=model.replication.id,action_timing=model.action_timing,action_schedule=model.action_schedule.id,authority_policy=model.authority.id)
 	thunk := proc(state: ^State, input: Batch(Control, Action, Seats), ctx: ^r.Step(Net_Event(Event))) {network_step(state, input, ctx)}
-	frame_error := r.init(&s.timeline, initial, thunk, cfg = {cfg.history, WIRE_EVENTS}, epoch = cfg.epoch,
-	                      allocator = allocator, user = &s.model)
-	if frame_error != .None {server_destroy(s); s.frame_error = frame_error; return .Invalid_Frame}
+	frame_error:r.Error
+	if model.complete_state {
+		if s.codecs.state.excluded_fields!=0 {return .Invalid_Model}
+		if error:=server_physics_init(s);error!=.None {return error}
+		s.contract=physics_contract(s.contract,model.complete_codec.identity)
+		metadata:=physics_codecs_bytes(&s.codecs)+physics_schemas_bytes(&s.physics.schemas)
+		if metadata>PHYSICS_SCHEMA_RESERVE {return .Capacity}
+		model.complete_codec.release(model.complete_codec.catalog,PHYSICS_SCHEMA_RESERVE-metadata)
+		s.complete_charge-=PHYSICS_SCHEMA_RESERVE-metadata
+		frame_error=r.init_complete(&s.timeline,initial_complete,thunk,{cfg.history,WIRE_EVENTS},allocator,user=&s.model,user_owner=ownership.model.owner,user_data=ownership.model.data)
+	} else {frame_error=r.init(&s.timeline,initial,thunk,{cfg.history,WIRE_EVENTS},cfg.epoch,allocator,&s.model)}
+	if frame_error != .None { s.frame_error = frame_error; return .Invalid_Frame}
 	s.inputs = make([]Input_Slot(Control), MAX_PEERS * cfg.history, allocator)
 	s.facts = make([]Facts_Packet(Event), cfg.history, allocator)
 	s.checkpoints = make([]Welcome_Packet(State, Control, Seats), MAX_PEERS, allocator)
 	s.rxb = make([]u8, tr.MAX_PACKET_BYTES, allocator)
 	s.txb = make([]u8, tr.MAX_PACKET_BYTES, allocator)
 	for &tx in s.snapshot_tx {
-		if !snapshot_tx_init(&tx, s.codecs.snapshot.wire_size, cfg.snapshot_history, allocator) {server_destroy(s); return .Invalid_Config}
+		if model.complete_state {continue}
+		if !snapshot_tx_init(&tx, s.codecs.snapshot.wire_size, cfg.snapshot_history, allocator) { return .Invalid_Config}
 	}
 	maximum := max(s.codecs.welcome.wire_size, max(s.codecs.snapshot.wire_size, s.codecs.facts.wire_size)) + sc.HEADER_BYTES
-	if cfg.egress_bytes_per_pump < maximum {server_destroy(s); return .Invalid_Config}
+	if cfg.egress_bytes_per_pump < maximum { return .Invalid_Config}
 	s.tx_remaining = cfg.egress_bytes_per_pump
 	for &held in s.held {held = model.neutral}
 	if local_seat != 0 {
@@ -39,11 +96,19 @@ server_init :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), initi
 		s.fresh |= u64(1) << uint(local_seat - 1)
 	}
 	s.initialized = true
+ committed=true
 	return .None
 }
 
-server_destroy :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) {
-	r.destroy(&s.timeline)
+server_destroy :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) ->Error {
+ if error:=server_access(s,.Read);error!=.None{return error}
+ if s.owner_cleanup {
+  retains:=s.owner_retains;s^={}
+  if error:=runner_drop(&retains);error!=.None{s.owner_retains=retains;s.owner_cleanup=true;return error}
+  return .None
+ }
+	server_physics_destroy(s)
+ if r.destroy(&s.timeline)!=.None{return .Invalid_Model}
 	codecs_destroy(&s.codecs)
 	delete(s.inputs, s.allocator)
 	delete(s.facts, s.allocator)
@@ -52,10 +117,16 @@ server_destroy :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) {
 	delete(s.txb, s.allocator)
 	delete(s.shuffle_workspace,s.allocator)
 	for &tx in s.snapshot_tx {snapshot_tx_destroy(&tx)}
-	s^ = {}
+	if s.complete_charge!=0 {s.model.complete_codec.release(s.model.complete_codec.catalog,s.complete_charge)}
+	if s.complete_lease {s.model.complete_codec.drop(s.model.complete_codec.catalog)}
+ retains:=s.owner_retains
+ s^={}
+ if error:=runner_drop(&retains);error!=.None{s.owner_retains=retains;s.owner_cleanup=true;return error}
+ return .None
 }
 
 server_local :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), control: Control) -> Error {
+ if error:=server_access(s);error!=.None{return error}
 	if !s.initialized || s.local_seat == 0 {return .Wrong_Phase}
 	if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return .Fenced}
 	if !s.model.control_valid(control) {return .Invalid_Input}
@@ -64,6 +135,7 @@ server_local :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), cont
 }
 
 server_issue :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), action: Action) -> (sequence: u64, error: Error) {
+ if error:=server_access(s);error!=.None{return 0,error}
 	if !s.initialized || s.local_seat == 0 {return 0, .Wrong_Phase}
 	if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return 0, .Fenced}
 	if s.model.action == nil || s.model.action_valid == nil || !s.model.action_valid(action) {return 0, .Invalid_Input}
@@ -84,7 +156,11 @@ server_issue :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), acti
 	return peer.action_received, .None
 }
 
-server_pump :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), now_ms: u64) -> Error {
+// A caller that advances in the same public frame can defer periodic egress
+// until after that step. It must still flush on zero-step/error returns.
+// The default preserves the standalone pump contract.
+server_pump :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), now_ms: u64, flush_egress: bool = true) -> Error {
+ if error:=server_access(s);error!=.None{return error}
 	if !s.initialized {return .Not_Initialized}
 	started, timed := profile_start(s.profile_clock)
 	defer profile_finish(&s.profile_metrics, .Pump, s.profile_clock, started, timed, s.profile_user, s.profile_sample)
@@ -123,12 +199,22 @@ server_pump :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), now_m
 		if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return .Fenced}
 		server_receive(s, packet.from, s.rxb[:packet.count])
 	}
-	server_flush(s)
+	if flush_egress {server_flush(s)}
 	return .None
 }
 
+server_flush_pending :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Error {
+ if error:=server_access(s);error!=.None{return error}
+ if !s.initialized{return .Not_Initialized}
+ if !permitted(s.cfg.require_permit,s.permit,s.cfg.epoch){return .Fenced}
+ server_flush(s)
+ return .None
+}
+
 server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Error {
+ if error:=server_access(s);error!=.None{return error}
 	if !s.initialized {return .Not_Initialized}
+	if (s.model.complete_state && s.physics==nil) || (!s.model.complete_state && r.external_enabled(&s.timeline)) {return .Incomplete_State}
 	if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return .Fenced}
 	if s.timeline.head == max(u64) {return .Simulation}
 	tick := s.timeline.head + 1
@@ -136,14 +222,18 @@ server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Er
 	if s.model.authority.id != 0 {batch.authority = {known=true,seat=s.local_seat}}
 	held := s.held
 	views := s.held_views
+	decisions:Accepted_Decisions(Seats)
 	for &control in batch.controls {control = s.model.neutral}
 	for &peer, index in s.peers {
 		if peer.seat == 0 || peer.phase == .Vacant {continue}
 		seat := int(peer.seat - 1)
+		decisions.drivers[seat]={peer.generation,peer.serial==0 && peer.phase==.Pending?1:peer.serial,peer.incarnation}
+		if peer.local {decisions.origins[seat]=.Local}
 		if peer.phase != .Disconnected {
 			if !peer.local {
 				slot := &s.inputs[index * s.cfg.history + int(tick % u64(s.cfg.history))]
-				if slot.tick == tick {held[seat], views[seat] = slot.value, slot.view} else {
+				if slot.tick == tick {held[seat], views[seat] = slot.value, slot.view;decisions.origins[seat]=.Sample} else {
+					decisions.origins[seat]=.Held
 					held[seat] = s.model.hold(held[seat]); s.stats.held_inputs += 1
 				}
 			}
@@ -169,7 +259,7 @@ server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Er
 	result := r.advance(&s.timeline, batch, gate)
 	profile_finish(&s.profile_metrics, .Advance, s.profile_clock, started, timed, s.profile_user, s.profile_sample)
 	if result.error == .Commit_Rejected {return .Fenced}
-	if result.error != .None {return .Simulation}
+	if result.error != .None {s.frame_error=result.error;if s.physics!=nil{s.physics.last_frame_error=result.error;if result.error==.Resource_Limit{return .Capacity}};return .Simulation}
 	s.held = held
 	s.held_views = views
 	s.joins, s.leaves, s.fresh = 0, 0, 0
@@ -182,6 +272,7 @@ server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Er
 	for occurrence in fact.events[:n] {
 		event := occurrence.value
 		if event.kind != .Action_Result {continue}
+		if event.seat>0 && int(event.seat)<=Seats {decisions.applied[event.seat-1]=event.applied;decisions.verdicts[event.seat-1]=event.reason}
 		for &peer in s.peers {
 			if peer.seat != event.seat || peer.action_count == 0 {continue}
 			if peer.actions[peer.action_head].sequence != event.sequence {continue}
@@ -193,6 +284,7 @@ server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Er
 			peer.recent_count += 1
 		}
 	}
+	if s.physics!=nil {s.physics.metadata[tick%PHYSICS_HISTORY]={tick,decisions}}
 	// A joining client's checkpoint includes the tick that created its avatar.
 	for &peer, index in s.peers {
 		if peer.phase == .Pending {server_checkpoint(s, index)}
@@ -203,6 +295,7 @@ server_step :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> Er
 
 @(private)
 server_receive :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), from: tr.Peer_Id, bytes: []u8) {
+ if error:=server_access(s);error!=.None{return}
 	meta, _, report := sc.inspect(bytes)
 	if report.error != .None {s.stats.rejected_packets += 1; return}
 	if meta.kind==u16(Kind.Epoch_Query) {server_epoch_query(s,from,bytes,meta);return}
@@ -230,7 +323,10 @@ server_receive :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), fr
 			index = i
 			if peer.phase == .Running || peer.phase == .Pending {
 				peer.last_seen = s.now
-				if peer.phase == .Running {peer.checkpoint_pending = true}
+				// A retry of an admitted physics Hello preserves its scope. Active
+				// Welcome transfers already retry until ACK; Resync is a separate request.
+				if s.physics!=nil && hello.incarnation==peer.incarnation {return}
+				if peer.phase == .Running {if s.physics!=nil {server_checkpoint(s,i)} else {peer.checkpoint_pending = true}}
 				return
 			}
 			break
@@ -281,7 +377,16 @@ server_receive :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), fr
 	peer.budget_packets -= 1
 	peer.budget_bytes -= f64(len(bytes))
 	expected := sc.Envelope_Meta{kind = meta.kind, epoch = s.cfg.epoch, content = s.cfg.content}
+	if s.physics!=nil {
+		#partial switch Kind(meta.kind) {case .Physics_Request,.Physics_Ack,.Inputs,.Inputs_Compact,.Action,.Resync,.Heartbeat: case: s.stats.rejected_packets+=1;return}
+	}
 	#partial switch Kind(meta.kind) {
+	case .Physics_Request:
+		if s.physics==nil {s.stats.rejected_packets+=1;return}
+		server_physics_request(s,index,bytes,expected)
+	case .Physics_Ack:
+		if s.physics==nil {s.stats.rejected_packets+=1;return}
+		server_physics_ack(s,index,bytes,expected)
 	case .Features:
 		packet: Features_Packet
 		_,report=sc.unpack(&s.codecs.features,&packet,bytes,expected)
@@ -329,11 +434,24 @@ server_receive :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), fr
 			if sample.tick == 0 || (sample.tick > s.timeline.head && sample.tick - s.timeline.head > u64(s.cfg.max_future)) ||
 			   !s.model.control_valid(sample.value) {s.stats.rejected_inputs += 1; return}
 			if i > 0 && packet.samples[i - 1].tick >= sample.tick {s.stats.rejected_inputs += 1; return}
+			if s.physics!=nil && sample.tick>s.timeline.head {
+				stored:=&s.inputs[index*s.cfg.history+int(sample.tick%u64(s.cfg.history))]
+				receipt:=&s.physics.input_receipts[index][sample.tick%PHYSICS_HISTORY]
+				if stored.tick==sample.tick {
+					digest,valid:=physics_control_digest(s,sample.value,sample.view)
+					if !valid || receipt.tick!=sample.tick || receipt.generation!=peer.generation || receipt.digest!=digest || !reflect.equal(stored.value,sample.value) {s.stats.rejected_inputs+=1;return}
+				}
+			}
 		}
 		for sample in packet.samples[:packet.count] {
 			if sample.tick <= s.timeline.head {continue}
 			slot := &s.inputs[index * s.cfg.history + int(sample.tick % u64(s.cfg.history))]
 			if slot.tick == sample.tick {continue} // first accepted value for this tick wins
+			if s.physics!=nil {
+				digest,valid:=physics_control_digest(s,sample.value,sample.view)
+				if !valid{s.stats.rejected_inputs+=1;return}
+				s.physics.input_receipts[index][sample.tick%PHYSICS_HISTORY]={sample.tick,peer.generation,digest}
+			}
 			slot^ = {sample.tick, sample.value, server_view(s, index, sample.view)}
 			peer.input_newest = max(peer.input_newest, sample.tick)
 		}
@@ -386,6 +504,7 @@ server_receive :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), fr
 
 @(private)
 server_reject :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), to: tr.Peer_Id, reason: Reject, meta: sc.Envelope_Meta) {
+ if error:=server_access(s);error!=.None{return}
 	s.stats.rejected_packets += 1
 	envelope := meta
 	envelope.kind = u16(Kind.Reject)
@@ -396,6 +515,13 @@ server_reject :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), to:
 
 @(private)
 server_checkpoint :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), index: int) {
+ if error:=server_access(s);error!=.None{return}
+	if s.physics!=nil {
+		peer:=&s.peers[index];peer.checkpoint_pending=true
+		complete_data_destroy(&s.physics.tx[index].data);s.physics.tx[index]={}
+		_=server_physics_prepare(s,index,.Welcome)
+		return
+	}
 	peer := &s.peers[index]
 	frame, _ := r.current(&s.timeline)
 	value,ok:=replica_project(s.model,frame,s.held,Recipient{peer.seat,peer.spectator},&s.codecs.replica,s.txb)
@@ -416,12 +542,14 @@ server_checkpoint :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats),
 
 @(private)
 server_flush :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) {
+ if error:=server_access(s);error!=.None{return}
 	start := s.flush_cursor
 	s.flush_cursor = (s.flush_cursor + 1) % MAX_PEERS
 	for offset in 0 ..< MAX_PEERS {
 		index := (start + offset) % MAX_PEERS
 		peer := &s.peers[index]
 		if peer.local || (peer.phase != .Running && peer.phase != .Pending) {continue}
+		if s.physics!=nil {server_physics_peer_flush(s,index);continue}
 		if peer.checkpoint_pending {
 			checkpoint := &s.checkpoints[index]
 			meta := sc.Envelope_Meta{kind = u16(Kind.Welcome), epoch = s.cfg.epoch, tick = checkpoint.frame.tick, content = s.cfg.content}
@@ -462,6 +590,7 @@ server_flush :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) {
 
 @(private)
 server_send :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), to: tr.Peer_Id, channel: tr.Channel, bytes: []u8) -> tr.Send_Result {
+ if error:=server_access(s);error!=.None{return .Disconnected}
 	if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return .Backpressure}
 	peer: ^Peer(Action)
 	for &candidate in s.peers {if candidate.connection == to && candidate.phase != .Vacant {peer = &candidate; break}}
@@ -483,6 +612,7 @@ server_send :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), to: t
 
 @(private)
 server_burst :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> f64 {
+ if error:=server_access(s);error!=.None{return 0}
 	maximum := max(s.codecs.welcome.wire_size, max(s.codecs.snapshot.wire_size, s.codecs.facts.wire_size)) + sc.HEADER_BYTES + 32
 	// Keep startup/catch-up bursts short while always admitting one complete
 	// bootstrap packet. Multi-second credit can overload a delayed UDP path
@@ -492,7 +622,9 @@ server_burst :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats)) -> f
 
 @(private)
 server_drop :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), peer: ^Peer(Action)) {
+ if error:=server_access(s);error!=.None{return}
 	peer.phase = .Disconnected
+	if s.physics!=nil {for &candidate,index in s.peers {if &candidate==peer {complete_data_destroy(&s.physics.tx[index].data);s.physics.tx[index]={};break}}}
 	peer.connection = 0
 	if peer.seat != 0 {
 		s.leaves |= u64(1) << uint(peer.seat - 1)
@@ -506,11 +638,19 @@ server_drop :: proc(s: ^Server($State, $Control, $Action, $Event, $Seats), peer:
 
 @(private)
 server_action :: proc(s:^Server($State,$Control,$Action,$Event,$Seats),index:int,packet:Action_Packet(Action)) {
+ if error:=server_access(s);error!=.None{return}
 	peer:=&s.peers[index]
 	if packet.generation != peer.generation || packet.serial != peer.serial || peer.spectator ||
 	   packet.sequence == 0 || packet.sequence > max(u64) >> 8 {s.stats.rejected_packets += 1; return}
 	peer.last_seen = s.now
-	if packet.sequence <= peer.action_received {s.stats.duplicate_actions += 1; return}
+	if packet.sequence <= peer.action_received {
+		if s.physics!=nil {
+			receipt:=s.physics.action_receipts[index][packet.sequence%ACTION_CAPACITY]
+			n:=s.codecs.action_value.wire_size
+			if sc.encode(&s.codecs.action_value,packet.value,s.txb[:n]).error!=.None || receipt.sequence!=packet.sequence || receipt.tick!=packet.tick || receipt.digest!=bd.hash_bytes(s.txb[:n]){s.stats.rejected_packets+=1;return}
+		}
+		s.stats.duplicate_actions += 1; return
+	}
 	if packet.sequence != peer.action_received + 1 || peer.action_count == ACTION_CAPACITY {s.stats.rejected_packets += 1; return}
 	reason := Action_Reason.None
 	if s.model.action == nil || s.model.action_valid == nil || !s.model.action_valid(packet.value) {reason = .Invalid}
@@ -526,7 +666,31 @@ server_action :: proc(s:^Server($State,$Control,$Action,$Event,$Seats),index:int
 	if reason == .None && s.model.action_admit != nil && !s.model.action_admit(s.model.action_admission_user, peer.seat, packet.value) {reason = .Invalid}
 	if !permitted(s.cfg.require_permit, s.permit, s.cfg.epoch) {return}
 	due := reason == .None && timing == .Scheduled ? packet.tick : s.timeline.head + 1
+	if s.physics!=nil {
+		n:=s.codecs.action_value.wire_size
+		if sc.encode(&s.codecs.action_value,packet.value,s.txb[:n]).error!=.None{s.stats.rejected_packets+=1;return}
+		s.physics.action_receipts[index][packet.sequence%ACTION_CAPACITY]={packet.sequence,packet.tick,bd.hash_bytes(s.txb[:n])}
+	}
 	peer.actions[(peer.action_head + peer.action_count) % ACTION_CAPACITY] = {sequence = packet.sequence, tick = due, value = packet.value, reason = reason}
 	peer.action_count += 1
 	peer.action_received = packet.sequence
+}
+
+@(private)
+server_access :: proc(s:^Server($S,$C,$A,$E,$N),access:r.Owner_Access=.Execute)->Error {
+ if s==nil{return .Invalid_Model}
+ if s.owner_cleanup {
+  for owner in s.owner_retains.owners[:s.owner_retains.count] {if r.owner_access(owner,.Read)!=.None{return .Invalid_Model}}
+  return access==.Read?Error.None:Error.Invalid_Model
+ }
+ if error:=runner_context_check(s.ownership,s.allocator,&s.model,s.model.complete_state,access);error!=.None{return error}
+ managed:=runner_managed(s.ownership)
+ if error:=model_context_check(s.model,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.wire,s.wire.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.permit,s.permit.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.profile_clock,s.profile_clock.user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.profile_sample,s.profile_user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.identity,s.identity_user,managed,access);error!=.None{return error}
+ if error:=owned_context_check(s.ownership.admission,s.admission_user,managed,access);error!=.None{return error}
+ return .None
 }

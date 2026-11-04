@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "result": "REPEATED_JOBS_PROCESS_OBSERVER_NO_TRIGGER_NOT_ADMISSION",
+  "release_admitted": false,
+  "runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-repeated-firefox-v1/report.json",
+    "sha256": "c1ed59230edceed57088f3b6f148b0bb593201c8f68637a5013da3ecbd6da401"
+  },
+  "binding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-repeated-firefox-v1/export-binding.json",
+    "sha256": "b31a94f0565e3b79ff2ad7e24fae477811e237fd1efdeb59b4ef2d2483e16fb8"
+  },
+  "observations": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-repeated-firefox-v1/process-state.json",
+    "sha256": "7b9e445117b6f965db98e11f1d0f5f44b9e1f810ec39365c46f732bf90864b23"
+  },
+  "summary": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-repeated-firefox-v1/process-summary.json",
+    "sha256": "fbdc3639bbb72d7c2114884566187ac581cef25196c092f000ef546ff5df38f5"
+  },
+  "analysis_plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-repeated-v1/analysis-plan.json",
+    "sha256": "f8438ddf83d6e6792719563ccc07a8a8f2796eef51f9a5566cdbeba66f61a3f5"
+  },
+  "population": "610s, real repeated NEXT JOB input path, same ordinary export; read-only process observer active",
+  "metrics": {
+    "host": {
+      "normal": {
+        "count": 36595,
+        "p95_ms": 3.621,
+        "p99_ms": 4.261,
+        "max_ms": 8.76
+      },
+      "repair8": null,
+      "go_to_end_seconds": 610.2151568749999,
+      "round": 7,
+      "result": {
+        "framework": "Replay",
+        "role": "host",
+        "ok": true,
+        "target": 36600,
+        "head": 36600,
+        "confirmed": 36600,
+        "final_tick": 36600,
+        "errors": [],
+        "cleanup": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        }
+      }
+    },
+    "client": {
+      "normal": {
+        "count": 21558,
+        "p95_ms": 1.431,
+        "p99_ms": 3.546,
+        "max_ms": 4.655
+      },
+      "repair8": {
+        "count": 4667,
+        "p95_ms": 6.414,
+        "p99_ms": 7.555,
+        "max_ms": 9.665
+      },
+      "go_to_end_seconds": 610.210628458,
+      "round": 7,
+      "result": {
+        "framework": "Replay",
+        "role": "client",
+        "ok": true,
+        "target": 36600,
+        "head": 36600,
+        "confirmed": 36600,
+        "final_tick": 36600,
+        "errors": [],
+        "cleanup": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        }
+      }
+    }
+  },
+  "retained_rows": 8192,
+  "total_observations": 413819,
+  "observation_bytes": 810649,
+  "observer_error": null,
+  "saved_before_browser_close": true,
+  "summary_tests": {
+    "command": "python3 -B tests/replay_dockyard/qualification/process_summary_test.py",
+    "actual_exit": 0,
+    "tests": 4
+  },
+  "conclusion": "No stalled interval was captured. This negative instrumented result cannot identify cause, prove an observer effect, erase the retained failures, or qualify the uninstrumented contract. No unchanged observer rerun selected."
+}

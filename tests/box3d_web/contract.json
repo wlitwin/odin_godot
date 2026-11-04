@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "name": "Dockyard Duo first release",
+  "status": "DECLARED_NOT_QUALIFIED",
+  "game": {
+    "players": 2,
+    "arena": "compact loading dock with ramp, crane and escape barge",
+    "art_direction": "colorful isometric toy warehouse; optional user preference pending",
+    "job_seconds": 150,
+    "job_variations": 3,
+    "cargo_goal": 3,
+    "solo_practice": true,
+    "controls": {
+      "move": "WASD/arrows",
+      "magnet": "mouse aim + hold primary",
+      "boost": "Space",
+      "menu": "Escape"
+    },
+    "simulation": {
+      "hz": 60,
+      "substeps": 4,
+      "workers": 1
+    },
+    "profile": {
+      "body_shape_hard_limit": 35,
+      "initial_dynamic_limit": 32,
+      "target_bodies": 24,
+      "geometry_assets": 8,
+      "joints": 1,
+      "memory_admission_bytes": 67108864,
+      "history_ticks": 128,
+      "max_correction_ticks": 8
+    },
+    "magnet": "bounded fixed-tick impulses through actual Box3D query/force APIs; no additional grab joint initially",
+    "host_loss": "pause/end shared round with explicit host-left notice; retain lobby result and offer rehost/new round; no seamless authority migration claim",
+    "recovery": "real same-identity reconnect, late receive-only observer and automatic complete Welcome after history loss"
+  },
+  "web": {
+    "architecture": "one Box3D engine+shim archive linked once into existing Odin/Godot AOT extension; real Core backend service/domain and ownership",
+    "same_build_cohort": true,
+    "native_web_crossplay": false,
+    "renderer": "gl_compatibility",
+    "simulation_workers": 1,
+    "simd": "one bounded scalar vs supported Wasm SIMD comparison; select one build identity",
+    "headers": {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp"
+    },
+    "deployment": "deploy-ready HTTPS/WSS package and exact serving/config guide; public live URL or new paid service requires a later concrete choice",
+    "external_connectivity": "existing Party/Room/WebRTC with ICE/TURN; direct and forced relay need actual independent-client evidence; localhost is not Internet proof"
+  },
+  "reference": {
+    "host": "current development Mac",
+    "model": "Mac15,13",
+    "cpu": "Apple M3",
+    "physical_cores": 8,
+    "memory_bytes": 25769803776,
+    "viewport": [
+      1280,
+      720
+    ],
+    "device_pixel_ratio": 1,
+    "power": "AC power, foreground tab, no CPU throttling",
+    "required_browsers": [
+      {
+        "name": "Chrome",
+        "installed_version_observed": "156.0.8078.80"
+      },
+      {
+        "name": "Firefox",
+        "installed_version_observed": "158.0.1"
+      }
+    ],
+    "evaluation_browser": {
+      "name": "Safari",
+      "installed_version_observed": "27.0",
+      "policy": "actual Safari physics/full5/multiplayer pass required before admission; WebKit emulation is separate evidence"
+    },
+    "qualification": "record actual versions, GPU/renderer, timer resolution, isolation and selected Wasm/tool hashes at run time; software WebGL/headless results are functional only"
+  },
+  "budgets": {
+    "status": "declared before browser physics measurement; any change needs reason/version and preserved results",
+    "normal_whole_entry_ms": {
+      "p95_max": 4,
+      "p99_max": 6,
+      "max": 10,
+      "minimum_samples": 1000
+    },
+    "correction8_whole_entry_ms": {
+      "p95_max": 16,
+      "max": 25,
+      "minimum_samples": 128
+    },
+    "presentation_frame_interval_ms": {
+      "p95_max": 20,
+      "p99_max": 33.4,
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    "cold_local_load_seconds_max": 20,
+    "compressed_initial_download_bytes_max": 26214400,
+    "wasm_linear_memory_bytes_max": 536870912,
+    "backend_admitted_bytes_max": 67108864,
+    "native_canonical_payload_bytes_max": 524288,
+    "complete_frame_wire_bytes_max": 1048576,
+    "sustained_foreground_pair_seconds_min": 600,
+    "sampling": "retain every selected normal/repair sample including cold/error/outliers; no phase subtraction; capture load separately; distinguish browser wall timer resolution and background state; RSS/UA estimates are diagnostic, not Native ledger"
+  },
+  "qualification_cases": [
+    "complete clean round with separate nonzero controls",
+    "full five-part authority/client byte comparison and actual eligible effects once",
+    "bounded delay/jitter/loss through real transport seam",
+    "same-token reconnect with old-scope packet isolation",
+    "late observer without prediction/input",
+    "actual background gaps below and beyond H128",
+    "explicit host-left behavior and rehost",
+    "600-second sustained foreground session",
+    "native and minimal Kit compatibility using the shared backend"
+  ],
+  "prototype_acceptance": [
+    "native solo practice and two independently controlled local clients",
+    "one awkward cargo carried cooperatively to delivery sensor with exactly-once score",
+    "real hinge/contact/magnet forces; camera/meshes are presentation only",
+    "clear retry and controls; screenshot plus automated round evidence",
+    "user/two-human play feedback requested once concrete prototype exists; never label automation human feedback"
+  ],
+  "fork_policy": "pinned upstream plus small justified patches first; generic allocator/snapshot/platform changes only; version identities and preserve regression/provenance; no remote fork/upstream messages implied",
+  "unavailable": [
+    "No browser solver/full-state/performance result at declaration",
+    "No native/browser cross-target equality",
+    "No native x86 hardware performance result",
+    "No mobile port or public live hosting established"
+  ],
+  "created_utc": "2026-11-03T05:23:44.332897+00:00"
+}

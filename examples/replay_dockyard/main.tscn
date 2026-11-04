@@ -1,0 +1,9 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://modules/dockyard/demo.odin" id="driver"]
+[ext_resource type="PackedScene" path="res://content/world.tscn" id="world"]
+[ext_resource type="Script" path="res://view.gd" id="view"]
+[node name="Dockyard" type="Node3D"]
+script = ExtResource("driver")
+[node name="AuthoredWorld" parent="." instance=ExtResource("world")]
+[node name="View" type="Node3D" parent="."]
+script = ExtResource("view")

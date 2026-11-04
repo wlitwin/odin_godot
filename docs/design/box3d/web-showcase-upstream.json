@@ -1,0 +1,381 @@
+{
+  "status": "PLANNING_FRESHNESS_CHECK_ONLY",
+  "checked_at_utc": "2026-11-03T03:59:24.978216+00:00",
+  "current_dependency": {
+    "sha": "d421e45c828f6f853a145f726f0b9425d31146eb",
+    "tree": "6ad02fc909b70c0c2f4c7d6c1bfa6c8dcfd53f7a",
+    "author_date": "2026-07-13T05:49:25Z",
+    "committer_date": "2026-07-13T05:49:25Z",
+    "subject": "Update benchmarks (#77)",
+    "url": "https://github.com/erincatto/box3d/commit/d421e45c828f6f853a145f726f0b9425d31146eb"
+  },
+  "upstream_head_at_check": {
+    "sha": "336263320469e5e9febfe18697ab562488f7e97a",
+    "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+    "author_date": "2026-10-28T05:33:17Z",
+    "committer_date": "2026-10-28T05:33:17Z",
+    "subject": "Dynamic Mover (#202)",
+    "url": "https://github.com/erincatto/box3d/commit/336263320469e5e9febfe18697ab562488f7e97a"
+  },
+  "comparison": {
+    "url": "https://github.com/erincatto/box3d/compare/d421e45c828f6f853a145f726f0b9425d31146eb...336263320469e5e9febfe18697ab562488f7e97a",
+    "status": "ahead",
+    "ahead_by": 30,
+    "behind_by": 0,
+    "total_commits": 30,
+    "commits": [
+      {
+        "sha": "c37cfe4cd78f555fcea4a10c7aed2ecf883a3271",
+        "tree": "704936a695177813858f71089fe7934868719776",
+        "author_date": "2026-07-19T05:43:03Z",
+        "committer_date": "2026-07-19T05:43:03Z",
+        "subject": "SIMD hull collision (#93)",
+        "url": "https://github.com/erincatto/box3d/commit/c37cfe4cd78f555fcea4a10c7aed2ecf883a3271"
+      },
+      {
+        "sha": "dfa5e6add08be96aa1380220aff769b6816d1f69",
+        "tree": "e136edacfd091795493b7d7a32fd1dab4b45f372",
+        "author_date": "2026-07-20T04:43:43Z",
+        "committer_date": "2026-07-20T04:43:43Z",
+        "subject": "Fixing issues (#94)",
+        "url": "https://github.com/erincatto/box3d/commit/dfa5e6add08be96aa1380220aff769b6816d1f69"
+      },
+      {
+        "sha": "23861418d877fdd97990f35645e845e44a7eb9ec",
+        "tree": "d79af2e1772839a06c9cf5ce5ebf3efd46e64225",
+        "author_date": "2026-07-21T05:05:11Z",
+        "committer_date": "2026-07-21T05:05:11Z",
+        "subject": "Fixes 07 (#97)",
+        "url": "https://github.com/erincatto/box3d/commit/23861418d877fdd97990f35645e845e44a7eb9ec"
+      },
+      {
+        "sha": "c52908c9a907714e4d3a8a30be5272a1761158e1",
+        "tree": "ff35b841829d7757d3cb3dee4e5b40aa220a56e8",
+        "author_date": "2026-07-22T22:55:02Z",
+        "committer_date": "2026-07-22T22:55:02Z",
+        "subject": "Fixes 08 (#98)",
+        "url": "https://github.com/erincatto/box3d/commit/c52908c9a907714e4d3a8a30be5272a1761158e1"
+      },
+      {
+        "sha": "781673be801569a94be7942848755fc0baad3653",
+        "tree": "0ca38009d71d9f6204164fa99a1c494715d2ad23",
+        "author_date": "2026-07-25T04:48:23Z",
+        "committer_date": "2026-07-25T04:48:23Z",
+        "subject": "Fixes 09 (#104)",
+        "url": "https://github.com/erincatto/box3d/commit/781673be801569a94be7942848755fc0baad3653"
+      },
+      {
+        "sha": "3fc20f5b453ba9e14cdf54ecafa87a2a4bcdf53c",
+        "tree": "6fd7e1491d2e6f344decd9b3ad2511809cef652e",
+        "author_date": "2026-07-30T05:14:26Z",
+        "committer_date": "2026-07-30T05:14:26Z",
+        "subject": "Follow cam (#107)",
+        "url": "https://github.com/erincatto/box3d/commit/3fc20f5b453ba9e14cdf54ecafa87a2a4bcdf53c"
+      },
+      {
+        "sha": "f42be210a21023e55881afa4c8daba159a60ef47",
+        "tree": "69f366f03bff206d87670706aa156ddff868c776",
+        "author_date": "2026-08-12T01:08:34Z",
+        "committer_date": "2026-08-12T01:08:34Z",
+        "subject": "64-bit hashes (#126)",
+        "url": "https://github.com/erincatto/box3d/commit/f42be210a21023e55881afa4c8daba159a60ef47"
+      },
+      {
+        "sha": "30c67b5e6d0a3a66f0f506c69ce9e9e0587e3b7c",
+        "tree": "14b6b7ff24e361d51d031bea25314a76b158ad3d",
+        "author_date": "2026-08-13T00:13:26Z",
+        "committer_date": "2026-08-13T00:13:26Z",
+        "subject": "Fixed the 64-bit hash function and added unit test (#129)",
+        "url": "https://github.com/erincatto/box3d/commit/30c67b5e6d0a3a66f0f506c69ce9e9e0587e3b7c"
+      },
+      {
+        "sha": "47d7f7cc7e091142c08d11dc7d2e493c5d34f536",
+        "tree": "0a6472d03ff61c9af28216443fba341a21cbed96",
+        "author_date": "2026-08-30T04:47:53Z",
+        "committer_date": "2026-08-30T04:47:53Z",
+        "subject": "clockwise option, joint is awake (#130)",
+        "url": "https://github.com/erincatto/box3d/commit/47d7f7cc7e091142c08d11dc7d2e493c5d34f536"
+      },
+      {
+        "sha": "954cf879e717334eb96da9a5c255788fdc9f5f87",
+        "tree": "f112da807e8a98f64339d1456b04ffcdf65a083f",
+        "author_date": "2026-09-16T22:46:31Z",
+        "committer_date": "2026-09-16T22:46:31Z",
+        "subject": "Fixes (#157)",
+        "url": "https://github.com/erincatto/box3d/commit/954cf879e717334eb96da9a5c255788fdc9f5f87"
+      },
+      {
+        "sha": "f555ee42084e0b43cbffa863f40bff8117c08896",
+        "tree": "5d3aee146ace7022293cead1e5918e17123355a1",
+        "author_date": "2026-09-17T05:28:39Z",
+        "committer_date": "2026-09-17T05:28:39Z",
+        "subject": "Optimize Broad-Phase (#159)",
+        "url": "https://github.com/erincatto/box3d/commit/f555ee42084e0b43cbffa863f40bff8117c08896"
+      },
+      {
+        "sha": "9e5a4cde862fba95ff19f096b79567f3ea6c01fd",
+        "tree": "787c15a1c0bd5702baca5a528ab76426bdc5ad98",
+        "author_date": "2026-09-20T22:54:52Z",
+        "committer_date": "2026-09-20T22:54:52Z",
+        "subject": "Optimizations (#161)",
+        "url": "https://github.com/erincatto/box3d/commit/9e5a4cde862fba95ff19f096b79567f3ea6c01fd"
+      },
+      {
+        "sha": "79fc55976a041d63f160da1de3ef8d224249ce7e",
+        "tree": "3cc1c3d44d7cccd07c85a819ad2d238152347ec2",
+        "author_date": "2026-09-24T19:21:17Z",
+        "committer_date": "2026-09-24T19:21:17Z",
+        "subject": "Optimizations (#168)",
+        "url": "https://github.com/erincatto/box3d/commit/79fc55976a041d63f160da1de3ef8d224249ce7e"
+      },
+      {
+        "sha": "8fda30e5a2c1bcb528628a65cebbf73b02a97c23",
+        "tree": "2285b19cc7f47f6512d1c388abd22dd508bf891e",
+        "author_date": "2026-09-24T20:43:40Z",
+        "committer_date": "2026-09-24T20:43:40Z",
+        "subject": "Update UI (#169)",
+        "url": "https://github.com/erincatto/box3d/commit/8fda30e5a2c1bcb528628a65cebbf73b02a97c23"
+      },
+      {
+        "sha": "adec25b3010b7b7a715e57ce79595b0d2184474a",
+        "tree": "feb44ed6ec6c589ba7352afe9570e2023a3e7b9a",
+        "author_date": "2026-09-25T04:16:19Z",
+        "committer_date": "2026-09-25T04:16:19Z",
+        "subject": "SAT optimizations (#170)",
+        "url": "https://github.com/erincatto/box3d/commit/adec25b3010b7b7a715e57ce79595b0d2184474a"
+      },
+      {
+        "sha": "5643cd81ff07fd0497e3bfcdf04f6425cc8a2e7f",
+        "tree": "8c5016ff3fd3588c4c505ee55c75b70f3419eda3",
+        "author_date": "2026-09-25T21:56:44Z",
+        "committer_date": "2026-09-25T21:56:44Z",
+        "subject": "Remove compound mesh child material limit. (#172)",
+        "url": "https://github.com/erincatto/box3d/commit/5643cd81ff07fd0497e3bfcdf04f6425cc8a2e7f"
+      },
+      {
+        "sha": "9f998c862d54c03a633ecea3831937385c78b532",
+        "tree": "265c10aa129225ea7c523317828d5c0de77bc0bc",
+        "author_date": "2026-09-27T21:39:11Z",
+        "committer_date": "2026-09-27T21:39:11Z",
+        "subject": "SAT samples (#173)",
+        "url": "https://github.com/erincatto/box3d/commit/9f998c862d54c03a633ecea3831937385c78b532"
+      },
+      {
+        "sha": "51f056e0a9d299326b10f10a63270c81d901df21",
+        "tree": "3e5b839113240f0480782d4ec3a71e5afb78fc67",
+        "author_date": "2026-10-03T03:47:05Z",
+        "committer_date": "2026-10-03T03:47:05Z",
+        "subject": "SAT benchmark (#177)",
+        "url": "https://github.com/erincatto/box3d/commit/51f056e0a9d299326b10f10a63270c81d901df21"
+      },
+      {
+        "sha": "e77352cd606dc1a34209094076199549a52ea0a1",
+        "tree": "47ba8433186a4ca2155317b67e9e9572a6a1209e",
+        "author_date": "2026-10-03T22:14:34Z",
+        "committer_date": "2026-10-03T22:14:34Z",
+        "subject": "Add support for AVX2 and runtime feature detection (#174)",
+        "url": "https://github.com/erincatto/box3d/commit/e77352cd606dc1a34209094076199549a52ea0a1"
+      },
+      {
+        "sha": "16f7f4cf4c3d6579e14e4309aa08f878cd59a520",
+        "tree": "216b50335d8bdc4d65adb69de83c907f8604e7d6",
+        "author_date": "2026-10-06T16:51:48Z",
+        "committer_date": "2026-10-06T16:51:48Z",
+        "subject": "Tree perf (#179)",
+        "url": "https://github.com/erincatto/box3d/commit/16f7f4cf4c3d6579e14e4309aa08f878cd59a520"
+      },
+      {
+        "sha": "f8c4fe83dfe97aeb4037bd46600ad138df02efbc",
+        "tree": "3597f790e132a2bff0e1436865a44a2e89d61d4f",
+        "author_date": "2026-10-06T23:43:20Z",
+        "committer_date": "2026-10-06T23:43:20Z",
+        "subject": "Shape cast support for box movers (#180)",
+        "url": "https://github.com/erincatto/box3d/commit/f8c4fe83dfe97aeb4037bd46600ad138df02efbc"
+      },
+      {
+        "sha": "003a3f772866157bfa700ae4b56f4ebea01ec28d",
+        "tree": "a4d2bcbcdcde774bf9c186ec9a92fc83730196a7",
+        "author_date": "2026-10-07T00:33:29Z",
+        "committer_date": "2026-10-07T00:33:29Z",
+        "subject": "Fix recording crash on compounds (#181)",
+        "url": "https://github.com/erincatto/box3d/commit/003a3f772866157bfa700ae4b56f4ebea01ec28d"
+      },
+      {
+        "sha": "3d9db79ee1a040691c3c4144aefd953ebe56a80b",
+        "tree": "621ed8cdc4bd78220fd8671995a874566cf9757e",
+        "author_date": "2026-10-07T05:45:33Z",
+        "committer_date": "2026-10-07T05:45:33Z",
+        "subject": "various recording fixes (#182)",
+        "url": "https://github.com/erincatto/box3d/commit/3d9db79ee1a040691c3c4144aefd953ebe56a80b"
+      },
+      {
+        "sha": "5d83df83ab47172c2c745b44315e7538ead02397",
+        "tree": "dd5eb692cfe683c7e6003e04d9cf7b324272a604",
+        "author_date": "2026-10-07T21:48:58Z",
+        "committer_date": "2026-10-07T21:48:58Z",
+        "subject": "Improve compound serialization (#183)",
+        "url": "https://github.com/erincatto/box3d/commit/5d83df83ab47172c2c745b44315e7538ead02397"
+      },
+      {
+        "sha": "a2e4816b4359b32408d5623784a7fe2d7259d3d6",
+        "tree": "561c272662db9c684b077c00071e24c8b23d04c4",
+        "author_date": "2026-10-13T04:46:51Z",
+        "committer_date": "2026-10-13T04:46:51Z",
+        "subject": "Fixes for #175 (#187)",
+        "url": "https://github.com/erincatto/box3d/commit/a2e4816b4359b32408d5623784a7fe2d7259d3d6"
+      },
+      {
+        "sha": "8128d7405e0029f3120471c728668bf8195436b5",
+        "tree": "803ad43f8c482516e86672bac4737ab156ae9765",
+        "author_date": "2026-10-13T18:02:43Z",
+        "committer_date": "2026-10-13T18:02:43Z",
+        "subject": "Discussion template (#185)",
+        "url": "https://github.com/erincatto/box3d/commit/8128d7405e0029f3120471c728668bf8195436b5"
+      },
+      {
+        "sha": "0cfc475b88d0e46bea9533a460afdd79a9001868",
+        "tree": "829465b250f202bed30cd355bb60c196baf1241e",
+        "author_date": "2026-10-15T05:20:52Z",
+        "committer_date": "2026-10-15T05:20:52Z",
+        "subject": "Solver stuff (#189)",
+        "url": "https://github.com/erincatto/box3d/commit/0cfc475b88d0e46bea9533a460afdd79a9001868"
+      },
+      {
+        "sha": "efca0c184d40fd6a82016983f1601c4d23965867",
+        "tree": "4194cd8781d1091af8a438b4c09820da26b22965",
+        "author_date": "2026-10-16T06:30:56Z",
+        "committer_date": "2026-10-16T06:30:56Z",
+        "subject": "Gyro tolerance (#191)",
+        "url": "https://github.com/erincatto/box3d/commit/efca0c184d40fd6a82016983f1601c4d23965867"
+      },
+      {
+        "sha": "f36d061ba26998c87cb7dc593a4065aaa03fb7eb",
+        "tree": "7e74dc2998e82058627ca8407e41547f6e987034",
+        "author_date": "2026-10-20T22:15:20Z",
+        "committer_date": "2026-10-20T22:15:20Z",
+        "subject": "CMake improvements (#201)",
+        "url": "https://github.com/erincatto/box3d/commit/f36d061ba26998c87cb7dc593a4065aaa03fb7eb"
+      },
+      {
+        "sha": "336263320469e5e9febfe18697ab562488f7e97a",
+        "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+        "author_date": "2026-10-28T05:33:17Z",
+        "committer_date": "2026-10-28T05:33:17Z",
+        "subject": "Dynamic Mover (#202)",
+        "url": "https://github.com/erincatto/box3d/commit/336263320469e5e9febfe18697ab562488f7e97a"
+      }
+    ],
+    "engine_and_build_paths_changed": [
+      ".github/workflows/build.yml",
+      "CMakeLists.txt",
+      "CMakePresets.json",
+      "README.md",
+      "include/box3d/base.h",
+      "include/box3d/box3d.h",
+      "include/box3d/collision.h",
+      "include/box3d/config.h",
+      "include/box3d/constants.h",
+      "include/box3d/id.h",
+      "include/box3d/math_functions.h",
+      "include/box3d/types.h",
+      "src/CMakeLists.txt",
+      "src/block_allocator.c",
+      "src/block_allocator.h",
+      "src/body.c",
+      "src/body.h",
+      "src/box3d.pc.in",
+      "src/broad_phase.c",
+      "src/broad_phase.h",
+      "src/capsule.c",
+      "src/compound.c",
+      "src/compound.h",
+      "src/constraint_graph.c",
+      "src/constraint_graph.h",
+      "src/contact.c",
+      "src/contact.h",
+      "src/contact_solver.c",
+      "src/contact_solver.h",
+      "src/contact_solver_wide.inl",
+      "src/container.h",
+      "src/convex_manifold.c",
+      "src/convex_manifold_wide.inl",
+      "src/core.c",
+      "src/core.h",
+      "src/distance.c",
+      "src/dynamic_tree.c",
+      "src/dynamic_tree.h",
+      "src/height_field.c",
+      "src/hull.c",
+      "src/hull.h",
+      "src/joint.c",
+      "src/joint.h",
+      "src/manifold.c",
+      "src/manifold.h",
+      "src/math_internal.h",
+      "src/mesh.c",
+      "src/mesh_contact.c",
+      "src/motor_joint.c",
+      "src/mover_joint.c",
+      "src/parallel_for.c",
+      "src/physics_world.c",
+      "src/physics_world.h",
+      "src/platform.h",
+      "src/pogo_joint.c",
+      "src/prismatic_joint.c",
+      "src/rapidhash.h",
+      "src/recording.c",
+      "src/recording.h",
+      "src/recording_ops.inl",
+      "src/replay.c",
+      "src/replay.h",
+      "src/revolute_joint.c",
+      "src/scheduler.c",
+      "src/sensor.c",
+      "src/shape.c",
+      "src/shape.h",
+      "src/simd.c",
+      "src/simd.h",
+      "src/simd_avx2.h",
+      "src/simd_neon.h",
+      "src/simd_scalar.h",
+      "src/simd_sse2.h",
+      "src/simd_wide.h",
+      "src/solver.c",
+      "src/solver.h",
+      "src/solver_set.c",
+      "src/sphere.c",
+      "src/spherical_joint.c",
+      "src/table.c",
+      "src/table.h",
+      "src/timer.c",
+      "src/triangle_manifold.c",
+      "src/types.c",
+      "src/weld_joint.c",
+      "src/wheel_joint.c",
+      "src/wide4.c",
+      "src/wide8.c",
+      "src/world_snapshot.c",
+      "src/world_snapshot.h"
+    ]
+  },
+  "existing_engine_patches": [
+    {
+      "path": "box3d/native/patches/block_allocator_alignment.patch",
+      "sha256": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+      "reason": "Avoid unaligned void** free-list access for element strides not divisible by pointer alignment. memcpy preserves stride, layout and free-list order."
+    },
+    {
+      "path": "box3d/native/patches/compound_geometry_alignment.patch",
+      "sha256": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+      "reason": "Align packed shared hull and mesh blobs to their typed header alignment, including odd-sized instance arrays; computed offsets and zeroed padding retained."
+    },
+    {
+      "path": "box3d/native/patches/broadphase_rebuild.patch",
+      "sha256": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+      "reason": "Rebuild dynamic and kinematic trees before the zero-move broadphase early return; destruction of the final buffered proxy can leave enlarged ancestors even when no pair queries remain. Normal nonzero-move task ordering is unchanged."
+    }
+  ],
+  "decision": "Evaluate the recent upstream revision before extending the web integration. Preserve the accepted pin and artifacts until the candidate and rebased/retired patches pass affected complete-state and native adapter checks. No source pin changed by this check.",
+  "engine_or_runtime_jobs_started": 0,
+  "fork_or_remote_repository_created": false
+}

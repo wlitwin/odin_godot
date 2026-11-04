@@ -1,0 +1,445 @@
+{
+  "schema": 1,
+  "task": "t_3fc459bacd25428b",
+  "task_revision": 5,
+  "board": "b_cdde1cdfea104035",
+  "result": "PASS",
+  "scope": "P5.2 character movement, deterministic queries and eight joint authoring surfaces, shared backend and distinct existing Kit/Replay adapters. Declared macOS arm64 reference only.",
+  "requirements": {
+    "joint_surface": "Eight actual Node3D families and reusable settings Resources; Pin=Spherical angular-disabled, Hinge=Revolute Z, Slider=Prismatic X; one joint at a time.",
+    "character": "Real configuration/initial-POD authoring; actual capsule cast/plane solver, explicit caller-owned state and fixed60 or zero backend step. No hidden body, clock or tick owner.",
+    "queries": "Actual execution-world AABB/ray/capsule overlap/cast; complete bounded key/fraction/tie sort, filters/sensor/self-exclusion, no partial publication on Capacity.",
+    "canonical": "Native joint fields/settings/impulses/prepared state and graph links retained, full typed validation/reconstruction/reencode; current format3, legacy1/authored2 preserved.",
+    "kit": "All8 native families plus character/query Side reconcile; rejected publication and ignored invalid movement preserve solver/Side; real Session/Lane canonical Welcome/Reset complete5 for each family.",
+    "replay": "All8 native families plus character/query Game revise/audit/branch; rejected commit and ignored invalid movement preserve published state; actual network-model rejected joint-replacement action restores solver/Game; real Server/Client complete Welcome/confirmation full5 for each family.",
+    "godot": "Actual standard SDK build/import, .tres/.tscn roundtrip, ordering/ID stability, source destruction before native construction, all8 constraints and explicit character step, one Native image and checked cleanup0.",
+    "compatibility": "Existing authoring pure5/native3/framework2 and real six-shape/sensor Godot fixture pass on current Native; old artifacts immutable."
+  },
+  "native_matrix": [
+    {
+      "configuration": "Debug",
+      "tests": [
+        "domain_static",
+        "domain_shared",
+        "domain_modules",
+        "motion",
+        "authoring",
+        "recovery",
+        "recovery_reference",
+        "recovery_fields",
+        "recovery_lifecycle",
+        "api_static",
+        "api_shared",
+        "lifecycle"
+      ],
+      "archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "manifest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Debug/build-manifest.json",
+        "sha256": "2d0266e6a3c7b49b8aa7701bd92d52495d7ab07b75cc087e98f77ddb2e7dfb71"
+      },
+      "raw_ctest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Debug/Testing/Temporary/LastTest.log",
+        "sha256": "bcb381177f3a7041fd7bc510d9278e44068fea3167c2ab166baba41a27ca7ca2"
+      },
+      "source_inputs": 37,
+      "current_code_fence": true,
+      "cmake_args": [
+        "-DOGB3_NATIVE_OBSERVATION=OFF"
+      ]
+    },
+    {
+      "configuration": "Release",
+      "tests": [
+        "domain_static",
+        "domain_shared",
+        "domain_modules",
+        "motion",
+        "authoring",
+        "recovery",
+        "recovery_reference",
+        "recovery_fields",
+        "recovery_lifecycle",
+        "api_static",
+        "api_shared",
+        "lifecycle"
+      ],
+      "archive_sha256": "52e2b8383233a8dc6a04f9b527bd5d05e3f7891bad2eebb1e81fe261299aa626",
+      "manifest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Release/build-manifest.json",
+        "sha256": "b1921b44a56093985ad8606cb04d624c51d38f2b77728abd694558bf359c7ae8"
+      },
+      "raw_ctest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Release/Testing/Temporary/LastTest.log",
+        "sha256": "7e20437efe19c2a3a3701ad98bddb42ff927d9425f9753d57fe907eb943d2571"
+      },
+      "source_inputs": 37,
+      "current_code_fence": true,
+      "cmake_args": [
+        "-DOGB3_NATIVE_OBSERVATION=OFF"
+      ]
+    },
+    {
+      "configuration": "ASanUBSan",
+      "tests": [
+        "domain_static",
+        "domain_shared",
+        "domain_modules",
+        "motion",
+        "authoring",
+        "recovery",
+        "recovery_reference",
+        "recovery_fields",
+        "recovery_lifecycle",
+        "api_static",
+        "api_shared",
+        "lifecycle"
+      ],
+      "archive_sha256": "550c5b5554c57969a6a12ca66477d9455bd476ea96d6b50302361804a591f916",
+      "manifest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-sanitized-v2/cache/build/Debug/build-manifest.json",
+        "sha256": "afc668c968004107e0cd12f12acff36d5a4b3c74a8c6af97f248f8e622ca2a1b"
+      },
+      "raw_ctest": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-sanitized-v2/cache/build/Debug/Testing/Temporary/LastTest.log",
+        "sha256": "ccc40364411a44b65d6430d309fabf877459b1bfed6958502953fa9bd6dedc70"
+      },
+      "source_inputs": 37,
+      "current_code_fence": true,
+      "cmake_args": [
+        "-DOGB3_NATIVE_OBSERVATION=OFF",
+        "-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined",
+        "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+      ]
+    }
+  ],
+  "odin": {
+    "pure": {
+      "tests": 4,
+      "names": [
+        "all_joint_families_stable_refs_and_schema2_json_copy",
+        "character_copied_pod_configuration_references_order_and_failures",
+        "joint_references_limits_flags_capacity_and_finite_reject_before_publish",
+        "legacy_schema1_identity_and_new_motion_collision_checks"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-odin-actual-v1/pure/report.json",
+        "sha256": "a751002038b80d64cb25304042241cba14b899ce4ce1cc898ad794372ab8c584"
+      },
+      "native_archive_sha256": "49da7f6f432dc5a3fa354723438b367ab8bf1c3c03d6c7e3707805fa0ce65941",
+      "source_fence_at_run": true
+    },
+    "native_odin": {
+      "tests": 3,
+      "names": [
+        "actual_capsule_mover_floor_wall_slide_explicit_pod_and_zero_invalid_dt",
+        "all_eight_native_constraints_roundtrip_separately_with_one_joint_cap",
+        "complete_sorted_actual_queries_filter_self_exclusion_and_capacity"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-current-odin-actual-v2/native_odin/report.json",
+        "sha256": "317589a7f9c17f0e559c5b272e2f3dfe0407976ac6a35a101f027cab49d2b838"
+      },
+      "native_archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "source_fence_at_run": true
+    },
+    "frameworks": {
+      "tests": 7,
+      "names": [
+        "kit_all_joint_families_character_and_sorted_queries_reconcile_atomically",
+        "kit_each_joint_family_and_character_survive_canonical_welcome_reset",
+        "kit_ignored_invalid_character_result_cannot_publish_side_or_solver",
+        "replay_actual_action_savepoint_restores_joint_replacement_and_character",
+        "replay_all_joint_families_character_queries_and_complete_revisions",
+        "replay_each_joint_family_and_character_survive_canonical_welcome_confirmation",
+        "replay_ignored_invalid_character_result_cannot_commit"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-current-odin-actual-v2/frameworks/report.json",
+        "sha256": "262e28f3e7c9a490b5af45ee97faa6be2d77f628309373b8218399c39430b694"
+      },
+      "native_archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "source_fence_at_run": true
+    }
+  },
+  "legacy_authoring_odin": {
+    "pure": {
+      "tests": 5,
+      "names": [
+        "finite_pose_scale_dimension_and_native_unsupported_controls",
+        "resource_geometry_dedup_duplicates_and_collisions",
+        "schema_namespace_keys_bounds_and_invalid_json",
+        "six_kinds_exact_transforms_and_sensor_flags",
+        "stable_order_ids_copy_and_json_roundtrip"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-motion-regression-v1/pure/report.json",
+        "sha256": "141f27395cdec18f4cf16981ac8266b20b6c88bedb899614a8c3b141c6ae1bd6"
+      },
+      "native_archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "source_fence_at_run": true
+    },
+    "native_odin": {
+      "tests": 3,
+      "names": [
+        "all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip",
+        "legacy_primitive_catalog_identity_and_v2_layout_compatibility",
+        "malformed_canonical_and_mutated_bake_leave_live_world_unchanged"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-motion-regression-v1/native_odin/report.json",
+        "sha256": "3ec8fdcb1f3a813839f23468bc7acd3a5baac8a0f6658a806b42424eeed5ad68"
+      },
+      "native_archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "source_fence_at_run": true
+    },
+    "frameworks": {
+      "tests": 2,
+      "names": [
+        "kit_authored_six_shapes_and_sensor_canonical_welcome_and_reset",
+        "replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-motion-regression-v1/frameworks/report.json",
+        "sha256": "5a364fb13751bc8b0877f7f61fcafa12ac3826c0df52d890a5ae01e3a3a5217a"
+      },
+      "native_archive_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55",
+      "source_fence_at_run": true
+    }
+  },
+  "motion_sdk": {
+    "report": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v2/report.json",
+      "sha256": "07b31f3ddf4af200095c82176c355c93d4bf5060420c5b039d03594cd243de08"
+    },
+    "steps": [
+      [
+        "build",
+        0
+      ],
+      [
+        "import",
+        0
+      ],
+      [
+        "functional",
+        0
+      ]
+    ],
+    "logs": {
+      "build": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v2/build.log",
+        "sha256": "0b49c9461425dd6fcff32110d93885cc704770f3bf91ec19e0badbabc820767f"
+      },
+      "import": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v2/import.log",
+        "sha256": "ec19173bdab3f5fc1232d061ec3c0426b9786806db315c8aef55d8dee2cb30d8"
+      },
+      "functional": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v2/functional.log",
+        "sha256": "263a267f00ee1fcfab032f7a090d78ea9597b24f86c3b38b7b04d09f6034fa8f"
+      }
+    },
+    "current_runnable_source_fence": true,
+    "source_hash_scope": "selected authoring source roots, not exact compiler import tracing",
+    "native_identity": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v2/project/bin/box3d-runtime.json",
+      "sha256": "f43ee885d26b272bd70e7f77c1a618ffe4ab62af649df4a683196b6f316880e8"
+    },
+    "domain": {
+      "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+      "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+      "versions": [
+        1,
+        1,
+        3,
+        2,
+        1
+      ],
+      "pointer_bits": 64,
+      "endian": 1
+    },
+    "source_native_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+    "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+    "artifacts": {
+      ".box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "box3d-runtime.json": "f43ee885d26b272bd70e7f77c1a618ffe4ab62af649df4a683196b6f316880e8",
+      "libodin_godot.dylib": "65e995f0d8ea8f07a5a25bce5a2f198586c02e0bc31b088cf1c6adf233e026ec",
+      "libodinscripts.dylib": "f5325162a81f836f79bbef04ea059aef5b92d9a3da87399bf63a3c99caa29d84",
+      "libodinscripts.dylib.r1.p40874.dylib": "f5325162a81f836f79bbef04ea059aef5b92d9a3da87399bf63a3c99caa29d84",
+      "libodinscripts_motion_probe.dylib": "3f0481874c0cb701289c91b8bb93378f12487b4b0d5186bfd9eee7dbcef9c380",
+      "libodinscripts_motion_probe.dylib.r2.p40874.dylib": "3f0481874c0cb701289c91b8bb93378f12487b4b0d5186bfd9eee7dbcef9c380",
+      "libogb3.dylib": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3"
+    }
+  },
+  "legacy_authoring_sdk": {
+    "report": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-motion-regression-v1/report.json",
+      "sha256": "0f2814841c2c48be50c32729df80aa23586a74642f15142f2879676a1129ef73"
+    },
+    "steps": [
+      [
+        "build",
+        0
+      ],
+      [
+        "import",
+        0
+      ],
+      [
+        "functional",
+        0
+      ]
+    ],
+    "logs": {
+      "build": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-motion-regression-v1/build.log",
+        "sha256": "389826300de9836617654cb9691f1ec43a3923d9d9798f728e71e4286e0164ec"
+      },
+      "import": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-motion-regression-v1/import.log",
+        "sha256": "65a597a83985367b9b49c35e7e6ac1061396f20a0bcce40eebee0785486354b2"
+      },
+      "functional": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-motion-regression-v1/functional.log",
+        "sha256": "b4ec9ecd34078cc9b9044086e30734caf605217f16e577de58f0bc743e63aa0a"
+      }
+    },
+    "current_runnable_source_fence": true,
+    "source_hash_scope": "selected authoring source roots, not exact compiler import tracing",
+    "native_identity": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-motion-regression-v1/project/bin/box3d-runtime.json",
+      "sha256": "8878909c172603cb0a9b9bcb8ac1f8b9fd68c7d1585d8637e64fb5e5edaf9c58"
+    },
+    "domain": {
+      "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+      "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+      "versions": [
+        1,
+        1,
+        3,
+        2,
+        1
+      ],
+      "pointer_bits": 64,
+      "endian": 1
+    },
+    "source_native_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+    "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+    "artifacts": {
+      ".box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "box3d-runtime.json": "8878909c172603cb0a9b9bcb8ac1f8b9fd68c7d1585d8637e64fb5e5edaf9c58",
+      "libodin_godot.dylib": "752bf9cf9babf518bc0967fe8fdfb82d1e380c08624b67cb698ce3ecd9a54039",
+      "libodinscripts.dylib": "8845af0bafda448748cc5d87da11508f549aa5217e4b127b623b349fdc3b8b6d",
+      "libodinscripts.dylib.r1.p41864.dylib": "8845af0bafda448748cc5d87da11508f549aa5217e4b127b623b349fdc3b8b6d",
+      "libodinscripts_authoring_probe.dylib": "4a036fcfed910899f9679cbdf8226759445d1287697b67fa5afbaa8feb79500f",
+      "libodinscripts_authoring_probe.dylib.r2.p41864.dylib": "4a036fcfed910899f9679cbdf8226759445d1287697b67fa5afbaa8feb79500f",
+      "libogb3.dylib": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3"
+    }
+  },
+  "distance_fix": {
+    "cause": "Pinned CreateDistanceJoint floors minLength but not maxLength for accepted inactive default0..0; native min>max rejected correctly by canonical validator.",
+    "change": "Public engine SetLengthRange normalizes both before key publication; strict inverted-range rejection retained.",
+    "regression": "Exact accepted coincident-anchor/default Distance admitted and fully roundtrips at tick0 and tick1.",
+    "source_record": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-distance-default-fix-v1/source-checkpoint.json",
+      "sha256": "a544f3090d628ab1c94c072a2b00777faa90e134033557019b979da51392ac53"
+    }
+  },
+  "prior_failures": {
+    "framework_compile": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-odin-actual-v1/frameworks/report.json",
+      "sha256": "35522e82cf22a30024b72588f2963d79296a5d94e33b8bb39ad23580e48bfa36"
+    },
+    "distance_runtime": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-frameworks-actual-v3/frameworks/report.json",
+      "sha256": "ed01fe8ebd67eaf8d4a3d925c9ae374eb8bddcb544ebd2852943e04fdbc80bd7"
+    },
+    "godot_json_array_type": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-godot-actual-v1/report.json",
+      "sha256": "14cd14237757c63faaa2560b1000672b54bc40a00be57dcddca28e6f18308bb4"
+    }
+  },
+  "completion_source_hashes": {
+    "addons/box3d_authoring/MOTION.md": "ba5d09b0ad1bd0070904cf15127ecab75f32fd134061eaf4e0855bd0996837ce",
+    "addons/box3d_authoring/README.md": "f0863651c3f8d589a9aedd91dc1a0929f436a8d47b84fe5e435b433982346cf7",
+    "addons/box3d_authoring/axis_joint_settings_3d.gd": "de97e380c1137498d3b1212b23b916c78ace2379e16ad3ed2190b3ea6e4886a9",
+    "addons/box3d_authoring/body_3d.gd": "2322f88f722ded5235eedbe2417ca34f06ecf897f1906bf69605e8ceefbadffc",
+    "addons/box3d_authoring/box_shape_3d.gd": "255a7d546195848ccd08739d45b84a91b2446173489b9b13a016d815d43ca5ed",
+    "addons/box3d_authoring/capsule_shape_3d.gd": "fd97f03dafd6c67b7e96d219381a296a9731cd5c9c43c82992382de15e99e377",
+    "addons/box3d_authoring/character_config_3d.gd": "754cb37fa2b14bf46555d7ed7facfa3440275ee6d2b583aa40bbef69ac249b72",
+    "addons/box3d_authoring/character_mover_3d.gd": "30393132105d974d31c558fa316c88cdb610e9d95e97fa6d28739a73cba9806e",
+    "addons/box3d_authoring/data.gd": "8d03ffd3da149250174b1167ee42bb55b00f3dce1599a7e845c6f265fae0051e",
+    "addons/box3d_authoring/distance_joint_3d.gd": "34fe9e96dd6bb16c0c0cf7d028a7e2d7c5fc8dff791fd6cc09ec2bba8acfbf7a",
+    "addons/box3d_authoring/distance_joint_settings_3d.gd": "701b22cb11b8952d687f3c1c9d3bd7b58984fa55d1fdbf86bf589b3fffd75cc8",
+    "addons/box3d_authoring/heightfield_shape_3d.gd": "fab4c6e62cf29bc873326c550df236b61ac8e4fc8c4118edf5a403a7660f216a",
+    "addons/box3d_authoring/hinge_joint_3d.gd": "75ce94d45f9e65caed747f113c736e1770e6ddcc973a1075c241bf7e6c96bb6b",
+    "addons/box3d_authoring/hull_shape_3d.gd": "339a6e07844a8259b38bd7ee80fe6f1cd7f1cd3e5e1ef0e8d98045ab5b32bf49",
+    "addons/box3d_authoring/joint_3d.gd": "9f3a681c538595a0ec387481c551a44bcadaff061498dac542536aec28eb0ddd",
+    "addons/box3d_authoring/joint_settings_3d.gd": "d0622e13da729278c5d80557ac1300352c0815e6af10102fb4bb73d4d7400fc6",
+    "addons/box3d_authoring/mesh_shape_3d.gd": "b765dcaf0aa1b0b6464e2877e20737100bae7d1336fb60d566dc9187ac67e257",
+    "addons/box3d_authoring/motion_data.gd": "6b95f6c2c96dcd7391772096bd524365d065cc03c5cc0b645fcdc924f00fa731",
+    "addons/box3d_authoring/motor_joint_3d.gd": "4c5e2061269fbd7bf71aa2d32ab5dbbd22f185b6f3d4adcb196c6b9ae44ea4a5",
+    "addons/box3d_authoring/motor_joint_settings_3d.gd": "0443329050598267d181e6ab37efd918a110300ad20f484deb1d9e800c88164c",
+    "addons/box3d_authoring/pin_joint_3d.gd": "e6d2824289f40ed48605d8f39a611fe344d87adcb545b9644fef766f54239321",
+    "addons/box3d_authoring/plugin.cfg": "3f03be73f1df384bcdf9be947eebede83aed3cc15207e9359aea5e4143eac617",
+    "addons/box3d_authoring/plugin.gd": "402208ec547d37d1ec92e748d1f4a70491f0cf350fe7a75de63150c47017f973",
+    "addons/box3d_authoring/sensor_3d.gd": "992d36cd6e4bdcbc6fefed384a389109cf13eb8364a052105a393093bfa1d927",
+    "addons/box3d_authoring/shape_3d.gd": "92a7e54ba9263078cec95c86f89ba82957fe5cd948ca6071d0b8d110fa0c9386",
+    "addons/box3d_authoring/slider_joint_3d.gd": "84a3b482631d639fcfaec6cfbff7af017179c502815c4e75472c061cf2e53423",
+    "addons/box3d_authoring/sphere_shape_3d.gd": "4f43f533079244afcc79028eb40054ed2bd5ccd07e53c0f6b7a7b06eb8341c2c",
+    "addons/box3d_authoring/spherical_joint_3d.gd": "bf72e86caf790222a39c81fa824ddb63b14b7743043252aa8c8aa8fc4acf4c7d",
+    "addons/box3d_authoring/spherical_joint_settings_3d.gd": "9e0fd1091d3abe83697b76ea58c27961fb6c6f9ae3b738129cba107468156a1e",
+    "addons/box3d_authoring/weld_joint_3d.gd": "40e1a6a1510dc3e3b188e0825bd83d018ba24285ba37d7e13a382d421c1a6b12",
+    "addons/box3d_authoring/weld_joint_settings_3d.gd": "f67b70073727053250b831c20c3ca66d2ca72520a150847a00b5434fc6c5ee9e",
+    "addons/box3d_authoring/wheel_joint_3d.gd": "da9c33eabe23b29d24f7603debc6d0ed490bda420a6dd58d2bdc94560b7e3552",
+    "addons/box3d_authoring/wheel_joint_settings_3d.gd": "b6ebc7a00294f643bd20aad8c75d94b7d079ca20c750c8ccb4e1043fdc0cb57c",
+    "addons/box3d_authoring/world_3d.gd": "20f9e3fc76e233fc2d90f96de23a32560c66b6aa37ce06eb1fd75fa4f3b500b9",
+    "box3d/README.md": "f6e0eadda6bcbb73f17f58f5f9c17a53cc06f1f139a19da5889d4dc75bdf4f7d",
+    "box3d/authoring/API.md": "848c161a01640749518b72829b82c6e9087884bdfb6e75732d6e97971eb2242c",
+    "box3d/authoring/bake.odin": "51b4b59458a3b99b5b0cbb1a6d3af16ded1c50514dce3554376429fe58780948",
+    "box3d/authoring/build.odin": "503f1704c6b9ff53ba593f185e69bdc54f548777868fb05fa3e45ca4a520ebc5",
+    "box3d/authoring/motion.odin": "3efb73ab393f51ffe166330acf4ff773e12414d97fab0cd448bae5dff3ee8ff3",
+    "box3d/authoring/types.odin": "eb787c27021e0ed6a555c3b95b6107459fc059c88824bf631f27c6daac126c9d",
+    "box3d/bindings.odin": "045cc2d24dc73adf1c3dce2729475f8c4db830e6592c88aaf31f49e2666e4805",
+    "box3d/character.odin": "60f04c253c8ce6940115105d9e592c49c31e9db4ae88a2d339ea2cb251b6f0da",
+    "box3d/godot/authoring/README.md": "b7e18023525bced8578a44168ed6c3b88cf7c58d9749d5639ea629da1db283a3",
+    "box3d/godot/authoring/extract.odin": "f2007241a8355885241691dd969b21efdc46e56f252bf4eb22fd021b1a04b940",
+    "box3d/joints.odin": "731b540bc01b7061b21b70e3f02fcbe028539479fe9a84b39b1897fc75afb1b0",
+    "box3d/query.odin": "77d6f5fb8e389349c8d3fe84472e09c6f959ce00ed5ab2305b59de187d359580",
+    "box3d/recovery.odin": "3ea1ee7398d8a42af3652eeb1ce9b2b4f504321566dd0451a6eb97c7c42205ee",
+    "docs/design/box3d/motion.md": "1804545daa18556c2405ceb864fa1a185a97ebe0e29a41456f888066aa7e2409",
+    "kit/physics/motion.odin": "c44290173e441c3ebdce53763a00664fb0ebb4b204ed655382ca3303238de040",
+    "replay/physics/authoring.odin": "7d8a84d1ab7de354a52fb671b18065adb48c518e6747caea783caab87835aa6e",
+    "replay/physics/commands.odin": "5d0dfe093ec704289e93fb1389cff74961598cd501a5817015407ee28dde779e",
+    "replay/physics/motion.odin": "995fbc6867b7021cc09a2a7c7e67a95b9aa92143c66986e86dd9fd3b4b93489e",
+    "tests/box3d_authoring/pure/authoring_test.odin": "09da404ee5b5611f067175deece4af82b66ca721197d382ffb8980d3eb90ced7",
+    "tests/box3d_motion/frameworks/kit_test.odin": "d8e41f4854f871c7da8aa574370320e3f38bc94073ae632b6db7931a9997a9e9",
+    "tests/box3d_motion/frameworks/network_test.odin": "a4a0e53451e87d1d3a2890c1f2781b44745b17c56fdbe914a34018be8c49ee63",
+    "tests/box3d_motion/frameworks/replay_test.odin": "f19786c19285dc4b45d816a6a3395e560d8fa39b17e1bec6ff3bcb50596f3f6b",
+    "tests/box3d_motion/frameworks/scene.odin": "1244a948a97da40ee8d5c0ea7881d1c006534dd7902faeb2fb9d034de9d2bf3e",
+    "tests/box3d_motion/godot/README.md": "6f25ed8a81ecce37cb8ec3807ea880b9f57e7828d0835aebc2e7ad151a959ce1",
+    "tests/box3d_motion/godot/project/modules/motion_probe/images_darwin.odin": "147c3a6aa177f6230905d4d14e8137cca306f3b2d374ad88252eb077b96be529",
+    "tests/box3d_motion/godot/project/modules/motion_probe/images_linux.odin": "ed1339b198fd82fbab11e42d342706913b3325894b52f7f52db3967be160927e",
+    "tests/box3d_motion/godot/project/modules/motion_probe/probe.odin": "04e0075afec22cb4f4c30a9c907e66a9155c7b9c3257119a8fadab45336ecb6c",
+    "tests/box3d_motion/godot/project/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "tests/box3d_motion/godot/project/project.godot": "21b0860f31526209dd7dfb108e1140ad3c180dfec33810e564e4d4d5a6e515a8",
+    "tests/box3d_motion/godot/project/scripts/boot.odin": "7d51aa0be2cff28dde72d7879879d6ad2bf9d8c3dcff63efbc8a7babc915c8c7",
+    "tests/box3d_motion/godot/project/test_motion.gd": "be331a6bb2362196165d39ccd55e66214178c834021c145edc82af06aaba3e57",
+    "tests/box3d_motion/godot/run.py": "30aa5c7998dd6cc0af7f1f3894bf2fa684b4d4c466766692bffae10787d3a13a",
+    "tests/box3d_motion/native/README.md": "ba63131e3326bc21e82cf541978d96e22a683749e703f9ae132a20bf68211d40",
+    "tests/box3d_motion/native/motion_test.c": "9881e5603e879fdabe2353103adfb9999d182615476f2bce02b4c212a56d734e",
+    "tests/box3d_motion/native_odin/motion_test.odin": "911d20313469d6863cf5a0b751988e7b681daf1db07b92e1e9166b79bdd7e07b",
+    "tests/box3d_motion/pure/motion_test.odin": "5c13882671ef04730b92ade48d9bc023f09381f20a0a43f9e62881b6198b0539",
+    "tests/box3d_motion/run.py": "c8623df072c318fe11598304ba35d09206cfa62de55172bbc0fee205740810de"
+  },
+  "source_hash_scope": "Selected assigned sources/tests/docs plus exact Native manifests, not exact compiler import tracing; documentation-only updates follow runtime runs.",
+  "limits": [
+    "35 bodies/shapes,32dynamic,onejoint,eightassets,H128,pred8/repair8,global64MiB unchanged.",
+    "Native motion hit/plane capacities256; a saturated per-shape public plane batch is conservatively Capacity, with no partial output.",
+    "Standalone framework cases use explicit static Native/nilOwner; the actual SDK authoring/mover probe is separate, not an invented whole-framework-in-engine test.",
+    "No new performance/cross-target/exportGateC/whole-goal claim.",
+    "Earlier failures and initial Native artifacts remain unchanged."
+  ],
+  "whole_goal_complete": false
+}

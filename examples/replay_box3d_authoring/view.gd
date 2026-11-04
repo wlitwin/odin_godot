@@ -1,0 +1,1 @@
+extends Box3DAuthoringSampleView

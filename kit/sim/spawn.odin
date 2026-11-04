@@ -88,6 +88,7 @@ lane_spawn_predicted :: proc(
 	type: ksess.Entity_Type,
 	allocator := mem.Allocator{},
 ) -> knet.Net_Id {
+	if lane_world_refuse(l) {return 0}
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	if l.ses.is_host {
 		return 0 // the authority spawns for real; prediction is the client's job
@@ -130,6 +131,7 @@ lane_spawn_match :: proc(
 	type: ksess.Entity_Type,
 	allocator := mem.Allocator{},
 ) -> (entity: rawptr, from: knet.Net_Id, ok: bool) {
+	if lane_world_refuse(l) {return nil,0,false}
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	// Oldest unmatched of this (owner, type) — lowest provisional id, FIFO with
 	// the authority's in-order spawns.
@@ -186,6 +188,7 @@ lane_spawn_of_exec :: proc(l: ^Lane) -> (entity: rawptr, id: knet.Net_Id, ok: bo
 // firing command's seq). Returns its entity so the caller frees the node
 // (or the installed spawn_free hook does). nil = this fire spawned nothing.
 lane_spawn_reject :: proc(l: ^Lane, seq: u32) -> rawptr {
+	if lane_world_refuse(l) {return nil}
 	for tr in l.tracked {
 		if tr.provisional && tr.spawn_seq == seq {
 			despawn_provisional(l, tr.id, tr.entity)
@@ -199,6 +202,7 @@ lane_spawn_reject :: proc(l: ^Lane, seq: u32) -> rawptr {
 // window. The installed spawn_free hook removes the engine node and Boot
 // census row. A committed/rekeyed entity is not a draft and returns false.
 lane_spawn_cancel :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
+	if lane_world_refuse(l) {return false}
 	if !lane_id_provisional(id) {return false}
 	for tr in l.tracked {
 		if tr.id == id && tr.provisional {
@@ -213,6 +217,7 @@ lane_spawn_cancel :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 // per client frame. Despawned entities are freed through the spawn_free hook
 // (and appended to `out`, if given, for a caller that frees nodes itself).
 lane_spawn_sweep :: proc(l: ^Lane, out: ^[dynamic]rawptr = nil) {
+	if lane_world_refuse(l) {return}
 	for i := 0; i < len(l.tracked); {
 		tr := l.tracked[i]
 		if tr.provisional && l.ticker.tick > tr.born + u64(l.slots) {

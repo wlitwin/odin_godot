@@ -8,6 +8,7 @@ import sc "godot:replay/schema"
 // assets. The bundle is encoded completely before the staged file write begins.
 checkpoint_bundle_write :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.Model(S, C, A, $E, N),
                                 cache: ^a.Cache, refs: []a.Ref, path: string, codec: ^net.Checkpoint_Codec = nil) -> Storage_Result {
+ if managed_physics(model){return {.Codec,.Invalid_Config}}
 	bytes,result:=checkpoint_bundle_encode(cp,model,cache,refs,codec);defer delete(bytes)
 	if result.error!=.None {return result}
 	return {error=storage_write(path,bytes,a.BUNDLE_LIMIT)}
@@ -17,6 +18,7 @@ checkpoint_bundle_write :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.
 // can be submitted to an asynchronous browser operation or a native file writer.
 checkpoint_bundle_encode :: proc(cp: ^net.Checkpoint($S,$C,$A,$N),model:net.Model(S,C,A,$E,N),
                                  cache:^a.Cache,refs:[]a.Ref,codec:^net.Checkpoint_Codec=nil)->([]u8,Storage_Result) {
+ if managed_physics(model){return nil,{.Codec,.Invalid_Config}}
 	root, err := net.checkpoint_encode(cp, model, codec = codec); defer delete(root)
 	if err != .None {return nil,{.Codec, err}}
 	bytes, bundled := a.bundle_encode(root, refs, cache, {epoch = cp.header.epoch, tick = cp.header.tick, content = cp.header.content})
@@ -29,6 +31,7 @@ checkpoint_bundle_encode :: proc(cp: ^net.Checkpoint($S,$C,$A,$N),model:net.Mode
 // checkpoints produce a view with no assets and must pass those same checks.
 checkpoint_bundle_read :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.Model(S, C, A, $E, N),
                                path: string, content: u64) -> ([]u8, a.Bundle_View, Storage_Result) {
+ if managed_physics(model){return nil,{},{.Codec,.Invalid_Config}}
 	if cp.ready {return nil, {}, {.Codec, .Wrong_Phase}}
 	bytes, storage := storage_read(path, a.BUNDLE_LIMIT)
 	if storage != .None {return nil, {}, {error = storage}}
@@ -41,6 +44,7 @@ checkpoint_bundle_read :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.M
 // completeness before installing assets or opening the resumed runner.
 checkpoint_bundle_decode :: proc(cp:^net.Checkpoint($S,$C,$A,$N),model:net.Model(S,C,A,$E,N),
                                  bytes:[]u8,content:u64)->(a.Bundle_View,Storage_Result) {
+ if managed_physics(model){return {},{.Codec,.Invalid_Config}}
 	if cp.ready {return {},{.Codec,.Wrong_Phase}}
 	view: a.Bundle_View
 	// Bundle headers describe an appended body; inspect only a raw checkpoint

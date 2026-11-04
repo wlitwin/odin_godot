@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "result": "PASS",
+  "scope": "W1 complete C backend WebAssembly, reusable archives and actual Chrome CPU/runtime control",
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-03T06:30:12.890418+00:00",
+  "board": "b_c14f6d2a88d84dbe",
+  "task": "t_530ac12389c748a9",
+  "pin": {
+    "url": "https://github.com/erincatto/box3d.git",
+    "commit": "336263320469e5e9febfe18697ab562488f7e97a",
+    "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+    "git_archive_sha256": "a9143675b297bb6c6f3d031d1bdf5c265d8642139eea26f265958066bd947935"
+  },
+  "selected_initial_profile": "WebSIMD",
+  "engine_patches_added": [],
+  "source_preparation": "Existing verified native extraction/patch/reverse-preimage checks factored into build/box3d_source.py and reused by both builders.",
+  "variants": {
+    "WebScalar": {
+      "archive": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/wasm-cache/build/WebScalar/ecca1da3b73cb87ffe612e0d6159bfd7c179c8ff4c2db755f1183d34a0f04def/libogb3.a",
+        "sha256": "8d05dfb0a6aa398b0038b6f82fdf9f15a2918b8b0ed8ac8070958e689210cd7b"
+      },
+      "manifest": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/wasm-cache/build/WebScalar/ecca1da3b73cb87ffe612e0d6159bfd7c179c8ff4c2db755f1183d34a0f04def/build-manifest.json",
+        "sha256": "b19f293bb4d7888ce43abd00b48bd783e2829edaa81639147b022d8b892a8e01"
+      },
+      "build": "ecca1da3b73cb87ffe612e0d6159bfd7c179c8ff4c2db755f1183d34a0f04def",
+      "target": "25294b8e1219011e65270f1b52b359b3aa8ee2ab7a071706238464108f25554a",
+      "testing": false,
+      "resolved_simulation_macros": {
+        "B3_ENABLE_ASSERT": "1",
+        "B3_SIMD_NONE": "",
+        "BOX3D_VALIDATE": "1",
+        "__BYTE_ORDER__": "__ORDER_LITTLE_ENDIAN__",
+        "__EMSCRIPTEN_PTHREADS__": "1",
+        "__EMSCRIPTEN_SHARED_MEMORY__": "1",
+        "__EMSCRIPTEN__": "1",
+        "__SIZEOF_POINTER__": "4",
+        "__wasm": "1",
+        "__wasm32": "1",
+        "__wasm32__": "1",
+        "__wasm__": "1",
+        "__wasm_atomics__": "1",
+        "__wasm_bulk_memory__": "1",
+        "__wasm_bulk_memory_opt__": "1",
+        "__wasm_exception_handling__": "1",
+        "__wasm_multivalue__": "1",
+        "__wasm_mutable_globals__": "1",
+        "__wasm_nontrapping_fptoint__": "1",
+        "__wasm_reference_types__": "1",
+        "__wasm_sign_ext__": "1"
+      },
+      "target_contract": {
+        "schema_version": 1,
+        "kind": "emscripten-wasm32",
+        "pointer_bits": 32,
+        "endian": "little",
+        "compiler_version": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.6-git\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\nThis is free and open source software under the MIT license.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "compiler_sha256": "ff4d49588ceee150ad3762b353c50ae818e5eaa34444ba866d1dd1ca4f589861",
+        "flags": [
+          "-O2",
+          "-std=gnu17",
+          "-fPIC",
+          "-fvisibility=hidden",
+          "-pthread",
+          "-UNDEBUG",
+          "-DBOX3D_VALIDATE",
+          "-DB3_ENABLE_ASSERT",
+          "-fno-fast-math",
+          "-ffp-contract=off",
+          "-sSUPPORT_LONGJMP=wasm",
+          "-DBOX3D_DISABLE_SIMD",
+          "-DOGB3_HAS_SNAPSHOTS",
+          "-DOGB3_HAS_STATE_DUMP",
+          "-DOGB3_HAS_RECOVERY"
+        ]
+      }
+    },
+    "WebSIMD": {
+      "archive": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/wasm-cache/build/WebSIMD/d3db4f9c5dac6097816881a914956ca4e0924a79b1a166c07ed54170979ed237/libogb3.a",
+        "sha256": "bcb24b2e3a9d294a1beb2defa559b13532b4f2b8373d75fa2093342c87e72c67"
+      },
+      "manifest": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/wasm-cache/build/WebSIMD/d3db4f9c5dac6097816881a914956ca4e0924a79b1a166c07ed54170979ed237/build-manifest.json",
+        "sha256": "7b4a60d8764cd3be645990dd0b3b89436540bef70a15dcad7bf9a18800b6a074"
+      },
+      "build": "d3db4f9c5dac6097816881a914956ca4e0924a79b1a166c07ed54170979ed237",
+      "target": "4df69614abec533b1f458de4fb2da034836e8a112ef57218faf482d026482a22",
+      "testing": false,
+      "resolved_simulation_macros": {
+        "B3_ENABLE_ASSERT": "1",
+        "B3_SIMD_ENABLED": "",
+        "B3_SIMD_SSE2": "",
+        "BOX3D_VALIDATE": "1",
+        "__BYTE_ORDER__": "__ORDER_LITTLE_ENDIAN__",
+        "__EMSCRIPTEN_PTHREADS__": "1",
+        "__EMSCRIPTEN_SHARED_MEMORY__": "1",
+        "__EMSCRIPTEN__": "1",
+        "__SIZEOF_POINTER__": "4",
+        "__wasm": "1",
+        "__wasm32": "1",
+        "__wasm32__": "1",
+        "__wasm__": "1",
+        "__wasm_atomics__": "1",
+        "__wasm_bulk_memory__": "1",
+        "__wasm_bulk_memory_opt__": "1",
+        "__wasm_exception_handling__": "1",
+        "__wasm_multivalue__": "1",
+        "__wasm_mutable_globals__": "1",
+        "__wasm_nontrapping_fptoint__": "1",
+        "__wasm_reference_types__": "1",
+        "__wasm_sign_ext__": "1",
+        "__wasm_simd128__": "1"
+      },
+      "target_contract": {
+        "schema_version": 1,
+        "kind": "emscripten-wasm32",
+        "pointer_bits": 32,
+        "endian": "little",
+        "compiler_version": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.6-git\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\nThis is free and open source software under the MIT license.\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "compiler_sha256": "ff4d49588ceee150ad3762b353c50ae818e5eaa34444ba866d1dd1ca4f589861",
+        "flags": [
+          "-O2",
+          "-std=gnu17",
+          "-fPIC",
+          "-fvisibility=hidden",
+          "-pthread",
+          "-UNDEBUG",
+          "-DBOX3D_VALIDATE",
+          "-DB3_ENABLE_ASSERT",
+          "-fno-fast-math",
+          "-ffp-contract=off",
+          "-sSUPPORT_LONGJMP=wasm",
+          "-msimd128",
+          "-msse2",
+          "-DOGB3_HAS_SNAPSHOTS",
+          "-DOGB3_HAS_STATE_DUMP",
+          "-DOGB3_HAS_RECOVERY"
+        ]
+      }
+    }
+  },
+  "corpora": {
+    "WebSIMD": {
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/corpus-simd-v2/report.json",
+        "sha256": "aafc3cb45dfa4487620ae65feef3760f94ebbbb75bdd91df6f16f1cdc6a23630"
+      },
+      "actual_C_groups": 8,
+      "independent_reference": true,
+      "actual_ctest_run_pass": false
+    },
+    "WebScalar": {
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/corpus-scalar-v1/report.json",
+        "sha256": "2753c82061469b202b4803c1501f44a4e193f992010fe0680117ed61050f7c2a"
+      },
+      "actual_C_groups": 8,
+      "independent_reference": true,
+      "actual_ctest_run_pass": false
+    }
+  },
+  "production": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/production-browser-v1/report.json",
+      "sha256": "226041f73ae55302083b8f4969a16017a555c337154595c71a8780be5bc16f7d"
+    },
+    "browser": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/production-browser-v1/browser-report.json",
+      "sha256": "eb0c3640c2dc2779425af23b9dc4a488a06e0fdffd66cfa689f0843fea16e5fb"
+    },
+    "browser_version": "Chrome/156.0.8078.80",
+    "node_and_browser_same_program_bytes": true,
+    "wasm32_asset_size": 64,
+    "wasm32_asset_alignment": 4,
+    "source_free_continuation_steps": 32,
+    "malformed_load_preserves_published_state": true,
+    "native_wrapper_cleanup_zero": true
+  },
+  "bounded_comparison": {
+    "scope": "21-body C impulse/fixed-step/history-release/capture/public-admission composite; headless Chrome, no renderer or adapter costs",
+    "order": [
+      "WebScalar",
+      "WebSIMD"
+    ],
+    "samples": {
+      "WebScalar": {
+        "unit": "milliseconds",
+        "count": 256,
+        "p50": 0.219970703,
+        "p95": 0.364990234,
+        "p99": 1.290039062,
+        "maximum": 2.245117188,
+        "raw_samples_ref": {
+          "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/production-browser-v1/browser-report.json",
+          "sha256": "eb0c3640c2dc2779425af23b9dc4a488a06e0fdffd66cfa689f0843fea16e5fb"
+        },
+        "all_samples_retained": true,
+        "result": {
+          "ok": true,
+          "pointer_bits": 32,
+          "asset_size": 64,
+          "asset_alignment": 4,
+          "samples": 256,
+          "bodies": 21,
+          "canonical_bytes": 41523,
+          "source_free_steps": 32,
+          "native_live": 0,
+          "wrapper_live": 0,
+          "timer_min_positive_ms": 0.004882812,
+          "native_peak": 2276096,
+          "wrapper_peak": 603713,
+          "wasm_linear_memory_bytes": 16777216
+        }
+      },
+      "WebSIMD": {
+        "unit": "milliseconds",
+        "count": 256,
+        "p50": 0.209960938,
+        "p95": 0.314941406,
+        "p99": 0.755126953,
+        "maximum": 3.780029297,
+        "raw_samples_ref": {
+          "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/production-browser-v1/browser-report.json",
+          "sha256": "eb0c3640c2dc2779425af23b9dc4a488a06e0fdffd66cfa689f0843fea16e5fb"
+        },
+        "all_samples_retained": true,
+        "result": {
+          "ok": true,
+          "pointer_bits": 32,
+          "asset_size": 64,
+          "asset_alignment": 4,
+          "samples": 256,
+          "bodies": 21,
+          "canonical_bytes": 41523,
+          "source_free_steps": 32,
+          "native_live": 0,
+          "wrapper_live": 0,
+          "timer_min_positive_ms": 0.004882812,
+          "native_peak": 2276096,
+          "wrapper_peak": 603713,
+          "wasm_linear_memory_bytes": 16777216
+        }
+      }
+    },
+    "decision": "Select supported upstream Wasm SIMD for integration. Its median/tail percentiles were lower here; its larger maximum3.780029297ms is retained. No statistical cause or final budget acceptance inferred.",
+    "qualification_status": "INCOMPLETE for S0 game/adapter/render/load/multiplayer budgets"
+  },
+  "native_compatibility": {
+    "manifest": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/native-compat-cache/build/Release/build-manifest.json",
+      "sha256": "6872a3bf739b8559ccede28491a2c81db1252f1abbc24f3192b5051730b67616"
+    },
+    "library": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/native-compat-cache/build/Release/libogb3.dylib",
+      "sha256": "4adcaf52d29665301cde49396e08f9378621276dfb1a1d3774c78c214cf74a49"
+    },
+    "archive": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/native-compat-cache/build/Release/libogb3.a",
+      "sha256": "c17c802ba33689236d6a5f6244143ded4095605a7e53f195cec34fca0e9a708b"
+    },
+    "actual_ctest_cases": 13,
+    "source_inputs_current": true
+  },
+  "source_rejection_controls": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/source-controls-v1/report.json",
+    "sha256": "fe57e83699c482057cc1da5e0d48b9548f9e132206a08d6fbfa69ff85dd6052a"
+  },
+  "retained_red": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/corpus-simd-v1/report.json",
+      "sha256": "b20cdf60429ff830881d3971a12b07144e280ff40722fe41a09446d3fb2ce455"
+    },
+    "cause": "Test-only hardcoded alignment8; actual wasm32 descriptor alignment4.",
+    "correction": "Alignment query compared with _Alignof(ogb3_recovery_asset_v2), retaining size/offset/lifetime/malformed/state assertions.",
+    "before_source": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W1/authoring-layout-before.c",
+      "sha256": "f714f060c44f737e8f687c73a54f6895ad9c4d1d2ec35b8b50e2106aa7970161"
+    }
+  },
+  "limits": [
+    "No Godot AOT backend service or C/Odin FFI proof yet (W2)",
+    "No browser Replay/Kit multiplayer or full-five-part framework comparison yet (W3)",
+    "No native/browser or scalar/SIMD peer compatibility claim",
+    "No rendering, final game budget or sustained-session qualification",
+    "No fork or engine patch required by these Wasm runs",
+    "Historical W0 and earlier report/artifact bytes preserved"
+  ]
+}

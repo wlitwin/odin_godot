@@ -1,0 +1,41 @@
+[gd_scene format=3]
+[sub_resource type="StandardMaterial3D" id="ground_mat"]
+albedo_color = Color(0.18,0.23,0.3,1)
+roughness = 0.9
+[sub_resource type="StandardMaterial3D" id="pendulum_mat"]
+albedo_color = Color(1,0.55,0.18,1)
+[sub_resource type="StandardMaterial3D" id="player_mat"]
+albedo_color = Color(0.25,0.65,1,1)
+[sub_resource type="StandardMaterial3D" id="sensor_mat"]
+transparency = 1
+albedo_color = Color(0.25,1,0.7,0.18)
+shading_mode = 0
+[sub_resource type="BoxMesh" id="ground_mesh"]
+size = Vector3(10,0.5,10)
+material = SubResource("ground_mat")
+[sub_resource type="BoxMesh" id="pendulum_mesh"]
+size = Vector3(0.4,1.5,0.4)
+material = SubResource("pendulum_mat")
+[sub_resource type="SphereMesh" id="player_mesh"]
+radius = 0.35
+height = 0.7
+radial_segments = 24
+rings = 12
+material = SubResource("player_mat")
+[sub_resource type="BoxMesh" id="sensor_mesh"]
+size = Vector3(3,0.4,3)
+material = SubResource("sensor_mat")
+[node name="Visuals" type="Node3D"]
+[node name="Ground" type="MeshInstance3D" parent="."]
+position = Vector3(0,-0.25,0)
+mesh = SubResource("ground_mesh")
+[node name="Pendulum" type="MeshInstance3D" parent="."]
+position = Vector3(-2,2,0)
+mesh = SubResource("pendulum_mesh")
+[node name="Player" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.5,0)
+mesh = SubResource("player_mesh")
+[node name="Sensor" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.2,0)
+mesh = SubResource("sensor_mesh")
+cast_shadow = 0

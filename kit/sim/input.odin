@@ -56,7 +56,7 @@ input_finite_f64 :: proc(x: f64) -> bool {return !math.is_nan(x) && !math.is_inf
 input_finite :: proc {
 	input_finite_f16,
 	input_finite_f32,
-	input_finite_f64
+	input_finite_f64,
 }
 
 input_unit_f32 :: proc(v: ^[$N]f32) -> bool {
@@ -89,7 +89,7 @@ input_unit_f64 :: proc(v: ^[$N]f64) -> bool {
 
 input_unit :: proc {
 	input_unit_f32,
-	input_unit_f64
+	input_unit_f64,
 }
 
 // Raw packet bytes can contain an enum's underlying integer even when no enum
@@ -117,10 +117,10 @@ write_blob :: proc(w: ^knet.Writer, blob: []u8) {
 
 Input_Ring :: struct {
 	ring: Tick_Ring, // the tick-indexed store (ring.odin)
-	head: u64,       // newest tick noted (0 = none yet)
-	tail: u64,       // oldest tick still held — the first note anchors it (a
-	                 // client joins mid-timeline, so tick 1 usually never existed
-	                 // here), lapping advances it
+	head: u64, // newest tick noted (0 = none yet)
+	tail: u64, // oldest tick still held — the first note anchors it (a
+	// client joins mid-timeline, so tick 1 usually never existed
+	// here), lapping advances it
 }
 
 // `slots` must cover the resim window (the client's maximum lead) — a replay
@@ -166,9 +166,16 @@ input_read :: proc(r: ^Input_Ring, tick: u64) -> (input: []u8, ok: bool) {
 // window STILL writes the header — the sim lane composes this with the snap
 // ack in one packet, and a conditionally-absent segment would desync every
 // read behind it.
-input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := INPUT_REDUNDANCY) -> int {
-	assert(redundancy >= 0 && redundancy <= MAX_INPUT_REDUNDANCY,
-		"input redundancy exceeds the receiver's u8/bounded-work contract")
+input_write :: proc(
+	w: ^knet.Writer,
+	r: ^Input_Ring,
+	acked: u64,
+	redundancy := INPUT_REDUNDANCY,
+) -> int {
+	assert(
+		redundancy >= 0 && redundancy <= MAX_INPUT_REDUNDANCY,
+		"input redundancy exceeds the receiver's u8/bounded-work contract",
+	)
 	// Keep release builds safe too: a bad hand-written caller must never wrap
 	// the u8 count or make a receiver do more work than its advertised cap.
 	redundancy_limit := clamp(redundancy, 0, MAX_INPUT_REDUNDANCY)
@@ -210,8 +217,8 @@ input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := I
 Input_Buffer :: struct {
 	ring:        Tick_Ring, // the tick-indexed store (ring.odin)
 	tags:        []u64, // per-tick rider, one per ring slot: the value `apply` was given for
-	                    // the packet that delivered the tick (the sim lane rides the snap ack
-	                    // here — it binds each input to the WORLD VIEW its sender aimed with)
+	// the packet that delivered the tick (the sim lane rides the snap ack
+	// here — it binds each input to the WORLD VIEW its sender aimed with)
 	tag:         u64, // the last popped tick's rider, held-last across gaps like the input
 	newest:      u64, // newest tick ever received — the ack the client trims by
 	popped:      u64, // last tick consumed (0 = none): older arrivals are stale
@@ -219,7 +226,7 @@ Input_Buffer :: struct {
 	fresh_count: u64, // pops that found the exact tick
 	held_count:  u64, // pops that fell back to hold-last (the gap stat)
 	fresh:       bool, // did the LAST pop find its tick (the driver's freshness bit) —
-	                   // per-class now, so it rides the buffer instead of the peer
+	// per-class now, so it rides the buffer instead of the peer
 }
 
 input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator) -> Input_Buffer {
@@ -227,7 +234,7 @@ input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator)
 	return Input_Buffer {
 		ring = tick_ring_make(size, slots, allocator),
 		tags = make([]u64, slots, allocator),
-		held = make([]u8, size, allocator)
+		held = make([]u8, size, allocator),
 	}
 }
 
@@ -248,7 +255,7 @@ input_buffer_destroy :: proc(b: ^Input_Buffer) {
 Input_Window_Header :: struct {
 	first: u64,
 	count: int,
-	size:  int
+	size:  int,
 }
 
 // Read and preflight one window without consuming its blob bytes. lane_handle
@@ -256,11 +263,15 @@ Input_Window_Header :: struct {
 // before applying any class; input_buffer_apply uses the same gate for direct
 // callers and tests.
 @(private)
-input_window_header :: proc(r: ^knet.Reader, expected_size: int, max_tick: u64) -> Input_Window_Header {
-	h := Input_Window_Header{
+input_window_header :: proc(
+	r: ^knet.Reader,
+	expected_size: int,
+	max_tick: u64,
+) -> Input_Window_Header {
+	h := Input_Window_Header {
 		first = knet.read_u64(r),
 		count = int(knet.read_u8(r)),
-		size  = int(knet.read_u16(r))
+		size  = int(knet.read_u16(r)),
 	}
 	if r.err || h.count > MAX_INPUT_REDUNDANCY || h.size != expected_size {
 		r.err = true
@@ -288,7 +299,7 @@ input_window_validate :: proc(
 	expected_size: int,
 	max_tick := max(u64),
 	validate: Input_Validate_Proc = nil,
-	user: rawptr = nil
+	user: rawptr = nil,
 ) -> bool {
 	h := input_window_header(r, expected_size, max_tick)
 	if r.err {
@@ -310,7 +321,7 @@ input_buffer_apply :: proc(
 	tag: u64 = 0,
 	max_tick := max(u64),
 	validate: Input_Validate_Proc = nil,
-	user: rawptr = nil
+	user: rawptr = nil,
 ) -> int {
 	// Direct callers get the same all-before-any semantic gate as lane_handle.
 	// The probe's blob views alias the packet, so a sanitizer's clamped bytes
@@ -381,4 +392,119 @@ input_buffer_pop :: proc(b: ^Input_Buffer, tick: u64) -> (input: []u8, fresh: bo
 	b.held_count += 1 // b.tag holds the last real rider, like the input itself
 	b.fresh = false
 	return b.held, false
+}
+
+// Whole-world input resolution. Accepted authority values always win, including
+// for this client's own player. Only an unknown row may use a local sample or a
+// held predecessor. Complete checkpoints install that predecessor explicitly.
+@(private)
+world_net_input_codec :: proc(n: ^World_Network, class: u16) -> ^World_Value_Codec {
+	for &c in n.config.codec.inputs {if c.class == class {return &c.codec}}
+	return nil
+}
+@(private)
+world_net_data :: proc(n: ^World_Network, data: []u8, tick: u64) -> []u8 {
+	i := int(tick % WORLD_HISTORY_FRAMES) * n.value_bytes
+	return data[i:i + n.value_bytes]
+}
+@(private)
+world_net_driver_bytes :: proc(n: ^World_Network, data: []u8, driver: int) -> []u8 {
+	c := world_net_input_codec(n, n.drivers[driver].class)
+	return data[n.offsets[driver]:n.offsets[driver] + c.local_bytes]
+}
+@(private)
+world_net_input :: proc(l: ^Lane, player: knet.Player_Id, class: u16) -> ([]u8, bool) {
+	n := l.world.network
+	for d, i in n.drivers {if d.player == player && d.class == class {
+			for j := n.stage_count - 1; j >= 0; j -= 1 {if n.staged[j].tick == l.step_tick {
+					data := n.staged_data[j * n.value_bytes:(j + 1) * n.value_bytes]
+					return world_net_driver_bytes(n, data, i), true
+				}}
+			row := &n.used[l.step_tick % WORLD_HISTORY_FRAMES]
+			if row.valid &&
+			   row.tick ==
+				   l.step_tick {return world_net_driver_bytes(n, world_net_data(n, n.used_data, l.step_tick), i), row.origin[i] != .Unknown}
+		}}
+	return nil, false
+}
+// Read the exact canonical accepted decision, never a held prediction disguised
+// as authority. The returned local bytes are borrowed until the ledger wraps.
+lane_world_accepted_input :: proc(
+	l: ^Lane,
+	tick: u64,
+	player: knet.Player_Id,
+	class: u16,
+) -> (
+	[]u8,
+	World_Input_Origin,
+	u64,
+	World_Error,
+) {
+	if l == nil || l.world == nil || l.world.network == nil {return nil, .Unknown, 0, .Unsupported}
+	n := l.world.network; row := &n.accepted[tick % WORLD_HISTORY_FRAMES]
+	if !row.valid || row.tick != tick {return nil, .Unknown, 0, .History_Missing}
+	for d, i in n.drivers {if d.player == player && d.class == class && row.origin[i] != .Unknown {return world_net_driver_bytes(n, world_net_data(n, n.accepted_data, tick), i), row.origin[i], row.sequence[i], .Ok}}
+	return nil, .Unknown, 0, .History_Missing
+}
+@(private)
+world_net_operation_begin :: proc(l: ^Lane, tick: u64) -> World_Error {
+	n := l.world.network; if n == nil {return .Ok}
+	n.stage_count = 0
+	row := &n.used[tick % WORLD_HISTORY_FRAMES]
+	if !row.valid || row.tick != tick {return .History_Missing}
+	n.staged[0] = row^; copy(n.staged_data[:n.value_bytes], world_net_data(n, n.used_data, tick)); n.stage_count = 1
+	return .Ok
+}
+@(private)
+world_net_prepare :: proc(l: ^Lane, tick: u64) -> World_Error {
+	n := l.world.network; if n == nil {return .Ok}
+	if n.stage_count == 0 || n.stage_count >= len(n.staged) {return .Capacity}
+	index := n.stage_count; prior := &n.staged[index - 1]
+	if prior.tick + 1 != tick {return .History_Missing}
+	row := &n.staged[index]; row^ = {
+		tick  = tick,
+		valid = true,
+	}
+	dst := n.staged_data[index * n.value_bytes:(index + 1) * n.value_bytes]
+	previous := n.staged_data[(index - 1) * n.value_bytes:index * n.value_bytes]
+	accepted := &n.accepted[tick % WORLD_HISTORY_FRAMES]
+	proposed := &n.proposed[tick % WORLD_HISTORY_FRAMES]
+	for d, i in n.drivers {
+		value := world_net_driver_bytes(n, dst, i)
+		if accepted.valid && accepted.tick == tick && accepted.origin[i] != .Unknown {
+			copy(
+				value,
+				world_net_driver_bytes(n, world_net_data(n, n.accepted_data, tick), i),
+			); row.origin[i] = accepted.origin[i]; row.sequence[i] = accepted.sequence[i]
+		} else if l.ses.is_host &&
+		   proposed.valid &&
+		   proposed.tick == tick &&
+		   proposed.origin[i] == .Submitted {
+			copy(
+				value,
+				world_net_driver_bytes(n, world_net_data(n, n.proposed_data, tick), i),
+			); row.origin[i] = .Submitted; row.sequence[i] = proposed.sequence[i]
+		} else if d.player == l.ses.me {
+			ic := lane_class(l, d.class); if ic == nil {return .Incompatible}
+			local, have := input_read(&ic.ring, tick); if !have {return .History_Missing}
+			copy(value, local); row.origin[i] = l.ses.is_host ? .Authority : .Unknown
+			row.sequence[i] = tick // stable local sample identity across retransmission
+		} else {
+			hold :=
+				true; for c in n.config.codec.inputs {if c.class == d.class {hold = c.prediction == .Hold}}
+			if hold {copy(value, world_net_driver_bytes(n, previous, i))} else {for &b in value {b = 0}}; row.origin[i] = l.ses.is_host ? .Held : .Unknown; row.sequence[i] = prior.sequence[i]
+		}
+	}
+	n.stage_count += 1
+	return .Ok
+}
+@(private)
+world_net_commit_inputs :: proc(l: ^Lane) {
+	n := l.world.network; if n == nil {return}
+	for row, i in n.staged[:n.stage_count] {
+		n.used[row.tick % WORLD_HISTORY_FRAMES] = row
+		data := n.staged_data[i * n.value_bytes:(i + 1) * n.value_bytes]
+		copy(world_net_data(n, n.used_data, row.tick), data)
+		if l.ses.is_host {n.accepted[row.tick % WORLD_HISTORY_FRAMES] = row; copy(world_net_data(n, n.accepted_data, row.tick), data)}
+	}
 }

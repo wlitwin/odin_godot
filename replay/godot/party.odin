@@ -3,6 +3,7 @@ package replay_godot
 import "core:crypto"
 import "core:fmt"
 import "core:strings"
+import "core:mem"
 import gd "godot:godot"
 import auth "godot:replay/authority"
 import p "godot:replay/provision"
@@ -30,6 +31,7 @@ Party_Config :: struct {
 	tls: gd.Tls_Options,
 	storage: Party_Storage,
 	entropy: p.Entropy, // optional embedding/test source; default uses Godot Crypto
+	short_codes: bool, // opt-in cooperative Player/single-use, five-character code v1
 }
 // Stable-address owner. Storage is borrowed; close Party before its native store.
 // No scene/UI/model dependency. A game starts Room only after party_grant succeeds.
@@ -49,6 +51,8 @@ Party :: struct {
 	grant: p.Grant,
 	invite: p.Ticket,
 	code: [p.INVITE_CODE_BYTES]u8,
+	code_count: int,
+	allocator:mem.Allocator,
 }
 @(private)
 party_scope :: proc(service: string) -> string {
@@ -56,7 +60,9 @@ party_scope :: proc(service: string) -> string {
 	for b, i in hash {bytes[2 * i], bytes[2 * i + 1] = alphabet[b >> 4], alphabet[b & 15]}
 	return strings.clone(string(bytes[:]))
 }
-party_open :: proc(o: ^Party, cfg: Party_Config) -> bool {
+party_open :: proc(o: ^Party, cfg: Party_Config,allocator:=context.allocator) -> bool {
+	context.allocator=allocator
+	if cfg.short_codes && (cfg.invite_role != .Player || cfg.invite_uses != 1) {return false}
 	if cfg.checkpoint_interval_ms!=0 && (cfg.checkpoint_interval_ms<1000 || cfg.checkpoint_interval_ms>120000) {return false}
 	if o.initialized || !p.service_url_valid(cfg.service, cfg.local_development) || !storagegd.browser_store_key_valid(cfg.namespace) ||
 	   cfg.content == 0 || cfg.invite_role > .Trusted_Peer || cfg.invite_uses == 0 || cfg.invite_uses >= auth.MAX_MEMBERS {return false}
@@ -65,6 +71,7 @@ party_open :: proc(o: ^Party, cfg: Party_Config) -> bool {
 	if transportgd.rtc_ice_validate(cfg.ice_json) != .None {return false}
 	if cfg.relay_credentials && cfg.ice_json != "" {return false}
 	when !gd.IS_WEB {if cfg.storage.open == nil || cfg.storage.recent == nil || cfg.storage.select == nil {return false}}
+	o.allocator=allocator
 	o.config = cfg; o.config.service = strings.clone(cfg.service); o.config.namespace = strings.clone(cfg.namespace)
 	o.config.ice_json = strings.clone(cfg.ice_json)
 	if cfg.tls != nil {gd.ref_counted_reference(cfg.tls)}
@@ -81,12 +88,20 @@ party_open :: proc(o: ^Party, cfg: Party_Config) -> bool {
 }
 party_begin :: proc(o: ^Party, action: Party_Action, ticket: p.Ticket = {}) -> bool {
 	if !o.initialized || !o.recent_loaded || o.active || o.recent_writing || action > .Rejoin || (action != .Join && ticket != (p.Ticket{})) {return false}
+	context.allocator=o.allocator
 	provision_disconnect(&o.connection); relay_close(&o.relay); enrollment_profile_close(&o.profile)
 	o.active, o.failed, o.invited, o.ready, o.recent_saved, o.error, o.protocol_error = false, false, false, false, false, .None, .None
 	o.grant, o.invite, o.code, o.request = {}, {}, {}, {}
+	o.code_count = 0
 	o.invite_resolved, o.invite_error = false, .None
 	claim, room, ok := party_random(o.config.entropy)
 	if !ok {party_fail(o, .Entropy); return false}
+	if action == .Create && o.config.short_codes {
+		code, valid := p.short_code(claim, o.config.content)
+		if !valid {party_fail(o, .Entropy); return false}
+		ticket, valid_ticket := p.short_ticket_parse(string(code[:]), o.config.content)
+		if !valid_ticket {party_fail(o, .Entropy); return false}; room = ticket.room
+	}
 	if action == .Rejoin {room = o.recent_room; if room == 0 {party_fail(o, .Missing); return false}}
 	else if action == .Join {_, valid := p.ticket_code(ticket); if !valid {party_fail(o, .Invite); return false}; room = ticket.room}
 	o.target = room
@@ -104,6 +119,7 @@ party_begin :: proc(o: ^Party, action: Party_Action, ticket: p.Ticket = {}) -> b
 }
 party_frame :: proc(o: ^Party) {
 	if !o.initialized || o.failed {return}
+	context.allocator=o.allocator
 	if o.ready && o.config.relay_credentials {relay_frame(&o.relay)}
 	party_recent_frame(o)
 	if o.failed || !o.active {return}
@@ -111,6 +127,10 @@ party_frame :: proc(o: ^Party) {
 	e := &o.profile.value
 	if e.phase == .Loading {return}
 	if e.phase == .Failed {party_fail(o, e.error == .Conflict ? .Conflict : .Storage); return}
+	// A code collision must not silently adopt an earlier local creator's
+	// enrollment. Rejoin is an explicit action with a different request path.
+	if o.config.short_codes && o.request.version != 0 && o.request.verb == .Create &&
+	   (e.phase == .Pending || e.phase == .Ready) && e.record.request.claim != o.request.claim {party_fail(o, .Conflict); return}
 	if e.phase == .Empty {
 		if o.request.version == 0 || !enrollment_profile_begin(&o.profile, o.request) {party_fail(o, .Missing)}
 		return
@@ -145,13 +165,25 @@ party_frame :: proc(o: ^Party) {
 	if e.record.request.verb == .Create && !o.invite_resolved {
 		if !o.connection.client.pending && !o.connection.client.complete {
 			q, ok := p.creator_invite(e.record, o.config.invite_role, o.config.invite_uses, local_development = o.config.local_development)
+			if o.config.short_codes {
+				short, valid := p.creator_short_invite(e.record, local_development = o.config.local_development)
+				if valid {q, ok = short, true} else if o.request.version != 0 && o.request.verb == .Create {ok = false}
+			}
 			if !ok || provision_request(&o.connection, q) != .None {party_fail(o, .Invite); return}
 		}
 		if error := provision_frame(&o.connection); error != .None {o.protocol_error = error; party_fail(o, .Transport); return}
 		if !o.connection.client.complete {return}
 		reply := o.connection.client.reply; o.connection.client.complete = false
 		o.invite_resolved, o.invite_error = true, reply.result
-		if reply.result == .None {o.invite = reply.ticket; o.code, _ = p.ticket_code(reply.ticket); o.invited = true}
+		if reply.result == .None {
+			o.invite = reply.ticket; o.code, _ = p.ticket_code(reply.ticket); o.code_count = p.INVITE_CODE_BYTES
+			if o.config.short_codes {
+				code, valid := p.short_code(e.record.request.claim, e.record.request.content)
+				expected, parsed := p.short_ticket_parse(string(code[:]), e.record.request.content)
+				if valid && parsed && expected == reply.ticket {o.code = {}; o.code_count = copy(o.code[:], code[:])}
+			}
+			o.invited = true
+		}
 	}
 	if o.config.relay_credentials {
 		if !o.relay.ready && !relay_connect(&o.relay, o.config.service, o.grant, o.config.tls, o.config.local_development) {party_fail(o, .Relay); return}
@@ -173,6 +205,7 @@ party_room_options :: proc(o: ^Party, session: Session_Options) -> (Room_Options
 	return room_with_grant(options, grant)
 }
 party_close :: proc(o: ^Party) {
+	if o.allocator.procedure!=nil{context.allocator=o.allocator}
 	provision_disconnect(&o.connection); relay_close(&o.relay); enrollment_profile_close(&o.profile); storagegd.browser_store_close(&o.recent_op)
 	if o.config.tls != nil {gd.release_ref(o.config.tls)}
 	delete(o.config.service); delete(o.config.namespace); delete(o.config.ice_json); delete(o.scope); crypto.zero_explicit(o, size_of(Party))

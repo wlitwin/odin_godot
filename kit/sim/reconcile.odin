@@ -173,3 +173,9 @@ find_truth :: proc(truths: []Truth, id: knet.Net_Id) -> ^Truth {
 	}
 	return nil
 }
+
+// Complete whole-world correction. The physics mode never enters the legacy
+// field-equality shortcut or its missing-entity live-state fallback.
+lane_world_reconcile :: proc(l:^Lane,checkpoint:^World_Checkpoint,gate:=World_Commit_Gate{})->World_Result {
+    return world_reconcile(l,checkpoint,false,gate)
+}

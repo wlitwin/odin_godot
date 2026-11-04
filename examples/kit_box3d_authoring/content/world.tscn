@@ -1,0 +1,49 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://addons/box3d_authoring/world_3d.gd" id="world"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/body_3d.gd" id="body"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/sensor_3d.gd" id="sensor"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/shape_3d.gd" id="shape_base"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/hinge_joint_3d.gd" id="hinge"]
+[ext_resource type="Resource" path="res://content/ground.tres" id="ground_shape"]
+[ext_resource type="Resource" path="res://content/pendulum.tres" id="pendulum_shape"]
+[ext_resource type="Resource" path="res://content/player.tres" id="player_shape"]
+[ext_resource type="Resource" path="res://content/sensor.tres" id="sensor_shape"]
+[ext_resource type="Resource" path="res://content/hinge.tres" id="hinge_settings"]
+[node name="AuthoredWorld" type="Node3D"]
+script = ExtResource("world")
+stable_key = "box3d.authored.sample.v1"
+gravity = Vector3(0, -9.81, 0)
+[node name="Ground" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "ground"
+position = Vector3(0, -0.25, 0)
+shapes = Array[ExtResource("shape_base")]([ExtResource("ground_shape")])
+[node name="Pendulum" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "pendulum"
+body_type = 2
+position = Vector3(-2, 2, 0)
+linear_damping = 0.05
+angular_damping = 0.05
+shapes = Array[ExtResource("shape_base")]([ExtResource("pendulum_shape")])
+[node name="Player" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "player"
+body_type = 2
+position = Vector3(0, 0.5, 0)
+linear_damping = 0.25
+angular_damping = 0.25
+shapes = Array[ExtResource("shape_base")]([ExtResource("player_shape")])
+[node name="Sensor" type="Node3D" parent="."]
+script = ExtResource("sensor")
+stable_key = "sensor"
+position = Vector3(0, 0.2, 0)
+shapes = Array[ExtResource("shape_base")]([ExtResource("sensor_shape")])
+[node name="PendulumHinge" type="Node3D" parent="."]
+script = ExtResource("hinge")
+stable_key = "pendulum.hinge"
+body_a = "ground"
+body_b = "pendulum"
+local_frame_a = Transform3D(1,0,0,0,1,0,0,0,1,-2,3.25,0)
+local_frame_b = Transform3D(1,0,0,0,1,0,0,0,1,0,1,0)
+settings = ExtResource("hinge_settings")

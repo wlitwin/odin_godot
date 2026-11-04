@@ -26,6 +26,19 @@ SCRIPTS="${2:-$PROJ/scripts}"
 BIN="$PROJ/bin"
 mkdir -p "$BIN"
 
+# Every module must resolve the same backend as the core, including installed
+# addons whose prebuilt core lives outside the consumer's scripts/bin folder.
+CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
+if [[ "$ROOT" == */addons/odin_godot ]]; then
+    case "$DLL_EXT" in
+        dylib) CORE_PLAT=macos ;;
+        so) CORE_PLAT=linux ;;
+        dll) CORE_PLAT=windows ;;
+    esac
+    CORE_DLL="$ROOT/bin/$CORE_PLAT/libodin_godot.$DLL_EXT"
+fi
+BOX3D_RUNTIME_DIR="$(dirname "$CORE_DLL")"
+
 # Actionable failure when there are no scripts to compile (the #1 first-run snag): odin_godot
 # ships the engine CORE prebuilt — your .odin gameplay scripts are YOURS and live in a
 # scripts/ folder you create. Point the user at the bundled starter (which also carries the
@@ -136,6 +149,9 @@ if [[ "$IS_MODULE_DIR" == "0" && "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modul
 fi
 
 if [[ "${SKIP_CORE:-0}" == "1" ]]; then
+    if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
+        python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
+    fi
     echo "Built (scripts only):"
     for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
     exit 0
@@ -147,20 +163,10 @@ fi
 # addons/odin_godot/bin/<platform>/ — a core built to the project's bin/ is
 # dead weight there (a fixed core "didn't take" for a full debugging hour).
 # Publish the core where the manifest actually points.
-CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
-if [[ "$ROOT" == */addons/odin_godot ]]; then
-    case "$DLL_EXT" in
-        dylib) CORE_PLAT=macos ;;
-        so)    CORE_PLAT=linux ;;
-        dll)   CORE_PLAT=windows ;;
-        *)     CORE_PLAT="" ;;
-    esac
-    if [[ -n "$CORE_PLAT" ]]; then
-        mkdir -p "$ROOT/bin/$CORE_PLAT"
-        CORE_DLL="$ROOT/bin/$CORE_PLAT/libodin_godot.$DLL_EXT"
-    fi
-fi
 atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
+if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
+    python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
+fi
 
 echo "Built:"
 echo "  $CORE_DLL"

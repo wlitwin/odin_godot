@@ -4,24 +4,26 @@ import "core:fmt"
 import gd "godot:godot"
 import "godot:gdext"
 import net "godot:replay/net"
+import bg "godot:box3d/godot"
 
 Storage_Error :: enum {None, Invalid_Path, Open, Read, Write, Rename, Size, Codec, Identity}
 Storage_Result :: struct {error: Storage_Error, network: net.Error}
 
 checkpoint_write :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.Model(S, C, A, $E, N),
-                         path: string, codec: ^net.Checkpoint_Codec = nil) -> Storage_Result {
-	bytes, err := net.checkpoint_encode(cp, model, codec = codec)
-	defer delete(bytes)
+                         path: string, codec: ^net.Checkpoint_Codec = nil,allocator:=context.allocator) -> Storage_Result {
+	owned,err:=net.checkpoint_encode_owned(cp,model,allocator,codec)
+ defer net.complete_data_destroy(&owned)
+ bytes:=owned.bytes
 	if err != .None {return {.Codec, err}}
 	return {error = storage_write(path, bytes)}
 }
 
 checkpoint_read :: proc(cp: ^net.Checkpoint($S, $C, $A, $N), model: net.Model(S, C, A, $E, N),
-                        path: string, content: u64) -> Storage_Result {
-	bytes, err := storage_read(path, net.MAX_CHECKPOINT_BYTES)
-	defer delete(bytes)
+                        path: string, content: u64,allocator:=context.allocator) -> Storage_Result {
+	bytes, err := storage_read(path,net.MAX_CHECKPOINT_BYTES,allocator)
+	defer delete(bytes,allocator)
 	if err != .None {return {error = err}}
-	if err := net.checkpoint_decode(cp, bytes, model, content); err != .None {return {.Codec, err}}
+	if err := net.checkpoint_decode(cp,bytes,model,content,allocator); err != .None {return {.Codec, err}}
 	return {}
 }
 
@@ -98,3 +100,6 @@ session_profile :: proc(path: string) -> (net.Token, Storage_Error) {
 	if err := storage_write(path, token[:]); err != .None {return {}, err}
 	return token, .None
 }
+
+@(private)
+managed_physics :: proc(model:net.Model($S,$C,$A,$E,$N))->bool{return model.complete_state && bg.module_profile()!=0}

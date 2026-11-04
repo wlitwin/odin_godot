@@ -1,0 +1,103 @@
+# Configuration only: these remote jobs have NOT been executed in the local
+# implementation session. Operators provision the exact toolchains first.
+name: Box3D supported desktop exports
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [macos-arm64, linux-x86_64]
+        framework: [kit, replay]
+        include:
+          - target: macos-arm64
+            labels: [self-hosted, macOS, ARM64, box3d-desktop]
+          - target: linux-x86_64
+            labels: [self-hosted, Linux, X64, box3d-desktop]
+    runs-on: ${{ matrix.labels }}
+    env:
+      ODIN: ${{ matrix.target == 'macos-arm64' && vars.BOX3D_MACOS_ODIN || vars.BOX3D_LINUX_ODIN }}
+      GODOT: ${{ matrix.target == 'macos-arm64' && vars.BOX3D_MACOS_GODOT || vars.BOX3D_LINUX_GODOT }}
+      BOX3D_TOOLCHAIN_REPORT: ${{ vars.BOX3D_LINUX_TOOLCHAIN_REPORT }}
+      CC: clang
+      JOBS: '2'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Require explicitly provisioned tools (no implicit install)
+        shell: bash
+        run: |
+          test -n "$ODIN" && test -x "$ODIN"
+          test -n "$GODOT" && test -x "$GODOT"
+          command -v python3 clang cmake
+          if [ '${{ matrix.target }}' = linux-x86_64 ]; then
+            test -n "$BOX3D_TOOLCHAIN_REPORT" && test -f "$BOX3D_TOOLCHAIN_REPORT"
+            command -v llvm-nm readelf ldd
+          else
+            command -v codesign install_name_tool lipo otool
+          fi
+      - name: Pure archive/planner controls
+        run: python3 -B -m unittest discover -s tests/box3d_desktop -p '*_test.py' -v
+      - name: Exact archive identity
+        id: archive
+        shell: bash
+        run: |
+          python3 build/box3d_ci.py identity > "$RUNNER_TEMP/archive-identity.json"
+          python3 - "$RUNNER_TEMP/archive-identity.json" >> "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          print('key='+json.load(open(sys.argv[1]))['key'])
+          PY
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          path: ${{ runner.temp }}/box3d-source-archives
+          key: ${{ steps.archive.outputs.key }}
+          enableCrossOsArchive: true
+      - name: Restore verified source archive only
+        run: python3 build/box3d_ci.py restore --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --native-cache "$RUNNER_TEMP/desktop-native"
+      - name: Always rebuild and execute Native Release matrix on this target
+        shell: bash
+        run: |
+          bash build/build_box3d.sh Release "$RUNNER_TEMP/desktop-native"
+          python3 build/box3d_ci.py store --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --archive "$RUNNER_TEMP/desktop-native/box3d.tar"
+          python3 - "$RUNNER_TEMP/desktop-native/build/Release" >> "$GITHUB_ENV" <<'PY'
+          import hashlib,json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]);m=json.loads((p/'build-manifest.json').read_text())
+          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          assert m['ctest']=='passed' and set(m['test_names'])==expected,m
+          lib=p/('libogb3.dylib' if sys.platform=='darwin' else 'libogb3.so')
+          print('BOX3D_DESKTOP_NATIVE='+str(lib))
+          print('BOX3D_DESKTOP_NATIVE_SHA256='+hashlib.sha256(lib.read_bytes()).hexdigest())
+          PY
+      - name: Plan exact case with explicit installed inputs
+        shell: bash
+        run: |
+          extra=()
+          if [ '${{ matrix.target }}' = linux-x86_64 ]; then
+            extra+=(--execution-mode native --toolchain-report "$BOX3D_TOOLCHAIN_REPORT")
+          fi
+          python3 -B tests/box3d_desktop/run.py --target '${{ matrix.target }}' --framework '${{ matrix.framework }}' \
+            --godot "$GODOT" --odin "$ODIN" --native-library "$BOX3D_DESKTOP_NATIVE" --native-sha256 "$BOX3D_DESKTOP_NATIVE_SHA256" \
+            --out "$RUNNER_TEMP/desktop-plan-${{ matrix.target }}-${{ matrix.framework }}" --port '${{ matrix.framework == 'kit' && 45241 || 45242 }}' --ticks 120 "${extra[@]}"
+      - name: Actual normal export and unchanged exported Host/Client proof
+        shell: bash
+        run: |
+          extra=()
+          if [ '${{ matrix.target }}' = linux-x86_64 ]; then
+            extra+=(--execution-mode native --toolchain-report "$BOX3D_TOOLCHAIN_REPORT")
+          fi
+          python3 -B tests/box3d_desktop/run.py --target '${{ matrix.target }}' --framework '${{ matrix.framework }}' \
+            --godot "$GODOT" --odin "$ODIN" --native-library "$BOX3D_DESKTOP_NATIVE" --native-sha256 "$BOX3D_DESKTOP_NATIVE_SHA256" \
+            --out "$RUNNER_TEMP/desktop-case-${{ matrix.target }}-${{ matrix.framework }}" --port '${{ matrix.framework == 'kit' && 45241 || 45242 }}' --ticks 120 "${extra[@]}" --execute
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: desktop-${{ matrix.target }}-${{ matrix.framework }}
+          path: |
+            ${{ runner.temp }}/desktop-plan-${{ matrix.target }}-${{ matrix.framework }}/
+            ${{ runner.temp }}/desktop-case-${{ matrix.target }}-${{ matrix.framework }}/
+            ${{ runner.temp }}/desktop-native/build/Release/build-manifest.json
+            ${{ runner.temp }}/desktop-native/build/Release/native-domain-identity.txt
+            ${{ runner.temp }}/desktop-native/build/Release/Testing/Temporary/LastTest.log

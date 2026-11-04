@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-03T22:32:40.334749+00:00",
+  "result": "BUFFERED_TELEMETRY_VALID_STRICT_FIREFOX_MAX_REJECTED",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "release_admitted": false,
+  "scope": "Later diagnostic artifact, separate from the immutable D1 B4 review package. Native/Web sampler ownership and complete state are validated; no performance fix or cause is inferred.",
+  "contract": {
+    "path": "tests/box3d_web/contract.json",
+    "sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124"
+  },
+  "thresholds_changed": false,
+  "production_net_optimization_retained": false,
+  "reuse_restoration": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/encode-reuse-v1/rejected-runtime-result.json",
+    "sha256": "34b70be6bd2fcba10b8fa06a19c7ea79b0b15babe65a85908e01376e27714b48"
+  },
+  "buffered_plan": {
+    "path": "tests/replay_dockyard/qualification/buffered-plan.json",
+    "sha256": "b073fdc63e38c87cd93edaed0093600a7cb040e1e82a45f8ad96c4f38823347e"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-sampler-v1/sustained-source-checkpoint.json",
+    "sha256": "d588fd50210602ae07b6f39645bfebf2736954589f588f350d60fe7c2ce6a29d"
+  },
+  "source_fence": true,
+  "browser_observed": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-sampler-v1/browser-observed.json",
+    "sha256": "51ea214b984eed2c017ef2c1f192b9526f14730b7a486932d8b684786e392452"
+  },
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-export-v1/report.json",
+    "sha256": "8c27258c332ff6df16bb194fb1baab64d385d20ea0f3a83b43d22d22ab22c886"
+  },
+  "short_comparison": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-sampler-v1/short-comparison.json",
+    "sha256": "86cb91caa2d50e38974ad7f7dc2ac15ca0c426d726029a5f974901b0ba26e891"
+  },
+  "sustained_runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-firefox-sustained-v1/report.json",
+    "sha256": "14243dfeb5c2c7b7f6131038b7fccbfacdfe8dde0e736aa6485300499f41cdb9"
+  },
+  "sustained_binding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-firefox-sustained-v1/export-binding.json",
+    "sha256": "bb4cc978af67260d70346c4313f1c14b7f1758b982f572dcaa2c4434e8eb2365"
+  },
+  "sustained_assessment": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-firefox-sustained-v1/assessment.json",
+    "sha256": "3ed78f3b81c85758f8d299424264b6abc176da0ec0ce55621871321bbbc649f6"
+  },
+  "normal_max_failures": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-firefox-sustained-v1/normal-max-failures.json",
+    "sha256": "9b283f9336f9deb799e7b4fb809299227d6b519893f0955eb9bd1640f9d053ed"
+  },
+  "assessment": {
+    "schema_version": 1,
+    "result": "BUDGET_REJECTED",
+    "observations": {
+      "host": {
+        "operation_rows": 37128,
+        "categories": {
+          "bootstrap": 31,
+          "pump": 502,
+          "advance1": 36590,
+          "advance_many": 5
+        },
+        "normal": {
+          "count": 36590,
+          "p95_ms": 3.72,
+          "p99_ms": 4.48,
+          "max_ms": 29.56
+        },
+        "repair8": {
+          "count": 0,
+          "p95_ms": null,
+          "p99_ms": null,
+          "max_ms": null
+        },
+        "presentation": {
+          "count": 37248,
+          "p95_ms": 16.74000000001979,
+          "p99_ms": 17.259999999951106,
+          "max_ms": 12183.34
+        },
+        "sampled_wasm_linear_peak_bytes": 144703488,
+        "sampled_admitted_peak_bytes": 41875744,
+        "transfers": [
+          {
+            "role": "host",
+            "complete_wire_bytes": 54643,
+            "native_payload_upper_bound_bytes": 18771
+          }
+        ],
+        "cold_lobby_ms": 5250.7825,
+        "cold_usable_menu_ms": 17296.212417,
+        "go_to_checked_result_seconds": 610.3329225409999,
+        "duration_boundary": "operation_end_before_close",
+        "operation_ends": [
+          {
+            "role": "host",
+            "buffered": true,
+            "rows": 37128,
+            "head": 36600,
+            "confirmed": 36600,
+            "arrival_ms": 637829.749708
+          }
+        ],
+        "raw_presentation_intervals": 37256,
+        "measured_presentation_intervals": 37248,
+        "teardown_intervals_retained": 8,
+        "raw_sha256": {
+          "console.ndjson": "d4ccbb1845a8e5d4383924df9e0fcbef84ebdb6b73721e036c9a068a19e16983",
+          "browser-samples.json": "0dc358a04386ecc0648eecf548cb9b645c600ee915251c9c6541d08b0868f0bc"
+        }
+      },
+      "client": {
+        "operation_rows": 36670,
+        "categories": {
+          "bootstrap": 21,
+          "pump": 3312,
+          "replacement": 1,
+          "repair": 11187,
+          "advance1": 21120,
+          "advance_many": 1029
+        },
+        "normal": {
+          "count": 21120,
+          "p95_ms": 1.376,
+          "p99_ms": 1.655,
+          "max_ms": 4.31
+        },
+        "repair8": {
+          "count": 4208,
+          "p95_ms": 6.945,
+          "p99_ms": 8.225,
+          "max_ms": 10.601
+        },
+        "presentation": {
+          "count": 37009,
+          "p95_ms": 18.294999999983702,
+          "p99_ms": 18.589999999996508,
+          "max_ms": 1166.6150000000002
+        },
+        "sampled_wasm_linear_peak_bytes": 144703488,
+        "sampled_admitted_peak_bytes": 43348207,
+        "transfers": [],
+        "cold_lobby_ms": 1422.202833000003,
+        "cold_usable_menu_ms": 1731.7116660000029,
+        "go_to_checked_result_seconds": 610.326738083,
+        "duration_boundary": "operation_end_before_close",
+        "operation_ends": [
+          {
+            "role": "client",
+            "buffered": true,
+            "rows": 36670,
+            "head": 36600,
+            "confirmed": 36600,
+            "arrival_ms": 637843.433208
+          }
+        ],
+        "raw_presentation_intervals": 37065,
+        "measured_presentation_intervals": 37009,
+        "teardown_intervals_retained": 56,
+        "raw_sha256": {
+          "console.ndjson": "cefea774ca23c8dfee7f2225fefeafd7ce242347d22f67c3bb39608b07289079",
+          "browser-samples.json": "febf9c915c0489a9188fc01d82ed8126037aed9377b7b9cc087cc3a24c09934f"
+        }
+      }
+    },
+    "violations": [
+      "host: normal max_ms"
+    ],
+    "missing": [],
+    "quantiles": "nearest rank ceil(p*N), milliseconds; no samples removed and no overhead subtraction",
+    "sampled_complete_wire_peak_bytes": 54643,
+    "conservative_native_payload_upper_bound_bytes": 54643,
+    "plan_sha256": "c78317b42c095ce094eef249645978df1dd05f8ad920ccbf9f3cd145cb121a9d",
+    "contract_sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124",
+    "source_report_sha256": "14243dfeb5c2c7b7f6131038b7fccbfacdfe8dde0e736aa6485300499f41cdb9",
+    "buffered_plan_sha256": "b073fdc63e38c87cd93edaed0093600a7cb040e1e82a45f8ad96c4f38823347e",
+    "release_admission": false,
+    "scope": "This case only. Matrix, faults, regressions, external Internet and human review remain separate requirements."
+  },
+  "all_five_byte_equal": true,
+  "rounds": {
+    "host": 7,
+    "client": 7
+  },
+  "browser_versions": {
+    "host": "firefox/159.0.1",
+    "client": "Chrome/156.0.8078.80"
+  },
+  "native_runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/buffered-sdk-native-v1/report.json",
+    "sha256": "dfb4f6ec9e6b9982d2b98743b74f5209135e5d36b4906be963e98a35dec8727e"
+  },
+  "native_buffered_samples": {
+    "host": {
+      "operation_rows": 2464,
+      "end": {
+        "role": "host",
+        "buffered": true,
+        "rows": 2464,
+        "head": 1200,
+        "confirmed": 1200,
+        "event": "SAMPLE_OPERATION_END"
+      },
+      "cleanup": {
+        "native": 0,
+        "wrapper": 0,
+        "meter": 0,
+        "owners": 0,
+        "owners_before": 4,
+        "owners_after": 4,
+        "observed": true
+      }
+    },
+    "client": {
+      "operation_rows": 2455,
+      "end": {
+        "role": "client",
+        "buffered": true,
+        "rows": 2455,
+        "head": 1200,
+        "confirmed": 1200,
+        "event": "SAMPLE_OPERATION_END"
+      },
+      "cleanup": {
+        "native": 0,
+        "wrapper": 0,
+        "meter": 0,
+        "owners": 0,
+        "owners_before": 4,
+        "owners_after": 4,
+        "observed": true
+      }
+    }
+  },
+  "conclusion": "Six Firefox normal calls exceeded 10 ms; maximum 29.56 ms. Clocks remained valid and leases were not poisoned. Deferring telemetry did not remove rare whole-call stalls. Cause UNKNOWN. Retain failure; no unchanged benchmark retry or threshold waiver.",
+  "remaining_external_gates": [
+    "Selected public WSS/TURN endpoints and actual Internet evidence",
+    "Two-human co-op play feedback"
+  ],
+  "earlier_review_archive_preserved": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/Dockyard-Duo-review-macos-arm64-web.tar.gz",
+    "sha256": "63103866c7daa98d3ca17c6dda795bc5c26dca69307c20060da974d7ce2e0c13"
+  }
+}

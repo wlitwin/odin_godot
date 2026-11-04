@@ -54,6 +54,8 @@ predict_matches :: proc(entity: rawptr, desc: ^knet.Entity_Desc, blob: []u8) -> 
 // History — the tick-indexed ring of predict-set snapshots.
 
 History :: struct {
+	write_guard: proc(user:rawptr)->bool,
+	guard_user: rawptr,
 	desc:            ^knet.Entity_Desc,
 	has_slack:       bool, // any predicted field carries a per-field slack (cached at make —
 	                       // keeps the exact-compare fast path a single memcmp, no field walk)
@@ -80,12 +82,14 @@ history_make :: proc(desc: ^knet.Entity_Desc, slots: int, allocator := context.a
 }
 
 history_destroy :: proc(h: ^History) {
+	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
 	tick_ring_destroy(&h.ring)
 }
 
 // Note the entity's live predict set as the state AT `tick` — the owner of
 // the truth (server) or of the prediction (client), once per simulated tick.
 history_note :: proc(h: ^History, tick: u64, entity: rawptr) {
+	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
 	predict_capture(tick_ring_dst(&h.ring, tick), entity, h.desc)
 }
 
@@ -93,6 +97,7 @@ history_note :: proc(h: ^History, tick: u64, entity: rawptr) {
 // authoritative truth replaces a wrong prediction in the ledger, so later
 // rewinds and compares read truth, not the superseded guess.
 history_note_bytes :: proc(h: ^History, tick: u64, blob: []u8) {
+	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
 	tick_ring_note(&h.ring, tick, blob)
 }
 

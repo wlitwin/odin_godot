@@ -1,6 +1,7 @@
 #+build darwin, linux, windows
 package core
 
+import bg "godot:box3d/godot"
 import "godot:gdext"
 import "godot:godot"
 import rt "godot:runtime"
@@ -34,34 +35,40 @@ web_startup :: proc "contextless" () {}
 // `dynlib.initialize_symbols` resolves each field by its name.
 @(private)
 Scripts_Dll :: struct {
-	__handle:             dynlib.Library,
-	odin_scripts_boot:    proc "c" (
+	__handle:                         dynlib.Library,
+	odin_scripts_box3d_profile:       proc "c" () -> u32,
+	odin_scripts_box3d_protocol:      proc "c" () -> u64,
+	odin_scripts_box3d_contract:      proc "c" (_: ^bg.Domain_Contract) -> bg.Status,
+	odin_scripts_box3d_install:       proc "c" (_: ^bg.Service) -> bg.Status,
+	odin_scripts_managed_callable_protocol: proc "c" () -> u64,
+	odin_scripts_set_managed_callable_api: proc "c" (_: ^rt.Managed_Callable_API) -> bg.Status,
+	odin_scripts_boot:                proc "c" (
 		get_proc_address: gdext.ExtensionInterfaceGetProcAddress,
 		library: gdext.ExtensionClassLibraryPtr,
 	),
-	odin_scripts_manifest: proc "c" (out_count: ^i32) -> [^]rt.Class_Desc,
+	odin_scripts_manifest:            proc "c" (out_count: ^i32) -> [^]rt.Class_Desc,
 	// Typed cross-script handoff (Option A): the core calls this right after boot to hand
 	// the scripts dll its `obj -> Odin script struct` resolver (core's odin_script_struct),
 	// which `rt.script_of` then uses. Exported by the runtime package (linked into the dll).
-	odin_scripts_set_core_api: proc "c" (script_struct: rt.Script_Struct_Proc),
+	odin_scripts_set_core_api:        proc "c" (script_struct: rt.Script_Struct_Proc),
 	// The any-class resolver handoff behind `rt.script_any` (per-type dispatch tables).
 	// Same pattern; optional — nil on a scripts dll built before it existed.
-	odin_scripts_set_core_api2: proc "c" (script_struct_any: rt.Script_Struct_Any_Proc),
+	odin_scripts_set_core_api2:       proc "c" (script_struct_any: rt.Script_Struct_Any_Proc),
 	// Panic-surfacing handoff (same pattern): the core hands the scripts dll a push_error
 	// reporter right after boot, so a script panic/assert shows RED in the editor Output
 	// (the runtime's assertion proc is stderr-only until this is installed). Exported by
 	// runtime/panic_native.odin (linked into the dll); optional — nil on an older dll.
-	odin_scripts_set_panic_report: proc "c" (report: rt.Panic_Report_Proc),
+	odin_scripts_set_panic_report:    proc "c" (report: rt.Panic_Report_Proc),
 	// ABI version of the shared core<->scripts data contract (see rt.ABI_VERSION). Checked
 	// before reading the manifest to reject a scripts dll built against a different addon
 	// version. Absent (nil) on a dll built before this handshake existed — also a mismatch.
-	odin_scripts_abi_version: proc "c" () -> u32,
+	odin_scripts_abi_version:         proc "c" () -> u32,
 	// Complete size/alignment/named-offset fingerprint for every ABI-visible descriptor.
 	// This is the compatibility decision that safely replaces exact compiler lockstep.
-	odin_scripts_abi_fingerprint: proc "c" () -> u64,
+	odin_scripts_abi_fingerprint:     proc "c" () -> u64,
 	// ODIN_VERSION of the compiler that built the scripts dll. Retained as provenance and
 	// diagnostics; a different release is accepted only when the full ABI contract matches.
-	odin_scripts_odin_version: proc "c" () -> cstring,
+	odin_scripts_odin_version:        proc "c" () -> cstring,
 	// Problems the dll's runtime reflection walk recorded while building its member tables
 	// at `@(init)` (see runtime/register_class.odin). Pulled after the manifest and surfaced
 	// via push_error from the frame pump — a bad export is dropped LOUDLY, never silently.
@@ -80,15 +87,17 @@ Scripts_Dll_Contract :: struct {
 
 @(private = "file")
 scripts_dll_has_required_symbols :: proc "contextless" (dll: ^Scripts_Dll) -> bool {
-	return dll != nil &&
-	       dll.__handle != nil &&
-	       dll.odin_scripts_boot != nil &&
-	       dll.odin_scripts_manifest != nil
+	return(
+		dll != nil &&
+		dll.__handle != nil &&
+		dll.odin_scripts_boot != nil &&
+		dll.odin_scripts_manifest != nil \
+	)
 }
 
 @(private = "file")
 scripts_dll_contract :: proc "contextless" (dll: ^Scripts_Dll) -> Scripts_Dll_Contract {
-	contract := Scripts_Dll_Contract{
+	contract := Scripts_Dll_Contract {
 		abi  = 0,
 		odin = "unknown (older scripts dll)",
 	}
@@ -109,8 +118,9 @@ scripts_dll_contract :: proc "contextless" (dll: ^Scripts_Dll) -> Scripts_Dll_Co
 	return contract
 }
 
-// Rejected candidates have published no descriptors or proc pointers, so they are safe
-// to unload immediately. Published generations go through Script_Generation retirement
+// Rejected candidates have published no descriptors or proc pointers, so their loader reference can be released. The OS may
+// retain TLV-bearing script images after successful dlclose; this is not physical
+// unmapping. Native/dependency admission must happen before mapping.  Published generations go through Script_Generation retirement
 // below so live instances, removed classes, and reload-safe callback state are respected.
 @(private = "file")
 scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
@@ -118,7 +128,9 @@ scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
 		return
 	}
 	if dll.__handle != nil {
-		_ = dynlib.unload_library(dll.__handle)
+		if !dynlib.unload_library(
+			dll.__handle,
+		) {gdext_print("ODIN_SCRIPT_LOADER_RELEASE_FAILED", dynlib.last_error())}
 	}
 	dll^ = {}
 }
@@ -135,12 +147,12 @@ scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
 
 @(private)
 Scripts_Module :: struct {
-	name:       string, // "" == the MAIN module. Heap-owned clone otherwise.
-	path:       string, // heap-owned dll base path (the published, non-unique-copy path)
-	generation: ^Script_Generation,
+	name:           string, // "" == the MAIN module. Heap-owned clone otherwise.
+	path:           string, // heap-owned dll base path (the published, non-unique-copy path)
+	generation:     ^Script_Generation,
 	// Source identities this module currently provides. Each entry is ONE heap clone shared
 	// with the path-identity map key (so reload can delete/free it exactly once).
-	classes: [dynamic]string,
+	classes:        [dynamic]string,
 	// Explicit `//gd:class` aliases, separately owned because they are optional and
 	// never serve as runtime identity.
 	global_classes: [dynamic]string,
@@ -151,17 +163,18 @@ g_modules: [dynamic]Scripts_Module
 
 // One mapped scripts-DLL image. The module owns the current generation; once replaced,
 // live Odin_Instance leases are the only reason an old generation remains mapped.
-// `reload_path` is a unique `.rN` copy and is deleted immediately after the handle unloads.
+// `reload_path` is a process-qualified exclusive unique generation copy and is deleted after the loader reference is released (the OS may retain TLV images).
 @(private)
 Script_Generation :: struct {
-	dll:          Scripts_Dll,
-	module_name:  string,
-	reload_path:  string,
-	bytes:        int,
-	serial:       int,
+	dll:           Scripts_Dll,
+	module_name:   string,
+	reload_path:   string,
+	bytes:         int,
+	serial:        int,
 	instance_refs: int,
-	retired:      bool,
-	desc_tokens:  [dynamic]uintptr,
+	retired:       bool,
+	desc_tokens:   [dynamic]uintptr,
+	box3d_service: bg.Service,
 }
 
 @(private)
@@ -190,7 +203,12 @@ script_generation_token :: proc "contextless" (desc: rt.Class_Desc) -> uintptr {
 }
 
 @(private = "file")
-script_generation_create :: proc(dll: Scripts_Dll, module_name: string, bytes: int, reload_path := "") -> ^Script_Generation {
+script_generation_create :: proc(
+	dll: Scripts_Dll,
+	module_name: string,
+	bytes: int,
+	reload_path := "",
+) -> ^Script_Generation {
 	context.allocator = core_allocator()
 	gen := new(Script_Generation)
 	gen.dll = dll
@@ -198,12 +216,20 @@ script_generation_create :: proc(dll: Scripts_Dll, module_name: string, bytes: i
 	gen.reload_path = strings.clone(reload_path)
 	gen.bytes = bytes
 	gen.serial = reload_counter
+	if !box3d_generation_install(gen) || !managed_callable_generation_install(gen) {
+		_ = box3d_generation_close(gen)
+		delete(gen.module_name); delete(gen.reload_path); free(gen); return nil
+	}
 	append(&g_script_generations, gen)
 	return gen
 }
 
 @(private = "file")
-script_generation_register_manifest :: proc(gen: ^Script_Generation, descs: [^]rt.Class_Desc, n: int) {
+script_generation_register_manifest :: proc(
+	gen: ^Script_Generation,
+	descs: [^]rt.Class_Desc,
+	n: int,
+) {
 	if gen == nil {return}
 	context.allocator = core_allocator()
 	if g_desc_generations == nil {
@@ -269,6 +295,7 @@ script_generations_collect_at_gate :: proc() {
 	for i := len(g_script_generations) - 1; i >= 0; i -= 1 {
 		gen := g_script_generations[i]
 		if gen == nil || !gen.retired || gen.instance_refs != 0 {continue}
+		if !box3d_generation_close(gen) {g_script_generation_collection_pending = true; continue}
 		reload_path := strings.clone(gen.reload_path, context.temp_allocator)
 		module_name := strings.clone(gen.module_name, context.temp_allocator)
 		serial := gen.serial
@@ -311,8 +338,13 @@ script_generations_collect_at_gate :: proc() {
 		sync.unlock(&g_script_generation_lock)
 		if reload_path != "" {os.remove(reload_path)}
 		gdext_print(
-			"ODIN_RELOAD_GENERATION_UNLOADED",
-			fmt.tprintf("module=%s generation=%d bytes=%d", module_display(module_name), serial, bytes),
+			"ODIN_RELOAD_GENERATION_LOADER_RELEASED",
+			fmt.tprintf(
+				"module=%s generation=%d bytes=%d",
+				module_display(module_name),
+				serial,
+				bytes,
+			),
 		)
 		sync.lock(&g_script_generation_lock)
 	}
@@ -322,7 +354,8 @@ script_generations_collect_at_gate :: proc() {
 // Called after an ordinary instance free. It takes the writer gate itself so the last
 // removed/blocked instance can retire its image without waiting for another reload.
 @(private)
-script_generations_collect_pending :: proc() {
+script_generations_collect_pending :: proc "contextless" () {
+	context = runtime.default_context()
 	sync.lock(&g_script_generation_lock)
 	pending := g_script_generation_collection_pending
 	sync.unlock(&g_script_generation_lock)
@@ -405,8 +438,7 @@ surface_load_failure_runtime :: proc(detail: string) {
 	// set for any non-exported run, including editor Play — so the fix advice can be accurate.
 	feat := godot.new_string_cstring("editor")
 	editor_run := bool(godot.os_has_feature(godot.singleton_os(), feat))
-	fix :=
-		"An exported game must ship libodinscripts beside the executable; rebuild/re-export."
+	fix := "An exported game must ship libodinscripts beside the executable; rebuild/re-export."
 	if editor_run {
 		fix =
 			"Build your Odin scripts first: in the editor use Project > Tools > Build Odin Scripts " +
@@ -445,8 +477,8 @@ scripts_surface_missing_warning :: proc() {
 		msg := godot.new_string_odin(
 			fmt.tprintf(
 				"odin_godot: your scripts dll has an incompatible native contract " +
-					"(core ABI v%d/fp=%016x, scripts v%d/fp=%016x). Rebuild it: addons/odin_godot/build/build_scripts.sh " +
-					"(your scripts won't load until you do).",
+				"(core ABI v%d/fp=%016x, scripts v%d/fp=%016x). Rebuild it: addons/odin_godot/build/build_scripts.sh " +
+				"(your scripts won't load until you do).",
 				g_abi_core,
 				g_abi_core_fingerprint,
 				g_abi_scripts,
@@ -593,8 +625,30 @@ scripts_dll_path :: proc() -> string {
 // errors — exactly the pre-spike behavior); an extra module's failure is surfaced via
 // scripts_note_error (frame-pump push_error) instead, and never flips the main flags.
 @(private = "file")
-load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: bool) {
-	_, lok := dynlib.initialize_symbols(&dll, path, "", "__handle")
+load_scripts_dll :: proc(
+	path: string,
+	main: bool,
+) -> (
+	dll: Scripts_Dll,
+	owned_path: string,
+	ok: bool,
+) {
+	load_path := path
+	when BOX3D_HOST_ENABLED {
+		bytes, read_ok := box3d_admission_read(path)
+		if !read_ok {gdext_print("ODIN_BOX3D_MODULE_CONTRACT_REJECTED", path); return {}, "", false}
+		defer delete(bytes)
+		if !box3d_admission_check(path, bytes) {return {}, "", false}
+		copied: bool
+		owned_path, copied = box3d_admission_copy(path, bytes)
+		if !copied {return {}, "", false}
+		load_path = owned_path
+	}
+	cleanup_path := owned_path
+	defer {
+		if !ok && cleanup_path != "" {os.remove(cleanup_path); delete(cleanup_path)}
+	}
+	_, lok := dynlib.initialize_symbols(&dll, load_path, "", "__handle")
 	if !lok || !scripts_dll_has_required_symbols(&dll) {
 		// Include the loader's own reason (dlerror / GetLastError text) — "failed to
 		// load" alone has sent people chasing phantom linkage theories before.
@@ -610,10 +664,12 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 			// surface it now so the game doesn't silently run with no Odin scripts.
 			surface_load_failure_runtime("scripts library not found")
 		} else {
-			scripts_note_error(fmt.tprintf("odin_godot: failed to load script module dll %s", path))
+			scripts_note_error(
+				fmt.tprintf("odin_godot: failed to load script module dll %s", path),
+			)
 		}
 		scripts_dll_discard(&dll)
-		return {}, false
+		return {}, "", false
 	}
 
 	// ABI handshake FIRST, before boot: refuse a scripts dll with a different semantic
@@ -663,7 +719,12 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 			),
 		)
 		scripts_dll_discard(&dll)
-		return {}, false
+		return {}, "", false
+	}
+
+	if !box3d_candidate_check(&dll) {
+		gdext_print("ODIN_BOX3D_MODULE_CONTRACT_REJECTED", path)
+		scripts_dll_discard(&dll); return {}, "", false
 	}
 
 	// Compiler identity is provenance, not a blanket lock. Every cross-DLL callback uses the C
@@ -700,7 +761,7 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 	if dll.odin_scripts_set_panic_report != nil {
 		dll.odin_scripts_set_panic_report(script_panic_report)
 	}
-	return dll, true
+	return dll, owned_path, true
 }
 
 // The push_error half of the scripts dll's assertion proc (runtime/panic_native.odin):
@@ -817,7 +878,7 @@ load_extra_modules :: proc(main_dll_path: string) {
 		}
 		append(
 			&found,
-			Found{
+			Found {
 				name = strings.clone(name, context.temp_allocator),
 				path = strings.clone(fi.fullpath, context.temp_allocator),
 			},
@@ -828,32 +889,33 @@ load_extra_modules :: proc(main_dll_path: string) {
 
 	for f in found {
 		cleanup_stale_reload_copies(f.path)
-		dll, ok := load_scripts_dll(f.path, false)
+		dll, verified_path, ok := load_scripts_dll(f.path, false)
+		defer delete(verified_path)
 		if !ok {
 			continue
 		}
 		append(
 			&g_modules,
-			Scripts_Module{
-				name = strings.clone(f.name),
-				path = strings.clone(f.path),
-			},
+			Scripts_Module{name = strings.clone(f.name), path = strings.clone(f.path)},
 		)
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
 		descs := dll.odin_scripts_manifest(&n)
 		note_dll_registration_errors(dll.odin_scripts_registration_errors)
+		gen := script_generation_create(dll, f.name, scripts_dll_file_size(f.path), verified_path)
+		if gen ==
+		   nil {delete(mod.name); delete(mod.path); unordered_remove(&g_modules, len(g_modules) - 1); scripts_dll_discard(&dll); if verified_path != "" {os.remove(verified_path)}; continue}
 		if index_module_manifest(mod, descs, int(n)) {
-			gen := script_generation_create(dll, f.name, scripts_dll_file_size(f.path))
 			script_generation_register_manifest(gen, descs, int(n))
 			mod.generation = gen
 		} else {
 			// The pre-pass publishes nothing on failure, so this rejected module has no
-			// generation owners and can be unloaded immediately.
+			// generation owners; retire/release its loader reference at the gate.
 			delete(mod.name)
 			delete(mod.path)
 			unordered_remove(&g_modules, len(g_modules) - 1)
-			scripts_dll_discard(&dll)
+			script_generation_retire(gen)
+			script_generations_collect_pending()
 		}
 	}
 }
@@ -876,19 +938,16 @@ odin_scripts_load :: proc() {
 	// by anyone — without this they accumulate in bin/ forever.
 	cleanup_stale_reload_copies(path)
 
-	if dll, ok := load_scripts_dll(path, true); ok {
-		append(
-			&g_modules,
-			Scripts_Module{
-				name = "",
-				path = strings.clone(path),
-			},
-		)
+	if dll, verified_path, ok := load_scripts_dll(path, true); ok {
+		defer delete(verified_path)
+		append(&g_modules, Scripts_Module{name = "", path = strings.clone(path)})
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
 		descs := dll.odin_scripts_manifest(&n)
+		gen := script_generation_create(dll, "", scripts_dll_file_size(path), verified_path)
+		if gen ==
+		   nil {delete(mod.path); unordered_remove(&g_modules, len(g_modules) - 1); scripts_dll_discard(&dll); if verified_path != "" {os.remove(verified_path)}; return}
 		_ = index_module_manifest(mod, descs, int(n)) // main loads first — cannot collide
-		gen := script_generation_create(dll, "", scripts_dll_file_size(path))
 		script_generation_register_manifest(gen, descs, int(n))
 		mod.generation = gen
 		note_dll_registration_errors(dll.odin_scripts_registration_errors)
@@ -904,7 +963,9 @@ odin_scripts_load :: proc() {
 // NOW — this runs at extension init / mid-reload, where the engine logger may not be
 // up, and a dropped export must be visible in headless logs regardless.
 @(private = "file")
-note_dll_registration_errors :: proc(errors_proc: proc "c" (out_count: ^i32) -> [^]rt.Registration_Error) {
+note_dll_registration_errors :: proc(
+	errors_proc: proc "c" (out_count: ^i32) -> [^]rt.Registration_Error,
+) {
 	if errors_proc == nil {
 		return
 	}
@@ -947,7 +1008,8 @@ note_dll_registration_errors :: proc(errors_proc: proc "c" (out_count: ^i32) -> 
 //   4. Re-bind every live instance to the new descriptors (same-layout keeps state in
 //      place; changed-layout migrates exports — see rebind_all_instances).
 //   5. Retire the old image. Instance leases keep removed or callback-bearing state safe;
-//      once its last lease is released, the image unloads at the closed execution gate.
+//      once its last lease is released, Core releases its loader reference at the
+//      closed gate. dyld may retain a TLV image; physical unmapping is not inferred.
 // ----------------------------------------------------------------------------
 
 @(private)
@@ -973,8 +1035,29 @@ cleanup_stale_reload_copies :: proc(base: string) {
 	defer os.close(fd)
 	files, rerr := os.read_dir(fd, -1, context.temp_allocator)
 	if rerr != nil {return}
+	pids: []int
+	when BOX3D_HOST_ENABLED {
+		list_error: os.Error
+		pids, list_error = os.process_list(context.temp_allocator)
+		if list_error != nil {return}
+	}
 	for fi in files {
 		if strings.has_prefix(fi.name, prefix) {
+			when BOX3D_HOST_ENABLED {
+				marker := strings.last_index(fi.name, ".p")
+				if marker < 0 {continue}
+				id := 0
+				valid := false
+				for c in fi.name[marker + 2:] {
+					if c < '0' || c > '9' {break}
+					if id > (max(int) - int(c - '0')) / 10 {valid = false; break}
+					id = id * 10 + int(c - '0'); valid = true
+				}
+				if !valid || id == 0 {continue}
+				live := false
+				for pid in pids {if pid == id {live = true; break}}
+				if live {continue}
+			}
 			os.remove(fi.fullpath)
 		}
 	}
@@ -1006,20 +1089,32 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	base := g_modules[mi].path
 
 	// 1. Snapshot the freshly-built dll to a unique path (force a fresh image).
-	data, read_err := os.read_entire_file(base, context.allocator)
-	if read_err != nil {
-		gdext_print("odin reload: cannot read scripts dll", base)
-		return false
+	data: []u8
+	when BOX3D_HOST_ENABLED {
+		read_ok: bool
+		data, read_ok = box3d_admission_read(base)
+		if !read_ok {gdext_print("ODIN_BOX3D_MODULE_CONTRACT_REJECTED", base); return false}
+	} else {
+		read_err: os.Error
+		data, read_err = os.read_entire_file(base, context.allocator)
+		if read_err !=
+		   nil {gdext_print("odin reload: cannot read scripts dll", base); return false}
 	}
 	defer delete(data)
+	if !box3d_admission_check(base, data) {return false}
 
-	reload_counter += 1
-	unique := fmt.aprintf("%s.r%d%s", base, reload_counter, SCRIPTS_DLL_EXT)
-	defer delete(unique)
-	if write_err := os.write_entire_file(unique, data); write_err != nil {
-		gdext_print("odin reload: cannot write unique dll", unique)
-		return false
+	unique: string
+	when BOX3D_HOST_ENABLED {
+		copied: bool
+		unique, copied = box3d_admission_copy(base, data)
+		if !copied {gdext_print("odin reload: cannot create verified unique dll", base); return false}
+	} else {
+		reload_counter += 1
+		unique = fmt.aprintf("%s.r%d%s", base, reload_counter, SCRIPTS_DLL_EXT)
+		if write_error := os.write_entire_file(unique, data);
+		   write_error != nil {delete(unique); return false}
 	}
+	defer delete(unique)
 
 	// 2. Load and validate the NEW dll before executing any of its boot code.
 	new_dll: Scripts_Dll
@@ -1056,10 +1151,10 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		msg := godot.new_string_odin(
 			fmt.tprintf(
 				"odin_godot: reload REJECTED — your freshly-built scripts (ABI v%d/fp=%016x) don't match " +
-					"the odin_godot core this session loaded at startup (v%d/fp=%016x). The addon was " +
-					"updated while the editor was running: RESTART THE EDITOR to load the new " +
-					"core. Until then the previously-loaded scripts stay active in the editor " +
-					"(Play runs are unaffected — they load fresh).",
+				"the odin_godot core this session loaded at startup (v%d/fp=%016x). The addon was " +
+				"updated while the editor was running: RESTART THE EDITOR to load the new " +
+				"core. Until then the previously-loaded scripts stay active in the editor " +
+				"(Play runs are unaffected — they load fresh).",
 				contract.abi,
 				contract.fingerprint,
 				rt.ABI_VERSION,
@@ -1084,10 +1179,16 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		)
 	}
 
+	if !box3d_candidate_check(&new_dll) {
+		gdext_print("ODIN_BOX3D_RELOAD_CONTRACT_REJECTED", module)
+		scripts_dll_discard(&new_dll); os.remove(unique); return false
+	}
+
 	// The candidate is valid and no user code has run from it yet. Close the execution
 	// gate before booting/publishing it: this drains every old trampoline and keeps
 	// instance creation, property access, and descriptor reads out of the mutation.
 	script_reload_begin()
+	defer script_generations_collect_pending()
 	defer script_reload_end()
 
 	// Compatibility passed: boot, hand off core APIs, then read the manifest.
@@ -1154,6 +1255,7 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	//    `affected` set (old ∪ new identities) scopes cache invalidation + rebind below.
 	mod := &g_modules[mi]
 	new_generation := script_generation_create(new_dll, module, len(data), unique)
+	if new_generation == nil {scripts_dll_discard(&new_dll); os.remove(unique); return false}
 	script_generation_register_manifest(new_generation, descs, int(n))
 	affected := make(map[string]bool, context.temp_allocator)
 	for old in mod.classes {

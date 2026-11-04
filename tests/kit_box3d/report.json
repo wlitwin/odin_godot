@@ -1,0 +1,5098 @@
+{
+  "task": "t_6dcb6be2c8cb4dd8",
+  "board": "b_cdde1cdfea104035",
+  "worker": "box3d-kit",
+  "status": "complete",
+  "implementation": "Optional whole-world Kit participation in existing lane_frame/run_tick plus complete correction entrypoint; no native imports/linkage in kit/sim.",
+  "scope_amendments": [
+    "Coordinator explicitly approved narrow guards in kit/sim/command.odin and kit/sim/spawn.odin before unsupported argument copies, sends, scene/lane tracking or command changes.",
+    "Accepted alpha authoring constraint: fixed registered pointer-free data proxies, dynamic native/game lifetime in typed Side using world-independent keys; no arbitrary scene/lane spawn or generated tick/then/fx support.",
+    "Root required ordinary confirmed frontier and complete equality for repeated acknowledgments, diagnostic-only wall clocks, safe readonly complete checkpoint dump/digests, and measured32-body H128/eight-tick staging."
+  ],
+  "contracts": [
+    "Complete owned checkpoint pairs native solver+pending future outputs, typed Side/maps/generations/RNG/timers/prior-input state and registered prediction-field bytes.",
+    "Ordinary settled tick cannot be rewritten; same-confirmed complete agreement is idempotent, disagreement rejected; explicit reset/recovery starts a new effect epoch.",
+    "Disposable execution and bounded staged suffix preserve published execution/Side/fields/legacy field history/input history/effects on admitted failure or rejection.",
+    "Contextless checkpoint clone/release/equality/diagnostics survive source Lane/provider object destruction; source allocator/code must outlive owners.",
+    "Post-commit stable-key effects deduplicate replay; irreversible arbitrary callbacks/scene work are outside the authoring contract.",
+    "Count/age/history/asset/requested-memory admission enforced; monotonic wall time recorded only for external integration acceptance.",
+    "P3 accepted-input protocol, canonical transfer/authority attachments and mixed-target support remain missing/explicitly rejected.",
+    "Actual Godot modules require one loaded shared native DSO; standalone archive tests do not prove production module identity/reload lifetime."
+  ],
+  "native_contract": {
+    "snapshot_resource_version": 2,
+    "normalized_version": 3,
+    "coverage": "ogb3-d421e45c-solver-v3",
+    "dependency_task": "t_7f69d1f269ae48db",
+    "dependency_status": "done",
+    "shared_sources_owner": "box3d-contract/t1q; no shared/native source edits in this card"
+  },
+  "targets": [
+    {
+      "platform": "macOS15.8 arm64 physical AppleM3",
+      "mode": "Debug",
+      "test_exit": 0,
+      "tests": "9/9 passed",
+      "log_path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit/debug-v3.log",
+      "log_sha256": "1d5d37384076462260e7861512d814446145412f2aa088da5e71c1238e2235a6",
+      "archive": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/cache/build/Debug/libogb3.a",
+      "archive_sha256": "eabbe4b0728de8a925d74f623097967a16810c4003f7324c6027c922f838c139",
+      "manifest_sha256": "68cc1dbd1bf256b3829866dfd9a0311a4925705a333c15a2d3d8414e58669312",
+      "profile": {
+        "bodies": 32,
+        "history": 128,
+        "repair": 8,
+        "normal_samples": 160,
+        "correction_samples": 33,
+        "observed_live_peak": 36163335,
+        "staged_live_peak": 36163335,
+        "live_at_end": 32876631,
+        "engine_component_high": 23915488,
+        "wrapper_component_high": 11279220,
+        "largest_operation_requests": 546384,
+        "reservation_bytes": 2097152,
+        "reservation_failures": 0,
+        "normal_max_ns": 2857292,
+        "correction_max_ns": 6561667
+      },
+      "teardown": {
+        "engine_live": 0,
+        "native_wrapper_live": 0,
+        "provider_live": 0,
+        "checkpoint_live": 0
+      },
+      "raw_samples": [
+        {
+          "metric": "normal",
+          "tick": 1,
+          "core_ns": 986292,
+          "call_ns": 1012500
+        },
+        {
+          "metric": "normal",
+          "tick": 2,
+          "core_ns": 926083,
+          "call_ns": 955375
+        },
+        {
+          "metric": "normal",
+          "tick": 3,
+          "core_ns": 935834,
+          "call_ns": 966958
+        },
+        {
+          "metric": "normal",
+          "tick": 4,
+          "core_ns": 959792,
+          "call_ns": 985583
+        },
+        {
+          "metric": "normal",
+          "tick": 5,
+          "core_ns": 897292,
+          "call_ns": 922583
+        },
+        {
+          "metric": "normal",
+          "tick": 6,
+          "core_ns": 886417,
+          "call_ns": 911500
+        },
+        {
+          "metric": "normal",
+          "tick": 7,
+          "core_ns": 967458,
+          "call_ns": 994083
+        },
+        {
+          "metric": "normal",
+          "tick": 8,
+          "core_ns": 927084,
+          "call_ns": 954708
+        },
+        {
+          "metric": "normal",
+          "tick": 9,
+          "core_ns": 941375,
+          "call_ns": 964000
+        },
+        {
+          "metric": "normal",
+          "tick": 10,
+          "core_ns": 1083166,
+          "call_ns": 1105500
+        },
+        {
+          "metric": "normal",
+          "tick": 11,
+          "core_ns": 1011125,
+          "call_ns": 1036125
+        },
+        {
+          "metric": "normal",
+          "tick": 12,
+          "core_ns": 1031750,
+          "call_ns": 1056083
+        },
+        {
+          "metric": "normal",
+          "tick": 13,
+          "core_ns": 1419500,
+          "call_ns": 1444667
+        },
+        {
+          "metric": "normal",
+          "tick": 14,
+          "core_ns": 1385500,
+          "call_ns": 1411375
+        },
+        {
+          "metric": "normal",
+          "tick": 15,
+          "core_ns": 1307417,
+          "call_ns": 1329708
+        },
+        {
+          "metric": "normal",
+          "tick": 16,
+          "core_ns": 1296667,
+          "call_ns": 1323041
+        },
+        {
+          "metric": "normal",
+          "tick": 17,
+          "core_ns": 1313125,
+          "call_ns": 1339708
+        },
+        {
+          "metric": "normal",
+          "tick": 18,
+          "core_ns": 1327083,
+          "call_ns": 1351625
+        },
+        {
+          "metric": "normal",
+          "tick": 19,
+          "core_ns": 1321250,
+          "call_ns": 1343917
+        },
+        {
+          "metric": "normal",
+          "tick": 20,
+          "core_ns": 1364042,
+          "call_ns": 1388375
+        },
+        {
+          "metric": "normal",
+          "tick": 21,
+          "core_ns": 1365125,
+          "call_ns": 1389958
+        },
+        {
+          "metric": "normal",
+          "tick": 22,
+          "core_ns": 1333958,
+          "call_ns": 1356833
+        },
+        {
+          "metric": "normal",
+          "tick": 23,
+          "core_ns": 1344041,
+          "call_ns": 1369667
+        },
+        {
+          "metric": "normal",
+          "tick": 24,
+          "core_ns": 1316584,
+          "call_ns": 1343416
+        },
+        {
+          "metric": "normal",
+          "tick": 25,
+          "core_ns": 1319542,
+          "call_ns": 1344791
+        },
+        {
+          "metric": "normal",
+          "tick": 26,
+          "core_ns": 1309125,
+          "call_ns": 1329625
+        },
+        {
+          "metric": "normal",
+          "tick": 27,
+          "core_ns": 1324583,
+          "call_ns": 1348584
+        },
+        {
+          "metric": "normal",
+          "tick": 28,
+          "core_ns": 1318625,
+          "call_ns": 1342500
+        },
+        {
+          "metric": "normal",
+          "tick": 29,
+          "core_ns": 1320875,
+          "call_ns": 1346042
+        },
+        {
+          "metric": "normal",
+          "tick": 30,
+          "core_ns": 1315875,
+          "call_ns": 1342625
+        },
+        {
+          "metric": "normal",
+          "tick": 31,
+          "core_ns": 1484250,
+          "call_ns": 1508709
+        },
+        {
+          "metric": "normal",
+          "tick": 32,
+          "core_ns": 1367666,
+          "call_ns": 1393208
+        },
+        {
+          "metric": "normal",
+          "tick": 33,
+          "core_ns": 1345917,
+          "call_ns": 1369958
+        },
+        {
+          "metric": "normal",
+          "tick": 34,
+          "core_ns": 1572292,
+          "call_ns": 1594209
+        },
+        {
+          "metric": "normal",
+          "tick": 35,
+          "core_ns": 1383625,
+          "call_ns": 1411292
+        },
+        {
+          "metric": "normal",
+          "tick": 36,
+          "core_ns": 1895583,
+          "call_ns": 1926875
+        },
+        {
+          "metric": "normal",
+          "tick": 37,
+          "core_ns": 1792667,
+          "call_ns": 1818791
+        },
+        {
+          "metric": "normal",
+          "tick": 38,
+          "core_ns": 2085417,
+          "call_ns": 2132833
+        },
+        {
+          "metric": "normal",
+          "tick": 39,
+          "core_ns": 1529708,
+          "call_ns": 1556208
+        },
+        {
+          "metric": "normal",
+          "tick": 40,
+          "core_ns": 1410750,
+          "call_ns": 1437750
+        },
+        {
+          "metric": "normal",
+          "tick": 41,
+          "core_ns": 1993125,
+          "call_ns": 2020708
+        },
+        {
+          "metric": "normal",
+          "tick": 42,
+          "core_ns": 2171750,
+          "call_ns": 2197792
+        },
+        {
+          "metric": "normal",
+          "tick": 43,
+          "core_ns": 1941500,
+          "call_ns": 1983166
+        },
+        {
+          "metric": "normal",
+          "tick": 44,
+          "core_ns": 1453542,
+          "call_ns": 1482792
+        },
+        {
+          "metric": "normal",
+          "tick": 45,
+          "core_ns": 1930708,
+          "call_ns": 1959625
+        },
+        {
+          "metric": "normal",
+          "tick": 46,
+          "core_ns": 2264750,
+          "call_ns": 2291625
+        },
+        {
+          "metric": "normal",
+          "tick": 47,
+          "core_ns": 2857292,
+          "call_ns": 2882417
+        },
+        {
+          "metric": "normal",
+          "tick": 48,
+          "core_ns": 1226416,
+          "call_ns": 1280333
+        },
+        {
+          "metric": "normal",
+          "tick": 49,
+          "core_ns": 1907125,
+          "call_ns": 1933125
+        },
+        {
+          "metric": "normal",
+          "tick": 50,
+          "core_ns": 1601500,
+          "call_ns": 1643875
+        },
+        {
+          "metric": "normal",
+          "tick": 51,
+          "core_ns": 977750,
+          "call_ns": 1006125
+        },
+        {
+          "metric": "normal",
+          "tick": 52,
+          "core_ns": 964083,
+          "call_ns": 989792
+        },
+        {
+          "metric": "normal",
+          "tick": 53,
+          "core_ns": 952208,
+          "call_ns": 980042
+        },
+        {
+          "metric": "normal",
+          "tick": 54,
+          "core_ns": 991291,
+          "call_ns": 1015333
+        },
+        {
+          "metric": "normal",
+          "tick": 55,
+          "core_ns": 949166,
+          "call_ns": 973334
+        },
+        {
+          "metric": "normal",
+          "tick": 56,
+          "core_ns": 967500,
+          "call_ns": 994291
+        },
+        {
+          "metric": "normal",
+          "tick": 57,
+          "core_ns": 927250,
+          "call_ns": 956542
+        },
+        {
+          "metric": "normal",
+          "tick": 58,
+          "core_ns": 930792,
+          "call_ns": 957250
+        },
+        {
+          "metric": "normal",
+          "tick": 59,
+          "core_ns": 936667,
+          "call_ns": 961083
+        },
+        {
+          "metric": "normal",
+          "tick": 60,
+          "core_ns": 1003917,
+          "call_ns": 1034333
+        },
+        {
+          "metric": "normal",
+          "tick": 61,
+          "core_ns": 987375,
+          "call_ns": 1012834
+        },
+        {
+          "metric": "normal",
+          "tick": 62,
+          "core_ns": 989583,
+          "call_ns": 1016584
+        },
+        {
+          "metric": "normal",
+          "tick": 63,
+          "core_ns": 993417,
+          "call_ns": 1021916
+        },
+        {
+          "metric": "normal",
+          "tick": 64,
+          "core_ns": 994625,
+          "call_ns": 1024042
+        },
+        {
+          "metric": "normal",
+          "tick": 65,
+          "core_ns": 978125,
+          "call_ns": 1004250
+        },
+        {
+          "metric": "normal",
+          "tick": 66,
+          "core_ns": 999334,
+          "call_ns": 1023167
+        },
+        {
+          "metric": "normal",
+          "tick": 67,
+          "core_ns": 995583,
+          "call_ns": 1026250
+        },
+        {
+          "metric": "normal",
+          "tick": 68,
+          "core_ns": 987292,
+          "call_ns": 1013875
+        },
+        {
+          "metric": "normal",
+          "tick": 69,
+          "core_ns": 996292,
+          "call_ns": 1026000
+        },
+        {
+          "metric": "normal",
+          "tick": 70,
+          "core_ns": 987084,
+          "call_ns": 1011500
+        },
+        {
+          "metric": "normal",
+          "tick": 71,
+          "core_ns": 994458,
+          "call_ns": 1017541
+        },
+        {
+          "metric": "normal",
+          "tick": 72,
+          "core_ns": 991667,
+          "call_ns": 1018334
+        },
+        {
+          "metric": "normal",
+          "tick": 73,
+          "core_ns": 1002375,
+          "call_ns": 1029750
+        },
+        {
+          "metric": "normal",
+          "tick": 74,
+          "core_ns": 999167,
+          "call_ns": 1027375
+        },
+        {
+          "metric": "normal",
+          "tick": 75,
+          "core_ns": 1029334,
+          "call_ns": 1054500
+        },
+        {
+          "metric": "normal",
+          "tick": 76,
+          "core_ns": 1002584,
+          "call_ns": 1028625
+        },
+        {
+          "metric": "normal",
+          "tick": 77,
+          "core_ns": 994125,
+          "call_ns": 1026375
+        },
+        {
+          "metric": "normal",
+          "tick": 78,
+          "core_ns": 1015833,
+          "call_ns": 1043083
+        },
+        {
+          "metric": "normal",
+          "tick": 79,
+          "core_ns": 1008958,
+          "call_ns": 1032041
+        },
+        {
+          "metric": "normal",
+          "tick": 80,
+          "core_ns": 1008375,
+          "call_ns": 1036916
+        },
+        {
+          "metric": "normal",
+          "tick": 81,
+          "core_ns": 974167,
+          "call_ns": 1000750
+        },
+        {
+          "metric": "normal",
+          "tick": 82,
+          "core_ns": 985625,
+          "call_ns": 1013125
+        },
+        {
+          "metric": "normal",
+          "tick": 83,
+          "core_ns": 987750,
+          "call_ns": 1015917
+        },
+        {
+          "metric": "normal",
+          "tick": 84,
+          "core_ns": 982125,
+          "call_ns": 1010625
+        },
+        {
+          "metric": "normal",
+          "tick": 85,
+          "core_ns": 991292,
+          "call_ns": 1020750
+        },
+        {
+          "metric": "normal",
+          "tick": 86,
+          "core_ns": 1004125,
+          "call_ns": 1031500
+        },
+        {
+          "metric": "normal",
+          "tick": 87,
+          "core_ns": 986708,
+          "call_ns": 1020125
+        },
+        {
+          "metric": "normal",
+          "tick": 88,
+          "core_ns": 990208,
+          "call_ns": 1013667
+        },
+        {
+          "metric": "normal",
+          "tick": 89,
+          "core_ns": 987666,
+          "call_ns": 1015959
+        },
+        {
+          "metric": "normal",
+          "tick": 90,
+          "core_ns": 976583,
+          "call_ns": 1002709
+        },
+        {
+          "metric": "normal",
+          "tick": 91,
+          "core_ns": 990334,
+          "call_ns": 1022375
+        },
+        {
+          "metric": "normal",
+          "tick": 92,
+          "core_ns": 986958,
+          "call_ns": 1021417
+        },
+        {
+          "metric": "normal",
+          "tick": 93,
+          "core_ns": 1001250,
+          "call_ns": 1025500
+        },
+        {
+          "metric": "normal",
+          "tick": 94,
+          "core_ns": 981166,
+          "call_ns": 1004208
+        },
+        {
+          "metric": "normal",
+          "tick": 95,
+          "core_ns": 987166,
+          "call_ns": 1012209
+        },
+        {
+          "metric": "normal",
+          "tick": 96,
+          "core_ns": 989084,
+          "call_ns": 1015708
+        },
+        {
+          "metric": "normal",
+          "tick": 97,
+          "core_ns": 982084,
+          "call_ns": 1009417
+        },
+        {
+          "metric": "normal",
+          "tick": 98,
+          "core_ns": 980834,
+          "call_ns": 1006166
+        },
+        {
+          "metric": "normal",
+          "tick": 99,
+          "core_ns": 978667,
+          "call_ns": 1010708
+        },
+        {
+          "metric": "normal",
+          "tick": 100,
+          "core_ns": 985666,
+          "call_ns": 1016084
+        },
+        {
+          "metric": "normal",
+          "tick": 101,
+          "core_ns": 984083,
+          "call_ns": 1017791
+        },
+        {
+          "metric": "normal",
+          "tick": 102,
+          "core_ns": 983042,
+          "call_ns": 1013875
+        },
+        {
+          "metric": "normal",
+          "tick": 103,
+          "core_ns": 983750,
+          "call_ns": 1012875
+        },
+        {
+          "metric": "normal",
+          "tick": 104,
+          "core_ns": 991084,
+          "call_ns": 1018375
+        },
+        {
+          "metric": "normal",
+          "tick": 105,
+          "core_ns": 982541,
+          "call_ns": 1010917
+        },
+        {
+          "metric": "normal",
+          "tick": 106,
+          "core_ns": 980000,
+          "call_ns": 1008709
+        },
+        {
+          "metric": "normal",
+          "tick": 107,
+          "core_ns": 962083,
+          "call_ns": 990208
+        },
+        {
+          "metric": "normal",
+          "tick": 108,
+          "core_ns": 985625,
+          "call_ns": 1014208
+        },
+        {
+          "metric": "normal",
+          "tick": 109,
+          "core_ns": 978666,
+          "call_ns": 1006834
+        },
+        {
+          "metric": "normal",
+          "tick": 110,
+          "core_ns": 982333,
+          "call_ns": 1013416
+        },
+        {
+          "metric": "normal",
+          "tick": 111,
+          "core_ns": 981291,
+          "call_ns": 1009334
+        },
+        {
+          "metric": "normal",
+          "tick": 112,
+          "core_ns": 985666,
+          "call_ns": 1018375
+        },
+        {
+          "metric": "normal",
+          "tick": 113,
+          "core_ns": 987625,
+          "call_ns": 1020541
+        },
+        {
+          "metric": "normal",
+          "tick": 114,
+          "core_ns": 993709,
+          "call_ns": 1027667
+        },
+        {
+          "metric": "normal",
+          "tick": 115,
+          "core_ns": 978125,
+          "call_ns": 1008500
+        },
+        {
+          "metric": "normal",
+          "tick": 116,
+          "core_ns": 989541,
+          "call_ns": 1018542
+        },
+        {
+          "metric": "normal",
+          "tick": 117,
+          "core_ns": 990583,
+          "call_ns": 1019666
+        },
+        {
+          "metric": "normal",
+          "tick": 118,
+          "core_ns": 978208,
+          "call_ns": 1001833
+        },
+        {
+          "metric": "normal",
+          "tick": 119,
+          "core_ns": 982417,
+          "call_ns": 1010417
+        },
+        {
+          "metric": "normal",
+          "tick": 120,
+          "core_ns": 955875,
+          "call_ns": 983125
+        },
+        {
+          "metric": "normal",
+          "tick": 121,
+          "core_ns": 989416,
+          "call_ns": 1019959
+        },
+        {
+          "metric": "normal",
+          "tick": 122,
+          "core_ns": 999750,
+          "call_ns": 1026125
+        },
+        {
+          "metric": "normal",
+          "tick": 123,
+          "core_ns": 985792,
+          "call_ns": 1015542
+        },
+        {
+          "metric": "normal",
+          "tick": 124,
+          "core_ns": 998583,
+          "call_ns": 1030375
+        },
+        {
+          "metric": "normal",
+          "tick": 125,
+          "core_ns": 987542,
+          "call_ns": 1010834
+        },
+        {
+          "metric": "normal",
+          "tick": 126,
+          "core_ns": 973542,
+          "call_ns": 998875
+        },
+        {
+          "metric": "normal",
+          "tick": 127,
+          "core_ns": 974667,
+          "call_ns": 1001125
+        },
+        {
+          "metric": "normal",
+          "tick": 128,
+          "core_ns": 1002458,
+          "call_ns": 1033167
+        },
+        {
+          "metric": "correction",
+          "tick": 128,
+          "depth": 8,
+          "core_ns": 6561667,
+          "call_ns": 6587166
+        },
+        {
+          "metric": "normal",
+          "tick": 129,
+          "core_ns": 995334,
+          "call_ns": 1024916
+        },
+        {
+          "metric": "correction",
+          "tick": 129,
+          "depth": 8,
+          "core_ns": 6559292,
+          "call_ns": 6586791
+        },
+        {
+          "metric": "normal",
+          "tick": 130,
+          "core_ns": 974667,
+          "call_ns": 1003166
+        },
+        {
+          "metric": "correction",
+          "tick": 130,
+          "depth": 8,
+          "core_ns": 6528709,
+          "call_ns": 6555416
+        },
+        {
+          "metric": "normal",
+          "tick": 131,
+          "core_ns": 1014208,
+          "call_ns": 1037500
+        },
+        {
+          "metric": "correction",
+          "tick": 131,
+          "depth": 8,
+          "core_ns": 6491416,
+          "call_ns": 6514166
+        },
+        {
+          "metric": "normal",
+          "tick": 132,
+          "core_ns": 981458,
+          "call_ns": 1007458
+        },
+        {
+          "metric": "correction",
+          "tick": 132,
+          "depth": 8,
+          "core_ns": 6369958,
+          "call_ns": 6394167
+        },
+        {
+          "metric": "normal",
+          "tick": 133,
+          "core_ns": 976625,
+          "call_ns": 1003292
+        },
+        {
+          "metric": "correction",
+          "tick": 133,
+          "depth": 8,
+          "core_ns": 6394750,
+          "call_ns": 6424334
+        },
+        {
+          "metric": "normal",
+          "tick": 134,
+          "core_ns": 975333,
+          "call_ns": 1000000
+        },
+        {
+          "metric": "correction",
+          "tick": 134,
+          "depth": 8,
+          "core_ns": 6373958,
+          "call_ns": 6398708
+        },
+        {
+          "metric": "normal",
+          "tick": 135,
+          "core_ns": 970333,
+          "call_ns": 995250
+        },
+        {
+          "metric": "correction",
+          "tick": 135,
+          "depth": 8,
+          "core_ns": 6427583,
+          "call_ns": 6453166
+        },
+        {
+          "metric": "normal",
+          "tick": 136,
+          "core_ns": 973625,
+          "call_ns": 1003875
+        },
+        {
+          "metric": "correction",
+          "tick": 136,
+          "depth": 8,
+          "core_ns": 6401125,
+          "call_ns": 6427208
+        },
+        {
+          "metric": "normal",
+          "tick": 137,
+          "core_ns": 983541,
+          "call_ns": 1011000
+        },
+        {
+          "metric": "correction",
+          "tick": 137,
+          "depth": 8,
+          "core_ns": 6517709,
+          "call_ns": 6549208
+        },
+        {
+          "metric": "normal",
+          "tick": 138,
+          "core_ns": 1002584,
+          "call_ns": 1027209
+        },
+        {
+          "metric": "correction",
+          "tick": 138,
+          "depth": 8,
+          "core_ns": 6537500,
+          "call_ns": 6562666
+        },
+        {
+          "metric": "normal",
+          "tick": 139,
+          "core_ns": 981125,
+          "call_ns": 1006208
+        },
+        {
+          "metric": "correction",
+          "tick": 139,
+          "depth": 8,
+          "core_ns": 6456833,
+          "call_ns": 6485250
+        },
+        {
+          "metric": "normal",
+          "tick": 140,
+          "core_ns": 975208,
+          "call_ns": 1003458
+        },
+        {
+          "metric": "correction",
+          "tick": 140,
+          "depth": 8,
+          "core_ns": 6476125,
+          "call_ns": 6502459
+        },
+        {
+          "metric": "normal",
+          "tick": 141,
+          "core_ns": 1004167,
+          "call_ns": 1032166
+        },
+        {
+          "metric": "correction",
+          "tick": 141,
+          "depth": 8,
+          "core_ns": 6509959,
+          "call_ns": 6539542
+        },
+        {
+          "metric": "normal",
+          "tick": 142,
+          "core_ns": 992416,
+          "call_ns": 1018833
+        },
+        {
+          "metric": "correction",
+          "tick": 142,
+          "depth": 8,
+          "core_ns": 6527791,
+          "call_ns": 6558125
+        },
+        {
+          "metric": "normal",
+          "tick": 143,
+          "core_ns": 973083,
+          "call_ns": 1000167
+        },
+        {
+          "metric": "correction",
+          "tick": 143,
+          "depth": 8,
+          "core_ns": 6462958,
+          "call_ns": 6483458
+        },
+        {
+          "metric": "normal",
+          "tick": 144,
+          "core_ns": 986750,
+          "call_ns": 1013250
+        },
+        {
+          "metric": "correction",
+          "tick": 144,
+          "depth": 8,
+          "core_ns": 6372917,
+          "call_ns": 6394875
+        },
+        {
+          "metric": "normal",
+          "tick": 145,
+          "core_ns": 987916,
+          "call_ns": 1012125
+        },
+        {
+          "metric": "correction",
+          "tick": 145,
+          "depth": 8,
+          "core_ns": 6426167,
+          "call_ns": 6448125
+        },
+        {
+          "metric": "normal",
+          "tick": 146,
+          "core_ns": 975833,
+          "call_ns": 1001208
+        },
+        {
+          "metric": "correction",
+          "tick": 146,
+          "depth": 8,
+          "core_ns": 6344417,
+          "call_ns": 6370834
+        },
+        {
+          "metric": "normal",
+          "tick": 147,
+          "core_ns": 994042,
+          "call_ns": 1019625
+        },
+        {
+          "metric": "correction",
+          "tick": 147,
+          "depth": 8,
+          "core_ns": 6488625,
+          "call_ns": 6515458
+        },
+        {
+          "metric": "normal",
+          "tick": 148,
+          "core_ns": 1001333,
+          "call_ns": 1028209
+        },
+        {
+          "metric": "correction",
+          "tick": 148,
+          "depth": 8,
+          "core_ns": 6491500,
+          "call_ns": 6518125
+        },
+        {
+          "metric": "normal",
+          "tick": 149,
+          "core_ns": 980250,
+          "call_ns": 1006875
+        },
+        {
+          "metric": "correction",
+          "tick": 149,
+          "depth": 8,
+          "core_ns": 6400541,
+          "call_ns": 6423208
+        },
+        {
+          "metric": "normal",
+          "tick": 150,
+          "core_ns": 981792,
+          "call_ns": 1012084
+        },
+        {
+          "metric": "correction",
+          "tick": 150,
+          "depth": 8,
+          "core_ns": 6458583,
+          "call_ns": 6486208
+        },
+        {
+          "metric": "normal",
+          "tick": 151,
+          "core_ns": 949084,
+          "call_ns": 975500
+        },
+        {
+          "metric": "correction",
+          "tick": 151,
+          "depth": 8,
+          "core_ns": 6391584,
+          "call_ns": 6414417
+        },
+        {
+          "metric": "normal",
+          "tick": 152,
+          "core_ns": 908375,
+          "call_ns": 933250
+        },
+        {
+          "metric": "correction",
+          "tick": 152,
+          "depth": 8,
+          "core_ns": 6273375,
+          "call_ns": 6300333
+        },
+        {
+          "metric": "normal",
+          "tick": 153,
+          "core_ns": 930541,
+          "call_ns": 956292
+        },
+        {
+          "metric": "correction",
+          "tick": 153,
+          "depth": 8,
+          "core_ns": 6394583,
+          "call_ns": 6418083
+        },
+        {
+          "metric": "normal",
+          "tick": 154,
+          "core_ns": 944791,
+          "call_ns": 968125
+        },
+        {
+          "metric": "correction",
+          "tick": 154,
+          "depth": 8,
+          "core_ns": 6282625,
+          "call_ns": 6307375
+        },
+        {
+          "metric": "normal",
+          "tick": 155,
+          "core_ns": 930917,
+          "call_ns": 957042
+        },
+        {
+          "metric": "correction",
+          "tick": 155,
+          "depth": 8,
+          "core_ns": 6173959,
+          "call_ns": 6198000
+        },
+        {
+          "metric": "normal",
+          "tick": 156,
+          "core_ns": 934959,
+          "call_ns": 960167
+        },
+        {
+          "metric": "correction",
+          "tick": 156,
+          "depth": 8,
+          "core_ns": 6056916,
+          "call_ns": 6082458
+        },
+        {
+          "metric": "normal",
+          "tick": 157,
+          "core_ns": 921375,
+          "call_ns": 942916
+        },
+        {
+          "metric": "correction",
+          "tick": 157,
+          "depth": 8,
+          "core_ns": 6022834,
+          "call_ns": 6050292
+        },
+        {
+          "metric": "normal",
+          "tick": 158,
+          "core_ns": 948583,
+          "call_ns": 972500
+        },
+        {
+          "metric": "correction",
+          "tick": 158,
+          "depth": 8,
+          "core_ns": 5960584,
+          "call_ns": 5988333
+        },
+        {
+          "metric": "normal",
+          "tick": 159,
+          "core_ns": 941958,
+          "call_ns": 964208
+        },
+        {
+          "metric": "correction",
+          "tick": 159,
+          "depth": 8,
+          "core_ns": 5968791,
+          "call_ns": 5995458
+        },
+        {
+          "metric": "normal",
+          "tick": 160,
+          "core_ns": 929500,
+          "call_ns": 953792
+        },
+        {
+          "metric": "correction",
+          "tick": 160,
+          "depth": 8,
+          "core_ns": 5895125,
+          "call_ns": 5919250
+        }
+      ],
+      "core_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 987916,
+          "p95_ns": 1895583,
+          "max_ns": 2857292
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 6401125,
+          "p95_ns": 6559292,
+          "max_ns": 6561667
+        }
+      },
+      "call_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 1017541,
+          "p95_ns": 1926875,
+          "max_ns": 2882417
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 6427208,
+          "p95_ns": 6586791,
+          "max_ns": 6587166
+        }
+      }
+    },
+    {
+      "platform": "macOS15.8 arm64 physical AppleM3",
+      "mode": "Release",
+      "test_exit": 0,
+      "tests": "9/9 passed",
+      "log_path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit/release-v3.log",
+      "log_sha256": "5472bb60a2edb0bafff629528489bd8b401acc6236f35e5e6040a06110e2d4f6",
+      "archive": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/cache/build/Release/libogb3.a",
+      "archive_sha256": "4c8e9d7b70fffc9b9cff71bffbabd34cdea7bff002891204877d3058ad774e69",
+      "manifest_sha256": "9c0d89b1fb24b108253d2b765fdf8a6c225f0b9e2e80157e1155c3811eba0151",
+      "profile": {
+        "bodies": 32,
+        "history": 128,
+        "repair": 8,
+        "normal_samples": 160,
+        "correction_samples": 33,
+        "observed_live_peak": 36163335,
+        "staged_live_peak": 36163335,
+        "live_at_end": 32876631,
+        "engine_component_high": 23915488,
+        "wrapper_component_high": 11279220,
+        "largest_operation_requests": 546384,
+        "reservation_bytes": 2097152,
+        "reservation_failures": 0,
+        "normal_max_ns": 615750,
+        "correction_max_ns": 3033334
+      },
+      "teardown": {
+        "engine_live": 0,
+        "native_wrapper_live": 0,
+        "provider_live": 0,
+        "checkpoint_live": 0
+      },
+      "raw_samples": [
+        {
+          "metric": "normal",
+          "tick": 1,
+          "core_ns": 500458,
+          "call_ns": 500833
+        },
+        {
+          "metric": "normal",
+          "tick": 2,
+          "core_ns": 427166,
+          "call_ns": 427417
+        },
+        {
+          "metric": "normal",
+          "tick": 3,
+          "core_ns": 423291,
+          "call_ns": 423583
+        },
+        {
+          "metric": "normal",
+          "tick": 4,
+          "core_ns": 423625,
+          "call_ns": 423875
+        },
+        {
+          "metric": "normal",
+          "tick": 5,
+          "core_ns": 423458,
+          "call_ns": 423792
+        },
+        {
+          "metric": "normal",
+          "tick": 6,
+          "core_ns": 422584,
+          "call_ns": 422916
+        },
+        {
+          "metric": "normal",
+          "tick": 7,
+          "core_ns": 450208,
+          "call_ns": 450417
+        },
+        {
+          "metric": "normal",
+          "tick": 8,
+          "core_ns": 429792,
+          "call_ns": 430000
+        },
+        {
+          "metric": "normal",
+          "tick": 9,
+          "core_ns": 427917,
+          "call_ns": 428167
+        },
+        {
+          "metric": "normal",
+          "tick": 10,
+          "core_ns": 479042,
+          "call_ns": 479292
+        },
+        {
+          "metric": "normal",
+          "tick": 11,
+          "core_ns": 452792,
+          "call_ns": 453000
+        },
+        {
+          "metric": "normal",
+          "tick": 12,
+          "core_ns": 466833,
+          "call_ns": 467041
+        },
+        {
+          "metric": "normal",
+          "tick": 13,
+          "core_ns": 534417,
+          "call_ns": 534625
+        },
+        {
+          "metric": "normal",
+          "tick": 14,
+          "core_ns": 545625,
+          "call_ns": 545833
+        },
+        {
+          "metric": "normal",
+          "tick": 15,
+          "core_ns": 524542,
+          "call_ns": 524750
+        },
+        {
+          "metric": "normal",
+          "tick": 16,
+          "core_ns": 523916,
+          "call_ns": 524166
+        },
+        {
+          "metric": "normal",
+          "tick": 17,
+          "core_ns": 522333,
+          "call_ns": 522584
+        },
+        {
+          "metric": "normal",
+          "tick": 18,
+          "core_ns": 512375,
+          "call_ns": 512583
+        },
+        {
+          "metric": "normal",
+          "tick": 19,
+          "core_ns": 509291,
+          "call_ns": 509500
+        },
+        {
+          "metric": "normal",
+          "tick": 20,
+          "core_ns": 522083,
+          "call_ns": 522291
+        },
+        {
+          "metric": "normal",
+          "tick": 21,
+          "core_ns": 513083,
+          "call_ns": 513333
+        },
+        {
+          "metric": "normal",
+          "tick": 22,
+          "core_ns": 512875,
+          "call_ns": 513084
+        },
+        {
+          "metric": "normal",
+          "tick": 23,
+          "core_ns": 522667,
+          "call_ns": 522917
+        },
+        {
+          "metric": "normal",
+          "tick": 24,
+          "core_ns": 512708,
+          "call_ns": 512875
+        },
+        {
+          "metric": "normal",
+          "tick": 25,
+          "core_ns": 513250,
+          "call_ns": 513458
+        },
+        {
+          "metric": "normal",
+          "tick": 26,
+          "core_ns": 512208,
+          "call_ns": 512458
+        },
+        {
+          "metric": "normal",
+          "tick": 27,
+          "core_ns": 513833,
+          "call_ns": 514125
+        },
+        {
+          "metric": "normal",
+          "tick": 28,
+          "core_ns": 511750,
+          "call_ns": 512000
+        },
+        {
+          "metric": "normal",
+          "tick": 29,
+          "core_ns": 512459,
+          "call_ns": 512667
+        },
+        {
+          "metric": "normal",
+          "tick": 30,
+          "core_ns": 512583,
+          "call_ns": 512750
+        },
+        {
+          "metric": "normal",
+          "tick": 31,
+          "core_ns": 513750,
+          "call_ns": 513958
+        },
+        {
+          "metric": "normal",
+          "tick": 32,
+          "core_ns": 521333,
+          "call_ns": 521542
+        },
+        {
+          "metric": "normal",
+          "tick": 33,
+          "core_ns": 515666,
+          "call_ns": 515833
+        },
+        {
+          "metric": "normal",
+          "tick": 34,
+          "core_ns": 516458,
+          "call_ns": 516708
+        },
+        {
+          "metric": "normal",
+          "tick": 35,
+          "core_ns": 518500,
+          "call_ns": 518708
+        },
+        {
+          "metric": "normal",
+          "tick": 36,
+          "core_ns": 487292,
+          "call_ns": 487541
+        },
+        {
+          "metric": "normal",
+          "tick": 37,
+          "core_ns": 565000,
+          "call_ns": 565333
+        },
+        {
+          "metric": "normal",
+          "tick": 38,
+          "core_ns": 615750,
+          "call_ns": 616208
+        },
+        {
+          "metric": "normal",
+          "tick": 39,
+          "core_ns": 558750,
+          "call_ns": 559083
+        },
+        {
+          "metric": "normal",
+          "tick": 40,
+          "core_ns": 544750,
+          "call_ns": 545042
+        },
+        {
+          "metric": "normal",
+          "tick": 41,
+          "core_ns": 497500,
+          "call_ns": 497708
+        },
+        {
+          "metric": "normal",
+          "tick": 42,
+          "core_ns": 485083,
+          "call_ns": 485333
+        },
+        {
+          "metric": "normal",
+          "tick": 43,
+          "core_ns": 474042,
+          "call_ns": 474250
+        },
+        {
+          "metric": "normal",
+          "tick": 44,
+          "core_ns": 499667,
+          "call_ns": 499916
+        },
+        {
+          "metric": "normal",
+          "tick": 45,
+          "core_ns": 468125,
+          "call_ns": 468375
+        },
+        {
+          "metric": "normal",
+          "tick": 46,
+          "core_ns": 466959,
+          "call_ns": 467167
+        },
+        {
+          "metric": "normal",
+          "tick": 47,
+          "core_ns": 488792,
+          "call_ns": 489000
+        },
+        {
+          "metric": "normal",
+          "tick": 48,
+          "core_ns": 525167,
+          "call_ns": 525500
+        },
+        {
+          "metric": "normal",
+          "tick": 49,
+          "core_ns": 437667,
+          "call_ns": 437916
+        },
+        {
+          "metric": "normal",
+          "tick": 50,
+          "core_ns": 436542,
+          "call_ns": 436750
+        },
+        {
+          "metric": "normal",
+          "tick": 51,
+          "core_ns": 448833,
+          "call_ns": 449083
+        },
+        {
+          "metric": "normal",
+          "tick": 52,
+          "core_ns": 436667,
+          "call_ns": 436875
+        },
+        {
+          "metric": "normal",
+          "tick": 53,
+          "core_ns": 434541,
+          "call_ns": 434791
+        },
+        {
+          "metric": "normal",
+          "tick": 54,
+          "core_ns": 434125,
+          "call_ns": 434375
+        },
+        {
+          "metric": "normal",
+          "tick": 55,
+          "core_ns": 433958,
+          "call_ns": 434125
+        },
+        {
+          "metric": "normal",
+          "tick": 56,
+          "core_ns": 435500,
+          "call_ns": 435708
+        },
+        {
+          "metric": "normal",
+          "tick": 57,
+          "core_ns": 435250,
+          "call_ns": 435500
+        },
+        {
+          "metric": "normal",
+          "tick": 58,
+          "core_ns": 435584,
+          "call_ns": 435833
+        },
+        {
+          "metric": "normal",
+          "tick": 59,
+          "core_ns": 435500,
+          "call_ns": 435750
+        },
+        {
+          "metric": "normal",
+          "tick": 60,
+          "core_ns": 444708,
+          "call_ns": 444916
+        },
+        {
+          "metric": "normal",
+          "tick": 61,
+          "core_ns": 452042,
+          "call_ns": 452209
+        },
+        {
+          "metric": "normal",
+          "tick": 62,
+          "core_ns": 440208,
+          "call_ns": 440500
+        },
+        {
+          "metric": "normal",
+          "tick": 63,
+          "core_ns": 440625,
+          "call_ns": 440833
+        },
+        {
+          "metric": "normal",
+          "tick": 64,
+          "core_ns": 439000,
+          "call_ns": 439208
+        },
+        {
+          "metric": "normal",
+          "tick": 65,
+          "core_ns": 438917,
+          "call_ns": 439166
+        },
+        {
+          "metric": "normal",
+          "tick": 66,
+          "core_ns": 442500,
+          "call_ns": 442667
+        },
+        {
+          "metric": "normal",
+          "tick": 67,
+          "core_ns": 439000,
+          "call_ns": 439208
+        },
+        {
+          "metric": "normal",
+          "tick": 68,
+          "core_ns": 438334,
+          "call_ns": 438583
+        },
+        {
+          "metric": "normal",
+          "tick": 69,
+          "core_ns": 438458,
+          "call_ns": 438666
+        },
+        {
+          "metric": "normal",
+          "tick": 70,
+          "core_ns": 474333,
+          "call_ns": 474583
+        },
+        {
+          "metric": "normal",
+          "tick": 71,
+          "core_ns": 450375,
+          "call_ns": 450667
+        },
+        {
+          "metric": "normal",
+          "tick": 72,
+          "core_ns": 439792,
+          "call_ns": 440041
+        },
+        {
+          "metric": "normal",
+          "tick": 73,
+          "core_ns": 443916,
+          "call_ns": 444208
+        },
+        {
+          "metric": "normal",
+          "tick": 74,
+          "core_ns": 439834,
+          "call_ns": 440042
+        },
+        {
+          "metric": "normal",
+          "tick": 75,
+          "core_ns": 441208,
+          "call_ns": 441375
+        },
+        {
+          "metric": "normal",
+          "tick": 76,
+          "core_ns": 440125,
+          "call_ns": 440375
+        },
+        {
+          "metric": "normal",
+          "tick": 77,
+          "core_ns": 442667,
+          "call_ns": 442875
+        },
+        {
+          "metric": "normal",
+          "tick": 78,
+          "core_ns": 456875,
+          "call_ns": 457041
+        },
+        {
+          "metric": "normal",
+          "tick": 79,
+          "core_ns": 480208,
+          "call_ns": 480416
+        },
+        {
+          "metric": "normal",
+          "tick": 80,
+          "core_ns": 443083,
+          "call_ns": 443292
+        },
+        {
+          "metric": "normal",
+          "tick": 81,
+          "core_ns": 441291,
+          "call_ns": 441542
+        },
+        {
+          "metric": "normal",
+          "tick": 82,
+          "core_ns": 441500,
+          "call_ns": 441709
+        },
+        {
+          "metric": "normal",
+          "tick": 83,
+          "core_ns": 461917,
+          "call_ns": 462125
+        },
+        {
+          "metric": "normal",
+          "tick": 84,
+          "core_ns": 524125,
+          "call_ns": 524459
+        },
+        {
+          "metric": "normal",
+          "tick": 85,
+          "core_ns": 502625,
+          "call_ns": 502958
+        },
+        {
+          "metric": "normal",
+          "tick": 86,
+          "core_ns": 458583,
+          "call_ns": 458834
+        },
+        {
+          "metric": "normal",
+          "tick": 87,
+          "core_ns": 452916,
+          "call_ns": 453125
+        },
+        {
+          "metric": "normal",
+          "tick": 88,
+          "core_ns": 442334,
+          "call_ns": 442541
+        },
+        {
+          "metric": "normal",
+          "tick": 89,
+          "core_ns": 443584,
+          "call_ns": 443833
+        },
+        {
+          "metric": "normal",
+          "tick": 90,
+          "core_ns": 480250,
+          "call_ns": 480458
+        },
+        {
+          "metric": "normal",
+          "tick": 91,
+          "core_ns": 437208,
+          "call_ns": 437458
+        },
+        {
+          "metric": "normal",
+          "tick": 92,
+          "core_ns": 436042,
+          "call_ns": 436209
+        },
+        {
+          "metric": "normal",
+          "tick": 93,
+          "core_ns": 448208,
+          "call_ns": 448417
+        },
+        {
+          "metric": "normal",
+          "tick": 94,
+          "core_ns": 436166,
+          "call_ns": 436375
+        },
+        {
+          "metric": "normal",
+          "tick": 95,
+          "core_ns": 464333,
+          "call_ns": 464500
+        },
+        {
+          "metric": "normal",
+          "tick": 96,
+          "core_ns": 447334,
+          "call_ns": 447500
+        },
+        {
+          "metric": "normal",
+          "tick": 97,
+          "core_ns": 436125,
+          "call_ns": 436333
+        },
+        {
+          "metric": "normal",
+          "tick": 98,
+          "core_ns": 436584,
+          "call_ns": 436750
+        },
+        {
+          "metric": "normal",
+          "tick": 99,
+          "core_ns": 438000,
+          "call_ns": 438166
+        },
+        {
+          "metric": "normal",
+          "tick": 100,
+          "core_ns": 440958,
+          "call_ns": 441167
+        },
+        {
+          "metric": "normal",
+          "tick": 101,
+          "core_ns": 434042,
+          "call_ns": 434250
+        },
+        {
+          "metric": "normal",
+          "tick": 102,
+          "core_ns": 435500,
+          "call_ns": 435667
+        },
+        {
+          "metric": "normal",
+          "tick": 103,
+          "core_ns": 436459,
+          "call_ns": 436625
+        },
+        {
+          "metric": "normal",
+          "tick": 104,
+          "core_ns": 469917,
+          "call_ns": 470125
+        },
+        {
+          "metric": "normal",
+          "tick": 105,
+          "core_ns": 435042,
+          "call_ns": 435250
+        },
+        {
+          "metric": "normal",
+          "tick": 106,
+          "core_ns": 435542,
+          "call_ns": 435750
+        },
+        {
+          "metric": "normal",
+          "tick": 107,
+          "core_ns": 435709,
+          "call_ns": 435875
+        },
+        {
+          "metric": "normal",
+          "tick": 108,
+          "core_ns": 437291,
+          "call_ns": 437458
+        },
+        {
+          "metric": "normal",
+          "tick": 109,
+          "core_ns": 435625,
+          "call_ns": 435834
+        },
+        {
+          "metric": "normal",
+          "tick": 110,
+          "core_ns": 433292,
+          "call_ns": 433500
+        },
+        {
+          "metric": "normal",
+          "tick": 111,
+          "core_ns": 434625,
+          "call_ns": 434833
+        },
+        {
+          "metric": "normal",
+          "tick": 112,
+          "core_ns": 433375,
+          "call_ns": 433542
+        },
+        {
+          "metric": "normal",
+          "tick": 113,
+          "core_ns": 436000,
+          "call_ns": 436167
+        },
+        {
+          "metric": "normal",
+          "tick": 114,
+          "core_ns": 433500,
+          "call_ns": 433667
+        },
+        {
+          "metric": "normal",
+          "tick": 115,
+          "core_ns": 439125,
+          "call_ns": 439333
+        },
+        {
+          "metric": "normal",
+          "tick": 116,
+          "core_ns": 433958,
+          "call_ns": 434209
+        },
+        {
+          "metric": "normal",
+          "tick": 117,
+          "core_ns": 435125,
+          "call_ns": 435333
+        },
+        {
+          "metric": "normal",
+          "tick": 118,
+          "core_ns": 468083,
+          "call_ns": 468333
+        },
+        {
+          "metric": "normal",
+          "tick": 119,
+          "core_ns": 474375,
+          "call_ns": 474583
+        },
+        {
+          "metric": "normal",
+          "tick": 120,
+          "core_ns": 477542,
+          "call_ns": 477792
+        },
+        {
+          "metric": "normal",
+          "tick": 121,
+          "core_ns": 448500,
+          "call_ns": 448708
+        },
+        {
+          "metric": "normal",
+          "tick": 122,
+          "core_ns": 433792,
+          "call_ns": 434000
+        },
+        {
+          "metric": "normal",
+          "tick": 123,
+          "core_ns": 468250,
+          "call_ns": 468458
+        },
+        {
+          "metric": "normal",
+          "tick": 124,
+          "core_ns": 435000,
+          "call_ns": 435250
+        },
+        {
+          "metric": "normal",
+          "tick": 125,
+          "core_ns": 436833,
+          "call_ns": 437041
+        },
+        {
+          "metric": "normal",
+          "tick": 126,
+          "core_ns": 435208,
+          "call_ns": 435375
+        },
+        {
+          "metric": "normal",
+          "tick": 127,
+          "core_ns": 438375,
+          "call_ns": 438542
+        },
+        {
+          "metric": "normal",
+          "tick": 128,
+          "core_ns": 443042,
+          "call_ns": 443250
+        },
+        {
+          "metric": "correction",
+          "tick": 128,
+          "depth": 8,
+          "core_ns": 2877459,
+          "call_ns": 2878417
+        },
+        {
+          "metric": "normal",
+          "tick": 129,
+          "core_ns": 441083,
+          "call_ns": 441333
+        },
+        {
+          "metric": "correction",
+          "tick": 129,
+          "depth": 8,
+          "core_ns": 2843458,
+          "call_ns": 2843959
+        },
+        {
+          "metric": "normal",
+          "tick": 130,
+          "core_ns": 437583,
+          "call_ns": 437875
+        },
+        {
+          "metric": "correction",
+          "tick": 130,
+          "depth": 8,
+          "core_ns": 2851667,
+          "call_ns": 2851958
+        },
+        {
+          "metric": "normal",
+          "tick": 131,
+          "core_ns": 438291,
+          "call_ns": 438500
+        },
+        {
+          "metric": "correction",
+          "tick": 131,
+          "depth": 8,
+          "core_ns": 2931083,
+          "call_ns": 2931375
+        },
+        {
+          "metric": "normal",
+          "tick": 132,
+          "core_ns": 437708,
+          "call_ns": 437917
+        },
+        {
+          "metric": "correction",
+          "tick": 132,
+          "depth": 8,
+          "core_ns": 2910292,
+          "call_ns": 2910625
+        },
+        {
+          "metric": "normal",
+          "tick": 133,
+          "core_ns": 438000,
+          "call_ns": 438209
+        },
+        {
+          "metric": "correction",
+          "tick": 133,
+          "depth": 8,
+          "core_ns": 2936292,
+          "call_ns": 2936667
+        },
+        {
+          "metric": "normal",
+          "tick": 134,
+          "core_ns": 436958,
+          "call_ns": 437167
+        },
+        {
+          "metric": "correction",
+          "tick": 134,
+          "depth": 8,
+          "core_ns": 2867792,
+          "call_ns": 2868125
+        },
+        {
+          "metric": "normal",
+          "tick": 135,
+          "core_ns": 447292,
+          "call_ns": 447542
+        },
+        {
+          "metric": "correction",
+          "tick": 135,
+          "depth": 8,
+          "core_ns": 2910833,
+          "call_ns": 2911209
+        },
+        {
+          "metric": "normal",
+          "tick": 136,
+          "core_ns": 432875,
+          "call_ns": 433166
+        },
+        {
+          "metric": "correction",
+          "tick": 136,
+          "depth": 8,
+          "core_ns": 2861833,
+          "call_ns": 2862167
+        },
+        {
+          "metric": "normal",
+          "tick": 137,
+          "core_ns": 435417,
+          "call_ns": 435625
+        },
+        {
+          "metric": "correction",
+          "tick": 137,
+          "depth": 8,
+          "core_ns": 2823834,
+          "call_ns": 2824125
+        },
+        {
+          "metric": "normal",
+          "tick": 138,
+          "core_ns": 431500,
+          "call_ns": 431834
+        },
+        {
+          "metric": "correction",
+          "tick": 138,
+          "depth": 8,
+          "core_ns": 2831583,
+          "call_ns": 2831875
+        },
+        {
+          "metric": "normal",
+          "tick": 139,
+          "core_ns": 442708,
+          "call_ns": 443000
+        },
+        {
+          "metric": "correction",
+          "tick": 139,
+          "depth": 8,
+          "core_ns": 2902167,
+          "call_ns": 2902500
+        },
+        {
+          "metric": "normal",
+          "tick": 140,
+          "core_ns": 433625,
+          "call_ns": 433875
+        },
+        {
+          "metric": "correction",
+          "tick": 140,
+          "depth": 8,
+          "core_ns": 2817916,
+          "call_ns": 2818292
+        },
+        {
+          "metric": "normal",
+          "tick": 141,
+          "core_ns": 436708,
+          "call_ns": 436959
+        },
+        {
+          "metric": "correction",
+          "tick": 141,
+          "depth": 8,
+          "core_ns": 2831791,
+          "call_ns": 2832125
+        },
+        {
+          "metric": "normal",
+          "tick": 142,
+          "core_ns": 477750,
+          "call_ns": 478083
+        },
+        {
+          "metric": "correction",
+          "tick": 142,
+          "depth": 8,
+          "core_ns": 2818417,
+          "call_ns": 2818708
+        },
+        {
+          "metric": "normal",
+          "tick": 143,
+          "core_ns": 432000,
+          "call_ns": 432250
+        },
+        {
+          "metric": "correction",
+          "tick": 143,
+          "depth": 8,
+          "core_ns": 2811792,
+          "call_ns": 2812167
+        },
+        {
+          "metric": "normal",
+          "tick": 144,
+          "core_ns": 432750,
+          "call_ns": 433041
+        },
+        {
+          "metric": "correction",
+          "tick": 144,
+          "depth": 8,
+          "core_ns": 2821667,
+          "call_ns": 2822042
+        },
+        {
+          "metric": "normal",
+          "tick": 145,
+          "core_ns": 434375,
+          "call_ns": 434625
+        },
+        {
+          "metric": "correction",
+          "tick": 145,
+          "depth": 8,
+          "core_ns": 2807458,
+          "call_ns": 2807834
+        },
+        {
+          "metric": "normal",
+          "tick": 146,
+          "core_ns": 458625,
+          "call_ns": 458875
+        },
+        {
+          "metric": "correction",
+          "tick": 146,
+          "depth": 8,
+          "core_ns": 2803458,
+          "call_ns": 2803792
+        },
+        {
+          "metric": "normal",
+          "tick": 147,
+          "core_ns": 430750,
+          "call_ns": 431042
+        },
+        {
+          "metric": "correction",
+          "tick": 147,
+          "depth": 8,
+          "core_ns": 2847875,
+          "call_ns": 2848166
+        },
+        {
+          "metric": "normal",
+          "tick": 148,
+          "core_ns": 433458,
+          "call_ns": 433709
+        },
+        {
+          "metric": "correction",
+          "tick": 148,
+          "depth": 8,
+          "core_ns": 2909167,
+          "call_ns": 2909458
+        },
+        {
+          "metric": "normal",
+          "tick": 149,
+          "core_ns": 434209,
+          "call_ns": 434459
+        },
+        {
+          "metric": "correction",
+          "tick": 149,
+          "depth": 8,
+          "core_ns": 2815375,
+          "call_ns": 2815667
+        },
+        {
+          "metric": "normal",
+          "tick": 150,
+          "core_ns": 476625,
+          "call_ns": 476917
+        },
+        {
+          "metric": "correction",
+          "tick": 150,
+          "depth": 8,
+          "core_ns": 2811125,
+          "call_ns": 2811500
+        },
+        {
+          "metric": "normal",
+          "tick": 151,
+          "core_ns": 456666,
+          "call_ns": 457125
+        },
+        {
+          "metric": "correction",
+          "tick": 151,
+          "depth": 8,
+          "core_ns": 2863167,
+          "call_ns": 2863708
+        },
+        {
+          "metric": "normal",
+          "tick": 152,
+          "core_ns": 423875,
+          "call_ns": 424125
+        },
+        {
+          "metric": "correction",
+          "tick": 152,
+          "depth": 8,
+          "core_ns": 2836541,
+          "call_ns": 2836875
+        },
+        {
+          "metric": "normal",
+          "tick": 153,
+          "core_ns": 462750,
+          "call_ns": 463083
+        },
+        {
+          "metric": "correction",
+          "tick": 153,
+          "depth": 8,
+          "core_ns": 3033334,
+          "call_ns": 3033792
+        },
+        {
+          "metric": "normal",
+          "tick": 154,
+          "core_ns": 448417,
+          "call_ns": 448667
+        },
+        {
+          "metric": "correction",
+          "tick": 154,
+          "depth": 8,
+          "core_ns": 2779667,
+          "call_ns": 2780042
+        },
+        {
+          "metric": "normal",
+          "tick": 155,
+          "core_ns": 427125,
+          "call_ns": 427416
+        },
+        {
+          "metric": "correction",
+          "tick": 155,
+          "depth": 8,
+          "core_ns": 2815916,
+          "call_ns": 2816250
+        },
+        {
+          "metric": "normal",
+          "tick": 156,
+          "core_ns": 425125,
+          "call_ns": 425417
+        },
+        {
+          "metric": "correction",
+          "tick": 156,
+          "depth": 8,
+          "core_ns": 2785042,
+          "call_ns": 2785416
+        },
+        {
+          "metric": "normal",
+          "tick": 157,
+          "core_ns": 444125,
+          "call_ns": 444375
+        },
+        {
+          "metric": "correction",
+          "tick": 157,
+          "depth": 8,
+          "core_ns": 2759458,
+          "call_ns": 2759750
+        },
+        {
+          "metric": "normal",
+          "tick": 158,
+          "core_ns": 484292,
+          "call_ns": 484541
+        },
+        {
+          "metric": "correction",
+          "tick": 158,
+          "depth": 8,
+          "core_ns": 2874000,
+          "call_ns": 2874958
+        },
+        {
+          "metric": "normal",
+          "tick": 159,
+          "core_ns": 438916,
+          "call_ns": 439250
+        },
+        {
+          "metric": "correction",
+          "tick": 159,
+          "depth": 8,
+          "core_ns": 2799250,
+          "call_ns": 2799625
+        },
+        {
+          "metric": "normal",
+          "tick": 160,
+          "core_ns": 429834,
+          "call_ns": 430125
+        },
+        {
+          "metric": "correction",
+          "tick": 160,
+          "depth": 8,
+          "core_ns": 2815125,
+          "call_ns": 2815458
+        }
+      ],
+      "core_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 441500,
+          "p95_ns": 524125,
+          "max_ns": 615750
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 2831791,
+          "p95_ns": 2936292,
+          "max_ns": 3033334
+        }
+      },
+      "call_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 441709,
+          "p95_ns": 524459,
+          "max_ns": 616208
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 2832125,
+          "p95_ns": 2936667,
+          "max_ns": 3033792
+        }
+      }
+    },
+    {
+      "platform": "Linux x86_64 Debian under Podman/Rosetta on AppleM3",
+      "mode": "Debug",
+      "test_exit": 0,
+      "tests": "9/9 passed",
+      "log_path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit/linux-debug-v3.log",
+      "log_sha256": "61938afef27518a9a927156506b6fcfc45b5e9c9230d438a65d4dfbe4f2f714d",
+      "archive": "/work/box3d-pending-v3/build/Debug/libogb3.a",
+      "archive_sha256": "87529bd1d35704e4562509cdea71ed11cf3abcf8edaf433b15fa4a6e4a4cd64a",
+      "manifest_sha256": "c589e28711d702978b41cc3ade7c074721630bc42596e00fcd63d429ecf5cc23",
+      "profile": {
+        "bodies": 32,
+        "history": 128,
+        "repair": 8,
+        "normal_samples": 160,
+        "correction_samples": 33,
+        "observed_live_peak": 36161127,
+        "staged_live_peak": 36161127,
+        "live_at_end": 32874567,
+        "engine_component_high": 23913280,
+        "wrapper_component_high": 11279220,
+        "largest_operation_requests": 546352,
+        "reservation_bytes": 2097152,
+        "reservation_failures": 0,
+        "normal_max_ns": 4947750,
+        "correction_max_ns": 7986125
+      },
+      "teardown": {
+        "engine_live": 0,
+        "native_wrapper_live": 0,
+        "provider_live": 0,
+        "checkpoint_live": 0
+      },
+      "raw_samples": [
+        {
+          "metric": "normal",
+          "tick": 1,
+          "core_ns": 4360667,
+          "call_ns": 4389542
+        },
+        {
+          "metric": "normal",
+          "tick": 2,
+          "core_ns": 1263334,
+          "call_ns": 1285417
+        },
+        {
+          "metric": "normal",
+          "tick": 3,
+          "core_ns": 1250833,
+          "call_ns": 1272291
+        },
+        {
+          "metric": "normal",
+          "tick": 4,
+          "core_ns": 1399917,
+          "call_ns": 1422875
+        },
+        {
+          "metric": "normal",
+          "tick": 5,
+          "core_ns": 1250333,
+          "call_ns": 1271333
+        },
+        {
+          "metric": "normal",
+          "tick": 6,
+          "core_ns": 1252083,
+          "call_ns": 1274167
+        },
+        {
+          "metric": "normal",
+          "tick": 7,
+          "core_ns": 1364208,
+          "call_ns": 1385125
+        },
+        {
+          "metric": "normal",
+          "tick": 8,
+          "core_ns": 1272166,
+          "call_ns": 1293000
+        },
+        {
+          "metric": "normal",
+          "tick": 9,
+          "core_ns": 1268542,
+          "call_ns": 1289417
+        },
+        {
+          "metric": "normal",
+          "tick": 10,
+          "core_ns": 2890291,
+          "call_ns": 2914416
+        },
+        {
+          "metric": "normal",
+          "tick": 11,
+          "core_ns": 1450166,
+          "call_ns": 1471167
+        },
+        {
+          "metric": "normal",
+          "tick": 12,
+          "core_ns": 1665750,
+          "call_ns": 1687000
+        },
+        {
+          "metric": "normal",
+          "tick": 13,
+          "core_ns": 4947750,
+          "call_ns": 4968791
+        },
+        {
+          "metric": "normal",
+          "tick": 14,
+          "core_ns": 2305667,
+          "call_ns": 2329792
+        },
+        {
+          "metric": "normal",
+          "tick": 15,
+          "core_ns": 2136333,
+          "call_ns": 2160084
+        },
+        {
+          "metric": "normal",
+          "tick": 16,
+          "core_ns": 2112333,
+          "call_ns": 2133584
+        },
+        {
+          "metric": "normal",
+          "tick": 17,
+          "core_ns": 2103250,
+          "call_ns": 2125708
+        },
+        {
+          "metric": "normal",
+          "tick": 18,
+          "core_ns": 2160000,
+          "call_ns": 2181334
+        },
+        {
+          "metric": "normal",
+          "tick": 19,
+          "core_ns": 2121958,
+          "call_ns": 2143917
+        },
+        {
+          "metric": "normal",
+          "tick": 20,
+          "core_ns": 2289292,
+          "call_ns": 2312209
+        },
+        {
+          "metric": "normal",
+          "tick": 21,
+          "core_ns": 2127375,
+          "call_ns": 2148542
+        },
+        {
+          "metric": "normal",
+          "tick": 22,
+          "core_ns": 2130834,
+          "call_ns": 2152625
+        },
+        {
+          "metric": "normal",
+          "tick": 23,
+          "core_ns": 2128250,
+          "call_ns": 2149125
+        },
+        {
+          "metric": "normal",
+          "tick": 24,
+          "core_ns": 2136625,
+          "call_ns": 2157541
+        },
+        {
+          "metric": "normal",
+          "tick": 25,
+          "core_ns": 2118541,
+          "call_ns": 2148209
+        },
+        {
+          "metric": "normal",
+          "tick": 26,
+          "core_ns": 2113083,
+          "call_ns": 2134209
+        },
+        {
+          "metric": "normal",
+          "tick": 27,
+          "core_ns": 2118792,
+          "call_ns": 2140792
+        },
+        {
+          "metric": "normal",
+          "tick": 28,
+          "core_ns": 2126792,
+          "call_ns": 2147792
+        },
+        {
+          "metric": "normal",
+          "tick": 29,
+          "core_ns": 2184583,
+          "call_ns": 2205792
+        },
+        {
+          "metric": "normal",
+          "tick": 30,
+          "core_ns": 2117291,
+          "call_ns": 2138333
+        },
+        {
+          "metric": "normal",
+          "tick": 31,
+          "core_ns": 2135000,
+          "call_ns": 2157125
+        },
+        {
+          "metric": "normal",
+          "tick": 32,
+          "core_ns": 2148667,
+          "call_ns": 2171917
+        },
+        {
+          "metric": "normal",
+          "tick": 33,
+          "core_ns": 2092959,
+          "call_ns": 2114208
+        },
+        {
+          "metric": "normal",
+          "tick": 34,
+          "core_ns": 2133875,
+          "call_ns": 2155000
+        },
+        {
+          "metric": "normal",
+          "tick": 35,
+          "core_ns": 2121375,
+          "call_ns": 2142166
+        },
+        {
+          "metric": "normal",
+          "tick": 36,
+          "core_ns": 2109916,
+          "call_ns": 2130833
+        },
+        {
+          "metric": "normal",
+          "tick": 37,
+          "core_ns": 2209875,
+          "call_ns": 2233125
+        },
+        {
+          "metric": "normal",
+          "tick": 38,
+          "core_ns": 2099375,
+          "call_ns": 2120250
+        },
+        {
+          "metric": "normal",
+          "tick": 39,
+          "core_ns": 2162375,
+          "call_ns": 2184583
+        },
+        {
+          "metric": "normal",
+          "tick": 40,
+          "core_ns": 2118000,
+          "call_ns": 2139000
+        },
+        {
+          "metric": "normal",
+          "tick": 41,
+          "core_ns": 2099125,
+          "call_ns": 2123333
+        },
+        {
+          "metric": "normal",
+          "tick": 42,
+          "core_ns": 2105083,
+          "call_ns": 2128958
+        },
+        {
+          "metric": "normal",
+          "tick": 43,
+          "core_ns": 2098875,
+          "call_ns": 2122791
+        },
+        {
+          "metric": "normal",
+          "tick": 44,
+          "core_ns": 2199417,
+          "call_ns": 2229042
+        },
+        {
+          "metric": "normal",
+          "tick": 45,
+          "core_ns": 1511458,
+          "call_ns": 1532416
+        },
+        {
+          "metric": "normal",
+          "tick": 46,
+          "core_ns": 1500250,
+          "call_ns": 1521208
+        },
+        {
+          "metric": "normal",
+          "tick": 47,
+          "core_ns": 1506833,
+          "call_ns": 1527750
+        },
+        {
+          "metric": "normal",
+          "tick": 48,
+          "core_ns": 1534042,
+          "call_ns": 1556875
+        },
+        {
+          "metric": "normal",
+          "tick": 49,
+          "core_ns": 1142000,
+          "call_ns": 1162875
+        },
+        {
+          "metric": "normal",
+          "tick": 50,
+          "core_ns": 1128667,
+          "call_ns": 1149417
+        },
+        {
+          "metric": "normal",
+          "tick": 51,
+          "core_ns": 1137167,
+          "call_ns": 1158083
+        },
+        {
+          "metric": "normal",
+          "tick": 52,
+          "core_ns": 1132292,
+          "call_ns": 1155958
+        },
+        {
+          "metric": "normal",
+          "tick": 53,
+          "core_ns": 1121541,
+          "call_ns": 1142458
+        },
+        {
+          "metric": "normal",
+          "tick": 54,
+          "core_ns": 1124750,
+          "call_ns": 1145500
+        },
+        {
+          "metric": "normal",
+          "tick": 55,
+          "core_ns": 1121791,
+          "call_ns": 1144542
+        },
+        {
+          "metric": "normal",
+          "tick": 56,
+          "core_ns": 1197542,
+          "call_ns": 1218416
+        },
+        {
+          "metric": "normal",
+          "tick": 57,
+          "core_ns": 1174208,
+          "call_ns": 1195167
+        },
+        {
+          "metric": "normal",
+          "tick": 58,
+          "core_ns": 1175208,
+          "call_ns": 1198542
+        },
+        {
+          "metric": "normal",
+          "tick": 59,
+          "core_ns": 1127584,
+          "call_ns": 1148459
+        },
+        {
+          "metric": "normal",
+          "tick": 60,
+          "core_ns": 1244041,
+          "call_ns": 1264875
+        },
+        {
+          "metric": "normal",
+          "tick": 61,
+          "core_ns": 1209667,
+          "call_ns": 1232084
+        },
+        {
+          "metric": "normal",
+          "tick": 62,
+          "core_ns": 1209583,
+          "call_ns": 1231792
+        },
+        {
+          "metric": "normal",
+          "tick": 63,
+          "core_ns": 1183417,
+          "call_ns": 1206000
+        },
+        {
+          "metric": "normal",
+          "tick": 64,
+          "core_ns": 1199292,
+          "call_ns": 1223041
+        },
+        {
+          "metric": "normal",
+          "tick": 65,
+          "core_ns": 1555417,
+          "call_ns": 1576416
+        },
+        {
+          "metric": "normal",
+          "tick": 66,
+          "core_ns": 1180750,
+          "call_ns": 1201667
+        },
+        {
+          "metric": "normal",
+          "tick": 67,
+          "core_ns": 1206833,
+          "call_ns": 1228459
+        },
+        {
+          "metric": "normal",
+          "tick": 68,
+          "core_ns": 1220083,
+          "call_ns": 1241000
+        },
+        {
+          "metric": "normal",
+          "tick": 69,
+          "core_ns": 1212250,
+          "call_ns": 1233083
+        },
+        {
+          "metric": "normal",
+          "tick": 70,
+          "core_ns": 1184000,
+          "call_ns": 1220208
+        },
+        {
+          "metric": "normal",
+          "tick": 71,
+          "core_ns": 1193500,
+          "call_ns": 1214375
+        },
+        {
+          "metric": "normal",
+          "tick": 72,
+          "core_ns": 1183250,
+          "call_ns": 1204000
+        },
+        {
+          "metric": "normal",
+          "tick": 73,
+          "core_ns": 1224542,
+          "call_ns": 1245542
+        },
+        {
+          "metric": "normal",
+          "tick": 74,
+          "core_ns": 1221083,
+          "call_ns": 1242000
+        },
+        {
+          "metric": "normal",
+          "tick": 75,
+          "core_ns": 1215667,
+          "call_ns": 1236667
+        },
+        {
+          "metric": "normal",
+          "tick": 76,
+          "core_ns": 1215542,
+          "call_ns": 1238375
+        },
+        {
+          "metric": "normal",
+          "tick": 77,
+          "core_ns": 1209958,
+          "call_ns": 1230916
+        },
+        {
+          "metric": "normal",
+          "tick": 78,
+          "core_ns": 2288709,
+          "call_ns": 2311834
+        },
+        {
+          "metric": "normal",
+          "tick": 79,
+          "core_ns": 1222417,
+          "call_ns": 1243209
+        },
+        {
+          "metric": "normal",
+          "tick": 80,
+          "core_ns": 1242583,
+          "call_ns": 1263458
+        },
+        {
+          "metric": "normal",
+          "tick": 81,
+          "core_ns": 1198000,
+          "call_ns": 1221417
+        },
+        {
+          "metric": "normal",
+          "tick": 82,
+          "core_ns": 1220042,
+          "call_ns": 1240833
+        },
+        {
+          "metric": "normal",
+          "tick": 83,
+          "core_ns": 1199041,
+          "call_ns": 1219917
+        },
+        {
+          "metric": "normal",
+          "tick": 84,
+          "core_ns": 1215333,
+          "call_ns": 1236125
+        },
+        {
+          "metric": "normal",
+          "tick": 85,
+          "core_ns": 1203583,
+          "call_ns": 1224625
+        },
+        {
+          "metric": "normal",
+          "tick": 86,
+          "core_ns": 1208875,
+          "call_ns": 1230000
+        },
+        {
+          "metric": "normal",
+          "tick": 87,
+          "core_ns": 1197916,
+          "call_ns": 1218875
+        },
+        {
+          "metric": "normal",
+          "tick": 88,
+          "core_ns": 1205791,
+          "call_ns": 1226583
+        },
+        {
+          "metric": "normal",
+          "tick": 89,
+          "core_ns": 1213000,
+          "call_ns": 1234000
+        },
+        {
+          "metric": "normal",
+          "tick": 90,
+          "core_ns": 1216292,
+          "call_ns": 1240125
+        },
+        {
+          "metric": "normal",
+          "tick": 91,
+          "core_ns": 1198750,
+          "call_ns": 1219958
+        },
+        {
+          "metric": "normal",
+          "tick": 92,
+          "core_ns": 1200625,
+          "call_ns": 1221375
+        },
+        {
+          "metric": "normal",
+          "tick": 93,
+          "core_ns": 1223791,
+          "call_ns": 1244792
+        },
+        {
+          "metric": "normal",
+          "tick": 94,
+          "core_ns": 1221500,
+          "call_ns": 1242334
+        },
+        {
+          "metric": "normal",
+          "tick": 95,
+          "core_ns": 1206125,
+          "call_ns": 1226958
+        },
+        {
+          "metric": "normal",
+          "tick": 96,
+          "core_ns": 1207791,
+          "call_ns": 1228666
+        },
+        {
+          "metric": "normal",
+          "tick": 97,
+          "core_ns": 1220541,
+          "call_ns": 1244334
+        },
+        {
+          "metric": "normal",
+          "tick": 98,
+          "core_ns": 1205166,
+          "call_ns": 1228208
+        },
+        {
+          "metric": "normal",
+          "tick": 99,
+          "core_ns": 1234458,
+          "call_ns": 1256292
+        },
+        {
+          "metric": "normal",
+          "tick": 100,
+          "core_ns": 1235125,
+          "call_ns": 1256917
+        },
+        {
+          "metric": "normal",
+          "tick": 101,
+          "core_ns": 1200542,
+          "call_ns": 1221292
+        },
+        {
+          "metric": "normal",
+          "tick": 102,
+          "core_ns": 1160792,
+          "call_ns": 1181792
+        },
+        {
+          "metric": "normal",
+          "tick": 103,
+          "core_ns": 1184542,
+          "call_ns": 1205583
+        },
+        {
+          "metric": "normal",
+          "tick": 104,
+          "core_ns": 1220291,
+          "call_ns": 1241417
+        },
+        {
+          "metric": "normal",
+          "tick": 105,
+          "core_ns": 1355667,
+          "call_ns": 1377000
+        },
+        {
+          "metric": "normal",
+          "tick": 106,
+          "core_ns": 1298083,
+          "call_ns": 1319458
+        },
+        {
+          "metric": "normal",
+          "tick": 107,
+          "core_ns": 1213541,
+          "call_ns": 1234792
+        },
+        {
+          "metric": "normal",
+          "tick": 108,
+          "core_ns": 1183250,
+          "call_ns": 1204292
+        },
+        {
+          "metric": "normal",
+          "tick": 109,
+          "core_ns": 1171834,
+          "call_ns": 1192750
+        },
+        {
+          "metric": "normal",
+          "tick": 110,
+          "core_ns": 1173792,
+          "call_ns": 1194875
+        },
+        {
+          "metric": "normal",
+          "tick": 111,
+          "core_ns": 1149750,
+          "call_ns": 1171000
+        },
+        {
+          "metric": "normal",
+          "tick": 112,
+          "core_ns": 1135833,
+          "call_ns": 1156792
+        },
+        {
+          "metric": "normal",
+          "tick": 113,
+          "core_ns": 1159500,
+          "call_ns": 1180708
+        },
+        {
+          "metric": "normal",
+          "tick": 114,
+          "core_ns": 1405625,
+          "call_ns": 1426917
+        },
+        {
+          "metric": "normal",
+          "tick": 115,
+          "core_ns": 1236125,
+          "call_ns": 1265000
+        },
+        {
+          "metric": "normal",
+          "tick": 116,
+          "core_ns": 1224375,
+          "call_ns": 1245500
+        },
+        {
+          "metric": "normal",
+          "tick": 117,
+          "core_ns": 1196500,
+          "call_ns": 1217667
+        },
+        {
+          "metric": "normal",
+          "tick": 118,
+          "core_ns": 1440417,
+          "call_ns": 1461333
+        },
+        {
+          "metric": "normal",
+          "tick": 119,
+          "core_ns": 1207375,
+          "call_ns": 1228416
+        },
+        {
+          "metric": "normal",
+          "tick": 120,
+          "core_ns": 1209417,
+          "call_ns": 1230584
+        },
+        {
+          "metric": "normal",
+          "tick": 121,
+          "core_ns": 1218542,
+          "call_ns": 1239667
+        },
+        {
+          "metric": "normal",
+          "tick": 122,
+          "core_ns": 1201250,
+          "call_ns": 1222583
+        },
+        {
+          "metric": "normal",
+          "tick": 123,
+          "core_ns": 1182833,
+          "call_ns": 1204042
+        },
+        {
+          "metric": "normal",
+          "tick": 124,
+          "core_ns": 1198959,
+          "call_ns": 1220041
+        },
+        {
+          "metric": "normal",
+          "tick": 125,
+          "core_ns": 1194167,
+          "call_ns": 1215208
+        },
+        {
+          "metric": "normal",
+          "tick": 126,
+          "core_ns": 1186750,
+          "call_ns": 1207667
+        },
+        {
+          "metric": "normal",
+          "tick": 127,
+          "core_ns": 1173583,
+          "call_ns": 1194541
+        },
+        {
+          "metric": "normal",
+          "tick": 128,
+          "core_ns": 1207458,
+          "call_ns": 1228458
+        },
+        {
+          "metric": "correction",
+          "tick": 128,
+          "depth": 8,
+          "core_ns": 7975750,
+          "call_ns": 8001291
+        },
+        {
+          "metric": "normal",
+          "tick": 129,
+          "core_ns": 1159209,
+          "call_ns": 1181834
+        },
+        {
+          "metric": "correction",
+          "tick": 129,
+          "depth": 8,
+          "core_ns": 7932875,
+          "call_ns": 7962292
+        },
+        {
+          "metric": "normal",
+          "tick": 130,
+          "core_ns": 1187750,
+          "call_ns": 1209875
+        },
+        {
+          "metric": "correction",
+          "tick": 130,
+          "depth": 8,
+          "core_ns": 7986125,
+          "call_ns": 8008916
+        },
+        {
+          "metric": "normal",
+          "tick": 131,
+          "core_ns": 1203208,
+          "call_ns": 1225125
+        },
+        {
+          "metric": "correction",
+          "tick": 131,
+          "depth": 8,
+          "core_ns": 7821000,
+          "call_ns": 7845459
+        },
+        {
+          "metric": "normal",
+          "tick": 132,
+          "core_ns": 1167041,
+          "call_ns": 1196417
+        },
+        {
+          "metric": "correction",
+          "tick": 132,
+          "depth": 8,
+          "core_ns": 7816667,
+          "call_ns": 7838709
+        },
+        {
+          "metric": "normal",
+          "tick": 133,
+          "core_ns": 1175291,
+          "call_ns": 1198458
+        },
+        {
+          "metric": "correction",
+          "tick": 133,
+          "depth": 8,
+          "core_ns": 7810625,
+          "call_ns": 7833042
+        },
+        {
+          "metric": "normal",
+          "tick": 134,
+          "core_ns": 1162333,
+          "call_ns": 1186458
+        },
+        {
+          "metric": "correction",
+          "tick": 134,
+          "depth": 8,
+          "core_ns": 7784667,
+          "call_ns": 7807250
+        },
+        {
+          "metric": "normal",
+          "tick": 135,
+          "core_ns": 1172958,
+          "call_ns": 1202542
+        },
+        {
+          "metric": "correction",
+          "tick": 135,
+          "depth": 8,
+          "core_ns": 7816000,
+          "call_ns": 7838750
+        },
+        {
+          "metric": "normal",
+          "tick": 136,
+          "core_ns": 1184583,
+          "call_ns": 1206417
+        },
+        {
+          "metric": "correction",
+          "tick": 136,
+          "depth": 8,
+          "core_ns": 7792750,
+          "call_ns": 7814625
+        },
+        {
+          "metric": "normal",
+          "tick": 137,
+          "core_ns": 1166833,
+          "call_ns": 1191542
+        },
+        {
+          "metric": "correction",
+          "tick": 137,
+          "depth": 8,
+          "core_ns": 7756291,
+          "call_ns": 7780791
+        },
+        {
+          "metric": "normal",
+          "tick": 138,
+          "core_ns": 1167292,
+          "call_ns": 1197292
+        },
+        {
+          "metric": "correction",
+          "tick": 138,
+          "depth": 8,
+          "core_ns": 7777875,
+          "call_ns": 7802458
+        },
+        {
+          "metric": "normal",
+          "tick": 139,
+          "core_ns": 1177750,
+          "call_ns": 1202750
+        },
+        {
+          "metric": "correction",
+          "tick": 139,
+          "depth": 8,
+          "core_ns": 7775125,
+          "call_ns": 7797833
+        },
+        {
+          "metric": "normal",
+          "tick": 140,
+          "core_ns": 1191500,
+          "call_ns": 1215834
+        },
+        {
+          "metric": "correction",
+          "tick": 140,
+          "depth": 8,
+          "core_ns": 7795750,
+          "call_ns": 7820583
+        },
+        {
+          "metric": "normal",
+          "tick": 141,
+          "core_ns": 1186417,
+          "call_ns": 1209333
+        },
+        {
+          "metric": "correction",
+          "tick": 141,
+          "depth": 8,
+          "core_ns": 7804583,
+          "call_ns": 7826625
+        },
+        {
+          "metric": "normal",
+          "tick": 142,
+          "core_ns": 1178625,
+          "call_ns": 1202917
+        },
+        {
+          "metric": "correction",
+          "tick": 142,
+          "depth": 8,
+          "core_ns": 7812416,
+          "call_ns": 7834375
+        },
+        {
+          "metric": "normal",
+          "tick": 143,
+          "core_ns": 1177667,
+          "call_ns": 1211708
+        },
+        {
+          "metric": "correction",
+          "tick": 143,
+          "depth": 8,
+          "core_ns": 7812667,
+          "call_ns": 7837041
+        },
+        {
+          "metric": "normal",
+          "tick": 144,
+          "core_ns": 1182583,
+          "call_ns": 1204958
+        },
+        {
+          "metric": "correction",
+          "tick": 144,
+          "depth": 8,
+          "core_ns": 7794375,
+          "call_ns": 7819375
+        },
+        {
+          "metric": "normal",
+          "tick": 145,
+          "core_ns": 1171417,
+          "call_ns": 1194541
+        },
+        {
+          "metric": "correction",
+          "tick": 145,
+          "depth": 8,
+          "core_ns": 7787250,
+          "call_ns": 7812042
+        },
+        {
+          "metric": "normal",
+          "tick": 146,
+          "core_ns": 1180542,
+          "call_ns": 1202375
+        },
+        {
+          "metric": "correction",
+          "tick": 146,
+          "depth": 8,
+          "core_ns": 7791750,
+          "call_ns": 7813958
+        },
+        {
+          "metric": "normal",
+          "tick": 147,
+          "core_ns": 1172042,
+          "call_ns": 1194458
+        },
+        {
+          "metric": "correction",
+          "tick": 147,
+          "depth": 8,
+          "core_ns": 7756083,
+          "call_ns": 7780750
+        },
+        {
+          "metric": "normal",
+          "tick": 148,
+          "core_ns": 1190041,
+          "call_ns": 1214416
+        },
+        {
+          "metric": "correction",
+          "tick": 148,
+          "depth": 8,
+          "core_ns": 7833125,
+          "call_ns": 7855125
+        },
+        {
+          "metric": "normal",
+          "tick": 149,
+          "core_ns": 1179041,
+          "call_ns": 1204167
+        },
+        {
+          "metric": "correction",
+          "tick": 149,
+          "depth": 8,
+          "core_ns": 7833250,
+          "call_ns": 7856042
+        },
+        {
+          "metric": "normal",
+          "tick": 150,
+          "core_ns": 1184000,
+          "call_ns": 1208125
+        },
+        {
+          "metric": "correction",
+          "tick": 150,
+          "depth": 8,
+          "core_ns": 7856000,
+          "call_ns": 7878042
+        },
+        {
+          "metric": "normal",
+          "tick": 151,
+          "core_ns": 1085709,
+          "call_ns": 1110125
+        },
+        {
+          "metric": "correction",
+          "tick": 151,
+          "depth": 8,
+          "core_ns": 7777458,
+          "call_ns": 7799833
+        },
+        {
+          "metric": "normal",
+          "tick": 152,
+          "core_ns": 1077209,
+          "call_ns": 1101459
+        },
+        {
+          "metric": "correction",
+          "tick": 152,
+          "depth": 8,
+          "core_ns": 7727042,
+          "call_ns": 7749541
+        },
+        {
+          "metric": "normal",
+          "tick": 153,
+          "core_ns": 1070167,
+          "call_ns": 1091709
+        },
+        {
+          "metric": "correction",
+          "tick": 153,
+          "depth": 8,
+          "core_ns": 7549542,
+          "call_ns": 7571459
+        },
+        {
+          "metric": "normal",
+          "tick": 154,
+          "core_ns": 1063959,
+          "call_ns": 1085708
+        },
+        {
+          "metric": "correction",
+          "tick": 154,
+          "depth": 8,
+          "core_ns": 7450375,
+          "call_ns": 7472958
+        },
+        {
+          "metric": "normal",
+          "tick": 155,
+          "core_ns": 1069417,
+          "call_ns": 1091334
+        },
+        {
+          "metric": "correction",
+          "tick": 155,
+          "depth": 8,
+          "core_ns": 7389250,
+          "call_ns": 7413834
+        },
+        {
+          "metric": "normal",
+          "tick": 156,
+          "core_ns": 1069542,
+          "call_ns": 1093333
+        },
+        {
+          "metric": "correction",
+          "tick": 156,
+          "depth": 8,
+          "core_ns": 7277417,
+          "call_ns": 7300584
+        },
+        {
+          "metric": "normal",
+          "tick": 157,
+          "core_ns": 1066916,
+          "call_ns": 1089708
+        },
+        {
+          "metric": "correction",
+          "tick": 157,
+          "depth": 8,
+          "core_ns": 7196250,
+          "call_ns": 7218166
+        },
+        {
+          "metric": "normal",
+          "tick": 158,
+          "core_ns": 1063292,
+          "call_ns": 1085834
+        },
+        {
+          "metric": "correction",
+          "tick": 158,
+          "depth": 8,
+          "core_ns": 7151542,
+          "call_ns": 7175708
+        },
+        {
+          "metric": "normal",
+          "tick": 159,
+          "core_ns": 1075708,
+          "call_ns": 1098458
+        },
+        {
+          "metric": "correction",
+          "tick": 159,
+          "depth": 8,
+          "core_ns": 7207042,
+          "call_ns": 7229917
+        },
+        {
+          "metric": "normal",
+          "tick": 160,
+          "core_ns": 1102916,
+          "call_ns": 1127458
+        },
+        {
+          "metric": "correction",
+          "tick": 160,
+          "depth": 8,
+          "core_ns": 7169500,
+          "call_ns": 7193375
+        }
+      ],
+      "core_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 1209417,
+          "p95_ns": 2184583,
+          "max_ns": 4947750
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 7791750,
+          "p95_ns": 7975750,
+          "max_ns": 7986125
+        }
+      },
+      "call_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 1230584,
+          "p95_ns": 2205792,
+          "max_ns": 4968791
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 7813958,
+          "p95_ns": 8001291,
+          "max_ns": 8008916
+        }
+      }
+    },
+    {
+      "platform": "Linux x86_64 Debian under Podman/Rosetta on AppleM3",
+      "mode": "Release",
+      "test_exit": 0,
+      "tests": "9/9 passed",
+      "log_path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit/linux-release-v3.log",
+      "log_sha256": "8014072ef497f50de6de0aaf5d3f2147f3a8e73924a03eada919b1c4b4892e19",
+      "archive": "/work/box3d-pending-v3/build/Release/libogb3.a",
+      "archive_sha256": "8640fbcc3ddda34a9f4e512ac2b406f23eb61ff16676d7621b193400c836cda9",
+      "manifest_sha256": "05acbf8aff26a020e45fb970fc6cecbf591e70ebae81ea3ca7bfcd4166c64b51",
+      "profile": {
+        "bodies": 32,
+        "history": 128,
+        "repair": 8,
+        "normal_samples": 160,
+        "correction_samples": 33,
+        "observed_live_peak": 36161127,
+        "staged_live_peak": 36161127,
+        "live_at_end": 32874567,
+        "engine_component_high": 23913280,
+        "wrapper_component_high": 11279220,
+        "largest_operation_requests": 546352,
+        "reservation_bytes": 2097152,
+        "reservation_failures": 0,
+        "normal_max_ns": 2749000,
+        "correction_max_ns": 3184833
+      },
+      "teardown": {
+        "engine_live": 0,
+        "native_wrapper_live": 0,
+        "provider_live": 0,
+        "checkpoint_live": 0
+      },
+      "raw_samples": [
+        {
+          "metric": "normal",
+          "tick": 1,
+          "core_ns": 2587750,
+          "call_ns": 2590542
+        },
+        {
+          "metric": "normal",
+          "tick": 2,
+          "core_ns": 458792,
+          "call_ns": 459500
+        },
+        {
+          "metric": "normal",
+          "tick": 3,
+          "core_ns": 451042,
+          "call_ns": 451459
+        },
+        {
+          "metric": "normal",
+          "tick": 4,
+          "core_ns": 549292,
+          "call_ns": 549708
+        },
+        {
+          "metric": "normal",
+          "tick": 5,
+          "core_ns": 428375,
+          "call_ns": 428791
+        },
+        {
+          "metric": "normal",
+          "tick": 6,
+          "core_ns": 438541,
+          "call_ns": 438917
+        },
+        {
+          "metric": "normal",
+          "tick": 7,
+          "core_ns": 468375,
+          "call_ns": 468750
+        },
+        {
+          "metric": "normal",
+          "tick": 8,
+          "core_ns": 421500,
+          "call_ns": 421875
+        },
+        {
+          "metric": "normal",
+          "tick": 9,
+          "core_ns": 432042,
+          "call_ns": 432416
+        },
+        {
+          "metric": "normal",
+          "tick": 10,
+          "core_ns": 1209500,
+          "call_ns": 1209833
+        },
+        {
+          "metric": "normal",
+          "tick": 11,
+          "core_ns": 765667,
+          "call_ns": 766125
+        },
+        {
+          "metric": "normal",
+          "tick": 12,
+          "core_ns": 634250,
+          "call_ns": 634666
+        },
+        {
+          "metric": "normal",
+          "tick": 13,
+          "core_ns": 2749000,
+          "call_ns": 2749375
+        },
+        {
+          "metric": "normal",
+          "tick": 14,
+          "core_ns": 637917,
+          "call_ns": 638291
+        },
+        {
+          "metric": "normal",
+          "tick": 15,
+          "core_ns": 559917,
+          "call_ns": 560291
+        },
+        {
+          "metric": "normal",
+          "tick": 16,
+          "core_ns": 563667,
+          "call_ns": 564041
+        },
+        {
+          "metric": "normal",
+          "tick": 17,
+          "core_ns": 562750,
+          "call_ns": 563166
+        },
+        {
+          "metric": "normal",
+          "tick": 18,
+          "core_ns": 561041,
+          "call_ns": 561375
+        },
+        {
+          "metric": "normal",
+          "tick": 19,
+          "core_ns": 567958,
+          "call_ns": 568292
+        },
+        {
+          "metric": "normal",
+          "tick": 20,
+          "core_ns": 594083,
+          "call_ns": 594416
+        },
+        {
+          "metric": "normal",
+          "tick": 21,
+          "core_ns": 589416,
+          "call_ns": 589750
+        },
+        {
+          "metric": "normal",
+          "tick": 22,
+          "core_ns": 559916,
+          "call_ns": 560292
+        },
+        {
+          "metric": "normal",
+          "tick": 23,
+          "core_ns": 571083,
+          "call_ns": 571417
+        },
+        {
+          "metric": "normal",
+          "tick": 24,
+          "core_ns": 561542,
+          "call_ns": 561875
+        },
+        {
+          "metric": "normal",
+          "tick": 25,
+          "core_ns": 556042,
+          "call_ns": 556375
+        },
+        {
+          "metric": "normal",
+          "tick": 26,
+          "core_ns": 574083,
+          "call_ns": 574417
+        },
+        {
+          "metric": "normal",
+          "tick": 27,
+          "core_ns": 564084,
+          "call_ns": 564416
+        },
+        {
+          "metric": "normal",
+          "tick": 28,
+          "core_ns": 560416,
+          "call_ns": 560750
+        },
+        {
+          "metric": "normal",
+          "tick": 29,
+          "core_ns": 568292,
+          "call_ns": 568625
+        },
+        {
+          "metric": "normal",
+          "tick": 30,
+          "core_ns": 549292,
+          "call_ns": 549625
+        },
+        {
+          "metric": "normal",
+          "tick": 31,
+          "core_ns": 574125,
+          "call_ns": 574458
+        },
+        {
+          "metric": "normal",
+          "tick": 32,
+          "core_ns": 564750,
+          "call_ns": 565083
+        },
+        {
+          "metric": "normal",
+          "tick": 33,
+          "core_ns": 562042,
+          "call_ns": 562375
+        },
+        {
+          "metric": "normal",
+          "tick": 34,
+          "core_ns": 560042,
+          "call_ns": 560417
+        },
+        {
+          "metric": "normal",
+          "tick": 35,
+          "core_ns": 582542,
+          "call_ns": 582916
+        },
+        {
+          "metric": "normal",
+          "tick": 36,
+          "core_ns": 553125,
+          "call_ns": 553500
+        },
+        {
+          "metric": "normal",
+          "tick": 37,
+          "core_ns": 575584,
+          "call_ns": 575916
+        },
+        {
+          "metric": "normal",
+          "tick": 38,
+          "core_ns": 591125,
+          "call_ns": 591500
+        },
+        {
+          "metric": "normal",
+          "tick": 39,
+          "core_ns": 616417,
+          "call_ns": 616834
+        },
+        {
+          "metric": "normal",
+          "tick": 40,
+          "core_ns": 582375,
+          "call_ns": 582750
+        },
+        {
+          "metric": "normal",
+          "tick": 41,
+          "core_ns": 562833,
+          "call_ns": 563167
+        },
+        {
+          "metric": "normal",
+          "tick": 42,
+          "core_ns": 584375,
+          "call_ns": 584708
+        },
+        {
+          "metric": "normal",
+          "tick": 43,
+          "core_ns": 572667,
+          "call_ns": 573000
+        },
+        {
+          "metric": "normal",
+          "tick": 44,
+          "core_ns": 640375,
+          "call_ns": 640708
+        },
+        {
+          "metric": "normal",
+          "tick": 45,
+          "core_ns": 552042,
+          "call_ns": 552458
+        },
+        {
+          "metric": "normal",
+          "tick": 46,
+          "core_ns": 530167,
+          "call_ns": 530458
+        },
+        {
+          "metric": "normal",
+          "tick": 47,
+          "core_ns": 537375,
+          "call_ns": 537708
+        },
+        {
+          "metric": "normal",
+          "tick": 48,
+          "core_ns": 554250,
+          "call_ns": 554625
+        },
+        {
+          "metric": "normal",
+          "tick": 49,
+          "core_ns": 515375,
+          "call_ns": 515750
+        },
+        {
+          "metric": "normal",
+          "tick": 50,
+          "core_ns": 505792,
+          "call_ns": 506083
+        },
+        {
+          "metric": "normal",
+          "tick": 51,
+          "core_ns": 524208,
+          "call_ns": 524584
+        },
+        {
+          "metric": "normal",
+          "tick": 52,
+          "core_ns": 509417,
+          "call_ns": 509750
+        },
+        {
+          "metric": "normal",
+          "tick": 53,
+          "core_ns": 518709,
+          "call_ns": 519083
+        },
+        {
+          "metric": "normal",
+          "tick": 54,
+          "core_ns": 506041,
+          "call_ns": 506459
+        },
+        {
+          "metric": "normal",
+          "tick": 55,
+          "core_ns": 510416,
+          "call_ns": 510750
+        },
+        {
+          "metric": "normal",
+          "tick": 56,
+          "core_ns": 518584,
+          "call_ns": 518916
+        },
+        {
+          "metric": "normal",
+          "tick": 57,
+          "core_ns": 525375,
+          "call_ns": 525750
+        },
+        {
+          "metric": "normal",
+          "tick": 58,
+          "core_ns": 519166,
+          "call_ns": 519542
+        },
+        {
+          "metric": "normal",
+          "tick": 59,
+          "core_ns": 504959,
+          "call_ns": 505291
+        },
+        {
+          "metric": "normal",
+          "tick": 60,
+          "core_ns": 534708,
+          "call_ns": 535125
+        },
+        {
+          "metric": "normal",
+          "tick": 61,
+          "core_ns": 525250,
+          "call_ns": 525625
+        },
+        {
+          "metric": "normal",
+          "tick": 62,
+          "core_ns": 501833,
+          "call_ns": 502209
+        },
+        {
+          "metric": "normal",
+          "tick": 63,
+          "core_ns": 523791,
+          "call_ns": 524125
+        },
+        {
+          "metric": "normal",
+          "tick": 64,
+          "core_ns": 532750,
+          "call_ns": 533125
+        },
+        {
+          "metric": "normal",
+          "tick": 65,
+          "core_ns": 698875,
+          "call_ns": 699292
+        },
+        {
+          "metric": "normal",
+          "tick": 66,
+          "core_ns": 516792,
+          "call_ns": 517125
+        },
+        {
+          "metric": "normal",
+          "tick": 67,
+          "core_ns": 528959,
+          "call_ns": 529291
+        },
+        {
+          "metric": "normal",
+          "tick": 68,
+          "core_ns": 524250,
+          "call_ns": 524625
+        },
+        {
+          "metric": "normal",
+          "tick": 69,
+          "core_ns": 517583,
+          "call_ns": 517875
+        },
+        {
+          "metric": "normal",
+          "tick": 70,
+          "core_ns": 522167,
+          "call_ns": 522500
+        },
+        {
+          "metric": "normal",
+          "tick": 71,
+          "core_ns": 513709,
+          "call_ns": 514041
+        },
+        {
+          "metric": "normal",
+          "tick": 72,
+          "core_ns": 522542,
+          "call_ns": 522875
+        },
+        {
+          "metric": "normal",
+          "tick": 73,
+          "core_ns": 506792,
+          "call_ns": 507125
+        },
+        {
+          "metric": "normal",
+          "tick": 74,
+          "core_ns": 522167,
+          "call_ns": 522500
+        },
+        {
+          "metric": "normal",
+          "tick": 75,
+          "core_ns": 500375,
+          "call_ns": 500750
+        },
+        {
+          "metric": "normal",
+          "tick": 76,
+          "core_ns": 509417,
+          "call_ns": 509709
+        },
+        {
+          "metric": "normal",
+          "tick": 77,
+          "core_ns": 510917,
+          "call_ns": 511250
+        },
+        {
+          "metric": "normal",
+          "tick": 78,
+          "core_ns": 1606167,
+          "call_ns": 1606542
+        },
+        {
+          "metric": "normal",
+          "tick": 79,
+          "core_ns": 552959,
+          "call_ns": 553333
+        },
+        {
+          "metric": "normal",
+          "tick": 80,
+          "core_ns": 543833,
+          "call_ns": 544291
+        },
+        {
+          "metric": "normal",
+          "tick": 81,
+          "core_ns": 546833,
+          "call_ns": 547250
+        },
+        {
+          "metric": "normal",
+          "tick": 82,
+          "core_ns": 509708,
+          "call_ns": 510042
+        },
+        {
+          "metric": "normal",
+          "tick": 83,
+          "core_ns": 521834,
+          "call_ns": 522250
+        },
+        {
+          "metric": "normal",
+          "tick": 84,
+          "core_ns": 522875,
+          "call_ns": 523250
+        },
+        {
+          "metric": "normal",
+          "tick": 85,
+          "core_ns": 510334,
+          "call_ns": 510750
+        },
+        {
+          "metric": "normal",
+          "tick": 86,
+          "core_ns": 511292,
+          "call_ns": 511708
+        },
+        {
+          "metric": "normal",
+          "tick": 87,
+          "core_ns": 524291,
+          "call_ns": 524667
+        },
+        {
+          "metric": "normal",
+          "tick": 88,
+          "core_ns": 500458,
+          "call_ns": 500875
+        },
+        {
+          "metric": "normal",
+          "tick": 89,
+          "core_ns": 530208,
+          "call_ns": 530584
+        },
+        {
+          "metric": "normal",
+          "tick": 90,
+          "core_ns": 509958,
+          "call_ns": 510334
+        },
+        {
+          "metric": "normal",
+          "tick": 91,
+          "core_ns": 518208,
+          "call_ns": 518584
+        },
+        {
+          "metric": "normal",
+          "tick": 92,
+          "core_ns": 508000,
+          "call_ns": 508333
+        },
+        {
+          "metric": "normal",
+          "tick": 93,
+          "core_ns": 514167,
+          "call_ns": 514500
+        },
+        {
+          "metric": "normal",
+          "tick": 94,
+          "core_ns": 517792,
+          "call_ns": 518166
+        },
+        {
+          "metric": "normal",
+          "tick": 95,
+          "core_ns": 512750,
+          "call_ns": 513167
+        },
+        {
+          "metric": "normal",
+          "tick": 96,
+          "core_ns": 531333,
+          "call_ns": 531750
+        },
+        {
+          "metric": "normal",
+          "tick": 97,
+          "core_ns": 513875,
+          "call_ns": 514292
+        },
+        {
+          "metric": "normal",
+          "tick": 98,
+          "core_ns": 507584,
+          "call_ns": 507958
+        },
+        {
+          "metric": "normal",
+          "tick": 99,
+          "core_ns": 522250,
+          "call_ns": 522625
+        },
+        {
+          "metric": "normal",
+          "tick": 100,
+          "core_ns": 528375,
+          "call_ns": 528750
+        },
+        {
+          "metric": "normal",
+          "tick": 101,
+          "core_ns": 511083,
+          "call_ns": 511417
+        },
+        {
+          "metric": "normal",
+          "tick": 102,
+          "core_ns": 520042,
+          "call_ns": 520375
+        },
+        {
+          "metric": "normal",
+          "tick": 103,
+          "core_ns": 515000,
+          "call_ns": 515333
+        },
+        {
+          "metric": "normal",
+          "tick": 104,
+          "core_ns": 509875,
+          "call_ns": 510292
+        },
+        {
+          "metric": "normal",
+          "tick": 105,
+          "core_ns": 510292,
+          "call_ns": 510625
+        },
+        {
+          "metric": "normal",
+          "tick": 106,
+          "core_ns": 510166,
+          "call_ns": 510542
+        },
+        {
+          "metric": "normal",
+          "tick": 107,
+          "core_ns": 508625,
+          "call_ns": 508959
+        },
+        {
+          "metric": "normal",
+          "tick": 108,
+          "core_ns": 520333,
+          "call_ns": 520750
+        },
+        {
+          "metric": "normal",
+          "tick": 109,
+          "core_ns": 504709,
+          "call_ns": 505041
+        },
+        {
+          "metric": "normal",
+          "tick": 110,
+          "core_ns": 518917,
+          "call_ns": 519291
+        },
+        {
+          "metric": "normal",
+          "tick": 111,
+          "core_ns": 510959,
+          "call_ns": 511291
+        },
+        {
+          "metric": "normal",
+          "tick": 112,
+          "core_ns": 520375,
+          "call_ns": 520708
+        },
+        {
+          "metric": "normal",
+          "tick": 113,
+          "core_ns": 503208,
+          "call_ns": 503583
+        },
+        {
+          "metric": "normal",
+          "tick": 114,
+          "core_ns": 509875,
+          "call_ns": 510291
+        },
+        {
+          "metric": "normal",
+          "tick": 115,
+          "core_ns": 510042,
+          "call_ns": 510416
+        },
+        {
+          "metric": "normal",
+          "tick": 116,
+          "core_ns": 512583,
+          "call_ns": 512917
+        },
+        {
+          "metric": "normal",
+          "tick": 117,
+          "core_ns": 518083,
+          "call_ns": 518417
+        },
+        {
+          "metric": "normal",
+          "tick": 118,
+          "core_ns": 511083,
+          "call_ns": 511500
+        },
+        {
+          "metric": "normal",
+          "tick": 119,
+          "core_ns": 514791,
+          "call_ns": 515125
+        },
+        {
+          "metric": "normal",
+          "tick": 120,
+          "core_ns": 543875,
+          "call_ns": 544209
+        },
+        {
+          "metric": "normal",
+          "tick": 121,
+          "core_ns": 502417,
+          "call_ns": 502792
+        },
+        {
+          "metric": "normal",
+          "tick": 122,
+          "core_ns": 523166,
+          "call_ns": 523542
+        },
+        {
+          "metric": "normal",
+          "tick": 123,
+          "core_ns": 510459,
+          "call_ns": 510833
+        },
+        {
+          "metric": "normal",
+          "tick": 124,
+          "core_ns": 514167,
+          "call_ns": 514500
+        },
+        {
+          "metric": "normal",
+          "tick": 125,
+          "core_ns": 510292,
+          "call_ns": 510625
+        },
+        {
+          "metric": "normal",
+          "tick": 126,
+          "core_ns": 502959,
+          "call_ns": 503333
+        },
+        {
+          "metric": "normal",
+          "tick": 127,
+          "core_ns": 513083,
+          "call_ns": 513417
+        },
+        {
+          "metric": "normal",
+          "tick": 128,
+          "core_ns": 557542,
+          "call_ns": 557875
+        },
+        {
+          "metric": "correction",
+          "tick": 128,
+          "depth": 8,
+          "core_ns": 3184833,
+          "call_ns": 3186541
+        },
+        {
+          "metric": "normal",
+          "tick": 129,
+          "core_ns": 471458,
+          "call_ns": 472458
+        },
+        {
+          "metric": "correction",
+          "tick": 129,
+          "depth": 8,
+          "core_ns": 3069167,
+          "call_ns": 3070042
+        },
+        {
+          "metric": "normal",
+          "tick": 130,
+          "core_ns": 463083,
+          "call_ns": 463541
+        },
+        {
+          "metric": "correction",
+          "tick": 130,
+          "depth": 8,
+          "core_ns": 3053875,
+          "call_ns": 3054459
+        },
+        {
+          "metric": "normal",
+          "tick": 131,
+          "core_ns": 475000,
+          "call_ns": 475417
+        },
+        {
+          "metric": "correction",
+          "tick": 131,
+          "depth": 8,
+          "core_ns": 2974667,
+          "call_ns": 2975208
+        },
+        {
+          "metric": "normal",
+          "tick": 132,
+          "core_ns": 459625,
+          "call_ns": 460042
+        },
+        {
+          "metric": "correction",
+          "tick": 132,
+          "depth": 8,
+          "core_ns": 2993334,
+          "call_ns": 2993833
+        },
+        {
+          "metric": "normal",
+          "tick": 133,
+          "core_ns": 460291,
+          "call_ns": 460709
+        },
+        {
+          "metric": "correction",
+          "tick": 133,
+          "depth": 8,
+          "core_ns": 2977917,
+          "call_ns": 2978500
+        },
+        {
+          "metric": "normal",
+          "tick": 134,
+          "core_ns": 464083,
+          "call_ns": 464458
+        },
+        {
+          "metric": "correction",
+          "tick": 134,
+          "depth": 8,
+          "core_ns": 2971834,
+          "call_ns": 2972375
+        },
+        {
+          "metric": "normal",
+          "tick": 135,
+          "core_ns": 467208,
+          "call_ns": 467542
+        },
+        {
+          "metric": "correction",
+          "tick": 135,
+          "depth": 8,
+          "core_ns": 2971042,
+          "call_ns": 2971667
+        },
+        {
+          "metric": "normal",
+          "tick": 136,
+          "core_ns": 457834,
+          "call_ns": 458208
+        },
+        {
+          "metric": "correction",
+          "tick": 136,
+          "depth": 8,
+          "core_ns": 2975125,
+          "call_ns": 2975667
+        },
+        {
+          "metric": "normal",
+          "tick": 137,
+          "core_ns": 463125,
+          "call_ns": 463459
+        },
+        {
+          "metric": "correction",
+          "tick": 137,
+          "depth": 8,
+          "core_ns": 2957375,
+          "call_ns": 2957917
+        },
+        {
+          "metric": "normal",
+          "tick": 138,
+          "core_ns": 465208,
+          "call_ns": 465542
+        },
+        {
+          "metric": "correction",
+          "tick": 138,
+          "depth": 8,
+          "core_ns": 2983917,
+          "call_ns": 2984583
+        },
+        {
+          "metric": "normal",
+          "tick": 139,
+          "core_ns": 457000,
+          "call_ns": 457417
+        },
+        {
+          "metric": "correction",
+          "tick": 139,
+          "depth": 8,
+          "core_ns": 2961042,
+          "call_ns": 2961500
+        },
+        {
+          "metric": "normal",
+          "tick": 140,
+          "core_ns": 463917,
+          "call_ns": 464250
+        },
+        {
+          "metric": "correction",
+          "tick": 140,
+          "depth": 8,
+          "core_ns": 2958917,
+          "call_ns": 2959375
+        },
+        {
+          "metric": "normal",
+          "tick": 141,
+          "core_ns": 463625,
+          "call_ns": 463959
+        },
+        {
+          "metric": "correction",
+          "tick": 141,
+          "depth": 8,
+          "core_ns": 3010750,
+          "call_ns": 3011292
+        },
+        {
+          "metric": "normal",
+          "tick": 142,
+          "core_ns": 456667,
+          "call_ns": 457042
+        },
+        {
+          "metric": "correction",
+          "tick": 142,
+          "depth": 8,
+          "core_ns": 2981459,
+          "call_ns": 2982041
+        },
+        {
+          "metric": "normal",
+          "tick": 143,
+          "core_ns": 457625,
+          "call_ns": 457959
+        },
+        {
+          "metric": "correction",
+          "tick": 143,
+          "depth": 8,
+          "core_ns": 2971542,
+          "call_ns": 2972000
+        },
+        {
+          "metric": "normal",
+          "tick": 144,
+          "core_ns": 466083,
+          "call_ns": 466417
+        },
+        {
+          "metric": "correction",
+          "tick": 144,
+          "depth": 8,
+          "core_ns": 2987875,
+          "call_ns": 2988417
+        },
+        {
+          "metric": "normal",
+          "tick": 145,
+          "core_ns": 462250,
+          "call_ns": 462584
+        },
+        {
+          "metric": "correction",
+          "tick": 145,
+          "depth": 8,
+          "core_ns": 2972083,
+          "call_ns": 2972709
+        },
+        {
+          "metric": "normal",
+          "tick": 146,
+          "core_ns": 460375,
+          "call_ns": 460750
+        },
+        {
+          "metric": "correction",
+          "tick": 146,
+          "depth": 8,
+          "core_ns": 2968167,
+          "call_ns": 2968667
+        },
+        {
+          "metric": "normal",
+          "tick": 147,
+          "core_ns": 541917,
+          "call_ns": 544584
+        },
+        {
+          "metric": "correction",
+          "tick": 147,
+          "depth": 8,
+          "core_ns": 3020125,
+          "call_ns": 3021084
+        },
+        {
+          "metric": "normal",
+          "tick": 148,
+          "core_ns": 474833,
+          "call_ns": 475375
+        },
+        {
+          "metric": "correction",
+          "tick": 148,
+          "depth": 8,
+          "core_ns": 2985500,
+          "call_ns": 2986208
+        },
+        {
+          "metric": "normal",
+          "tick": 149,
+          "core_ns": 462500,
+          "call_ns": 463041
+        },
+        {
+          "metric": "correction",
+          "tick": 149,
+          "depth": 8,
+          "core_ns": 3005833,
+          "call_ns": 3006500
+        },
+        {
+          "metric": "normal",
+          "tick": 150,
+          "core_ns": 475667,
+          "call_ns": 476084
+        },
+        {
+          "metric": "correction",
+          "tick": 150,
+          "depth": 8,
+          "core_ns": 3008666,
+          "call_ns": 3009292
+        },
+        {
+          "metric": "normal",
+          "tick": 151,
+          "core_ns": 455625,
+          "call_ns": 456000
+        },
+        {
+          "metric": "correction",
+          "tick": 151,
+          "depth": 8,
+          "core_ns": 2984458,
+          "call_ns": 2984959
+        },
+        {
+          "metric": "normal",
+          "tick": 152,
+          "core_ns": 451000,
+          "call_ns": 451375
+        },
+        {
+          "metric": "correction",
+          "tick": 152,
+          "depth": 8,
+          "core_ns": 2971042,
+          "call_ns": 2971542
+        },
+        {
+          "metric": "normal",
+          "tick": 153,
+          "core_ns": 466458,
+          "call_ns": 466917
+        },
+        {
+          "metric": "correction",
+          "tick": 153,
+          "depth": 8,
+          "core_ns": 2952000,
+          "call_ns": 2952500
+        },
+        {
+          "metric": "normal",
+          "tick": 154,
+          "core_ns": 462708,
+          "call_ns": 463125
+        },
+        {
+          "metric": "correction",
+          "tick": 154,
+          "depth": 8,
+          "core_ns": 2934083,
+          "call_ns": 2934583
+        },
+        {
+          "metric": "normal",
+          "tick": 155,
+          "core_ns": 449833,
+          "call_ns": 450542
+        },
+        {
+          "metric": "correction",
+          "tick": 155,
+          "depth": 8,
+          "core_ns": 2946750,
+          "call_ns": 2947250
+        },
+        {
+          "metric": "normal",
+          "tick": 156,
+          "core_ns": 446042,
+          "call_ns": 446458
+        },
+        {
+          "metric": "correction",
+          "tick": 156,
+          "depth": 8,
+          "core_ns": 2909584,
+          "call_ns": 2910041
+        },
+        {
+          "metric": "normal",
+          "tick": 157,
+          "core_ns": 447500,
+          "call_ns": 447875
+        },
+        {
+          "metric": "correction",
+          "tick": 157,
+          "depth": 8,
+          "core_ns": 2886042,
+          "call_ns": 2886666
+        },
+        {
+          "metric": "normal",
+          "tick": 158,
+          "core_ns": 453291,
+          "call_ns": 453709
+        },
+        {
+          "metric": "correction",
+          "tick": 158,
+          "depth": 8,
+          "core_ns": 2887167,
+          "call_ns": 2887709
+        },
+        {
+          "metric": "normal",
+          "tick": 159,
+          "core_ns": 454084,
+          "call_ns": 454416
+        },
+        {
+          "metric": "correction",
+          "tick": 159,
+          "depth": 8,
+          "core_ns": 2892584,
+          "call_ns": 2893083
+        },
+        {
+          "metric": "normal",
+          "tick": 160,
+          "core_ns": 447209,
+          "call_ns": 447625
+        },
+        {
+          "metric": "correction",
+          "tick": 160,
+          "depth": 8,
+          "core_ns": 2872792,
+          "call_ns": 2873417
+        }
+      ],
+      "core_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 515375,
+          "p95_ns": 634250,
+          "max_ns": 2749000
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 2972083,
+          "p95_ns": 3069167,
+          "max_ns": 3184833
+        }
+      },
+      "call_timings": {
+        "normal": {
+          "samples": 160,
+          "p50_ns": 515750,
+          "p95_ns": 634666,
+          "max_ns": 2749375
+        },
+        "correction": {
+          "samples": 33,
+          "p50_ns": 2972709,
+          "p95_ns": 3070042,
+          "max_ns": 3186541
+        }
+      }
+    }
+  ],
+  "legacy": {
+    "tests": "56/56 native-free kitsim passed",
+    "log_path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit/legacy-final.log",
+    "sha256": "fe25f0e7f71583a17cf2c4fea8503396c1d6f9e16d770cf84e2269a8cd2a1f4d"
+  },
+  "test_cases": [
+    "measured_32_body_history_and_eight_tick_transaction",
+    "real_native_failures_preserve_complete_pair_ledgers_and_effects",
+    "counts_memory_missing_attachment_and_gate_purity",
+    "all_owned_domains_return_to_zero",
+    "side_requires_owned_values_and_world_independent_keys",
+    "settle_despawn_preserves_future_end_once_through_checkpoint",
+    "actual_lane_complete_correction_and_settled_frontier",
+    "history_wrap_dynamic_keys_and_detached_checkpoint",
+    "unsupported_mutation_and_prediction_repair_bounds"
+  ],
+  "source_sha256": {
+    "kit/sim/physics.odin": "bfc0487740e2634fc8e3d91e8bc370d39702231eb7eb394d90a1c94adf2edd58",
+    "kit/sim/world_history.odin": "74430567b9740a3a79b94a80b30e7dac7d9e20867cdf84a47566c4f85239f155",
+    "kit/sim/lane.odin": "9812893ccf9035a74e555551f0051db28076e8381c5230f614ad49113bb18974",
+    "kit/sim/reconcile.odin": "2954109a30cc3c9cf8cb5c2a73a0cce289b7a2cc60e14e4b53e4e7677c12cf2f",
+    "kit/sim/history.odin": "4bd927d2a2ed0322e9474147e0ab34d5d6862faadbcc88952050889e48f1464e",
+    "kit/sim/command.odin": "d70e03a0c7be8c1586da28ecaeccaf3e6ad0be563f6c7bef139bb90780872277",
+    "kit/sim/spawn.odin": "a22dc408d354e1b26982a054ea219b951be18bc03e745eca9511f8cf99b941a4",
+    "kit/physics/physics.odin": "034a62426a9d538cabe1335bc995fd92aca5924abe0786e863f1732d0e079895",
+    "docs/kit/box3d.md": "d83fa7d5a778c7fbf12b7f4824d4b5835ac7e70d0209d0b7eeec25002719ccdc",
+    "tests/kit_box3d/run.sh": "f57e0b5a4f72108a672956e020ecb3a6237d58d7c5c403686847583b6bed6be1",
+    "tests/kit_box3d/envelope_test.odin": "8afff32ae96a7fc5a099bebe673cf88a888020e994f3ea4e0a15aaaa1a0278c9",
+    "tests/kit_box3d/failure_test.odin": "ef6cded74197608b19a9b31bf887f6bfa9c817936b7b271c37800547d46088bf",
+    "tests/kit_box3d/kit_box3d_test.odin": "4ea28a1e684d3cc67fbfeb963318c9ac9eb02a26b17988539c20293dc8caecf3"
+  },
+  "limitations": [
+    "Standalone/static target execution, not actual Godot native DSO domain or editor/export/runtime parity.",
+    "Linux execution via Podman/Rosetta does not certify native Linux hardware throughput.",
+    "Optimized physical Mac32-body samples satisfy observed4ms ceilings; Debug and emulated variants have diagnostic overages, no timing-driven gameplay rejection.",
+    "Sampled staged live and native/wrapper high-water counters are requested bytes, not an exact simultaneous RSS peak. Allocator headers/rounding, call-stack/Odin runtime and external caller-owned overhead are not claimed as measured RSS.",
+    "Profile largest-operation requests cover native engine, native wrapper and typed image/execution requests between reserved boundaries; comparison/output caller buffers are separately preflighted diagnostics.",
+    "Only bounded predeclared assets/commands and fixed proxy configuration are supported. Native allocator OOM/unexpected loader invariants remain fatal.",
+    "Tests reuse accepted geometry through tests/replay_physics/fixture only; production Kit has no Replay dependency or replacement netcode."
+  ],
+  "independent_acceptance": {
+    "coordinator": "t12",
+    "report_id": "r_738bcc9c59a14c10",
+    "scope": "Coordinator independently verified actual four-target Kit9 tests and optimized32-body H128/eight-tick envelope; paired Kit/Replay four tests each target pass.",
+    "P2.4_status": "done per explicit coordinator confirmation"
+  }
+}

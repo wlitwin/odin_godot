@@ -1,0 +1,181 @@
+package replay_box3d
+import auth "godot:replay/authority"
+import gd "godot:godot"
+import "godot:gdext"
+import "core:mem"
+import "core:reflect"
+import "core:fmt"
+import bg "godot:box3d/godot"
+import meter "godot:box3d/godot/meter"
+import b "godot:box3d"
+import r "godot:replay"
+import ph "godot:replay/physics"
+import rgd "godot:replay/godot"
+import storage "godot:replay/godot/storage"
+import net "godot:replay/net"
+import common "godot:examples/box3d_common"
+import adapter "../shared/adapter"
+
+Redirect_Lease :: struct {lease:auth.Lease,block:bg.Data_Lease,deny:bool}
+@(private) redirect_lease:^Redirect_Lease
+@(private) redirect_lease_freed:bool
+lease_retain :: proc "c"(user:rawptr)->bg.Status{
+ context=gdext.godot_context();data:=cast(^Redirect_Lease)(uintptr(user)-offset_of(Redirect_Lease,lease));return data.block.retain(user)
+}
+lease_drop :: proc "c"(user:rawptr)->bg.Status{
+ context=gdext.godot_context();data:=cast(^Redirect_Lease)(uintptr(user)-offset_of(Redirect_Lease,lease))
+ if data.deny{return bg.INCOMPATIBLE}
+ block:=data.block;redirect_lease=nil;redirect_lease_freed=true;return block.drop(user)
+}
+@(gd_method)
+replay_box3d_probe_redirect :: proc(self:^ReplayBox3d)->gd.Int{
+ if self.hosting || self.state==nil || self.state.session.client.phase!=.Running{return -1}
+ s:=&self.state.session;alloc:=meter.allocator(self.scope)
+ head,wire,permit:=s.client.timeline.head,s.client.wire.user,s.client.permit.user
+ initial,ie:=r.capture_complete(&s.client.timeline,head,alloc);if ie!=.None{return -2};defer r.complete_checkpoint_destroy(&initial)
+ before,_:=ph.digests(&initial)
+ old_input,old_input_found:=r.read_input(&s.client.timeline,head)
+ data:=new(Redirect_Lease,alloc);redirect_lease=data
+ source_released:=false;defer if !source_released{mem.free(data,alloc)}
+ clock:=auth.Clock_Source{read=proc(_:rawptr)->(u64,bool){return u64(gd.time_get_ticks_msec(gd.singleton_time())),true}}
+ if auth.lease_init(&data.lease,{member=202,incarnation=1},1,s.client.cfg.content,clock,false)!=.None{return -3}
+ seq,se:=auth.lease_request(&data.lease);if se!=.None{return -4}
+ endpoint,valid:=auth.endpoint("127.0.0.1",u16(gd.env_int("B3_PORT",49660)));if !valid{return -5}
+ policy:=auth.DEFAULT_POLICY;policy.lease_ms=30000
+ view:=auth.View{room=1,content=s.client.cfg.content,revision=1,epoch=s.client.cfg.epoch,coordinator_generation=1,owner={member=101,incarnation=1},endpoint=endpoint,remaining_ms=30000,policy=policy}
+ if auth.lease_accept(&data.lease,seq,view)!=.None{return -6}
+ block,bs:=meter.block_lease(self.scope,data,size_of(Redirect_Lease),&data.lease,size_of(auth.Lease));if bs!=bg.OK{return -7};data.block=block
+ binding,be:=ph.owner_context_create({&data.lease,lease_retain,lease_drop},user_data=&data.lease,require_live_instance=false);if be!=.None{return -8}
+ defer ph.owner_context_destroy(&binding)
+ bad:=r.Owned_Context{binding.owner,self.state}
+ bad_error:=rgd.session_redirect(s,&data.lease,permit_context=bad)
+ if bad_error==.None || s.client.timeline.head!=head || s.client.wire.user!=wire || s.client.permit.user!=permit{return -9}
+ service:=bg.service_get();mark:u64;if service.budget_begin(service.user,1,&mark)!=bg.OK{return -10}
+ denied:=rgd.session_redirect(s,&data.lease,permit_context={binding.owner,&data.lease})
+ ended:=service.budget_end(service.user,mark)
+ if denied==.None || (ended!=bg.OK && ended!=bg.CAPACITY) || s.client.timeline.head!=head || s.client.wire.user!=wire || s.client.permit.user!=permit{return -11}
+ // Permit the actual new Meter metadata, then deny the connection block.
+ // This boundary must clean the new context without touching the old runner.
+ metadata_mark:u64
+ if service.budget_begin(service.user,size_of(meter.Context),&metadata_mark)!=bg.OK{return -21}
+ metadata_denied:=rgd.session_redirect(s,&data.lease,permit_context={binding.owner,&data.lease})
+ metadata_ended:=service.budget_end(service.user,metadata_mark)
+ if metadata_denied==.None || (metadata_ended!=bg.OK && metadata_ended!=bg.CAPACITY) || s.client.timeline.head!=head || s.client.wire.user!=wire || s.client.permit.user!=permit{return -22}
+ unchanged,ue:=r.capture_complete(&s.client.timeline,head,alloc);if ue!=.None{return -12};after,_:=ph.digests(&unchanged)
+ defer r.complete_checkpoint_destroy(&unchanged)
+ same_events:=len(initial.events)==len(unchanged.events)
+ if same_events{for event,index in initial.events{if !reflect.equal(event,unchanged.events[index]){same_events=false}}}
+ if before!=after || !reflect.equal(initial.frame,unchanged.frame) || !same_events{
+  gd.print_str(fmt.tprintf("REDIRECT_PRESERVE solver=%v game=%v events=%v",before==after,reflect.equal(initial.frame,unchanged.frame),same_events));return -13
+ }
+ new_input,new_input_found:=r.read_input(&s.client.timeline,head)
+ if old_input_found!=new_input_found || (old_input_found && !reflect.equal(old_input,new_input)){return -16}
+ // Exhaust metadata slots, then leave exactly one for the new allocator
+ // owner. The following self-owner creation fails after a real Meter block.
+ held:[1024]bg.Owner;held_count:=0;empty:bg.Data_Lease
+ for held_count<len(held){
+  status:=service.owner_create(service.user,0,&empty,&held[held_count]);if status!=bg.OK{break};held_count+=1
+ }
+ if held_count==0{return -17}
+ if r.owner_drop(&held[held_count-1])!=.None{return -18};held_count-=1
+ self_denied:=rgd.session_redirect(s,&data.lease,permit_context={binding.owner,&data.lease})
+ for index in 0..<held_count{if r.owner_drop(&held[index])!=.None{return -19}}
+ if self_denied==.None || s.client.timeline.head!=head || s.client.wire.user!=wire || s.client.permit.user!=permit{return -20}
+ error:=rgd.session_redirect(s,&data.lease,permit_context={binding.owner,&data.lease})
+ if error!=.None{return -14}
+ if s.client.permit.user!=&data.lease || s.client.wire.user==wire{return -15}
+ ph.owner_context_destroy(&binding)
+ // This is a real requested free; exact retained Lease data owns the block.
+ mem.free(data,alloc);source_released=true
+ gd.print_str("REDIRECT_FIXTURE candidate_context_failed=true allocation_failed=true connection_allocation_failed_after_metadata=true self_owner_capacity_failed=true old_pair_preserved=true same_authority_committed=true source_free_requested=true")
+ return 0
+}
+@(gd_method)
+replay_box3d_probe_running :: proc(self:^ReplayBox3d)->gd.Int{
+ if self.state==nil{return 0};s:=&self.state.session
+ return s.client.phase==.Running && s.client.serial>0 && s.retired_connection==nil && s.retired_client.count==0 && s.retired_session.count==0?1:0
+}
+@(gd_method)
+replay_box3d_probe_close :: proc(self:^ReplayBox3d)->gd.Int{
+ if redirect_lease==nil || self.state==nil{return -1}
+ self.ready=false;self.finished=true;redirect_lease.deny=true
+ error:=rgd.session_close(&self.state.session)
+ if error==.None || !self.state.session.cleanup{return -2}
+ if redirect_lease==nil || redirect_lease_freed{return -3}
+ redirect_lease.deny=false
+ if rgd.session_close(&self.state.session)!=.None{return -4}
+ if !redirect_lease_freed{return -5}
+ if slice_close(self)!=.None{return -6}
+ native,_:=b.engine_allocation_stats();wrapper,_:=b.snapshot_allocation_stats();a,_:=meter.category_stats(bg.CATEGORY_REPLAY_CORE);z,_:=meter.category_stats(bg.CATEGORY_REPLAY_PROVIDER)
+ if native.live_bytes!=0 || wrapper.live_bytes!=0 || a.live_bytes+z.live_bytes!=0{return -7}
+ gd.print_str("REDIRECT_FIXTURE source_retained_until_teardown=true declined_drop_tombstone=true retry_exactly_once=true native0=true wrapper0=true meter0=true")
+ return 0
+}
+
+@(gd_method)
+replay_box3d_probe_archive :: proc(self:^ReplayBox3d)->gd.Int{
+ if self.state==nil || !self.hosting{return -1}
+ source:=&self.state.session
+ before,error:=rgd.session_checkpoint(source,source.server.timeline.head);if error!=.None{return -30}
+ defer r.complete_checkpoint_destroy(&before)
+ before_digest,digest_error:=ph.digests(&before);if digest_error!=.None{return -31}
+ contract,contract_status:=b.domain_contract_get();if contract_status!=.Ok{return -32}
+ ledger_before,ledger_status:=b.host_ledger_get(contract.cookie);if ledger_status!=.Ok{return -33}
+ status:=probe_archive_owned(self);if status!=0{return status}
+ after,after_error:=rgd.session_checkpoint(source,source.server.timeline.head);if after_error!=.None{return -34}
+ after_digest,after_digest_error:=ph.digests(&after)
+ unchanged:=after_digest_error==.None && before_digest==after_digest && reflect.equal(before.frame,after.frame) && len(before.events)==len(after.events)
+ if unchanged{for event,index in before.events{if !reflect.equal(event,after.events[index]){unchanged=false}}}
+ r.complete_checkpoint_destroy(&after)
+ if !unchanged{return -35}
+ ledger_after,after_status:=b.host_ledger_get(contract.cookie);if after_status!=.Ok{return -36}
+ balanced:=ledger_before.engine_live_bytes==ledger_after.engine_live_bytes && ledger_before.snapshot_live_bytes==ledger_after.snapshot_live_bytes && ledger_before.host_live_bytes==ledger_after.host_live_bytes && ledger_before.host_reserved_bytes==ledger_after.host_reserved_bytes && ledger_before.owner_count==ledger_after.owner_count
+ gd.print_str(fmt.tprintf("REDIRECT_ARCHIVE_BALANCE balanced=%v source_pair_preserved=%v before=%v after=%v",balanced,unchanged,ledger_before,ledger_after))
+ return balanced?0:-37
+}
+probe_archive_owned :: proc(self:^ReplayBox3d)->gd.Int{
+ source:=&self.state.session
+ prepared:auth.Prepared;unsupported_lease:auth.Lease
+ if rgd.session_takeover(source,&prepared,&unsupported_lease)!=.Invalid_Config || rgd.session_rejoin(source,&unsupported_lease)!=.Invalid_Config{return -38}
+ gd.print_str("REDIRECT_FIXTURE sdk_takeover_unsupported=true sdk_authority_rejoin_unsupported=true")
+ // Each simultaneously live runner has its own bounded allocation-entry table;
+ // every context remains charged to the same process-wide Native ledger.
+ scope,scope_status:=meter.create(bg.service_get(),bg.CATEGORY_REPLAY_PROVIDER);if scope_status!=bg.OK{return -20}
+ defer meter.destroy(&scope)
+ alloc:=meter.allocator(scope)
+ allocator_owner,allocator_error:=ph.owner_context_create(meter.data_lease(scope),allocator_data=alloc.data,require_live_instance=false);if allocator_error!=.None{return -22}
+ defer ph.owner_context_destroy(&allocator_owner)
+ codec:=new(adapter.Codec,alloc);defer mem.free(codec,alloc)
+ codec_block,codec_block_status:=meter.block_lease(scope,codec,size_of(codec^),codec,size_of(codec^));if codec_block_status!=bg.OK{return -23}
+ codec_owner,codec_owner_error:=ph.owner_context_create(codec_block,user_data=codec,require_live_instance=false);if codec_owner_error!=.None{return -24}
+ defer ph.owner_context_destroy(&codec_owner)
+ if ph.network_codec_init(codec,&self.state.catalog,self.state.codec.config,adapter.rules(self.initial,u32(gd.env_int("B3_SEED",1))),allocator=alloc,ownership=allocator_owner,context_ownership=codec_owner)!=.None{return -25}
+ defer ph.network_codec_destroy(codec)
+ model:=source.server.model;model.complete_codec=codec.value
+ cp:net.Checkpoint(common.Game,common.Control,common.Action,2)
+ if net.checkpoint_capture(&source.server,&cp,allocator=meter.allocator(self.scope))!=.None{return -2};defer net.checkpoint_destroy(&cp)
+ resumed:=new(rgd.Session(common.Game,common.Control,common.Action,common.Event,2),alloc);defer mem.free(resumed,alloc)
+ block,status:=meter.block_lease(scope,resumed,size_of(resumed^),resumed,size_of(resumed^));if status!=bg.OK{return -3}
+ context_owner,error:=ph.owner_context_create(block,user_data=resumed,require_live_instance=false);if error!=.None{return -4}
+ defer ph.owner_context_destroy(&context_owner)
+ defer rgd.session_close(resumed)
+ owned:=rgd.Session_Ownership{allocator={allocator_owner.owner,alloc.data},container={context_owner.owner,resumed},allocation_base=resumed,allocation_bytes=size_of(resumed^)}
+ options:=rgd.SESSION_OPTIONS;options.role=.Server;options.port=u16(gd.env_int("B3_PORT",49660)+1);options.network=source.server.cfg
+ gd.print_str(fmt.tprintf("REDIRECT_ARCHIVE_PRE cp_ready=%v cp_content=%d opt_content=%d cp_hz=%d opt_hz=%d contract=%d timing=%v",cp.ready,cp.header.content,options.network.content,cp.settings.hz,options.network.hz,cp.header.contract,source.server.model.action_timing))
+ resume_error:=rgd.session_resume(resumed,&cp,model,options,{epoch=source.server.cfg.epoch+1,local_seat=0},allocator=alloc,ownership=owned)
+ if resume_error!=.None{
+  gd.print_str(fmt.tprintf("REDIRECT_ARCHIVE_ERROR resume=%v frame=%v native=%v",resume_error,resumed.server.frame_error,self.state.codec.last_native_status))
+  return -5
+ }
+ path:=fmt.tprintf("%s/archive.rpl",gd.env_string("B3_FIXTURE_OUTPUT","/tmp"))
+ saved:=rgd.session_save(resumed,path);if saved.error!=.None{gd.print_str(fmt.tprintf("REDIRECT_ARCHIVE_SAVE error=%v",saved));return -6}
+ // The durable codec retains its own context after the source runtime closes.
+ if rgd.session_close(resumed)!=.None{return -9}
+ decoded:net.Checkpoint(common.Game,common.Control,common.Action,2)
+ read:=storage.checkpoint_read(&decoded,model,path,source.server.cfg.content,allocator=alloc)
+ if read.error!=.None{gd.print_str(fmt.tprintf("REDIRECT_ARCHIVE_READ error=%v",read));return -7}
+ if !reflect.equal(decoded.frame,cp.frame){return -8};net.checkpoint_destroy(&decoded)
+ if rgd.session_close(resumed)!=.None{return -9}
+ gd.print_str("REDIRECT_FIXTURE owned_archive_capture_resume_save_read=true source_model_and_cache_preserved=true")
+ return 0
+}

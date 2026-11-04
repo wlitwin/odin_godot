@@ -1,5 +1,7 @@
 package replay_godot_transport
 
+import bg "godot:box3d/godot"
+
 import wiregd "godot:replay/godot/internal/wire"
 
 import "core:strings"
@@ -65,7 +67,7 @@ rtc_signal_message :: proc(r:^Rtc,d:^gd.Dictionary) {
   challenge:=wiregd.get_string(d,"challenge",256);defer delete(challenge)
   if len(challenge)==0 {r.error=.Authentication;return}
   r.challenged=true
-  proof:=r.config.authorize(r.config.authorization_user,challenge,r.config.room,r.config.host)
+  proof:=rtc_authorization_value(r,challenge,r.config.room,r.config.host)
   if len(proof)==0 || len(proof)>1024 {r.error=.Authentication;return}
   request:=gd.new_dictionary_default();defer gd.free_dictionary(request)
   wiregd.set_string(&request,"type",r.config.host ? "create" : "join")
@@ -124,15 +126,14 @@ rtc_signal_message :: proc(r:^Rtc,d:^gd.Dictionary) {
 rtc_peer_open :: proc(r:^Rtc,id:tr.Peer_Id)->bool {
  if rtc_find(r,id)!=nil {return true}
  if r.connection_serial==max(u64) {r.error=.Capacity;return false}
- peer:^Rtc_Peer
- for &slot in r.slots {if slot.conn==nil {peer=&slot;break}}
+ peer:^Rtc_Peer;peer_index:=-1
+ for &slot,index in r.slots {if slot.conn==nil {peer=&slot;peer_index=index;break}}
  if peer==nil {r.error=.Capacity;return false}
  conn:=gd.new_web_rtc_peer_connection();if conn==nil {return false};gd.ref_counted_init_ref(conn)
  r.connection_serial+=1
  peer^={id=id,serial=r.connection_serial,owner=r,conn=conn,started=rtc_clock(nil),ice=make([dynamic]Rtc_Ice,0,8,r.allocator)}
  ok:=false;defer {if !ok {rtc_peer_close(peer)}}
- ice_json:=r.config.ice_json
- if r.config.ice_source!=nil {valid:bool;ice_json,valid=r.config.ice_source(r.config.ice_user);if !valid {return false}}
+ ice_json,valid_ice:=rtc_ice_value(r);if !valid_ice{return false}
  if rtc_ice_validate(ice_json)!=.None {return false}
  js:=gd.new_string_odin(ice_json);defer gd.free_string(js)
  v:=gd.json_parse_string(js);defer gd.variant_destroy(&v)
@@ -142,9 +143,14 @@ rtc_peer_open :: proc(r:^Rtc,id:tr.Peer_Id)->bool {
  names:=[2]cstring{"session_description_created","ice_candidate_created"}
  procs:=[2]gdext.ExtensionCallableCustomCall{rtc_description_created,rtc_ice_created}
  for i in 0..<2 {
-  cb:=new(Rtc_Callback,r.allocator);cb^={true,peer,r.allocator};peer.callbacks[i]=cb
-  info:=gdext.ExtensionCallableCustomInfo2{token=gdext.library,callable_userdata=cb,call_func=procs[i],free_func=rtc_callback_free}
-  gdext.callable_custom_create2(&peer.calls[i],&info)
+  if rtc_managed(r){
+   handle,status:=rtc_callable(r,peer_index,i==0);if status!=bg.OK{return false}
+   peer.managed[i]=handle;peer.calls[i]=handle.value
+  }else{
+   cb:=new(Rtc_Callback,r.allocator);cb^={true,peer,r.allocator};peer.callbacks[i]=cb
+   info:=gdext.ExtensionCallableCustomInfo2{token=gdext.library,callable_userdata=cb,call_func=procs[i],free_func=rtc_callback_free}
+   gdext.callable_custom_create2(&peer.calls[i],&info)
+  }
   if gd.object_connect(cast(gd.Object)conn,gd.new_string_name_cstring(names[i],true),peer.calls[i],0)!=.Ok {return false}
   peer.watching[i]=true
  }
@@ -202,7 +208,12 @@ rtc_callback_free :: proc "c"(user:rawptr) {
 @(private)
 rtc_description_created :: proc "c"(user:rawptr,args:[^]gdext.VariantPtr,argc:i64,ret:gdext.VariantPtr,error:^gdext.CallError) {
  context=gdext.godot_context();gdext.variant_new_nil(ret);error^={}
- cb:=cast(^Rtc_Callback)user;if !cb.active || argc!=2 {return};peer:=cb.peer
+ cb:=cast(^Rtc_Callback)user;if !cb.active || argc!=2 {return}
+ rtc_description_effect(cb.peer,args,argc,ret,error)
+}
+@(private)
+rtc_description_effect :: proc(peer:^Rtc_Peer,args:[^]gdext.VariantPtr,argc:i64,ret:gdext.VariantPtr,error:^gdext.CallError){
+ gdext.variant_new_nil(ret);error^={}
  typ,sdp:gd.String
  convert:=gdext.get_variant_to_type_constructor(.String);convert(&typ,args[0]);convert(&sdp,args[1])
  defer gd.free_string(typ);defer gd.free_string(sdp)
@@ -216,7 +227,12 @@ rtc_description_created :: proc "c"(user:rawptr,args:[^]gdext.VariantPtr,argc:i6
 @(private)
 rtc_ice_created :: proc "c"(user:rawptr,args:[^]gdext.VariantPtr,argc:i64,ret:gdext.VariantPtr,error:^gdext.CallError) {
  context=gdext.godot_context();gdext.variant_new_nil(ret);error^={}
- cb:=cast(^Rtc_Callback)user;if !cb.active || argc!=3 {return};peer:=cb.peer
+ cb:=cast(^Rtc_Callback)user;if !cb.active || argc!=3 {return}
+ rtc_ice_effect(cb.peer,args,argc,ret,error)
+}
+@(private)
+rtc_ice_effect :: proc(peer:^Rtc_Peer,args:[^]gdext.VariantPtr,argc:i64,ret:gdext.VariantPtr,error:^gdext.CallError){
+ gdext.variant_new_nil(ret);error^={}
  media,name:gd.String;index:i64
  convert:=gdext.get_variant_to_type_constructor(.String);convert(&media,args[0]);convert(&name,args[2])
  convert_int:=gdext.get_variant_to_type_constructor(.Int);convert_int(&index,args[1])

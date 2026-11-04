@@ -60,6 +60,10 @@ __pycache__/
 .DS_Store
 # stray repo-root logs (e.g. a redirected error.log)
 /*.log
+# Ad-hoc packet captures and diagnostic output; keep curated reports under tests/.
+/raw-*-*.bin
+/raw-*-*.json
+/fact-batching-observation.json
 
 # ── web browser-test deps (puppeteer-core, installed by the web test) ──
 node_modules
@@ -84,3 +88,9 @@ examples/slopball3d/.sloplogs/
 examples/quickdraw/.qdlogs/
 examples/speedball/.spblogs/
 examples/claimball/.clblogs/
+
+# Pinned Box3D sources/build cache (explicit external caches are also supported)
+/.box3d-cache/
+/box3d/native/libogb3.a
+/box3d/native/libogb3.dylib
+/box3d/native/libogb3.so

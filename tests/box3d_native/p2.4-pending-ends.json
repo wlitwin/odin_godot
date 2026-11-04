@@ -1,0 +1,152 @@
+{
+  "support": "P2.4 pending end queues",
+  "worker": "box3d-contract",
+  "new_card_claimed": false,
+  "date": "2026-10-30",
+  "host": "macOS-15.8-arm64-arm-64bit",
+  "owned_resource_version": 2,
+  "normalized_version": 3,
+  "coverage": "ogb3-d421e45c-solver-v3",
+  "public_proc_ABI_changed": false,
+  "declared_exports": 74,
+  "upstream_pins_and_three_patches_changed": false,
+  "historical_v2_relabelled": false,
+  "old_timing_matrix_rerun": false,
+  "pending_capacity_per_family": 65536,
+  "representation": {
+    "sensor": [
+      "shape_key",
+      "visitor_key"
+    ],
+    "contact": [
+      "shape_a_key",
+      "shape_b_key",
+      "contact_index1_generation32_key"
+    ],
+    "ordering": "preserved",
+    "host_world_slots_and_padding": "excluded"
+  },
+  "results": {
+    "public_probe_before": [
+      1,
+      0
+    ],
+    "public_probe_after": [
+      1,
+      1
+    ],
+    "mac_Debug_CTest": 3,
+    "mac_Release_CTest": 3,
+    "mac_Debug_Odin": 10,
+    "mac_Release_Odin": 10,
+    "ASan_UBSan_CTest": 3,
+    "sanitizer_exclusions": false,
+    "linux_Debug_CTest": 3,
+    "linux_Release_CTest": 3,
+    "linux_Debug_Odin": 10,
+    "linux_Release_Odin": 10,
+    "version_negative_native": 2,
+    "version_negative_compiled": 3,
+    "version_negative_status": "Incompatible",
+    "version_negative_native_allocations": 0,
+    "version_negative_wrapper_allocations": 0,
+    "native_and_wrapper_live_final": 0,
+    "mac_leaked_bytes": 0,
+    "pending_capture_allocation_failure_sites": 7
+  },
+  "remaining": "Parent paired-adapter/current integrated acceptance owns final P2.4 conclusion; no cross-target throughput/wire/actual Godot DSO claim",
+  "Linux_context": "Debian x86-64 Clang14 via existing Podman/Rosetta, not native throughput",
+  "scratch": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends",
+  "sources": {
+    "box3d/native/owned_snapshot.c": "ffe6aaa193293eafab5816aa1050e8e1d7b4f74d13e81f58490a77601d52a646",
+    "box3d/native/owned_snapshot.h": "96af8187f783785db4b9b1b8a924e0a70f9483b15d53003de19a179bdc43f582",
+    "box3d/native/state_dump.c": "ff6d98df3d61b99584b30d01c9224d0a0a997b8f0f2ad8e929cd90bc862804da",
+    "box3d/native/state_dump.h": "59be6b71d0979046be63e488b1b100cfdae1bcd085591f5f210b8f66a7a8d56a",
+    "box3d/bindings.odin": "fc8cc11e33b8c3295e7d43e3b8401a1a5b823467bdbd86adf22ead80a2fad86d",
+    "box3d/world.odin": "bea6d6da773997bf42a216a704deb2874919739343daaa13c6f6f5e0fc8d41fa",
+    "box3d/snapshot.odin": "c7e904086aaa2b37216e45ec4dee82c5b509ab269bd634e94147cc40c8974184",
+    "tests/box3d_native/lifecycle.c": "9022302417fb1ae979aef97b326ca9af19d7d30ed00c9ed11d31a9c6ca16c3ec",
+    "tests/box3d/lifecycle_test.odin": "30d25b5f53d5d71401856e012c26e5e3e369427af193eabb3233dbcdc26cd4e6",
+    "tests/box3d/version_mismatch/main.odin": "fe3c28882d66c473386bf2da5198faced5c51d0b17d92e01a6f3e5c07bb51af0",
+    "docs/design/box3d/framework-contract.md": "928ea9d22ea59afd466acd73c84637b3ac40ebe5306f0977574219900942c219",
+    "tests/box3d_native/README.md": "d2f018ed0a189beabf98f68917c4655109eb447f7fdff1a150c100645fa0f9fc"
+  },
+  "artifacts": {
+    "before.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/before.log",
+      "sha256": "0d2155575dfee2a4cd2e6d02d865ef144f3f76c0cf669f0dcc790004cdf86448"
+    },
+    "after.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/after.log",
+      "sha256": "8f31fa50657795fead81f75e8e0f1e3cc305d4659923970d486a4b9c8c8ccb5d"
+    },
+    "coherent-debug.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/coherent-debug.log",
+      "sha256": "3bf47b7e5553adfc171b1f3b9d7cefe475b1195e6e2d9169785208b616dc254b"
+    },
+    "coherent-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/coherent-release.log",
+      "sha256": "6279691e73ff4e91adafa98ebc132cd02e4b06ff98c82f2b6a512bfefba85588"
+    },
+    "asan-build.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/asan-build.log",
+      "sha256": "48cf227c6421776f9bf94c621704c86c1e7ff40773ae0ac77d6e1c386a3c3c1a"
+    },
+    "asan-ctest.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/asan-ctest.log",
+      "sha256": "c89122e613a4d0cf0c66e0bbc2fd99536bc71b1a79edf0fe29f0a2fba4c10b15"
+    },
+    "odin-debug.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/odin-debug.log",
+      "sha256": "8111b7dca2366fedf35cc0f6b526fd0dcbe556993b5a568c4c209b4753978367"
+    },
+    "odin-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/odin-release.log",
+      "sha256": "913741a89aa80e5d6e718b60d32e3b4ffb048f48f8760d7db683f0f01b244b49"
+    },
+    "version-negative.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/version-negative.log",
+      "sha256": "3dc950fc27a0574d8301538c915d3e5d467d65aabfc94dc2dfa8fa8577dcc40e"
+    },
+    "leaks.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/leaks.log",
+      "sha256": "7bd10ecc8fefee5ed1df9628771ded79aef61e33841636b940ad8e5c1d336e1e"
+    },
+    "linux.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/linux.log",
+      "sha256": "5ef002ba5d0426df90e6d999873d9efc9aea2f0683e2fe4ba72ecdc54717c9f2"
+    },
+    "linux-validated.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/linux-validated.json",
+      "sha256": "134bb9182b91f1fa9971a4b81134bcd05c9a44994aa4af6b9605143a3587081f"
+    },
+    "linux-debug-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/linux-debug-manifest.json",
+      "sha256": "c589e28711d702978b41cc3ade7c074721630bc42596e00fcd63d429ecf5cc23"
+    },
+    "linux-release-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/linux-release-manifest.json",
+      "sha256": "05acbf8aff26a020e45fb970fc6cecbf591e70ebae81ea3ca7bfcd4166c64b51"
+    },
+    "v2-negative-control-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/v2-negative-control-manifest.json",
+      "sha256": "4e629a64a8ef88f99646ec7b86fd91a698709021d2221d505a85cea972ccfe75"
+    },
+    "cache/build/Debug/build-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/cache/build/Debug/build-manifest.json",
+      "sha256": "68cc1dbd1bf256b3829866dfd9a0311a4925705a333c15a2d3d8414e58669312"
+    },
+    "cache/build/Release/build-manifest.json": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/cache/build/Release/build-manifest.json",
+      "sha256": "9c0d89b1fb24b108253d2b765fdf8a6c225f0b9e2e80157e1155c3811eba0151"
+    },
+    "artifact-handoff.txt": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/artifact-handoff.txt",
+      "sha256": "3e12f55c3b9c4548e72d6f1d3add5142b5003e7e1fbd8984ddf53a12823e2678"
+    },
+    "linux-handoff.txt": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-contract/pending-ends/linux-handoff.txt",
+      "sha256": "0e24c50dc079b1f930b6a1aa23d95641d6d92a809285ebbdafbbb1f0e52e9b70"
+    }
+  }
+}

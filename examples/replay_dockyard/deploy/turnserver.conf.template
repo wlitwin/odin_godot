@@ -1,0 +1,28 @@
+# Operator template, not runnable until addresses, paths and secret are replaced.
+listening-port=3478
+tls-listening-port=5349
+listening-ip=PUBLIC_LISTENER_IP
+relay-ip=PUBLIC_RELAY_IP
+# For a NAT deployment, set the actual public/private mapping as documented by Coturn.
+# external-ip=PUBLIC_IP/PRIVATE_IP
+realm=turn.example.invalid
+server-name=turn.example.invalid
+fingerprint
+use-auth-secret
+# The same server-only value as REPLAY_ROOM_TURN_SECRET_FILE. Never ship it in Web assets.
+static-auth-secret=REPLACE_WITH_PRIVATE_SECRET
+cert=/PRIVATE/tls/turn-fullchain.pem
+pkey=/PRIVATE/tls/turn-key.pem
+min-port=55000
+max-port=55100
+user-quota=8
+total-quota=32
+no-cli
+no-multicast-peers
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=::1

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "result": "REVIEW_HANDOFF_VERIFIED_RELEASE_GATES_OPEN",
+  "at": "2026-11-04T05:27:16.364112+00:00",
+  "release_admitted": false,
+  "goal_complete": false,
+  "archive": {
+    "result": "CURRENT_REVIEW_ARCHIVE_VERIFIED_NOT_RELEASED",
+    "release_admitted": false,
+    "archive": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/Dockyard-Duo-review-v4-macos-arm64-web.tar.gz",
+    "bytes": 16755391,
+    "archive_sha256": "c473d6bc0c4ccdbd37b2f1910ddea7ef6cdd9f52b8551bdca3263ef211af9d0c",
+    "manifest_sha256": "7f9af118ce2aec046789ee9650f48fc49ef2320965ba13337c8c0727903845c8",
+    "files": 186,
+    "template_reproduced_from_packaged_helper": true,
+    "safe_extraction_and_all_payload_bytes_verified": true,
+    "runtime_proof_scope": "All185 v3 payloads byte-identical, including entireNative/Web runtime. V4 adds only rootNOTICE; actual relocatedNative/copiedWeb v3 proofs reused without rerunning unchanged gameplay.",
+    "native_relocated_runtime": "PASS",
+    "web_moved_runtime": "PASS",
+    "original_review_archive_preserved_sha256": "63103866c7daa98d3ca17c6dda795bc5c26dca69307c20060da974d7ce2e0c13"
+  },
+  "qualification": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/qualification/handoff-status.json",
+    "sha256": "7f5a6fc52291e185d90df3dab2e512d4afa7c756cc30900a5ae4c5d4d5209bb4"
+  },
+  "package": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/candidate-v4",
+  "packaging_tests": {
+    "tests": 8,
+    "actual_exit": 0
+  },
+  "game_and_selected_test_source_fence_unchanged": true,
+  "original_contract_unchanged": true,
+  "prior_qualification_report_and_original_review_archive_preserved": true,
+  "local_review": {
+    "terminal": "t1my",
+    "url": "http://127.0.0.1:53196/index.html?service=ws%3A%2F%2F127.0.0.1%3A53194&local=1&relay=1",
+    "scope": "Current browser runtime payloads byte-identical to v4; localhost only, no human-feedback or public-connectivity claim."
+  },
+  "runtime_proofs": {
+    "native": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/relocated-native-v3/report.json",
+      "sha256": "9d763a73b908bf1bd704229c7931b3da42858b34c8ecdf85d4feda7ce7b35290"
+    },
+    "web": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/moved-web-runtime-v3/report.json",
+      "sha256": "62aa57b2fff646c5b69f3e882dcb6f1616185adfb34f3da34b44d03f79690862"
+    }
+  },
+  "remaining": [
+    {
+      "task": "Q1",
+      "status": "WORKING_NOT_QUALIFIED",
+      "requirement": "One Firefox actualrepair8 of45.920ms exceeds original25ms. Precise contract question pending; no changed limit or unchanged retry assumed."
+    },
+    {
+      "task": "N1",
+      "status": "BLOCKED",
+      "requirement": "Chosen public endpoint and actual independent remote connectivity acceptance."
+    },
+    {
+      "task": "P1",
+      "status": "BLOCKED",
+      "requirement": "Two-human cooperative play feedback."
+    }
+  ],
+  "protected_resources": [
+    "User t9y VM/session",
+    "Old immutable human review server t1fd"
+  ]
+}

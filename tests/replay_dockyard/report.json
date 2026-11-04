@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "result": "REVIEW_CANDIDATE_PACKAGED_RELEASE_GATES_OPEN",
+  "task_complete": true,
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-03T21:20:18.189426+00:00",
+  "release_admitted": false,
+  "archive": {
+    "result": "CANDIDATE_ARCHIVED_NOT_RELEASED",
+    "file": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/Dockyard-Duo-review-macos-arm64-web.tar.gz",
+    "bytes": 16706022,
+    "sha256": "63103866c7daa98d3ca17c6dda795bc5c26dca69307c20060da974d7ce2e0c13",
+    "manifest_sha256": "f9725bf0800656f91f5b01a5220e45ebac28da20171908d560714d3a3ac91bbc",
+    "release_admitted": false
+  },
+  "archive_verification": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/archive-verify.json",
+    "sha256": "5d8eee39df66d40aa6a2f5f850d88d532439dcd790829e2222d44704cf205a66",
+    "result": "ARCHIVE_BYTES_VALID_NOT_RELEASED",
+    "scope": "Fresh safe extraction with Python3.13, manifest-pinned byte verification; system Python first lacked tar extraction filter and wrote no payload."
+  },
+  "package": {
+    "directory": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/candidate-v2",
+    "manifest_sha256": "f9725bf0800656f91f5b01a5220e45ebac28da20171908d560714d3a3ac91bbc",
+    "files": 180,
+    "payload_bytes": 61666614,
+    "tested_candidate_v1_payload_byte_identical": true,
+    "web_cohort": "58a43f78f7481773",
+    "native_domain": {
+      "build": "776018674c0381b730e8f894e23199c5364bf07f40fa1d6f77b75fc3998cfea5",
+      "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+      "versions": [
+        1,
+        1,
+        4,
+        2,
+        1
+      ],
+      "pointer_bits": 64,
+      "endian": 1
+    },
+    "scope": "Frozen macOS ARM64 SDK project and ordinary Web export. No signed native app/universal SDK/public deployment claim."
+  },
+  "runtime_checks": {
+    "relocated_native": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/relocated-native-v1/report.json",
+      "sha256": "39c0933dca2a9aacccced5dca137e553997009a12f9de13531bbc59f9ead8a1d",
+      "result": "PASS",
+      "scope": "Copied Native project, no source-root environment/compiler/import; actual pair1200/all5/ACK/oneNativeimage/typedcleanup; only exact owned PID reload copies removed."
+    },
+    "copied_web": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/moved-web-runtime-v1/report.json",
+      "sha256": "b1f8ff8e6966640464e8e36c3633769f3955918c24c0e57f22612ee5fc335e79",
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "scope": "Verified byte-exact copied ordinary export through package, then actual real menu/Room/TURN pair1200/full5/ACK/cleanup. No new compile inferred."
+    },
+    "copied_web_input_binding": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/moved-web-input-v1/report.json",
+      "sha256": "db3b5a266f025cbf06a15b7f6e4957635c565b0ce4e936a5f8865caa7077f939",
+      "result": "EXPORTED_BROWSER_PENDING",
+      "scope": "Actual ordinary export record retained with original SHA and explicit byte-identical relocation provenance."
+    }
+  },
+  "synthetic_checks": {
+    "command": "python3 -B tests/replay_dockyard/package/package_test.py",
+    "actual_tests": 6,
+    "actual_exit": 0,
+    "scope": "Opaque synthetic bytes only: exact copy/cohort binding, no overwrite, altered export, symlink, corrupt payload and manifest-pin refusal; no physics/SDK/browser qualification."
+  },
+  "qualification": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/qualification/report.json",
+    "sha256": "65bd7a3ffe1f1fa9ff72972a1ad52e027e9a0a02b22e7f196400d338fc3818f7",
+    "result": "FUNCTIONAL_MATRIX_PASS_STRICT_HOST_MAX_REJECTED"
+  },
+  "prior_stage_reports": {
+    "upstream": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_upgrade/report.json",
+      "sha256": "1893851b8d68b591360e3b0709b1abcd95cfa911c0e9e0f3bb6c08762cce8ab3",
+      "result": "PASS"
+    },
+    "backend_web": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/backend/report.json",
+      "sha256": "73bcbf36df55e0717b2c87541bd92539cfb54f0a0ed717ac158af7f214dd7758",
+      "result": "PASS"
+    },
+    "core_web": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/integration/report.json",
+      "sha256": "6f8a7fc0d9b48949b0a7d2d49d0c96d6fbbc3a736de4906d24b59c701d212918",
+      "result": "PASS"
+    },
+    "replay_web": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/replay/report.json",
+      "sha256": "7f9f9825a9c1ce3106689b5ec23590a368bd7bfe8ee3eb6b85709f7a8d44d2b7",
+      "result": "PASS"
+    },
+    "rounds": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/rounds/report.json",
+      "sha256": "66f0933c92a108947bcf788a1d369569b503ccd2b43c024543f005dcee9b56e6",
+      "result": "PASS"
+    },
+    "online": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/online/report.json",
+      "sha256": "411b2960d34f11735009a2dac22640df694e7869a52325483a5bcf345b7967f5",
+      "result": "LOCAL_FUNCTIONAL_PASS_INTERNET_PENDING"
+    },
+    "recovery": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/recovery/report.json",
+      "sha256": "eb55b46a6f954a9fe02ee1c5d966e17c26a00fc76336621615f9524ce5f2820a",
+      "result": "LOCAL_LIFECYCLE_PASS"
+    },
+    "presentation": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/presentation/report.json",
+      "sha256": "8d0e1b50cfbc700af5976ede09d1e153ed9076ec7f0bded4d6c2897d3be25a8a",
+      "result": "RENDERED_AUDIO_FUNCTIONAL_PASS_HUMAN_PENDING"
+    }
+  },
+  "open_gates": [
+    "Q1: original10ms Firefox authority maximum rejected at10.601/12.94ms; no timing normalization or threshold waiver.",
+    "N1: actual public Internet endpoints/trust/remote route acceptance not provided; local relay is separate proof.",
+    "P1: two-human co-op feedback is unobserved.",
+    "Actual Safari remote automation is disabled; Safari is not admitted.",
+    "Native/Web crossplay, mobile, Windows, Intel SDK and current Linux hardware performance are unqualified."
+  ],
+  "scope_limits": [
+    "Candidate files remain marked release_admitted:false; copying a runtime PASS cannot override QA rejection.",
+    "Original failed timing/build/audio/fixture reports and historical GateB8.894ms/causeUNKNOWN/SDK observer failures remain unchanged.",
+    "The C engine is current pinned33626332/unpatched; small local shim compatibility is declared, no remote fork or upstream messages created.",
+    "No public deployment, paid service, secret publication, commit, push or subagent launch occurred.",
+    "The user VM t9y/interactive shell was untouched; t1fd still serves the older immutable local human-review artifact."
+  ],
+  "source_sha256": {
+    "examples/replay_dockyard/package.py": "a4cd4ff43ae2cec391261f494fc4be653d5390a1f84227d91f8c0e35229541ed",
+    "examples/replay_dockyard/README.md": "02a452043ba23194466e398009011645d5659c0354ddfbf6d05b71ec6742c260",
+    "examples/replay_dockyard/deploy/service.env.example": "ada23aed90d32b81869e29c4b5ee1fbeae1c900bfe224355aff6d20961e912c6",
+    "docs/design/box3d/showcase-candidate.md": "3c648ef67b6bed51808ec6aee82e329e56c34a3822cbc1c709375302004dced0",
+    "docs/design/box3d/desktop-compatibility.md": "b74aec19387e4031f1fdd2abb05c033004c0f8e5be1a2fdc951ff7c0b7a196dd",
+    "tests/replay_dockyard/package/package_test.py": "a9f4398ffa09bbe6e76f6378747e066a46ace24d50def17f9c5ef5a13d4e0d9c",
+    "tests/replay_dockyard/package/runtime.py": "456bc2523ce8f75d107ec7b8bd69a9dfef482cea741ad0246b134308c3e8d0db",
+    "tests/replay_dockyard/package/README.md": "077683614ba7c4bfa8948ccbcdc1b159495dbafbf763077f0c4de037ab5093e8"
+  },
+  "completed_task": "D1 independent unreleased candidate package/handoff",
+  "current_web_download_bound": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/web-size.json",
+    "sha256": "a96ee6b026e17e88783ddbc1f10ce88143eae3ced4c30d8696bf0a5aee6fd97d",
+    "result": "OFFLINE_WEB_GZIP_BOUND",
+    "scope": "All current packaged Web files compressed individually withgzip9/mtime0; not an actual HTTPtransfer or gameplay result",
+    "raw_bytes": 51701929,
+    "gzip_bytes": 12860411,
+    "limit": 26214400,
+    "python": "3.9.6 (default, Nov 11 2024, 03:15:38) \n[Clang 16.0.0 (clang-1600.0.26.6)]",
+    "zlib": "1.2.12",
+    "files": [
+      {
+        "file": "index.apple-touch-icon.png",
+        "raw_bytes": 10368,
+        "gzip_bytes": 10376,
+        "sha256": "81e142be04b2f1cc3843da5908c7368a16a8704d96d9b33f3e6547eb0ee80fe3"
+      },
+      {
+        "file": "index.audio.position.worklet.js",
+        "raw_bytes": 2973,
+        "gzip_bytes": 1161,
+        "sha256": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8"
+      },
+      {
+        "file": "index.audio.worklet.js",
+        "raw_bytes": 7298,
+        "gzip_bytes": 2194,
+        "sha256": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3"
+      },
+      {
+        "file": "index.html",
+        "raw_bytes": 5460,
+        "gzip_bytes": 2198,
+        "sha256": "8ecc3571295a5c32ad2c49446f8704496b62f914f2ea036985a5388bdfb9c210"
+      },
+      {
+        "file": "index.icon.png",
+        "raw_bytes": 8538,
+        "gzip_bytes": 8551,
+        "sha256": "70d937a5c99f89d6978e9b1d69745cb379527c3b3a6daf31f81b32e10ab31d0c"
+      },
+      {
+        "file": "index.js",
+        "raw_bytes": 2958897,
+        "gzip_bytes": 370670,
+        "sha256": "878c9ae7fb3c27ce886faea8da0670dc1a97fb93930fac4b433a1bb56e662d3a"
+      },
+      {
+        "file": "index.pck",
+        "raw_bytes": 278424,
+        "gzip_bytes": 150489,
+        "sha256": "13c033ad3b803dd048c0c5edc6124721b82adff6403da1975f066c91f7b59566"
+      },
+      {
+        "file": "index.png",
+        "raw_bytes": 21443,
+        "gzip_bytes": 19328,
+        "sha256": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e"
+      },
+      {
+        "file": "index.side.wasm",
+        "raw_bytes": 43273321,
+        "gzip_bytes": 10462300,
+        "sha256": "7524005084798d164449a7bb28595e3e680103898cf26c50cb2bc7335a5c9254"
+      },
+      {
+        "file": "index.wasm",
+        "raw_bytes": 1601069,
+        "gzip_bytes": 597493,
+        "sha256": "eb7ab9dcb2c2c484f4dca0acaad466b7fd8448fb86a0a552b5c3e5291952115f"
+      },
+      {
+        "file": "libodin_godot.wasm",
+        "raw_bytes": 3534138,
+        "gzip_bytes": 1235651,
+        "sha256": "698d967df1162062382f0f95fe2c4766e6ae2a03f777e57452659b8446634b84"
+      }
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "result": "AUDIO_LIFETIME_AND_LIFECYCLE_PASS_FIREFOX_STRICT_MAX_REJECTED",
+  "release_admitted": false,
+  "task_complete": false,
+  "goal_complete": false,
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-v1/plan.json",
+    "sha256": "ce899a2c26b3a7be63d3f1d0a70f48e85fcdda39fec8d2f95ba2e378cd43d2d4"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-v1/source-checkpoint.json",
+    "sha256": "291c6a891d5424a851e64fc524037c3341446583d8257debeb64d05d37784da1"
+  },
+  "review": {
+    "model": "claude-opus-5-5",
+    "read_only": true,
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-exit-review-v1/review.json",
+      "sha256": "2c571c8b7ac684aeac8bd8bfb7ead0980026adf4b73d42dfe399bbfccfbb6693"
+    }
+  },
+  "negative_control": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/rtc-exit-near-cue-v1/report.json",
+      "sha256": "6505399ecbbe2a9b7626582869a93dc5f8816544c2918390dd4c8034b1b54196"
+    },
+    "scope": "Controlled650msnearboost quit, actualAudioStreamPlaybackWAV+boost.wav leaked; fullGodotRuntimeExit observed."
+  },
+  "same_close_after_fix": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-active-close-v1/audio-release-proof.json",
+    "sha256": "61c7c0cfd1e6dd61721ec74f8efbd70d0d4e069d196ecdc638af54770581aadb"
+  },
+  "native_four_voice": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-native-voices-active-v1/corrected-assessment.json",
+    "sha256": "9fc12800854d95a7a38e84236908a8ddee2a0d3b66216ec511f258de6bc9c7b1"
+  },
+  "muted_native": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-native-voices-muted-v1/report.json",
+    "sha256": "57100a03f72b74ea7f65e41cf0abdb75736196bd8c460cc95d73da5bc821a7ae"
+  },
+  "full_fault_game": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-faults-v1/audio-fault-proof.json",
+    "sha256": "7d2bb7898753f4491aa76711193bb9b00dd73b7293453cbb012de501209e85fc"
+  },
+  "native_sdk": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-native-sdk-v1/report.json",
+    "sha256": "222f3565644590e64ec2b7cc58169479463b7151b7938549126bb4b10531e617"
+  },
+  "export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-export-v1/report.json",
+    "sha256": "fe032f0978cbe8334b81bab5827cbb7e974af693fbd205c98dfd77418f0af08e"
+  },
+  "definition": "ExistingNative runtime closes before feedback teardown. Feedback keeps onlyWeakRefs, stopsvoices+clearsstreams, acceptsactualplaybackdestructionoverrealframesbeforequit/reload. Bounded2000ms timeout isexpliciterror/nonzeroquit. Sharedtransitionlatch andWindowClose interception; scriptedOdinfinish defers to existingViewchild; standalonefixtures fallbackdirectquit.",
+  "not_changed": [
+    "physics",
+    "canonical/wire",
+    "time step or FP policy",
+    "Session/Timeline ownership",
+    "acceptance budgets"
+  ],
+  "live_case": null,
+  "limitations": [
+    "Actualactivehostclose andidleclientclose aredistinguished; no activeclientclaim fromthatfixture.",
+    "FourvoiceNative test initiallyfalsefailed onunsupportedmarker; originalretained, correctedassessmentusesactual0exit/4->0ACK/noGodotleaks, no unchangedrerun.",
+    "No budgetadmission fromresourceprobes. Sustainedbrowser/actualInternet/two-humanfeedback remainseparate."
+  ],
+  "updated_utc": "2026-11-04T03:54:37.015031+00:00",
+  "affected_lifecycle_checks": {
+    "audio-drain-cold-v1": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-cold-v1/report.json",
+      "sha256": "86f3d1736ac3d6d396031db0f9ec5d9fe87e53328327b943ffbda60027f10afc"
+    },
+    "audio-drain-hostloss-v1": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-hostloss-v1/report.json",
+      "sha256": "17dc0d456f7cd21e65114fa46a130dff7663dbeffb01bdcc6d232e9df2c36644"
+    }
+  },
+  "latest_short_timing": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-drain-firefox-short-v1/assessment.json",
+    "sha256": "6cc4f3296b571e43993105ccc0f71349c68ee1bee44d0c6ecda7783c1fd21d8b"
+  },
+  "performance": {
+    "host_p95_ms": 3.52,
+    "host_p99_ms": 4.52,
+    "host_max_ms": 10.9,
+    "original_max_limit_ms": 10,
+    "strict_result": "BUDGET_REJECTED",
+    "sustained_final_sessions": "NOT_STARTED: current short candidate violates hardmaximum"
+  }
+}

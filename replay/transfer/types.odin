@@ -1,6 +1,7 @@
 package replay_transfer
 
 import "core:mem"
+import r "godot:replay"
 import sc "godot:replay/schema"
 import tr "godot:replay/transport"
 
@@ -31,7 +32,10 @@ Stats :: struct {
 }
 
 Sender :: struct {
+ ownership:Ownership,
+ owner_state:Ownership_State,
 	allocator: mem.Allocator,
+	budget:Budget_State,
 	ready: bool,
 	scope: Scope,
 	target: tr.Peer_Id,
@@ -123,3 +127,119 @@ clock_at :: proc(c: ^Clock, now: u64, cfg: Config) -> bool {
 key_for :: proc(scope: Scope) -> Key {return {scope.room, scope.binding}}
 @(private)
 chunk_count :: proc(bytes: int) -> int {return (bytes + CHUNK_BYTES - 1) / CHUNK_BYTES}
+
+// Optional allocation accounting. Hooks never affect wire bytes or pacing.
+// Each owner acquires its own lease; callback metadata must remain immutable and
+// valid until drop. Nil hooks preserve the ordinary native-free behavior.
+Budget :: struct {
+	user:rawptr,
+	reserve:proc(rawptr,u64)->bool,
+	release:proc(rawptr,u64),
+	acquire:proc(rawptr)->bool,
+	drop:proc(rawptr),
+}
+Budget_State :: struct {
+	hooks:Budget,
+	bytes,denied:u64,
+	attached,leased:bool,
+	schema_memory:[]u8,
+	schema_arena:mem.Arena,
+}
+SCHEMA_ARENA_BYTES :: 512*1024
+
+@(private)
+budget_begin :: proc(state:^Budget_State,hooks:Budget,retained:u64)->Error {
+	if (hooks.reserve==nil)!=(hooks.release==nil) || (hooks.acquire==nil)!=(hooks.drop==nil){return .Invalid_Config}
+	if hooks.reserve==nil {if hooks.acquire!=nil{return .Invalid_Config};return .None}
+	if state.attached {return state.hooks.user==hooks.user && state.hooks.reserve==hooks.reserve && state.hooks.release==hooks.release && state.hooks.acquire==hooks.acquire && state.hooks.drop==hooks.drop ? .None:.Invalid_Config}
+	if hooks.acquire!=nil && !hooks.acquire(hooks.user){return .Capacity}
+	if !hooks.reserve(hooks.user,retained){if hooks.drop!=nil{hooks.drop(hooks.user)};state.denied+=1;return .Capacity}
+	state.hooks=hooks;state.bytes=retained;state.attached=true;state.leased=hooks.acquire!=nil
+	return .None
+}
+@(private)
+budget_add :: proc(state:^Budget_State,bytes:u64)->bool {
+	if !state.attached{return true}
+	if bytes>max(u64)-state.bytes || !state.hooks.reserve(state.hooks.user,bytes){state.denied+=1;return false}
+	state.bytes+=bytes;return true
+}
+@(private)
+budget_sub :: proc(state:^Budget_State,bytes:u64){
+	if !state.attached{return};assert(state.bytes>=bytes);state.bytes-=bytes;state.hooks.release(state.hooks.user,bytes)
+}
+@(private)
+budget_alloc :: proc(state:^Budget_State,n:int,allocator:mem.Allocator)->([]u8,Error){
+	if n==0{return nil,.None}
+	if n<0 || !budget_add(state,u64(n)){return nil,.Capacity}
+	bytes,error:=mem.alloc_bytes(n,allocator=allocator)
+	if error!=.None || len(bytes)!=n {if len(bytes)!=0{delete(bytes,allocator)};budget_sub(state,u64(n));return nil,.Capacity}
+	return bytes,.None
+}
+@(private)
+budget_free :: proc(state:^Budget_State,bytes:^[]u8,allocator:mem.Allocator){
+	n:=len(bytes^);if n==0{bytes^=nil;return};delete(bytes^,allocator);bytes^=nil;budget_sub(state,u64(n))
+}
+@(private)
+budget_end :: proc(state:^Budget_State,allocator:mem.Allocator){
+	budget_free(state,&state.schema_memory,allocator)
+	if state.attached {state.hooks.release(state.hooks.user,state.bytes);if state.leased {state.hooks.drop(state.hooks.user)}}
+	state^={}
+}
+@(private)
+budget_schema_allocator :: proc(state:^Budget_State,allocator:mem.Allocator)->(mem.Allocator,Error){
+	if !state.attached{return allocator,.None}
+	memory,error:=budget_alloc(state,SCHEMA_ARENA_BYTES,allocator)
+	if error!=.None{return {},error}
+	state.schema_memory=memory;mem.arena_init(&state.schema_arena,memory)
+	return mem.arena_allocator(&state.schema_arena),.None
+}
+@(private)
+budget_array_bytes :: proc(array:[dynamic]$T)->u64{return u64(cap(array))*u64(size_of(T))}
+@(private)
+budget_schema_bytes :: proc(s:^sc.Schema)->u64 {
+	bytes:=budget_array_bytes(s.fields)+budget_array_bytes(s.checks)+budget_array_bytes(s.validation)+budget_array_bytes(s.validation_blocks)+budget_array_bytes(s.spans)+budget_array_bytes(s.arrays)+budget_array_bytes(s.canonical)+budget_array_bytes(s.unions)+budget_array_bytes(s.guards)+u64(len(s.problem.path))
+	for field in s.fields {bytes+=u64(len(field.path))}
+	for layout in s.unions {bytes+=u64(len(layout.variant_sizes))*8+u64(len(layout.variant_names))*size_of(string);for name in layout.variant_names{bytes+=u64(len(name))}}
+	return bytes
+}
+@(private)
+budget_codecs_bytes :: proc(c:^Codecs)->u64 {
+	bytes:u64
+	for schema in ([?]^sc.Schema{&c.offer,&c.compressed_offer,&c.shuffled_offer,&c.chunk,&c.progress,&c.ready,&c.failure}) {bytes+=budget_schema_bytes(schema)}
+	return bytes
+}
+
+// Charge a containing owner's retained payload alongside this transfer. The
+// containing owner must free it before ending this budget owner. This is for
+// immutable schema caches and fixed context owned by recovery adapters.
+budget_charge_owner :: proc(state:^Budget_State,bytes:u64)->Error {
+	return budget_add(state,bytes)?Error.None:Error.Capacity
+}
+
+// Optional process-local whole-owner metadata. Exact aliases are explicit;
+// allocator ownership never implies ownership of wire/accept/schema user data.
+Ownership :: struct {allocator,container,wire,accept,schema,budget:r.Owned_Context}
+@(private)
+Ownership_State :: struct {retains:r.Owner_Retains,cleanup:bool}
+@(private)
+ownership_entry :: proc(owned:Ownership,allocator:mem.Allocator,container,wire,accept,schema,budget:rawptr,access:r.Owner_Access=.Execute)->Error {
+ managed:=!r.owner_is_nil(owned.allocator.owner) || !r.owner_is_nil(owned.container.owner)
+ when #config(BOX3D_REQUIRE_DOMAIN,false){if !managed{return .Invalid_Config}}
+ if managed {
+  if r.owner_is_nil(owned.allocator.owner) || r.owner_is_nil(owned.container.owner){return .Invalid_Config}
+  if r.owner_contexts_check({owner=owned.allocator.owner,owner_allocator_data=owned.allocator.data},allocator)!=.None{return .Invalid_Config}
+ }
+ bindings:=[?]r.Owned_Context{owned.allocator,owned.wire,owned.accept,owned.schema,owned.budget,owned.container}
+ values:=[?]rawptr{allocator.data,wire,accept,schema,budget,container}
+ for binding,index in bindings {if r.owned_context_access(binding,values[index],managed,access)!=.None{return .Invalid_Config}}
+ return .None
+}
+@(private)
+ownership_retain :: proc(state:^Ownership_State,owned:Ownership)->Error {
+ owners:=[?]r.Owner{owned.allocator.owner,owned.wire.owner,owned.accept.owner,owned.schema.owner,owned.budget.owner,owned.container.owner}
+ return r.owner_retains_acquire(&state.retains,owners[:])==.None?Error.None:Error.Invalid_Config
+}
+
+// Composition preflight, before a containing recovery adapter allocates any
+// schema/container or invokes an application callback.
+ownership_validate :: proc(owned:Ownership,allocator:mem.Allocator,container,wire,accept,schema,budget:rawptr)->Error{return ownership_entry(owned,allocator,container,wire,accept,schema,budget)}

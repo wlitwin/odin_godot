@@ -1,0 +1,955 @@
+{
+  "schema": 1,
+  "task": "t_dfc08787deb1463a",
+  "revision": 5,
+  "board": "b_cdde1cdfea104035",
+  "result": "PASS",
+  "scope": "P5.4 distinct authored Kit/Replay SDK samples and setup/API/migration docs on macOS arm64 reference. Gate C/export and whole-goal remain open.",
+  "requirements": {
+    "samples": "Same actual four-body/four-asset/one-hinge authored content in two distinct framework projects; six files byte-identical and runtime bake hash equal. Existing stress examples untouched.",
+    "sdk_network": "Ordinary SDK build/import and real separate Host/Client via current framework Sessions; exactly one Native image per actor, no new netcode/timeline.",
+    "complete_state": "Confirmed120; direct byte equality of all five retained complete parts within each pair; actual terminal signature ACK and natural0; cross-framework solver identity not claimed.",
+    "input_provenance": "Kit actual public Side at tick120: nonzero120 and pulse2 per seat. Replay actual authoritative accepted-input Sample/nonzero remote evidence. No unique-action ACK/fidelity-rate inference.",
+    "ownership": "Actual SDK Meter/code/data users, typed teardown, Native/wrapper/Meter0 and measured raw Core-owner baseline4->4/SAMPLEdelta0, fully drained logs.",
+    "docs": "Separate setup/API/ownership/ordering/recovery; authored/editor/artifact workflow, reproducible commands, Godot physics migration, limits/named unsupported failures. Replay manualReset explicitly unsupported; existing automatic recovery retained."
+  },
+  "cases": [
+    {
+      "framework": "kit",
+      "build": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-build-v7/report.json",
+        "sha256": "b214881dccfd2869202abd18a2596386ed316895994460b3084bd63eafbfa4a0"
+      },
+      "build_log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-build-v7/build.log",
+        "sha256": "b1f17ba0a1e7dfd2002aa2caa51a5f203943287f3e401666e41c2579ae845795"
+      },
+      "run": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/report.json",
+        "sha256": "e31b3a2981ef06b446dc611828977c86218501060e9385721a3ed82f152d9e9a"
+      },
+      "controller": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/controller.py",
+        "sha256": "8041ad8ceb111b91efa153b817bf5dfc03776910545b26aaf04482a5d08f2f55"
+      },
+      "import": {
+        "argv": [
+          "/Applications/Godot.app/Contents/MacOS/Godot",
+          "--headless",
+          "--editor",
+          "--path",
+          "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-build-v7/project",
+          "--quit-after",
+          "120"
+        ],
+        "actual_exit": 0,
+        "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/import.log",
+        "sha256": "94aba4bda37d3b580d351136d3060c0bbcd7712cd280cc18d43c82051f6c242d"
+      },
+      "current_runnable_sources_match": true,
+      "complete_views": {
+        "host": {
+          "manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/final-frame.json",
+          "sha256": "f9ff1d59a02ed4ca5ba8d53f982270fd63989e982d1a552cb4cd2807c0ed3e11",
+          "parts": {
+            "Solver": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/Solver.bin",
+              "sha256": "7e34f79d526bd25fd2b2490f8e5d3166bf8bb2361e3229301e4173fd71c7c5e9",
+              "bytes": 5909
+            },
+            "Game": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/Game.bin",
+              "sha256": "97be82da02475a9f4b49cb7053c1caa9a738a18ed911a18709350a61bea1e1d4",
+              "bytes": 434
+            },
+            "Side": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/Side.bin",
+              "sha256": "e71bc33f3168976308af8443e2ae8a9d180e8bbb9f691eb630cc661e44eb1ec9",
+              "bytes": 100
+            },
+            "Observations": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/Observations.bin",
+              "sha256": "a3cab394e53f55926b1548e6614bc98ea877ba045e4269a5766e29920715b584",
+              "bytes": 2564
+            },
+            "Occurrences": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/Occurrences.bin",
+              "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+              "bytes": 1
+            }
+          }
+        },
+        "client": {
+          "manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/final-frame.json",
+          "sha256": "f9ff1d59a02ed4ca5ba8d53f982270fd63989e982d1a552cb4cd2807c0ed3e11",
+          "parts": {
+            "Solver": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/Solver.bin",
+              "sha256": "7e34f79d526bd25fd2b2490f8e5d3166bf8bb2361e3229301e4173fd71c7c5e9",
+              "bytes": 5909
+            },
+            "Game": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/Game.bin",
+              "sha256": "97be82da02475a9f4b49cb7053c1caa9a738a18ed911a18709350a61bea1e1d4",
+              "bytes": 434
+            },
+            "Side": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/Side.bin",
+              "sha256": "e71bc33f3168976308af8443e2ae8a9d180e8bbb9f691eb630cc661e44eb1ec9",
+              "bytes": 100
+            },
+            "Observations": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/Observations.bin",
+              "sha256": "a3cab394e53f55926b1548e6614bc98ea877ba045e4269a5766e29920715b584",
+              "bytes": 2564
+            },
+            "Occurrences": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/Occurrences.bin",
+              "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+              "bytes": 1
+            }
+          }
+        },
+        "all_five_byte_equal": true,
+        "ready": {
+          "host": {
+            "framework": "kit",
+            "role": "host",
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "mode": "host_client",
+            "native_images": 1,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "owners_scope": "pre_sample_context_baseline_and_ready_raw",
+            "event": "SAMPLE_READY"
+          },
+          "client": {
+            "framework": "kit",
+            "role": "client",
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "mode": "host_client",
+            "native_images": 1,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "owners_scope": "pre_sample_context_baseline_and_ready_raw",
+            "event": "SAMPLE_READY"
+          }
+        },
+        "results": {
+          "host": {
+            "framework": "kit",
+            "role": "host",
+            "ok": true,
+            "target": 120,
+            "head": 120,
+            "confirmed": 120,
+            "final_tick": 120,
+            "errors": [],
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 4,
+              "owners_after": 4,
+              "owners_observed": true,
+              "observed": true
+            },
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "sampled": 120,
+            "event": "SAMPLE_RESULT"
+          },
+          "client": {
+            "framework": "kit",
+            "role": "client",
+            "ok": true,
+            "target": 120,
+            "head": 120,
+            "confirmed": 120,
+            "final_tick": 120,
+            "errors": [],
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 4,
+              "owners_after": 4,
+              "owners_observed": true,
+              "observed": true
+            },
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "sampled": 120,
+            "event": "SAMPLE_RESULT"
+          }
+        },
+        "authority_inputs": {
+          "framework": "kit",
+          "role": "host",
+          "epoch": 1,
+          "tick": 120,
+          "available": true,
+          "published_tick": 120,
+          "nonzero_by_seat": [
+            120,
+            120
+          ],
+          "pulse_by_seat": [
+            2,
+            2
+          ],
+          "submitted": 120,
+          "held": 0,
+          "authority": 120,
+          "unavailable": 0,
+          "accepted_through": 120,
+          "event": "SAMPLE_INPUTS"
+        }
+      },
+      "actors": [
+        {
+          "role": "host",
+          "pid": 12734,
+          "actual_exit": 0,
+          "intake_drained": true,
+          "intake_error": null,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/host/godot.log",
+          "log_sha256": "703209e5a1b3404e59d2688cb60d63aa6d8266a26e51f82bf3d57ee750c55348",
+          "events": [
+            {
+              "framework": "kit",
+              "role": "host",
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "mode": "host_client",
+              "native_images": 1,
+              "owners_before": 4,
+              "owners_after": 4,
+              "owners_observed": true,
+              "owners_scope": "pre_sample_context_baseline_and_ready_raw",
+              "event": "SAMPLE_READY"
+            },
+            {
+              "framework": "kit",
+              "role": "host",
+              "epoch": 1,
+              "tick": 120,
+              "available": true,
+              "published_tick": 120,
+              "nonzero_by_seat": [
+                120,
+                120
+              ],
+              "pulse_by_seat": [
+                2,
+                2
+              ],
+              "submitted": 120,
+              "held": 0,
+              "authority": 120,
+              "unavailable": 0,
+              "accepted_through": 120,
+              "event": "SAMPLE_INPUTS"
+            },
+            {
+              "framework": "kit",
+              "role": "host",
+              "ok": true,
+              "target": 120,
+              "head": 120,
+              "confirmed": 120,
+              "final_tick": 120,
+              "errors": [],
+              "cleanup": {
+                "native": 0,
+                "wrapper": 0,
+                "meter": 0,
+                "owners": 0,
+                "owners_before": 4,
+                "owners_after": 4,
+                "owners_observed": true,
+                "observed": true
+              },
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "sampled": 120,
+              "event": "SAMPLE_RESULT"
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "pid": 12735,
+          "actual_exit": 0,
+          "intake_drained": true,
+          "intake_error": null,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-pair-v8/client/godot.log",
+          "log_sha256": "ff33c43d98671672b5cf7a450ebb48ce1a2231abf8d1e60d4975578561ea213e",
+          "events": [
+            {
+              "framework": "kit",
+              "role": "client",
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "mode": "host_client",
+              "native_images": 1,
+              "owners_before": 4,
+              "owners_after": 4,
+              "owners_observed": true,
+              "owners_scope": "pre_sample_context_baseline_and_ready_raw",
+              "event": "SAMPLE_READY"
+            },
+            {
+              "framework": "kit",
+              "role": "client",
+              "epoch": 1,
+              "tick": 120,
+              "available": true,
+              "published_tick": 120,
+              "nonzero_by_seat": [
+                120,
+                120
+              ],
+              "pulse_by_seat": [
+                2,
+                2
+              ],
+              "submitted": 120,
+              "held": 0,
+              "authority": 120,
+              "unavailable": 0,
+              "accepted_through": 120,
+              "event": "SAMPLE_INPUTS"
+            },
+            {
+              "framework": "kit",
+              "role": "client",
+              "ok": true,
+              "target": 120,
+              "head": 120,
+              "confirmed": 120,
+              "final_tick": 120,
+              "errors": [],
+              "cleanup": {
+                "native": 0,
+                "wrapper": 0,
+                "meter": 0,
+                "owners": 0,
+                "owners_before": 4,
+                "owners_after": 4,
+                "owners_observed": true,
+                "observed": true
+              },
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "sampled": 120,
+              "event": "SAMPLE_RESULT"
+            }
+          ]
+        }
+      ],
+      "native_identity": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-kit-authored-build-v7/project/bin/box3d-runtime.json",
+        "sha256": "f3f2834d1d231fd117a38699aaf062a02c64ee2bd7c94ddc0054e25d6159bcf7"
+      },
+      "domain": {
+        "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+        "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+        "versions": [
+          1,
+          1,
+          3,
+          2,
+          1
+        ],
+        "pointer_bits": 64,
+        "endian": 1
+      },
+      "native_source_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+      "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+      "exact_module_copy_binding": {
+        "copies": {
+          "bin/libodinscripts.dylib.r1.p12734.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 12734,
+            "sha256": "83d5be2b8c58ec7569f4feb1afa7f0d65e71e587cb23b6d9b156f5dff5c885de",
+            "source_sha256": "83d5be2b8c58ec7569f4feb1afa7f0d65e71e587cb23b6d9b156f5dff5c885de"
+          },
+          "bin/libodinscripts_authoring_demo.dylib.r2.p12735.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 12735,
+            "sha256": "51b12b6380e6cb09ee88619a3266d81287a15a93a8ca598435012c8e2ae06d2e",
+            "source_sha256": "51b12b6380e6cb09ee88619a3266d81287a15a93a8ca598435012c8e2ae06d2e"
+          },
+          "bin/libodinscripts.dylib.r1.p12735.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 12735,
+            "sha256": "83d5be2b8c58ec7569f4feb1afa7f0d65e71e587cb23b6d9b156f5dff5c885de",
+            "source_sha256": "83d5be2b8c58ec7569f4feb1afa7f0d65e71e587cb23b6d9b156f5dff5c885de"
+          },
+          "bin/libodinscripts_authoring_demo.dylib.r2.p12734.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 12734,
+            "sha256": "51b12b6380e6cb09ee88619a3266d81287a15a93a8ca598435012c8e2ae06d2e",
+            "source_sha256": "51b12b6380e6cb09ee88619a3266d81287a15a93a8ca598435012c8e2ae06d2e"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p12734.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 12734,
+            "sha256": "af7d987aecb1c45f0b53d127457fcc6666951a7298db956ba1c15b9666adcc1d",
+            "source_sha256": "af7d987aecb1c45f0b53d127457fcc6666951a7298db956ba1c15b9666adcc1d"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p12735.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 12735,
+            "sha256": "af7d987aecb1c45f0b53d127457fcc6666951a7298db956ba1c15b9666adcc1d",
+            "source_sha256": "af7d987aecb1c45f0b53d127457fcc6666951a7298db956ba1c15b9666adcc1d"
+          }
+        },
+        "prior_verified": {},
+        "removed_stale": [],
+        "contract": "Existing core/scripts_native.odin cleanup_stale_reload_copies; exact source binary/hash checked, actual PID names retained."
+      }
+    },
+    {
+      "framework": "replay",
+      "build": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-replay-authored-build-v3/report.json",
+        "sha256": "ecde3ef2cd2ad20ede3d36dd8081ff1fc7591e1700651fafd9a1fdc6de826824"
+      },
+      "build_log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-replay-authored-build-v3/build.log",
+        "sha256": "18d986a1d025a3bcf6591b153d312e483c6044138485c20e0255cb3604ecbc52"
+      },
+      "run": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/report.json",
+        "sha256": "bf84361a8d8b2b7eb6df6eb541a9d59f47d0b9a9800fc0ee3fd6a5b89a241c57"
+      },
+      "controller": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/controller.py",
+        "sha256": "8041ad8ceb111b91efa153b817bf5dfc03776910545b26aaf04482a5d08f2f55"
+      },
+      "import": {
+        "argv": [
+          "/Applications/Godot.app/Contents/MacOS/Godot",
+          "--headless",
+          "--editor",
+          "--path",
+          "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-build-v3/project",
+          "--quit-after",
+          "120"
+        ],
+        "actual_exit": 0,
+        "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/import.log",
+        "sha256": "77cb6a31e761b1cc26d90bdde19a599d7a2f7ca4923bf2537d73a1ae52cdd17e"
+      },
+      "current_runnable_sources_match": true,
+      "complete_views": {
+        "host": {
+          "manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/final-frame.json",
+          "sha256": "ff1ac904caa32816c26ccfff4cefa8636041ea522fec74325c9c2c7ccae32b17",
+          "parts": {
+            "Solver": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/Solver.bin",
+              "sha256": "44fb83ad1c0d2d1202283ad0ab5470446664fa5e85cdf951dc686c36b532ae10",
+              "bytes": 5909
+            },
+            "Game": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/Game.bin",
+              "sha256": "c8616afb5f009020ae63307b34366bb0fa86ee82b3d2630f715d508227e87c63",
+              "bytes": 116
+            },
+            "Side": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/Side.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "Observations": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/Observations.bin",
+              "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+              "bytes": 4
+            },
+            "Occurrences": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/Occurrences.bin",
+              "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+              "bytes": 4
+            }
+          }
+        },
+        "client": {
+          "manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/final-frame.json",
+          "sha256": "ff1ac904caa32816c26ccfff4cefa8636041ea522fec74325c9c2c7ccae32b17",
+          "parts": {
+            "Solver": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/Solver.bin",
+              "sha256": "44fb83ad1c0d2d1202283ad0ab5470446664fa5e85cdf951dc686c36b532ae10",
+              "bytes": 5909
+            },
+            "Game": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/Game.bin",
+              "sha256": "c8616afb5f009020ae63307b34366bb0fa86ee82b3d2630f715d508227e87c63",
+              "bytes": 116
+            },
+            "Side": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/Side.bin",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0
+            },
+            "Observations": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/Observations.bin",
+              "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+              "bytes": 4
+            },
+            "Occurrences": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/Occurrences.bin",
+              "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+              "bytes": 4
+            }
+          }
+        },
+        "all_five_byte_equal": true,
+        "ready": {
+          "host": {
+            "framework": "Replay",
+            "role": "host",
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "mode": "scripted",
+            "native_images": 1,
+            "event": "SAMPLE_READY"
+          },
+          "client": {
+            "framework": "Replay",
+            "role": "client",
+            "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+            "mode": "scripted",
+            "native_images": 1,
+            "event": "SAMPLE_READY"
+          }
+        },
+        "results": {
+          "host": {
+            "framework": "Replay",
+            "role": "host",
+            "ok": true,
+            "target": 120,
+            "head": 120,
+            "confirmed": 120,
+            "final_tick": 120,
+            "errors": [],
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 4,
+              "owners_after": 4,
+              "observed": true
+            },
+            "event": "SAMPLE_RESULT"
+          },
+          "client": {
+            "framework": "Replay",
+            "role": "client",
+            "ok": true,
+            "target": 120,
+            "head": 120,
+            "confirmed": 120,
+            "final_tick": 120,
+            "errors": [],
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 4,
+              "owners_after": 4,
+              "observed": true
+            },
+            "event": "SAMPLE_RESULT"
+          }
+        },
+        "authority_inputs": {
+          "framework": "Replay",
+          "role": "host",
+          "first": 1,
+          "last": 120,
+          "rows": 240,
+          "sample": 85,
+          "held": 35,
+          "local": 120,
+          "neutral": 0,
+          "nonzero": 194,
+          "event": "SAMPLE_INPUTS"
+        }
+      },
+      "actors": [
+        {
+          "role": "host",
+          "pid": 7501,
+          "actual_exit": 0,
+          "intake_drained": true,
+          "intake_error": null,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/host/godot.log",
+          "log_sha256": "187b06bda6d7c6f276c0c8fc83b4a2087aa1127bd967ce6d49296ce7580ea016",
+          "events": [
+            {
+              "framework": "Replay",
+              "role": "host",
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "mode": "scripted",
+              "native_images": 1,
+              "event": "SAMPLE_READY"
+            },
+            {
+              "framework": "Replay",
+              "role": "host",
+              "first": 1,
+              "last": 120,
+              "rows": 240,
+              "sample": 85,
+              "held": 35,
+              "local": 120,
+              "neutral": 0,
+              "nonzero": 194,
+              "event": "SAMPLE_INPUTS"
+            },
+            {
+              "framework": "Replay",
+              "role": "host",
+              "epoch": 1,
+              "tick": 120,
+              "complete": "8c3b2ed5d4344fcf99b0cfe5c1ed83da15d46a76ecb8e2e867a1fd38aed4591f",
+              "event": "SAMPLE_FINAL"
+            },
+            {
+              "framework": "Replay",
+              "role": "host",
+              "stage": "final_accepted",
+              "epoch": 1,
+              "tick": 120,
+              "signature_match": true,
+              "event": "SAMPLE_TAIL"
+            },
+            {
+              "framework": "Replay",
+              "role": "host",
+              "ok": true,
+              "target": 120,
+              "head": 120,
+              "confirmed": 120,
+              "final_tick": 120,
+              "errors": [],
+              "cleanup": {
+                "native": 0,
+                "wrapper": 0,
+                "meter": 0,
+                "owners": 0,
+                "owners_before": 4,
+                "owners_after": 4,
+                "observed": true
+              },
+              "event": "SAMPLE_RESULT"
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "pid": 7502,
+          "actual_exit": 0,
+          "intake_drained": true,
+          "intake_error": null,
+          "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-pair-v3/client/godot.log",
+          "log_sha256": "201eda2657000295b275ef9fa7b82a329a5f134e58d8cc23cccc1645603b334a",
+          "events": [
+            {
+              "framework": "Replay",
+              "role": "client",
+              "content_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+              "mode": "scripted",
+              "native_images": 1,
+              "event": "SAMPLE_READY"
+            },
+            {
+              "framework": "Replay",
+              "role": "client",
+              "first": 2,
+              "last": 120,
+              "rows": 238,
+              "sample": 85,
+              "held": 34,
+              "local": 119,
+              "neutral": 0,
+              "nonzero": 194,
+              "event": "SAMPLE_INPUTS"
+            },
+            {
+              "framework": "Replay",
+              "role": "client",
+              "epoch": 1,
+              "tick": 120,
+              "complete": "8c3b2ed5d4344fcf99b0cfe5c1ed83da15d46a76ecb8e2e867a1fd38aed4591f",
+              "event": "SAMPLE_FINAL"
+            },
+            {
+              "framework": "Replay",
+              "role": "client",
+              "stage": "close_accepted",
+              "epoch": 1,
+              "tick": 120,
+              "signature_match": true,
+              "event": "SAMPLE_TAIL"
+            },
+            {
+              "framework": "Replay",
+              "role": "client",
+              "stage": "close_accepted",
+              "epoch": 1,
+              "tick": 120,
+              "signature_match": true,
+              "event": "SAMPLE_TAIL"
+            },
+            {
+              "framework": "Replay",
+              "role": "client",
+              "ok": true,
+              "target": 120,
+              "head": 120,
+              "confirmed": 120,
+              "final_tick": 120,
+              "errors": [],
+              "cleanup": {
+                "native": 0,
+                "wrapper": 0,
+                "meter": 0,
+                "owners": 0,
+                "owners_before": 4,
+                "owners_after": 4,
+                "observed": true
+              },
+              "event": "SAMPLE_RESULT"
+            }
+          ]
+        }
+      ],
+      "native_identity": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-replay-authored-build-v3/project/bin/box3d-runtime.json",
+        "sha256": "d997c3ab2a6c1f6807b29ecebe348e279cc7832464086f4feec0331098e3248f"
+      },
+      "domain": {
+        "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+        "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+        "versions": [
+          1,
+          1,
+          3,
+          2,
+          1
+        ],
+        "pointer_bits": 64,
+        "endian": 1
+      },
+      "native_source_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+      "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+      "exact_module_copy_binding": {
+        "copies": {
+          "bin/libodinscripts_authoring_demo.dylib.r2.p7501.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 7501,
+            "sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748",
+            "source_sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748"
+          },
+          "bin/libodinscripts.dylib.r1.p7502.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 7502,
+            "sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7",
+            "source_sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7"
+          },
+          "bin/libodinscripts_authoring_demo.dylib.r2.p7502.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 7502,
+            "sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748",
+            "source_sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p7502.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 7502,
+            "sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787",
+            "source_sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p7501.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 7501,
+            "sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787",
+            "source_sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787"
+          },
+          "bin/libodinscripts.dylib.r1.p7501.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 7501,
+            "sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7",
+            "source_sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7"
+          }
+        },
+        "prior_verified": {
+          "bin/libodinscripts.dylib.r1.p4168.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 4168,
+            "sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7"
+          },
+          "bin/libodinscripts.dylib.r1.p4169.dylib": {
+            "source": "bin/libodinscripts.dylib",
+            "pid": 4169,
+            "sha256": "1d54db40c1ac920d7cdb5e4cdf0218f21c24bcde9ed2a89591ffbe10c0872ee7"
+          },
+          "bin/libodinscripts_authoring_demo.dylib.r2.p4168.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 4168,
+            "sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748"
+          },
+          "bin/libodinscripts_authoring_demo.dylib.r2.p4169.dylib": {
+            "source": "bin/libodinscripts_authoring_demo.dylib",
+            "pid": 4169,
+            "sha256": "c0ef177510302789f4773e8615ba21bbfe56f67e33a198dfb97ab2ce98281748"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p4168.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 4168,
+            "sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787"
+          },
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p4169.dylib": {
+            "source": "bin/libodinscripts_box3d_authoring_tools.dylib",
+            "pid": 4169,
+            "sha256": "6ac70dcd9b13752e861a075970c65309cabd1bc615e22a6354c935420cb42787"
+          }
+        },
+        "removed_stale": [
+          "bin/libodinscripts.dylib.r1.p4168.dylib",
+          "bin/libodinscripts.dylib.r1.p4169.dylib",
+          "bin/libodinscripts_authoring_demo.dylib.r2.p4168.dylib",
+          "bin/libodinscripts_authoring_demo.dylib.r2.p4169.dylib",
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p4168.dylib",
+          "bin/libodinscripts_box3d_authoring_tools.dylib.r3.p4169.dylib"
+        ],
+        "contract": "Existing core/scripts_native.odin cleanup_stale_reload_copies; exact source binary/hash checked, actual PID names retained."
+      }
+    }
+  ],
+  "shared_content_sha256": {
+    "ground.tres": "c72e1a308d609ea03ac4e1263ee4adc4867fef71b36da7c40cf1c6db0790ca5f",
+    "hinge.tres": "b242e2f58fa01d351a5c5d1713d5139c60a89df7b25f4ab616e116b7b2bc824e",
+    "pendulum.tres": "10031c686b838ae027487ba2a35bc00c6bfebaf3677fc517a06ac75f12c51795",
+    "player.tres": "be0341ac2e9b8aa588fdb9dd618f4b78010b973a2e78d21c90c4802ac2483359",
+    "sensor.tres": "d2396cd0cce900041056a4619f07beacdf7cdf3419acbaca077efd72e4860643",
+    "world.tscn": "a1b8ce7db7f289d330936b1f0f3ed8ba7407138c61e706ff84057e322b74d3bd"
+  },
+  "shared_runtime_bake_sha256": "0f5758790dc22fee4f2873fadbfda54443268a16c5e640e6ca6dd2d7d9218cbd",
+  "documentation_checks": {
+    "local_links": [
+      "docs/box3d-authoring.md",
+      "docs/design/box3d/samples.md",
+      "docs/design/box3d/migration.md"
+    ],
+    "controller_python_syntax": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "source_scope": "Selected assigned sample/controller/docs snapshot; actual controller copied+hashed at launch, runnable source compared to build snapshots, not exact compiler import tracing.",
+  "completion_source_hashes": {
+    "README.md": "143e521e00e03b02a6f7bd39cf9c55e05bc8558ec530713028ee27c2d0faeea5",
+    "docs/box3d-authoring.md": "4385768e9aa7083efc5f99b3a1aaac18fa6f46481ae10719051d89e723fba803",
+    "docs/design/box3d/migration.md": "9faf3b4bcc7407a1b1554658bc1a5e26c60cd1125418b7497607960694b8731b",
+    "docs/design/box3d/samples.md": "ebfdf660113314f26c2ee5f98dfdd41ca16301ca59b90d2fd1afaeb50203fec1",
+    "examples/box3d_authoring_shared/content/ground.tres": "c72e1a308d609ea03ac4e1263ee4adc4867fef71b36da7c40cf1c6db0790ca5f",
+    "examples/box3d_authoring_shared/content/hinge.tres": "b242e2f58fa01d351a5c5d1713d5139c60a89df7b25f4ab616e116b7b2bc824e",
+    "examples/box3d_authoring_shared/content/pendulum.tres": "10031c686b838ae027487ba2a35bc00c6bfebaf3677fc517a06ac75f12c51795",
+    "examples/box3d_authoring_shared/content/player.tres": "be0341ac2e9b8aa588fdb9dd618f4b78010b973a2e78d21c90c4802ac2483359",
+    "examples/box3d_authoring_shared/content/sensor.tres": "d2396cd0cce900041056a4619f07beacdf7cdf3419acbaca077efd72e4860643",
+    "examples/box3d_authoring_shared/content/world.tscn": "a1b8ce7db7f289d330936b1f0f3ed8ba7407138c61e706ff84057e322b74d3bd",
+    "examples/box3d_authoring_shared/interface.md": "5f4b0068dfd28ed11ea285060f4adaa219741060bdcbf912a997ededfbd853d9",
+    "examples/box3d_authoring_shared/prepare.py": "9c7fe275b6cb5fad3afe6280f4ac74c06775088b76e2787bf969abae14918912",
+    "examples/box3d_authoring_shared/view.gd": "a3996f89b2d8bea00965a379c73bbf5652da30787eb760d26ec4df4b2b71ebc8",
+    "examples/box3d_authoring_shared/visuals.tscn": "e299923db3dab92fd3fcb205d9de8f1f942199a1c73631a23a199bcf01f94ac9",
+    "examples/kit_box3d_authoring/README.md": "db0f1ae2d1c695dd3fe9255a17038b585df107431b9b096bb4b779f7b8b78855",
+    "examples/kit_box3d_authoring/content/ground.tres": "c72e1a308d609ea03ac4e1263ee4adc4867fef71b36da7c40cf1c6db0790ca5f",
+    "examples/kit_box3d_authoring/content/hinge.tres": "b242e2f58fa01d351a5c5d1713d5139c60a89df7b25f4ab616e116b7b2bc824e",
+    "examples/kit_box3d_authoring/content/pendulum.tres": "10031c686b838ae027487ba2a35bc00c6bfebaf3677fc517a06ac75f12c51795",
+    "examples/kit_box3d_authoring/content/player.tres": "be0341ac2e9b8aa588fdb9dd618f4b78010b973a2e78d21c90c4802ac2483359",
+    "examples/kit_box3d_authoring/content/sensor.tres": "d2396cd0cce900041056a4619f07beacdf7cdf3419acbaca077efd72e4860643",
+    "examples/kit_box3d_authoring/content/world.tscn": "a1b8ce7db7f289d330936b1f0f3ed8ba7407138c61e706ff84057e322b74d3bd",
+    "examples/kit_box3d_authoring/main.tscn": "d690d0c163f7def5267650d08353d413d55c1cd1fd9d9db87b55afaad48258db",
+    "examples/kit_box3d_authoring/modules/authoring_demo/demo.odin": "e6b26ac712f582615e63bbf087b229bfcad10f80f204cd8054b782e7c20ba3f9",
+    "examples/kit_box3d_authoring/modules/authoring_demo/images_darwin.odin": "232d7f729f8d8782d720529c6ef13f51872718f94b50db0eace8646554189b16",
+    "examples/kit_box3d_authoring/modules/authoring_demo/images_linux.odin": "9860ea7720b8b4bfa74cfa07fe2bf7b030ad405b239382d0fc13ed58048c04d5",
+    "examples/kit_box3d_authoring/modules/authoring_demo/model.odin": "22e3ddf02865b211af20cf23b55a8631bfbb67b4418a5599ce1218324b4d80ca",
+    "examples/kit_box3d_authoring/modules/authoring_demo/runtime.odin": "8d6196c39fb3a55cd2965860d56dfbb3eefbddda58957e7e11716cde1815e24a",
+    "examples/kit_box3d_authoring/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "examples/kit_box3d_authoring/project.godot": "5b2223b32c0f750168403b18f5be01b92a0f841565eeba0e2124b125fdf3c0cc",
+    "examples/kit_box3d_authoring/scripts/boot.odin": "bb51c472e336d990bb2f61f8b7262b52db82a1e07e0d3a2a36c718df076d6dd1",
+    "examples/kit_box3d_authoring/view.gd": "f5de96b8697f4d033aa8fabbeceb91ba8b91984cf8b1b07d442e0b8976979276",
+    "examples/replay_box3d_authoring/README.md": "a92bbd24f89aea86b5945679946284aac91a5c235100b356023a818bbcf5ae1d",
+    "examples/replay_box3d_authoring/content/ground.tres": "c72e1a308d609ea03ac4e1263ee4adc4867fef71b36da7c40cf1c6db0790ca5f",
+    "examples/replay_box3d_authoring/content/hinge.tres": "b242e2f58fa01d351a5c5d1713d5139c60a89df7b25f4ab616e116b7b2bc824e",
+    "examples/replay_box3d_authoring/content/pendulum.tres": "10031c686b838ae027487ba2a35bc00c6bfebaf3677fc517a06ac75f12c51795",
+    "examples/replay_box3d_authoring/content/player.tres": "be0341ac2e9b8aa588fdb9dd618f4b78010b973a2e78d21c90c4802ac2483359",
+    "examples/replay_box3d_authoring/content/sensor.tres": "d2396cd0cce900041056a4619f07beacdf7cdf3419acbaca077efd72e4860643",
+    "examples/replay_box3d_authoring/content/world.tscn": "a1b8ce7db7f289d330936b1f0f3ed8ba7407138c61e706ff84057e322b74d3bd",
+    "examples/replay_box3d_authoring/main.tscn": "d690d0c163f7def5267650d08353d413d55c1cd1fd9d9db87b55afaad48258db",
+    "examples/replay_box3d_authoring/modules/authoring_demo/demo.odin": "943a045a8a246ba6b3c86c4de0b3baaad41dcbb4bb836a7b16b462f182a121cd",
+    "examples/replay_box3d_authoring/modules/authoring_demo/evidence.odin": "c27cc1b09c3091a62e38aadb1effa396a42c63ada72814cfd406fcb8ddf3f981",
+    "examples/replay_box3d_authoring/modules/authoring_demo/images_darwin.odin": "36b8fc9f8ef111f57a8449c14b7ccda1c7b0d1ac9cfdb62c598ee4a693506415",
+    "examples/replay_box3d_authoring/modules/authoring_demo/images_linux.odin": "4c0625ba14e16b039ebe6ff70d0dbdf938e22d1424a47cf36eb829ccb01fd48a",
+    "examples/replay_box3d_authoring/modules/authoring_demo/model.odin": "69c5f51873999393bb2f2de03fde0013f81a106267e914beaafdac8c2cb3ecc6",
+    "examples/replay_box3d_authoring/modules/authoring_demo/process.odin": "278620bfc83b08cb581a80f2503f6af31639736b3d9571c8929211858f5aa81d",
+    "examples/replay_box3d_authoring/modules/authoring_demo/startup.odin": "9f1742c3f629cfd8738d34730401e3ff41f4c62c987d9202af9a6dcc09bcec11",
+    "examples/replay_box3d_authoring/modules/authoring_demo/terminal.odin": "495ce280bacacee59c773340abe5ccf70f9c8d25d0afa1404b1ab24eff3d8879",
+    "examples/replay_box3d_authoring/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "examples/replay_box3d_authoring/project.godot": "1b812435a2aeac27b2e69146eadfe0fdb33895f01daccd38943165bfde91b20f",
+    "examples/replay_box3d_authoring/scripts/boot.odin": "34ccf6cbb6804bd23603d476691bd12d38fbabb84928040466e1983027e701b3",
+    "examples/replay_box3d_authoring/view.gd": "f5de96b8697f4d033aa8fabbeceb91ba8b91984cf8b1b07d442e0b8976979276",
+    "tests/box3d_samples/run.py": "8041ad8ceb111b91efa153b817bf5dfc03776910545b26aaf04482a5d08f2f55"
+  },
+  "prior_failures_preserved": [
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-build-v1/report.json",
+      "sha256": "d77517acc7f60009b23eccf55ad8a214ff5c0ba2158f404ea15507987a56a095"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-build-v2/report.json",
+      "sha256": "073974bbc520b049c1ed5979abbfcde3ca3624e41d10eb96a84750ff7a925c30"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-replay-authored-build-v1/report.json",
+      "sha256": "f7479081fa5e222ed1e1529f33156156123fb5365fa9f1741a03b8e2a11f775c"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v2/report.json",
+      "sha256": "5bedd88c00dc2a1753b2bd3bbeec7f0dd5061c918a0699da35b4fc734caccab6"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v3/report.json",
+      "sha256": "ad1a86dd1a1a201d9fea7120c7a7915047cfb9f42e6f144ded9ba3a9eb139d99"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-replay-authored-pair-v1/report.json",
+      "sha256": "0189440b9a666c8567b906aa6857ac1aba1207b44e7e401e38afbbac0d9f513a"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v6/report.json",
+      "sha256": "02028718b1729b77aacc3848080381ec0dc693af9136522e7cc9279377de012e"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v7/report.json",
+      "sha256": "b9bf2aa50bc6e2c16320a9f26a81ac7b607ef940091a249dc7e88c4f1415a0ea"
+    },
+    {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-kit-authored-pair-v1/failure-readback-v1.json",
+      "sha256": "da663ef8d4248534541fbb810ea8deb73e50d7e2e2b50ced1c52e149eb8e14b1"
+    }
+  ],
+  "non_actor_preflight": "t95 launched before build record existed; no game process started; terminal traceback retained, not a sample result.",
+  "native_reuse": "Motion NativeV2 unchanged; no Native/Core/pin/FP/cap/protocol source changes.",
+  "limits": [
+    "Bounded same-build/same-target functional120ticks; no long-soak/performance ceiling claim.",
+    "Actual SDK script module copies/PIDs/hashes and stale loader sweep explicitly bound; no PID normalization or base-binary/source waiver.",
+    "Headless run is not a manual visual/usability proof.",
+    "Owner cleanup is an observed sample delta, not an assumed global0.",
+    "No Linux/exportGateC/whole-goal completion claim from these macOS runs."
+  ],
+  "whole_goal_complete": false
+}

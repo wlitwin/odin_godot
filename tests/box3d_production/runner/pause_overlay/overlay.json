@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "autoload_name": "Box3DProductionPause",
+  "script": "production_pause.gd",
+  "project_settings": {"application/run/flush_stdout_on_print": true},
+  "scope": "test-only live stdout flushing for every production case; optional exact self-stop/live host-boundary instrumentation; no simulation or protocol"
+}

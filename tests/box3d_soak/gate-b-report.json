@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "status": "GATE_B_BOUNDED_REFERENCE_PASS",
+  "scope": "P4.4/GateB bounded macOS arm64 candidate only; all36-board goal NOT complete",
+  "requirements": [
+    {
+      "requirement": "Both sibling primary clean and impaired long fixed-seed pairs, exact full5/action/FX/intake/cleanup",
+      "status": "PROVEN_FOR_RECORDED_BOUNDED_GRAPHS",
+      "evidence": [
+        "kit_impaired",
+        "kit_clean",
+        "replay_impaired",
+        "replay_clean"
+      ]
+    },
+    {
+      "requirement": "Current wire2 Kit atomic signature/accepted confirmation, mismatch reset, receipt is not actionACK, rejects malformed/stale/foreign",
+      "status": "PROVEN_FOCUSED8_AND_LIVE",
+      "evidence_path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-world-v2-clean-public-tests-v1/report.json"
+    },
+    {
+      "requirement": "Second-seed deeper-than8 recovery/lifecycle",
+      "status": "PROVEN_DECLARED_SCOPES",
+      "evidence": [
+        "kit_intentional_reset",
+        "replay_current_lifecycle"
+      ],
+      "limits": "Kit actual intentional canonical Reset; Replay same-scope fact catchup16 ticks. No claim that ordinary catchup must reset. Canonical late/rejoin Welcome separately covered; exhaustive history-exhaustion hardening remains P6."
+    },
+    {
+      "requirement": "Late observer and real reconnect with admitted new identity/finalACK/cleanup",
+      "status": "PROVEN_DECLARED_SCOPES",
+      "evidence": [
+        "kit_reconnect",
+        "kit_observer",
+        "replay_current_lifecycle"
+      ],
+      "limits": "Kit exit390 was declared at retained comparison boundary; arbitrary exit coverage not claimed. Replay original exit400 current strict+raw rolling passes."
+    },
+    {
+      "requirement": "H128/60Hz/4substeps/pred8/repair8/count envelopes/global64MiB tracked",
+      "status": "PROVEN_CANDIDATE_LIMITS",
+      "evidence": [
+        "kit_cpu",
+        "replay_current_cpu_raw",
+        "kit_impaired",
+        "replay_impaired"
+      ],
+      "limits": "Final CPU source/3bin postfences verified, actual tracked peak<=64MiB. No cap increase."
+    },
+    {
+      "requirement": "Original normal and eligible8 whole-call4ms on declared Dense/Common workloads, full mandatory operation, all raw retained",
+      "status": "PROVEN_DECLARED_CURRENT_CPU_WORKLOADS",
+      "evidence": [
+        "kit_cpu",
+        "replay_current_cpu_raw",
+        "replay_current_cpu_seals"
+      ],
+      "limits": "Four required Replay streams19each independently meet4ms with full provenance; no percentile pooling or individual-report relabelling. Kit six streams114calls remain separately proven. Historical8.894ms artifact staysFAILED; no causal fix claim."
+    },
+    {
+      "requirement": "Requested/staging memory and OS RSS kept distinct",
+      "status": "PROVEN_WITH_LABELLED_SCOPE",
+      "evidence": [
+        "kit_cpu",
+        "replay_current_cpu_raw",
+        "kit_impaired",
+        "kit_clean",
+        "replay_impaired",
+        "replay_clean"
+      ],
+      "limits": "RSS sampled whole Godot process, not exact highwater and not part of64MiB requested quota; values below."
+    },
+    {
+      "requirement": "Native build/target/one shared image, Source/binary/project/driver provenance",
+      "status": "PROVEN_PER_ACTUAL_BUILD_AND_RUN",
+      "evidence": [
+        "kit_cpu",
+        "replay_current_cpu_raw",
+        "kit_impaired",
+        "replay_impaired",
+        "replay_current_cpu_seals"
+      ],
+      "limits": "One immutable shared NativeOFFddff across candidate evidence. No same-target/cross-platform determinism extrapolation."
+    },
+    {
+      "requirement": "Historical failures, optional diagnostics and abandoned prototype cleanup",
+      "status": "PROVEN_RETAINED_AND_PRODUCTION_RETIRED",
+      "limits": "Original failures and raw artifacts retained. Kit Fine/Holder/checkedSend/old observers removed; temporary Meter/schema/allocator traces restored; shared Core ordinaryABI1. No new messaging to Opus."
+    }
+  ],
+  "references": {
+    "kit_cpu": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-world-v2-cpu-closure-v1/report.json",
+      "sha256": "5ebb7de582209c98c793f107963433e2b65edccb5bbc93eedc9f01d277c7367e"
+    },
+    "replay_current_cpu_raw": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/replay-current-off-cpu-acceptance-v1/report.json",
+      "sha256": "29211b0728dbaa426b221f4646621dfc686e57ee3a25aa4763555ef17b98fb78"
+    },
+    "kit_impaired": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-world-protocol-v2-clean-impaired-long-v1/report.json",
+      "sha256": "15f851a0e451161a0a3b4ebea3f0ca9efabab8c267b48dd255a2f9d20883906b"
+    },
+    "kit_impaired_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-world-protocol-v2-clean-impaired-long-v1/long-coverage-audit.json",
+      "sha256": "007defa8445d647f194ecffdc4774ad32a3947ff0296ebda73e2deb7854a0626"
+    },
+    "kit_clean": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-world2-noimpair-long-v1/report.json",
+      "sha256": "1e1b98923e54933312942b08aab77b55cc7de952a13ad6dd4d7806dd9151fee5"
+    },
+    "kit_clean_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-world2-noimpair-long-v1/long-coverage-audit.json",
+      "sha256": "76dc8cc358bf47b8fb18155e8a09463268e4902d9b6c39ddd50fe30a377bcc80"
+    },
+    "replay_impaired": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-coalesced-final-impaired-long-v1/report.json",
+      "sha256": "6d8dc5c2e2c9b71d8e22dc928d2a6d9aa939fdcc4b23bf681e92ea60529406fd"
+    },
+    "replay_impaired_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-coalesced-final-impaired-long-v1/long-coverage-audit.json",
+      "sha256": "0749853e6f274858683b3e2f1957687324a0a88ce0ebe7ac919251fe71e992a1"
+    },
+    "replay_clean": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-coalesced-final-clean-long-v1/report.json",
+      "sha256": "0b8b147743125d3788888a37b5b5ab948219fb13eb657c3bdb46ee8dd9eb4cb5"
+    },
+    "replay_clean_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-coalesced-final-clean-long-v1/long-coverage-audit.json",
+      "sha256": "ed08791be1afbb006461f97f4ff043217a44dd9e160f72a8d847e42dc732f1f6"
+    },
+    "replay_current_lifecycle": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/replay-final-current-lifecycle-closure-v1/report.json",
+      "sha256": "ea34efa030ecf55658f732b9ccb9acf61564986e0e70bc76fedb913de9c99f1e"
+    },
+    "kit_reconnect": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/lifecycle-kit-reconnect-seed42-exit390-v2/report.json",
+      "sha256": "183a70e0db9d7d03cbfad404ee09ea7edbf994680ecad419706d7232ecba918b"
+    },
+    "kit_observer": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/lifecycle-kit-late-observer-seed42-v2/report.json",
+      "sha256": "8d7544cf527b17b711fde55085ff9ff404b2a6397dd926b25a88a2306f2a991e"
+    },
+    "kit_intentional_reset": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/lifecycle-kit-reset-qualified-seed42-v1/intentional-reset-classification.json",
+      "sha256": "dbf34809731dca8cd5c3b65a8f91f3be3321bc0ca1aafe0b3f0b7f0c64c8f3b6"
+    },
+    "replay_current_cpu_seals": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/current-off-cpu-four-seals-v1.json",
+      "sha256": "572d00d459bdd48b1d31fcbb7e7920a55a151d5492a191af1035bcc36b200df4"
+    },
+    "kit_world_public8": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-world-v2-clean-public-tests-v1/report.json",
+      "sha256": "351899d52477e4f0726e64a7d3ca97f95bcd2b5d9cb9a31bec32e650f5560703"
+    }
+  },
+  "long_cases": [
+    {
+      "case": "kit_impaired",
+      "seconds": 610.0597194577567,
+      "cycles": {
+        "consecutive_after_last_gap": 152,
+        "denominator": 152,
+        "verified": 152
+      },
+      "full5": 1220,
+      "joins": 1069,
+      "gaps": 0
+    },
+    {
+      "case": "kit_clean",
+      "seconds": 610.1257942919619,
+      "cycles": {
+        "consecutive_after_last_gap": 152,
+        "denominator": 152,
+        "verified": 152
+      },
+      "full5": 1220,
+      "joins": 1069,
+      "gaps": 0
+    },
+    {
+      "case": "replay_impaired",
+      "seconds": 609.8589047090001,
+      "cycles": {
+        "consecutive_after_last_gap": 152,
+        "denominator": 152,
+        "verified": 152
+      },
+      "full5": 20841,
+      "joins": 1069,
+      "gaps": 0
+    },
+    {
+      "case": "replay_clean",
+      "seconds": 609.5907765,
+      "cycles": {
+        "consecutive_after_last_gap": 152,
+        "denominator": 152,
+        "verified": 152
+      },
+      "full5": 12107,
+      "joins": 1069,
+      "gaps": 0
+    }
+  ],
+  "rss": {
+    "kit_impaired": {
+      "client": {
+        "sampled_rss_peak_bytes": 265568256,
+        "rss_samples": 603,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      },
+      "host": {
+        "sampled_rss_peak_bytes": 288276480,
+        "rss_samples": 603,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      }
+    },
+    "kit_clean": {
+      "client": {
+        "sampled_rss_peak_bytes": 270761984,
+        "rss_samples": 602,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      },
+      "host": {
+        "sampled_rss_peak_bytes": 266616832,
+        "rss_samples": 602,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      }
+    },
+    "replay_impaired": {
+      "client": {
+        "sampled_rss_peak_bytes": 320159744,
+        "rss_samples": 603,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      },
+      "host": {
+        "sampled_rss_peak_bytes": 314982400,
+        "rss_samples": 603,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      }
+    },
+    "replay_clean": {
+      "client": {
+        "sampled_rss_peak_bytes": 347357184,
+        "rss_samples": 602,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      },
+      "host": {
+        "sampled_rss_peak_bytes": 428081152,
+        "rss_samples": 602,
+        "rss_unavailable": 0,
+        "rss_scope": "sampled OS ps residentKiB*1024; whole Godot process, NOT requested-byte quota or exact highwater"
+      }
+    }
+  },
+  "current_native": "shared NativeOFFddff Release d7e5657a9f7fe7c20a7b7345b343f29ae65c436fdbeb56a09dbe43e6499aaee0",
+  "current_cpu_max_ns": {
+    "normal-a": 325000,
+    "normal-b": 1591000,
+    "dense-repair": 3348000,
+    "common-repair": 3180000
+  },
+  "historical_dense_fail_ns": 8894000,
+  "source_of_old_spike": "UNKNOWN; no fix attribution",
+  "remaining_after_GateB": [
+    "P5 authoring/GateC",
+    "P6 export/CI/long-memory/window-exhaustion/security/release/mobile evaluation"
+  ],
+  "no_goal_completion_claim": true,
+  "gate_b_passed": true,
+  "completion_audit": "All stated P4.4 candidate requirements mapped above; no unverified CPU/source/cleanup item remains within this bounded profile.",
+  "current_replay_cpu_coverage": {
+    "required": [
+      "('normal', 'authority_step_requested_canonical', 'dense32_boxes_extra_sphere')",
+      "('normal', 'client_prediction_send', 'dense32_boxes_extra_sphere')",
+      "('repair8', None, 'common32_spheres_crates_extra_capsule')",
+      "('repair8', None, 'dense32_boxes_extra_sphere')"
+    ],
+    "actual": [
+      "('normal', 'authority_step_requested_canonical', 'dense32_boxes_extra_sphere')",
+      "('normal', 'client_prediction_send', 'dense32_boxes_extra_sphere')",
+      "('repair8', None, 'common32_spheres_crates_extra_capsule')",
+      "('repair8', None, 'dense32_boxes_extra_sphere')"
+    ],
+    "counts": {
+      "normal": 38,
+      "repair8": 38,
+      "total_raw_calls": 76,
+      "normal_kinds": [
+        "client_prediction_send",
+        "authority_step_requested_canonical"
+      ],
+      "normal_profiles": [
+        "dense32_boxes_extra_sphere"
+      ],
+      "repair_profiles": [
+        "dense32_boxes_extra_sphere",
+        "common32_spheres_crates_extra_capsule"
+      ],
+      "per_stream_plan": "19 one-category samples; analyzer retains category coverage INCOMPLETE",
+      "not_inferred": "Common normal, alternate workload/platform/ENet performance and signed-fact-burst CPU are not measured by these four streams"
+    },
+    "individual_category_reports": "INCOMPLETE retained; this explicit coverage proof does not rewrite them"
+  },
+  "limitations": [
+    "Native macOS arm64 reference/Odin speed+debug/NativeOFF Release, exact build+target only. No cross-platform exact physics or nativeLinux throughput claim.",
+    "Bounded32 initial dynamics/35body-shape/147contacts/onehinge/H128/pred8/repair8/64MiB tracked. No unconditional100/500body60Hz or total render-frame guarantee.",
+    "Kit lifecycle proves declared exit390/reset/lateobserver; arbitrary exit/window exhaustion hardening remainsP6. Replay current exit400/lateobserver/same-scope16tick fact catchup are explicit.",
+    "CPU observed final-artifact samples meet unchanged4ms. Older artifact8.894ms remains failed/causeunknown. One ON diagnostic excluded. Common normal and signed-fact-burst CPU not inferred from the declared Replay four-stream suite.",
+    "All historical raw failure artifacts and reporting mistakes retained; no source/validator/metric waivers used to obtain this pass."
+  ],
+  "full_board_goal_complete": false,
+  "remaining_board_tasks": 11
+}

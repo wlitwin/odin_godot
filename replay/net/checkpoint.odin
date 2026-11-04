@@ -12,6 +12,7 @@ MAX_CHECKPOINT_BYTES :: 1024 * 1024
 // runtime callbacks, connections, presentation history, and allocators are never
 // serialized. Copying a live Checkpoint would alias allocations: use by pointer.
 Checkpoint :: struct($State, $Control, $Action: typeid, $Seats: int) {
+ lifetime:Container_Lifetime, // runtime only; never encoded
 	allocator: mem.Allocator,
 	ready: bool,
 	header: Checkpoint_Header,
@@ -25,6 +26,9 @@ Checkpoint :: struct($State, $Control, $Action: typeid, $Seats: int) {
 	outcomes: [dynamic]Checkpoint_Outcome,
 	banned: [dynamic][32]u8,
 	policy_data: []u8,
+	// Complete mode owns canonical solver/provider bytes independently of the source runtime.
+	complete: Complete_Data,
+	complete_charge: u64,
 }
 
 Checkpoint_Header :: struct {
@@ -83,29 +87,56 @@ server_set_local_token :: proc(s: ^Server($S, $C, $A, $E, $N), token: Token) -> 
 // Looks up an existing playable reservation. The archive stores a digest, never
 // the bearer token; a local save keeps that credential in a separate profile file.
 checkpoint_seat :: proc(cp: ^Checkpoint($S, $C, $A, $N), token: Token) -> (seat: u16, found: bool) {
+ if container_access(&cp.lifetime)!=.None{return 0,false}
 	if !cp.ready || !token_valid(token) {return 0, false}
 	hash := token_digest(token)
 	for peer in cp.peers {if !peer.spectator && peer.token_hash == hash {return peer.seat, true}}
 	return 0, false
 }
 
-checkpoint_destroy :: proc(cp: ^Checkpoint($S, $C, $A, $N)) {
-	delete(cp.peers); delete(cp.actions); delete(cp.inputs); delete(cp.outcomes); delete(cp.banned)
-	delete(cp.policy_data, cp.allocator)
-	cp^ = {}
+checkpoint_destroy :: proc(cp: ^Checkpoint($S, $C, $A, $N))->Error {
+ if error:=container_access(&cp.lifetime);error!=.None{return error}
+ life:=cp.lifetime
+ if !life.cleanup {
+  cp.ready=false
+  delete(cp.peers);delete(cp.actions);delete(cp.inputs);delete(cp.outcomes);delete(cp.banned)
+  delete(cp.policy_data,cp.allocator)
+  if cp.complete_charge!=0 && cp.complete._release!=nil{cp.complete._release(cp.complete._catalog,cp.complete_charge);cp.complete_charge=0}
+  if error:=complete_data_destroy(&cp.complete);error!=.None{
+   // Payload arrays are already retired; preserve only the remaining byte owner.
+   cp.peers=nil;cp.actions=nil;cp.inputs=nil;cp.outcomes=nil;cp.banned=nil;cp.policy_data=nil;return error
+  }
+ }
+ cp^={}
+ if error:=container_drop(&life);error!=.None{life.cleanup=true;cp.lifetime=life;return error}
+ return .None
 }
 
 checkpoint_capture :: proc(s: ^Server($S, $C, $A, $E, $N), cp: ^Checkpoint(S, C, A, N),
                            policy_id: u64 = 0, policy_data: []u8 = nil, allocator := context.allocator) -> Error {
+ if error:=server_access(s);error!=.None{return error}
+ if error:=container_access(&cp.lifetime);error!=.None{return error}
 	if !s.initialized || s.timeline.busy || !checkpoint_empty(cp) {return .Wrong_Phase}
+	if s.model.complete_state != (s.physics!=nil) || r.external_enabled(&s.timeline)!=s.model.complete_state {return .Incomplete_State}
 	if (s.admission != nil) != (policy_id != 0) || len(policy_data) > 65536 {return .Checkpoint_Policy}
 	if policy_id == 0 && len(policy_data) != 0 {return .Checkpoint_Policy}
 	for peer in s.peers {
 		if peer.phase == .Vacant {continue}
 		if !hash_present(peer.token_hash) {return .Invalid_Checkpoint}
 	}
+ if s.model.complete_state {
+  if error:=container_acquire(&cp.lifetime,s.model.complete_codec.ownership,allocator,s.model.complete_codec.catalog,#config(BOX3D_REQUIRE_DOMAIN,false));error!=.None{checkpoint_destroy(cp);return error}
+ }
+ committed_owner:=false;defer if !committed_owner{checkpoint_destroy(cp)}
 	cp.allocator = allocator
-	cp.frame, _ = r.current(&s.timeline)
+	if s.physics!=nil {
+		bytes:=u64(size_of(Checkpoint(S,C,A,N)))+u64(MAX_PEERS)*(u64(size_of(Checkpoint_Peer))+u64(ACTION_CAPACITY)*(u64(size_of(Checkpoint_Action(A)))+u64(size_of(Checkpoint_Outcome)))+u64(s.cfg.max_future)*u64(size_of(Checkpoint_Input(C))))+u64(s.banned_count)*32+u64(len(policy_data))
+		if bytes>8*1024*1024 {return .Capacity}
+		if error:=s.model.complete_codec.reserve(s.model.complete_codec.catalog,bytes);error!=.None{return error}
+		cp.complete_charge=bytes
+		cp.complete._release=s.model.complete_codec.release;cp.complete._catalog=s.model.complete_codec.catalog
+	}
+	cp.frame, _ = r.current_values(&s.timeline)
 	cp.header = {version = CHECKPOINT_VERSION, protocol = PROTOCOL_VERSION, content = s.cfg.content,
 	             epoch = s.cfg.epoch, contract = s.contract, generation = s.generation,
 	             tick = cp.frame.tick, local_seat = s.local_seat, joins = s.joins, leaves = s.leaves,
@@ -138,16 +169,34 @@ checkpoint_capture :: proc(s: ^Server($S, $C, $A, $E, $N), cp: ^Checkpoint(S, C,
 	copy(cp.policy_data, policy_data)
 	cp.header.peers, cp.header.actions, cp.header.outcomes, cp.header.bans = u16(len(cp.peers)), u16(len(cp.actions)), u16(len(cp.outcomes)), u16(len(cp.banned))
 	cp.header.inputs, cp.header.policy_bytes = u32(len(cp.inputs)), u32(len(cp.policy_data))
+	if s.physics!=nil {
+		image,error:=r.capture_complete(&s.timeline,s.timeline.head,allocator)
+		if error!=.None {return .Simulation}
+		receipts,receipt_error:=physics_receipts_encode(s,allocator)
+		if receipt_error!=.None {r.complete_checkpoint_destroy(&image);return receipt_error}
+		defer complete_data_destroy(&receipts)
+		data,encode_error:=complete_encode(s.model.complete_codec,&image,.Archive,receipts.bytes,&s.physics.schemas.state,&s.physics.schemas.occurrence,allocator)
+		r.complete_checkpoint_destroy(&image)
+		if encode_error!=.None {return encode_error}
+		cp.complete=data
+	}
 	cp.ready = true
-	if !checkpoint_valid(cp, s.model) {checkpoint_destroy(cp); return .Invalid_Checkpoint}
+	if !checkpoint_valid(cp, s.model) { return .Invalid_Checkpoint}
+ committed_owner=true
 	return .None
+
 }
 
 // Validation happens before changing the destination server. The checkpoint's
 // settings are restored exactly; callers may explicitly retune afterward.
 server_restore :: proc(s: ^Server($S, $C, $A, $E, $N), cp: ^Checkpoint(S, C, A, N),
                        model: Model(S, C, A, E, N), wire: tr.Transport, options: Resume_Options,
-                       allocator := context.allocator) -> Error {
+                       allocator := context.allocator,ownership:Runner_Ownership={}) -> Error {
+ if error:=container_access(&cp.lifetime);error!=.None{return error}
+ if error:=runner_context_check(ownership,allocator,&s.model,model.complete_state);error!=.None{return error}
+ if error:=model_context_check(model,runner_managed(ownership));error!=.None{return error}
+ if error:=owned_context_check(ownership.admission,options.admission_user,runner_managed(ownership));error!=.None{return error}
+	if model.complete_state && !complete_codec_valid(model.complete_codec) {return .Incomplete_State}
 	if s.initialized || !checkpoint_valid(cp, model) {return .Invalid_Checkpoint}
 	if options.epoch <= cp.header.epoch || int(options.local_seat) > N {return .Invalid_Config}
 	if cp.header.policy_id != options.policy_id || (options.admission != nil) != (cp.header.policy_id != 0) {return .Checkpoint_Policy}
@@ -159,7 +208,13 @@ server_restore :: proc(s: ^Server($S, $C, $A, $E, $N), cp: ^Checkpoint(S, C, A, 
 	if !found_local {return .Invalid_Input}
 	cfg := checkpoint_config(cp.header, cp.settings)
 	cfg.epoch = options.epoch
-	if err := server_init(s, cp.frame, model, wire, cfg, allocator = allocator, permit = options.permit); err != .None {return err}
+	if model.complete_state {
+		image,error:=checkpoint_complete_image(cp,model,allocator)
+		if error!=.None{return error};defer r.complete_checkpoint_destroy(&image)
+		image.epoch=options.epoch
+		for &event in image.events {event.id.epoch=options.epoch}
+		if error:=server_init_complete(s,&image,model,wire,cfg,allocator=allocator,permit=options.permit,ownership=ownership);error!=.None{return error}
+	} else if err := server_init(s, cp.frame, model, wire, cfg, allocator = allocator, permit = options.permit,ownership=ownership); err != .None {return err}
 	if s.contract != cp.header.contract {server_destroy(s); return .Checkpoint_Contract}
 	s.local_seat, s.generation = options.local_seat, cp.header.generation
 	s.locked, s.banned_count = cp.header.locked, len(cp.banned)
@@ -198,6 +253,7 @@ server_restore :: proc(s: ^Server($S, $C, $A, $E, $N), cp: ^Checkpoint(S, C, A, 
 			s.inputs[int(saved.peer) * cfg.history + int(saved.tick % u64(cfg.history))] = {saved.tick, saved.value, saved.view}
 		}
 	}
+	if model.complete_state {inspection,_:=complete_inspect(cp.complete.bytes,model.complete_codec.identity,cp.header.epoch);physics_receipts_restore(s,inspection.metadata)}
 	for saved in cp.outcomes {
 		peer := &s.peers[saved.peer]
 		peer.recent[peer.recent_count] = saved.outcome
@@ -212,7 +268,14 @@ checkpoint_valid :: proc(cp: ^Checkpoint($S, $C, $A, $N), model: Model(S, C, A, 
 
 @(private)
 checkpoint_valid_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),model:Model(S,C,A,$E,N),protocol:u64)->bool {
+ if model_context_check(model,!r.owner_is_nil(cp.lifetime.ownership.allocator.owner),.Read)!=.None{return false}
+ if container_access(&cp.lifetime)!=.None{return false}
 	#assert(N >= 1 && N <= 8)
+	if model.complete_state {
+		if !complete_codec_valid(model.complete_codec) {return false}
+		inspection,error:=complete_inspect(cp.complete.bytes,model.complete_codec.identity,cp.header.epoch)
+		if error!=.None || inspection.purpose!=.Archive || inspection.signature.tick!=cp.frame.tick || !physics_receipts_valid(cp,inspection.metadata){return false}
+	} else if len(cp.complete.bytes)!=0 {return false}
 	if model.action_timing > .Receipt || !action_schedule_valid(model.action_schedule) || !authority_policy_valid(model.authority) {return false}
 	if !cp.ready || cp.header.version != CHECKPOINT_VERSION || cp.header.protocol != protocol ||
 	   cp.header.epoch == 0 || cp.frame.tick != cp.header.tick || cp.frame.tick == max(u64) ||
@@ -291,8 +354,10 @@ checkpoint_valid_protocol :: proc(cp:^Checkpoint($S,$C,$A,$N),model:Model(S,C,A,
 
 @(private)
 checkpoint_empty :: proc(cp: ^Checkpoint($S, $C, $A, $N)) -> bool {
+ if cp.lifetime.cleanup || cp.lifetime.retains.count!=0{return false}
+ if container_access(&cp.lifetime)!=.None{return false}
 	return !cp.ready && cap(cp.peers) == 0 && cap(cp.actions) == 0 && cap(cp.inputs) == 0 &&
-	       cap(cp.outcomes) == 0 && cap(cp.banned) == 0 && len(cp.policy_data) == 0
+	       cap(cp.outcomes) == 0 && cap(cp.banned) == 0 && len(cp.policy_data) == 0 && len(cp.complete.bytes)==0 && cp.complete_charge==0
 }
 
 @(private)

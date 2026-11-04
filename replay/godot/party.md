@@ -61,6 +61,14 @@ strings are copied. Closing releases connections, profile operations, owned stri
 and the retained TLS reference. Browser CAS and native CAS retain their observed
 revision; conflicts do not refresh merely to overwrite another window's choice.
 
+`party_open(&party, config, allocator)` optionally selects the allocator for its
+entire lifetime. Party retains that choice for later frames, enrollment retries
+and close. Close it before destroying the borrowed native store or allocator.
+This does not create a managed lifetime for arbitrary storage callbacks: their
+stable user data and code must still outlive Party. Strict native Box3D SDKs can
+select an explicit static SQLite archive with `-define:REPLAY_SQLITE_LIBRARY=ABS`
+while preserving the normal `system:sqlite3` default for other applications.
+
 Invites use the existing reproducible creator recipe with index zero and the
 configured role/use count. Guests with a ready credential need no provisioning
 socket to rejoin. A creator retries its invitation after restart; a **correlated
@@ -76,6 +84,27 @@ trusted host. Authority still requires the coordinator's current lease, and the
 Room still validates the authenticated roster and process incarnation.
 
 ## Game-specific ownership
+
+### Optional five-character room codes
+
+Cooperative games may set `short_codes=true` with `invite_role=.Player` and
+`invite_uses=1`. This uses the provision layer's short-code format v1, while
+keeping the existing Room wire protocol and durable enrollment. Create derives
+the room locator from a fresh creator claim's code. A collision cannot replace
+the server's creator or adopt another local enrollment. Display `code[:code_count]`
+after `invited`; the default long-ticket mode still returns its original 85 bytes.
+
+Parse a user-entered code with `short_ticket_parse(text, content)`. The explicit
+Watch door uses index 1 and a separately registered `creator_short_invite(record,1)`.
+Both use the same five-character room code, with distinct single-use invitation
+secrets. Existing long tickets and stored guest enrollment remain usable. A
+creator rejoining an older long-ticket room retains that format.
+
+Short codes deliberately have 25 bits of invitation entropy and are for casual
+Player enrollment, not administrative or trusted-host credentials. Creator claims
+and member keys remain independent 256-bit secrets; no membership credentials are
+shortened. The existing TLS, global/per-peer limits, use counts, revocation and
+CAS checks remain in force. The default format and other games are unchanged.
 
 Scrapyard keeps its personal progression token and profile file/IndexedDB record
 separate from the room token. Changing parties therefore does not create another

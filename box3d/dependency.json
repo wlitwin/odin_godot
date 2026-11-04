@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "abi_version": 1,
+  "dependencies": {
+    "box3d": {
+      "url": "https://github.com/erincatto/box3d.git",
+      "commit": "336263320469e5e9febfe18697ab562488f7e97a",
+      "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+      "git_archive_sha256": "a9143675b297bb6c6f3d031d1bdf5c265d8642139eea26f265958066bd947935"
+    },
+    "rollback-in-a-box": {
+      "url": "https://github.com/pdaddyo/rollback-in-a-box.git",
+      "commit": "9e1fe882a0ea4eb52e160d5754a752580b4db462",
+      "tree": "7cefe9ae72bd39788473bb318d160fca7eee8a91",
+      "git_archive_sha256": "f2f2a2488a1d88d4eb79f448a627b2adc820e36697d07c65a949551aea8e279d",
+      "files": {
+        "core/src/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921",
+        "core/include/box3d_rollback/rollback_shim.h": "992c796ac3b6c79580992378ee10ee4a6dcd3b962c1ef557233b546aee0ab24e"
+      }
+    }
+  },
+  "runtime_dependency_closure": [
+    "Box3D C engine",
+    "isolated rollback_shim.c",
+    "local ogb3 C wrappers and owned snapshot/digest modules"
+  ],
+  "excluded": [
+    "upstream C++ session/world",
+    "godot-cpp",
+    "Godot"
+  ],
+  "simulation": {
+    "precision": "float32",
+    "units": "meters",
+    "coordinates": "Y-up/right-handed",
+    "workers": 1,
+    "corpus_hz": 60,
+    "corpus_substeps": 4,
+    "validate": true,
+    "assertions": "enabled in Debug and Release",
+    "fp_flags": [
+      "-fno-fast-math",
+      "-ffp-contract=off"
+    ],
+    "simd": "runtime dispatch explicitly locked to width4 by ogb3_initialize; OGB3_DISABLE_SIMD selects scalar implementation; record resolved compiler macros per build"
+  },
+  "shim_patches": [
+    {
+      "path": "box3d/native/patches/rollback_shim_box3d_33626332.patch",
+      "sha256": "92cc54f8c2dfc27de6d09f92accebbb5f6e8356099c4b75ac6bf03227f63568d",
+      "reason": "Adapt private recording registry/replay header and SIMD-width fingerprint to Box3D33626332; retain explicit original-source preimage and allocator/ownership behavior.",
+      "base_files": {
+        "core/src/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921"
+      },
+      "output_files": {
+        "core/src/rollback_shim.c": "b439f788081230278dec88b676a14b831a0a51b8b4600512067d67e106c30218"
+      }
+    }
+  ],
+  "engine_patches": []
+}

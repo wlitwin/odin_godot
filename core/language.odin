@@ -432,7 +432,7 @@ odin_language_register :: proc() {
     add("_finish", lv_finish_session) // kill the persistent ols session (see core/complete.odin)
     add("_thread_enter", lv_noop)
     add("_thread_exit", lv_noop)
-    add("_frame", lv_frame) // deferred syntax-highlighter registration (see highlighter.odin)
+    add("_frame", managed_callable_language_frame) // main-thread collection before existing frame pump
     add("_create_script", lv_create_script)
     add("_make_template", lv_make_template)
     add("_supports_builtin_mode", lv_false)

@@ -1,0 +1,129 @@
+{
+  "task": "t_cfe2df256c194c2d",
+  "board": "b_cdde1cdfea104035",
+  "worker": "box3d-snapshots",
+  "date": "2026-10-30",
+  "host": "macOS-15.8-arm64-arm-64bit",
+  "compiler": "Apple Clang16.0.0 clang-1600.0.26.6",
+  "odin": "dev-2026-04 (Nix)",
+  "box3d_pin": "d421e45c828f6f853a145f726f0b9425d31146eb",
+  "shim_pin": "9e1fe882a0ea4eb52e160d5754a752580b4db462",
+  "coverage": "ogb3-d421e45c-solver-v1",
+  "dump_version": 1,
+  "snapshot_version": 1,
+  "configuration": {
+    "build": "Debug",
+    "precision": "float",
+    "worker_count": 1,
+    "seconds": "1/60",
+    "substeps": 4,
+    "fp": "-fno-fast-math -ffp-contract=off",
+    "assertions": true,
+    "validation": true,
+    "sanitizers": "address,undefined (alignment enabled; no suppressions)"
+  },
+  "results": {
+    "native_ctest": {
+      "passed": 3,
+      "failed": 0
+    },
+    "sanitized_ctest": {
+      "passed": 3,
+      "failed": 0
+    },
+    "odin_tests": {
+      "passed": 5,
+      "failed": 0,
+      "test_threads": 1
+    },
+    "independent_construction_ticks": 90,
+    "independent_baseline_retained_ticks": 180,
+    "restored_branch_ticks_compared_to_baseline": 360,
+    "extra_restored_compound_contact_ticks": 240,
+    "truncations_rejected": 7,
+    "corruptions_rejected": 8,
+    "version_mismatches_rejected": 1,
+    "staging_failure_points": 3,
+    "actual_wrapper_allocation_failure_points": 5,
+    "native_engine_allocations": 4136,
+    "native_aligned_requested_bytes_total": 9977984,
+    "native_aligned_requested_bytes_peak": 1182192,
+    "native_live_bytes_final": 0,
+    "snapshot_wrapper_allocations": 90,
+    "snapshot_wrapper_requested_bytes_total": 1560762,
+    "snapshot_wrapper_requested_bytes_peak": 79592,
+    "snapshot_wrapper_live_bytes_final": 0,
+    "macos_leaks": {
+      "count": 0,
+      "bytes": 0
+    }
+  },
+  "scope_limits": [
+    "Opaque exact-build locally created resources only, no arbitrary raw import or portable codec",
+    "Engine allocator exhaustion and impossible post-preflight destructive loader failure are fatal invariants, not recovered errors",
+    "Independent captured resources duplicate geometry; explicit clones share it",
+    "Complete solver dump requires separately compared deterministic game side-state and fixed callbacks/process settings",
+    "Wrapper counters exclude caller buffers, flat API geometry wrappers and allocator overhead",
+    "Large corpus benchmarks, release/cross-target evidence and Gate A decision are coordinator/build tasks"
+  ],
+  "coordinator_approved_patches": [
+    "block_allocator_alignment.patch",
+    "compound_geometry_alignment.patch"
+  ],
+  "scratch": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots",
+  "artifacts": {
+    "configure.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/configure.log",
+      "sha256": "c0a7be739a5a5f3c001ef6133191ca110e7e5182a0c08dccfcf3eda45ff07197"
+    },
+    "build.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/build.log",
+      "sha256": "34d4c67e8c5ea3beab7e99cf3d66abd023ce146f85ddf2385a7dd0463c50de39"
+    },
+    "ctest.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/ctest.log",
+      "sha256": "5f8c92afa3d6573ab86207066bddc0d9a72139c89d2d9a1832018081611e1ceb"
+    },
+    "asan-configure.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-configure.log",
+      "sha256": "1baff70ea644f47cf75561503167deba028ba254faa83d147fe9913030fcb152"
+    },
+    "asan-build.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-build.log",
+      "sha256": "4354066916fdebbc3bfe10ae966b0fdf5902cdfab49be92c0cdcd32b699dbd5e"
+    },
+    "asan-ctest.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-ctest.log",
+      "sha256": "049bf6be53d7b238b776fa3cc1ac0f0ec66e249714b28a07e6cd0c5d9f1d045f"
+    },
+    "asan.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan.log",
+      "sha256": "061aa2c3806706890b74291a49c384a2c9060f3c782f13e2bb10e38e3e5ab58f"
+    },
+    "upstream-alignment.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/upstream-alignment.log",
+      "sha256": "47f761b2487bf6b18dfe95084337b49f8759f8d5fb3b35a26144693771b0a892"
+    },
+    "odin.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/odin.log",
+      "sha256": "d828b0a20e0f4525d885cf087091162101458b0f3055f9de61bc39d0433f5d74"
+    },
+    "leaks.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/leaks.log",
+      "sha256": "84c3451178e6359c6417c5f405321b99bd1b5ed6b2d4c0fddd8c51f35932666f"
+    }
+  },
+  "source_sha256": {
+    "box3d/native/owned_snapshot.c": "33949ef876e8d086087354bb105cb09fd506ed2e717e8b41ad984ff102d2ea6f",
+    "box3d/native/owned_snapshot.h": "f0ca2824cf0f651339d5bf4cce628f2fd94f89ffdefd9da162a45adbad5d1e11",
+    "box3d/native/state_dump.c": "2642fa0553b88c00c094800c28836c26bd55298587b814955e190a4d51becf60",
+    "box3d/native/state_dump.h": "00b12f6c2c2770eb6c4a8d769e9d5d739604a97dccad5f1aaa13db21e2cb5411",
+    "box3d/native/patches/block_allocator_alignment.patch": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+    "box3d/native/patches/compound_geometry_alignment.patch": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+    "tests/box3d_native/lifecycle.c": "b7751b5cee92c9309bc1b0c22954f304ba82bc1dbaf7d5b650579edf7834f166",
+    "tests/box3d_native/generate_fields.py": "fdb73339981534c767ac6d7ff2a772b58a0b7e859d2d8e719ba8e2ca8fdb801b",
+    "tests/box3d_native/fields.json": "379d99830e8f0061d3c47cef69ef646dff8f15a766f3faa933c3858b6c885357",
+    "tests/box3d/lifecycle_test.odin": "48c1d67a575b2c543a5350207125db57602b04fe730562bcb4a351af4e09fafb",
+    "tests/box3d/run.sh": "73187eafd51ae08408754175e301fe1d61f2d06c5102b9b2cd6cb2bcd4114721"
+  }
+}

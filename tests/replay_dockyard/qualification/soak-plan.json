@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "status": "DECLARED_BEFORE_SUSTAINED_RUN",
+  "base_sampling_plan": "plan.json",
+  "contract": "tests/box3d_web/contract.json",
+  "target_ticks": 36600,
+  "minimum_actual_go_to_checked_result_seconds": 600,
+  "selection": "one required sustained case per selected final browser candidate, with real repeated jobs; no unmodified short-case retry for a lucky maximum",
+  "job_input": "real host result-panel NEXT JOB button at1280x720, attempted after90s then every10s; hidden Working-phase button cannot issue a reset; no state setter or test autoload",
+  "required": ["round>=3", "layout==(round-1)%3", "at least3 actual eligible delivery cues", "two nonzero committed input seats", "all5 final byte parts equal", "actual terminal acknowledgement", "checked typed cleanup and engine shutdown", "all normal/repair/presentation samples retained"],
+  "known_open_failure": "Firefox short case v6 exceeded declared normal/repair maxima; that failure remains valid and cannot be erased by this distinct sustained requirement",
+  "admission": "all original budgets remain in force; a requested user decision about percentile-based admission is pending and no answer is assumed",
+  "cpu_profiler": "disabled for admission measurements",
+  "network": "owned local authenticated forced TURN route; public Internet admission is separate"
+}

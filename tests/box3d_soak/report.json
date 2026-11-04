@@ -1,0 +1,771 @@
+{
+  "schema": 1,
+  "status": "WORKING",
+  "gate_b": "NOT_ESTABLISHED",
+  "p5": "BLOCKED_BY_GATE_B",
+  "generated_utc": "2026-11-01T22:18:44.755464+00:00",
+  "task": {
+    "id": "t_6d1ea94bc14540f1",
+    "revision": 88,
+    "worker": "box3d-gate-b"
+  },
+  "intent": "Finish both sibling integrations; current evidence is partial and preserves all failed attempts.",
+  "limits": {
+    "initial_dynamic": 32,
+    "bodies": 35,
+    "shapes": 35,
+    "contacts": 147,
+    "joints": 1,
+    "history": 128,
+    "hz": 60,
+    "substeps": 4,
+    "prediction": 8,
+    "ordinary_repair": 8,
+    "tracked_bytes": 67108864,
+    "normal_ceiling_ns": 4000000,
+    "repair8_ceiling_ns": 4000000
+  },
+  "normal_cpu": {
+    "A": {
+      "normal_kind": "client_prediction_send",
+      "raw_ns": [
+        474000,
+        470000,
+        470000,
+        474000,
+        473000,
+        470000,
+        491000,
+        468000,
+        468000,
+        467000,
+        531000,
+        470000,
+        468000,
+        473000,
+        469000,
+        469000,
+        469000,
+        471000,
+        490000
+      ],
+      "p50_ns": 470000,
+      "p95_ns": 531000,
+      "max_ns": 531000,
+      "over4ms": 0,
+      "records": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-A19-prepared-v2/records.jsonl",
+        "sha256": "f442536995565b64a73df80347b911407e75eb918af5b78b8d18434780f68d88",
+        "bytes": 99972,
+        "scope": "all raw samples retained"
+      },
+      "overall_cpu": "INCOMPLETE: repair8=0 in this stream"
+    },
+    "B": {
+      "normal_kind": "authority_step_requested_canonical",
+      "raw_ns": [
+        1864000,
+        1708000,
+        1757000,
+        1749000,
+        1754000,
+        1764000,
+        1755000,
+        1763000,
+        1715000,
+        1771000,
+        1754000,
+        1758000,
+        1755000,
+        1753000,
+        1729000,
+        1713000,
+        1713000,
+        1713000,
+        1712000
+      ],
+      "p50_ns": 1754000,
+      "p95_ns": 1864000,
+      "max_ns": 1864000,
+      "over4ms": 0,
+      "records": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-B19-prepared-v2/records.jsonl",
+        "sha256": "6a1a69f73619dfea134a4e8d6fbdf7f28eea3cef3775eaca2a7f0c5703ea97b5",
+        "bytes": 94981,
+        "scope": "all raw samples retained"
+      },
+      "overall_cpu": "INCOMPLETE: repair8=0 in this stream"
+    },
+    "current_zero42": {
+      "native_build": "ddff3ce2612b66717785981ead3d5433992d84ab8cfd5e6e98ab4fc36e43da66",
+      "A": {
+        "kind": "client_prediction_send",
+        "samples": 19,
+        "p50_ns": 293000,
+        "p95_ns": 324000,
+        "max_ns": 324000,
+        "over4ms": 0
+      },
+      "B": {
+        "kind": "authority_step_requested_canonical",
+        "samples": 19,
+        "p50_ns": 1369000,
+        "p95_ns": 1693000,
+        "max_ns": 1693000,
+        "over4ms": 0
+      },
+      "qualification": "Both recorded Replay streams were independently verified (3483/c3fd), with all raw samples, full five-part state, public step/requireStep, actual sent data, ownership and quota checks. A is client prediction/send; B includes the requested canonical output. Each is a separate observed batch on its recorded source graph."
+    },
+    "kit_current_observed": {
+      "native_build": "39236220f71c0d2eb00c31dee803aedb8b08203eaa63fd4468d097a33c244e1d",
+      "dense_a": {
+        "samples": 19,
+        "p50_ns": 298000,
+        "max_ns": 327000,
+        "over4ms": 0
+      },
+      "common_a": {
+        "samples": 19,
+        "p50_ns": 280000,
+        "max_ns": 305000,
+        "over4ms": 0
+      },
+      "dense_b": {
+        "samples": 19,
+        "p50_ns": 1491000,
+        "max_ns": 3567000,
+        "over4ms": 0
+      },
+      "common_b": {
+        "samples": 19,
+        "p50_ns": 1330000,
+        "max_ns": 1351000,
+        "over4ms": 0
+      },
+      "qualification": "All four saved batches were independently verified against the original seals, source and binary maps. Each retains all 19 raw integer samples and passes public step, local five-part oracle, actual sent-buffer copying/freeing, ownership, quota and natural-exit checks. Game proof uses all registered local checkpoint fields; observed callback counts are not Native engine counters. Each normal-only stream remains INCOMPLETE for repair coverage; no pooled timing or unconditional CPU claim."
+    }
+  },
+  "repair_cpu": {
+    "replay": {
+      "samples": 19,
+      "p50_ns": 4741000,
+      "p95_ns": 7065000,
+      "max_ns": 7065000,
+      "over4ms": 19
+    },
+    "kit": {
+      "samples": 19,
+      "p50_ns": 4479000,
+      "p95_ns": 4658000,
+      "max_ns": 4658000,
+      "over4ms": 18
+    },
+    "qualification": "Different tick-window plans; never pooled or used for isolated attribution. Historical exact build9c66; all raw retained.",
+    "typed_kit_observation": {
+      "samples": 19,
+      "p50_ns": 4563000,
+      "p95_ns": 4854000,
+      "max_ns": 4854000,
+      "over4ms": 18,
+      "normal_samples": 0,
+      "overall": "INCOMPLETE / budget failure"
+    },
+    "fresh_seal": {
+      "kit": {
+        "samples": 19,
+        "p50_ns": 3731000,
+        "p95_ns": 4050000,
+        "max_ns": 4050000,
+        "over4ms": 1,
+        "native_configuration": "ON2d4 timed observer included"
+      },
+      "replay": {
+        "samples": 19,
+        "p50_ns": 4008000,
+        "p95_ns": 4428000,
+        "max_ns": 4428000,
+        "over4ms": 12,
+        "native_configuration": "OFFc5 phasehooksOFF"
+      },
+      "qualification": "Independent saved19 audits verified both raw/provenance/boundary/cleanup. SeparateKitrolling8..152 vsReplayfresh152->160; allrawretained/no subtraction. BothbudgetFAIL/normal0INCOMPLETE."
+    },
+    "zero42": {
+      "kit": {
+        "samples": 19,
+        "p50_ns": 3032000,
+        "p95_ns": 3395000,
+        "max_ns": 3395000,
+        "over4ms": 0
+      },
+      "replay": {
+        "samples": 19,
+        "p50_ns": 3309000,
+        "p95_ns": 3518000,
+        "max_ns": 3518000,
+        "over4ms": 0
+      },
+      "qualification": "ObservedDENSErepairbatchceilingsPASS; normal0 leavesoverallINCOMPLETE; common/currentnormalcoveragepending. Allrawretained, independentfullstate/leases/quota; exactdifferentwindowplansremainseparate.",
+      "kit_common": {
+        "samples": 19,
+        "p50_ns": 2769000,
+        "p95_ns": 2858000,
+        "max_ns": 2858000,
+        "over4ms": 0,
+        "normal_samples": 0
+      }
+    }
+  },
+  "current_results": {
+    "copied_kit_query": "Confirmed public INPUT160 and APPLIED kind6/Submitted1/seq160/appliedtrue/query_total2; bothnatural0/10full5/resource0. Observation may perturb cadence; original clean missingQuery failure remains unexplained.",
+    "replay_extended": "Bothnatural0/resource0/tick2700/1395full5; client23issues exceedsformer16 limit. FAIL523missingdecisionrows+13FX and initialSpawncoverage; about46s, not600s.",
+    "controller": "Disk-backed chained intake, fair64 EOF draining and indexed rolling history implemented.51combinedpurecontrols passed; actual7500capacity and609.8367s cleanReplay pass with all intake consumed/fsynced/closed/sourcebound. Kit full intake verified separately despite strict scenario FAIL.",
+    "observer_capacity": "7500ticks/124.85683575sec/bothnatural0/application0/4601all5/7500refs/220joins/253settledFX/missingchangedextra0/noRecovery, seen=pub=consumedHost38396/client29889/indexEOF+fsync+closedtrue/peakbacklog10+14. Not600s/GateB.",
+    "long_v2": "FAIL107s/Rootforcedboth due1024queueoverflow;399Hostrawrecordsnotarchived; all33unmatchedfull5equalretainedHostraw inreadonlyaudit. Fourrealrecoveriesalsoafterfixedlatest3601 deadline. No retroactive registration/waiver/cleanupPASS.",
+    "replay_clean_long": "FUNCTIONAL_SOAK_PASS independently confirmed:609.836717125observedseconds/tick36600/36599afteradmission/152of152verifiedcycles/152consecutive/1069immutablejoins/noRecovery/22023requiredall5matches/36600refs/allrawmissingchangedextra0/bothnatural0/NativeWrapperMeter0/Coreclean. All331758actorindexedrecords consumed;331759archiveevents includes prelaunchmarker. NotGateB/CPU/impairment/Kit/lifecycle; recorded NativeOFF217 build remains historical.",
+    "kit_disk_intake": "Strict FAIL despite bothnatural0/application0/Coreclean/finalACK300/complete1063actorrecords/EOFfsyncclosed/pending0. Six realReset cf111->127->144->167->194->226->266;2missingdecisions+3FX preserved. Five actualfull5matches30/60/90/270/300; Query227 and clientSpawn280 localISSUED have no authorityAPPLIED join, exact authoritybankrows unavailable. No waiver or long claim.",
+    "fresh_constructor": "Private seal-once native and currentSDKfunctionals pass; measured19correcteach butKit3731us/max4050/1over4 andReplay4008us/max4428/12over4. Fullwork/owners/quotas unchanged; GateB repair ceiling stillFAIL.",
+    "kit_fresh_seal": "Independent original strictFAIL confirmed. Query160 actualAPPLIED bothroles/query_total2/all6kinds/9ISSUEDjoins; clientSpawn280 has no HostAPPLIED join/exactauthorityrowunavailable. Eightpreserved resets cf219->224,228->233,237->242,249->254,258->264,264->272,272->289,291->300; no future suffix afterlastbaseline=end300. MissingHostSpawn280/Remove296 andFX280/281/296/297 withinlastresetspans; no waiver. All8full5/10authorityrefs/intake600+684/allnatural0/cleanup0 verified.",
+    "fnv_candidate": "Exact FNV zero4/2 implementation and Native/SDK parity checks pass. Separate recorded repair batches: denseKit3032/max3395us, commonKit2769/max2858us, Replay3309/max3518us. Replay normalA293/max324us and normalB1369/max1693us; four Kit normal batches are reported separately. All recorded calls are correct and within4ms. Live quality, long impairment and lifecycle gates remain open.",
+    "kit_zero42": "OriginalstrictFAIL firstClientfreshintent40/sample_window_exceeded;0ATTEMPT/0ISSUED/0RECOVERY/0REBASE. Callbackticknotlogged(only>48implied), cfatfatal/lookup40..48unavailable. Onefull5/3refs/all331indexeventsconsumed; Clientnatural1/selfreportedapp0, HostRootforced-15/noRESULT/cleanupunverified. MissingRemove56+FX56/57aborttail; noresetgap or modeldivergence claim.",
+    "replay_impaired_staged": "Exactstagedplan1dfb/policyaa85 executedONCE completedFAIL; actualfailureseparateartifact, originalstaging/preflightunchanged.",
+    "kit_normalA": "Dense and common client normal functionals and separate 19-call batches are sealed and independently verified. Each actual public call returns one, advances head159->160 with cf152, observes one model-step callback and copies/frees one 265B Stream input. Independent plain five-part store, full reference-context destruction, ownership, quota and natural cleanup pass on the recorded graph.",
+    "kit_normalAB": "Combined actual Core SDK ON392 build and five selected functionals pass, including default20x8 regression. Separate A/B normal batches are complete: A includes real input send; B retains automatic after-tick output and explicit public requested Correction to actual roster peer. All use the declared local checkpoint Game contract and observed model-step callback counter, with full reference-context destruction and checked cleanup.",
+    "kit_normal19": "Four separate 19-call batches are sealed and independently verified: denseA298/max327us, commonA280/max305us, denseB1491/max3567us, commonB1330/max1351us; no calls exceed4ms. All cold/outlier samples remain. All76 raw integers, source/binary maps, full local five-part comparisons, public one-step returns, real send copies/frees, quota and cleanup passed. Each normal-only validator remains INCOMPLETE for repair coverage; GateB remains open.",
+    "replay_impaired_long_zero42": "Independent609.3097s/36600/all303830archive+201230receipts/all187292Host+116537Clientindices/full12936paired5/36600canonicalhashes/zerochangedextra+confirmeddups/noobserverloss/bothnatural0+Coreapp0. Observed5gaps union322/max122/duration<=2.620731s;10987>3601lateFAIL. Missing653=644controls+9actions/13FXallobservedspans but38controlslateNONqualifiedspan. Logical1069joins/sampling/FIFOvalid, publishedscopeequal1068only(ISSUEDseq1serial2->APPLIED200serial3); no physicalwirerewriteproof. Cycles148of152intact/106future/9233post10987matches/854settledFXfuture. OriginalFAIL/policyunchanged.",
+    "action_scope_contract": "CASE_A_V4plaincompile/test0actualpublicResyncSnapshotAhead20->sameepochWelcome serial1->2; seq1/gen1/tick4/valueMotor fixed, oldpacketheldpreadmission0/newpacketfirstadmission1/execution21/applied+confirmedActionResultonce/full5equal; lateoldserialreject+1/nochange/owners0. V1-3testsetupguards failed andpreserved; no production/Kernel/validator/policy change.",
+    "caller_clamp_extraction": "Rev34 unchanged extraction and prospective accounting RED are preserved. Rev37 bounded caller-credit source8a23 and17-group pure controls now pass; fresh strict short Scene passes. Historical Query/intent/recovery failures remain unchanged and unexplained by this success.",
+    "caller_credit": "Runtime8a23 implements bounded client-only pending/quarantine, explicit capacity/lifecycle dispositions and path-checked normal-call receipts. The old eligibility helper and initial lead remain unchanged. All17 pure groups pass, including163 previous arithmetic cases and five legacy metadata controls once; synthetic records do not establish live Lane receipts. Fresh actual Core Scene32/17/0impair/end300 passes strict short checker: ten action joins/all6 kinds/contested Spawn, ten full five-part matches,17 settled effects, zero missing/changed/extra, no recovery, real finalACK, bothnatural0/Coreapp0/all1144intake records consumed. Actual constructor Meter requested/live delta21480 equals sizeof(Runtime) both endpoints. Independent saved audit08ba364a verifies original chains, raw intake, canonical/signature/receipt bindings, ten joins, FX, cleanup and Meter deltas; consumed duplicate export files are not reconstructed. Short5.095568791seconds, not long/CPU/GateB or historical-cause proof.",
+    "caller_credit_kit_long": "ONE prospective clean Kit32 run stopped after about209controller-wallseconds with ClientINTENT_UNEXERCISED original/requested12280 sampled0 sample_window_exceeded. LastClientFRAME12270/head12277/cf12270; RESULTconfirmed12282/okfalse/natural1/application0. Actual fatal callback tick and earlier known-slot lookup outcomes are unavailable; no cause inferred. Hostforced-15/noRESULT/cleanupunverified. All409exportpairs matched/zerochangedextra, but strict1missingdecision+2FX and incomplete tail/duration remainFAIL; Independent saved audit51669e5d verifies44977intake/2371receipts/411canonicalstates/409pairedreceipts/358joins/51completecycles; missingHostRemove12296 andFX12296/12297 are abort-tail omissions after Clientfailure, without recovery exclusion. Exact callback/slot lookups remain unavailable. All44977intake records consumed/EOFclosed/pending0/source+driverfencesunchanged. Shortpass and pure17 remain valid on their own evidence.",
+    "intent_observation": "DefaultOFF observer sourceb025/628c reverse-reconstructs policy8a23/ff90; actual18 pure groups/49JSON records pass. Fresh actualCoreSDK/OFFddff defaultOFF32/17/end300 strict case passes with all6/10joins/10full5/17FX/natural0/Coreapp0/actual108976-byte Meter allocation and zero observer records. Separately declared selected12280 ON case FAILS clientintent40 before selected target: summary selected_seenfalse/frame0/sample0/observation_completefalse. Clientnatural1/app0, Hostforced15/cleanupunknown. Old failures preserved; no diagnostic result/cause. Existing bounded observer may be redesigned to retain active intent context only after a new exact scope amendment.",
+    "active_intent_observation": "Frozen Runtime94b5/intents628c reverse to gameplay policy8a23/ff90; actual18/producer pass. Build8d0796/sourcea5d0 passes coherent source/binary checks. ONE default-OFF short FAIL532fe65b: three validated resets, client unsampled280 and160 rebased301>end300, no paired exports, seven decisions/twelve FX missing, clientnatural1/app0 and Hostforced15/cleanupunknown. ActualRuntime109888 charge both/zeroobserver. Rev46 permits one diagnostic against this failing baseline without any source change or acceptance waiver; no ACTIVE-ON result yet.",
+    "active_intent_observation_on": "ONE frozen ACTIVE diagnostic report934226a3 FAIL:36validatedResets,0pairedexports,260missingdecisions365FX, Clientnatural1/app0/noeligibleoriginal280due280 atcf12400, Hostforced15/noRESULT/cleanupunknown. Captured32frames+1sample+1summary scoped to original40/rebaseddue12296, currentplan null/contextstale,838frameoverwrites/completefalse. One actual NORMAL sample12296 has HistoryMissing4/emptyvalue and laterlocalISSUED/no proven authorityjoin. Retained INGEST0 movesheadcf11861->12295; normal0 thenfractional0step thennormal1. This partialtrace doesnot explain allreset causes/finalintent280 or oldfailures. No rerun/waiver. Rootnow scopes ONE declared120 servicecap comparison, default60 andfixedLane60 unchanged; not a transport-cause or acceptance claim.",
+    "service120_experiment": "ONE explicit120-cap experiment FAILd959f1ba; actual Engine cap getter120 both, Lane60 and allphysics/policies unchanged. Eight validated resets; Query original160/currentdue362 remained unattempted. Actual NORMAL getters at362 and368 are Ok/Held2/seq143/value00; subsequentReset oldhead362->baseline367 and368->370 does not meet existing due>oldhead rebase guard. Callback371 exceeds362+8 before getter and fails. Four full5 comparisons/74receipts/source+bin/wrapper/intake verified independentlybc917c25, five decisions/eightFX missing, Clientnatural1/app0/Hostforced15/cleanupunknown. Currenttrace loses319prefixframes; no fullhistory or oldcause/Reliablebottleneck/120fix/GateB claim. Existing verifier enforces same crossing constraint; prospective helper rebase criterion needs a public regression and separate contract review, no validator change authorized.",
+    "known_skip_reset_regression": "Public generic4/staticOFFddff/nilOwner regression V2 reaches exactly ONE prospective RED: realknownNone40/Held2/seq39 skipped/actualpublichead40cf39/noattemptpubtransport; UIreset produces realRequest/Reset45/signatureMATCH/watermark14->17/actualobserve_recovered true/headcf45. Due remains40 vsproposed46, original40/identity flags pinned. Full5retained39+45, all102packetprovenance/sixcleanupdomains0/sourcefence pass. Root independently checks all123binary/signature artifact hashes/lengths. V1wrongunconfirmed40 diagnostic gate setupFAIL preserved. Current helper AND verifier hardcrossing unchanged; prospective helper+V2proof contract remains design only.",
+    "intent_contract_v2": "Prospective V2 helper rebases ONLY whollyunattempted/unpublished/untransported zeroidentity-counter plans on existing signature-validated Reset tobaseline+1, originalimmutable; attemptedidentities pinned. ExplicittypedREADY2/REBASE2+actualPREstate+Resetproof; V1/absent oldcrossing retainslegacyinterpretation. Publicgeneric4 realReset45/due46/FIRST46authorityadmission/full5/FX/cleanup and10focusedgroups pass. q50proofcontrols/Root15controllercontrols pass. FreshSDK32/17/end300/declaredcap120/explicitCLI2 strictcasePASSad952e:10joins/all6/10full5/17FX/norecovery/missingchangedextra0/realACK/bothnatural0/Coreapp0/complete1167intake. ActualRuntime109888 chargedboth; Source/bins/driver/wrapperfences. No oldcasePASS, clock/Native/Kernel/transport orboundchange; long/impair/lifecycle remainunmet.",
+    "kit_v2_clean_long": "The single clean Kit V2 run completed 610.082810209 observed seconds through tick36600, with both natural exits, application/Core cleanup0 and unchanged source, driver, wrapper and Godot fences. Independent audit2e287af8 verifies all133651 actor intake records,1220 original full-five comparisons,1069 action joins,152/152 complete cycles and1227 matched effects per actor. Required authority class0 control rows are0 of73200. Original report7b6ae7a1 remains FAIL and audit7d8bc3d8 INCOMPLETE; no reconstruction or relabel.",
+    "confirmed_control_evidence": "Public confirmed class0 logging is implemented in Runtime7ef5, with strict Kit control validation eecfa721. Producer6 focused groups plus JSON checks and checker59 groups pass; ordinary Example Appgen and one fresh actualCore/scripts speeddebug Scene build pass with unchanged source fences. One fresh strict300 Kit32/17/0impair/explicitV2/configured120 Scene report5d351b18 passes: exactly600 controls per endpoint for ticks1..300/seats1..2, all paired bodies equal and strictly typed, complete coverage summaries, actual Runtime requested/live delta109968 per endpoint,10 full-five comparisons,10 action joins/all6 kinds,17 settled FX each, finalACK, natural exits and checked cleanup0. Host1281/Client1090 intake records all consumed/fsynced/closed. This is short proof only. The earlier600s report7b6ae remains FAIL/INCOMPLETE; a new frozen600s plan is staged but not granted or run.",
+    "kit_confirmed_controls_clean_long": "The single fresh clean Kit V2 run reports FUNCTIONAL_SOAK_PASS with PROSPECTIVE_LONG_COVERAGE_PASS:610.072722 observed seconds through36600,73200 of73200 authority controls,152 of152 complete cycles and152 consecutive future cycles,1069 issued-to-authority joins,1220 original complete five-part comparisons,1227 matched effects per actor, zero gaps/missing/changed/extra/tail findings. Both natural exits and all checked application/Core cleanup0; Host152678/Client151726 intake records fully consumed/fsynced/closed, source/driver/wrapper/official fences unchanged. Report1f37f10c/audit19c67583 preserved. Independent saved audit03b3e01a verifies all raw/index/archive chains, controls, original state bytes/receipts, joins/cycles/FX, duration, tail, cleanup and source/binary identity. Clean Kit primary-pair functional proof only; impairment/lifecycle/Replay quality and explicit GateB remain separate.",
+    "kit_impaired_controls_short": "One actual strict300 Kit32/17 modeled10ms latency/1ms jitter/loss0 case passed on the same frozen current graph. Report46954110 verifies both READY2 requested/effective delay settings,600 exact typed paired controls per actor,10 original full-five comparisons,10 joins/all6 kinds,17 effects per actor,no recovery,final ACK,natural exits and checked application/Core cleanup0. All2371 intake records consumed/fsynced/closed and source/driver/wrapper/official fences unchanged. The channel truth that unreliable jitter may reorder is retained. Independent saved auditc506667c verifies chains, controls, settings, state receipts, actions/effects, allocation and cleanup; this5.062358167-second case is not impaired600s/GateB.",
+    "kit_impaired_controls_long": "The single modeled10ms/1ms current Kit long attempt reports FAILc91aab85. Client original280 remained unsampled and was rebased36601 beyond target36600; Client exited naturally1 with selfreported application cleanup0, while the controller terminated Host(-15), whose cleanup is unverified. Original prospective audit62129f8c fails intent/recovery observation bound before complete classification. Raw strict result retains73693 missing decisions/1067 missing FX, only7 paired full-five exports against1220 Host references, changed/extra0. Client control summary emitted268/unavailable66590/through33429/domain_completefalse. All Host158986+Client56639 raw/index records were consumed/fsynced/closed, source/driver/wrapper/official fences unchanged. Report duration proof0 is not a600s acceptance result; process wall runtime is separate. Independent saved auditbc1494 confirms complete intake,1220 original authority states/seven exact comparisons,Host73200/Client268 typed controls,72932 missing controls/761 actions/1067 FX,6770 actual resets and no all-six cycle proof. The first request is Repair_Limit7 at head83/cf81; first-fault call context is overwritten. No cause is proved; no retry or policy fix authorized.",
+    "first_hold_observation": "Diagnostic source0c64, actual pure6/53 checks and saved map proof40a2 pass; fresh Scene11e7/source5ca95 and one bounded3000-tick casee1bb56cb pass strict100 complete-state comparisons, control/action/effect/tail/intake and natural cleanup checks. The selected FIRST_HOLD mode was active on Client and emitted32 frames plus1 summary, but no hold/recovery occurred. Actual lead frame81 is retained; tail frames6094..6124 have6092 prefix overwrites. first_hold remains null/observation_completefalse. Both constructor Meter requested/live deltas equal112440. This validates the no-hold branch only, not the historical failure cause or impaired600 quality. No diagnostic retry; independent saved audit pending. Independent saved audit654d19e8 verifies all23041 archive/intake records,12596 receipts,6000 typed paired controls per actor,100 original full-state comparisons,89 joins,107 FX each,actual112440 Meter/cleanup0 and exact no-hold/lead/tail/provenance/bit-field truth.",
+    "production_off_impaired_long": "The one both-observers-OFF modeled10ms/1ms Kit run reports FAIL51056b6e because prospective audit40b1cc01 finds an ISSUED intent without immutable authority decision. Actual610.068038 observed seconds/tick36600/both natural0/checked Core+application cleanup0/zero observer rows/Runtime112440 requested+live charge each. Raw rollingPASS has1220 original full-five comparisons,73200 authority controls, complete73200 control summaries per actor, no recorded gaps or missing/changed/extra/tail findings. AllHost152623/Client137735 intake records consumed/fsynced/closed and source/driver/wrapper/official fences unchanged. This does not waive the prospective action failure or establish observer causality. Exact saved join/cycle classification pending; no retry or source change authorized. Independent saved audit92aa6519 verifies290359 archive events/153326 receipts/control73200each/1220 comparisons/1208 matched FX each/duration/tail/cleanup0/zero diagnostics. It identifies36 unjoined Client publications(19Query+17Spawn,cycles87..106),1033 valid joins(Host764/Client269) and132/152 candidate-complete cycles. Missing class1 authority rows/admission timing remain unavailable; no None or network cause is inferred.",
+    "world_timing_interface": "Reviewed interface46c8/80be plus preserving wrapper constructor76371 now compiles. Public suiteV3 report2bc13bb3 reaches exactly one prospective FEATURE_ABSENT capability RED; genuine97B T1 control/public host ingestion/Submitted same bytes sourceSeq1/actual canonical response/confirmed1/full five parts+signatures/FX0parity/atomic unsupported+unknown rejection all pass. Native/wrapper/provider/checkpoint/diagnostic/Odin cleanup0, source fence true; actual sizes config1/networkConfig384/network99440/status16, no old-size delta inference. This proves unsupported/unavailable baseline only; no timing ACK, configured feedback, clock actuation or historical cause. First compile failures3fe57/8b46 immutable. Independent saved closure pending; no feedback/caller/wire implementation authorized yet.",
+    "world_timing_feedback": "Revision91 optional timing integration remains open. Core retirement ABI2 source739c has independent C/Odin layout/installer proof (saved67148ab2) and actual Core5 report5e17a2c3: natural0, five declared lifecycle cases, exact same-PID9-DSO/16-metadata fences, storage22576. Original fixture failure6d3d remains unchanged; generated Callable argument ownership was corrected in the new fixture only. Full Fine Runtime lifecycle source9a218c8d passes bounded review; ordinary Appgen54b8 exits0 and current plain compile/pure10 reportf78c8bbc preserves163 legacy/540 scaled checks with unchanged source fence. This compiles but does not execute the full Runtime cleanup. Actual four-body Fine World feedback source prep is now assigned, with genuine Memory delivery and actual Core owners; no feedback/checked-Godot-wire/live soak pass yet. All original validators, quality limits and historical failures remain fixed; GateB not established.",
+    "independent_strategy_review": {
+      "status": "DONE_WITH_ROOT_VERIFICATION",
+      "reviewer": "Claude Opus 5.5",
+      "terminal": "t1s",
+      "record": "/tmp/odin-box3d-goal-t4jbbj4v/claude-independent-review-v1/review-result.json",
+      "implementation_expansion": "NEW_PROTOCOL_FROZEN_MINIMAL_REPAIR_SELECTED",
+      "new_findings": "Kit269/36 join-origin split; Replay36600/36600heldzero controls in both clean/impaired; existing Replay feedback bypassed and unhooked",
+      "no_acceptance_or_criteria_change": true
+    },
+    "simple_input_feedback_repair": {
+      "status": "SMALL_REGRESSION_FIXED_LIVE_INPUT_FIDELITY_STILL_DEGENERATE",
+      "task_revision": 97,
+      "scope": "existing Replay input feedback bridge, no new protocol",
+      "baseline": "input-fidelity-baseline-v3/report.json a3fa978c: intended RED only",
+      "after_fix": "input-fidelity-after-fix-v1/report.json 277be9c3: identical assertion GREEN, samples1/scale1.015, admitted/executed control100, full5/cleanup0",
+      "generic_regression": "five existing timing tests PASS265baa2f",
+      "short_case": "54d89acd: CONTROLLER_SMOKE_PASS189.869s/11400,5341full5/naturalcleanup0",
+      "input_fidelity": "independent59da3f28 confirms remote Sample0/Held11400/nonzero0; no observed live improvement",
+      "next": "one existing WAIT diagnostic field-only patch to measure actual startup/lead/stalls/catchups/feedback, not a behavior fix",
+      "criteria": "UNCHANGED_NO_GATEB_OR_P5_UNBLOCK"
+    }
+  },
+  "remaining": [
+    "Complete Kit impaired600s and explicit both-sibling lifecycle/rejoin/deep hold/reset quality, then final GateB. Current clean Kit610s proof is independently closed; old missing-control run remains INCOMPLETE.",
+    "Resolve current impaired Replay frozen late-recovery and published scope-equality failures without relaxing validators or reclassifying the saved case; required both-sibling impairment quality remains open.",
+    "Preserve each observed normal/repair CPU batch separately with all samples and source identities. Changed Example runtime code requires fresh coherent Scene/source/binary bindings; old CPU evidence remains tied to its recorded graphs.",
+    "Retain strict validators, quality bounds, full five-part state, actual tail/ACK, complete intake and owner cleanup; no historical failure reclassification.",
+    "Final explicit GateB acceptance before P5 and remaining project tasks. Functional or observed CPU milestones do not establish full-goal acceptance."
+  ],
+  "artifacts": {
+    "playable_prerequisite": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_slices/report.json",
+      "sha256": "2235dfe04577cd51f1da63c952281bab6608c121e42e0981c67f7f3ffd57dd2b",
+      "bytes": 439293,
+      "scope": "DONE P4.2; original evidence retained"
+    },
+    "presentation_prerequisite": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_presentation/report.json",
+      "sha256": "719be7842e69383d6635aed21660de41d146a3d850d7a2db0919f6938a4ee753",
+      "bytes": 133788,
+      "scope": "DONE P4.3; original evidence retained"
+    },
+    "action_retirement": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/action-retire-support-final-v1.json",
+      "sha256": "e52952355cd883a3d6407367d9c7c5fbd2d6b2aa118b0d2bb79126c83ad6d4c1",
+      "bytes": 4181,
+      "scope": "focused public regression and native16/pure182; not long acceptance"
+    },
+    "readiness_straddle": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-kit-slice/readiness-straddle-support-final-v1.json",
+      "sha256": "8f755192ee104f7f4352a3ed0c8e0e4bbd82f9b7a4b2ba313be0962f7f91fc12",
+      "bytes": 6902,
+      "scope": "focused3/FIFO7/default14/strictSDK1; live quality remains open"
+    },
+    "normal_A": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-A19-prepared-v2/seal.json",
+      "sha256": "d687b6a4faedca0c3c29db070cf7c43f2f92264b76beac2d565cc48fa51cfcc8",
+      "bytes": 1945,
+      "scope": "19 client prediction/input-send CPU samples; dense offline"
+    },
+    "normal_B": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-B19-prepared-v2/seal.json",
+      "sha256": "71688a0348a403ef51cd6b04287a27fbaa0ec77dc581d9b6aa135a15524ff853",
+      "bytes": 1979,
+      "scope": "19 authority step/requested-checkpoint CPU samples; offline composite"
+    },
+    "repair_replay": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-count-once-prepared-v1/records.jsonl",
+      "sha256": "8eb678e60326603cc76ba39caf91ccabe9a0496f7e6cbb8f9c77c14968ef6a20",
+      "bytes": 98343,
+      "scope": "19 fresh152->160 complete repairs; all over4ms"
+    },
+    "repair_kit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-kit-slice/gate-b-native-count-once-dense-profile19-v1/sealed-report.json",
+      "sha256": "8a415106ffad80a001706bf2d347bef7004d0469dbac10471f7501e95369fa79",
+      "bytes": 4136,
+      "scope": "19 rolling8..152 complete repairs;18over4ms"
+    },
+    "copied_query": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-kit-slice/query-diagnostic-observational-v1/sealed-observation-v1.json",
+      "sha256": "1873c0bc9edde87cf2edcfb0657761213a5118f90c3d5e1581695a2f59c66e9a",
+      "bytes": 71899,
+      "scope": "copy-only observation; no production fix or noninterference proof"
+    },
+    "extended_replay_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-extended-clean-v1/report.json",
+      "sha256": "862621703e3bd614e6de25c4de4c92daa57e935db13c78f838b076e282c073d6",
+      "bytes": 12228,
+      "scope": "46s bounded failed attempt; not600s"
+    },
+    "native_observer_design": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-kit-slice/P4.4-native-observer-implementation-scope-v1.md",
+      "sha256": "3a01be8085c0247ff9302737d4edf860adf5284eb9d25862ed11e63a48b904ac",
+      "bytes": 12749,
+      "scope": "implementation+functional authorized; no timed observer grant"
+    },
+    "observer_capacity_pass": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-observer-capacity-v1/report.json",
+      "sha256": "2ab5b8d39ea000a7f4e92274dfa86b3640efc3a221efabb110fa96ab222c1210",
+      "bytes": 183029,
+      "scope": "bounded7500/124.857s/controller capacity only; not600s/GateB"
+    },
+    "long_v2_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-clean-long-v2/report.json",
+      "sha256": "03db6cf96d0b856dacaa7d80e529a6f2938d0a12eb203c6e00b4deabf63c27aa",
+      "bytes": 16827,
+      "scope": "queue overflow plus independent late-recovery budget failure; original immutable"
+    },
+    "native_typed_profile": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-integer-producer-v1/profile-native-dense19-v2/seal-v1.json",
+      "sha256": "b7143615365c920c58416affba6a66c8ed6e4fdacfdc5b46cd5ef9a9a483a2c7",
+      "bytes": 3157,
+      "scope": "19correct typed whole repair observations;18over4ms/normal0"
+    },
+    "disk_actor": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/stream-spool-support-v1.json",
+      "sha256": "511838bebdd32f0cea0cec41d9902c96984adbdc2b71f9aa9a59409d9934bb35",
+      "bytes": 3358,
+      "scope": "14pure intake controls; explicit finite disk caps"
+    },
+    "rolling_index": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/rolling-index-support-v1.json",
+      "sha256": "3905218930ff1d4135120f47ef64e83889cd7fadb2ab2241f2126ca18c55f92d",
+      "bytes": 4090,
+      "scope": "24pure storage controls; no durability/policy/validation change"
+    },
+    "replay_clean_long_pass": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-clean-long-v3/report.json",
+      "sha256": "886c3fbfcf7bcbb5d43d7ba6b21c94be04276110b1c32160fa95427f2044d464",
+      "bytes": 50811,
+      "scope": "CLEAN Replay functional-soak pass ONLY; CPU/Kit/impairment/lifecycle/GateB separate"
+    },
+    "replay_clean_long_policy_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-clean-long-v3/long-coverage-audit.json",
+      "sha256": "7f1eb12cfbd2bf86350c5fa82408293e20027cdfedd77788a87ba78520e8f032",
+      "bytes": 728549,
+      "scope": "prospectively frozen coverage/duration/cycle policy PASS; original raw rolling also PASS"
+    },
+    "replay_clean_long_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/replay-clean-long-v3-independent-v1/report.json",
+      "sha256": "4f6e301ecf6d9dfb039d24b43ae23523d739bc7cfa4cd5ecb10489bf1bdf2425",
+      "bytes": 7358,
+      "scope": "Independent saved-only confirmation; alloriginalreceipts,source,cycles,intake,cleanup; no rerun"
+    },
+    "kit_disk_intake_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-disk-intake-v1/report.json",
+      "sha256": "130b08a7bc7cecc65ecc91fc7f6fb6c5bceca757cf77113c2e8d2af1b8911dbb",
+      "bytes": 17516,
+      "scope": "Original strict failure preserved; no observerloss, no authorityQuery/Spawn join claim"
+    },
+    "kit_disk_intake_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit32-disk-intake-v1-independent/report.json",
+      "sha256": "8f9e03ef0a6a2ad9f21b60d93752533406daf8268b4c9c38a3b5207918f727bf",
+      "bytes": 20882,
+      "scope": "Saved classification only; strict2decisions+3FX omissions remain"
+    },
+    "fresh_seal_native": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-fresh-seal-v1/native-artifacts-final-v1.json",
+      "sha256": "08edc00f0cc31623db00e0ac6fbbf60c77539bdb24137f91f47126e259f6c889",
+      "bytes": 6209,
+      "scope": "NewON2d4/OFFc5 D/R/sanitizer corpus and manifest identities; no timing"
+    },
+    "fresh_seal_kit_functionals": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-fresh-seal-v1/fresh-seal-support-final-v1.json",
+      "sha256": "3aee3fffd8ca3c707ef89d5716f5522b4cba5cb4c963a5ff1a1b20f566dfd5b0",
+      "bytes": 13077,
+      "scope": "Four actualCoreSDK dense/common no-scope/structure functionals; no clocks/SAMPLE; Replay consumer separate"
+    },
+    "fresh_seal_source_review": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/fresh-constructor-final-source-binding-v1.json",
+      "sha256": "915f5387f693f3bcd9bd3fa2f91f8ec1ae55012c14495f04b53cefc8bb3d7a11",
+      "bytes": 1415,
+      "scope": "Read-only final source/parity binding; no matrix rerun"
+    },
+    "fresh_seal_kit_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/fresh-seal-kit-functionals-independent-v1/report.json",
+      "sha256": "e718ce5dac4550223f22b500b848f8db715c7539c860936b47364f3d014b1941",
+      "bytes": 6219,
+      "scope": "Four saved actualCoreSDK functionals independently verified; NOT_MEASURED"
+    },
+    "fresh_seal_kit19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-fresh-seal-v1/profile-fresh-seal-dense19-v1/seal-v1.json",
+      "sha256": "6b126be7bc23a4c09aaa013e500401bfc8efd6a04e7fc7700eaf9c97495c17d4",
+      "bytes": 2842,
+      "scope": "KitON2d4 whole repair19;1over4ms/normal0; no repeated run"
+    },
+    "fresh_seal_replay19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-fresh-seal-offc5-prepared-v1/seal.json",
+      "sha256": "9dce3db26a680b13316a022ac7871c8706cf0185a1a8d2f41cb7a31b07457697",
+      "bytes": 8227,
+      "scope": "ReplayOFFc5 whole repair19;12over4ms/normal0; no repeated run"
+    },
+    "kit_fresh_seal_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-fresh-seal-v1/report.json",
+      "sha256": "5f8e76bd5ae0cc25a1cfb6cd7921f8975d825a68c07a469fb110cb7ed201aa9a",
+      "bytes": 17538,
+      "scope": "Original strict FAIL2missingdecisions+4FX despite8full5/natural0/cleanup0/intakeall; no waiver"
+    },
+    "fresh_seal_kit19_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/fresh-seal19-kit-independent-v1/report.json",
+      "sha256": "8168b6381951ec4a8492cb202e2c6f52a833c4c292b0ea3964f726f6a066c12c",
+      "bytes": 61140,
+      "scope": "Saved-only independent all19integer/raw/whole/nativecontexts/provenance/cleanup; budgetFAIL"
+    },
+    "fresh_seal_replay19_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/fresh-seal19-replay-independent-v1/report.json",
+      "sha256": "b1b0285bd9fa23c7aecd241e79724ff704271124250b3f5910be92f4994618bc",
+      "bytes": 2964,
+      "scope": "Saved-only independent all19raw/provenance/whole/cleanup; budgetFAIL"
+    },
+    "kit_fresh_seal_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit32-fresh-seal-v1-independent/report.json",
+      "sha256": "789dd913c8140ec407b99e175a5d5c3e6d8cc63008373d9426bdfc2e30c5190f",
+      "bytes": 13069,
+      "scope": "OriginalFAIL preserved:8late resets/no future suffix/2decisions+4FXmissing; Queryactual160 established, clientSpawn280authorityunproven"
+    },
+    "fnv_zero42_source_review": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/fnv-zero42-source-review-v1.json",
+      "sha256": "ab03cea2f5d68f73a54a6958926e108520a3a20b3ef8333cf36ef5837ac37b1a",
+      "bytes": 2914,
+      "scope": "Read-only exact recurrence/inbounds/order proof; not vector/matrix/CPU acceptance"
+    },
+    "fnv_zero42_native": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-zero42-v1/native-artifacts-final-v1.json",
+      "sha256": "fe66a1e26aaefbaa5ff2a9013fe3539ee7e2c2fd05eaea29c05dc6a25370c787",
+      "bytes": 6052,
+      "scope": "AllON/OFFD/R/defaultASanUBSan; exactvectors/guard/parity; newON392/OFFddff identities. SDKconsumerresults andCPU separate."
+    },
+    "zero42_kit_dense19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-zero42-v1/profile-zero42-dense19-v1/seal-v1.json",
+      "sha256": "7c94d2c64d220209dfe69ca808aa0483f9ac3c3e87ed856a99a900ef8a5c5b92",
+      "bytes": 2816,
+      "scope": "Dense reference repair19 allcorrect/under4ms, normal0INCOMPLETE; nofullCPU/GateB claim"
+    },
+    "zero42_replay_dense19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-zero42-offddff-prepared-v1/seal.json",
+      "sha256": "b62f12b2de84b2023519906ed14c64fa1329130eabaa4384805dccf6c9c2ab95",
+      "bytes": 8153,
+      "scope": "Dense reference repair19 allcorrect/under4ms, normal0INCOMPLETE; nofullCPU/GateB claim"
+    },
+    "zero42_kit_dense_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/zero42-kit19-independent-v1/report.json",
+      "sha256": "5120a85834056e0ac1f90818538db02819e6fc11b64d713c4a7665ad9228660f",
+      "bytes": 52631,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "zero42_replay_dense_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/zero42-replay19-independent-v1/report.json",
+      "sha256": "25de10c1ab7e866f1016809a8287607646c229d7aff8e48b93e77861669a44c0",
+      "bytes": 3284,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "zero42_kit_common19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-zero42-v1/profile-zero42-common19-v1/seal-v1.json",
+      "sha256": "f08e3f8d860cb4227ba1979c28e006cd6eca09c8ea1eeca2f358c67bf1d33ccf",
+      "bytes": 2825,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "zero42_kit_common_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/zero42-common19-independent-v1/report.json",
+      "sha256": "9d79f0443cb03a26980f920db3f6304e21fede46291bd3314ca0ea017ecf78e7",
+      "bytes": 53496,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "zero42_replay_normalA19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-A-zero42-offddff-prepared-v1/seal.json",
+      "sha256": "57c7866c01372caf9a1a25695fbeb0e7a2df8d0e3fd427925f94ea03ec20a3f4",
+      "bytes": 8291,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "zero42_replay_normalB19": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/profile-normal-B-zero42-offddff-prepared-v1/seal.json",
+      "sha256": "553cd35f40484eac65d9407e96883d0a65396d3ff894f755e0446d3ef4be1e1f",
+      "bytes": 8326,
+      "scope": "Current isolatedobservedbatch/source/step/full5/cleanup; separateworkloads, no GateB/Kitlivequality claim"
+    },
+    "kit_zero42_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-zero42-v1/report.json",
+      "sha256": "961064ea0e744ce4abc344d295d20a1cdbd06e3ab9fa28254f915aca11772513",
+      "bytes": 14242,
+      "scope": "Originalfirstintent40/windowFAIL; Clientnatural1/Hostforced-15/no aggregatecleanupPASS"
+    },
+    "kit_zero42_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit32-zero42-v1-independent/report.json",
+      "sha256": "9b59c378f848b860f0f387d22f103dc5c96f896d0da6939cb8a74b6b04d4771e",
+      "bytes": 14427,
+      "scope": "Savedclassificationonly; callbacktick>48implied, actualtick/cf/lookupresults40..48UNAVAILABLE; no cause/waiver"
+    },
+    "zero42_seed_oracle": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/seed-oracle-zero42-offddff-v1/oracle-values-v1.json",
+      "sha256": "3b5e86e74163d3dfabedaf957fbc15a23871d4dfc00c101de1cd0c17ac33f25f",
+      "bytes": 2921,
+      "scope": "FreshpublicCodecrules14refs/nativeDDFF; descriptoronly/no world/history/Godot"
+    },
+    "zero42_impaired_staged_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/replay-impaired-long-zero42-v1-staged-audit.json",
+      "sha256": "412522900c81476cc5743807ddc379c544a47668dc9adb49e8b2952d67a6a282",
+      "bytes": 5356,
+      "scope": "Prospective10/1/loss0LONG preflightonly/NOTEXECUTED; allfixedpolicyboundsunchanged"
+    },
+    "kit_normalA_functionals": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-normal-a-functional-v1/client-a-functional-support-final-v1.json",
+      "sha256": "1932bbf3a8a8cacade9189f310b6a95323353a7b76411c66b0bd5de2249f8404",
+      "bytes": 8567,
+      "scope": "ActualCoreSDKdense/common clientNORMALfunctionalPASS/NOT_MEASURED, localpredictioncp.fields contract/observedcallbacknotNativecounter"
+    },
+    "kit_normalA_source_closure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit-normal-A-source-closure-v1/A-source-closure.json",
+      "sha256": "f0a5350b5c1e539032dd6d3667e8d8f24caaaf5097697115a51d21b21ec17afd",
+      "bytes": 415014,
+      "scope": "All1290consumedsources+6casebins copied/hashbound BEFOREauthorityBsourcechange; oldAproofs preserved"
+    },
+    "kit_normalAB_functionals": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-normal-ab-functional-v1/ab-functional-support-final-v1.json",
+      "sha256": "70ff2f5a6ab9cf1ad16821f9c4156021306bfac1096a9353e950e8de5c9a157d",
+      "bytes": 14646,
+      "scope": "CurrentactualCoreSDKON3925functionalsA/Bdense/common+defaultrepairPASS/noTime/noSAMPLE; LOCAL5contract/callbackcounter semantics explicit"
+    },
+    "kit_normalAB_source_closure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit-normal-AB-source-closure-v1/AB-source-closure.json",
+      "sha256": "b04d95b87b04f760c1030d10d30087179e832273505830a1a246eacc58ebf112",
+      "bytes": 426713,
+      "scope": "1290actualconsumedABsourcefiles+15casebins immutablebeforediagnosticwrapperedit"
+    },
+    "replay_impaired_long_zero42_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-impaired-long-zero42-v1/report.json",
+      "sha256": "253b4f5ae61b04f33b5a335c151a000aa58c3e5744142152727fd26d75f4ac52",
+      "bytes": 48987,
+      "scope": "OriginalfrozenlateRecoveryFAIL despite609.31s/natural0/all12936full5/cleanup0; no policywaiver"
+    },
+    "replay_impaired_long_zero42_audit": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-replay32-impaired-long-zero42-v1/long-coverage-audit.json",
+      "sha256": "701d1272960f2b125623a79371b3becdf5738727a2b02b53f6148a4af2b79eee",
+      "bytes": 9882,
+      "scope": "ProspectivepolicyFAILlateRecoverybeyondfrozenbudget; rawstrict653decisions13FXmissingpreserved"
+    },
+    "replay_impaired_long_zero42_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/replay-impaired-long-zero42-v1-independent/report-final-v1.json",
+      "sha256": "4f58adcf47acf958f34487df0e5d811011f06370e6ba3c43d9e1ca3563f3f2d9",
+      "bytes": 17246,
+      "scope": "Savedindependent303830events/201230receipts/fullstate+allintake/cleanup; frozenlateRecovery+scopejoinFAIL remain, no waiver"
+    },
+    "action_scope_caseA_setup_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/action-scope-case-a-offddff-v1/report.json",
+      "sha256": "0e91262b33b8a34e225c86d6cdffd432f526fad3b36eb1748ec50878774e236b",
+      "bytes": 7647,
+      "scope": "Public4body diagnosticsetupguardFAIL beforeclient_issue; no contract/resendproof; actualcleanup0; freshdiagnostic-only revision separatelyauthorized"
+    },
+    "public_action_scope_caseA_v4": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/action-scope-case-a-offddff-v4-monotonic-ack/report.json",
+      "sha256": "5c68df1f9838395bcf6cd483a79ce296f0cae73bbd92150538fc7349ca4882be",
+      "bytes": 13692,
+      "scope": "Public4body/staticnilOwnercontrolledMemorycasePASS: logicaltupleunchanged/transportserialresend/oneexecution/full5/staleoldreject/cleanup0. NotSDK32/livecause/ENet/frozenpolicywaiver"
+    },
+    "kit_normal_four_seals": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/kit-normal-ab-timing-prep-v1/normal19-four-seals-v1.json",
+      "sha256": "198c1f6cfe82e9fbe2c9ee9b39bfc35e01207d71a1243787eb8dc15df3632342",
+      "bytes": 4089,
+      "scope": "Four separate observed Kit normal batches; raw samples and source/map refs retained."
+    },
+    "kit_normal_four_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit-normal4-saved-independent-v1/report.json",
+      "sha256": "56f6af27a0fabbfe3e0fa0ec8316d6abb95999c9c24bc8f14f6ca0f575486352",
+      "bytes": 11466,
+      "scope": "Independent saved-only verification of all76 raw samples and source/operation/cleanup evidence; no GateB acceptance."
+    },
+    "caller_credit_support": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/kit-caller-credit-v1/support-final-v1.json",
+      "sha256": "8e043e59ac57852608d055e7b0ac4cfcc17b78f7206134b88dd63e0abe4a0563",
+      "bytes": 4617,
+      "scope": "Actual imported pure helper controls only; synthetic Boundary records, not live receipt proof."
+    },
+    "caller_credit_scene_build": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-build-kit-caller-credit-v1/build-record.json",
+      "sha256": "876752895cfe336154d797381d9222b6a31a807bd34bdef008e427c42a9796d9",
+      "bytes": 7384,
+      "scope": "Fresh coherent actual Core/scripts speeddebug and OFFddff source/binary binding."
+    },
+    "caller_credit_kit_short": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-caller-credit-v1/report.json",
+      "sha256": "994504b5c9998b1e01c27433c65d53e2b889119dc3322ec300247a709ebd2320",
+      "bytes": 26741,
+      "scope": "Strict short Kit32 case passes; no600s/CPU/GateB/historical cause claim."
+    },
+    "caller_credit_kit_short_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit32-caller-credit-v1-independent/report.json",
+      "sha256": "08ba364ab1a7e99674371dccd1db5d415f4c3195e9a06ebc23fb170a1955d63b",
+      "bytes": 7357,
+      "scope": "Saved-only short evidence verified, including retained canonical bytes/signatures/original comparison receipts; no reread of consumed duplicate exports or long/CPU/GateB claim."
+    },
+    "caller_credit_kit_long_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-clean-long-caller-credit-v1/report.json",
+      "sha256": "d8c452e72b9844cbbfdc87fc97a01f15177a0b50ebc77206c0df4daad5b73a27",
+      "bytes": 15853,
+      "scope": "Original prospective clean Kit long FAIL: intent12280 window expired, no600s or final target, clientnatural1 and Hostforced-15; no waiver."
+    },
+    "caller_credit_kit_long_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/kit-clean-long-caller-credit-v1-independent/report.json",
+      "sha256": "51669e5d255cf5ac89ce062b2e8ad96c1967f0f9c90b2f5b4457e6bb1d226497",
+      "bytes": 12233,
+      "scope": "Original failure confirmed;409 paired receipts/411 canonical references/358joins/51completecycles; strict abort-tail omissions retained, no re-auditPASS."
+    },
+    "intent_observation_pure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/intent-observation-v1/support-final-v1.json",
+      "sha256": "066d556f9a8ee1744d8c8a4cb53fa5dc5b7c5fc02aba3fd130c0c28cd1c0528e",
+      "bytes": 5464,
+      "scope": "18 pure groups and49 synthetic JSON records; no live Lane/getter/admission proof."
+    },
+    "intent_observer_off_short": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-intent-observer-off-v1/report.json",
+      "sha256": "2307c52a3adcdb11cd4bd53a988f4006856c3eac45c084db6c4c0baae5aa2c79",
+      "bytes": 26844,
+      "scope": "DefaultOFF strict short case passes; full108976-byte Runtime allocation charged, zero observer records."
+    },
+    "intent_observation_on_incomplete": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-intent-observation-on-v1/report.json",
+      "sha256": "c40ec411179e31997733e3af2d7594893b8955be50067ff6d20c9d2b84f2369e",
+      "bytes": 14473,
+      "scope": "OriginalFAIL intent40 beforeselected12280; selected_seenfalse/zero observations, no cause or oldcase explanation."
+    },
+    "intent_observation_off_on_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/intent-observation-off-on-v1-independent/report.json",
+      "sha256": "f78ade42062331c0fa853734f2d733dc9a23ea12a61fd1fc0e3233f3d35f7584",
+      "bytes": 13236,
+      "scope": "Saved OFF strict pass and ON unreached-selected abort verified separately; no cause or waiver."
+    },
+    "active_intent_pure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/active-intent-observation-v1/support-final-v1.json",
+      "sha256": "b105d3ef2b2da91474b38ea17d5dc02474207e49c5dad985df749a1dd43c8f47",
+      "bytes": 5726,
+      "scope": "18 pure groups and bounded current-selection producer JSON; no live receipt proof."
+    },
+    "active_intent_off_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-active-observer-off-v1/report.json",
+      "sha256": "532fe65b3ac86d0b706d04b5f9d9d69252de9a53509dd37b2318452d9303638a",
+      "bytes": 14481,
+      "scope": "Original strict default-OFF FAIL after three validated resets and intent rebase beyond target. No acceptance waiver."
+    },
+    "active_intent_on_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-active-intent-observation-on-v1/report.json",
+      "sha256": "934226a3fe8fb87a349f0c3310ecd9cad14c732d2103f6a26fc8e2422170fb39",
+      "bytes": 14679,
+      "scope": "Original observationalFAIL:36resets/zero pairedexports/stale overwrittencontext; no cause/600s/acceptance."
+    },
+    "active_intent_off_on_partial": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/active-intent-observer-off-on-v1-partial/report.json",
+      "sha256": "119e489753f1ca4fb558fd5046f3d64567a784d4f098229b120342dff835b7cd",
+      "bytes": 9235,
+      "scope": "Partial savedclassification only; full chain/binary/canonical/numeric-account independent rechecks explicitly incomplete."
+    },
+    "service120_experiment_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-service120-active-v1/report.json",
+      "sha256": "d959f1ba8b8ed45eaacd618d259e7cfcbacdc33106a209bbe94342ab342726d5",
+      "bytes": 14429,
+      "scope": "Original strict FAIL despite actual configured120 both; Querywindow after8resets, not isolated transport evidence or120fix."
+    },
+    "service120_independent": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/service120-active-v1-independent/report.json",
+      "sha256": "bc917c256a460fdc155546521ef797e1b168b1a112a80ea4efd2a1e948aa17b9",
+      "bytes": 11797,
+      "scope": "Saved source/binaries/intake/74receipts/4full5/three sample records and reset facts verified;319 overwritten prefix and Host cleanup unknown retained."
+    },
+    "known_skip_reset_setup_failure": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/known-skip-reset-offddff-v1/report.json",
+      "sha256": "d031b10ad1b88bdd22d15a4f4d240e7c6bf3df149b6fe01faa12f52911db4b38",
+      "bytes": 1204935,
+      "scope": "Preserved setup failure: unconfirmed40 diagnostic export rejected atcf39, no Reset/criterion reached."
+    },
+    "known_skip_reset_prospective_red": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/known-skip-reset-offddff-v2/report.json",
+      "sha256": "e6effd6c7680d84b2f4e916cc6d7ba6efd9b9aaca77c42d133e20f08b7441976",
+      "bytes": 1208511,
+      "scope": "Real public known40 skip/step40/Reset45/signature/watermark/observe; full5confirmed39+45 and cleanup pass; ONE prospective due46 assertion fails at40. Not existing Kernel promise/SDK32/ENet/oldcause."
+    },
+    "intent_v2_public_green": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-bindings/replay-p44/unattempted-reset-v2-v1/support-final-v1.json",
+      "sha256": "a8472283040870a475140e068a2fd15d799aa471e342258e84dd7b061c5cc5d3",
+      "bytes": 7984,
+      "scope": "Actual10focusedpass/publicReset45->due46->first46admission/full5/FX/cleanup; generic4Memory/staticnilOwner only."
+    },
+    "intent_v2_proof_controls": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/box3d-gate-b-shared/intent-contract-v2-v1/support-final-v1.json",
+      "sha256": "dbeb3c33b3cff5eb9e53843317c9e26a99db220093ba5be0ad4882e3393d8b7f",
+      "bytes": 5074,
+      "scope": "50synthetic V1/V2/LONGproofcontrols pass, legacycrossing unchanged; not live acceptance."
+    },
+    "intent_v2_controller_binding": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/intent-v2-controller-binding-v1/support-final-v1.json",
+      "sha256": "6ed756c424db9d9f7f766a70b9f57aea8f1675e1f346a46e3d84eb80406287dc",
+      "bytes": 514,
+      "scope": "15synthetic controllercontrols pass; explicit2prelaunch matchesREADY2 beforeadmission."
+    },
+    "intent_v2_sdk_short": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-intent-v2-service120-v1/report.json",
+      "sha256": "ad952ee1ce46ac2db0d7edb97f11f3d2bcdc6193c5a7e3f2777221992d6c5633",
+      "bytes": 27059,
+      "scope": "FreshSDK32/17 explicitV2/120cap strict shortPASS; no600s/perf/GateB or historicalcause claim."
+    },
+    "kit_v2_clean_long_original": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-clean-long-intent-v2-service120-v1/report.json",
+      "sha256": "7b6ae7a17d3f7c5d8d734301b5fb56d2ad0da67ee5b64811aa9c9f81e65daac5",
+      "bytes": 20333,
+      "scope": "OriginalFAIL/INCOMPLETE prospective control proof; rawstrictPASS610.08s/1220full5/natural0/cleanup0 retained, not reclassified."
+    },
+    "kit_v2_clean_long_audit_incomplete": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/controller-live-kit32-clean-long-intent-v2-service120-v1/long-coverage-audit.json",
+      "sha256": "7d8bc3d87388b764718752482de7964ceff82392694ca1a30affd53d605a1713",
+      "bytes": 6470,
+      "scope": "Frozen audit missing authority per-tick control records, no failures/waivers; cannot establish prospective coverage."
+    }
+  },
+  "owned_documents": {
+    "path": "/Users/walter/data/code/odin/odin_godot/docs/design/box3d/gate-b.md",
+    "sha256": "9c37d661d483d62e5d36d9b3fd2cb0a4619b35401515f5370ffc5e15cbe694c7",
+    "bytes": 22162,
+    "scope": "Current progress and remaining gates; not acceptance"
+  }
+}

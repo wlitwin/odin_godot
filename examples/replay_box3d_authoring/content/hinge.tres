@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="Box3DAxisJointSettings3D" format=3]
+[ext_resource type="Script" path="res://addons/box3d_authoring/axis_joint_settings_3d.gd" id="1"]
+[resource]
+script = ExtResource("1")
+flags = 2
+lower = -0.75
+upper = 0.75

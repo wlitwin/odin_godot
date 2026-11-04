@@ -62,8 +62,8 @@ room_moderation_roster :: proc(room:^Room($S,$C,$A,$E,$N)) {
   net.server_ban_identity(&room.session.server,member.game_token_hash)
   if room.options.successor.member==member.identity.member {room.options.successor={};room.options.successor_seat=0}
  }}
- if room.session.link.outgoing.ready {
-  _,live:=net.server_connection(&room.session.server,room.session.link.outgoing.target)
-  if !live {rec.link_untarget(&room.session.link)}
+ if session_link(&room.session)^.outgoing.ready {
+  _,live:=net.server_connection(&room.session.server,session_link(&room.session)^.outgoing.target)
+  if !live {rec.link_untarget(session_link(&room.session))}
  }
 }

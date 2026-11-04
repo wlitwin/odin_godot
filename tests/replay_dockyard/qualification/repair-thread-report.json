@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "result": "BROADER_POST_CALL_WAIT_CPU_ENVELOPE_DIAGNOSTIC_NOT_ADMISSION",
+  "release_admitted": false,
+  "case": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/repair-thread-firefox-v1",
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/repair-thread-v1/plan.json",
+    "sha256": "8eea652e756b96157375eb3521510bc9382c9defbaca0b0b37320e10f6a65694"
+  },
+  "raw_report_sha256": "4a6baa2bf0f769385552e370e72d3cfe1366013d6c58f10aecb24e28dd12b6dd",
+  "raw_thread_sha256": "74d2bafecfb7cdf7238203bdb3eb33ccbbf742b1c7a8dfd4bca22892e6db90b4",
+  "summary": {
+    "result": "BROADER_POST_CALL_WAIT_CPU_ENVELOPE_DIAGNOSTIC_NOT_ADMISSION",
+    "at": "2026-11-04T05:44:14.423591+00:00",
+    "original_wide_formula_result": "TRIGGER_MISSING_CPU_BRACKETS_NOT_ADMISSION",
+    "whole_call_ms": 89.639,
+    "thread_cpu_ms_in_broader_envelope": 35.36,
+    "envelope_wall_ms": 287.56298828125,
+    "lower_bound": {
+      "epoch_ms": 1793770677485,
+      "basis": "Before-state last_wall was sampled before this measured Room.frame. Minus2ms for quantization/cross-clock uncertainty; choose a query whose entire interval ends before it."
+    },
+    "upper_bound": {
+      "epoch_ms": 1793770677739,
+      "basis": "Node Date.now console arrival occurs after the synchronous SAMPLE_OPERATION_SLOW log, after Room.frame end. Plus2ms for quantization; choose first later WAITING sample to allow runtime accounting after the call."
+    },
+    "before_query": [
+      1793770677481.577,
+      461878674917,
+      80667,
+      139824765000,
+      4959013000,
+      1,
+      31,
+      31,
+      151,
+      0
+    ],
+    "after_query": [
+      1793770677769.14,
+      462166234750,
+      26667,
+      139856493000,
+      4962645000,
+      3,
+      31,
+      31,
+      93,
+      1
+    ],
+    "columns": [
+      "wall_ms",
+      "monotonic_since_start_ns",
+      "query_ns",
+      "user_ns",
+      "system_ns",
+      "run_state",
+      "current_priority",
+      "priority",
+      "cpu_usage_raw",
+      "flags"
+    ],
+    "clock_discrepancy_max_ms": 0.1373662031249996,
+    "inference": "Reported CPU in this broader envelope is below whole-call wall time. This does not support interpreting the entire stall as steady computation on this mapped thread. Specific wait/scheduling/IPC mechanism remains unestablished; no CPU subtraction or budget normalization.",
+    "limitations": [
+      "Analysis-only conservative bounds, broader than the call; the original pre-existing formula lacked a future upper bracket and is preserved.",
+      "CPU counter accounting can lag a running thread. The upper sample explicitly observes WAITING after the call; public base-kernel sources describe switch-time accounting. Installed security-suffix kernel is not byte-verified against that source.",
+      "The observer may perturb scheduling. Run-state samples are snapshots and RUNNING includes TH_RUN; no context-switch history or specific scheduler diagnosis.",
+      "This observed89.639ms diagnostic event is separate from original45.920ms unprofiled failure; neither is removed."
+    ],
+    "sources": [
+      "https://github.com/apple-oss-distributions/xnu/blob/xnu-11417.140.69/osfmk/kern/bsd_kern.c",
+      "https://github.com/apple-oss-distributions/xnu/blob/xnu-11417.140.69/osfmk/kern/thread.c",
+      "https://github.com/apple-oss-distributions/xnu/blob/xnu-11417.140.69/osfmk/kern/recount.c"
+    ],
+    "release_admitted": false
+  },
+  "calibration": {
+    "pid": 13037,
+    "opaque_thread_handle_hex": "000000020813a3e0",
+    "os_name": "MainThread",
+    "calibration_cpu_ms": 1999.48,
+    "calibration_wall_ms": 2000.0200000000004
+  },
+  "actual_exit": 0,
+  "errors": [],
+  "source_export_helper_service_fences": true,
+  "both_full_godot_exits": true,
+  "original_performance_contract_unchanged": true,
+  "next": "User requests focused Claude review while Root investigates existing Scrapyard TURN/itch deployment. No public deployment or performance waiver assumed."
+}

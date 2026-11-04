@@ -1,0 +1,1325 @@
+{
+  "schema_version": 1,
+  "result": "FUNCTIONAL_MATRIX_PASS_STRICT_HOST_MAX_REJECTED",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-03T21:00:27.853556+00:00",
+  "contract": {
+    "path": "tests/box3d_web/contract.json",
+    "sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124",
+    "thresholds_changed": false,
+    "admission": "REJECTED: Firefox authority normal whole Room.frame maxima10.601/12.94ms exceed10ms; p95/p99 and every other current threshold pass. No percentile waiver assumed."
+  },
+  "current_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/web-audio-stream-export-v2/report.json",
+    "sha256": "a1545b357fb434717c3c9e07ece1db3ff447340cabc40afe4d277b17e16b3bc7",
+    "files": {
+      "index.apple-touch-icon.png": "81e142be04b2f1cc3843da5908c7368a16a8704d96d9b33f3e6547eb0ee80fe3",
+      "index.wasm": "eb7ab9dcb2c2c484f4dca0acaad466b7fd8448fb86a0a552b5c3e5291952115f",
+      "index.icon.png": "70d937a5c99f89d6978e9b1d69745cb379527c3b3a6daf31f81b32e10ab31d0c",
+      "index.html": "8ecc3571295a5c32ad2c49446f8704496b62f914f2ea036985a5388bdfb9c210",
+      "index.png": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e",
+      "index.audio.worklet.js": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
+      "index.js": "878c9ae7fb3c27ce886faea8da0670dc1a97fb93930fac4b433a1bb56e662d3a",
+      "index.audio.position.worklet.js": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
+      "index.side.wasm": "7524005084798d164449a7bb28595e3e680103898cf26c50cb2bc7335a5c9254",
+      "index.pck": "13c033ad3b803dd048c0c5edc6124721b82adff6403da1975f066c91f7b59566",
+      "libodin_godot.wasm": "698d967df1162062382f0f95fe2c4766e6ae2a03f777e57452659b8446634b84"
+    },
+    "native_sha256": "331605c2902d37885ed11e0f191304807364584923fbf5bbe37edef48303e25f",
+    "web_archive_sha256": "8275b69e999729e87b6118163b291cca8ee5a8959a576173c010935598f87979",
+    "build_optimizer_workers": 1
+  },
+  "final_streams": {
+    "final-chrome-host-v1": {
+      "runtime": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-chrome-host-v1/report.json",
+        "sha256": "9ffc31a55897670808e7e5232816649ae9c10c440d17fc1a0d651d700299d7b1",
+        "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+        "scope": "Current stream-audio artifact, actual headed hardware mixed-browser pair; every raw row retained",
+        "binding": {
+          "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-chrome-host-v1/export-binding.json",
+          "sha256": "5382f48ed2e7579841d8c636dd91b2cc3ce6c9f184fdd6d475276401cbdc61a6",
+          "actual_exit": 0,
+          "export_unchanged": true,
+          "helper_source_fence": true,
+          "service_clean": true
+        }
+      },
+      "assessment": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-chrome-host-v1/assessment.json",
+        "sha256": "e172dc99b61f6927c52f340d789c31bbebe34dcc7af6945d9a96a90883530a21",
+        "schema_version": 1,
+        "result": "MEASURED_BUDGETS_PASS",
+        "observations": {
+          "host": {
+            "operation_rows": 38378,
+            "categories": {
+              "bootstrap": 31,
+              "pump": 1750,
+              "advance1": 36594,
+              "advance_many": 3
+            },
+            "normal": {
+              "count": 36594,
+              "p95_ms": 1.97,
+              "p99_ms": 2.195,
+              "max_ms": 6.094
+            },
+            "repair8": {
+              "count": 0,
+              "p95_ms": null,
+              "p99_ms": null,
+              "max_ms": null
+            },
+            "presentation": {
+              "count": 38480,
+              "p95_ms": 18.244999999995343,
+              "p99_ms": 18.580000000016298,
+              "max_ms": 1116.625
+            },
+            "sampled_wasm_linear_peak_bytes": 100466688,
+            "sampled_admitted_peak_bytes": 25137982,
+            "transfers": [
+              {
+                "role": "host",
+                "complete_wire_bytes": 49479,
+                "native_payload_upper_bound_bytes": 17070
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 51345,
+                "native_payload_upper_bound_bytes": 17179
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 51805,
+                "native_payload_upper_bound_bytes": 17409
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52105,
+                "native_payload_upper_bound_bytes": 17409
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52690,
+                "native_payload_upper_bound_bytes": 17719
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52770,
+                "native_payload_upper_bound_bytes": 17863
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52926,
+                "native_payload_upper_bound_bytes": 17922
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52976,
+                "native_payload_upper_bound_bytes": 17955
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53310,
+                "native_payload_upper_bound_bytes": 18130
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53312,
+                "native_payload_upper_bound_bytes": 18131
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53840,
+                "native_payload_upper_bound_bytes": 18379
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53863,
+                "native_payload_upper_bound_bytes": 18389
+              }
+            ],
+            "cold_lobby_ms": 1343.8963330000001,
+            "cold_usable_menu_ms": 1611.359125,
+            "go_to_checked_result_seconds": 610.2493471659999,
+            "raw_sha256": {
+              "console.ndjson": "ea8e331b0fa34099b492de429551b2ec5c64e347173f759653a76eab7db52019",
+              "browser-samples.json": "01a324690be39548caffb9b49b4f28651c8c86caa236c3ce7fe7c2fb826b4990"
+            }
+          },
+          "client": {
+            "operation_rows": 36669,
+            "categories": {
+              "bootstrap": 22,
+              "pump": 2619,
+              "replacement": 1,
+              "advance1": 21445,
+              "repair": 11697,
+              "advance_many": 885
+            },
+            "normal": {
+              "count": 21445,
+              "p95_ms": 1.28,
+              "p99_ms": 2.279,
+              "max_ms": 6.42
+            },
+            "repair8": {
+              "count": 4237,
+              "p95_ms": 5.279,
+              "p99_ms": 6.601,
+              "max_ms": 20.02
+            },
+            "presentation": {
+              "count": 37041,
+              "p95_ms": 16.800000000046566,
+              "p99_ms": 17.28000000002794,
+              "max_ms": 13150
+            },
+            "sampled_wasm_linear_peak_bytes": 120586240,
+            "sampled_admitted_peak_bytes": 26582421,
+            "transfers": [],
+            "cold_lobby_ms": 5896.843667,
+            "cold_usable_menu_ms": 18933.165875000002,
+            "go_to_checked_result_seconds": 610.238441167,
+            "raw_sha256": {
+              "console.ndjson": "99c6eb2a3b94abed23bf52805d363658e30a562c0c506e00414ea44b3c0db58c",
+              "browser-samples.json": "d7b43f2f37fbada43b06a87b154f8525288fd93932ba60c94ca099fdcbacc740"
+            }
+          }
+        },
+        "violations": [],
+        "missing": [],
+        "quantiles": "nearest rank ceil(p*N), milliseconds; no samples removed and no overhead subtraction",
+        "sampled_complete_wire_peak_bytes": 53863,
+        "conservative_native_payload_upper_bound_bytes": 53863,
+        "plan_sha256": "c78317b42c095ce094eef249645978df1dd05f8ad920ccbf9f3cd145cb121a9d",
+        "contract_sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124",
+        "source_report_sha256": "9ffc31a55897670808e7e5232816649ae9c10c440d17fc1a0d651d700299d7b1",
+        "release_admission": false,
+        "scope": "This case only. Matrix, faults, regressions, external Internet and human review remain separate requirements."
+      },
+      "browsers": {
+        "host": "chrome",
+        "client": "firefox"
+      },
+      "all_five_byte_equal": true,
+      "clipboard_restored": true,
+      "game": {
+        "host": {
+          "role": "host",
+          "tick": 36600,
+          "score": 3,
+          "delivered": [
+            true,
+            true,
+            true
+          ],
+          "inside": [
+            true,
+            true,
+            true
+          ],
+          "dwell": [
+            120,
+            120,
+            120
+          ],
+          "cargo_positions": [
+            [
+              4.36783934,
+              1.19966614,
+              4.20704365
+            ],
+            [
+              7.23754072,
+              1.19966495,
+              4.17398691
+            ],
+            [
+              5.86619377,
+              1.1496129,
+              2.54849029
+            ]
+          ],
+          "eligible_delivery_cues": 19,
+          "game_sha256": "2953f5f57d80caa1ea86f96e6c28f9364b154e370dc7b37b593f6489cf9055cd",
+          "round": 8,
+          "layout": 1,
+          "phase": "Results",
+          "round_ticks": 5146,
+          "payout": 1328,
+          "lost": [
+            false,
+            false,
+            false
+          ],
+          "recovered": [
+            0,
+            0
+          ]
+        },
+        "client": {
+          "role": "client",
+          "tick": 36600,
+          "score": 3,
+          "delivered": [
+            true,
+            true,
+            true
+          ],
+          "inside": [
+            true,
+            true,
+            true
+          ],
+          "dwell": [
+            120,
+            120,
+            120
+          ],
+          "cargo_positions": [
+            [
+              4.36783934,
+              1.19966614,
+              4.20704365
+            ],
+            [
+              7.23754072,
+              1.19966495,
+              4.17398691
+            ],
+            [
+              5.86619377,
+              1.1496129,
+              2.54849029
+            ]
+          ],
+          "eligible_delivery_cues": 19,
+          "game_sha256": "2953f5f57d80caa1ea86f96e6c28f9364b154e370dc7b37b593f6489cf9055cd",
+          "round": 8,
+          "layout": 1,
+          "phase": "Results",
+          "round_ticks": 5146,
+          "payout": 1328,
+          "lost": [
+            false,
+            false,
+            false
+          ],
+          "recovered": [
+            0,
+            0
+          ]
+        }
+      },
+      "cleanup": {
+        "host": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        },
+        "client": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        }
+      },
+      "network": {
+        "host": {
+          "role": "host",
+          "stats": {
+            "compact_observations": 0,
+            "observation_bytes_saved": 0,
+            "replay_samples": 0,
+            "replay_wall_us": 0,
+            "replay_max_us": 0,
+            "replay_max_depth": 0,
+            "profile_errors": 0,
+            "replay_histogram": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "rx_packets": 41034,
+            "tx_packets": 45517,
+            "rx_bytes": 5967742,
+            "tx_bytes": 257079179,
+            "rejected_packets": 0,
+            "rejected_inputs": 0,
+            "duplicate_actions": 0,
+            "held_inputs": 14993,
+            "fenced_packets": 0,
+            "corrections": 0,
+            "replayed_ticks": 0,
+            "resyncs": 0,
+            "stalls": 0,
+            "reused_correction_ticks": 0,
+            "snapshot_catchups": 0,
+            "watch_catchups": 0,
+            "timing_samples": 0,
+            "timing_rejected": 0,
+            "lead_updates": 0,
+            "full_snapshots": 0,
+            "delta_snapshots": 0,
+            "snapshot_bytes_saved": 0,
+            "baseline_misses": 0,
+            "rejected_acks": 0,
+            "egress_deferred": 0,
+            "large_reliable_snapshots": 0,
+            "lz4_snapshots": 0,
+            "shuffled_snapshots": 0,
+            "shuffle_attempts": 0,
+            "shuffle_bytes_saved": 0,
+            "redundant_facts": 0,
+            "redundant_fact_bytes": 0,
+            "compact_recent_facts": 0,
+            "recent_fact_bytes_saved": 0,
+            "fact_repair_requests": 0,
+            "fact_repairs": 0,
+            "fact_repair_bytes": 0,
+            "fact_repair_oversize": 0,
+            "action_copy_batches": 0,
+            "action_copies": 0,
+            "action_copy_bytes": 0,
+            "action_copy_oversize": 0,
+            "fragmented_snapshots": 0,
+            "snapshot_parts_sent": 0,
+            "snapshot_parts_received": 0,
+            "snapshot_parts_expired": 0,
+            "snapshot_parity_sent": 0,
+            "snapshot_parity_received": 0,
+            "snapshot_parity_bytes": 0,
+            "snapshot_shards_recovered": 0,
+            "rejected_replica_views": 0,
+            "filtered_events": 0,
+            "rejected_views": 0,
+            "expired_views": 0
+          },
+          "action_outcomes": [
+            8,
+            1
+          ],
+          "action_applied": [
+            8,
+            1
+          ],
+          "accepted_actions": [
+            8,
+            1
+          ],
+          "boost_fx": 2,
+          "issued_sequence": 1,
+          "boosts": 2,
+          "repair_available": false,
+          "repair_profile_limit": 8,
+          "last_planned_depth": 0,
+          "last_executed_steps": 0,
+          "session_role": "Host",
+          "seat": 1,
+          "controls_consumed": 36597,
+          "frontier_samples": 38332,
+          "max_prediction_ahead": 0,
+          "resumed_prior_actions": false
+        },
+        "client": {
+          "role": "client",
+          "stats": {
+            "compact_observations": 0,
+            "observation_bytes_saved": 0,
+            "replay_samples": 0,
+            "replay_wall_us": 0,
+            "replay_max_us": 0,
+            "replay_max_depth": 0,
+            "profile_errors": 0,
+            "replay_histogram": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "rx_packets": 45517,
+            "tx_packets": 41035,
+            "rx_bytes": 257079179,
+            "tx_bytes": 5967850,
+            "rejected_packets": 0,
+            "rejected_inputs": 0,
+            "duplicate_actions": 0,
+            "held_inputs": 0,
+            "fenced_packets": 0,
+            "corrections": 11697,
+            "replayed_ticks": 73034,
+            "resyncs": 0,
+            "stalls": 2834,
+            "reused_correction_ticks": 0,
+            "snapshot_catchups": 0,
+            "watch_catchups": 0,
+            "timing_samples": 3559,
+            "timing_rejected": 0,
+            "lead_updates": 0,
+            "full_snapshots": 0,
+            "delta_snapshots": 0,
+            "snapshot_bytes_saved": 0,
+            "baseline_misses": 0,
+            "rejected_acks": 0,
+            "egress_deferred": 0,
+            "large_reliable_snapshots": 0,
+            "lz4_snapshots": 0,
+            "shuffled_snapshots": 0,
+            "shuffle_attempts": 0,
+            "shuffle_bytes_saved": 0,
+            "redundant_facts": 0,
+            "redundant_fact_bytes": 0,
+            "compact_recent_facts": 0,
+            "recent_fact_bytes_saved": 0,
+            "fact_repair_requests": 0,
+            "fact_repairs": 0,
+            "fact_repair_bytes": 0,
+            "fact_repair_oversize": 0,
+            "action_copy_batches": 0,
+            "action_copies": 0,
+            "action_copy_bytes": 0,
+            "action_copy_oversize": 0,
+            "fragmented_snapshots": 0,
+            "snapshot_parts_sent": 0,
+            "snapshot_parts_received": 0,
+            "snapshot_parts_expired": 0,
+            "snapshot_parity_sent": 0,
+            "snapshot_parity_received": 0,
+            "snapshot_parity_bytes": 0,
+            "snapshot_shards_recovered": 0,
+            "rejected_replica_views": 0,
+            "filtered_events": 0,
+            "rejected_views": 0,
+            "expired_views": 0
+          },
+          "action_outcomes": [
+            8,
+            1
+          ],
+          "action_applied": [
+            8,
+            1
+          ],
+          "accepted_actions": [
+            8,
+            1
+          ],
+          "boost_fx": 2,
+          "issued_sequence": 1,
+          "boosts": 2,
+          "repair_available": true,
+          "repair_profile_limit": 8,
+          "last_planned_depth": 6,
+          "last_executed_steps": 6,
+          "session_role": "Client",
+          "seat": 2,
+          "controls_consumed": 34021,
+          "frontier_samples": 36610,
+          "max_prediction_ahead": 8,
+          "resumed_prior_actions": false
+        }
+      }
+    },
+    "final-firefox-host-v1": {
+      "runtime": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-firefox-host-v1/report.json",
+        "sha256": "4ec062caad404638492b29adcc8d7ffc0c8c5753b9581865283b72e8c487164a",
+        "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+        "scope": "Current stream-audio artifact, actual headed hardware mixed-browser pair; every raw row retained",
+        "binding": {
+          "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-firefox-host-v1/export-binding.json",
+          "sha256": "3cb5ba5dbc486e31201a700609bd214c37c8f931810bc989c01024fd46f4b5fe",
+          "actual_exit": 0,
+          "export_unchanged": true,
+          "helper_source_fence": true,
+          "service_clean": true
+        }
+      },
+      "assessment": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-firefox-host-v1/assessment.json",
+        "sha256": "e2914bbde35ad86c63c733b164426653d99a5fc076e02d3f55b4cd039e55e3da",
+        "schema_version": 1,
+        "result": "BUDGET_REJECTED",
+        "observations": {
+          "host": {
+            "operation_rows": 37118,
+            "categories": {
+              "bootstrap": 31,
+              "pump": 488,
+              "advance1": 36598,
+              "advance_many": 1
+            },
+            "normal": {
+              "count": 36598,
+              "p95_ms": 2.099,
+              "p99_ms": 2.48,
+              "max_ms": 12.94
+            },
+            "repair8": {
+              "count": 0,
+              "p95_ms": null,
+              "p99_ms": null,
+              "max_ms": null
+            },
+            "presentation": {
+              "count": 37258,
+              "p95_ms": 16.79999999998836,
+              "p99_ms": 17.279999999969732,
+              "max_ms": 12367.08
+            },
+            "sampled_wasm_linear_peak_bytes": 100466688,
+            "sampled_admitted_peak_bytes": 25057323,
+            "transfers": [
+              {
+                "role": "host",
+                "complete_wire_bytes": 49479,
+                "native_payload_upper_bound_bytes": 17070
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 51345,
+                "native_payload_upper_bound_bytes": 17179
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 51805,
+                "native_payload_upper_bound_bytes": 17409
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52105,
+                "native_payload_upper_bound_bytes": 17409
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52482,
+                "native_payload_upper_bound_bytes": 17719
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52545,
+                "native_payload_upper_bound_bytes": 17741
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52685,
+                "native_payload_upper_bound_bytes": 17811
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52814,
+                "native_payload_upper_bound_bytes": 17890
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 52874,
+                "native_payload_upper_bound_bytes": 17912
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53110,
+                "native_payload_upper_bound_bytes": 18030
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 53956,
+                "native_payload_upper_bound_bytes": 18437
+              },
+              {
+                "role": "host",
+                "complete_wire_bytes": 54066,
+                "native_payload_upper_bound_bytes": 18492
+              }
+            ],
+            "cold_lobby_ms": 5663.936,
+            "cold_usable_menu_ms": 17936.802042,
+            "go_to_checked_result_seconds": 610.221050042,
+            "raw_sha256": {
+              "console.ndjson": "f3e01bc41270ed265d9c022ba4fa8ab38679f616cb5b58868ecf3edf6d6b8672",
+              "browser-samples.json": "f296ff99f240bc6e6d0f75128144276b9adda83c0a2e7dbd29ccf7fa37033991"
+            }
+          },
+          "client": {
+            "operation_rows": 36659,
+            "categories": {
+              "bootstrap": 21,
+              "pump": 1615,
+              "replacement": 1,
+              "repair": 12594,
+              "advance1": 21786,
+              "advance_many": 642
+            },
+            "normal": {
+              "count": 21786,
+              "p95_ms": 1.0,
+              "p99_ms": 2.035,
+              "max_ms": 2.935
+            },
+            "repair8": {
+              "count": 3803,
+              "p95_ms": 4.48,
+              "p99_ms": 5.42,
+              "max_ms": 6.57
+            },
+            "presentation": {
+              "count": 37038,
+              "p95_ms": 18.244999999995343,
+              "p99_ms": 18.584999999999127,
+              "max_ms": 1166.625
+            },
+            "sampled_wasm_linear_peak_bytes": 100466688,
+            "sampled_admitted_peak_bytes": 26450461,
+            "transfers": [],
+            "cold_lobby_ms": 1431.0085409999992,
+            "cold_usable_menu_ms": 1728.5557909999989,
+            "go_to_checked_result_seconds": 610.2242579169999,
+            "raw_sha256": {
+              "console.ndjson": "a00f12201025f1da60518a7574217099a3036150db78ec506afde016df663dd6",
+              "browser-samples.json": "89c3f3b3c48b5d72a8a9102e8cf6c8d7699beb40eef8dbe2e05039f043e19e2c"
+            }
+          }
+        },
+        "violations": [
+          "host: normal max_ms"
+        ],
+        "missing": [],
+        "quantiles": "nearest rank ceil(p*N), milliseconds; no samples removed and no overhead subtraction",
+        "sampled_complete_wire_peak_bytes": 54066,
+        "conservative_native_payload_upper_bound_bytes": 54066,
+        "plan_sha256": "c78317b42c095ce094eef249645978df1dd05f8ad920ccbf9f3cd145cb121a9d",
+        "contract_sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124",
+        "source_report_sha256": "4ec062caad404638492b29adcc8d7ffc0c8c5753b9581865283b72e8c487164a",
+        "release_admission": false,
+        "scope": "This case only. Matrix, faults, regressions, external Internet and human review remain separate requirements."
+      },
+      "browsers": {
+        "host": "firefox",
+        "client": "chrome"
+      },
+      "all_five_byte_equal": true,
+      "clipboard_restored": true,
+      "game": {
+        "host": {
+          "role": "host",
+          "tick": 36600,
+          "score": 1,
+          "delivered": [
+            true,
+            false,
+            false
+          ],
+          "inside": [
+            true,
+            false,
+            false
+          ],
+          "dwell": [
+            120,
+            0,
+            0
+          ],
+          "cargo_positions": [
+            [
+              4.4003315,
+              1.19966602,
+              1.71753705
+            ],
+            [
+              0.83807427,
+              0.96912217,
+              1.37377965
+            ],
+            [
+              -6.52510738,
+              0.39990333,
+              -0.52440363
+            ]
+          ],
+          "eligible_delivery_cues": 29,
+          "game_sha256": "74c11c02384c5f66de5c9cd00ac2e56f9cc84d5aa1db574cd07e7302213afd35",
+          "round": 11,
+          "layout": 1,
+          "phase": "Working",
+          "round_ticks": 1150,
+          "payout": 0,
+          "lost": [
+            false,
+            false,
+            false
+          ],
+          "recovered": [
+            0,
+            0
+          ]
+        },
+        "client": {
+          "role": "client",
+          "tick": 36600,
+          "score": 1,
+          "delivered": [
+            true,
+            false,
+            false
+          ],
+          "inside": [
+            true,
+            false,
+            false
+          ],
+          "dwell": [
+            120,
+            0,
+            0
+          ],
+          "cargo_positions": [
+            [
+              4.4003315,
+              1.19966602,
+              1.71753705
+            ],
+            [
+              0.83807427,
+              0.96912217,
+              1.37377965
+            ],
+            [
+              -6.52510738,
+              0.39990333,
+              -0.52440363
+            ]
+          ],
+          "eligible_delivery_cues": 29,
+          "game_sha256": "74c11c02384c5f66de5c9cd00ac2e56f9cc84d5aa1db574cd07e7302213afd35",
+          "round": 11,
+          "layout": 1,
+          "phase": "Working",
+          "round_ticks": 1150,
+          "payout": 0,
+          "lost": [
+            false,
+            false,
+            false
+          ],
+          "recovered": [
+            0,
+            0
+          ]
+        }
+      },
+      "cleanup": {
+        "host": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        },
+        "client": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 3,
+          "owners_after": 3,
+          "observed": true
+        }
+      },
+      "network": {
+        "host": {
+          "role": "host",
+          "stats": {
+            "compact_observations": 0,
+            "observation_bytes_saved": 0,
+            "replay_samples": 0,
+            "replay_wall_us": 0,
+            "replay_max_us": 0,
+            "replay_max_depth": 0,
+            "profile_errors": 0,
+            "replay_histogram": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "rx_packets": 41843,
+            "tx_packets": 45903,
+            "rx_bytes": 6252238,
+            "tx_bytes": 265566931,
+            "rejected_packets": 0,
+            "rejected_inputs": 0,
+            "duplicate_actions": 0,
+            "held_inputs": 9091,
+            "fenced_packets": 0,
+            "corrections": 0,
+            "replayed_ticks": 0,
+            "resyncs": 0,
+            "stalls": 0,
+            "reused_correction_ticks": 0,
+            "snapshot_catchups": 0,
+            "watch_catchups": 0,
+            "timing_samples": 0,
+            "timing_rejected": 0,
+            "lead_updates": 0,
+            "full_snapshots": 0,
+            "delta_snapshots": 0,
+            "snapshot_bytes_saved": 0,
+            "baseline_misses": 0,
+            "rejected_acks": 0,
+            "egress_deferred": 0,
+            "large_reliable_snapshots": 0,
+            "lz4_snapshots": 0,
+            "shuffled_snapshots": 0,
+            "shuffle_attempts": 0,
+            "shuffle_bytes_saved": 0,
+            "redundant_facts": 0,
+            "redundant_fact_bytes": 0,
+            "compact_recent_facts": 0,
+            "recent_fact_bytes_saved": 0,
+            "fact_repair_requests": 0,
+            "fact_repairs": 0,
+            "fact_repair_bytes": 0,
+            "fact_repair_oversize": 0,
+            "action_copy_batches": 0,
+            "action_copies": 0,
+            "action_copy_bytes": 0,
+            "action_copy_oversize": 0,
+            "fragmented_snapshots": 0,
+            "snapshot_parts_sent": 0,
+            "snapshot_parts_received": 0,
+            "snapshot_parts_expired": 0,
+            "snapshot_parity_sent": 0,
+            "snapshot_parity_received": 0,
+            "snapshot_parity_bytes": 0,
+            "snapshot_shards_recovered": 0,
+            "rejected_replica_views": 0,
+            "filtered_events": 0,
+            "rejected_views": 0,
+            "expired_views": 0
+          },
+          "action_outcomes": [
+            11,
+            1
+          ],
+          "action_applied": [
+            11,
+            1
+          ],
+          "accepted_actions": [
+            11,
+            1
+          ],
+          "boost_fx": 2,
+          "issued_sequence": 1,
+          "boosts": 2,
+          "repair_available": false,
+          "repair_profile_limit": 8,
+          "last_planned_depth": 0,
+          "last_executed_steps": 0,
+          "session_role": "Host",
+          "seat": 1,
+          "controls_consumed": 36599,
+          "frontier_samples": 37073,
+          "max_prediction_ahead": 0,
+          "resumed_prior_actions": false
+        },
+        "client": {
+          "role": "client",
+          "stats": {
+            "compact_observations": 0,
+            "observation_bytes_saved": 0,
+            "replay_samples": 0,
+            "replay_wall_us": 0,
+            "replay_max_us": 0,
+            "replay_max_depth": 0,
+            "profile_errors": 0,
+            "replay_histogram": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "rx_packets": 45903,
+            "tx_packets": 41845,
+            "rx_bytes": 265566931,
+            "tx_bytes": 6252430,
+            "rejected_packets": 0,
+            "rejected_inputs": 0,
+            "duplicate_actions": 0,
+            "held_inputs": 0,
+            "fenced_packets": 0,
+            "corrections": 12594,
+            "replayed_ticks": 78034,
+            "resyncs": 0,
+            "stalls": 1729,
+            "reused_correction_ticks": 0,
+            "snapshot_catchups": 0,
+            "watch_catchups": 0,
+            "timing_samples": 4134,
+            "timing_rejected": 0,
+            "lead_updates": 0,
+            "full_snapshots": 0,
+            "delta_snapshots": 0,
+            "snapshot_bytes_saved": 0,
+            "baseline_misses": 0,
+            "rejected_acks": 0,
+            "egress_deferred": 0,
+            "large_reliable_snapshots": 0,
+            "lz4_snapshots": 0,
+            "shuffled_snapshots": 0,
+            "shuffle_attempts": 0,
+            "shuffle_bytes_saved": 0,
+            "redundant_facts": 0,
+            "redundant_fact_bytes": 0,
+            "compact_recent_facts": 0,
+            "recent_fact_bytes_saved": 0,
+            "fact_repair_requests": 0,
+            "fact_repairs": 0,
+            "fact_repair_bytes": 0,
+            "fact_repair_oversize": 0,
+            "action_copy_batches": 0,
+            "action_copies": 0,
+            "action_copy_bytes": 0,
+            "action_copy_oversize": 0,
+            "fragmented_snapshots": 0,
+            "snapshot_parts_sent": 0,
+            "snapshot_parts_received": 0,
+            "snapshot_parts_expired": 0,
+            "snapshot_parity_sent": 0,
+            "snapshot_parity_received": 0,
+            "snapshot_parity_bytes": 0,
+            "snapshot_shards_recovered": 0,
+            "rejected_replica_views": 0,
+            "filtered_events": 0,
+            "rejected_views": 0,
+            "expired_views": 0
+          },
+          "action_outcomes": [
+            11,
+            1
+          ],
+          "action_applied": [
+            11,
+            1
+          ],
+          "accepted_actions": [
+            11,
+            1
+          ],
+          "boost_fx": 2,
+          "issued_sequence": 1,
+          "boosts": 2,
+          "repair_available": true,
+          "repair_profile_limit": 8,
+          "last_planned_depth": 3,
+          "last_executed_steps": 3,
+          "session_role": "Client",
+          "seat": 2,
+          "controls_consumed": 35018,
+          "frontier_samples": 36605,
+          "max_prediction_ahead": 8,
+          "resumed_prior_actions": false
+        }
+      }
+    }
+  },
+  "functional_cases": {
+    "mixed_browser": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/mixed-browser-v1/report.json",
+      "sha256": "09bd38f886f73d7b9d0faff6fc52830f74d122131dc609aa09b7424140784e7b",
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "scope": "Chrome156 host/Firefox159 client same B3Wasm; complete5/ACK/cleanup, before only Webaudio mode changed",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/mixed-browser-v1/export-binding.json",
+        "sha256": "9957aa6ea0be42b12db9921b0739015c47d6eae25a45d19aaebdc83df73b5f93",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    "faults": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v3/report.json",
+      "sha256": "4aa0a638be008eda9ee254714b271609e3dcddddc8586f87038c93d8c9d3b791",
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "scope": "B3 same model/network/Cbackend;15\u00b18ms FIFOdelay/jitter and35 actual unreliable client input drops. Host reliable physics traffic has no artificial loss. No baseline timing admission.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v3/export-binding.json",
+        "sha256": "3a2526b428b36cb035a3f3bfa717a17f8a2290f70cb1f9497ade0085e7cb85f7",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    "frozen_stream_audio": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-freeze-v2/report.json",
+      "sha256": "ad53aa4acd186c3e142c57e627a52cb04ef2b2b95f3f93a52dfa447e578fb02d",
+      "result": "PASS",
+      "scope": "Current audio artifact: actual1s client freeze/return, complete5/ACK/cleanup and no audio context error",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/audio-freeze-v2/export-binding.json",
+        "sha256": "542274908510f5fe5cf6e679930216f7a5dda587c97658fca7f3dd22547a0702",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    "rendered_audio": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/stream-audio-rendered-v1/report.json",
+      "sha256": "e2e025787f3f6e1de0eeb8ab45cc5950efb04e32aee0b79f2e0bc120729da22e",
+      "result": "PASS",
+      "scope": "Current audio artifact: actual hardwareMetalM3/1280x720DPR1 renderedpair, nonzero WebAudio RMS on both, full5/ACK/cleanup; recorder30fps is not gameFPS",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/stream-audio-rendered-v1/export-binding.json",
+        "sha256": "fa09441e74750b61b59abdbe6b28cd1fd50152f2475cb417dc5d731df9bc6c1b",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    }
+  },
+  "lifecycle": {
+    "before_audio_property": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/lifecycle-final-v1/report.json",
+      "sha256": "5e62be110ec7594596c659bf344b052d0556878bd742d3d4235d5ff17d24f3f3",
+      "result": "FAIL",
+      "scope": "Observer/transient/gap PASS on B3; next frozencase correctly FAIL actualsampleAudioContextnull; batchstopped and originals retained."
+    },
+    "after_audio_property": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/lifecycle-audio-v2/report.json",
+      "sha256": "8a730bd2431095d1f1556af5d5939e5a687ee3ec91e14f36d1bcf171750824a0",
+      "result": "PASS",
+      "scope": "Current stream-audio artifact coldreturn/hostloss/rehost/frozenhost allPASS. Model/content/transport unchanged; Webaudio-only property fix has separate successful frozen regression."
+    }
+  },
+  "compatibility": {
+    "native": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-compat-v2/report.json",
+      "sha256": "01ad508af0f413c4bcc3f0158ea25862305b00ed3399c042cfb503b096e33c77",
+      "result": "PASS",
+      "scope": "Actual NativeMacARM64 SDK pair1200/oneimage/full5/ACK/typedcleanup before Web-only audio override; Native default playback unchanged"
+    },
+    "kit_web": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/kit-compat-v1/report.json",
+      "sha256": "b643f4d1610a8ce9e14745719e9fc0afa3eaa556f1449117118e5985d67cce95",
+      "result": "PASS",
+      "scope": "Actual current shared Core/backend with minimal Kit provider/World2/codec/sourcefree cleanup. No Kit network/game/frame-budget inheritance."
+    }
+  },
+  "preserved_failures": [
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/firefox-pair-v6/report.json",
+      "sha256": "ceabd8aba61103a5dece9ec2ca7dee3a1c7edb33418b3221fb992a03dfe9374f",
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "scope": "Earlier B3 runtimePASS but assessment BUDGET_REJECTED max11.16normal/73.88,37.14repair, causeUNKNOWN; not erased by later passing B3streams.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/firefox-pair-v6/export-binding.json",
+        "sha256": "ec2b7be4f9dd12bb43baf56097b4bc928f549da9060b9565fa6f7a9fdeb0acc0",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/firefox-pair-v5/report.json",
+      "sha256": "624851154fd0a9416b353e8b45e1db1a3c08e562728130f2f0a96b6810b86a99",
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "scope": "Earlier prewarm runtimePASS but coldusable26-27sec exceeds20s; opaque material consolidation reduced currentcold below20.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/firefox-pair-v5/export-binding.json",
+        "sha256": "b38d8d927f67df38e38b954b96351c0f709cb8d988c1ca6a275fb2735a438d45",
+        "actual_exit": 0,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/lifecycle-final-v1/frozen/report.json",
+      "sha256": "355d7fef9ecb8c196dd2109afc70211effcb76654de1060c096934fd7f80ef07",
+      "result": "FAIL",
+      "scope": "Actual sample playback pause dereferences null AudioContext; gameplaychecks pass but browserexception correctly failedcase.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/lifecycle-final-v1/frozen/export-binding.json",
+        "sha256": "020ea25ab686e6aa4616f4e54171997ad1c65858cb9961df1bf15c3fa546a22d",
+        "actual_exit": 1,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/web-audio-stream-export-v1/report.json",
+      "sha256": "9cfa17bdb7bc09be78008761efe9175ee10288b9a3b4a40938510182c79bdc3f",
+      "result": "FAIL",
+      "scope": "Original Binaryen129 optimizerSIGSEGV(-11) atprobe; controlledBINARYEN_CORES1 build later succeeded, causeUNKNOWN."
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v1/report.json",
+      "sha256": "2f654a2988989f1860128d6f07ca553b4b5cbb68f4e6c47ec006ae848101cb38",
+      "result": "FAIL",
+      "scope": "Old fixture independenttimers could reorder reliable packets, failedjoining.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v1/export-binding.json",
+        "sha256": "3fe08fe99c01bb41762c8ac56a86f96b39e7fec3c3507e29b88c43a2c4163bdc",
+        "actual_exit": 1,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    },
+    {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v2/report.json",
+      "sha256": "fa68ef89bc7b8c77fe6fd4f392b64475f9afb7eae6dcef4b2e234bce6186e194",
+      "result": "FAIL",
+      "scope": "FIFO fixture completedstatechecks but wronglyrequired hostunreliableloss despite reliable-onlyauthority stream; originalFAIL retained.",
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/network-faults-v2/export-binding.json",
+        "sha256": "b4262f6bc308c0c2923fe799fb31005718ad30076618cc3c2577ebd53b21c4a5",
+        "actual_exit": 1,
+        "export_unchanged": true,
+        "helper_source_fence": true,
+        "service_clean": true
+      }
+    }
+  ],
+  "source_sha256": {
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/view.gd": "c4b2965bba15b4ad400ed69db6c4d6d56eb0795c3eebed59eb208228aa9c4ad2",
+    "examples/replay_dockyard/README.md": "f80d111bd4c494931a24676874a2d4e24fc1902f724e2da0468050d0c898d3a0",
+    "examples/replay_dockyard/launch.py": "266ba66413c7aae5b2eae1cc3c81a30c7f31e881964adecc81ba4d5e0898f852",
+    "examples/replay_dockyard/CONTRIBUTING.md": "c7b8e591aca77019cdeb67516b1bc9caa776ab872eed84848e55e646cf8314b3",
+    "examples/replay_dockyard/odin_godot.gdextension": "88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/export_presets.cfg": "23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4",
+    "examples/replay_dockyard/feedback.gd": "4372391bef864092add285f95de240b5ebeea4f9ba7569ca2185203afbf5fe05",
+    "examples/replay_dockyard/prepare.py": "2feab6ca84f5471fbcc7c8801824468f3a35d1c27bf7ab9666f373ac28a5c1e7",
+    "examples/replay_dockyard/deploy/turnserver.conf.template": "aa3f9634e88070fc3e49c41068b2b00b75d656bd96944f9cd031ef80d3420f69",
+    "examples/replay_dockyard/deploy/README.md": "ebc01f0c1564c912f1fafa9b18d4fac5a173d625ddadcdde0d5132c0b400e89f",
+    "examples/replay_dockyard/deploy/Caddyfile": "21bb872dc97f89a03aa4147d1250011b7b7d33a5022a2754680e19aaddf0a357",
+    "examples/replay_dockyard/deploy/service.env.example": "d877e58ac12d7dc1643b42bcd1dfc295869e4dca0e7a60becc8c6e1f6adddef5",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/delivery.tres": "9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/ramp.tres": "08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/robot.tres": "36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9",
+    "examples/replay_dockyard/content/world.tscn": "164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/barge.tres": "28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b",
+    "examples/replay_dockyard/audio/boost.wav": "4e5137b6674a69c56dee501923a24476d108e010fe0edfbdfbcf87392c305211",
+    "examples/replay_dockyard/audio/PROVENANCE.md": "292bace6d2306829e2fc49855ea2b05b33788bfcf0a71f53f3584feb4601e93d",
+    "examples/replay_dockyard/audio/latch_score.wav": "aa33ae28b8ba6976c111c5e48d18c921021fa8371f3fe6c8c78309b27647dc1d",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/online.odin": "6238bcf064554f73fb5d8ce8614a98df23c4e74ebab44528eda3dbdabe831268",
+    "examples/replay_dockyard/modules/dockyard/controller.odin": "67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "1363e842752e689aad606036f4901657777f9229a8fcc49522a7c3318e7b18a3",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340",
+    "examples/replay_dockyard/modules/dockyard/qualification.odin": "32231ad14a3016fe82b5e0716b21f2a688f1555e10ec557347d62a1314f05481",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "57b13b6738c7b2b3adc80bfd5eb74f86eac2af0f9d41276e675d256a3d27113f",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "98f8ecaee34c4788ae750c77983b74ba3c2e3f3e60339db87355f5b8094fcdbf",
+    "examples/replay_dockyard/modules/dockyard/online_web.odin": "4bfbe438239d11dc02cd6e3691e92d62a2843f76822bb4cff46a511a6feb9101",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "2648d4761fedc22b698cc5afcf2bce90831534ff25facbc4c397178004221054",
+    "examples/replay_dockyard/modules/dockyard/launch.odin": "85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "cdbf3f436e36ac5e5203247bf2aed0bda5a32be6f97b3370905f3c070b1b1ab3",
+    "examples/replay_dockyard/modules/dockyard/round.odin": "f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/online_native.odin": "2376ed53709d043d99e7f90ebe56ae61af5c5549ff0d7e5e527b9cc340fa0577",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "1efea61273f1c12e86d1a08f108c8a5b070bf64c0f6199c23cacb894a1de7872",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d"
+  },
+  "limits": [
+    "Current candidate remains unqualified under the original strict authority maximum; runtime success is separate.",
+    "No guarantee of universal wall-time worst case or CPU bounds beyond actual measured streams. No raw samples removed or overhead subtracted.",
+    "Safari automation prerequisite disabled; actual Safari physics/multiplayer is not admitted. WebKit emulation is not Safari proof.",
+    "Public Internet endpoints have not been supplied; local private-interface TURN/HTTPS/WSS results are not WAN acceptance.",
+    "Two-human co-op feedback remains unobserved; automation, audio signal and screenshots do not substitute.",
+    "Native/Web crossplay and cross-target solver equality remain unqualified. Mobile/Windows/current Linux hardware admission is not inferred.",
+    "Earlier GateB Dense8.894ms/causeUNKNOWN and legacy SDK observer failures remain in their own historical reports.",
+    "The opaque material and Web-only STREAM playback preserve physics bodies19/shapes19,geometry8,joint1; Native/backend assertions/FP/profile limits unchanged."
+  ]
+}

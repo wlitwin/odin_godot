@@ -1,6 +1,7 @@
 package replay_transfer
 
 import "core:mem"
+import replay "godot:replay"
 import compression "godot:replay/compress"
 import sc "godot:replay/schema"
 import tr "godot:replay/transport"
@@ -9,7 +10,11 @@ import tr "godot:replay/transport"
 // atomically, borrow bytes only during the call, and return false on failure.
 // This owner and its callback user must remain at stable addresses.
 Blob_Receiver :: struct {
+ ownership:Ownership,
+ owner_state:Ownership_State,
 	allocator: mem.Allocator,
+	budget:Budget_State,
+	last_error:Error,
 	ready: bool,
 	scope: Scope,
 	source: tr.Peer_Id,
@@ -45,22 +50,59 @@ Blob_Receiver :: struct {
 
 blob_init :: proc(r: ^Blob_Receiver, scope: Scope, source: tr.Peer_Id, wire: tr.Transport, archive_kind: u16,
                   accept: proc(user: rawptr, archive: Archive, bytes: []u8) -> bool, user: rawptr,
-                  cfg := DEFAULT_CONFIG, allocator := context.allocator, kind_base: u16 = DEFAULT_KIND_BASE, max_bytes: int = MAX_BYTES) -> Error {
-	if r.ready || !config_valid(scope, source, cfg, kind_base, max_bytes) || archive_kind == 0 || accept == nil {return .Invalid_Config}
+                  cfg := DEFAULT_CONFIG, allocator := context.allocator, kind_base: u16 = DEFAULT_KIND_BASE, max_bytes: int = MAX_BYTES,budget:Budget={},ownership:Ownership={}) -> Error {
+	if r.owner_state.cleanup || r.ready || !config_valid(scope, source, cfg, kind_base, max_bytes) || archive_kind == 0 || accept == nil {return .Invalid_Config}
+ if error:=ownership_entry(ownership,allocator,r,wire.user,user,nil,budget.user);error!=.None{return error}
+ r.ownership=ownership
+ if error:=ownership_retain(&r.owner_state,ownership);error!=.None{
+  retained:=r.owner_state.retains;r^={}
+  if replay.owner_retains_drop(&retained)!=.None{r.owner_state={retains=retained,cleanup=true}}
+  return error
+ }
+ committed_owner:=false;defer if !committed_owner{blob_destroy(r)}
+
 	r.allocator, r.scope, r.source, r.wire, r.cfg = allocator, scope, source, wire, cfg
 	r.archive_kind, r.accept, r.user = archive_kind, accept, user
 	r.kind_base, r.max_bytes = kind_base, max_bytes
-	if !codecs_init(&r.codecs, allocator) {blob_destroy(r); return .Invalid_Config}
-	r.bytes = make([]u8, max_bytes, allocator)
+	if error:=budget_begin(&r.budget,budget,u64(size_of(Blob_Receiver)));error!=.None{return error}
+	schema_allocator,error:=budget_schema_allocator(&r.budget,allocator)
+	if error!=.None{return error}
+	if !codecs_init(&r.codecs, schema_allocator) { return .Invalid_Config}
+	r.bytes,error=budget_alloc(&r.budget,max_bytes,allocator)
+	if error!=.None{return error}
+ committed_owner=true
 	r.ready = true
 	return .None
 }
 
-blob_destroy :: proc(r: ^Blob_Receiver) {delete(r.bytes, r.allocator); delete(r.decoded,r.allocator); delete(r.decode_scratch,r.allocator); codecs_destroy(&r.codecs); r^ = {}}
+blob_destroy :: proc(r: ^Blob_Receiver) -> Error {
+ when #config(BOX3D_REQUIRE_DOMAIN,false){
+  if !r.ready && replay.owner_is_nil(r.ownership.container.owner) && r.owner_state.retains.count==0 && !r.budget.attached{return .None}
+ }
+ if error:=blob_owner_entry(r,.Read);error!=.None{return error}
+ if r.owner_state.cleanup {
+  state:=r.owner_state;r^={}
+  if replay.owner_retains_drop(&state.retains)!=.None{r.owner_state=state;return .Invalid_Config}
+  return .None
+ }
+	budget_free(&r.budget,&r.bytes,r.allocator);budget_free(&r.budget,&r.decoded,r.allocator);budget_free(&r.budget,&r.decode_scratch,r.allocator)
+	codecs_destroy(&r.codecs);budget_end(&r.budget,r.allocator)
+ state:=r.owner_state;r^={}
+ if replay.owner_retains_drop(&state.retains)!=.None{state.cleanup=true;r.owner_state=state;return .Invalid_Config}
+ return .None
+}
+// Attach a previously native-free owner before using it in a complete runtime.
+blob_budget_attach :: proc(r:^Blob_Receiver,budget:Budget)->Error {
+ if error:=blob_owner_entry(r);error!=.None{return error}
+ if replay.owned_context_access(r.ownership.budget,budget.user,!replay.owner_is_nil(r.ownership.container.owner),.Execute)!=.None{return .Invalid_Config}
+	if !r.ready{return .Wrong_Phase}
+	return budget_begin(&r.budget,budget,u64(size_of(Blob_Receiver))+budget_codecs_bytes(&r.codecs)+u64(len(r.bytes)+len(r.decoded)+len(r.decode_scratch)))
+}
 
 // Reliable delivery is an explicit caller capability. Valid traffic can upgrade
 // replies for this scope; delayed older datagrams cannot downgrade that choice.
 blob_receive :: proc(r:^Blob_Receiver,from:tr.Peer_Id,bytes:[]u8,now_ms:u64,channel:tr.Channel=.Unreliable)->Received {
+ if error:=blob_owner_entry(r);error!=.None{return .Rejected}
  if channel>.Unreliable {return .Rejected}
  result:=blob_receive_packet(r,from,bytes,now_ms)
  if channel==.Reliable && (result==.Accepted || result==.Validated) {r.reliable_replies=true}
@@ -69,6 +111,7 @@ blob_receive :: proc(r:^Blob_Receiver,from:tr.Peer_Id,bytes:[]u8,now_ms:u64,chan
 
 @(private)
 blob_receive_packet :: proc(r: ^Blob_Receiver, from: tr.Peer_Id, bytes: []u8, now_ms: u64) -> Received {
+ if error:=blob_owner_entry(r);error!=.None{return .Rejected}
 	if !r.ready || !handles(bytes, r.kind_base) {return .Ignored}
 	r.stats.rx_packets += 1; r.stats.rx_bytes += u64(len(bytes))
 	if len(bytes) > CHUNK_BYTES + 128 || from != r.source || !clock_at(&r.clock, now_ms, r.cfg) {r.stats.rejected += 1; return .Rejected}
@@ -153,8 +196,11 @@ blob_receive_packet :: proc(r: ^Blob_Receiver, from: tr.Peer_Id, bytes: []u8, no
 		archive_bytes := r.bytes[:r.offer.archive.bytes]
   if r.compressed {
    if len(r.decoded)==0 {
-    r.decoded=make([]u8,r.max_bytes,r.allocator)
-    r.decode_scratch=make([]u8,r.max_bytes,r.allocator)
+    decoded,error:=budget_alloc(&r.budget,r.max_bytes,r.allocator)
+    if error!=.None {r.last_error=.Capacity;blob_fail(r,.Archive);return .Rejected}
+    scratch,scratch_error:=budget_alloc(&r.budget,r.max_bytes,r.allocator)
+    if scratch_error!=.None {budget_free(&r.budget,&decoded,r.allocator);r.last_error=.Capacity;blob_fail(r,.Archive);return .Rejected}
+    r.decoded,r.decode_scratch=decoded,scratch
    }
    archive_bytes=r.decoded[:r.offer.archive.bytes]
    if !compression.decode(r.bytes[:r.wire_size],archive_bytes,r.decode_scratch) {blob_fail(r,.Integrity);return .Rejected}
@@ -188,6 +234,7 @@ blob_receive_packet :: proc(r: ^Blob_Receiver, from: tr.Peer_Id, bytes: []u8, no
 }
 
 blob_update :: proc(r: ^Blob_Receiver, now_ms: u64) -> Error {
+ if error:=blob_owner_entry(r);error!=.None{return error}
 	if !r.ready {return .Wrong_Phase}
 	if !clock_at(&r.clock, now_ms, r.cfg) {return .Invalid_Time}
 	if r.active && now_ms - r.started >= r.cfg.timeout_ms {blob_fail(r, .Timeout)}
@@ -220,13 +267,22 @@ blob_update :: proc(r: ^Blob_Receiver, now_ms: u64) -> Error {
 
 @(private)
 blob_retained :: proc(r: ^Blob_Receiver, sequence: u64, digest: [32]u8) -> bool {
+ if error:=blob_owner_entry(r);error!=.None{return false}
 	return (r.latest.archive.sequence == sequence && r.latest.archive.hash == digest) ||
 	       (r.previous_receipt.archive.sequence == sequence && r.previous_receipt.archive.hash == digest)
 }
 
 @(private)
 blob_fail :: proc(r: ^Blob_Receiver, failure: Failure) {
+ if error:=blob_owner_entry(r);error!=.None{return}
 	r.active, r.offer_pending, r.progress_pending = false, false, {}
 	r.failure_sequence, r.failure_tick, r.failure, r.failure_pending = r.offer.archive.sequence, r.offer.archive.tick, failure, true
 	r.stats.failures += 1
+}
+
+@(private)
+blob_owner_entry :: proc(r:^Blob_Receiver,access:replay.Owner_Access=.Execute)->Error {
+ if r==nil{return .Invalid_Config}
+ if r.owner_state.cleanup{return access==.Read && replay.owner_retains_access(&r.owner_state.retains,.Read)==.None?Error.None:Error.Invalid_Config}
+ return ownership_entry(r.ownership,r.allocator,r,r.wire.user,r.user,r.layout.schema,r.budget.hooks.user,access)
 }

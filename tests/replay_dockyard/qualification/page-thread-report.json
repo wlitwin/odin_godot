@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "result": "PAGE_THREAD_CALIBRATION_PASS_NO_SLOW_TRIGGER_CAUSE_UNRESOLVED",
+  "release_admitted": false,
+  "task_complete": false,
+  "goal_complete": false,
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/plan.json",
+    "sha256": "23f6f150f6637695430285deb1018d9b78890ae7e956c0a8acff830827c8a61f"
+  },
+  "self_cpu_calibration": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/self-calibration.json",
+    "sha256": "5bfc12ecf9a4814844275cfa57b3ff37977fb5cdcc268151d3af5858bcf00eb0"
+  },
+  "namespace_observation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/self-namespace-observation.json",
+    "sha256": "fa73306328742dbde019840a1cdc71d7e0ba17f7061f5d5d5bdf340c3ab7add7"
+  },
+  "selector_checks": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/selector-checks.json",
+    "sha256": "3e4ad72699b3a294f6bd3c1d7cff98d387b1142d5e36e80c7eec115f235733ac"
+  },
+  "summary_checks": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/summary-checks.json",
+    "sha256": "cc024210b7740e889d8e6e931dcd189b4ae2cbc982726ade5bd0343e8c8b989b"
+  },
+  "actual_menu_calibration": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-calibration-v1/report.json",
+    "sha256": "5ac0aeb187d0786e4b35568faaaafbb307e61c087b16485d642c90f784eb4d1f"
+  },
+  "diagnostic_report": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-firefox-v1/report.json",
+    "sha256": "121d59ed67c2b7c9f7b3ac5d6cf6825ade7f7505f849d856c2cd9bd211f63d29"
+  },
+  "diagnostic_binding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-firefox-v1/export-binding.json",
+    "sha256": "63b16decc6b346097452047095e692b0da13025f705c8aa0773f25b82080d62d"
+  },
+  "summary": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-firefox-v1/thread-summary.json",
+    "sha256": "a355a8459970ccfac6a8015cf78f3db065ae5108c130e2668b8e8021ce2ccad9"
+  },
+  "observations": {
+    "rows": 8192,
+    "total": 35403,
+    "bytes": 888057,
+    "observed_cpu_units": "ns",
+    "browser": "Firefox159.0.1",
+    "os_thread_name": "MainThread",
+    "calibration_cpu_ms": 2006.588,
+    "busy_wall_ms": 2000.06
+  },
+  "checked_actors_cleanup_zero": true,
+  "source_fences_unchanged": true,
+  "limitations": [
+    "Actual180second diagnostic captured no normal call>10ms; no CPU/wait cause or unprofiled performance admission inferred.",
+    "The sampler can perturb scheduling and had gaps up to18.387ms; all real intervals retained.",
+    "The prior30.600/18.299ms uninstrumented failures remain rejected."
+  ],
+  "retained_stack_symbolication": {
+    "binary_uuid_and_debug_id_matched": true,
+    "local_atos": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/retained-profile-symbols.json",
+      "sha256": "306c58db8a965b0c7e8fd35823002a1640e055fcee9e874125e969395aa574ec"
+    },
+    "mozilla_request": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/mozilla-symbol-request.json",
+      "sha256": "e7b419c33f57a51a466761eb835bed7944060274d8a42e9b464831bcf423a495"
+    },
+    "mozilla_response": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/mozilla-symbol-response.json",
+      "sha256": "cc0f0079220419012bdeeceed7389402eb86cb23a7616bbdb02d46f7cfccabfa"
+    },
+    "fetch": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/page-thread-v1/mozilla-symbol-fetch.json",
+      "sha256": "c6e1a13b9d8548393bc5de527beabdf2d8bc048c7d87b7282e9925947f6215ad"
+    },
+    "service_docs": "https://symbolication.services.mozilla.com/",
+    "submitted_scope": "Only two public Firefox binary debug IDs/module offsets; no raw profile or private game data.",
+    "resolved": [
+      "moz_arena_calloc",
+      "js::jit::AllocateAndInitTypedArrayBuffer(JSContext*, js::FixedLengthTypedArrayObject*, int, unsigned long)"
+    ],
+    "scope": "The existing sampled stack before an11.0146ms gap, not proof allocation occupied that entire gap."
+  },
+  "next": "Inspect exact Godot RTC send bridge allocation and evaluate a bounded copy-buffer alternative before any product patch.",
+  "updated_utc": "2026-11-04T02:26:39.755340+00:00"
+}

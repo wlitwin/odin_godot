@@ -1,0 +1,7 @@
+config_version=5
+[application]
+config/name="Box3D Presentation Values"
+run/main_scene="res://presentation.tscn"
+config/features=PackedStringArray("4.7")
+[rendering]
+renderer/rendering_method="gl_compatibility"

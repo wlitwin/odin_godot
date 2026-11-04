@@ -22,14 +22,37 @@ import "core:fmt"
 // `random_generator` at a persistent, pre-seeded package-global state (see below). scriptgen
 // routes the trampolines here via rt.script_context() + the hook installed in web_startup.
 //
-// Note: temp allocations made here are not freed until the engine heap reclaims them; the
-// showcase HUD only formats on a score CHANGE (guarded), so this is negligible.
+// Callback temporary storage is one engine-backed arena. The outer Core access
+// gate restores its marker after marshaling the return value; nested calls keep
+// their caller's temporaries alive. Freestanding default-temp guards are no-ops.
+@(private)
+web_temp_arena:runtime.Arena
+@(private)
+web_temp_ready:bool
+@(private)
+web_temp_ensure :: proc "contextless"(){
+ if web_temp_ready{return}
+ context=runtime.default_context()
+ context.allocator=web_aligned_allocator()
+ if runtime.arena_init(&web_temp_arena,4*runtime.Megabyte,context.allocator)!=nil{runtime.trap()}
+ web_temp_ready=true
+}
+@(private)
+web_temporary_allocator :: proc "contextless"()->runtime.Allocator{
+ web_temp_ensure();context=runtime.default_context()
+ return runtime.arena_allocator(&web_temp_arena)
+}
+@(private)
+web_temporary_shutdown :: proc "contextless"(){
+ if web_script_access_depth!=0{runtime.trap()}
+ if web_temp_ready{runtime.arena_destroy(&web_temp_arena);web_temp_ready=false}
+}
 @(private)
 web_script_context :: proc "contextless" () -> runtime.Context {
 	c := runtime.default_context()
 	a := web_aligned_allocator()
 	c.allocator = a
-	c.temp_allocator = a
+	c.temp_allocator = web_temporary_allocator()
 	// Make `core:math/rand` work in the browser. The default chacha8 generator carried by
 	// runtime.default_context() lazily self-seeds from the OS entropy source on first use —
 	// but freestanding_wasm32 has none (runtime.HAS_RAND_BYTES == false), so that path hits
@@ -152,6 +175,7 @@ web_startup :: proc "contextless" () {
 // run via web_startup, so the registry is populated.
 @(private)
 odin_scripts_load :: proc() {
+ if !box3d_web_initialize(){gd.print_str("ODIN_BOX3D_WEB_SERVICE_REJECTED one-domain service/identity/origin validation failed");return}
 	// Single module on web: wire the typed cross-script resolver directly (no dlsym).
 	rt.odin_scripts_set_core_api(odin_script_struct)
 	rt.odin_scripts_set_core_api2(odin_script_struct_any)
@@ -177,11 +201,11 @@ odin_scripts_reload :: proc(module := "") -> bool {
 // Shared instance bookkeeping uses native generation leases. Web has one permanently
 // linked image and no dlopen/reload, so the same hooks compile to inert tokens.
 @(private)
-script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {return nil}
+script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {return box3d_web_image.alive?rawptr(&box3d_web_image):nil}
 @(private)
-script_generation_retain :: proc "contextless" (generation: rawptr) {}
+script_generation_retain :: proc "contextless" (generation: rawptr) {if generation!=nil{box3d_web_pin(generation)}}
 @(private)
-script_generation_release :: proc "contextless" (generation: rawptr) {}
+script_generation_release :: proc "contextless" (generation: rawptr) {if generation!=nil{box3d_web_unpin(generation)}}
 @(private)
 script_generations_collect_pending :: proc() {}
 

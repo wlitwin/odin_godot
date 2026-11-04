@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Box3DBoxShape3D" format=3]
+
+[ext_resource type="Script" path="res://addons/box3d_authoring/box_shape_3d.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+stable_key = "pendulum.shape"
+half_extents = Vector3(0.2, 0.75, 0.2)
+density = 1.25

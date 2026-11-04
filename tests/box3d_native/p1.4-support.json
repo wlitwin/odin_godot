@@ -1,0 +1,150 @@
+{
+  "support_for": "P1.4",
+  "worker": "box3d-snapshots",
+  "board": "b_cdde1cdfea104035",
+  "new_card_claimed": false,
+  "coordinator_authorized_patch": "box3d/native/patches/broadphase_rebuild.patch",
+  "host": "macOS-15.8-arm64-arm-64bit",
+  "compiler": "Apple Clang16",
+  "odin": "dev-2026-04 Nix",
+  "box3d_pin": "d421e45c828f6f853a145f726f0b9425d31146eb",
+  "coverage": "ogb3-d421e45c-solver-v2",
+  "dump_version": 2,
+  "failure": {
+    "assertion": "( node->flags & b3_enlargedNode ) == 0",
+    "source": "dynamic_tree.c:1078",
+    "stack": [
+      "b3InternalAssert",
+      "b3DynamicTree_ValidateNoEnlarged",
+      "b3ValidateNoEnlarged",
+      "b3Solve",
+      "b3World_Step",
+      "ogb3_world_step_fixed",
+      "advance",
+      "main"
+    ],
+    "world_role": "independent baseline",
+    "packed_world": 1,
+    "native_worldId": 0,
+    "stepIndex": 1760,
+    "tree_root": 164,
+    "tree_root_flags": 3,
+    "tree_node_capacity": 1167,
+    "sparse_body_count": 503,
+    "pre_stepIndex": 1759,
+    "pre_moveArray_count": 0,
+    "old_retained_executable_reproduced": true,
+    "final_two_patch_forward_only_Debug_reproduced": true,
+    "final_two_patch_forward_only_Release_sigtrap": true,
+    "minimal_public_operation_body_count": 3
+  },
+  "fix": "Synchronously call existing tree maintenance on empty pair-query move queue before returning; keep normal query/rebuild ordering and validation",
+  "patch_provenance": {
+    "base_sha256": "3171e243be540b63579133e37170fb95da111ff626a77c4eaea98359721c2a3d",
+    "patch_sha256": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+    "result_sha256": "471e8dc75998ad9a7cb6544df0c46a7788be308b45dce65fbd0e0fc0ae044516"
+  },
+  "normalization_fix": "Emit active material representation once; ignore inactive inline shape.material when array is active",
+  "capacity_fix": "Snapshot capture/validation treat zero fingerprint as Capacity; never store zero token; API owner prewarms probe before public worlds",
+  "results": {
+    "minimal_dynamic_and_kinematic_cases": "PASS",
+    "inactive_material_unchanged_digest": "PASS",
+    "active_material_changed_digest": "PASS",
+    "initial_128_bare_native_world_fingerprint_zero_and_capture_capacity": "PASS",
+    "final_500_body_seed1_forward_ticks": 2400,
+    "final_500_body_seed1_forward_result": "PASS",
+    "Debug_CTest_passed": 3,
+    "ASan_UBSan_CTest_passed": 3,
+    "sanitizer_suppressions": false,
+    "Odin_tests_passed": 5,
+    "native_engine_allocations": 4191,
+    "native_aligned_requested_bytes_total": 9991712,
+    "native_aligned_requested_bytes_peak": 1182192,
+    "native_live_bytes_final": 0,
+    "wrapper_allocations": 96,
+    "wrapper_requested_bytes_total": 1557824,
+    "wrapper_requested_bytes_peak": 78184,
+    "wrapper_live_bytes_final": 0,
+    "macos_leaks": 0
+  },
+  "remaining_evidence": "Coordinator must rerun full corrected rollback/performance corpus with strict v2 parsing and branch oracle; forward regression is not a Gate A conclusion",
+  "scratch": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots",
+  "artifacts": {
+    "crash-repro-old-lldb.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-repro-old-lldb.log",
+      "sha256": "bfa92372b05a8bf0f1c915d7e7faefdd32a1cb9ddb5f2e6b4962b45db80542b3"
+    },
+    "crash-baseline-final/lldb-entry.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-baseline-final/lldb-entry.log",
+      "sha256": "7a80839f94b1de2434d1495ec1ede02082a851c3fa54dada7bb6c43d95ff70a2"
+    },
+    "crash-baseline-final/build-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-baseline-final/build-release.log",
+      "sha256": "e5a321932422f0c49133fa838be33affc12fb2b161ad63682ed44be28f5a4443"
+    },
+    "crash-baseline-final/run-release.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-baseline-final/run-release.log",
+      "sha256": "49d875ca1e5d92397f10291efe1a608cfa6ddbb5c274899685417849b7dddd37"
+    },
+    "crash-baseline-final/run-fixed-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-baseline-final/run-fixed-final.log",
+      "sha256": "7fea41d4d328e3e816ed95f2b6da6f921b9adf5191a761580246f16e7fa261a0"
+    },
+    "crash-baseline-final/build-fixed-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/crash-baseline-final/build-fixed-final.log",
+      "sha256": "37ea665dbf91d0a30e6ab2c08a060a5d7dfa55461f3b102931f27d46c33ad384"
+    },
+    "broadphase-minimal/repro.c": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/broadphase-minimal/repro.c",
+      "sha256": "15e89b70cbee311b43fa8cc44c01faaaada5f773f88af6a09d0d40d7293bcf2f"
+    },
+    "broadphase-minimal/before.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/broadphase-minimal/before.log",
+      "sha256": "354083ea4c261e9163f97ac06b524cfda1c188580c45bfc6081137976fe55089"
+    },
+    "broadphase-minimal/after.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/broadphase-minimal/after.log",
+      "sha256": "397d6890e12aa9b33a4f1346975d572ef306a8f5ee3a9c80abc5016845d1a384"
+    },
+    "ctest-v2-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/ctest-v2-final.log",
+      "sha256": "da5f1c4490d8d5c24ba3cf99a9e76a376e24790312dcb436e93c83d1d35fb13f"
+    },
+    "asan-build-v2-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-build-v2-final.log",
+      "sha256": "bddcb8a711ff2b5742e77ad1d8b2b7cfeb1b8f011f46f1c4b6d1be8a23995279"
+    },
+    "asan-ctest-v2-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-ctest-v2-final.log",
+      "sha256": "93ddaa0794da7b714861871cedbb008a53c65b648f755a7fbaf48f9d9b66784b"
+    },
+    "asan-v2-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/asan-v2-final.log",
+      "sha256": "be498387e1e58ceed64be08438d551e02cd819e7a5cc4a8530b1f501fe1a27d4"
+    },
+    "odin-v2.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/odin-v2.log",
+      "sha256": "724020c9a2189ab2f5b933fff0d5164836ace0a039a716003cf2a1749a3c1954"
+    },
+    "leaks-v2-final.log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-snapshots/leaks-v2-final.log",
+      "sha256": "9bee6142af3f9928f10fb697c406837f115b90ccc8cce5512d952c9bc76fdcef"
+    }
+  },
+  "source_sha256": {
+    "box3d/native/owned_snapshot.c": "a0441aae8a0b9cb2b0668bedb35e1ef6dbe9b72ae208c28ad0ecf733aad21d87",
+    "box3d/native/owned_snapshot.h": "f0ca2824cf0f651339d5bf4cce628f2fd94f89ffdefd9da162a45adbad5d1e11",
+    "box3d/native/state_dump.c": "a8eea34b83fadd953f7eeff91bd08f0de0921ef59371d58c29bcef0f5ba219c0",
+    "box3d/native/state_dump.h": "c4f517ef1244fb716a01c2a1bda38064971342985db2ff600ef1f88ff09a3680",
+    "box3d/native/api.c": "afe1ed6731596b5a6e1c894dcd6d1df574372fe1b0f457904105ad8dabae5bc9",
+    "box3d/native/api.h": "f83c2e0dc5bd89411d8c08d24f3a53a03583322612b5857cf904f318cbe7b85b",
+    "box3d/native/api_smoke.c": "eec54a0966c13186c11586385a6d2cc344bff248be8f42477f0a1a4df6c39114",
+    "box3d/native/patches/block_allocator_alignment.patch": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+    "box3d/native/patches/compound_geometry_alignment.patch": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+    "box3d/native/patches/broadphase_rebuild.patch": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+    "tests/box3d_native/lifecycle.c": "57826746c103449ac0a16dc3f45c734b50a0fa1cdaf1143d46f9a1ee0bf2ff67",
+    "tests/box3d_native/generate_fields.py": "ed4596718aa6eecf499445687990d82876b3b7b25cb61fd404b204c063bd026d",
+    "tests/box3d_native/fields.json": "082f49bcf952db1fe5c01a3fb54cdc9cb41c7f9fdc980254454370157b4f75e0",
+    "tests/box3d/lifecycle_test.odin": "48c1d67a575b2c543a5350207125db57602b04fe730562bcb4a351af4e09fafb"
+  }
+}

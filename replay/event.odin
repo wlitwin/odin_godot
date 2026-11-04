@@ -21,6 +21,17 @@ Error :: enum {
 	Time_Reversed,
 	Invalid_Event,
 	Invalid_Epoch,
+	Incomplete_State,
+	External_State,
+	Diverged_External,
+	Prediction_Limit,
+	Repair_Limit,
+	Resource_Limit,
+	Time_Budget,
+	Stale_Execution,
+	Reuse_Disabled,
+	Audit_Limit,
+	Step_Limit,
 }
 
 // source identifies the producer; key identifies its semantic occurrence within
@@ -45,6 +56,7 @@ Step :: struct($Event: typeid) {
 	count:  int,
 	error:  Error,
 	user: rawptr, // immutable model/assets supplied by the timeline owner
+	execution: Execution, // borrowed managed state; separate from immutable user
 }
 
 emit :: proc(s: ^Step($Event), source, key: u64, value: Event) -> bool {

@@ -1,5 +1,30 @@
 # Coordinator-driven game rooms
 
+## Managed complete physics
+
+Use `room_open_complete` for the SDK's complete-physics models. Supply the actual
+initial `Complete_Checkpoint`, model, selected allocator and `Room_Ownership`.
+The caller's Room container and callback data must have real code/data owners;
+`allocation_base`/`allocation_bytes` identify its actual metered containing block.
+The allocator, model/codec, permit, identity, ICE provider and RTC authorization
+contexts remain retained across the single Room-owned Session. A follower receives
+its complete Welcome through that Session. There is no additional simulation.
+
+Room clones its initial checkpoint and owns a separate metered Core context for
+authority RPC metadata. Both contexts charge the same host ledger and admission
+limit. Schema scalar/diagnostic paths share allocator-backed owned blocks, avoiding
+one bookkeeping slot per tiny string while preserving canonical bytes and limits.
+
+This entry currently refuses automatic successor selection, takeover preparation,
+durable checkpoint publication and restore. Disable those options explicitly after
+`party_room_options`; a game using this profile must choose end/rehost on host loss.
+The legacy value-mode constructor and its authority-transfer behavior remain
+separate. `room_try_close` returns a checked error: retain the containing Room and
+allocator on decline, then retry after the callback/borrow completes. Close Room
+before Party, its borrowed native store and the containing metered allocation.
+
+## Value-mode rooms
+
 Use `Room(State, Control, Action, Event, Seats)` when a coordinator must approve
 the gameplay authority and transfers to another host. Room owns the coordinator
 client, a time-limited authority lease, prepared checkpoint storage, and the

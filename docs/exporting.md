@@ -47,6 +47,19 @@ warns that their classes will be absent. Use it for scoped builds or CI checks,
 not release exports. On web, all modules link into the single wasm. See
 [Script Modules — Exporting](modules.md#exporting-with-modules).
 
+**Optional Box3D profile.** The normal exporter also deploys the profile's
+verified shared Native library beside Core and the script modules. The authored
+Kit and Replay samples passed actual exported Host/Client runs on macOS arm64
+and translated Linux x86-64. Core discovers the Native API through its stable
+host service; it need not import the engine directly. Gameplay consumers share
+one Native image. See [Gate C](design/box3d/gate-c.md) for records, architecture
+boundaries, memory requirements and unsupported claims. These results do not
+extend Box3D qualification to Windows or web. The current per-target table,
+toolchain/format identities and minimum-OS limits are in
+[desktop compatibility](design/box3d/desktop-compatibility.md); maintainer changes
+follow the [pinned upgrade workflow](design/box3d/upgrade.md). Native Linux x86
+hardware CI is not inferred from Rosetta execution or workflow source.
+
 ## Native desktop (macOS) — verified
 
 The macOS export test verifies that the exported `.app` loads the extension
@@ -69,6 +82,14 @@ out/Game.app/Contents/Frameworks/libodinscripts.dylib     (scripts — bundled b
 headless `--export-release "macOS"` export (the plugin compiles and bundles the scripts dll),
 then runs the exported `.app` headless and asserts the Odin `_ready` ran.
 
+For the current authored Box3D samples, `macOS arm64` is the preset **name**;
+its official launcher selector is `universal`. Actual SDK Core/scripts/modules
+and shared Native are ARM64, and only ARM64 execution was validated. The launcher
+plist minimum11.0 does not apply to the whole bundle: the actual exported
+SDK/Native consumers declare minos14.0 (SDK14.4); tested host macOS15.8. Do not
+claim macOS11..13 or Intel support from the launcher alone. These current records
+use strict logs and do not grant a blanket waiver for older fixture warnings.
+
 **macOS export gotchas:**
 
 - The installed `macos.zip` template ships only a **universal** binary, so the preset must use
@@ -79,6 +100,24 @@ then runs the exported `.app` headless and asserts the Odin `_ready` ran.
   aborts.
 - Two non-fatal `Required virtual method … _update_exports / _get_script_signal_list` warnings
   may print during the export's class scan. These are harmless.
+
+## Box3D supported-desktop orchestration
+
+`tests/box3d_desktop/run.py` accepts explicit `--target macos-arm64|linux-x86_64`,
+`--framework kit|replay`, `--godot`, `--odin`, `--native-library`,
+`--native-sha256`, `--out` (NEW and outside the repository), `--port` and
+`--ticks 120`. Default execution is `STAGED_ONLY`; `--execute` reuses the normal
+Gate C exporter and actual exported-pair controller. Linux also needs an explicit
+`--execution-mode native|translated-linux-x86_64` and `--toolchain-report`.
+Plans/configuration, successful export and successful runtime are separate facts.
+Do not force a project `--path` or `ODIN_SCRIPTS_DLL` override to make an exported
+binary appear runnable. Keep actual artifact/native/domain/source/loader fences.
+See [upgrade.md](design/box3d/upgrade.md#desktop-orchestration-and-ci) for a concrete
+plan command and CI/release qualifications; no remote CI run is claimed by this
+documentation.
+
+The following generic SDK cross-build section retains its earlier scope; it is
+not the current Box3D Linux exported-run record and does not qualify Windows.
 
 ## Cross-compile (Linux / Windows) — build-verified
 

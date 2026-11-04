@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Box3DSphereShape3D" format=3]
+
+[ext_resource type="Script" path="res://addons/box3d_authoring/sphere_shape_3d.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+stable_key = "player.shape"
+radius = 0.35
+friction = 0.5

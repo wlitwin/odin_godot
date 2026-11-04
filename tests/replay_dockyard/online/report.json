@@ -1,0 +1,452 @@
+{
+  "schema_version": 1,
+  "result": "LOCAL_FUNCTIONAL_PASS_INTERNET_PENDING",
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "scope": "Native ENet and same-artifact browser RTC Party/Room complete physics; actual production canvas inputs, local HTTPS/WSS/authenticated TURN and refusal gates. Public Internet acceptance, lifecycle, polish and final performance/release qualification remain separate.",
+  "production_export": {
+    "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-export-v2/report.json",
+    "sha256": "41ce9d2f4b7843ff1a70630531aec3b0d15a64abf68fe9025169d3537a2c59f8",
+    "test_autoload_present": false,
+    "artifact_files": {
+      "index.apple-touch-icon.png": "81e142be04b2f1cc3843da5908c7368a16a8704d96d9b33f3e6547eb0ee80fe3",
+      "index.wasm": "eb7ab9dcb2c2c484f4dca0acaad466b7fd8448fb86a0a552b5c3e5291952115f",
+      "index.icon.png": "70d937a5c99f89d6978e9b1d69745cb379527c3b3a6daf31f81b32e10ab31d0c",
+      "index.html": "31f3d0266d8488779e88b6921056ec5eba8a13b4d13211b25fe6129297ae1e46",
+      "index.png": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e",
+      "index.audio.worklet.js": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
+      "index.js": "878c9ae7fb3c27ce886faea8da0670dc1a97fb93930fac4b433a1bb56e662d3a",
+      "index.audio.position.worklet.js": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
+      "index.side.wasm": "7524005084798d164449a7bb28595e3e680103898cf26c50cb2bc7335a5c9254",
+      "index.pck": "b4447570c925ca38faf796a2c69167f6372eaf3b1d0099f8f33782d3856cd28c",
+      "libodin_godot.wasm": "52ef0e761355a4e43924b048de1a7ea707865b119c49ffd04329f03fbba99b64"
+    }
+  },
+  "actual_cases": {
+    "local-menu-v12": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/local-menu-v12/report.json",
+      "sha256": "d204985500ce7c94540023957a0d78223916841fd96d0e20ed59a8a39fc456e0",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": null,
+      "all_five_byte_equal": true,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": [
+          {
+            "index": 1,
+            "policy": "all",
+            "local": "host",
+            "remote": "host",
+            "protocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 8565323,
+            "bytesReceived": 686341
+          }
+        ],
+        "client": [
+          {
+            "index": 1,
+            "policy": "all",
+            "local": "host",
+            "remote": "host",
+            "protocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 686407,
+            "bytesReceived": 8565323
+          }
+        ]
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/local-menu-v12/export-binding.json",
+        "sha256": "137d2f0fafef0e1b18577912ded260867912ece8dfa130ea760a3608bb32414f",
+        "production_ui": null,
+        "tls": false,
+        "authenticated_relay_provider": null
+      }
+    },
+    "native-menu-v3": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/native-menu-v3/report.json",
+      "sha256": "5a31302981d743ae106eed6658e32bcf8316e23148441da8e42171e0cd97874f",
+      "scope": "Local Native Party/Room complete ENet menu flow, same native cohort; no Internet or browser inference"
+    },
+    "local-tls-turn-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/local-tls-turn-v1/report.json",
+      "sha256": "ad0a5d7f99851c6d9b193c9e6642ec0ea21ac43d4b4851d29bf7c6a2ab4b0960",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": null,
+      "all_five_byte_equal": true,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 8736274,
+            "bytesReceived": 676928
+          }
+        ],
+        "client": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 677678,
+            "bytesReceived": 8755856
+          }
+        ]
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/local-tls-turn-v1/export-binding.json",
+        "sha256": "3cf634344f4b62426d8ef6179df2eb4e752287e5a2b6fddc0558c5fa16b06444",
+        "production_ui": null,
+        "tls": true,
+        "authenticated_relay_provider": null
+      }
+    },
+    "bad-turn-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/bad-turn-v1/report.json",
+      "sha256": "e8fe454d08f036c0e8505094eb06b6d233a756ab87791dbef967acc7f4590c53",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": {
+        "case": "bad-turn",
+        "no_go": true,
+        "no_selected_pair": true,
+        "typed_close": true,
+        "shutdown": true
+      },
+      "all_five_byte_equal": null,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": null,
+        "client": null
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/bad-turn-v1/export-binding.json",
+        "sha256": "9be7d5c013da30decf27dbedbd9a46fb9e0b843377f960b03dacc1c5175ffe3f",
+        "production_ui": null,
+        "tls": false,
+        "authenticated_relay_provider": null
+      }
+    },
+    "no-isolation-v2": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/no-isolation-v2/report.json",
+      "sha256": "ae4cb97e5c7239ad6a52f05f0c5dde4e434de3ccd3bbe7e734708ffbae2da9a0",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": {
+        "case": "no-isolation",
+        "isolated": false,
+        "game_started": false,
+        "notice": "Error\nThe following features required to run Godot projects on the Web are missing:\nCross-Origin Isolation - Check that the web server configuration sends the correct headers.\nSharedArrayBuffer - Check that the web server configuration sends the correct headers.\n"
+      },
+      "all_five_byte_equal": null,
+      "copy_invite": null,
+      "invalid_invite": null,
+      "selected_pairs": {
+        "host": null
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/no-isolation-v2/export-binding.json",
+        "sha256": "6cd9e58822d73e2ef86f8fbe8f2b4250126de7a88cd4fcb9f5b60ed676740b4f",
+        "production_ui": null,
+        "tls": false,
+        "authenticated_relay_provider": null
+      }
+    },
+    "production-menu-v3": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-menu-v3/report.json",
+      "sha256": "5edda7f8bfe923b1dcbf6a57df7475a89f5515bab31233c8346479973fb98292",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": null,
+      "all_five_byte_equal": true,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": [
+          {
+            "index": 1,
+            "policy": "all",
+            "local": "host",
+            "remote": "host",
+            "protocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 10430543,
+            "bytesReceived": 826128
+          }
+        ],
+        "client": [
+          {
+            "index": 1,
+            "policy": "all",
+            "local": "host",
+            "remote": "host",
+            "protocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 826328,
+            "bytesReceived": 10436715
+          }
+        ]
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-menu-v3/export-binding.json",
+        "sha256": "2ec68eb57f1ab527e44403487752fa9727f98ee523b7bda231f126d3b6fa2940",
+        "production_ui": true,
+        "tls": false,
+        "authenticated_relay_provider": null
+      }
+    },
+    "production-tls-turn-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-tls-turn-v1/report.json",
+      "sha256": "817a2c90d142c769ec450fbb03cddc6c9d6c039db7a889906e52a49e72f08ad0",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": null,
+      "all_five_byte_equal": true,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 9346178,
+            "bytesReceived": 738610
+          }
+        ],
+        "client": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 0,
+            "bytesSent": 738610,
+            "bytesReceived": 9346178
+          }
+        ]
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-tls-turn-v1/export-binding.json",
+        "sha256": "44c51eb1b602f32d412b90e91369600798e6da55537843130267b368f564aa7b",
+        "production_ui": true,
+        "tls": true,
+        "authenticated_relay_provider": null
+      }
+    },
+    "production-auth-turn-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-auth-turn-v1/report.json",
+      "sha256": "02ff171539954524730e5292e1e56abda9caf6c7a4df64a111800037512014e7",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": null,
+      "all_five_byte_equal": true,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 1793724947,
+            "bytesSent": 9313818,
+            "bytesReceived": 747858
+          }
+        ],
+        "client": [
+          {
+            "index": 1,
+            "policy": "relay",
+            "local": "relay",
+            "remote": "relay",
+            "protocol": "udp",
+            "relayProtocol": "udp",
+            "credentialExpires": 1793724947,
+            "bytesSent": 748612,
+            "bytesReceived": 9321040
+          }
+        ]
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-auth-turn-v1/export-binding.json",
+        "sha256": "a5aaf14bc1a08eb39f36d32ed9b1449c4d1048207c176fdfaf42774355771297",
+        "production_ui": true,
+        "tls": true,
+        "authenticated_relay_provider": true
+      }
+    },
+    "production-bad-turn-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-bad-turn-v1/report.json",
+      "sha256": "fc7f2ce7a2544c01bc9357913599439a6bd035779218fdd13557e1a196b50bb2",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": {
+        "case": "bad-turn",
+        "no_go": true,
+        "no_selected_pair": true,
+        "typed_close": true,
+        "shutdown": true
+      },
+      "all_five_byte_equal": null,
+      "copy_invite": true,
+      "invalid_invite": true,
+      "selected_pairs": {
+        "host": null,
+        "client": null
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-bad-turn-v1/export-binding.json",
+        "sha256": "bf07c05d718d6e1158c09c145cef7f377eada08de903e5a5d2d7598601f18342",
+        "production_ui": true,
+        "tls": false,
+        "authenticated_relay_provider": false
+      }
+    },
+    "production-no-isolation-v1": {
+      "report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-no-isolation-v1/report.json",
+      "sha256": "f81907817b0046ebb733377e0e42c5cadc65f8f60990400d54c1dc52cb7f26d2",
+      "scope": "Actual Party enrollment and Room-owned complete physics through real menu buttons, independent local Chrome processes. Software GL with drawing disabled; no public Internet or rendering-budget claim.",
+      "expected_refusal": {
+        "case": "no-isolation",
+        "isolated": false,
+        "game_started": false,
+        "notice": "Error\nThe following features required to run Godot projects on the Web are missing:\nCross-Origin Isolation - Check that the web server configuration sends the correct headers.\nSharedArrayBuffer - Check that the web server configuration sends the correct headers.\n"
+      },
+      "all_five_byte_equal": null,
+      "copy_invite": null,
+      "invalid_invite": null,
+      "selected_pairs": {
+        "host": null
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/production-no-isolation-v1/export-binding.json",
+        "sha256": "13fa0ed1e26a8c10ae77b155030eb9055ec39bc6af00eec0ff26413a908e522a",
+        "production_ui": true,
+        "tls": false,
+        "authenticated_relay_provider": false
+      }
+    }
+  },
+  "focused_schema_checks": {
+    "coexisting_schemas": 1,
+    "allocation_failure_groups": 7,
+    "general_schema_groups": 28,
+    "native_or_sdk_claim_from_pure_checks": false,
+    "logs": {
+      "metadata-old-red": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/metadata-old-red.log",
+        "sha256": "13955ddb608ad3a098df54e63253f32ff9087ade3f6883e5bcb40e73362a40cd"
+      },
+      "metadata-pooled-pass": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/metadata-pooled-pass.log",
+        "sha256": "8cbb363265311a8b1069571a3776c16d76836368a381e3dd5d17687fdb054099"
+      },
+      "schema-failure-sweep-pass": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/schema-failure-sweep-pass.log",
+        "sha256": "f9f342f2134e89005b17c8ca390c4fb868fd1ee2cb7c6a12556713fe6d5fbad4"
+      },
+      "schema-suite-pass": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/schema-suite-pass.log",
+        "sha256": "7c102e776bc5c23be236de5aca504ce982a5f01ef075fec25d1e62b572178db4"
+      }
+    }
+  },
+  "changes": [
+    "Managed complete-checkpoint Room retains actual allocator/model/identity/permit/ICE/authorization owners and one Session; checked typed close.",
+    "Party stores lifetime allocator; native service/game select explicit sealed static SQLite archive without weakening module admission.",
+    "Schema scalar/diagnostic strings share supplied-allocator blocks; wire/canonical data, fingerprints, validation and allocation-slot/byte limits remain unchanged.",
+    "Real Name/Host/Join/Copy Invite/Recent/Leave UI; production export contains no automation autoload."
+  ],
+  "deployment": {
+    "selected_destination": "deploy-ready configuration, no public destination selected",
+    "templates": "/Users/walter/data/code/odin/odin_godot/examples/replay_dockyard/deploy",
+    "templates_executed": false,
+    "public_deployment_performed": false,
+    "public_internet_reachability": "NOT_RUN_NO_SELECTED_ENDPOINTS",
+    "local_certificate_pin_is_public_trust": false,
+    "private_test_data_publishable": false
+  },
+  "historical_failures": {
+    "retained": true,
+    "note": "All versioned source/build/run failures remain in N1, including RPC/Session schema slot exhaustion, partial pool pointer-offset bug caught before SDK builds, missing copied-project import setup and actual clipboard/input fixture failures. No prior result was relabeled."
+  },
+  "sources_sha256": {
+    "examples/replay_dockyard/README.md": "ccda94473ee94f8d92bd82e1f7d235bb47d8c5c29e7296f9f4a4f29a5733ef2f",
+    "examples/replay_dockyard/content/barge.tres": "28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b",
+    "examples/replay_dockyard/content/cargo.tres": "30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5",
+    "examples/replay_dockyard/content/crane.tres": "ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95",
+    "examples/replay_dockyard/content/delivery.tres": "9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234",
+    "examples/replay_dockyard/content/ground.tres": "359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d",
+    "examples/replay_dockyard/content/hinge.tres": "94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48",
+    "examples/replay_dockyard/content/long.tres": "08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296",
+    "examples/replay_dockyard/content/rail.tres": "d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0",
+    "examples/replay_dockyard/content/ramp.tres": "08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb",
+    "examples/replay_dockyard/content/robot.tres": "36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9",
+    "examples/replay_dockyard/content/world.tscn": "164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935",
+    "examples/replay_dockyard/deploy/Caddyfile": "21bb872dc97f89a03aa4147d1250011b7b7d33a5022a2754680e19aaddf0a357",
+    "examples/replay_dockyard/deploy/README.md": "ebc01f0c1564c912f1fafa9b18d4fac5a173d625ddadcdde0d5132c0b400e89f",
+    "examples/replay_dockyard/deploy/service.env.example": "d877e58ac12d7dc1643b42bcd1dfc295869e4dca0e7a60becc8c6e1f6adddef5",
+    "examples/replay_dockyard/deploy/turnserver.conf.template": "aa3f9634e88070fc3e49c41068b2b00b75d656bd96944f9cd031ef80d3420f69",
+    "examples/replay_dockyard/export_presets.cfg": "23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4",
+    "examples/replay_dockyard/launch.py": "266ba66413c7aae5b2eae1cc3c81a30c7f31e881964adecc81ba4d5e0898f852",
+    "examples/replay_dockyard/main.tscn": "60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6",
+    "examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "examples/replay_dockyard/modules/dockyard/controller.odin": "67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49",
+    "examples/replay_dockyard/modules/dockyard/demo.odin": "681ac91b4f3480f19cf07f2b76214e41a398ea49c7c024b825875c4d85d467e2",
+    "examples/replay_dockyard/modules/dockyard/evidence.odin": "7c12ec3bdf931a3a6310bef9a3b8e59e8d3f81309355d76471419dd0946fcb23",
+    "examples/replay_dockyard/modules/dockyard/images_darwin.odin": "cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1",
+    "examples/replay_dockyard/modules/dockyard/images_linux.odin": "950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb",
+    "examples/replay_dockyard/modules/dockyard/launch.odin": "85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9",
+    "examples/replay_dockyard/modules/dockyard/model.odin": "2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340",
+    "examples/replay_dockyard/modules/dockyard/online.odin": "35cbd5288fae685de2eb1f2d248d4be553d3bb3e71068ae174e172afd5c35331",
+    "examples/replay_dockyard/modules/dockyard/online_native.odin": "2376ed53709d043d99e7f90ebe56ae61af5c5549ff0d7e5e527b9cc340fa0577",
+    "examples/replay_dockyard/modules/dockyard/online_web.odin": "4bfbe438239d11dc02cd6e3691e92d62a2843f76822bb4cff46a511a6feb9101",
+    "examples/replay_dockyard/modules/dockyard/process.odin": "e4ee5e9c508c6acd2851b5943a64c56ec146b96ca1ef9baffc3e2bf404044997",
+    "examples/replay_dockyard/modules/dockyard/round.odin": "f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e",
+    "examples/replay_dockyard/modules/dockyard/startup.odin": "47f3b32d847b3d1ba75e584037a4595ab310e7c87af8bb24ec3879d00bacbd0f",
+    "examples/replay_dockyard/modules/dockyard/telemetry.odin": "b86e476ff9196e75e10b485d99a6e6ea3a7db85d34b3f0910cac3082aafd18c6",
+    "examples/replay_dockyard/modules/dockyard/terminal.odin": "1697bf88f1f529e22c4a562960fe2d016645fb683afb8d067dbb570b81f95786",
+    "examples/replay_dockyard/odin_godot.gdextension": "88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18",
+    "examples/replay_dockyard/prepare.py": "2feab6ca84f5471fbcc7c8801824468f3a35d1c27bf7ab9666f373ac28a5c1e7",
+    "examples/replay_dockyard/project.godot": "2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24",
+    "examples/replay_dockyard/scripts/boot.odin": "8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce",
+    "examples/replay_dockyard/view.gd": "dd729a5e0fb88b11b23a602081dd8b1ba5c685103abceeada56fdf30f6246b95",
+    "tests/replay_dockyard/online/README.md": "ebd69d512671fb9baf45d79dccbcf1760ae85c2ea56c1d0ef60963d6f4d3bfb6",
+    "tests/replay_dockyard/online/bridge.gd": "ba1873e9c05634e8fece2d4c4b4e9c1863891b4d10a4416cea12520265d2dafb",
+    "tests/replay_dockyard/online/compile_probe.odin": "e103feda4a40fdbeea6ea6ab69342928fa078200b3b077495363f43d917a6ed1",
+    "tests/replay_dockyard/online/drive.mjs": "2ce9416f932db7ef46c4c212a5160e5ff84123f7facb2c0f4c4b640c4e4d0d69",
+    "tests/replay_dockyard/online/native.py": "255ccfb2d83225fca2bbb6fabd147fd977c09ecacf01700049cc9b492a45d495",
+    "tests/replay_dockyard/online/native_menu.gd": "f33ffdb7e46b7f63b0778f1a53eab846f982c3ebe565757e17122bb1c0bc008e",
+    "tests/replay_dockyard/online/prepare.py": "2aeb9787d7d5466a50e332e3a964f4c3d5f18000f3febf392a6d97f378e8904a",
+    "tests/replay_dockyard/online/run.py": "6a884fa2feb25d837164aa696a458e6365732b4b2808eaa9f046807028fa780c",
+    "tests/replay_dockyard/online/schema_metadata/pool_test.odin": "98675935798cf889bb2d4c3c06b3fbe4b45e9122f300347175f3bd7ab01cd921",
+    "replay/godot/party.odin": "b3abd872521c3b3819ab493867707718dd7f40690ae81f7118825b92e48b43f3",
+    "replay/godot/party.md": "c8a649dace65cdb71b1f1f3cadba5a2ab765f3d071c2b67d12ba26aff965b1c0",
+    "replay/godot/room.odin": "c06daff252fc4a045d6d85e621c8a86122c510bfbe55991d64af8c41d07754a4",
+    "replay/godot/room_complete.odin": "57ea0ba2110dd28264168a129ce09b20c7415a3bd711ddda63f9b30e0fea985e",
+    "replay/godot/room_moderation.odin": "19465f0b1edb52ff47934f2c7d002a8bcb5837a3327e11a08ac3ba204182a9a4",
+    "replay/godot/room.md": "7112287c6d40117023f6ff5aeeb27ef81183eb56ecfc67b5e6947496dee63fe3",
+    "replay/godot/session.odin": "ce4f0ad80cffd091d3c0034b78465ced83b28836fdc0ea12fdc2433d033bbc3c",
+    "replay/godot/migration.odin": "1c7bab712e45b1a72918b44069e6f997809d2739bf27164b7bcfc76d6ad25832",
+    "replay/authority/sqlite/ffi.odin": "c5f54db634323a7998d9cd049c4fe32d1a4682d351e6ab607fca1a1b799b7ca4",
+    "replay/schema/schema.odin": "09172a0d5be4bed5b6dc6a967e30e63ca5b6a41563f8e326eb31fbd17c236c72"
+  }
+}

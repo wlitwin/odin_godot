@@ -52,7 +52,7 @@ server_view :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, v: View_Stamp) -
 	_ = from; _ = to
 	age := f64(s.timeline.head) - view_position(result)
 	bound := u64(s.cfg.max_rewind)
-	if peer.rtt_floor_ms != 0 {
+	if s.physics==nil && peer.rtt_floor_ms != 0 {
 		observed := (peer.rtt_floor_ms * u64(s.cfg.hz) + 999) / 1000 + u64(s.cfg.watch_delay) + u64(s.cfg.view_slack)
 		bound = min(bound, observed)
 	}
@@ -64,6 +64,13 @@ server_view :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, v: View_Stamp) -
 @(private)
 sent_view :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, id, tick: u64) -> (Sent_View, bool) {
 	peer := &s.peers[index]
+	if s.physics!=nil {
+		if id==0 && peer.welcome_view.valid && tick>=peer.welcome_view.tick && tick<=peer.facts_sent && tick<=s.timeline.head && s.timeline.head-tick<PHYSICS_HISTORY {
+			if _,found:=r.read_values(&s.timeline,tick);found{return {id=0,tick=tick,valid=true},true}
+		}
+		proof:=s.physics.views[index][tick%PHYSICS_HISTORY]
+		return proof.proof,proof.generation==peer.generation && proof.serial==peer.serial && proof.proof.valid && proof.proof.id==id && proof.proof.tick==tick
+	}
 	if id == 0 {return peer.welcome_view, peer.welcome_view.valid && peer.welcome_view.tick == tick}
 	for proof in s.snapshot_tx[index].views {if proof.valid && proof.id == id && proof.tick == tick {return proof, true}}
 	return {}, false

@@ -75,6 +75,7 @@ esac
 
 OUT_DIR="${3:-$PROJ/bin/$TARGET}"
 mkdir -p "$OUT_DIR"
+BOX3D_RUNTIME_DIR="$OUT_DIR"
 
 if [[ -z "$CC" || ! -x "$(command -v "$CC" 2>/dev/null || echo /nonexistent)" ]]; then
     echo "build_cross.sh: no $TARGET cross C compiler found." >&2
@@ -103,6 +104,17 @@ odin_obj_link() {
     obj="$stage/$base.o"
     odin_gd_cleanup_on_exit "$stage"
 
+    odin_gd_box3d_prepare "$pkg" "$out" "$TARGET" || return $?
+    local box3d_link=()
+    if [[ -n "$_ODIN_GD_BOX3D_RUNTIME" ]]; then
+        if [[ "$TARGET" == "linux" ]]; then
+            box3d_link+=("-L$_ODIN_GD_BOX3D_RUNTIME" -logb3 '-Wl,-rpath,$ORIGIN')
+        else
+            echo "build_cross.sh: Box3D Windows cross-link needs a verified target import library; use a native Windows build" >&2
+            return 2
+        fi
+    fi
+
     "$ODIN" build "$pkg" \
         -collection:godot="$ROOT" \
         -build-mode:obj \
@@ -110,7 +122,8 @@ odin_obj_link() {
         -use-single-module \
         -reloc-mode:pic \
         -out:"$obj" \
-        "$@" || build_rc=$?
+        "$@" \
+        ${_ODIN_GD_BOX3D_FLAGS[@]+"${_ODIN_GD_BOX3D_FLAGS[@]}"} || build_rc=$?
     if [[ "$build_rc" != "0" ]]; then
         rm -rf "$stage"
         return "$build_rc"
@@ -118,10 +131,13 @@ odin_obj_link() {
 
     # -shared: a loadable module Godot dlopen/LoadLibrary's. The cross gcc wrapper
     # supplies the target crt/libc/libgcc + dynamic linker for us.
-    "$CC" -shared -o "$tmp" "$obj" "${LINK_LIBS[@]}" || build_rc=$?
+    "$CC" -shared -o "$tmp" "$obj" "${LINK_LIBS[@]}" ${box3d_link[@]+"${box3d_link[@]}"} || build_rc=$?
     if [[ "$build_rc" != "0" ]]; then
         rm -rf "$stage"
         return "$build_rc"
+    fi
+    if [[ -n "$_ODIN_GD_BOX3D_RUNTIME" && "$pkg" != "$ROOT/core" ]]; then
+        python3 "$ROOT/build/box3d_profile.py" --inspect-consumer "$tmp" --target "$TARGET" || { rm -rf "$stage"; return 1; }
     fi
     mv -f "$tmp" "$out"
     rm -rf "$stage"

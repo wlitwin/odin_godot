@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "result": "PUBLIC_ROOM_DEPLOYED_RELAY_AND_RECOVERY_PASS_EXTERNAL_ACCEPTANCE_PENDING",
+  "at": "2026-11-04T08:00:01.802999+00:00",
+  "task_complete": false,
+  "release_admitted": false,
+  "service_url": "wss://mc.laserturtle.net:62127/replay-room/dockyard",
+  "legacy_signal_url": "wss://mc.laserturtle.net:62127/rtc",
+  "turn_url": "turn:mc.laserturtle.net:3478",
+  "deployment": {
+    "repo": "/Users/walter/data/code/pi-nix",
+    "handle": "t1p7",
+    "actual_exit": 0,
+    "deploy_rs_confirmed": true,
+    "remote_build": true,
+    "exact_remote_deployment_checks": {
+      "handle": "t1p5",
+      "actual_exit": 0
+    },
+    "dry_activation": {
+      "handle": "t1p6",
+      "actual_exit": 0
+    },
+    "source_snapshot_manifest_sha256": "01ebce3d0cf500d788f2f213c4c627621555e0cfb86fcbb8b4dc71ce614e7acc",
+    "package": "/nix/store/lfjfck32xndkjwlkw3nwf1r2w2hgzfcn-dockyard-replay-room-1",
+    "source_profile": "LinuxARM64 Room/control service, Godot4.7.1; no gameplay/performance/crossplay inheritance",
+    "coturn_running_pid_unchanged": 1144,
+    "new_service_backend_log_clean": true
+  },
+  "architecture": "Nginx TLS on existing public62127 routes unchanged legacyfallback/rtc to Elixirloopback62129 and exactnewpath to existingtypedOdinRoomloopback49740. No secondauthority implementation. Server-only signing key supplied via systemdLoadCredential.",
+  "client_artifact": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-export-v1/report.json",
+    "sha256": "8744e1242516139eccc5d695bcff1282b22a18cc38fca52601dab04f1b25ff07"
+  },
+  "current_cases": {
+    "public-room-pair-v1": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-pair-v1/report.json",
+        "sha256": "44d7ec26eb6c01925780f46c1de5632402651a6b388b88aa9f046425431f26e3"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-pair-v1/export-binding.json",
+        "sha256": "77622f876138e525714a5c4676b3d99d665ac1167d18a87ce8a52a2cb03d128c"
+      }
+    },
+    "public-room-observer-v1": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-observer-v1/report.json",
+        "sha256": "db6a88a6b85b127580c04f510da61b7ee852fb0d08932eec4a0667d32c8a4a58"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-observer-v1/export-binding.json",
+        "sha256": "3ca914351c2a40b9f968d68ea3932ad8b28dff34b16cf013e717721f6f312026"
+      }
+    },
+    "public-room-transient-v1": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-transient-v1/report.json",
+        "sha256": "df29423700c4a5c16ec14de7fa3a14ade1c1c0d3329f5ea9ab03cd5a94f5e088"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-transient-v1/export-binding.json",
+        "sha256": "e198807c46d0fbe0d74cc3f69cd8269d73b6c1bbea39b085c2b2b4724ed16d99"
+      }
+    },
+    "public-room-bad-turn-v2": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-bad-turn-v2/report.json",
+        "sha256": "97ef23536a85c3712d2bfe0cd521d92ecd41f1b34556d32c52f2e7ea67b3bf5c"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-bad-turn-v2/export-binding.json",
+        "sha256": "b225912432c35c975027bb06fdcd1a1da68aa30a932f62c5ac02b2626f8eabbc"
+      }
+    }
+  },
+  "legacy_before": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/pi-deploy-v1/legacy-before.json",
+    "sha256": "13383419bfdb683e1920c46f0b4590fb0121e0469d6cac23e5e0fac2acc4be98"
+  },
+  "legacy_after": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/pi-deploy-v1/legacy-after.json",
+    "sha256": "13383419bfdb683e1920c46f0b4590fb0121e0469d6cac23e5e0fac2acc4be98"
+  },
+  "standard_browser_tls_no_private_pin": true,
+  "public_relay_full_five_ack_owners_audio_and_godot_exit": "PASS",
+  "public_observer_and_pending_action_reconnect": "PASS",
+  "invalid_turn_no_direct_fallback_and_checked_exit": "PASS",
+  "known_failed_cases": {
+    "stun_only_direct": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/public-room-direct-v1/diagnosis-summary.json",
+      "sha256": "1c0be37e8bc51555eb59e84abffa4d36b75eb0134d84fcc4e27ff38df303b3a1"
+    },
+    "bad_turn_v1": "Credential refusal observed, but obsolete UI close coordinates failed the exit requirement; original failure preserved. Harness v2 uses actual game-window close and full runtime exit, passed."
+  },
+  "network_boundary": {
+    "client_http_and_udp_stun_public_address": "71.212.157.159",
+    "server_public_dns_address": "71.212.157.159",
+    "same_WAN_hairpin": true,
+    "independent_outside_network_acceptance": "NOT_RUN"
+  },
+  "remaining": [
+    "Actual off-network client acceptance",
+    "Two-human co-op feedback (P1)",
+    "Original Firefox correction maximum (Q1, user-deferred)"
+  ],
+  "operator_source": "examples/replay_dockyard/deploy/pi.md",
+  "local_review_url": "http://127.0.0.1:53196/index.html?service=wss%3A%2F%2Fmc.laserturtle.net%3A62127%2Freplay-room%2Fdockyard&relay=1"
+}

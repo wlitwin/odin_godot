@@ -1,0 +1,30 @@
+package __PACKAGE__
+
+// Derived SDK fixture only. These primitive methods read the selected producer
+// module/thread allocator. They allocate nothing and do not reset its arena.
+import rt "base:runtime"
+
+callback_lifetime_allocator :: proc()->^rt.Default_Temp_Allocator {
+ allocator:=context.temp_allocator
+ if allocator.procedure!=rt.default_temp_allocator_proc||allocator.data==nil{return nil}
+ return cast(^rt.Default_Temp_Allocator)allocator.data
+}
+@(gd_method)
+__PREFIX___callback_temp_available :: proc(self:^__CLASS__)->bool {
+ return callback_lifetime_allocator()!=nil
+}
+@(gd_method)
+__PREFIX___callback_temp_used :: proc(self:^__CLASS__)->i64 {
+ allocator:=callback_lifetime_allocator();if allocator==nil{return -1}
+ return i64(allocator.arena.total_used)
+}
+@(gd_method)
+__PREFIX___callback_temp_capacity :: proc(self:^__CLASS__)->i64 {
+ allocator:=callback_lifetime_allocator();if allocator==nil{return -1}
+ return i64(allocator.arena.total_capacity)
+}
+@(gd_method)
+__PREFIX___callback_temp_count :: proc(self:^__CLASS__)->i64 {
+ allocator:=callback_lifetime_allocator();if allocator==nil{return -1}
+ return i64(allocator.arena.temp_count)
+}

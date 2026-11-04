@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-11-04T00:07:40.303293+00:00",
+  "result": "SLOW_ADVANCE_ENVELOPE_CAPTURED_CAUSE_UNRESOLVED",
+  "release_admitted": false,
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/existing-phase-seam-v1/plan.json",
+    "sha256": "8748ff676aa30eb9d7b4656febecb3a86535535ab3f8c2efa85c896072ece78b"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/existing-phase-seam-v1/source-checkpoint.json",
+    "sha256": "c73e48b6c2adb7346a8a833538087d753d0ecd2130705d388bf1c64c00c3cd43"
+  },
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-export-v1/report.json",
+    "sha256": "975f031e32a62a3dcd68f6a9cc2652e7e67caf01a6badaab040236a2abd32bd0"
+  },
+  "native_runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-sdk-native-v1/report.json",
+    "sha256": "6c99e1bfc3337c13e3e2e8965ac6fbcc08a9541f83824ff4ba9b6abbcdbbfc14"
+  },
+  "native_clock_validation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-sdk-native-v1/phase-clock-validation.json",
+    "sha256": "86a6a7f5bab4a118087013f15789a2499ffc2d7aec71fb8c8d448bf3c4035fcb"
+  },
+  "prior_process_negative": {
+    "path": "tests/replay_dockyard/qualification/process-repeated-report.json",
+    "sha256": "0d03ff93891b662924a4a4c3484d14fbe6e399657d684b929bc5c8c53fda37a9"
+  },
+  "implementation": "Opt-in Game profile3 uses existing stateless net profile_clock/profile_metrics. No new framework API, userdata, retained context, wire, physics or backend change; original whole-call timing stays authoritative.",
+  "coverage": "Supplementary nested/partial phases; no timing subtraction. Complete-physics outbound work may not use ordinary Snapshot metrics, so zero samples do not establish zero cost.",
+  "browser": {
+    "live_hc_handle": null,
+    "runtime": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-firefox-v1/report.json",
+      "sha256": "6167a330996d29be9dc3ce6e3005b0e91f367af1fbfafac99abd4097374c2768"
+    },
+    "binding": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-firefox-v1/export-binding.json",
+      "sha256": "e88dba932ee541dd350866c039943a1e5787a48e4e1d664b689a0e8e292ab532"
+    },
+    "capture": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/internal-phase-firefox-v1/phase-capture.json",
+      "sha256": "385783cf56e22740be914e9dc44b709f558b70860040ad4eeeb974fa223b7214"
+    },
+    "whole_call_us": 18560,
+    "advance_envelope_us": 18119,
+    "pump_us": 20,
+    "sample_valid": true,
+    "timing_errors": 0,
+    "engine_shutdown": {
+      "host": true,
+      "client": true
+    }
+  },
+  "original_failure": "Unprofiled buffered stream normal maximum29.56ms remains rejected against10ms. Prior reports/archive unchanged.",
+  "updated_utc": "2026-11-04T00:24:16.692634+00:00",
+  "interpretation": "This particular event is in the optional timer envelope aroundr.advance. It includes simulation, external state preparation/capture, commit authorization, publication/cleanup and timing overhead. No adjusted call budget, solver-CPU attribution or fix is claimed."
+}

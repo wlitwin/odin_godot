@@ -1,0 +1,487 @@
+{
+  "schema": 1,
+  "task": "t_68563250876941a8",
+  "task_revision": 5,
+  "board": "b_cdde1cdfea104035",
+  "result": "PASS",
+  "scope": "P5.3 shared editor/import/debug tooling on declared macOS arm64 reference; both sibling framework readers supply actual copied frames.",
+  "requirements": {
+    "inspector": "Real registered Inspector callbacks, exported Resource property editing, shared validation/hex identities and bake/install actions.",
+    "gizmo": "Real registered Node3D gizmo callbacks; shared bounded authored shape outlines plus explicit joint/character authoring overlays, rigid/local transforms and explicit preview errors.",
+    "mesh_bake": "Actual ArrayMesh surfaces/indices copied with affine transform/material/filter flags into existing Mesh Resource; metadata/resource roundtrip; shared semantic identity, no frontend ID algorithm.",
+    "artifact": "Version1 owning envelope, exact source bytes/import metadata/shared bake identity; bounded strict version/hash/reference/length/corrupt validation; load uses same shared parser/baker.",
+    "importer": "Registered .b3authoring importer with native Resource loader type, actual target resources_reimported signal and strict loaded Box3DBakeArtifact identity.",
+    "runtime_draw": "DefaultOFF actual ImmediateMesh drawing from exact saved Kit and Replay JSON batches; hex16 counters preserve u64, stale clears, 128lines each, Native allocation totals unchanged.",
+    "frameworks": "Existing public Kit complete-CP and Replay complete-CP presentation readers; copied geometry/frames draw identically after source bake/world/catalog/framework/checkpoint owners destroyed; full checkpoints preserved.",
+    "source_free_native": "Standalone artifact test constructs Native after sources destroyed; actual SDK additionally builds/steps exact imported ArrayMesh artifact after source nodes/Mesh/Resources destroyed with checked world/catalog/maps/Meter cleanup.",
+    "lifecycle": "Real editor plugin registration/disable/reenable, checked native cleanup0, strict log checks, ordinary scriptgen/module/Core build and one Native image.",
+    "compatibility": "Earlier authoring six-shape/sensor and motion eight-family/character SDK fixtures pass after registered-parent declaration fix."
+  },
+  "standalone": [
+    {
+      "suite": "debugdraw",
+      "tests": 8,
+      "names": [
+        "actual_frame_body_and_local_rigid_transforms",
+        "sphere_and_arbitrary_axis_capsule_surface_lines",
+        "hull_tetra_cube_crease_topology_and_input_order",
+        "mesh_and_baked_heightfield_no_hidden_geometry_or_partial_write",
+        "disabled_stale_invalid_missing_and_duplicate_are_atomic",
+        "source_lifetime_and_revision_are_value_only",
+        "joint_and_character_overlays_use_copied_frames_and_world_state",
+        "stable_binding_frame_order_and_preview_limits"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/debugdraw/report.json",
+        "sha256": "e039e900aa45de3191d51cbb8c7bc5096fe6d76bc799c1bbb4c8bebd2b6256a2"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/debugdraw/test.log",
+        "sha256": "0b1ce8313f071c04ce4197e2f69bafb49245e6fff955754ddfba612a8919f4f9"
+      },
+      "source_fence_at_run": true,
+      "native_link": null,
+      "native_sha256": null
+    },
+    {
+      "suite": "pure",
+      "tests": 5,
+      "names": [
+        "artifact_detaches_exact_source_metadata_and_shared_bake",
+        "semantic_identity_survives_order_with_distinct_exact_source_identity",
+        "strict_versions_hashes_lengths_truncation_and_failure_atomicity",
+        "owned_inspection_json_exact_hex_ids_and_authored_preview_only",
+        "invalid_definition_metadata_and_input_bounds_publish_no_owner"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/pure/report.json",
+        "sha256": "795ff96a1a4fab8aa40f5ef5acc1954da0673ba0fcf5608a7f0019c87a9f3907"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/pure/test.log",
+        "sha256": "a0de8e353646f5256f3b76830e501d3b1bbeeed9ea92b043ae0c9547d0b27895"
+      },
+      "source_fence_at_run": true,
+      "native_link": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Debug/libogb3.a",
+      "native_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55"
+    },
+    {
+      "suite": "artifacts",
+      "tests": 1,
+      "names": [
+        "detached_loaded_artifact_builds_real_six_shapes_after_all_source_storage_gone"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/artifacts/report.json",
+        "sha256": "81bf3030ac39f611d6fb18fe79456d0a24660a01815aed42c4a65196def10209"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v3/artifacts/test.log",
+        "sha256": "f056730efd2e8ed36c3da82a12e9ff28fada0c3215cf07bc4a17ad1cf7f53e83"
+      },
+      "source_fence_at_run": true,
+      "native_link": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Debug/libogb3.a",
+      "native_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55"
+    },
+    {
+      "suite": "frameworks",
+      "tests": 4,
+      "names": [
+        "kit_copied_checkpoint_geometry_draws_after_all_sources_are_destroyed",
+        "replay_copied_checkpoint_geometry_draws_without_live_solver_or_mutation",
+        "draw_json_preserves_wide_stamps_as_hex_and_copies_finite_line_values",
+        "draw_json_rejects_inconsistent_counts_and_invalid_colors_without_payload"
+      ],
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frameworks/report.json",
+        "sha256": "bd9a40447664ef7879a942a5cf03c657c2e0f47f39eaee6bdadcfd2eab282077"
+      },
+      "log": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frameworks/test.log",
+        "sha256": "b532b4169fd7877da6dbf3ac15ce745a64e186b907f4dbb5f0f0fe94a61a106c"
+      },
+      "source_fence_at_run": true,
+      "native_link": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Debug/libogb3.a",
+      "native_sha256": "4659d47b41dfda62e26605c11eae3813669728bf8d6c7eb973e5bf0bee95ee55"
+    }
+  ],
+  "standalone_unique_groups": 18,
+  "actual_framework_frames": {
+    "report": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frameworks/report.json",
+    "report_sha256": "bd9a40447664ef7879a942a5cf03c657c2e0f47f39eaee6bdadcfd2eab282077",
+    "frames": {
+      "kit-frame.json": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frameworks/kit-frame.json",
+        "sha256": "d673a7bec36be831b7f936dae9e31de395818da6d1cd245b3ec69d0dbe11956b",
+        "version": 1,
+        "source": "Predicted",
+        "epoch": "0000000000000001",
+        "tick": "0000000000000003",
+        "revision": "0000000000000001",
+        "lines": 128
+      },
+      "replay-frame.json": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frameworks/replay-frame.json",
+        "sha256": "d673a7bec36be831b7f936dae9e31de395818da6d1cd245b3ec69d0dbe11956b",
+        "version": 1,
+        "source": "Predicted",
+        "epoch": "0000000000000001",
+        "tick": "0000000000000003",
+        "revision": "0000000000000001",
+        "lines": 128
+      }
+    }
+  },
+  "frame_bindings": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-actual-frames-v1/frame-bindings.json",
+    "sha256": "67ca4f965ae59959edb94562ca652a63d105512883721216a7110d317ae15124"
+  },
+  "pure_binary_closure": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-completion-audit-v1/debugdraw-binary-closure.json",
+    "sha256": "c4966ec15f7bfdc5ddf6b445e14622e25edaef6b83830b637db6989cc4adb906"
+  },
+  "sdk": [
+    {
+      "case": "editor",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/report.json",
+        "sha256": "3c548f63445f1489586ad8d8ad68fa66c35c25acf692923efb9cf52c8d60cf90"
+      },
+      "steps": [
+        [
+          "build",
+          0
+        ],
+        [
+          "import",
+          0
+        ],
+        [
+          "editor",
+          0
+        ],
+        [
+          "functional",
+          0
+        ]
+      ],
+      "logs": {
+        "build": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/build.log",
+          "sha256": "69ac48f47886660d3f8b648e7c092fa507ddd466ce6c7adaaf1ce35aa40b6d25"
+        },
+        "import": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/import.log",
+          "sha256": "db74b7fa3eb38fb08730b9710e9e93561f708cee7893940048b3edcc6f8ef3d0"
+        },
+        "editor": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/editor.log",
+          "sha256": "609b682af60f08e25f60d4d6edb16f902042c7d2b9be3445280736f0b2be3109"
+        },
+        "functional": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/functional.log",
+          "sha256": "04e77431c3e5666cf302641da1d2b36e2c0fdedaacac99431ef67083cb60c9ec"
+        }
+      },
+      "current_runnable_source_fence": true,
+      "scope": "real SDK/editor plugins/ArrayMesh/shared owning artifacts +actual detached Kit/Replay frame renderer; no manual pixel/GateC/whole-goal claim",
+      "markers": [
+        "BOX3D_EDITOR_CHECK_OK inspector_panels=2 gizmo_callbacks=21 lines=298 importer=true enable_disable=true no_manual_pixel_claim=true",
+        "BOX3D_EDITOR_IMPORTED_NATIVE source_free=true body_count=1.0 shape_count=1.0 step=true cleanup=0",
+        "BOX3D_EDITOR_FRAME Kit actual_file=res://data/kit-frame.json lines=128 NativeDelta=0",
+        "BOX3D_EDITOR_FRAME Replay actual_file=res://data/replay-frame.json lines=128 NativeDelta=0",
+        "BOX3D_EDITOR_RUNTIME_OK mesh=true artifact_source_free=true ResourceRoundtrip=true actual_Kit_Replay_frames=true NativeDelta=0 no_manual_pixel_claim=true"
+      ],
+      "native_identity": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-godot-actual-v4/project/bin/box3d-runtime.json",
+        "sha256": "03ddeb86fbb3d25bb96aa6618019c1c3bf3ff8ec75ad22268a31b0197fb6a8be"
+      },
+      "domain": {
+        "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+        "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+        "versions": [
+          1,
+          1,
+          3,
+          2,
+          1
+        ],
+        "pointer_bits": 64,
+        "endian": 1
+      },
+      "native_source_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+      "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+      "artifacts": {
+        ".box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "box3d-runtime.json": "03ddeb86fbb3d25bb96aa6618019c1c3bf3ff8ec75ad22268a31b0197fb6a8be",
+        "libodin_godot.dylib": "bf0e169c1594c1d2b3410fa8060c773703f1d46619c97f026c489148689885ef",
+        "libodinscripts.dylib": "fee006b80c795c7c8bb983764a3bef93e4b282afcd1b3740bba638f45fbea17a",
+        "libodinscripts.dylib.r1.p75826.dylib": "fee006b80c795c7c8bb983764a3bef93e4b282afcd1b3740bba638f45fbea17a",
+        "libodinscripts_box3d_authoring_tools.dylib": "b4adcf29ed399be695f2bf8d6b6c7f93e8e335452eeba43fcab110c6cee1e283",
+        "libodinscripts_box3d_authoring_tools.dylib.r2.p75826.dylib": "b4adcf29ed399be695f2bf8d6b6c7f93e8e335452eeba43fcab110c6cee1e283",
+        "libodinscripts_editor_probe.dylib": "4692c5c68bf39fc3e1a86bcd765ef1481ea7a30f8b1ad47ecb99784d16a73b82",
+        "libodinscripts_editor_probe.dylib.r3.p75826.dylib": "4692c5c68bf39fc3e1a86bcd765ef1481ea7a30f8b1ad47ecb99784d16a73b82",
+        "libogb3.dylib": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3"
+      }
+    },
+    {
+      "case": "legacy_authoring",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-authoring-sdk-regression-v1/report.json",
+        "sha256": "1cf34f6b4f2bb9443f693f20c3f905b7e05953ba5cbe951a78b06afe3adfed33"
+      },
+      "steps": [
+        [
+          "build",
+          0
+        ],
+        [
+          "import",
+          0
+        ],
+        [
+          "functional",
+          0
+        ]
+      ],
+      "logs": {
+        "build": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-authoring-sdk-regression-v1/build.log",
+          "sha256": "c9c5026ab08a6f003f3b1460a0354e01f989fa670d1d884e49518ed1c1d33149"
+        },
+        "import": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-authoring-sdk-regression-v1/import.log",
+          "sha256": "d9794d1765896d408810954e1289bd27712476ebf2206c143beb256a45b01cc5"
+        },
+        "functional": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-authoring-sdk-regression-v1/functional.log",
+          "sha256": "b4ec9ecd34078cc9b9044086e30734caf605217f16e577de58f0bc743e63aa0a"
+        }
+      },
+      "current_runnable_source_fence": true,
+      "scope": "actual SDK module/Resource/node save-reload/source-free Native construction; not Kit/Replay adapter or GateC acceptance",
+      "markers": [],
+      "native_identity": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-authoring-sdk-regression-v1/project/bin/box3d-runtime.json",
+        "sha256": "47967a69a314b733ec3b7dc2bb66c9178de84793a63ea26bfbf00f7fd93cb43d"
+      },
+      "domain": {
+        "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+        "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+        "versions": [
+          1,
+          1,
+          3,
+          2,
+          1
+        ],
+        "pointer_bits": 64,
+        "endian": 1
+      },
+      "native_source_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+      "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+      "artifacts": {
+        ".box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "box3d-runtime.json": "47967a69a314b733ec3b7dc2bb66c9178de84793a63ea26bfbf00f7fd93cb43d",
+        "libodin_godot.dylib": "d0ab8f4d97f70ad6750101111a3cb1dc84d7a8accd4b70ea918677ff0878fe5c",
+        "libodinscripts.dylib": "7067ab8748bf50f7d98172bec8649a5b482673fe59f3306798cb723660488ea1",
+        "libodinscripts.dylib.r1.p76650.dylib": "7067ab8748bf50f7d98172bec8649a5b482673fe59f3306798cb723660488ea1",
+        "libodinscripts_authoring_probe.dylib": "cd1542acc5d6c6869b2479ae1e19191d6ce0d8db7b8b839aa65daf224380190d",
+        "libodinscripts_authoring_probe.dylib.r2.p76650.dylib": "cd1542acc5d6c6869b2479ae1e19191d6ce0d8db7b8b839aa65daf224380190d",
+        "libogb3.dylib": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3"
+      }
+    },
+    {
+      "case": "legacy_motion",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-motion-sdk-regression-v1/report.json",
+        "sha256": "78f5aa4bd65435c743c9c7fb4a44c67ce01e126691f19bcb59f735669623766c"
+      },
+      "steps": [
+        [
+          "build",
+          0
+        ],
+        [
+          "import",
+          0
+        ],
+        [
+          "functional",
+          0
+        ]
+      ],
+      "logs": {
+        "build": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-motion-sdk-regression-v1/build.log",
+          "sha256": "b9cb02cbb9439eafff5da0d194fc37235f30402aeb7ddfb597bc170044367c86"
+        },
+        "import": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-motion-sdk-regression-v1/import.log",
+          "sha256": "03fc2ca8a7c8fae6e4f8ebc37672077ef46612d580caca03856af8c973cd4897"
+        },
+        "functional": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p5-editor-motion-sdk-regression-v1/functional.log",
+          "sha256": "263a267f00ee1fcfab032f7a090d78ea9597b24f86c3b38b7b04d09f6034fa8f"
+        }
+      },
+      "current_runnable_source_fence": true,
+      "scope": "actual SDK motion authoring/source-free eight separate one-joint constructions and character POD/explicit Native mover; not framework or GateC acceptance",
+      "markers": [],
+      "native_identity": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-motion-sdk-regression-v1/project/bin/box3d-runtime.json",
+        "sha256": "9216c0e81849b4132dbad5580ea34b7a632742c3ef58b3c8b56dcb843d06ddd0"
+      },
+      "domain": {
+        "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+        "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+        "versions": [
+          1,
+          1,
+          3,
+          2,
+          1
+        ],
+        "pointer_bits": 64,
+        "endian": 1
+      },
+      "native_source_sha256": "bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d",
+      "deployed_native_sha256": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3",
+      "artifacts": {
+        ".box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "box3d-runtime.json": "9216c0e81849b4132dbad5580ea34b7a632742c3ef58b3c8b56dcb843d06ddd0",
+        "libodin_godot.dylib": "843b1004358bdabc2261c20d45f399409686a636f036ca5b9463273aeeb10c0a",
+        "libodinscripts.dylib": "99e29fc0c577e0e731ec73dae8383beca864ce2928f97232a3f52a78cdead7d2",
+        "libodinscripts.dylib.r1.p77337.dylib": "99e29fc0c577e0e731ec73dae8383beca864ce2928f97232a3f52a78cdead7d2",
+        "libodinscripts_motion_probe.dylib": "b278da1ddde4e589518ae2a27f1f1b6b34d08dc4723736945573840a05baf751",
+        "libodinscripts_motion_probe.dylib.r2.p77337.dylib": "b278da1ddde4e589518ae2a27f1f1b6b34d08dc4723736945573840a05baf751",
+        "libogb3.dylib": "cdde3047f17650b4ee8e8cbb2d2c5e681c971cc5c4a6d65a9476527027e825b3"
+      }
+    }
+  ],
+  "native_reused": {
+    "manifest": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-motion-native-build-v2/cache/build/Release/build-manifest.json",
+      "sha256": "b1921b44a56093985ad8606cb04d624c51d38f2b77728abd694558bf359c7ae8"
+    },
+    "current_native_source_fence": true,
+    "native_tests_not_rerun": "No Native C/codec/pin/FP/cap changes on this card; current P5.2 Native12x3 evidence reused explicitly."
+  },
+  "prior_failures_preserved": {
+    "odin_struct_syntax": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-debugdraw-pure-actual-v1/debugdraw/report.json",
+      "sha256": "f7f57daeb79177b8a8ef9eff83e484b3a5da1043870d0be7d15cc341521c7b50"
+    },
+    "odin_readonly_contextless_typecheck": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-standalone-actual-v2/debugdraw/report.json",
+      "sha256": "4825ba7bd7094e72f1c5b1a062c9c2a991424da9707e8b62637fcc0d50e43945"
+    },
+    "godot_typed_array": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-godot-actual-v1/report.json",
+      "sha256": "2fe2c3c92b79b699d10ad10469069c7b0cc76f2f2ccaed0c7ef5d03b93f67995"
+    },
+    "godot_icon_and_import_sync": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-godot-actual-v2/report.json",
+      "sha256": "7f35888495c178d15c37ce6599ec57a2130f9bfca48f791e7f56fbe080150e4e"
+    },
+    "godot_icon_and_resource_loader_type": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-editor-godot-actual-v3/report.json",
+      "sha256": "2769379b9f2e2e09a3077ecd570c421c19aa22f7b3f0a07e406e87e5ddcae587"
+    }
+  },
+  "fixes": [
+    "Struct field separators/read-only locals/contextless invariant traps corrected without geometry/criteria change.",
+    "Typed gizmo traversal initializer fixed; actual filesystem signal replaces idle-scan race without longer arbitrary wait.",
+    "Actual Godot class cache had empty native base for path-inherited classes; same registered parents now named explicitly, properties/behavior preserved.",
+    "Importer advertises native Resource, then checks actual loaded script class and artifact identity."
+  ],
+  "completion_source_hashes": {
+    "addons/box3d_authoring/MOTION.md": "ba5d09b0ad1bd0070904cf15127ecab75f32fd134061eaf4e0855bd0996837ce",
+    "addons/box3d_authoring/README.md": "f0863651c3f8d589a9aedd91dc1a0929f436a8d47b84fe5e435b433982346cf7",
+    "addons/box3d_authoring/axis_joint_settings_3d.gd": "6de228215195cc2c5825088d5553911ef244f5807b97ed878419460b8bd4c7eb",
+    "addons/box3d_authoring/bake_artifact.gd": "18d337eac8edae7d270ae09ec15e9f0d0ae363cc42a2a9d43758642ea963a8e3",
+    "addons/box3d_authoring/body_3d.gd": "2322f88f722ded5235eedbe2417ca34f06ecf897f1906bf69605e8ceefbadffc",
+    "addons/box3d_authoring/box_shape_3d.gd": "414ff0d0c52b4163f72b114a9fa7841e2c1ef59ab80084478d047f39563b954a",
+    "addons/box3d_authoring/capsule_shape_3d.gd": "392d3eb8089ede554386fef9817a5c68f73be62b3707d507951e56719ade18ec",
+    "addons/box3d_authoring/character_config_3d.gd": "754cb37fa2b14bf46555d7ed7facfa3440275ee6d2b583aa40bbef69ac249b72",
+    "addons/box3d_authoring/character_mover_3d.gd": "30393132105d974d31c558fa316c88cdb610e9d95e97fa6d28739a73cba9806e",
+    "addons/box3d_authoring/data.gd": "8d03ffd3da149250174b1167ee42bb55b00f3dce1599a7e845c6f265fae0051e",
+    "addons/box3d_authoring/debug_draw_3d.gd": "680a1b59d75b14e219c5687bc546d37a67a7d00c79b9e0cd6ebde1615778a687",
+    "addons/box3d_authoring/distance_joint_3d.gd": "a474435089ac811749b20c5ccbcf285360cfb932f7469ff1db7bf4c1695618c1",
+    "addons/box3d_authoring/distance_joint_settings_3d.gd": "ca421d3e8e5d3e90894bbd6e007417e74d3c313342b098a29d719ba9024d9550",
+    "addons/box3d_authoring/editor/gizmo.gd": "547f84d15091ab9a87efd4b977b5402c1bc0bc94d1f8eb7ea26ebff10f716eb5",
+    "addons/box3d_authoring/editor/importer.gd": "67e820516f5b8dee61c2b17dd8124c884c35faadeb4dbcef7b3e6bbdc1537a75",
+    "addons/box3d_authoring/editor/inspector.gd": "3f8d81fff51762b2f885799dac58324154f1be67f310181599e3210e05aa4b5d",
+    "addons/box3d_authoring/editor/mesh_baker.gd": "6651a6d482c67b736adcb115e5344f250161fabffb6d3cfe2b43aadbc863c8da",
+    "addons/box3d_authoring/editor/services.gd": "0eff6e1ce252e18576c6883d7245157eb9c43027ea6b4a9967b95c9d736d13f3",
+    "addons/box3d_authoring/heightfield_shape_3d.gd": "e1d308a28ce8010e1215105cf256e8116dc4fd87f9a3fb48628d22644d0800cc",
+    "addons/box3d_authoring/hinge_joint_3d.gd": "ff15e2e98a29ce71e5fcaa931f5ca855becdc8a22ff63f27e1a154021545dbc2",
+    "addons/box3d_authoring/hull_shape_3d.gd": "039937b15392be0fe7df3813ae7523f16c0ad71bf60d3656e261ca2f0ac2ea6d",
+    "addons/box3d_authoring/joint_3d.gd": "9f3a681c538595a0ec387481c551a44bcadaff061498dac542536aec28eb0ddd",
+    "addons/box3d_authoring/joint_settings_3d.gd": "d0622e13da729278c5d80557ac1300352c0815e6af10102fb4bb73d4d7400fc6",
+    "addons/box3d_authoring/mesh_shape_3d.gd": "34701ef6df68fd702022e9f1b6bec6599d8659a29a2d3df79fabb510245757d7",
+    "addons/box3d_authoring/motion_data.gd": "6b95f6c2c96dcd7391772096bd524365d065cc03c5cc0b645fcdc924f00fa731",
+    "addons/box3d_authoring/motor_joint_3d.gd": "e3a61a432bb4e02f8eb70a14b5445a7c589ef028cfb218d3dc3788b3e6e0c851",
+    "addons/box3d_authoring/motor_joint_settings_3d.gd": "14f1d508a8ed59cf8ebccd688fe77517a48f24b5c84fa9b7d59f6ba642a339e4",
+    "addons/box3d_authoring/pin_joint_3d.gd": "c04edec2388469e52e4d5b29320365393406e966ba57214b83a06320d11b937a",
+    "addons/box3d_authoring/plugin.cfg": "3f03be73f1df384bcdf9be947eebede83aed3cc15207e9359aea5e4143eac617",
+    "addons/box3d_authoring/plugin.gd": "f4f7dc461872f6df071f8bd3bc512949063acef298c58edaee6a92ba39715d11",
+    "addons/box3d_authoring/sensor_3d.gd": "9c36d9b18676576d97a0a4c93e572bf19dc8388d557a5922e90e8b0b7cfd1c06",
+    "addons/box3d_authoring/shape_3d.gd": "b13097a0cb8586d3a01f458a4a85469a165d1b1a02a939bb4228c8d0923f572a",
+    "addons/box3d_authoring/slider_joint_3d.gd": "c15b4256334e6df39092309092d047294dfc9cd27fb20826e578059e7f56da87",
+    "addons/box3d_authoring/sphere_shape_3d.gd": "5855bdaf8e71f73e85d68c94bc86d804b9f16cf443589f2e57d8789588432657",
+    "addons/box3d_authoring/spherical_joint_3d.gd": "6678d57dd28daeb67f5c0331449fea5bb58503ced44460718a5038c58a210f6b",
+    "addons/box3d_authoring/spherical_joint_settings_3d.gd": "cc163abd938b3eac2dbbd9bb20944c07c8b30d348769eac30e3a006b1a30f999",
+    "addons/box3d_authoring/tool_module/README.md": "9d800f04ae085174e7a6f505690c2b58762a4c4d65d26065409cc2e6653d8f03",
+    "addons/box3d_authoring/tool_module/tools.odin": "a070b2712f99ba1eb761a2351b3133c28c9080f2498b08ec8763c2bed26e8a95",
+    "addons/box3d_authoring/weld_joint_3d.gd": "ff20894d1c5465fe14d73d0c18301b0d0f123449b845b4065c1175ed90925370",
+    "addons/box3d_authoring/weld_joint_settings_3d.gd": "276cea7f83b75198a3e41ac721d1aa1e418c55f98449a7ce604861f1185a35d7",
+    "addons/box3d_authoring/wheel_joint_3d.gd": "8b3b45de9d23e16edee26f1f34895d17b7361a1305bda03cf24037c5092d26b6",
+    "addons/box3d_authoring/wheel_joint_settings_3d.gd": "d438657d0f3382f01e0a3b64714685c87720a24d812146f9ebde3a6b16e6c92d",
+    "addons/box3d_authoring/world_3d.gd": "20f9e3fc76e233fc2d90f96de23a32560c66b6aa37ce06eb1fd75fa4f3b500b9",
+    "box3d/authoring/API.md": "b3eb1635cd870d4ae1870d1fb270daef12fc188cfa873fd045036308cfc798bf",
+    "box3d/authoring/artifact.odin": "746c9effd09b0ce0c3275f2c09437faeac592d911c6d50df28489ba775875275",
+    "box3d/authoring/bake.odin": "51b4b59458a3b99b5b0cbb1a6d3af16ded1c50514dce3554376429fe58780948",
+    "box3d/authoring/build.odin": "503f1704c6b9ff53ba593f185e69bdc54f548777868fb05fa3e45ca4a520ebc5",
+    "box3d/authoring/debugdraw.odin": "020e618ffac168a19a9fed72e1f38d2b0db2667aba2817540d54f2992b944452",
+    "box3d/authoring/inspection.odin": "f960a09f0b143245587ad307790e1c48aead17db34b7755a92b719a44e3826fa",
+    "box3d/authoring/motion.odin": "3efb73ab393f51ffe166330acf4ff773e12414d97fab0cd448bae5dff3ee8ff3",
+    "box3d/authoring/types.odin": "eb787c27021e0ed6a555c3b95b6107459fc059c88824bf631f27c6daac126c9d",
+    "box3d/debugdraw/API.md": "09ab52c3e9b1d37e13cc813641ccd966aaeb9ed62a3ad41b44a0d3f6870ad0f3",
+    "box3d/debugdraw/generate.odin": "921c6bc098b4856389a2766cf2ac632b83fb40538571a17dd256ee5973cf2a31",
+    "box3d/debugdraw/geometry.odin": "c2d1fbf99063dd641570e4c167a348bb4d7935bbfd08e99bbcd6aebdcae2e061",
+    "box3d/debugdraw/hull.odin": "c556d30339c103716cf89e19a6c3fdb49eb1412b71a4244e4d4d765ba636c05e",
+    "box3d/debugdraw/types.odin": "1e7c5c2a63b1a8e7765141d15a88ed95b2ea0f42cf3da402c92d98f3c4c4006c",
+    "box3d/godot/authoring/README.md": "b7e18023525bced8578a44168ed6c3b88cf7c58d9749d5639ea629da1db283a3",
+    "box3d/godot/authoring/editor.odin": "4871dbee01445ae22ccaf6be4220d146ac9743a7aa47f433a64d507e0f9ac29d",
+    "box3d/godot/authoring/extract.odin": "f2007241a8355885241691dd969b21efdc46e56f252bf4eb22fd021b1a04b940",
+    "box3d/godot/debugdraw/json.odin": "68666df998a06bedce2bc79375540a6f33188d963fc3f9c49387e6240ad3ec3c",
+    "docs/design/box3d/editor.md": "c6b933e53256e7fb7447a93d6e9e2089983ba017cadde984337450dcb63fc3e9",
+    "tests/box3d_editor/artifacts/artifact_test.odin": "2cb73df17b3f1064691ade5fea28e6ea66c990101c325c4ac164bc80f6322329",
+    "tests/box3d_editor/debugdraw/debugdraw_test.odin": "e1aebf0027720ab8fa71ab20b09258e919833730d29506bc63fe6ff421138691",
+    "tests/box3d_editor/frameworks/debugdraw_test.odin": "398be7ea307f1c4881379d48102bdd3dfdf3d143f34df29d4a791dcc702e7ff6",
+    "tests/box3d_editor/frameworks/json_test.odin": "579b46858fdc0b1f6aeb1d5613849587e7f82475a0bdcbd63d6c46442db3fbba",
+    "tests/box3d_editor/godot/README.md": "abebd0c290338561e88ec0c9412973d1f44d68e3be6c091fe5636c4ea75f3bfe",
+    "tests/box3d_editor/godot/project/addons/editor_acceptance/plugin.cfg": "5a747e356e274a0f28bfc8472aae311c240c229608069e6c9cdbda4dcbe26e67",
+    "tests/box3d_editor/godot/project/addons/editor_acceptance/plugin.gd": "ea11cd8f3f40b1174a27c5f7cfa881bd699fd1a3bfbef166a92ae1af8fc6d2f6",
+    "tests/box3d_editor/godot/project/fixture.gd": "cc392c4551423ab32bc932c3a06440b0b14d8230bb7a30a1e3343bbdad2452cc",
+    "tests/box3d_editor/godot/project/modules/editor_probe/images_darwin.odin": "cef3c8767d8c76bfe23a34dd3484f93d70d0667a3bec4c5be7eab110791d52bf",
+    "tests/box3d_editor/godot/project/modules/editor_probe/images_linux.odin": "75857095c2a3a8f6f8a76af60c5b770940feceb9dacef337408660681d655ca7",
+    "tests/box3d_editor/godot/project/modules/editor_probe/probe.odin": "b3e95d37597b08cb27cabc2680446e9db2caa40f693b4aced5fd05761a90fa19",
+    "tests/box3d_editor/godot/project/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "tests/box3d_editor/godot/project/project.godot": "f7d2a8a4ee861a3504a6d1fb0d4e153a85ac9341729a837f8e07caf36616c385",
+    "tests/box3d_editor/godot/project/scripts/boot.odin": "d0c39a6191b57b76c2cf943381c121166e232f2532374179ee77df0185119dc2",
+    "tests/box3d_editor/godot/project/test_runtime.gd": "fb87e17187b9db1de71a4cf84a1d5f55bebf5de627cf77da5ca15e52ed224524",
+    "tests/box3d_editor/godot/run.py": "419a98628bbb3cd45c0f1e94c3322d2ba55f42dfccd7f408bcec18730b3752e0",
+    "tests/box3d_editor/pure/artifact_test.odin": "e047fedb304513e869ba587cf0e976d54d2c700d6c3196f1c5841f8722a1ad21"
+  },
+  "source_scope": "Selected assigned sources/tests/docs plus SDK and Native manifests, not exact compiler import tracing. Documentation-only changes follow runs.",
+  "limits": [
+    "Headless API/geometry/component checks; no manual pixel/usability review claim.",
+    "Preview limits8geometries/35bindings/onejoint/35characters/4096meshvertices+triangles/8192lines; Capacity explicit, simulation limits unchanged.",
+    "Runtime drawing defaultsOFF and queries no live solver; presentation package remains Native/Godot-free.",
+    "Same reference platform; no cross-target performance/exportGateC/whole-goal completion claim.",
+    "Static standalone framework/nilOwner tests and real SDK tests have separately stated scopes."
+  ],
+  "whole_goal_complete": false
+}

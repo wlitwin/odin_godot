@@ -1,0 +1,171 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://addons/box3d_authoring/world_3d.gd" id="world"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/body_3d.gd" id="body"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/sensor_3d.gd" id="sensor"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/shape_3d.gd" id="shape_base"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/hinge_joint_3d.gd" id="hinge"]
+[ext_resource type="Resource" path="res://content/ground.tres" id="ground_shape"]
+[ext_resource type="Resource" path="res://content/robot.tres" id="robot_shape"]
+[ext_resource type="Resource" path="res://content/cargo.tres" id="cargo_shape"]
+[ext_resource type="Resource" path="res://content/long.tres" id="long_shape"]
+[ext_resource type="Resource" path="res://content/crane.tres" id="crane_shape"]
+[ext_resource type="Resource" path="res://content/barge.tres" id="barge_shape"]
+[ext_resource type="Resource" path="res://content/ramp.tres" id="ramp_shape"]
+[ext_resource type="Resource" path="res://content/delivery.tres" id="delivery_shape"]
+[ext_resource type="Resource" path="res://content/hinge.tres" id="hinge_settings"]
+[node name="AuthoredWorld" type="Node3D"]
+script = ExtResource("world")
+stable_key = "dockyard.duo.v1"
+gravity = Vector3(0,-9.81,0)
+[node name="ground" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "ground"
+body_type = 0
+position = Vector3(0,-0.5,0)
+shapes = Array[ExtResource("shape_base")]([ExtResource("ground_shape")])
+[node name="robot_a" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "robot_a"
+body_type = 2
+position = Vector3(-2.2,0.5,-0.75)
+shapes = Array[ExtResource("shape_base")]([ExtResource("robot_shape")])
+linear_damping = 1.8
+angular_damping = 1.5
+enable_sleep = false
+[node name="robot_b" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "robot_b"
+body_type = 2
+position = Vector3(-2.2,0.5,0.75)
+shapes = Array[ExtResource("shape_base")]([ExtResource("robot_shape")])
+linear_damping = 1.8
+angular_damping = 1.5
+enable_sleep = false
+[node name="cargo_a" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "cargo_a"
+body_type = 2
+position = Vector3(-4,0.46,0)
+shapes = Array[ExtResource("shape_base")]([ExtResource("cargo_shape")])
+linear_damping = 0.1
+angular_damping = 1.5
+enable_sleep = false
+[node name="cargo_b" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "cargo_b"
+body_type = 2
+position = Vector3(-6,0.46,3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("cargo_shape")])
+linear_damping = 0.1
+angular_damping = 1.5
+enable_sleep = false
+[node name="cargo_long" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "cargo_long"
+body_type = 2
+position = Vector3(-5,0.41,-3.5)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+linear_damping = 0.1
+angular_damping = 1.5
+enable_sleep = false
+[node name="crane_anchor" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "crane_anchor"
+body_type = 0
+position = Vector3(-0.5,1.3,-1.5)
+shapes = Array[ExtResource("shape_base")]([ExtResource("robot_shape")])
+[node name="crane" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "crane"
+body_type = 2
+position = Vector3(1.5,1.3,-1.5)
+shapes = Array[ExtResource("shape_base")]([ExtResource("crane_shape")])
+linear_damping = 0.1
+angular_damping = 1.5
+enable_sleep = false
+[node name="barge" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge"
+body_type = 1
+position = Vector3(6,0.5,1)
+shapes = Array[ExtResource("shape_base")]([ExtResource("barge_shape")])
+[node name="ramp" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "ramp"
+body_type = 0
+position = Vector3(0.027150373,0.123442713,1)
+shapes = Array[ExtResource("shape_base")]([ExtResource("ramp_shape")])
+rotation = Vector3(0,0,0.166147984)
+[node name="delivery" type="Node3D" parent="."]
+script = ExtResource("sensor")
+stable_key = "delivery"
+body_type = 0
+position = Vector3(6,1.45,1)
+shapes = Array[ExtResource("shape_base")]([ExtResource("delivery_shape")])
+[node name="crane_hinge" type="Node3D" parent="."]
+script = ExtResource("hinge")
+stable_key = "crane.hinge"
+body_a = "crane_anchor"
+body_b = "crane"
+local_frame_a = Transform3D(1,0,0,0,0,-1,0,1,0,0,0,0)
+local_frame_b = Transform3D(1,0,0,0,0,-1,0,1,0,-2,0,0)
+settings = ExtResource("hinge_settings")
+
+
+[node name="barge_backstop" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_backstop"
+body_type = 1
+position = Vector3(9.9,1.15,-0.5)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+rotation = Vector3(0,1.570796326794897,0)
+
+[node name="barge_rail_a" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_a"
+body_type = 1
+position = Vector3(3.4,1.15,-2.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+
+[node name="barge_rail_b" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_b"
+body_type = 1
+position = Vector3(6.2,1.15,-2.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+
+[node name="barge_rail_c" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_c"
+body_type = 1
+position = Vector3(3.4,1.15,4.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+
+[node name="barge_rail_d" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_d"
+body_type = 1
+position = Vector3(6.2,1.15,4.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+
+[node name="barge_backstop_b" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_backstop_b"
+body_type = 1
+position = Vector3(9.9,1.15,2.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+rotation = Vector3(0,1.570796326794897,0)
+
+[node name="barge_rail_e" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_e"
+body_type = 1
+position = Vector3(9,1.15,-2.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
+
+[node name="barge_rail_f" type="Node3D" parent="."]
+script = ExtResource("body")
+stable_key = "barge_rail_f"
+body_type = 1
+position = Vector3(9,1.15,4.3)
+shapes = Array[ExtResource("shape_base")]([ExtResource("long_shape")])
