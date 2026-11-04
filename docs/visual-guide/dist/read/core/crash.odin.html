@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>crash.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>crash.odin</h1><div class="reader-meta"><span>397 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/core/crash.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>crash.odin</h1><div class="reader-meta"><span>440 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/core/crash.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">#+build darwin, linux
 <span class="hljs-keyword">package</span> core
@@ -64,13 +64,14 @@
 
 <span class="hljs-comment">// execinfo: backtrace/backtrace_symbols_fd live in libSystem on Darwin, glibc on Linux.</span>
 <span class="hljs-keyword">when</span> ODIN_OS == .Darwin {
-	<span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libexecinfo <span class="hljs-string">&quot;system:System&quot;</span>
+    <span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libexecinfo <span class="hljs-string">&quot;system:System&quot;</span>
 } <span class="hljs-keyword">else</span> {
-	<span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libexecinfo <span class="hljs-string">&quot;system:c&quot;</span>
+    <span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libexecinfo <span class="hljs-string">&quot;system:c&quot;</span>
 }
+
 <span class="hljs-keyword">foreign</span> libexecinfo {
-	backtrace :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (buffer: [^]<span class="hljs-type">rawptr</span>, size: <span class="hljs-type">i32</span>) -&gt; <span class="hljs-type">i32</span> ---
-	backtrace_symbols_fd :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (buffer: [^]<span class="hljs-type">rawptr</span>, size: <span class="hljs-type">i32</span>, fd: <span class="hljs-type">i32</span>) ---
+    backtrace :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (buffer: [^]<span class="hljs-type">rawptr</span>, size: <span class="hljs-type">i32</span>) -&gt; <span class="hljs-type">i32</span> ---
+    backtrace_symbols_fd :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (buffer: [^]<span class="hljs-type">rawptr</span>, size: <span class="hljs-type">i32</span>, fd: <span class="hljs-type">i32</span>) ---
 }
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
@@ -115,17 +116,19 @@ g_crash_fd: posix.FD = <span class="hljs-number">-1</span>
 <span class="hljs-comment">//     game&#x27;s crash leaves a post-mortem file a player can send in.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 crash_file_precompute_path :: <span class="hljs-keyword">proc</span>() {
-	feat := godot.new_string_cstring(<span class="hljs-string">&quot;editor&quot;</span>)
-	editor_run := <span class="hljs-type">bool</span>(godot.os_has_feature(godot.singleton_os(), feat))
-	loc: <span class="hljs-type">cstring</span> = editor_run ? <span class="hljs-string">&quot;res://bin/.odin_crash.log&quot;</span> : <span class="hljs-string">&quot;user://odin_crash.log&quot;</span>
-	gres := godot.new_string_cstring(loc)
-	global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
-	s := string_to_odin(global, <span class="hljs-keyword">context</span>.temp_allocator)
-	<span class="hljs-keyword">if</span> len(s) == <span class="hljs-number">0</span> || len(s) &gt;= len(g_crash_file_path) {
-		<span class="hljs-keyword">return</span>
-	}
-	copy(g_crash_file_path[:], s)
-	g_crash_file_path[len(s)] = <span class="hljs-number">0</span>
+    feat := godot.new_string_cstring(<span class="hljs-string">&quot;editor&quot;</span>)
+    editor_run := <span class="hljs-type">bool</span>(godot.os_has_feature(godot.singleton_os(), feat))
+    loc: <span class="hljs-type">cstring</span> = editor_run ? <span class="hljs-string">&quot;res://bin/.odin_crash.log&quot;</span> : <span class="hljs-string">&quot;user://odin_crash.log&quot;</span>
+    gres := godot.new_string_cstring(loc)
+    global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+    s := string_to_odin(global, <span class="hljs-keyword">context</span>.temp_allocator)
+
+    <span class="hljs-keyword">if</span> len(s) == <span class="hljs-number">0</span> || len(s) &gt;= len(g_crash_file_path) {
+        <span class="hljs-keyword">return</span>
+    }
+
+    copy(g_crash_file_path[:], s)
+    g_crash_file_path[len(s)] = <span class="hljs-number">0</span>
 }
 
 <span class="hljs-comment">// Open the crash-report file for one report. O_TRUNC normally (a fresh report replaces</span>
@@ -134,13 +137,13 @@ crash_file_precompute_path :: <span class="hljs-keyword">proc</span>() {
 <span class="hljs-comment">// mid-panic. Returns -1 (disabled/failed) without affecting the stderr path.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 crash_file_open :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> () -&gt; posix.FD {
-	<span class="hljs-keyword">if</span> g_crash_file_path[<span class="hljs-number">0</span>] == <span class="hljs-number">0</span> {
-		<span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>
-	}
-	flags := posix.O_Flags{.WRONLY, .CREAT} +
-		(g_crash_file_panic ? posix.O_Flags{.APPEND} : posix.O_Flags{.TRUNC})
-	mode := posix.mode_t{.IRUSR, .IWUSR, .IRGRP, .IROTH} <span class="hljs-comment">// 0644</span>
-	<span class="hljs-keyword">return</span> posix.open(<span class="hljs-keyword">cast</span>(<span class="hljs-type">cstring</span>)raw_data(g_crash_file_path[:]), flags, mode)
+    <span class="hljs-keyword">if</span> g_crash_file_path[<span class="hljs-number">0</span>] == <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>
+    }
+
+    flags := posix.O_Flags{.WRONLY, .CREAT} + (g_crash_file_panic ? posix.O_Flags{.APPEND} : posix.O_Flags{.TRUNC})
+    mode := posix.mode_t{.IRUSR, .IWUSR, .IRGRP, .IROTH} <span class="hljs-comment">// 0644</span>
+    <span class="hljs-keyword">return</span> posix.open(<span class="hljs-keyword">cast</span>(<span class="hljs-type">cstring</span>)raw_data(g_crash_file_path[:]), flags, mode)
 }
 
 <span class="hljs-comment">// crash_file_note_panic — write one already-formatted ODIN_SCRIPT_PANIC line to the</span>
@@ -153,18 +156,21 @@ crash_file_open :: <span class="hljs-keyword">proc</span> <span class="hljs-stri
 <span class="hljs-comment">// line — one coherent file either way. proc &quot;c&quot; + raw write(2): called mid-panic, must</span>
 <span class="hljs-comment">// not allocate. No-op when no path was precomputed (editor process / Windows stub).</span>
 crash_file_note_panic :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (msg: <span class="hljs-type">cstring</span>) {
-	<span class="hljs-keyword">if</span> msg == <span class="hljs-literal">nil</span> {
-		<span class="hljs-keyword">return</span>
-	}
-	fd := crash_file_open()
-	<span class="hljs-keyword">if</span> fd &lt; <span class="hljs-number">0</span> {
-		<span class="hljs-keyword">return</span>
-	}
-	g_crash_file_panic = <span class="hljs-literal">true</span>
-	posix.write(fd, <span class="hljs-keyword">transmute</span>([^]<span class="hljs-type">u8</span>)msg, <span class="hljs-type">uint</span>(len(msg)))
-	nl: [<span class="hljs-number">1</span>]<span class="hljs-type">byte</span> = {<span class="hljs-string">&#x27;\n&#x27;</span>}
-	posix.write(fd, raw_data(nl[:]), <span class="hljs-number">1</span>)
-	posix.close(fd)
+    <span class="hljs-keyword">if</span> msg == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span>
+    }
+
+    fd := crash_file_open()
+
+    <span class="hljs-keyword">if</span> fd &lt; <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span>
+    }
+
+    g_crash_file_panic = <span class="hljs-literal">true</span>
+    posix.write(fd, <span class="hljs-keyword">transmute</span>([^]<span class="hljs-type">u8</span>)msg, <span class="hljs-type">uint</span>(len(msg)))
+    nl: [<span class="hljs-number">1</span>]<span class="hljs-type">byte</span> = {<span class="hljs-string">&#x27;\n&#x27;</span>}
+    posix.write(fd, raw_data(nl[:]), <span class="hljs-number">1</span>)
+    posix.close(fd)
 }
 
 <span class="hljs-comment">// Install the fatal-signal reporter. Called at extension .Scene init (runs in both the</span>
@@ -172,39 +178,42 @@ crash_file_note_panic :: <span class="hljs-keyword">proc</span> <span class="hlj
 <span class="hljs-comment">// Godot installs its own crash handler during main setup, BEFORE extension init, so the</span>
 <span class="hljs-comment">// sigactions saved here are Godot&#x27;s — restored + re-raised after reporting (step 5).</span>
 crash_reporter_install :: <span class="hljs-keyword">proc</span>() {
-	<span class="hljs-keyword">if</span> g_crash_installed {
-		<span class="hljs-keyword">return</span>
-	}
-	<span class="hljs-comment">// Never alter the EDITOR&#x27;s crash behavior; only the running game reports.</span>
-	<span class="hljs-keyword">if</span> <span class="hljs-type">bool</span>(godot.engine_is_editor_hint(godot.singleton_engine())) {
-		<span class="hljs-keyword">return</span>
-	}
-	g_crash_installed = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">if</span> g_crash_installed {
+        <span class="hljs-keyword">return</span>
+    }
 
-	<span class="hljs-comment">// Godot calls are legal HERE (not in the handler): fix the crash-report file path</span>
-	<span class="hljs-comment">// now, into a static buffer the handler and the panic path can use allocation-free.</span>
-	crash_file_precompute_path()
+    <span class="hljs-comment">// Never alter the EDITOR&#x27;s crash behavior; only the running game reports.</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-type">bool</span>(godot.engine_is_editor_hint(godot.singleton_engine())) {
+        <span class="hljs-keyword">return</span>
+    }
 
-	<span class="hljs-comment">// Alternate signal stack: a STACK-OVERFLOW SIGSEGV leaves the faulting thread no</span>
-	<span class="hljs-comment">// stack to run a handler on — without this the process just dies, report-less. A</span>
-	<span class="hljs-comment">// static buffer (never freed; the reporter lives for the process) + SA_ONSTACK.</span>
-	<span class="hljs-comment">// Failure is non-fatal: handlers still work for every non-overflow crash.</span>
-	<span class="hljs-meta">@(static)</span> alt_stack: [<span class="hljs-number">256</span> * <span class="hljs-number">1024</span>]<span class="hljs-type">byte</span>
-	ss := posix.stack_t {
-		ss_sp    = raw_data(alt_stack[:]),
-		ss_size  = len(alt_stack),
-		ss_flags = {},
-	}
-	posix.sigaltstack(&amp;ss, <span class="hljs-literal">nil</span>)
+    g_crash_installed = <span class="hljs-literal">true</span>
 
-	act: posix.sigaction_t
-	act.sa_sigaction = crash_handler
-	act.sa_flags = {.SIGINFO, .ONSTACK}
-	posix.sigemptyset(&amp;act.sa_mask)
-	sigs := CRASH_SIGNALS
-	<span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> sigs {
-		posix.sigaction(s, &amp;act, &amp;g_prev_actions[i])
-	}
+    <span class="hljs-comment">// Godot calls are legal HERE (not in the handler): fix the crash-report file path</span>
+    <span class="hljs-comment">// now, into a static buffer the handler and the panic path can use allocation-free.</span>
+    crash_file_precompute_path()
+
+    <span class="hljs-comment">// Alternate signal stack: a STACK-OVERFLOW SIGSEGV leaves the faulting thread no</span>
+    <span class="hljs-comment">// stack to run a handler on — without this the process just dies, report-less. A</span>
+    <span class="hljs-comment">// static buffer (never freed; the reporter lives for the process) + SA_ONSTACK.</span>
+    <span class="hljs-comment">// Failure is non-fatal: handlers still work for every non-overflow crash.</span>
+    <span class="hljs-meta">@(static)</span> alt_stack: [<span class="hljs-number">256</span> * <span class="hljs-number">1024</span>]<span class="hljs-type">byte</span>
+    ss := posix.stack_t {
+        ss_sp    = raw_data(alt_stack[:]),
+        ss_size  = len(alt_stack),
+        ss_flags = {},
+    }
+    posix.sigaltstack(&amp;ss, <span class="hljs-literal">nil</span>)
+
+    act: posix.sigaction_t
+    act.sa_sigaction = crash_handler
+    act.sa_flags = {.SIGINFO, .ONSTACK}
+    posix.sigemptyset(&amp;act.sa_mask)
+    sigs := CRASH_SIGNALS
+
+    <span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> sigs {
+        posix.sigaction(s, &amp;act, &amp;g_prev_actions[i])
+    }
 }
 
 <span class="hljs-comment">// ---- async-signal-safe output helpers (raw write(2); no fmt, no allocation) ----</span>
@@ -213,29 +222,33 @@ crash_reporter_install :: <span class="hljs-keyword">proc</span>() {
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 cwrite :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (s: <span class="hljs-type">string</span>) {
-	posix.write(posix.FD(<span class="hljs-number">2</span>), raw_data(s), <span class="hljs-type">uint</span>(len(s)))
-	<span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
-		posix.write(g_crash_fd, raw_data(s), <span class="hljs-type">uint</span>(len(s)))
-	}
+    posix.write(posix.FD(<span class="hljs-number">2</span>), raw_data(s), <span class="hljs-type">uint</span>(len(s)))
+
+    <span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
+        posix.write(g_crash_fd, raw_data(s), <span class="hljs-type">uint</span>(len(s)))
+    }
 }
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 cwrite_hex :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (v: <span class="hljs-type">uintptr</span>) {
-	digits := <span class="hljs-string">&quot;0123456789abcdef&quot;</span>
-	buf: [<span class="hljs-number">18</span>]<span class="hljs-type">byte</span>
-	buf[<span class="hljs-number">0</span>] = <span class="hljs-string">&#x27;0&#x27;</span>
-	buf[<span class="hljs-number">1</span>] = <span class="hljs-string">&#x27;x&#x27;</span>
-	n := <span class="hljs-number">2</span>
-	shift := (size_of(<span class="hljs-type">uintptr</span>) * <span class="hljs-number">8</span>) - <span class="hljs-number">4</span>
-	<span class="hljs-keyword">for</span> shift &gt;= <span class="hljs-number">0</span> {
-		buf[n] = digits[(v &gt;&gt; <span class="hljs-type">uint</span>(shift)) &amp; <span class="hljs-number">0xf</span>]
-		n += <span class="hljs-number">1</span>
-		shift -= <span class="hljs-number">4</span>
-	}
-	posix.write(posix.FD(<span class="hljs-number">2</span>), raw_data(buf[:]), <span class="hljs-type">uint</span>(n))
-	<span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
-		posix.write(g_crash_fd, raw_data(buf[:]), <span class="hljs-type">uint</span>(n))
-	}
+    digits := <span class="hljs-string">&quot;0123456789abcdef&quot;</span>
+    buf: [<span class="hljs-number">18</span>]<span class="hljs-type">byte</span>
+    buf[<span class="hljs-number">0</span>] = <span class="hljs-string">&#x27;0&#x27;</span>
+    buf[<span class="hljs-number">1</span>] = <span class="hljs-string">&#x27;x&#x27;</span>
+    n := <span class="hljs-number">2</span>
+    shift := (size_of(<span class="hljs-type">uintptr</span>) * <span class="hljs-number">8</span>) - <span class="hljs-number">4</span>
+
+    <span class="hljs-keyword">for</span> shift &gt;= <span class="hljs-number">0</span> {
+        buf[n] = digits[(v &gt;&gt; <span class="hljs-type">uint</span>(shift)) &amp; <span class="hljs-number">0xf</span>]
+        n += <span class="hljs-number">1</span>
+        shift -= <span class="hljs-number">4</span>
+    }
+
+    posix.write(posix.FD(<span class="hljs-number">2</span>), raw_data(buf[:]), <span class="hljs-type">uint</span>(n))
+
+    <span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
+        posix.write(g_crash_fd, raw_data(buf[:]), <span class="hljs-type">uint</span>(n))
+    }
 }
 
 <span class="hljs-comment">// One &quot;  &lt;addr&gt;  &lt;symbol&gt; + &lt;offset&gt;  (&lt;module&gt;)&quot; line via dladdr (Dl_info/dladdr are</span>
@@ -244,23 +257,26 @@ cwrite_hex :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&
 <span class="hljs-comment">// crash handler (Godot&#x27;s included) leans on it — and stderr step 1 already landed.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 cwrite_frame :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (label: <span class="hljs-type">string</span>, addr: <span class="hljs-type">rawptr</span>) {
-	cwrite(label)
-	cwrite_hex(<span class="hljs-type">uintptr</span>(addr))
-	info: Dl_info
-	<span class="hljs-keyword">if</span> addr != <span class="hljs-literal">nil</span> &amp;&amp; dladdr(addr, &amp;info) != <span class="hljs-number">0</span> &amp;&amp; info.dli_sname != <span class="hljs-literal">nil</span> {
-		cwrite(<span class="hljs-string">&quot;  &quot;</span>)
-		cwrite(<span class="hljs-type">string</span>(info.dli_sname))
-		cwrite(<span class="hljs-string">&quot; + &quot;</span>)
-		cwrite_hex(<span class="hljs-type">uintptr</span>(addr) - <span class="hljs-type">uintptr</span>(info.dli_saddr))
-		<span class="hljs-keyword">if</span> info.dli_fname != <span class="hljs-literal">nil</span> {
-			cwrite(<span class="hljs-string">&quot;  (&quot;</span>)
-			cwrite(<span class="hljs-type">string</span>(info.dli_fname))
-			cwrite(<span class="hljs-string">&quot;)&quot;</span>)
-		}
-	} <span class="hljs-keyword">else</span> {
-		cwrite(<span class="hljs-string">&quot;  &lt;no symbol — symbolize via dSYM, see docs/debugging.md&gt;&quot;</span>)
-	}
-	cwrite(<span class="hljs-string">&quot;\n&quot;</span>)
+    cwrite(label)
+    cwrite_hex(<span class="hljs-type">uintptr</span>(addr))
+    info: Dl_info
+
+    <span class="hljs-keyword">if</span> addr != <span class="hljs-literal">nil</span> &amp;&amp; dladdr(addr, &amp;info) != <span class="hljs-number">0</span> &amp;&amp; info.dli_sname != <span class="hljs-literal">nil</span> {
+        cwrite(<span class="hljs-string">&quot;  &quot;</span>)
+        cwrite(<span class="hljs-type">string</span>(info.dli_sname))
+        cwrite(<span class="hljs-string">&quot; + &quot;</span>)
+        cwrite_hex(<span class="hljs-type">uintptr</span>(addr) - <span class="hljs-type">uintptr</span>(info.dli_saddr))
+
+        <span class="hljs-keyword">if</span> info.dli_fname != <span class="hljs-literal">nil</span> {
+            cwrite(<span class="hljs-string">&quot;  (&quot;</span>)
+            cwrite(<span class="hljs-type">string</span>(info.dli_fname))
+            cwrite(<span class="hljs-string">&quot;)&quot;</span>)
+        }
+    } <span class="hljs-keyword">else</span> {
+        cwrite(<span class="hljs-string">&quot;  &lt;no symbol — symbolize via dSYM, see docs/debugging.md&gt;&quot;</span>)
+    }
+
+    cwrite(<span class="hljs-string">&quot;\n&quot;</span>)
 }
 
 <span class="hljs-comment">// Pull the interrupted pc (and caller lr on arm64) out of the signal ucontext. Raw,</span>
@@ -270,136 +286,163 @@ cwrite_frame :: <span class="hljs-keyword">proc</span> <span class="hljs-string"
 <span class="hljs-comment">// address that dladdr simply fails to resolve (best-effort by design).</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 fault_pc_lr :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (uctx: <span class="hljs-type">rawptr</span>) -&gt; (pc: <span class="hljs-type">rawptr</span>, lr: <span class="hljs-type">rawptr</span>) {
-	<span class="hljs-keyword">if</span> uctx == <span class="hljs-literal">nil</span> {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>
-	}
-	<span class="hljs-keyword">when</span> ODIN_OS == .Darwin {
-		<span class="hljs-comment">// ucontext_t.uc_mcontext (a POINTER) at +48.</span>
-		mctx := (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">48</span>))^
-		<span class="hljs-keyword">if</span> mctx == <span class="hljs-literal">nil</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>
-		}
-		<span class="hljs-keyword">when</span> ODIN_ARCH == .arm64 {
-			<span class="hljs-comment">// mcontext64: __es{far,esr,exc}=16, __ss.x[29]=232, then fp, lr@256, sp, pc@272.</span>
-			pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">272</span>))^
-			lr = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">256</span>))^
-		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_ARCH == .amd64 {
-			<span class="hljs-comment">// mcontext64: __es=16, then x86_thread_state64 — rip is its 17th u64.</span>
-			pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">16</span> + <span class="hljs-number">16</span> * <span class="hljs-number">8</span>))^
-		}
-	} <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_OS == .Linux {
-		<span class="hljs-keyword">when</span> ODIN_ARCH == .amd64 {
-			<span class="hljs-comment">// glibc ucontext_t.uc_mcontext (INLINE) at +40; gregs[REG_RIP=16].</span>
-			pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">40</span> + <span class="hljs-number">16</span> * <span class="hljs-number">8</span>))^
-		} <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_ARCH == .arm64 {
-			<span class="hljs-comment">// uc_mcontext (INLINE, 16-aligned) at +176; {fault_address, regs[31], sp, pc}.</span>
-			pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">176</span> + <span class="hljs-number">264</span>))^
-			lr = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">176</span> + <span class="hljs-number">8</span> + <span class="hljs-number">30</span> * <span class="hljs-number">8</span>))^
-		}
-	}
-	<span class="hljs-keyword">return</span>
+    <span class="hljs-keyword">if</span> uctx == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>
+    }
+
+    <span class="hljs-keyword">when</span> ODIN_OS == .Darwin {
+        <span class="hljs-comment">// ucontext_t.uc_mcontext (a POINTER) at +48.</span>
+        mctx := (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">48</span>))^
+
+        <span class="hljs-keyword">if</span> mctx == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">nil</span>
+        }
+
+        <span class="hljs-keyword">when</span> ODIN_ARCH == .arm64 {
+            <span class="hljs-comment">// mcontext64: __es{far,esr,exc}=16, __ss.x[29]=232, then fp, lr@256, sp, pc@272.</span>
+            pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">272</span>))^
+            lr = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">256</span>))^
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_ARCH == .amd64 {
+            <span class="hljs-comment">// mcontext64: __es=16, then x86_thread_state64 — rip is its 17th u64.</span>
+            pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(mctx) + <span class="hljs-number">16</span> + <span class="hljs-number">16</span> * <span class="hljs-number">8</span>))^
+        }
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_OS == .Linux {
+        <span class="hljs-keyword">when</span> ODIN_ARCH == .amd64 {
+            <span class="hljs-comment">// glibc ucontext_t.uc_mcontext (INLINE) at +40; gregs[REG_RIP=16].</span>
+            pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">40</span> + <span class="hljs-number">16</span> * <span class="hljs-number">8</span>))^
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">when</span> ODIN_ARCH == .arm64 {
+            <span class="hljs-comment">// uc_mcontext (INLINE, 16-aligned) at +176; {fault_address, regs[31], sp, pc}.</span>
+            pc = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">176</span> + <span class="hljs-number">264</span>))^
+            lr = (<span class="hljs-keyword">cast</span>(^<span class="hljs-type">rawptr</span>)(<span class="hljs-type">uintptr</span>(uctx) + <span class="hljs-number">176</span> + <span class="hljs-number">8</span> + <span class="hljs-number">30</span> * <span class="hljs-number">8</span>))^
+        }
+    }
+
+    <span class="hljs-keyword">return</span>
 }
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 signal_name :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (sig: posix.Signal) -&gt; <span class="hljs-type">string</span> {
-	<span class="hljs-meta">#partial</span> <span class="hljs-keyword">switch</span> sig {
-	<span class="hljs-keyword">case</span> .SIGSEGV: <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGSEGV&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGBUS:  <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGBUS&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGILL:  <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGILL&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGFPE:  <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGFPE&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGTRAP: <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGTRAP&quot;</span>
-	}
-	<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;signal&quot;</span>
+    <span class="hljs-meta">#partial</span> <span class="hljs-keyword">switch</span> sig {
+    <span class="hljs-keyword">case</span> .SIGSEGV:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGSEGV&quot;</span>
+    <span class="hljs-keyword">case</span> .SIGBUS:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGBUS&quot;</span>
+    <span class="hljs-keyword">case</span> .SIGILL:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGILL&quot;</span>
+    <span class="hljs-keyword">case</span> .SIGFPE:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGFPE&quot;</span>
+    <span class="hljs-keyword">case</span> .SIGTRAP:
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;SIGTRAP&quot;</span>
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;signal&quot;</span>
 }
 
 <span class="hljs-comment">// The one-liner for the editor Output. Static cstrings only — mid-crash is no place</span>
 <span class="hljs-comment">// to format.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 editor_crash_message :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (sig: posix.Signal) -&gt; <span class="hljs-type">cstring</span> {
-	<span class="hljs-meta">#partial</span> <span class="hljs-keyword">switch</span> sig {
-	<span class="hljs-keyword">case</span> .SIGSEGV:
-		<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGSEGV — bad memory access, e.g. an engine call on a nil object handle). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGBUS:
-		<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGBUS — misaligned/invalid memory access). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGILL:
-		<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGILL — illegal instruction; also how an Odin panic/trap terminates). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGFPE:
-		<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGFPE — integer division by zero or similar). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span>
-	<span class="hljs-keyword">case</span> .SIGTRAP:
-		<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game hit a TRAP (SIGTRAP — how an Odin panic/assert/bounds-check terminates). If no ODIN_SCRIPT_PANIC message appears above, this is likely a bounds-check failure: run from a terminal (or under Tools &gt; Debug Game (LLDB)) to see the runtime&#x27;s index/range message.&quot;</span>
-	}
-	<span class="hljs-keyword">return</span> <span class="hljs-string">&quot;Odin: the game CRASHED in native code (fatal signal). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span>
+    <span class="hljs-meta">#partial</span> <span class="hljs-keyword">switch</span> sig {
+    <span class="hljs-keyword">case</span> .SIGSEGV:
+        <span class="hljs-keyword">return</span>(
+            <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGSEGV — bad memory access, e.g. an engine call on a nil object handle). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span> \
+        )
+    <span class="hljs-keyword">case</span> .SIGBUS:
+        <span class="hljs-keyword">return</span>(
+            <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGBUS — misaligned/invalid memory access). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span> \
+        )
+    <span class="hljs-keyword">case</span> .SIGILL:
+        <span class="hljs-keyword">return</span>(
+            <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGILL — illegal instruction; also how an Odin panic/trap terminates). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span> \
+        )
+    <span class="hljs-keyword">case</span> .SIGFPE:
+        <span class="hljs-keyword">return</span>(
+            <span class="hljs-string">&quot;Odin: the game CRASHED in native code (SIGFPE — integer division by zero or similar). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span> \
+        )
+    <span class="hljs-keyword">case</span> .SIGTRAP:
+        <span class="hljs-keyword">return</span>(
+            <span class="hljs-string">&quot;Odin: the game hit a TRAP (SIGTRAP — how an Odin panic/assert/bounds-check terminates). If no ODIN_SCRIPT_PANIC message appears above, this is likely a bounds-check failure: run from a terminal (or under Tools &gt; Debug Game (LLDB)) to see the runtime&#x27;s index/range message.&quot;</span> \
+        )
+    }
+
+    <span class="hljs-keyword">return</span>(
+        <span class="hljs-string">&quot;Odin: the game CRASHED in native code (fatal signal). Backtrace on stderr/terminal; symbolize with docs/debugging.md.&quot;</span> \
+    )
 }
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 restore_previous_actions :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> () {
-	sigs := CRASH_SIGNALS
-	<span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> sigs {
-		posix.sigaction(s, &amp;g_prev_actions[i], <span class="hljs-literal">nil</span>)
-	}
+    sigs := CRASH_SIGNALS
+
+    <span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> sigs {
+        posix.sigaction(s, &amp;g_prev_actions[i], <span class="hljs-literal">nil</span>)
+    }
 }
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 crash_handler :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (sig: posix.Signal, info: ^posix.siginfo_t, uctx: <span class="hljs-type">rawptr</span>) {
-	<span class="hljs-comment">// Reentry (a fault inside this handler, or a second crashing thread): hand straight</span>
-	<span class="hljs-comment">// to Godot&#x27;s handlers — our report is already (partially) out.</span>
-	<span class="hljs-keyword">if</span> intrinsics.atomic_exchange(&amp;g_crash_reporting, <span class="hljs-literal">true</span>) {
-		restore_previous_actions()
-		posix.raise(sig)
-		<span class="hljs-keyword">return</span>
-	}
+    <span class="hljs-comment">// Reentry (a fault inside this handler, or a second crashing thread): hand straight</span>
+    <span class="hljs-comment">// to Godot&#x27;s handlers — our report is already (partially) out.</span>
+    <span class="hljs-keyword">if</span> intrinsics.atomic_exchange(&amp;g_crash_reporting, <span class="hljs-literal">true</span>) {
+        restore_previous_actions()
+        posix.raise(sig)
+        <span class="hljs-keyword">return</span>
+    }
 
-	<span class="hljs-comment">// 0. Open the crash-report FILE (path fixed at install). Best-effort: on failure</span>
-	<span class="hljs-comment">//    g_crash_fd stays -1 and every cwrite below is stderr-only, exactly as before.</span>
-	g_crash_fd = crash_file_open()
+    <span class="hljs-comment">// 0. Open the crash-report FILE (path fixed at install). Best-effort: on failure</span>
+    <span class="hljs-comment">//    g_crash_fd stays -1 and every cwrite below is stderr-only, exactly as before.</span>
+    g_crash_fd = crash_file_open()
 
-	<span class="hljs-comment">// 1. Marker FIRST — an unbuffered write that survives whatever happens next.</span>
-	cwrite(<span class="hljs-string">&quot;\nODIN_GODOT_CRASH: fatal signal &quot;</span>)
-	cwrite(signal_name(sig))
-	cwrite(<span class="hljs-string">&quot; — crash in native code (Odin script or engine).\n&quot;</span>)
+    <span class="hljs-comment">// 1. Marker FIRST — an unbuffered write that survives whatever happens next.</span>
+    cwrite(<span class="hljs-string">&quot;\nODIN_GODOT_CRASH: fatal signal &quot;</span>)
+    cwrite(signal_name(sig))
+    cwrite(<span class="hljs-string">&quot; — crash in native code (Odin script or engine).\n&quot;</span>)
 
-	<span class="hljs-comment">// 2. The faulting frame, from the ucontext (see fault_pc_lr — the stack walkers</span>
-	<span class="hljs-comment">//    below cannot recover this frame across the signal trampoline).</span>
-	pc, lr := fault_pc_lr(uctx)
-	cwrite_frame(<span class="hljs-string">&quot;ODIN_GODOT_CRASH at   pc &quot;</span>, pc)
-	<span class="hljs-keyword">if</span> lr != <span class="hljs-literal">nil</span> {
-		cwrite_frame(<span class="hljs-string">&quot;ODIN_GODOT_CRASH from lr &quot;</span>, lr)
-	}
+    <span class="hljs-comment">// 2. The faulting frame, from the ucontext (see fault_pc_lr — the stack walkers</span>
+    <span class="hljs-comment">//    below cannot recover this frame across the signal trampoline).</span>
+    pc, lr := fault_pc_lr(uctx)
+    cwrite_frame(<span class="hljs-string">&quot;ODIN_GODOT_CRASH at   pc &quot;</span>, pc)
 
-	<span class="hljs-comment">// 3. Stack dump (execinfo; async-signal-safe). Engine frames below the extension</span>
-	<span class="hljs-comment">//    boundary carry frame pointers and walk fully; Odin frames appear shallow.</span>
-	cwrite(<span class="hljs-string">&quot;ODIN_GODOT_CRASH backtrace (backtrace_symbols_fd):\n&quot;</span>)
-	frames: [<span class="hljs-number">64</span>]<span class="hljs-type">rawptr</span>
-	n := backtrace(raw_data(frames[:]), <span class="hljs-type">i32</span>(len(frames)))
-	<span class="hljs-keyword">if</span> n &gt; <span class="hljs-number">0</span> {
-		backtrace_symbols_fd(raw_data(frames[:]), n, <span class="hljs-number">2</span>)
-		<span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
-			backtrace_symbols_fd(raw_data(frames[:]), n, <span class="hljs-type">i32</span>(g_crash_fd))
-		}
-	}
+    <span class="hljs-keyword">if</span> lr != <span class="hljs-literal">nil</span> {
+        cwrite_frame(<span class="hljs-string">&quot;ODIN_GODOT_CRASH from lr &quot;</span>, lr)
+    }
 
-	<span class="hljs-comment">// 3b. Close the crash file BEFORE the risky part below: the report must be complete</span>
-	<span class="hljs-comment">//     on disk even if push_error or the re-raise teardown faults.</span>
-	<span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
-		posix.close(g_crash_fd)
-		g_crash_fd = <span class="hljs-number">-1</span>
-	}
+    <span class="hljs-comment">// 3. Stack dump (execinfo; async-signal-safe). Engine frames below the extension</span>
+    <span class="hljs-comment">//    boundary carry frame pointers and walk fully; Odin frames appear shallow.</span>
+    cwrite(<span class="hljs-string">&quot;ODIN_GODOT_CRASH backtrace (backtrace_symbols_fd):\n&quot;</span>)
+    frames: [<span class="hljs-number">64</span>]<span class="hljs-type">rawptr</span>
+    n := backtrace(raw_data(frames[:]), <span class="hljs-type">i32</span>(len(frames)))
 
-	<span class="hljs-comment">// 4. Restore Godot&#x27;s handlers BEFORE the risky part: if push_error faults mid-crash,</span>
-	<span class="hljs-comment">//    the nested signal chains to Godot&#x27;s crash handler instead of recursing here.</span>
-	restore_previous_actions()
+    <span class="hljs-keyword">if</span> n &gt; <span class="hljs-number">0</span> {
+        backtrace_symbols_fd(raw_data(frames[:]), n, <span class="hljs-number">2</span>)
 
-	<span class="hljs-comment">// 5. Best-effort ONE red line into the editor Output (push_error travels the</span>
-	<span class="hljs-comment">//    debugger TCP link to the editor; stderr does not). May silently fail or be</span>
-	<span class="hljs-comment">//    lost in the dying process — steps 1-3 are already on stderr regardless.</span>
-	godot.error(editor_crash_message(sig))
+        <span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
+            backtrace_symbols_fd(raw_data(frames[:]), n, <span class="hljs-type">i32</span>(g_crash_fd))
+        }
+    }
 
-	<span class="hljs-comment">// 6. Chain: previous (Godot&#x27;s) handlers are restored; re-raise. The signal is</span>
-	<span class="hljs-comment">//    blocked during this handler, so it is delivered — to Godot&#x27;s handler — the</span>
-	<span class="hljs-comment">//    moment we return (and a hardware fault would re-trigger at the faulting</span>
-	<span class="hljs-comment">//    instruction anyway). Godot&#x27;s engine backtrace still prints.</span>
-	posix.raise(sig)
+    <span class="hljs-comment">// 3b. Close the crash file BEFORE the risky part below: the report must be complete</span>
+    <span class="hljs-comment">//     on disk even if push_error or the re-raise teardown faults.</span>
+    <span class="hljs-keyword">if</span> g_crash_fd &gt;= <span class="hljs-number">0</span> {
+        posix.close(g_crash_fd)
+        g_crash_fd = <span class="hljs-number">-1</span>
+    }
+
+    <span class="hljs-comment">// 4. Restore Godot&#x27;s handlers BEFORE the risky part: if push_error faults mid-crash,</span>
+    <span class="hljs-comment">//    the nested signal chains to Godot&#x27;s crash handler instead of recursing here.</span>
+    restore_previous_actions()
+
+    <span class="hljs-comment">// 5. Best-effort ONE red line into the editor Output (push_error travels the</span>
+    <span class="hljs-comment">//    debugger TCP link to the editor; stderr does not). May silently fail or be</span>
+    <span class="hljs-comment">//    lost in the dying process — steps 1-3 are already on stderr regardless.</span>
+    godot.error(editor_crash_message(sig))
+
+    <span class="hljs-comment">// 6. Chain: previous (Godot&#x27;s) handlers are restored; re-raise. The signal is</span>
+    <span class="hljs-comment">//    blocked during this handler, so it is delivered — to Godot&#x27;s handler — the</span>
+    <span class="hljs-comment">//    moment we return (and a hardware fault would re-trigger at the faulting</span>
+    <span class="hljs-comment">//    instruction anyway). Godot&#x27;s engine backtrace still prints.</span>
+    posix.raise(sig)
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">core/crash.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">core/crash.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/core/crash.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

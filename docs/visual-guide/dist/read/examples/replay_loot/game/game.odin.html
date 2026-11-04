@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>The Loot world · odin_godot</title><meta name="description" content="Players, entity lifetime, inventories, and RNG live in one replayable model."><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>The Loot world</h1><p class="reader-dek">Players, entity lifetime, inventories, and RNG live in one replayable model.</p><div class="reader-meta"><span>86 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_loot/game/game.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>The Loot world</h1><p class="reader-dek">Players, entity lifetime, inventories, and RNG live in one replayable model.</p><div class="reader-meta"><span>104 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_loot/game/game.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> loot
 
@@ -11,84 +11,102 @@
 <span class="hljs-comment">// gameplay value, including allocation and RNG, is inside World.</span>
 <span class="hljs-keyword">import</span> r <span class="hljs-string">&quot;godot:replay&quot;</span>
 
-Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {Chest, Projectile}
+Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
+    Chest,
+    Projectile,
+}
 
 Entity :: <span class="hljs-keyword">struct</span> {
-	kind:  Kind,
-	x:     <span class="hljs-type">i32</span>,
-	items: <span class="hljs-type">u32</span>,
-	ttl:   <span class="hljs-type">u16</span>,
+    kind:  Kind,
+    x:     <span class="hljs-type">i32</span>,
+    items: <span class="hljs-type">u32</span>,
+    ttl:   <span class="hljs-type">u16</span>,
 }
 
 Player :: <span class="hljs-keyword">struct</span> {
-	x:   <span class="hljs-type">i32</span>,
-	bag: <span class="hljs-type">u32</span>,
+    x:   <span class="hljs-type">i32</span>,
+    bag: <span class="hljs-type">u32</span>,
 }
 
 World :: <span class="hljs-keyword">struct</span> {
-	players:  [<span class="hljs-number">2</span>]Player,
-	entities: r.Pool(Entity, <span class="hljs-number">16</span>),
-	chest:    r.Handle(Entity),
-	rng:      r.Rng,
+    players:  [<span class="hljs-number">2</span>]Player,
+    entities: r.Pool(Entity, <span class="hljs-number">16</span>),
+    chest:    r.Handle(Entity),
+    rng:      r.Rng,
 }
 
 Controls :: <span class="hljs-keyword">struct</span> {
-	move: <span class="hljs-type">i8</span>,
-	take: <span class="hljs-type">bool</span>,
-	fire: <span class="hljs-type">bool</span>,
-	seq:  <span class="hljs-type">u32</span>,
+    move: <span class="hljs-type">i8</span>,
+    take: <span class="hljs-type">bool</span>,
+    fire: <span class="hljs-type">bool</span>,
+    seq:  <span class="hljs-type">u32</span>,
 }
 
 <span class="hljs-comment">// Fixed seat order defines conflict resolution for this experiment. A network</span>
 <span class="hljs-comment">// driver must authenticate and assemble this batch; it is not a packet format.</span>
-Input :: <span class="hljs-keyword">struct</span> {players: [<span class="hljs-number">2</span>]Controls}
-Event_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {Item_Taken, Fired}
+Input :: <span class="hljs-keyword">struct</span> {
+    players: [<span class="hljs-number">2</span>]Controls,
+}
+
+Event_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
+    Item_Taken,
+    Fired,
+}
 
 Event :: <span class="hljs-keyword">struct</span> {
-	kind:   Event_Kind,
-	player: <span class="hljs-type">u8</span>,
-	x:      <span class="hljs-type">i32</span>,
-	amount: <span class="hljs-type">u32</span>,
+    kind:   Event_Kind,
+    player: <span class="hljs-type">u8</span>,
+    x:      <span class="hljs-type">i32</span>,
+    amount: <span class="hljs-type">u32</span>,
 }
 
 Timeline :: r.Timeline(World, Input, Event)
 
 initial :: <span class="hljs-keyword">proc</span>() -&gt; World {
-	w := World{players = {{x = <span class="hljs-number">-1</span>}, {x = <span class="hljs-number">1</span>}}, rng = r.rng_make(<span class="hljs-number">1337</span>)}
-	w.chest, _ = r.pool_insert(&amp;w.entities, Entity{kind = .Chest, items = <span class="hljs-number">5</span>})
-	<span class="hljs-keyword">return</span> w
+    w := World {
+        players = {{x = <span class="hljs-number">-1</span>}, {x = <span class="hljs-number">1</span>}},
+        rng     = r.rng_make(<span class="hljs-number">1337</span>),
+    }
+    w.chest, _ = r.pool_insert(&amp;w.entities, Entity{kind = .Chest, items = <span class="hljs-number">5</span>})
+    <span class="hljs-keyword">return</span> w
 }
 
 step :: <span class="hljs-keyword">proc</span>(w: ^World, input: Input, ctx: ^r.Step(Event)) {
-	<span class="hljs-comment">// Stable slot order; spawning happens after the lifetime pass.</span>
-	<span class="hljs-keyword">for</span> &amp;entity, i <span class="hljs-keyword">in</span> w.entities.values {
-		<span class="hljs-keyword">if</span> !w.entities.alive[i] || entity.kind != .Projectile {<span class="hljs-keyword">continue</span>}
-		entity.ttl -= <span class="hljs-number">1</span>
-		<span class="hljs-keyword">if</span> entity.ttl == <span class="hljs-number">0</span> {
-			r.pool_remove(&amp;w.entities, r.Handle(Entity){<span class="hljs-type">u32</span>(i), w.entities.generations[i]})
-		}
-	}
-	<span class="hljs-keyword">for</span> control, i <span class="hljs-keyword">in</span> input.players {
-		p := &amp;w.players[i]
-		p.x += <span class="hljs-type">i32</span>(clamp(control.move, <span class="hljs-number">-1</span>, <span class="hljs-number">1</span>))
-		<span class="hljs-keyword">if</span> control.take {
-			<span class="hljs-keyword">if</span> chest, found := r.pool_get(&amp;w.entities, w.chest); found &amp;&amp; abs(p.x - chest.x) &lt;= <span class="hljs-number">2</span> {
-				amount := chest.items
-				p.bag += amount
-				r.pool_remove(&amp;w.entities, w.chest)
-				r.emit(ctx, <span class="hljs-type">u64</span>(i + <span class="hljs-number">1</span>), <span class="hljs-type">u64</span>(control.seq) &lt;&lt; <span class="hljs-number">8</span> | <span class="hljs-number">1</span>,
-				       Event{.Item_Taken, <span class="hljs-type">u8</span>(i), p.x, amount})
-			}
-		}
-		<span class="hljs-keyword">if</span> control.fire {
-			ttl := <span class="hljs-type">u16</span>(<span class="hljs-number">2</span> + r.rng_next(&amp;w.rng) % <span class="hljs-number">3</span>)
-			<span class="hljs-keyword">if</span> _, spawned := r.pool_insert(&amp;w.entities, Entity{kind = .Projectile, x = p.x, ttl = ttl}); spawned {
-				r.emit(ctx, <span class="hljs-type">u64</span>(i + <span class="hljs-number">1</span>), <span class="hljs-type">u64</span>(control.seq) &lt;&lt; <span class="hljs-number">8</span> | <span class="hljs-number">2</span>,
-				       Event{.Fired, <span class="hljs-type">u8</span>(i), p.x, <span class="hljs-number">1</span>})
-			}
-		}
-	}
+    <span class="hljs-comment">// Stable slot order; spawning happens after the lifetime pass.</span>
+    <span class="hljs-keyword">for</span> &amp;entity, i <span class="hljs-keyword">in</span> w.entities.values {
+        <span class="hljs-keyword">if</span> !w.entities.alive[i] || entity.kind != .Projectile {
+            <span class="hljs-keyword">continue</span>
+        }
+
+        entity.ttl -= <span class="hljs-number">1</span>
+
+        <span class="hljs-keyword">if</span> entity.ttl == <span class="hljs-number">0</span> {
+            r.pool_remove(&amp;w.entities, r.Handle(Entity){<span class="hljs-type">u32</span>(i), w.entities.generations[i]})
+        }
+    }
+
+    <span class="hljs-keyword">for</span> control, i <span class="hljs-keyword">in</span> input.players {
+        p := &amp;w.players[i]
+        p.x += <span class="hljs-type">i32</span>(clamp(control.move, <span class="hljs-number">-1</span>, <span class="hljs-number">1</span>))
+
+        <span class="hljs-keyword">if</span> control.take {
+            <span class="hljs-keyword">if</span> chest, found := r.pool_get(&amp;w.entities, w.chest); found &amp;&amp; abs(p.x - chest.x) &lt;= <span class="hljs-number">2</span> {
+                amount := chest.items
+                p.bag += amount
+                r.pool_remove(&amp;w.entities, w.chest)
+                r.emit(ctx, <span class="hljs-type">u64</span>(i + <span class="hljs-number">1</span>), <span class="hljs-type">u64</span>(control.seq) &lt;&lt; <span class="hljs-number">8</span> | <span class="hljs-number">1</span>, Event{.Item_Taken, <span class="hljs-type">u8</span>(i), p.x, amount})
+            }
+        }
+
+        <span class="hljs-keyword">if</span> control.fire {
+            ttl := <span class="hljs-type">u16</span>(<span class="hljs-number">2</span> + r.rng_next(&amp;w.rng) % <span class="hljs-number">3</span>)
+
+            <span class="hljs-keyword">if</span> _, spawned := r.pool_insert(&amp;w.entities, Entity{kind = .Projectile, x = p.x, ttl = ttl}); spawned {
+                r.emit(ctx, <span class="hljs-type">u64</span>(i + <span class="hljs-number">1</span>), <span class="hljs-type">u64</span>(control.seq) &lt;&lt; <span class="hljs-number">8</span> | <span class="hljs-number">2</span>, Event{.Fired, <span class="hljs-type">u8</span>(i), p.x, <span class="hljs-number">1</span>})
+            }
+        }
+    }
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_loot/game/game.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_loot/game/game.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_loot/game/game.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

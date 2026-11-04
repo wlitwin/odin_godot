@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Gate B shared records v1 · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Validation</a><span>/</span><span>Guide</span></div><p class="eyebrow">Validation</p><h1>Gate B shared records v1</h1><div class="reader-meta"><span>10 min read</span><span>Odin × Godot</span><a href="../../../../reference/tests/box3d_soak/shared/records-v1.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#meta-once-first">META (once, first)</a><a href="#full-boundary-without-a-production-hook">Full boundary without a production hook</a><a href="#sample-profile-mode-only">SAMPLE (profile mode only)</a><a href="#additive-normal-only-streams">Additive normal-only streams</a><a href="#result-once-last">RESULT (once, last)</a><a href="#optional-native-observer-records">Optional Native observer records</a></nav></details>
+<article class="reading-body "><p>Test-only protocol, plain JSON lines. Events are <code>GATE_B_META</code>,
+<code>GATE_B_SAMPLE</code>, <code>GATE_B_RESULT</code>; every record has <code>schema:1</code> and the SAME
+nonempty <code>run_id</code>. One stream contains one framework/fixture/mode/build only.
+No timing job is authorized merely by this document. Root grants exclusivity.</p>
+<h2 id="meta-once-first">META (once, first)<a class="heading-anchor" href="#meta-once-first" aria-label="Link to this section">#</a></h2>
+<p>Required keys:</p>
+<ul>
+<li><code>framework</code>: <code>kit</code> or <code>replay</code>.</li>
+<li><code>timing_mode</code>: <code>functional_only</code> or <code>profile</code>.</li>
+<li><code>fixture</code>: <code>{id,profile_hex,descriptor_sha256,initial_dynamic,reference_peak}</code>.
+IDs are exactly <code>dense32_boxes_extra_sphere</code> / profile <code>504859534e455431</code>
+and <code>common32_spheres_crates_extra_capsule</code> / <code>534c494345503031</code>.
+<code>initial_dynamic=32</code>. Reference peaks are respectively
+<code>{bodies:35,shapes:35,contacts:141,joints:1}</code> and
+<code>{bodies:35,shapes:35,contacts:122,joints:1}</code>. These are labelled historical
+references, not fabricated measured sample counts. Descriptor hash binds the
+actual geometry, placement, hinge, damping, input/action schedule and seed.</li>
+<li><code>execution</code>: <code>{core,ownership,native_linkage,transport,native_images}</code>.
+<code>core</code>: <code>actual_godot_core</code>, <code>registry_fake_core</code>, or <code>none</code>;
+<code>ownership</code>: <code>sdk_meter</code> or <code>nil_owner</code>; linkage <code>shared_dso</code> or
+<code>static_diagnostic</code>; transport <code>offline_public_packets</code> or <code>actual_enet</code>.
+Final CPU candidate eligibility requires actual Core + SDK Meter + one shared
+native image. Fake-Core and nilOwner remain separate diagnostic groups.
+Offline public serialized packet CPU fixtures do NOT prove live ENet soak.</li>
+<li><code>identity</code>: <code>{os,arch,configuration,godot,source_manifest_sha256, core_binary_sha256,script_binary_sha256,native_binary_sha256, native_build_sha256,native_target_sha256}</code>. All hashes are64 lowercase
+hex/nonzero. Use exact artifacts, not caller labels. Configuration is explicit.</li>
+<li><code>limits</code>: <code>{normal_ns:4000000,repair8_ns:4000000,hz:60,substeps:4, history:128,prediction:8,ordinary_repair:8,bodies:35,shapes:35,contacts:147, joints:1,tracked_bytes:67108864}</code>. Timers are acceptance observations only.</li>
+<li><code>boundary</code>: <code>{id,receiver_entry,clock_domain,clock_resolution_ns, included_work,excluded_work,source_refs}</code>.
+Full ID <code>core_public_ingress_v1</code>; lower diagnostic ID <code>lower_diagnostic_v1</code>.
+Full receiver entries: <code>session_frame</code>, <code>link_pump_then_client_pump</code>,
+<code>session_dispatch_then_lane_frame</code>. <code>client_pump_only</code> is lower-boundary
+diagnostic if input already bypassed Link dispatch/reassembly.
+The two additive normal-only entries below require their exact declared kind;
+they are never full repair8 boundaries.
+<code>clock_domain=godot_ticks_usec</code>, <code>clock_resolution_ns=1000</code> for actual Core.
+Source refs are <code>{path,symbol,sha256}</code> for the test method and required public
+pipeline entries. Composite C internals are source-audited coverage, not
+individually timed phases unless an actual existing timing hook measures them.</li>
+<li><code>sample_plan</code>: <code>{normal:N,repair8:M}</code> exact timed counts, fixed BEFORE run.
+Functional-only uses both0. A complete CPU candidate needs both positive.</li>
+</ul>
+<p><code>included_work</code> lists actual coverage, using these exact names:</p>
+<p>Normal: <code>public_dispatch</code>, <code>normal_step_capture_admission</code>,
+<code>required_serialization</code>, <code>publication_events</code>, <code>operation_cleanup</code>, <code>core_return</code>.</p>
+<p>Repair8: <code>public_dispatch</code>, <code>envelope_reassembly_inspect</code>,
+<code>canonical_native_read_build_verify_reencode</code>, <code>typed_decode</code>,
+<code>accepted_input_replay</code>, <code>complete_paired_compare</code>, <code>publication_events</code>,
+<code>operation_cleanup</code>, <code>core_return</code>.</p>
+<p>Kit ordinary wire-v2 repair is selected only by META <code>framework:&quot;kit&quot;</code> and
+<code>descriptor.wire_revision</code> with integer value2. Its repair8 coverage replaces
+<code>canonical_native_read_build_verify_reencode</code> with
+<code>canonical_five_part_signature_verification</code>; every other required operation
+above remains inside the whole call. The descriptor must explicitly declare
+<code>native_recovery_read_in_operation:false</code>. Native recovery-read coverage is
+forbidden under this ordinary signature-repair branch.</p>
+<p>Each such SAMPLE supplies integer <code>accepted_packets:1</code>, <code>signature_packets:1</code>,
+<code>signatures_before</code>, <code>signatures_after</code>, <code>full_states_before</code>, <code>full_states_after</code>.
+Matched-signature delta must be1; full-state receives must stay unchanged from
+an actual bootstrap count of at least1. <code>counter_kind:&quot;model_step_callback&quot;</code>
+identifies the observed <code>actual_steps_*</code> delta8; it is not a Native engine-step
+counter. All prior complete-five-part equality/hash, publication, tick, quota,
+cleanup, source/binary, outer-clock and4ms rules remain unchanged. No absent,
+wire1, differently typed/versioned or Replay metadata selects this branch.
+<code>sample_findings(sample, meta=None)</code> preserves legacy requirements by default;
+the analyzer passes the stream&#39;s actual validated META explicitly.</p>
+<p>Use the union of ONLY the predeclared sample_plan operations in META.
+A normal0/repair8-positive probe must not fabricate normal work; its overall CPU
+candidate remains INCOMPLETE without normal coverage. Functional-only zero-sample
+META declares the actual complete functional pipeline (normal or repair8), not an
+unused union. Actual operation-specific coverage is repeated in SAMPLE.
+Missing required coverage makes CPU acceptance INCOMPLETE, not a faster pass.
+Exclude only declared <code>network_wait</code>, <code>render</code>, <code>diagnostic_output</code> and
+<code>diagnostic_resource_read</code>. Mandatory validation/comparison/cleanup cannot be
+relabelled diagnostic. Reference/input preparation is source-described; actual
+receiver dispatch, canonical validation and required paired comparison remain
+inside the timed operation.</p>
+<h2 id="full-boundary-without-a-production-hook">Full boundary without a production hook<a class="heading-anchor" href="#full-boundary-without-a-production-hook" aria-label="Link to this section">#</a></h2>
+<p>A test-only GDScript caller reads <code>Time.get_ticks_usec()</code> immediately BEFORE
+<code>node.call(test_method)</code> and immediately AFTER it returns. This includes Core
+entry, typed producer work, operation cleanup and the entire return through Core.
+The method must contain the public ingress path and required work above. Read
+phase/result diagnostics in a SEPARATE method and serialize/write them after the
+outer timer. No renderer, JSON, printf or file capture inside the timed method.
+Do not move required cleanup or comparison into the diagnostic method.</p>
+<h2 id="sample-profile-mode-only">SAMPLE (profile mode only)<a class="heading-anchor" href="#sample-profile-mode-only" aria-label="Link to this section">#</a></h2>
+<p>Required keys:</p>
+<ul>
+<li><code>seq</code>: consecutive1..N; <code>operation</code>: <code>normal</code> or <code>repair8</code>.</li>
+<li><code>epoch,base_tick,head_before,head_after,confirmed_before,confirmed_after</code>.
+<code>base_tick</code> is the predecessor BEFORE the first replayed tick. For repair8,
+<code>head_before-base_tick==8</code>; no from-tick inclusive/exclusive ambiguity.</li>
+<li><code>requested_depth</code>:0 for normal,8 for repair8.</li>
+<li><code>actual_steps_before,actual_steps_after</code>: operation-local observed step
+counter values, not a literal copied from requested_depth. Normal delta1;
+repair8 delta8. Any failed/short/noop attempt remains recorded and cannot be
+silently discarded as an ineligible fast success. The additive normal-only
+invariant below instead requires both fields explicitly <code>null</code> (unavailable),
+with no invented native/replay counter. Default counter semantics, including
+every existing repair8 stream, remain unchanged.</li>
+<li><code>outcome</code>: <code>committed</code>, <code>rejected</code>, <code>hold_resync</code>, or <code>error</code>.</li>
+<li><code>outer_start_us,outer_end_us,whole_ns</code> with
+<code>whole_ns==(outer_end_us-outer_start_us)*1000</code> and whole_ns&gt;0.
+Normal requires head_after=head_before+1. Reference repair8 requires
+head_after=head_before, confirmed_before=base_tick and
+confirmed_after=head_before. Both before/after confirmation&lt;=head and
+head-confirmed&lt;=8. Failed/short/noop records remain raw and fail acceptance.</li>
+<li><code>included_work</code>: actual operation coverage names above.</li>
+<li><code>proof</code>: <code>{full_state_equal,publication_atomic,quota_ok, expected_complete_sha256,actual_complete_sha256}</code>. Equality refers to ALL
+Solver/Game/Side/Observations/Occurrences. Equal motion hash is insufficient.
+Hashes bind actual complete data; source describes the byte comparison.</li>
+<li><code>counts</code>: actual observed <code>{bodies,shapes,contacts,joints}</code>. State if observations
+include candidates vs only published worlds in optional <code>counts_scope</code>.</li>
+<li><code>ledger</code>: actual <code>{live_bytes,reserved_bytes,admitted_bytes,limit_bytes, committed_peak_bytes,storage_bytes}</code>. Require live+reserved=admitted and the
+unchanged64MiB cap. The peak is the combined ledger&#39;s observed highwater,
+not a sum of unrelated component peaks. SourceQuota/Meter paths remain active.</li>
+<li><code>phases</code>: array of optional measured spans (empty is honest):
+<code>{name,duration_ns,clock_domain,start_us,end_us,relation}</code>. Same-Godot-clock
+spans may include absolute start/end and must fit outer bounds. Odin/native
+durations with another origin use <code>start_us:null,end_us:null</code>, labelled
+clock_domain and relation such as <code>nested_in_canonical_decode</code>.
+NEVER subtract cross-clock origins or sum nested timings into whole_ns.
+Existing profile callback durations may be emitted as operation-local spans;
+repeated names are allowed and retained, not averaged away before analysis.</li>
+<li>Optional <code>rss_sampled_bytes</code> / <code>rss_process_peak_bytes</code>, with actual source/unit
+identified in META. Sampled RSS is not an unsampled staging peak or64MiB claim.</li>
+</ul>
+<p>All raw samples, including cold and over-target values, stay in input/output.
+Nearest-rank p50/p95 and actual maximum are computed per exact stream/category;
+there is no outlier discard or sum of marginal percentiles. The4ms candidate
+ceiling is checked against EACH whole eligible call, never core-only timings.</p>
+<h2 id="additive-normal-only-streams">Additive normal-only streams<a class="heading-anchor" href="#additive-normal-only-streams" aria-label="Link to this section">#</a></h2>
+<p>These two categories use separate descriptors, record streams and percentiles:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Fixed <code>META.normal_kind</code></th>
+<th>Required <code>boundary.receiver_entry</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>client_prediction_send</code></td>
+<td><code>link_pump_then_client_step</code></td>
+</tr>
+<tr>
+<td><code>authority_step_requested_canonical</code></td>
+<td><code>server_step_then_requested_snapshot_pump</code></td>
+</tr>
+</tbody></table>
+</div><p>Both require <code>META.step_observation=&quot;committed_tick_require_step&quot;</code>.
+Profile mode declares exactly <code>{normal:19,repair8:0}</code>; functional-only declares
+<code>{normal:0,repair8:0}</code> and emits no SAMPLE or new timing reads. Each SAMPLE repeats
+the identical <code>normal_kind</code> and <code>step_observation</code>, has <code>operation=&quot;normal&quot;</code> and
+<code>requested_depth=0</code>, and includes these additional <code>proof</code> fields:</p>
+<div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;successful_public_step&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;external_require_step&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;committed_tick_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">159</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;committed_tick_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">160</span>
+<span class="hljs-punctuation">}</span></code></pre></div><p><code>actual_steps_before</code> and <code>actual_steps_after</code> are mandatory <strong>null</strong> values in
+these streams. The proof uses actual published tick observations and the
+successful public step under an enabled <code>External.require_step</code> contract; it
+does not claim an independent native/global/replayed-tick counter. Proof ticks
+must match <code>head_before/head_after</code>, advance exactly one tick and have
+<code>base_tick=head_before</code>. Client prediction leaves confirmation unchanged;
+authority work starts and ends with <code>confirmed=head</code>. The usual eight-tick
+unconfirmed window, all full-state/quota/atomicity proofs and cleanup remain hard.
+False step-success/require-step flags, no-op/extra ticks, errors and over-target
+samples remain retained failures. Mixing kinds or repair8 into either stream,
+using the new entries without their declared kind, or inventing counter values
+is rejected. Legacy streams without these fields retain their existing rules.</p>
+<p>Human source review is mandatory before interpreting these records as CPU
+evidence: verify the actual <code>ph.step</code> path, enabled provider <code>require_step</code>,
+failure propagation before publication, actual outer Core return, all required
+serialization/ownership work and independent full-five-part reference. Bind the
+relevant test/provider/public-step sources in <code>boundary.source_refs</code> and the
+existing compiled/runtime artifact map. Boolean record claims alone do not prove
+that source contract. A client normal includes its real INPUT serialization/send;
+it does not invent a per-prediction canonical solver export. The authority entry
+is the explicitly declared offline step plus correlated public-request canonical
+egress composite, not a claim about live snapshot cadence or ENet throughput.</p>
+<p>All <code>NORMAL_WORK</code> coverage, including <code>required_serialization</code>, still applies in
+profile and functional mode. No mandatory work may move outside the outer timer.
+Normal19/repair0 remains overall CPU-candidate <strong>INCOMPLETE</strong> for missing repair
+coverage even if all19 calls meet4ms. Per-stream raw/p50/p95/max and each-call4ms
+failures remain visible. Never pool the two normal categories or relabel them as
+the dense repair8/common live-scene/long-soak gate.</p>
+<h2 id="result-once-last">RESULT (once, last)<a class="heading-anchor" href="#result-once-last" aria-label="Link to this section">#</a></h2>
+<p>Required keys: <code>sample_count</code>, <code>functional_operations</code>, <code>correctness_ok</code>,
+<code>source_fence_unchanged</code>, <code>binary_fence_unchanged</code>, <code>cleanup</code>.</p>
+<p>Cleanup is actual <code>{native_live_bytes,snapshot_live_bytes,host_application_live_bytes, all_explicit_drops_ok,core_shutdown_clean,ownership_evidence}</code>.
+<code>ownership_evidence</code> names direct counters OR checked explicit drops + Meter0;
+never invent a direct owner count. Include actual available owner/callback/mark
+counts separately. Stable Core/ledger storage is separately labelled and is not
+pretended to be application bytes0. Query failures/missing counters cannot become
+synthetic zero. Root retains process natural exits and shutdown logs.</p>
+<p>Functional-only mode emits NO SAMPLE and performs NO added profile clock reads.
+Use RESULT sample_count0 and actual functional_operations count/proofs. Existing
+runtime delivery/diagnostic clocks remain unchanged. Functional success returns
+NOT_MEASURED timing status, never0ns or CPU acceptance.</p>
+<h2 id="optional-native-observer-records">Optional Native observer records<a class="heading-anchor" href="#optional-native-observer-records" aria-label="Link to this section">#</a></h2>
+<p>Legacy records without <code>META.native_observer</code> keep their rules. This opt-in is
+TEST-RECORDS only; it does not authorize a timing run or change game outcomes.
+<code>META.native_observer</code> has these exact fields:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">abi_version:1, mode:off|structure_only|timed,
+block_bytes:49392, span_bytes:48, capacity:1024, stack_capacity:16,
+phase_mask:4095, clock_domain:godot_ticks_usec,
+native_static_bytes:48, binding_control_bytes:32, clock_binding_static_bytes:24,
+meter_context_bytes:219928, overhead:inside_whole,
+native_status_names:{...}, source_phase_map:[{phase,name,path,symbol,sha256},...]</code></pre></div><p>The three static/control/cache sizes are explicitly labelled instrumentation
+storage, not successful Native allocation requests. Actual Meter context/block
+allocation remains charged once; source audit verifies the exact leases and
+global resource ledger. Fields are not permission to hide or double-count memory.
+Status keys are decimal strings:0..7 map to the exact C names <code>OGB3_OK</code>,
+<code>OGB3_INVALID_ARGUMENT</code>, <code>OGB3_INVALID_HANDLE</code>, <code>OGB3_OUT_OF_MEMORY</code>,
+<code>OGB3_CAPACITY</code>, <code>OGB3_UNSUPPORTED</code>, <code>OGB3_INCOMPATIBLE</code>, <code>OGB3_CORRUPT</code>;
+<code>-2147483648</code> is <code>UNAVAILABLE</code>, never fake success0.</p>
+<p>The sorted12-entry source map binds phases1..12 and their names below to the
+actual hashed C source sites. Every path/hash must also occur in ordinary
+<code>boundary.source_refs</code>, so existing artifact-map verification binds it. Symbol
+placement remains subject to actual source review. Initial mask4095 excludes
+separately proposed phases13..15; no silent extra selection.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>IDs</th>
+<th>Names</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>native.step.fixed</code></td>
+</tr>
+<tr>
+<td>2..6</td>
+<td><code>native.snapshot.capture</code>, <code>native.snapshot.serialize</code>, <code>native.snapshot.normalize</code>, <code>native.snapshot.finalize</code>, <code>native.snapshot.validate</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>native.admission.world</code></td>
+</tr>
+<tr>
+<td>8..12</td>
+<td><code>native.recovery.read</code>, <code>native.recovery.parse_validate</code>, <code>native.recovery.build</code>, <code>native.recovery.verify_reencode</code>, <code>native.recovery.write</code></td>
+</tr>
+</tbody></table>
+</div><p>Mode timed requires profile mode and a nonempty top-level <code>META.exclusive_grant</code>
+containing the ACTUAL Root grant label. A label alone never self-authorizes a run.
+Functional-only allows off/structure_only, no SAMPLE, no added clock/prewarm.</p>
+<h3 id="raw-sample-and-derived-phases">Raw SAMPLE and derived phases<a class="heading-anchor" href="#raw-sample-and-derived-phases" aria-label="Link to this section">#</a></h3>
+<p><code>SAMPLE.native_observation</code> is the CLOSED actual C block header, exact fields:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">abi_version,struct_bytes,mode,capacity,count,stack_depth,error_flags,state,
+scope_token,domain_cookie,next_span_id,root_count,clock_reads,clock_errors,
+overflow_count,nesting_errors,last_clock_us,phase_mask,stack,spans</code></pre></div><p>Header values use their actual u32/u64 integer ranges, never JSON doubles/bools.
+stack is exactly16 u64s. spans contains exactly count written slots (&lt;=1024),
+each with EXACTLY seven keys:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">id,parent_id,root_ordinal,phase,native_status,start_us,end_us</code></pre></div><p>No status-name strings or extra keys occur in raw spans. Span IDs are contiguous
+BEGIN ordinals; parent is0 or an earlier recorded ID; roots are counted/ordered
+and inherited by children. Closed state is2, mode2 for timed SAMPLE, ABI1 and
+struct_bytes49392. Valid closed stacks are allzero; next_span_id=count+1;
+clock_reads=2*count in a valid timed record, with last_clock_us matching the last
+actual boundary. Empty selection, unknown status, invalid state/mode/IDs/parents/
+roots or clock/nesting/overflow errors are observation failures.</p>
+<p>For valid observations every raw span has ONE derived entry in SAMPLE.phases,
+with ordinary phase fields plus EXACT extras <code>native_span_id</code>,
+<code>native_parent_id</code>, <code>native_root_ordinal</code>, <code>native_phase</code>, <code>native_status</code>.
+Name is the fixed mapped name, relation=<code>native_nested_in_whole</code>, same-Godot
+absolute start/end and duration_ns=(end_us-start_us)*1000. Parents/children/whole
+intervals must contain one another; root intervals are sequential. No sums,
+subtractions, residual claims, rewritten statuses or overhead correction.</p>
+<p><strong>Narrow failed-observation encoding:</strong> actual nonzero raw error_flags,
+clock_errors, overflow_count, nesting_errors or stack_depth may instead have ZERO
+Native-derived entries. Keep ALL raw header/stack/spans EXACTLY, and retain other
+existing phases. This avoids unsigned-wrap/negative/fake0 valid durations after
+a clock failure. It STILL fails observation acceptance; actual game outcome,
+state/proof and resources remain separately recorded. A bad model outcome alone
+does not permit omission; valid error-free observations always require one-for-one
+derivation. Never forge CLOSED or erase an error to make a sample eligible.</p>
+<h3 id="functional-and-final-untimed-result">Functional and final untimed result<a class="heading-anchor" href="#functional-and-final-untimed-result" aria-label="Link to this section">#</a></h3>
+<p><code>RESULT.native_clock_prewarm_calls</code> is0 for functional off/structure and1 for the
+explicit timed profile setup. Functional off has <code>RESULT.native_observation:null</code>.
+Structure-only has the exact closed raw block with mode1, clock_reads0,
+last_clock_us0 and all raw times0 labelled UNAVAILABLE; no timing SAMPLE.
+Optional <code>RESULT.native_functional_scopes</code> retains at most20 such raw structure
+blocks before reuse. Any aggregate <code>native_observation_summary</code> is diagnostic
+only and cannot replace those raw entries.</p>
+<p>For the rolling19 profile, META.mode timed describes ONLY19 timed SAMPLEs at
+heads8..152. Final160 remains an UNTImed oracle: RESULT.native_observation is its
+closed structure block (mode1/no callback reads), with profile prewarm count1.
+There is no synthetic SAMPLE160 and no pretend timed final block. Errors in a
+functional/final block are hard observation failures, not a faster game result.</p>
+<p>The shared analyzer reports CPU candidate PASS/FAIL/INCOMPLETE/DIAGNOSTIC_ONLY.
+It NEVER declares the whole Gate B passed: long two-process ENet correctness,
+impairment/recovery schedule, rolling evidence, memory/RSS and Root review remain
+separate mandatory requirements. P5 remains blocked until Root&#39;s explicit Gate B.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/box3d_soak/shared/records-v1.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#meta-once-first" class="">META (once, first)</a><a href="#full-boundary-without-a-production-hook" class="">Full boundary without a production hook</a><a href="#sample-profile-mode-only" class="">SAMPLE (profile mode only)</a><a href="#additive-normal-only-streams" class="">Additive normal-only streams</a><a href="#result-once-last" class="">RESULT (once, last)</a><a href="#optional-native-observer-records" class="">Optional Native observer records</a><a href="#raw-sample-and-derived-phases" class="subsection">Raw SAMPLE and derived phases</a><a href="#functional-and-final-untimed-result" class="subsection">Functional and final untimed result</a></nav><div class="outline-actions"><a href="../../../../reference/tests/box3d_soak/shared/records-v1.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

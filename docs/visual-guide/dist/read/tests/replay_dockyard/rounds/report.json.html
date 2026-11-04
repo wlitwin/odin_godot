@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>report.json · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>report.json</h1><div class="reader-meta"><span>385 lines · JSON</span><span>Odin × Godot</span><a href="../../../../reference/tests/replay_dockyard/rounds/report.json" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;task&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;G2&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;whole_goal_complete&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;evidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;rules5&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/round-rules-v25/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;823ad3a165ea64a4ea468f52dadcedb0c3b930f35d0bff9964b297a6a412776f&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_matrix&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-type-matrix-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0875d3dd73014833679ca0265b816582d92ff3b43a49db189b846944bcb6152e&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;wasm_corpus&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/type-corpus-simd-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9df23ce21072cb8bda85cf5098581718691cef0a068e52c6d0a37104b6771987&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;export&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/game-export-v2/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c63aab110085d8fdf1de76883e74918a09c85eb3f5632a87fadb9c8c465e0969&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_pair&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-round-pair-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4775fd67ee0f9909a5019ac1c64d74e9c3b5eb1c1072200cf1e71e2c5e417c74&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_game&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-round-assessment-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e99069fe4c3d295fa8747e55ea3eacfd9005ea2e211b380db22200f60eecc492&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;web_pair&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-pair-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ad781fc7414314be7bafc5f2106fd0296b2a5178ad0a6ef07aa604d292620a3a&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;web_binding&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-pair-v3/export-binding.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;19b90bb34774787875d7c5d5f691e782743fcf3dc51112e1a6266690616dc12b&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;web_game&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-round-assessment-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ad7438e478b1c5ea6e73ab57fc525918a2baa47cb1000fa22ec6787135b342dc&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_next_button&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/next-button-pair-v2/game-assessment.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;61aefaaae611af197f51ac8cf9bdb2553dc40491cbf9bda6efdbba568de0b83e&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_next_button_controller&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/next-button-pair-v2/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1ebdf5e81e33d7d079bb008bea5e9550b407ce02cfcd3728add566ca0dce817e&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;visual&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/visual-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;79f5c68bdf5470c10ba06b99e26d612b9b79946a23b9e8a2c2f772341a9a2def&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;screenshot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/visual-v1/dockyard.png&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;dbacb648c569b93b644dacbbfc8be686312f49fa7862b62e32a3b1b98e21e33c&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;negative_controls&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/assessor-controls-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a70892a11ca0db24e2e8c03b9afd30ed94433008f9a48469460d92c0cd3a5b48&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;sources&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;box3d/bindings.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e0b28c4ac73c25e04324c0657915a17fedaa055027572a0823914c979404e1df&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/body.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;47cd6b44e9915d067cc062ab4a7165668dc8fd947e844703abbb9cabfb4848e2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/native/api.c&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;40c7fb97ba8de4baf47097016aeef6241563e96880f9abaec8e99574e089360f&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/native/api.h&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;72a9738dd423acc4277067b75e82cd4c2480360fa2078083cbd1fe71d920484e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/native/api_smoke.c&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1e33914b4c81102db21c8b18a3c5dbe222facc2952dc1dc4afc2ed559282b2f0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;948d191be11013234dc641ca85953f1a2237eda28a2bc2448eb4cb8120b9ffa8&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/barge.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;28b1476adabefa194a67590cfe399e17a03acd6a58282a572544e1ae3b3cdb8b&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/cargo.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/crane.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/delivery.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9d9223eaa53a4b70db75d276afda646c915b6735defe009002cbcd323173d234&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/ground.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/hinge.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/long.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/rail.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/ramp.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;08f1deeae85fdc3a92be48e4081a1185d50d5721b833a6cd60514196c4e874cb&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/robot.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;36f2e9bacaae9e5dbb7b3171c77b60c2f06035340c12cdd44131a96d4a6370e9&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/world.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;164360bb1f569de982a076540bf7ef837e12b19f55fd7c8795b6e0ff18fdf935&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/export_presets.cfg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/launch.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3468e7e253e26b1799151323ea8d016d97b644513b85cae7e967a86e6f39481b&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/main.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/controller.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;67a0f7d277b242fd6c420d747dded90e50a8ad46bd57b252882f39cd46f09f49&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/demo.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0854d14fbd94e5178178071de28ec3a035a993652f4a926b8696f4e6e44ed4b7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/evidence.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b64f22de4c8e29da9870de256fa1b60779c0c290b5277effbe5cae29d0391c2a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/images_darwin.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/images_linux.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/launch.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/model.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2e13241d2937144a6912065b614174b417e88830ff3ec882029fd8df274c6340&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/process.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ec4962121803dd4445f2b696156082aa513af0ceec722a207adba6948157d02a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/round.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;f93e5bdb0b1b4486a6c89b8aa0e863664a456120d76e85c5af8e426b2865e21e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/startup.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6d37cf72a9dc186271347eb18e010a70ade30189ddadea663df6306ca10cf91f&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/telemetry.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8c17c35ee97eddb2a82174f99ad5356085b09bd2a7444bbc2d7ab4358b44c4f1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/terminal.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;018196551b3204363c4083e00bb92aad8cc243ac6b7dff58b03cf93392f66f5e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/odin_godot.gdextension&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/prepare.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7fca36d9ec256bdf76b1c07ccdebd61023eaef9957b45d75fa1e9c5997e11194&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/project.godot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/scripts/boot.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/view.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;51c8c636214fd003ee3123a8e7299427e2212ff1629838248065c4aabb60f643&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;66521c1bb7c4dbcf980e968a0f3ece57518ee95d22ba5c69a5d51a803b71f7e0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/commands.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e6bb61b42bbe85b11072ca094e7f9cea978ba070e7051b3cabd7defa98c284d1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/provider.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c98ddbeb9655d9d671ea11ee487bb192f9161f2d9951b745783a88754266feba&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;80cf2e954b6e3c548d7c273d1c8d965a378ca9384245d6464628b86765dd7a62&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/assess_pair.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;696a61c12bb03d27964d9b13b32854a7b4fa95fb19f2021932e4df57a5557698&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/assessor_controls.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;93ede67d4d37e384723bb4366b4f9ed25cf41379d6e48572145a0a51b56748e9&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/extract.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;176214b5b21cf4e6875b3ef9c321a0786f1aea4a254a434e1be6002753ef2319&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/legacy_provider/authoring.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ebd2316cc0f5c346c9af25f060a5b5f03d1a95afa76ca5cce739c73cbc5260e6&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/legacy_provider/commands.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;189ba9d5e554b04fe1d18552de52fb244e819ee0c9026f854c682e29d9a264a1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/legacy_provider/motion.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;bf4eeca7f88b2b90eabadfdd76591ea1bb34115d4c818c0f5229b243e1e17ec1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/legacy_provider/network_codec.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5d07734b6aa8b2f0a217644d66eded0a52de17f74c8f2781a9adaef888a497e3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/legacy_provider/provider.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ee3b254c8330b64a2d2c580970884b2395c220f33c075304c30c369ead79b4c5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/provider_abi_test.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ecabb10d7acf703489389992f27912ac512779a611d3e4ba23476f6e28150be7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/retry.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9fde37298b9128f865dd517107b7d616ef8660283b2aa59f4d64c58f6f9517bd&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/retry.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;620a9b33b6f3b08feb8c5f5b3efbc26518e88188625a63f6e66812ebb79e2a4c&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/round_test.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7c3167f1322ff24dcb038475ba8d7ef5384cf2417887650df0ee964a6970d504&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/run.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;33bbb9a92e0228ae94be24d8d47ac1a70ed7a6d325257763265dc70794699cf9&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/replay_dockyard/rounds/visual.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;bae46dc5baf01eb5adc72e8b6198f17d7ea09f0cd6c17359d1d313fc4d550843&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;game&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;bodies&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">19</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;shapes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">19</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;geometry_assets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;joints&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;deadline_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">9000</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;hz&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">60</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;substeps&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;jobs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;rules&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;same reducer/authoring/bake across native and Web; bounded surface-point magnets, actual sensor/bay dwell120, Native kinematic latches, Native departure, payout, robot recovery and lost-load recreation&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_complete_round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;host&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;host&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;tick&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;delivered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;inside&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;dwell&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;cargo_positions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">4.20688486</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966626</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.20792818</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">7.07658958</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966543</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.25743914</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">5.85412598</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.14961278</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.70264769</span>
+          <span class="hljs-punctuation">]</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;eligible_delivery_cues&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;game_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d2d81fdb06ea1e6547739269d334fafa3a5265cadb426f2c6be0690046c1fd8d&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;layout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;phase&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Results&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2845</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;payout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1404</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;lost&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;event&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SAMPLE_GAME&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;client&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;client&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;tick&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3600</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;delivered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;inside&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;dwell&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;cargo_positions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">4.20688486</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966626</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.20792818</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">7.07658958</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966543</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.25743914</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">5.85412598</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.14961278</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.70264769</span>
+          <span class="hljs-punctuation">]</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;eligible_delivery_cues&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;game_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d2d81fdb06ea1e6547739269d334fafa3a5265cadb426f2c6be0690046c1fd8d&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;layout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;phase&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Results&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2845</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;payout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1404</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;lost&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;event&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SAMPLE_GAME&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;browser_complete_round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;host&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;host&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;tick&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">6600</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;delivered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;inside&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;dwell&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;cargo_positions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">4.31212091</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966555</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.26630354</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">7.38850546</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966602</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.21294308</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">5.84469604</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.14961135</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.65660787</span>
+          <span class="hljs-punctuation">]</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;eligible_delivery_cues&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;game_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;435e6648f160580603eb486efef4f5f9faa9225293f7c1e707efb501a0557e38&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;layout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;phase&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Results&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4906</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;payout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1336</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;lost&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;event&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SAMPLE_GAME&quot;</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;client&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;client&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;tick&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">6600</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;delivered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;inside&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;dwell&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">120</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;cargo_positions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">4.31212091</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966555</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.26630354</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">7.38850546</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.19966602</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.21294308</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">5.84469604</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.14961135</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.65660787</span>
+          <span class="hljs-punctuation">]</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;eligible_delivery_cues&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;game_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;435e6648f160580603eb486efef4f5f9faa9225293f7c1e707efb501a0557e38&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;layout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;phase&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Results&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;round_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4906</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;payout&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1336</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;lost&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+          <span class="hljs-literal"><span class="hljs-keyword">false</span></span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;event&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;SAMPLE_GAME&quot;</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;validation&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;native_rules_groups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;three_layouts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual physical carrying, three cues, departure/results/next-job; source Timeline destroyed, complete CP restored with all5 byte equality and continued work&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;hazards&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual driven robot fall recovers once; separately configured Native load falls, body count18, real retry creates new key/stable gameplay identity&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;negative&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;invalid staged pose preserves all5; actual legacy ABI1 producer/current helper refused before table access, new context refuses legacy identity then advances; corrupted evidence controls rejected&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;current private ABI2 actual native pair3600/full5/ACK/cleanup +actual NEXT JOB button same-session action bothround2/layout1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;web&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;same artifact independent Chrome RTC pair6600, finished at roundtick4906, all3/cues3/payout1336/full5/ACK/zero observed teardown; functional softwareGL with3D disabled/local-IP flag&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;visual&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual native GPU viewport19bodies/Sphere surfaces/bay+clamp surfaces +checkedclose. Screenshot before private ABI marker only; renderer/game code unchanged.&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;shared_changes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;flat_api&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;compatible ogb3_body_set_type addition; invalid enum and unsupported compound/height/Mesh refuse before upstream setter; immediate capture, source-free restore, stable key and dynamic mass return tested in existing static/shared API cases&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;private providerREPLB3D2, identity included in configuration contract; original command order retained/extensions trail; actual owner-checked staged pose/type/point impulse and velocity reads&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;versions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Native C ABI1/POD layouts/logical4/resource2/canonical versions unchanged; C source fingerprint/build changed; private Odin provider identity deliberately versioned2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_library&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/native-type-cache/build/Release/libogb3.dylib&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;web_archive&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/G2/web-type-cache/build/WebSIMD/017c4bbf03ac1d43252338686f55f391807ea4b2d9b1ee7fa0ac551cbf6d48e8/libogb3.a&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;retained_failures&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;round-rules-v1 shared library relocation missing in standalone output; corrected by exact-byte sibling staging&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;v2..v20 physical/controller failures retained: rigid box transitions, ramp toe/end face, insufficient workspace, unlatched loads and unstable stateless routes. Current rounded equal-mass robots, overlapping ramp, working space, Native latches and local staged input controller satisfy the unchanged win/deadline criteria.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;v13 descriptor tag order panic; v21 both test bodies exit0 but wrapper receipt attempted to hash an auto-deleted executable; -keep-executable corrected&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;v24 duplicate Odin package name in copied legacy ABI fixture, only namespace renamed&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;native-round-pair-v2 actors succeeded but project fence rejected unrelated extractor23704 module copy from Root concurrent same-project checks. Exclusivev3 passed with exact source/binaries; oldFAIL unchanged.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;web-round-pair-v2 generic networkPASS but game assessment at3600 remainedWorking/score1. Distinct longer6600 case completed within declared9000deadline. No unchanged automatic retry or relabel.&quot;</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;limits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;Human playtesting NOT_OBSERVED. Automated input reads copied poses and never assigns solver poses, scores, heads or protocol state.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;No native/browser cross-play or cross-target deterministic equality claim. Native and browser cases are separate qualified cohorts.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Chrome functional localhost with3D disabled/local-IP discovery flag; Internet/forced relay, other browsers, foreground budgets and final600s are later cards.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Current Native C addition is tested on macOS ARM64 and Wasm. Later whole-goal validation must rebuild/recheck Linux; earlier Linux reports are build-specific.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Rooms/invitations/security/rejoin/observers/host-loss UX, audio/polish and deploy-ready final package remain N1/R1/P1/Q1/D1.&quot;</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_dockyard/rounds/report.json · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/tests/replay_dockyard/rounds/report.json" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

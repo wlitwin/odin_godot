@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>timeline.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>timeline.odin</h1><div class="reader-meta"><span>673 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/replay/timeline.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:mem&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:reflect&quot;</span>
+
+<span class="hljs-comment">// Frame is a pointer-free game value, including entity allocation and RNG.</span>
+<span class="hljs-comment">// Managed external state additionally requires an owned Complete_Checkpoint.</span>
+<span class="hljs-comment">// Tick zero is a real initial frame; ordinary value-only behavior is unchanged.</span>
+Frame :: <span class="hljs-keyword">struct</span>($State: <span class="hljs-type">typeid</span>) {
+    tick:  <span class="hljs-type">u64</span>,
+    state: State,
+}
+
+Config :: <span class="hljs-keyword">struct</span> {
+    history_frames:  <span class="hljs-type">int</span>,
+    events_per_tick: <span class="hljs-type">int</span>,
+}
+
+DEFAULT_CONFIG :: Config {
+    history_frames  = <span class="hljs-number">128</span>,
+    events_per_tick = <span class="hljs-number">32</span>,
+}
+
+Result :: <span class="hljs-keyword">struct</span> {
+    error: Error,
+    <span class="hljs-comment">// steps counts completed staged steps, including on an aborted operation.</span>
+    <span class="hljs-comment">// Only error=None commits a revision. Audit never commits.</span>
+    steps: <span class="hljs-type">int</span>,
+    tick:  <span class="hljs-type">u64</span>, <span class="hljs-comment">// first failing tick, or final processed tick on success</span>
+}
+
+<span class="hljs-meta">@(private)</span>
+Record :: <span class="hljs-keyword">struct</span>($State, $Input, $Event: <span class="hljs-type">typeid</span>) {
+    valid:       <span class="hljs-type">bool</span>,
+    has_input:   <span class="hljs-type">bool</span>,
+    frame:       Frame(State),
+    input:       Input,
+    events:      []Occurrence(Event),
+    count:       <span class="hljs-type">int</span>,
+    image:       <span class="hljs-type">rawptr</span>,
+    image_bytes: <span class="hljs-type">u64</span>,
+}
+
+<span class="hljs-comment">// Runtime owner: initialize once, use by pointer, destroy once. Do not copy a</span>
+<span class="hljs-comment">// live Timeline: its allocations have one owner. Public reads copy data out.</span>
+Timeline :: <span class="hljs-keyword">struct</span>($State, $Input, $Event: <span class="hljs-type">typeid</span>) {
+    owner:                               Owner, <span class="hljs-comment">// fixed prefix permits rejecting a foreign typed realm first</span>
+    user_owner:                          Owner, <span class="hljs-comment">// separately retained exact step/user allocation</span>
+    owner_retained, user_owner_retained: <span class="hljs-type">bool</span>,
+    allocator:                           mem.Allocator,
+    step:                                <span class="hljs-keyword">proc</span>(state: ^State, input: Input, ctx: ^Step(Event)),
+    epoch:                               <span class="hljs-type">u64</span>,
+    head:                                <span class="hljs-type">u64</span>,
+    confirmed:                           <span class="hljs-type">u64</span>,
+    busy:                                <span class="hljs-type">bool</span>,
+    user:                                <span class="hljs-type">rawptr</span>,
+    records:                             []Record(State, Input, Event),
+    staged:                              []Record(State, Input, Event),
+    event_storage:                       []Occurrence(Event),
+    staged_events:                       []Occurrence(Event),
+    external:                            External,
+    execution:                           <span class="hljs-type">rawptr</span>,
+    run:                                 External_Run,
+    image_bytes, runtime_bytes:          <span class="hljs-type">u64</span>,
+    runtime_reserved:                    <span class="hljs-type">bool</span>,
+    external_profile:                    External_Profile,
+}
+
+init :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    initial: Frame(State),
+    step: <span class="hljs-keyword">proc</span>(state: ^State, input: Input, ctx: ^Step(Event)),
+    cfg := DEFAULT_CONFIG,
+    epoch: <span class="hljs-type">u64</span> = <span class="hljs-number">1</span>,
+    allocator := <span class="hljs-keyword">context</span>.allocator,
+    user: <span class="hljs-type">rawptr</span> = <span class="hljs-literal">nil</span>,
+) -&gt; Error {
+    <span class="hljs-keyword">if</span> error := owner_access(t.owner, .Execute); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">if</span> error := owner_access(t.user_owner, .Execute); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">if</span> len(t.records) != <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> .Already_Initialized
+    }
+
+    <span class="hljs-keyword">if</span> step == <span class="hljs-literal">nil</span> ||
+       epoch == <span class="hljs-number">0</span> ||
+       cfg.history_frames &lt; <span class="hljs-number">2</span> ||
+       cfg.history_frames &gt; <span class="hljs-number">4096</span> ||
+       cfg.events_per_tick &lt; <span class="hljs-number">0</span> ||
+       cfg.events_per_tick &gt; <span class="hljs-number">4096</span> {
+        <span class="hljs-keyword">return</span> .Invalid_Config
+    }
+
+    <span class="hljs-keyword">if</span> !value_supported(State) || !value_supported(Input) || !value_supported(Event) {
+        <span class="hljs-keyword">return</span> .Unsupported_Value
+    }
+
+    t.records = make([]Record(State, Input, Event), cfg.history_frames, allocator)
+    t.staged = make([]Record(State, Input, Event), cfg.history_frames, allocator)
+    n := cfg.history_frames * cfg.events_per_tick
+    t.event_storage = make([]Occurrence(Event), n, allocator)
+    t.staged_events = make([]Occurrence(Event), n, allocator)
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; cfg.history_frames {
+        lo, hi := i * cfg.events_per_tick, (i + <span class="hljs-number">1</span>) * cfg.events_per_tick
+        t.records[i].events = t.event_storage[lo:hi]
+        t.staged[i].events = t.staged_events[lo:hi]
+    }
+
+    t.step = step
+    t.user = user
+    t.allocator = allocator
+    t.epoch = epoch
+    t.head = initial.tick
+    t.confirmed = initial.tick
+    r := &amp;t.records[initial.tick % <span class="hljs-type">u64</span>(len(t.records))]
+    r.valid = <span class="hljs-literal">true</span>
+    r.frame = initial
+    <span class="hljs-keyword">return</span> .None
+}
+
+destroy :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event)) -&gt; Error {
+    <span class="hljs-keyword">if</span> error := owner_access(t.owner, .Read); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">if</span> error := owner_access(t.user_owner, .Read); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    owner := t.owner
+    owned := t.owner_retained
+    user_owner := t.user_owner
+    user_owned := t.user_owner_retained
+
+    <span class="hljs-keyword">if</span> !owner_is_nil(owner) &amp;&amp; t.busy {
+        <span class="hljs-keyword">return</span> .Reentrant
+    }
+
+    assert(!t.busy, <span class="hljs-string">&quot;destroy cannot run inside a simulation step&quot;</span>)
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        <span class="hljs-keyword">if</span> t.runtime_reserved {
+            t.external.unreserve(t.runtime_bytes)
+            t.runtime_reserved = <span class="hljs-literal">false</span>
+        }
+
+        external_finish(t)
+
+        <span class="hljs-keyword">for</span> &amp;record <span class="hljs-keyword">in</span> t.records {
+            external_release_record(t, &amp;record)
+        }
+
+        <span class="hljs-keyword">if</span> t.execution != <span class="hljs-literal">nil</span> {
+            t.external.close(t.execution)
+            t.execution = <span class="hljs-literal">nil</span>
+        }
+    }
+
+    delete(t.records, t.allocator)
+    delete(t.staged, t.allocator)
+    delete(t.event_storage, t.allocator)
+    delete(t.staged_events, t.allocator)
+    t^ = {}
+
+    <span class="hljs-keyword">if</span> owned {
+        error := owner_drop(&amp;owner)
+
+        <span class="hljs-keyword">if</span> error != .None {
+            t.owner = owner
+            t.owner_retained = <span class="hljs-literal">true</span>
+            t.user_owner = user_owner
+            t.user_owner_retained = user_owned
+            <span class="hljs-keyword">return</span> error
+        }
+    }
+
+    <span class="hljs-keyword">if</span> user_owned {
+        error := owner_drop(&amp;user_owner)
+
+        <span class="hljs-keyword">if</span> error != .None {
+            t.user_owner = user_owner
+            t.user_owner_retained = <span class="hljs-literal">true</span>
+        }
+
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">return</span> .None
+}
+
+read :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>) -&gt; (frame: Frame(State), ok: <span class="hljs-type">bool</span>) {
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    } <span class="hljs-comment">// use read_values or capture_complete explicitly</span>
+
+    r := record_at(t, tick)
+
+    <span class="hljs-keyword">if</span> r == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">return</span> r.frame, <span class="hljs-literal">true</span>
+}
+
+current :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event)) -&gt; (frame: Frame(State), ok: <span class="hljs-type">bool</span>) {
+    <span class="hljs-keyword">return</span> read(t, t.head)
+}
+
+<span class="hljs-comment">// Configuration metadata for bounded diagnostics; no history storage is exposed.</span>
+timeline_config :: <span class="hljs-keyword">proc</span>(t: ^Timeline($S, $I, $E)) -&gt; (Config, Error) {
+    <span class="hljs-keyword">if</span> err := available(t, .Read); err != .None {
+        <span class="hljs-keyword">return</span> {}, err
+    }
+
+    <span class="hljs-keyword">return</span> {len(t.records), len(t.records[<span class="hljs-number">0</span>].events)}, .None
+}
+
+<span class="hljs-comment">// Copies the entire occurrence batch or nothing. Never exposes history storage.</span>
+copy_events :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    tick: <span class="hljs-type">u64</span>,
+    dst: []Occurrence(Event),
+) -&gt; (
+    count: <span class="hljs-type">int</span>,
+    error: Error,
+) {
+    <span class="hljs-keyword">if</span> len(t.records) == <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>, .Not_Initialized
+    }
+
+    r := record_at(t, tick)
+
+    <span class="hljs-keyword">if</span> r == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>, .History_Missing
+    }
+
+    <span class="hljs-keyword">if</span> len(dst) &lt; r.count {
+        <span class="hljs-keyword">return</span> r.count, .Output_Too_Small
+    }
+
+    copy(dst, r.events[:r.count])
+    <span class="hljs-keyword">return</span> r.count, .None
+}
+
+<span class="hljs-comment">// Optional outside-simulation authorization immediately before publishing a</span>
+<span class="hljs-comment">// candidate. Rejection preserves the complete ring, including its oldest slot.</span>
+Commit_Gate :: <span class="hljs-keyword">struct</span> {
+    user:  <span class="hljs-type">rawptr</span>,
+    allow: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, epoch: <span class="hljs-type">u64</span>) -&gt; <span class="hljs-type">bool</span>,
+}
+
+advance :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), input: Input, gate: Commit_Gate = {}) -&gt; Result {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err}
+    }
+
+    <span class="hljs-keyword">if</span> t.head == max(<span class="hljs-type">u64</span>) {
+        <span class="hljs-keyword">return</span> {error = .Tick_Overflow, tick = t.head}
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) &amp;&amp;
+       t.external.limits.max_prediction_ticks != <span class="hljs-number">0</span> &amp;&amp;
+       t.head - t.confirmed &gt;= t.external.limits.max_prediction_ticks {
+        <span class="hljs-keyword">return</span> {error = .Prediction_Limit, tick = t.head + <span class="hljs-number">1</span>}
+    }
+
+    t.busy = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">defer</span> t.busy = <span class="hljs-literal">false</span>
+    parent := record_at(t, t.head)
+
+    <span class="hljs-keyword">if</span> err := external_begin(t, parent.image, .Advance); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = t.head + <span class="hljs-number">1</span>}
+    }
+
+    <span class="hljs-keyword">defer</span> external_finish(t)
+    before := parent.frame
+    candidate := &amp;t.staged[<span class="hljs-number">0</span>]
+
+    <span class="hljs-keyword">if</span> err := simulate(t, candidate, before, input); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = before.tick + <span class="hljs-number">1</span>}
+    }
+
+    <span class="hljs-keyword">if</span> err := external_prepare(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, steps = <span class="hljs-number">1</span>, tick = before.tick + <span class="hljs-number">1</span>}
+    }
+
+    <span class="hljs-keyword">if</span> gate.allow != <span class="hljs-literal">nil</span> &amp;&amp; !gate.allow(gate.user, t.epoch) {
+        <span class="hljs-keyword">return</span> {error = .Commit_Rejected, steps = <span class="hljs-number">1</span>, tick = before.tick + <span class="hljs-number">1</span>}
+    }
+
+    commit(t, candidate)
+    external_publish(t)
+    t.head = candidate.frame.tick
+    <span class="hljs-keyword">return</span> {steps = <span class="hljs-number">1</span>, tick = t.head}
+}
+
+<span class="hljs-comment">// Replace the complete input batch for one tick, then replay its entire suffix.</span>
+<span class="hljs-comment">// Missing history or any failed step leaves ALL committed frames/inputs/events</span>
+<span class="hljs-comment">// unchanged. No approximate fallback from current state is allowed.</span>
+revise_input :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>, input: Input) -&gt; Result {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = tick}
+    }
+
+    <span class="hljs-keyword">if</span> tick &lt;= t.confirmed {
+        <span class="hljs-keyword">if</span> first := record_at(t, tick); first != <span class="hljs-literal">nil</span> &amp;&amp; !first.has_input {
+            <span class="hljs-keyword">return</span> {error = .Initial_Frame, tick = tick}
+        }
+
+        <span class="hljs-keyword">return</span> {error = .Committed, tick = tick}
+    }
+
+    <span class="hljs-keyword">return</span> replay_suffix(t, tick, input, <span class="hljs-literal">false</span>)
+}
+
+<span class="hljs-comment">// Called by the runner after authority has settled complete state through tick.</span>
+<span class="hljs-comment">// Simulation and presentation have separate frontiers; this protects gameplay</span>
+<span class="hljs-comment">// even if a view is delayed or temporarily blocked on its notification queue.</span>
+confirm_through :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>) -&gt; Error {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> err
+    }
+
+    <span class="hljs-keyword">if</span> tick &lt; t.confirmed {
+        <span class="hljs-keyword">return</span> .Time_Reversed
+    }
+
+    <span class="hljs-keyword">if</span> record_at(t, tick) == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> .History_Missing
+    }
+
+    t.confirmed = tick
+    <span class="hljs-keyword">return</span> .None
+}
+
+<span class="hljs-comment">// Re-execute recorded inputs and compare logical values, ignoring struct padding.</span>
+<span class="hljs-comment">// Reports the first differing tick and whether state or events diverged. This</span>
+<span class="hljs-comment">// checks local reproducibility; it cannot prove cross-machine determinism or</span>
+<span class="hljs-comment">// undo side effects in a callback that violates the simulation contract.</span>
+audit :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), from_tick: <span class="hljs-type">u64</span>) -&gt; Result {
+    <span class="hljs-keyword">return</span> replay_suffix(t, from_tick, Input{}, <span class="hljs-literal">true</span>)
+}
+
+<span class="hljs-comment">// Explicit branch: discard future frames, inputs, and events. A caller can also</span>
+<span class="hljs-comment">// copy a Frame and init a separate Timeline at that checkpoint without touching</span>
+<span class="hljs-comment">// the original. Neither operation constitutes network host migration.</span>
+rewind :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>) -&gt; Error {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> err
+    }
+
+    <span class="hljs-keyword">if</span> tick &lt; t.confirmed {
+        <span class="hljs-keyword">return</span> .Committed
+    }
+
+    <span class="hljs-keyword">if</span> record_at(t, tick) == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> .History_Missing
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        t.busy = <span class="hljs-literal">true</span>
+        <span class="hljs-keyword">defer</span> t.busy = <span class="hljs-literal">false</span>
+
+        <span class="hljs-keyword">if</span> t.external.limits.max_repair_ticks != <span class="hljs-number">0</span> &amp;&amp; t.head - tick &gt; t.external.limits.max_repair_ticks {
+            <span class="hljs-keyword">return</span> .Repair_Limit
+        }
+
+        <span class="hljs-keyword">if</span> err := external_begin(t, record_at(t, tick).image, .Revision, t.head - tick); err != .None {
+            <span class="hljs-keyword">return</span> err
+        }
+
+        <span class="hljs-keyword">defer</span> external_finish(t)
+
+        <span class="hljs-keyword">if</span> err := external_prepare(t); err != .None {
+            <span class="hljs-keyword">return</span> err
+        }
+
+        external_publish(t)
+    }
+
+    <span class="hljs-keyword">for</span> &amp;r <span class="hljs-keyword">in</span> t.records {
+        <span class="hljs-keyword">if</span> r.valid &amp;&amp; r.frame.tick &gt; tick {
+            external_release_record(t, &amp;r)
+            r.valid = <span class="hljs-literal">false</span>
+            r.count = <span class="hljs-number">0</span>
+        }
+    }
+
+    t.head = tick
+    <span class="hljs-keyword">return</span> .None
+}
+
+<span class="hljs-meta">@(private)</span>
+available :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), access: Owner_Access = .Execute) -&gt; Error {
+    <span class="hljs-keyword">if</span> error := owner_access(t.owner, access); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">if</span> error := owner_access(t.user_owner, access); error != .None {
+        <span class="hljs-keyword">return</span> error
+    }
+
+    <span class="hljs-keyword">if</span> len(t.records) == <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> .Not_Initialized
+    }
+
+    <span class="hljs-keyword">if</span> t.busy {
+        <span class="hljs-keyword">return</span> .Reentrant
+    }
+
+    <span class="hljs-keyword">return</span> .None
+}
+
+<span class="hljs-meta">@(private)</span>
+record_at :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>) -&gt; ^Record(State, Input, Event) {
+    <span class="hljs-keyword">if</span> owner_access(t.owner, .Read) != .None {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>
+    }
+
+    <span class="hljs-keyword">if</span> len(t.records) == <span class="hljs-number">0</span> || tick &gt; t.head {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>
+    }
+
+    r := &amp;t.records[tick % <span class="hljs-type">u64</span>(len(t.records))]
+
+    <span class="hljs-keyword">if</span> !r.valid || r.frame.tick != tick {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>
+    }
+
+    <span class="hljs-keyword">return</span> r
+}
+
+<span class="hljs-meta">@(private)</span>
+simulate :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    dst: ^Record(State, Input, Event),
+    before: Frame(State),
+    input: Input,
+) -&gt; Error {
+    external_release_record(t, dst)
+    dst.frame = {before.tick + <span class="hljs-number">1</span>, before.state}
+    dst.input = input
+    dst.has_input = <span class="hljs-literal">true</span>
+    dst.valid = <span class="hljs-literal">true</span>
+    ctx := Step(Event) {
+        tick   = dst.frame.tick,
+        epoch  = t.epoch,
+        events = dst.events,
+        user   = t.user,
+    }
+    previous_run, previous_nonce := external_active_run, external_active_nonce
+    model_clock: <span class="hljs-keyword">proc</span>() -&gt; <span class="hljs-type">u64</span>
+    model_started: <span class="hljs-type">u64</span>
+
+    <span class="hljs-keyword">if</span> external_enabled(t) &amp;&amp; t.external.clock != <span class="hljs-literal">nil</span> {
+        model_clock = t.external.clock
+        model_started = model_clock()
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        <span class="hljs-keyword">if</span> t.run.value == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> .External_State
+        }
+
+        nonce, error := external_next_scope()
+
+        <span class="hljs-keyword">if</span> error != .None {
+            <span class="hljs-keyword">return</span> error
+        }
+
+        t.run.generation = nonce
+        t.run.active = <span class="hljs-literal">true</span>
+        t.run.error = .None
+        t.run.step_count = <span class="hljs-number">0</span>
+        external_active_run, external_active_nonce = &amp;t.run, nonce
+        ctx.execution = {&amp;t.run, nonce, external_scope_valid}
+    }
+
+    t.step(&amp;dst.frame.state, input, &amp;ctx)
+    t.run.active = <span class="hljs-literal">false</span>
+    external_active_run, external_active_nonce = previous_run, previous_nonce
+    external_timing_finish(&amp;t.external_profile.model, model_clock, model_started)
+    dst.count = ctx.count
+
+    <span class="hljs-keyword">if</span> ctx.error != .None {
+        <span class="hljs-keyword">return</span> ctx.error
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) &amp;&amp; t.run.error != .None {
+        <span class="hljs-keyword">return</span> t.run.error
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) &amp;&amp; t.external.require_step &amp;&amp; t.run.step_count != <span class="hljs-number">1</span> {
+        <span class="hljs-keyword">return</span> .Step_Limit
+    }
+
+    <span class="hljs-keyword">return</span> external_capture_record(t, dst)
+}
+
+<span class="hljs-meta">@(private)</span>
+commit :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), src: ^Record(State, Input, Event)) {
+    dst := &amp;t.records[src.frame.tick % <span class="hljs-type">u64</span>(len(t.records))]
+    external_release_record(t, dst)
+    dst.image, dst.image_bytes = src.image, src.image_bytes
+    src.image, src.image_bytes = <span class="hljs-literal">nil</span>, <span class="hljs-number">0</span>
+    dst.valid = <span class="hljs-literal">true</span>
+    dst.has_input = src.has_input
+    dst.frame = src.frame
+    dst.input = src.input
+    dst.count = src.count
+    copy(dst.events, src.events[:src.count])
+}
+
+<span class="hljs-meta">@(private)</span>
+replay_suffix :: <span class="hljs-keyword">proc</span>(t: ^Timeline($S, $I, $E), tick: <span class="hljs-type">u64</span>, input: I, checking: <span class="hljs-type">bool</span>) -&gt; Result {
+    capture: ^Audit_Capture(S, I, E)
+    <span class="hljs-keyword">return</span> replay_suffix_capture(t, tick, input, checking, capture, <span class="hljs-keyword">context</span>.allocator)
+}
+
+<span class="hljs-meta">@(private)</span>
+replay_suffix_capture :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    tick: <span class="hljs-type">u64</span>,
+    input: Input,
+    checking: <span class="hljs-type">bool</span>,
+    capture: ^Audit_Capture(State, Input, Event),
+    allocator: mem.Allocator,
+) -&gt; Result {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = tick}
+    }
+
+    first := record_at(t, tick)
+
+    <span class="hljs-keyword">if</span> first == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {error = .History_Missing, tick = tick}
+    }
+
+    <span class="hljs-keyword">if</span> !first.has_input {
+        <span class="hljs-keyword">return</span> {error = .Initial_Frame, tick = tick}
+    }
+
+    parent := record_at(t, tick - <span class="hljs-number">1</span>)
+
+    <span class="hljs-keyword">if</span> parent == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {error = .History_Missing, tick = tick - <span class="hljs-number">1</span>}
+    }
+
+    n := <span class="hljs-type">int</span>(t.head - tick) + <span class="hljs-number">1</span> <span class="hljs-comment">// bounded by the stamped history window</span>
+    t.busy = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">defer</span> t.busy = <span class="hljs-literal">false</span>
+
+    <span class="hljs-keyword">if</span> err := external_begin(t, parent.image, checking ? External_Phase.Audit : External_Phase.Revision, <span class="hljs-type">u64</span>(n));
+       err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = tick}
+    }
+
+    <span class="hljs-keyword">defer</span> external_finish(t)
+    before := parent.frame
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n {
+        at := tick + <span class="hljs-type">u64</span>(i)
+        original := record_at(t, at)
+
+        <span class="hljs-keyword">if</span> original == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> {error = .History_Missing, steps = i, tick = at}
+        }
+
+        <span class="hljs-keyword">if</span> !original.has_input {
+            <span class="hljs-keyword">return</span> {error = .Initial_Frame, steps = i, tick = at}
+        }
+
+        sample := original.input
+
+        <span class="hljs-keyword">if</span> i == <span class="hljs-number">0</span> &amp;&amp; !checking {
+            sample = input
+        }
+
+        dst := &amp;t.staged[i]
+
+        <span class="hljs-keyword">if</span> err := simulate(t, dst, before, sample); err != .None {
+            <span class="hljs-keyword">return</span> {error = err, steps = i, tick = at}
+        }
+
+        <span class="hljs-keyword">if</span> checking {
+            <span class="hljs-keyword">if</span> external_enabled(t) {
+                equal, err := t.external.equal(dst.image, original.image)
+
+                <span class="hljs-keyword">if</span> err != .None {
+                    <span class="hljs-keyword">return</span> {error = err, steps = i + <span class="hljs-number">1</span>, tick = at}
+                }
+
+                <span class="hljs-keyword">if</span> !equal {
+                    result := Result {
+                        error = .Diverged_External,
+                        steps = i + <span class="hljs-number">1</span>,
+                        tick  = at,
+                    }
+                    capture_audit_difference(capture, result, original, dst, before, allocator, t.external, t.epoch)
+
+                    <span class="hljs-keyword">if</span> capture != <span class="hljs-literal">nil</span> &amp;&amp; capture.external_error != .None {
+                        result.error = capture.external_error
+                    }
+
+                    <span class="hljs-keyword">if</span> capture != <span class="hljs-literal">nil</span> &amp;&amp; capture.external_error != .None {
+                        result.error = capture.external_error
+                    }
+
+                    <span class="hljs-keyword">return</span> result
+                }
+            }
+
+            <span class="hljs-keyword">if</span> !reflect.equal(dst.frame.state, original.frame.state) {
+                result := Result {
+                    error = .Diverged_State,
+                    steps = i + <span class="hljs-number">1</span>,
+                    tick  = at,
+                }
+                capture_audit_difference(capture, result, original, dst, before, allocator, t.external, t.epoch)
+
+                <span class="hljs-keyword">if</span> capture != <span class="hljs-literal">nil</span> &amp;&amp; capture.external_error != .None {
+                    result.error = capture.external_error
+                }
+
+                <span class="hljs-keyword">return</span> result
+            }
+
+            <span class="hljs-keyword">if</span> dst.count != original.count ||
+               !reflect.equal(dst.events[:dst.count], original.events[:original.count], <span class="hljs-literal">true</span>) {
+                result := Result {
+                    error = .Diverged_Event,
+                    steps = i + <span class="hljs-number">1</span>,
+                    tick  = at,
+                }
+                capture_audit_difference(capture, result, original, dst, before, allocator, t.external, t.epoch)
+
+                <span class="hljs-keyword">if</span> capture != <span class="hljs-literal">nil</span> &amp;&amp; capture.external_error != .None {
+                    result.error = capture.external_error
+                }
+
+                <span class="hljs-keyword">return</span> result
+            }
+        }
+
+        before = dst.frame
+
+        <span class="hljs-keyword">if</span> checking {
+            external_release_record(t, dst)
+            dst.valid = <span class="hljs-literal">false</span>
+        } <span class="hljs-comment">// stream audit images</span>
+    }
+
+    <span class="hljs-keyword">if</span> err := external_prepare(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, steps = n, tick = t.head}
+    }
+
+    <span class="hljs-keyword">if</span> !checking {
+        <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n {
+            commit(t, &amp;t.staged[i])
+        }
+
+        external_publish(t)
+    }
+
+    <span class="hljs-keyword">return</span> {steps = n, tick = t.head}
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/timeline.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/replay/timeline.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

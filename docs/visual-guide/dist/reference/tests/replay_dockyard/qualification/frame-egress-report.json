@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "result": "FUNCTIONAL_MATRIX_PASS_ORIGINAL_S0_FIREFOX_REPAIR_MAX_REJECTED",
+  "release_admitted": false,
+  "task_complete": false,
+  "goal_complete": false,
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-v1/plan.json",
+    "sha256": "e74b3dfb91aa133e636d79e093a01f4d218c9ae93c58458edbf72cb229016fff"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-v1/source-checkpoint.json",
+    "sha256": "12072ecc7d67869cce69aad9c20e50a4e22093f714802731b83a0af138ad5a92"
+  },
+  "counter_observation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/egress-counters-firefox-v1/counter-analysis.json",
+    "sha256": "450c51630b72fc9f25b8b3baff07d75730bc0d1059e81573bd3fa582fc63cf46"
+  },
+  "baseline": {
+    "handle": "t1m7",
+    "actual_exit": 1,
+    "solver_fills": 2,
+    "snapshot_tick": 3,
+    "current_head": 4
+  },
+  "candidate": {
+    "handle": "t1m9",
+    "actual_exit": 0,
+    "solver_fills": 1,
+    "snapshot_current_head": true,
+    "zero_step_flush": true,
+    "owner_permit_checks": true,
+    "normative_complete_wire_equal": true,
+    "actual_receiver_confirmed": true,
+    "all_tracked_resource_baselines_balanced": true
+  },
+  "native_suite": {
+    "handle": "t1mc",
+    "actual_exit": 0,
+    "tests": 16
+  },
+  "definition": "Onlycomplete-physicsGodotauthority pump defersperiodicflush untilcurrentstep; zero-step/errorfunctionexitflush staysinsidepublicRoom.frame. Standalonepumpdefaultunchanged. No persistentcache/heap, wire/cadence/FP/acceptance changes.",
+  "latency": "Both sustained roles pass original normal, presentation, load and memory limits. Firefox authority role passes all budgets; Firefox client role has one45.920ms actualrepair8 among3968, exceeding25ms maximum (p95=8.599,p99=9.640ms). Original contract unchanged.",
+  "user_contract_question": "Pending. Original10msmaximum remains unchanged.",
+  "native_sdk": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-native-sdk-v1/report.json",
+    "sha256": "05bfd4b83a68a2360cc9244662d4a63b5ce589bbe091e799e2562fcb07b6c179"
+  },
+  "broader_net_suite": {
+    "handle": "t1md",
+    "actual_exit": 0,
+    "tests": 182
+  },
+  "live_case": null,
+  "web_counter_proof": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-counter-v1/egress-proof.json",
+    "sha256": "bc9f1b90043a7fac916dea93b5edcfac00c3fb102bb588111e5ab686514eb888"
+  },
+  "ordinary_short": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-short-v1/assessment.json",
+    "sha256": "bf145db25087dcd7808485fd1e301b82274f739ed8bbef7b652faeff0a09eb0e"
+  },
+  "final_prerequisites": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-v1/final-prerequisites.json",
+    "sha256": "aaa4c5c0116305946283625898fb9024b1e792efdbf20c0ce9d0d68c1e0b1cae"
+  },
+  "firefox_authority_sustained": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-firefox-host-v1/qualification-proof.json",
+    "sha256": "d4bc121c4af1fdd5527f3c89d5fca68c6101bc3c27902f4afd48f11f8b577d45"
+  },
+  "chrome_authority_sustained": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-chrome-host-v1/qualification-proof.json",
+    "sha256": "514324499b281da91860f71515d9fbbc38a1b1aac6b4844c9648c368de052fdb"
+  },
+  "correction_outlier": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-chrome-host-v1/client/memory-peak-inputs.json",
+    "sha256": "6dbe80ad047dadf722e772bb7f44cc15bbcde9b0a69a6627e735a39b4c6afd1a"
+  },
+  "contract_decision": "Pending user response; strict25ms original correction maximum remains in force. Normal maxima now meet10ms in both sustained roles."
+}

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Character movement, queries and joints · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Character movement, queries and joints</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/motion.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#tick-ownership-and-character-state">Tick ownership and character state</a><a href="#deterministic-queries">Deterministic queries</a><a href="#calling-from-each-framework">Calling from each framework</a><a href="#joint-families-and-identity">Joint families and identity</a><a href="#complete-recovery-and-limits">Complete recovery and limits</a><a href="#required-validation">Required validation</a></nav></details>
+<article class="reading-body "><p>P5.2 extends the shared authoring backend through separate Kit and Replay
+execution adapters. The Native matrix, pure and Native-facing Odin tests, both framework transaction
+and canonical-transfer cases, and actual Godot SDK fixture pass on the declared
+macOS reference. Exact artifacts and limits are in the
+<a href="../../../tests/box3d_motion/report.json.html">task report</a>.</p>
+<h2 id="tick-ownership-and-character-state">Tick ownership and character state<a class="heading-anchor" href="#tick-ownership-and-character-state" aria-label="Link to this section">#</a></h2>
+<p><code>Box3DCharacterMover3D</code> authors a capsule and its movement settings. It does not
+schedule physics. Extract its configuration before simulation and store the
+character position, velocity and grounded state in rollback-owned Game or Side.
+Kit and Replay call the shared mover from their existing staged tick callbacks.
+Presentation reads the published value and updates nodes afterward.</p>
+<p>Movement uses the pinned engine&#39;s capsule cast, collision-plane collection,
+plane solver and velocity clipping. Query filters and an explicit body exclusion
+apply to the same actual execution world. No Godot query, Resource lookup,
+process clock or live node reference participates in replay. Floor classification
+uses a declared up vector and slope threshold. An unsupported or exhausted
+query returns an error instead of publishing movement based on a partial set.</p>
+<h2 id="deterministic-queries">Deterministic queries<a class="heading-anchor" href="#deterministic-queries" aria-label="Link to this section">#</a></h2>
+<p>The original raw AABB and ray queries retain their documented traversal order.
+The new deterministic operations gather the complete bounded result, convert
+handles to world-independent allocation keys, and apply stable ordering and tie
+breaks before copying to the caller. Capacity is explicit. Stable allocation
+keys are valid within the recorded world history; they do not replace durable
+authored logical IDs across unrelated construction histories.</p>
+<p>Framework helpers query the unpublished staged solver. Callers copy results
+into their own value state; they never retain the borrowed execution world.
+Rejected ticks, actions and commit gates preserve both character side-state and
+the complete solver through the frameworks&#39; existing transaction machinery.</p>
+<h2 id="calling-from-each-framework">Calling from each framework<a class="heading-anchor" href="#calling-from-each-framework" aria-label="Link to this section">#</a></h2>
+<p>The shared runtime types are <code>Character_Config</code>, <code>Character_State</code> and
+<code>Character_Result</code> in <code>godot:box3d</code>. Build-time character maps supply a copied
+configuration and initial state. A mover does not create a hidden dynamic body;
+its optional self-exclusion resolves an authored body reference to a local
+allocation key during construction.</p>
+<p>Inside a Kit authored tick, use the current Side and the staged helper:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">side := kp.state(physics)
+next, error := kp.character_step(physics, movement_config, side.character)
+<span class="hljs-keyword">if</span> error != .Ok {<span class="hljs-keyword">return</span>}
+side.character = next.state</code></pre></div><p>Inside Replay&#39;s existing step callback:</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">next, error := rp.character_step(ctx.execution, movement_config, game.character)
+<span class="hljs-keyword">if</span> error != .None {<span class="hljs-keyword">return</span>}
+game.character = next.state
+<span class="hljs-keyword">if</span> rp.step(ctx.execution) != .None {<span class="hljs-keyword">return</span>}</code></pre></div><p>The callback supplies desired velocity in its rollback-owned state, including
+any game-specific gravity or jump rule. Both adapter movement helpers use the
+existing fixed 1/60 step. Kit still performs its participant solver step; Replay
+still requires exactly one ordinary <code>rp.step</code>. The mover itself only reads the
+world and returns a candidate value. Invalid movement poisons the unpublished
+transaction even if its error is ignored.</p>
+<p>Both adapters expose <code>motion_aabb</code>, <code>motion_ray</code>, <code>motion_capsule</code> and
+<code>motion_capsule_cast</code> with copied <code>Motion_Hit</code> results and a <code>Motion_Filter</code>.
+They expose <code>motion_joint_create</code> and <code>motion_joint_destroy</code> for staged commands
+using body/joint allocation keys. Replay dispatches mutations through the
+producer that owns the execution and its accounting. Read results only after
+checking status. Capacity from a read query remains an explicit sizing result;
+no partial prefix is published by the deterministic query API.</p>
+<h2 id="joint-families-and-identity">Joint families and identity<a class="heading-anchor" href="#joint-families-and-identity" aria-label="Link to this section">#</a></h2>
+<p>The named authoring surfaces map to the pinned engine as follows:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Authoring kind</th>
+<th>Native constraint</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Pin</td>
+<td>Spherical point constraint with angular features disabled</td>
+</tr>
+<tr>
+<td>Hinge</td>
+<td>Revolute</td>
+</tr>
+<tr>
+<td>Slider</td>
+<td>Prismatic</td>
+</tr>
+<tr>
+<td>Spherical</td>
+<td>Spherical with its explicit angular settings</td>
+</tr>
+<tr>
+<td>Distance</td>
+<td>Distance</td>
+</tr>
+<tr>
+<td>Motor</td>
+<td>Motor</td>
+</tr>
+<tr>
+<td>Weld</td>
+<td>Weld</td>
+</tr>
+<tr>
+<td>Wheel</td>
+<td>Wheel</td>
+</tr>
+</tbody></table>
+</div><p>Joint definitions reference explicit body keys in the same authored world.
+Their own stable keys produce durable logical IDs independent of node names,
+resource order and runtime handles. Baking validates references, rigid local
+frames, finite settings and limit relationships before native construction.
+The local runtime map contains native joint allocation keys for executing later
+operations. Neither Godot object identities nor native handles enter canonical
+Game state.</p>
+<h2 id="complete-recovery-and-limits">Complete recovery and limits<a class="heading-anchor" href="#complete-recovery-and-limits" aria-label="Link to this section">#</a></h2>
+<p>Schema 1 keeps its earlier body/shape content identity and recovery format 2.
+Use <code>scene_input_default(namespace, 2)</code> for joint/character arrays. Schema 2 uses
+the same copied asset descriptor layout with a recovery-format-3 catalog. Legacy
+primitive format 1 and authored format 2 retain their earlier readers. The new
+format carries every supported native joint union; no solver field is omitted.
+The wrapper normalizes default Distance length bounds through the engine&#39;s
+setter before publishing the key, including a disabled 0..0 range. Inverted
+native ranges remain invalid canonical data.</p>
+<p>A locally created constraint is usable in networked rollback only after the
+canonical codec covers its complete solver state. Every joint family requires
+its actual settings, impulses, prepared solver data and native graph links to
+survive validation, scratch reconstruction and exact re-encoding. Unsupported
+format versions fail explicitly; legacy recovery readers keep their declared
+contracts. No joint family may be silently omitted from a checkpoint.</p>
+<p>The existing profile still permits one joint at a time, 35 bodies/shapes,
+32 dynamic bodies, eight deduplicated geometry assets, H128 and prediction and
+ordinary repair depth eight. Tests exercise joint families separately under that
+profile. Adding authoring classes does not increase the 64 MiB tracked resource
+limit or change the dependency pin and floating-point policy.</p>
+<h2 id="required-validation">Required validation<a class="heading-anchor" href="#required-validation" aria-label="Link to this section">#</a></h2>
+<p>The task must establish Native Debug, Release and sanitizer coverage; pure
+schema/identity/reference controls; actual native Odin construction and movement;
+Kit and Replay rollback, rejected-publication and canonical recovery checks; and
+ordinary Godot import plus Resource/scene save/reload, source destruction and
+checked cleanup. Editor gizmos and export Gate C are separate tasks.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/motion.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#tick-ownership-and-character-state" class="">Tick ownership and character state</a><a href="#deterministic-queries" class="">Deterministic queries</a><a href="#calling-from-each-framework" class="">Calling from each framework</a><a href="#joint-families-and-identity" class="">Joint families and identity</a><a href="#complete-recovery-and-limits" class="">Complete recovery and limits</a><a href="#required-validation" class="">Required validation</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/motion.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Gate C authoring/export validation · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Gate C authoring/export validation</h1><div class="reader-meta"><span>4 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/gate-c.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#normal-export-preset-setup">Normal export preset setup</a><a href="#reproduced-build-limits">Reproduced build limits</a></nav></details>
+<article class="reading-body "><p>Gate C covers actual exported Host/Client runs of the same authored content
+through separate Kit and Replay adapters. A successful export and binary
+inspection are prerequisites, not runtime acceptance. Current work keeps each
+framework/target result separate in the final report.</p>
+<p>All four required cases passed. The <a href="../../../tests/box3d_gate_c/report.json.html">Gate C report</a>
+binds each normal export to its actual exported Host/Client run, raw logs,
+complete five-part bytes, remote controls, loaded Native image and measured
+cleanup. These are target120 functional checks; production hardening remains
+in Phase 6.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Required case</th>
+<th>Execution scope</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kit / macOS arm64</td>
+<td>Native arm64 SDK and Native modules; official universal Godot launcher</td>
+<td>PASS: export, inspection, exported pair</td>
+</tr>
+<tr>
+<td>Replay / macOS arm64</td>
+<td>Same architecture boundary</td>
+<td>PASS: separate export and exported pair</td>
+</tr>
+<tr>
+<td>Kit / Linux x86-64</td>
+<td>ELF64 x86-64 userspace translated by Rosetta on the available Linux arm64 VM</td>
+<td>PASS: Native matrix, export, exported pair</td>
+</tr>
+<tr>
+<td>Replay / Linux x86-64</td>
+<td>Same translated functional scope</td>
+<td>PASS: separate export and exported pair</td>
+</tr>
+</tbody></table>
+</div><p>Translated Linux execution is not native x86 hardware performance evidence.
+The universal macOS launcher is not a claim that arm64-only SDK modules support
+Intel. No cross-target deterministic equality is inferred by comparing separate
+same-build Host/Client cases. Existing simulation/profile bounds and ownership
+contracts remain unchanged.</p>
+<h2 id="normal-export-preset-setup">Normal export preset setup<a class="heading-anchor" href="#normal-export-preset-setup" aria-label="Link to this section">#</a></h2>
+<p>The two authored examples provide the same exact preset names: <code>macOS arm64</code>
+(<code>macOS</code>, Godot launcher selector <code>universal</code>, ARM64 SDK/runtime scope) and
+<code>Linux x86_64</code> (<code>Linux</code>, architecture <code>x86_64</code>).
+macOS declares minimum11.0, unique <code>org.odingodot.box3d.kitauthoring</code> and
+<code>org.odingodot.box3d.replayauthoring</code> bundle identifiers, Godot built-in ad-hoc
+signing and notarization disabled. These are local test bundles, not signed
+release/notarized/uploaded distribution. Actual bundle architecture/minimumOS and
+library loading still require inspection of the exported files.</p>
+<p>The matching official macOS template contains only the normal universal Godot
+launcher. It is exported unchanged through the ordinary exporter: no custom
+PCK/template patch or lipo thinning. The preset display name <code>macOS arm64</code>
+denotes the SDK Core/scripts/modules/shared Native consumers and actual test
+execution, which remain ARM64. Export inspection requires the launcher&#39;s actual
+architecture list to contain ARM64 and records that list, while every SDK/Native
+consumer must still be ARM64. This does not claim a universal SDK, Intel
+execution or Intel compatibility. Actual binary inspection/runtime evidence,
+not the preset label, establishes those facts.</p>
+<p>Use <code>examples/box3d_authoring_shared/prepare.py</code> in a NEW task output with the
+correct target&#39;s explicit verified shared Native library/SHA. It already copies
+<code>export_presets.cfg</code> unchanged with the ordinary project; no special staging or
+packer is added. Build the standard SDK Core/scripts/modules, import with the
+matching official Godot/templates, then invoke the normal exporter, for example:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 examples/box3d_authoring_shared/prepare.py --framework kit \
+  --out <span class="hljs-string">&quot;<span class="hljs-variable">$WORK</span>/kit&quot;</span> --native-library <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE</span>&quot;</span> --native-sha256 <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE_SHA</span>&quot;</span> \
+  --odin <span class="hljs-string">&quot;<span class="hljs-variable">$ODIN</span>&quot;</span> --godot <span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --build
+<span class="hljs-comment"># Exporter&#x27;s ordinary optimized build subprocess also needs the selected SDK/Native.</span>
+<span class="hljs-built_in">export</span> ROOT=<span class="hljs-string">&quot;<span class="hljs-variable">$SDK_ROOT</span>&quot;</span> ODIN_GODOT_ROOT=<span class="hljs-string">&quot;<span class="hljs-variable">$SDK_ROOT</span>&quot;</span> BOX3D_NATIVE_LIBRARY=<span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE</span>&quot;</span>
+<span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --headless --editor --path <span class="hljs-string">&quot;<span class="hljs-variable">$WORK</span>/kit/project&quot;</span> --quit-after 120
+<span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --headless --path <span class="hljs-string">&quot;<span class="hljs-variable">$WORK</span>/kit/project&quot;</span> \
+  --export-release <span class="hljs-string">&quot;macOS arm64&quot;</span> <span class="hljs-string">&quot;<span class="hljs-variable">$WORK</span>/exports/KitBox3DAuthoring.app&quot;</span></code></pre></div><p>Use <code>--framework replay</code>/<code>ReplayBox3DAuthoring.app</code> for Replay. Linux uses its
+verified Linux x86_64 shared <code>.so</code>, the same ordinary plugin/build flow and
+<code>--export-release &quot;Linux x86_64&quot; .../kit-box3d-authoring.x86_64</code> (or Replay).
+Do not use a macOS library in the Linux export. <code>ODIN</code> must identify the intended
+target-capable compiler; export flags/target selection belong to the ordinary SDK
+export plugin, not per-scene glue. Keep all output PCK/shared objects/modules and
+adjacent metadata together. No manual PCK or <code>ODIN_SCRIPTS_DLL</code> override is part of
+exported execution.</p>
+<p>Both presets use <code>all_resources</code> plus explicit normal <code>.odin</code>, GDScript,
+<code>.tres</code>, <code>.tscn</code>, <code>.gdextension</code>, JSON/config inclusion, so helper/module sources
+and authored resources remain available to the supported export pipeline. Native
+and module deployment remains the normal GDExtension/Odin export-plugin job;
+there is no static engine duplication. The configuration-only reader
+<code>tests/box3d_gate_c/presets/validate.py</code> checks names/arch/signing/source-inclusion
+and identical shared content, without running Godot. Its result is not an export
+or runtime pass.</p>
+<p>Root/p/q own actual platform exports, file/loader inspection and record creation.
+A record marked PASS means actual export and file inspection only; Root&#39;s
+separate exported Host/Client controller must still prove state/inputs/final ACK,
+natural cleanup and one Native image. Linux Rosetta execution is translated
+functional evidence, not native x86 performance or cross-target determinism.
+Final Gate C classification and its report remain Root-owned.</p>
+<h2 id="reproduced-build-limits">Reproduced build limits<a class="heading-anchor" href="#reproduced-build-limits" aria-label="Link to this section">#</a></h2>
+<p>The original Linux task container reached its 1536 MiB limit and recorded two
+OOM kills while Godot invoked Odin during export. One compiler thread alone did
+not resolve the failed exports. The passing setup used a 6144 MiB VM, a 4096 MiB
+task container and export-only <code>SCRIPT_BUILD_FLAGS=-thread-count:1</code>, retaining
+the normal <code>-o:speed</code> optimization. SDK and product memory limits were unchanged.
+Godot can return exit0 after reporting a failed script compilation, so the
+Linux harness also rejects error and leak messages in import/export logs.</p>
+<p>The first Linux CTest supervisor stopped collecting a zombie test process.
+That attempt is retained as incomplete supervision, without a product verdict.
+The replacement queried the actual CTest registration and ran every registered
+command with the same arguments, working directory, properties and dependency
+order, using file logs and direct waits. All 12 commands passed in Debug and
+Release, including another complete run after the memory change. These records
+explicitly say <code>actual_ctest_run_pass:false</code>. The SDK profile verifies their
+source/binary identity, registration and logs rather than inventing a CTest PASS.</p>
+<p>The report preserves failed attempts and the controlled VM resource change.
+Only two idle containers belonging to this goal were stopped and restored;
+user container states and the default connection were preserved. The recorded
+rollback is for safe goal cleanup after checking for newly active user work.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/gate-c.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#normal-export-preset-setup" class="">Normal export preset setup</a><a href="#reproduced-build-limits" class="">Reproduced build limits</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/gate-c.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

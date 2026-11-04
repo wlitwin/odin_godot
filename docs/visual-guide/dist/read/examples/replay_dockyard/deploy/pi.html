@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Existing Pi deployment · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Existing Pi deployment</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_dockyard/deploy/pi.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#reproduce-the-service-build">Reproduce the service build</a><a href="#state-and-credentials">State and credentials</a><a href="#acceptance-scope">Acceptance scope</a></nav></details>
+<article class="reading-body "><p>The selected host is the existing NixOS Pi at <code>10.0.0.10</code>, reached as <code>pi</code> over
+SSH port82. Deployment changes belong in <code>~/data/code/pi-nix</code>. Its existing
+GameServers and Coturn services remain the shared infrastructure.</p>
+<p>The deployed gateway preserves <code>wss://mc.laserturtle.net:62127/rtc</code> and forwards
+legacy paths to GameServers.Signal on literal loopback port62129. The exact
+<code>/replay-room/dockyard</code> path forwards to the existing Odin/Godot Replay Room
+implementation on loopback49740. Nginx terminates TLS with the existing ACME
+certificate. The Elixir <code>SIGNAL_LOCAL_PROXY=1</code> option explicitly binds its
+private listener to loopback; the ordinary direct-TLS default is retained.
+No new authority protocol implementation or router port is required.</p>
+<p>The deployment and current same-network acceptance are recorded in
+<code>tests/replay_dockyard/online/public-deployment-report.json</code>. Actual public WSS,
+authenticated forced TURN, full state/acknowledgement/cleanup, observer and
+reconnect checks passed. A STUN-only attempt did not establish direct gameplay
+on the reference network; its diagnostics remain separate. Outside-network
+acceptance and human co-op feedback are still required.</p>
+<h2 id="reproduce-the-service-build">Reproduce the service build<a class="heading-anchor" href="#reproduce-the-service-build" aria-label="Link to this section">#</a></h2>
+<p>Use the deployment helper to snapshot current intended working sources into a
+new persistent directory outside the repository. It verifies the pinned engine
+archive, records every selected source hash and refuses overwriting a snapshot.
+The snapshot retains the existing compiler/nixpkgs lock and uses the exact
+Godot4.7.1 Linux ARM64 archive. A service build does not rebuild the client game.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 examples/replay_dockyard/deploy/stage_room_source.py \
+  --engine-archive /ABSOLUTE/VERIFIED/CACHE/box3d.tar \
+  --out /PERSISTENT/NEW/SERVICE/SOURCE</code></pre></div><p>Point the <code>replay-room</code> input in pi-nix at that snapshot, then update only the
+changed inputs. Build on the Pi through its remote Nix store, with bounded
+parallelism, so the unrelated user VM is not used:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">cd</span> ~/data/code/pi-nix
+nix flake update game-servers replay-room
+NIX_SSHOPTS=<span class="hljs-string">&#x27;-p 82 -o BatchMode=yes -o StrictHostKeyChecking=yes&#x27;</span> \
+  nix build .#nixosConfigurations.pi.config.system.build.toplevel \
+  --store ssh-ng://pi@10.0.0.10 --eval-store auto --builders <span class="hljs-string">&#x27;&#x27;</span> \
+  --max-jobs 1 --cores 1 --no-link --print-out-paths -L</code></pre></div><p>Check the actual native build, private service startup, authenticated Room flow,
+complete-state agreement and shutdown before activation. The existing deploy-rs
+workflow supports a remote build and automatic rollback:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh"><span class="hljs-built_in">cd</span> ~/data/code/pi-nix
+nix run github:serokell/deploy-rs -- .#pi --remote-build</code></pre></div><p>The coordinated switch restarts the legacy signal listener and nginx; existing
+connections can reconnect. Verify both protocol paths afterward. Nginx starts
+after both private backends and does not race a reload against the previous
+public62127 listener.</p>
+<h2 id="state-and-credentials">State and credentials<a class="heading-anchor" href="#state-and-credentials" aria-label="Link to this section">#</a></h2>
+<p><code>dockyard-room.service</code> uses private state and runtime directories. It runs a
+writable private copy of the frozen SDK project because initial module loading
+creates owned reload copies. The database remains under its state directory.
+Initial database creation is explicit; if it disappears after initialization,
+the service refuses to replace it silently. Recover the database as an operator.</p>
+<p>Systemd supplies Coturn&#39;s existing server-only signing secret with
+<code>LoadCredential</code>; it never enters a Nix derivation, client checkpoint, URL or log.
+Room issues and refreshes authenticated member credentials with a600-second TTL.
+The game content/cohort must match the selected frozen browser artifact.</p>
+<h2 id="acceptance-scope">Acceptance scope<a class="heading-anchor" href="#acceptance-scope" aria-label="Link to this section">#</a></h2>
+<p>A check from this home&#39;s public address back into the same router is hairpin
+traffic. Record that separately from a genuinely outside-network client.
+Performance qualification remains on the declared M3/browser profile; building
+a control service for Linux ARM64 does not admit native physics crossplay or
+inherit that performance result. Human cooperative play feedback is separate.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_dockyard/deploy/pi.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#reproduce-the-service-build" class="">Reproduce the service build</a><a href="#state-and-credentials" class="">State and credentials</a><a href="#acceptance-scope" class="">Acceptance scope</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_dockyard/deploy/pi.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

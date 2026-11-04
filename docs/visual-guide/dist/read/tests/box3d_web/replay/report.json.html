@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>report.json · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>report.json</h1><div class="reader-meta"><span>413 lines · JSON</span><span>Odin × Godot</span><a href="../../../../reference/tests/box3d_web/replay/report.json" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;version&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;task&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;W3&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;whole_goal_complete&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;evidence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;browser_pair&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/browser-pair-v7/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d2366833ef3e975bf4f0e01e364058d58e98dd7102baee9c195ea6541aa309d9&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;browser_export_binding&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/browser-pair-v7/export-binding.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ba943751f8badbfdd106f2412d4c147102f04dc9c28d62b201addc95c3a97866&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ordinary_export&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/game-export-v7/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a33a6e8cfa82552c88d79dced681ac873fe582512720a33bf7602e5c7e9ecfcc&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_game&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/native-game-pair-v2/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;baea53c20c648b90f1f43694a845346985b98794b01cadb58bbadd0d6b178fec&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_callbacks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/native-callbacks-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e51b098b3cc1833bbf8bf849a2acce6cbc4b69e076f6d0d8366da9d33fd6073b&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit_browser&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/kit-compat-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;79cea61548674f2434019795a80164f75e3cbc7d1211606dab29a039cb47e977&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay_browser_window&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/recovery-window-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3b88d251ec02df82363349bc33e6ac85a4e7b9a1266a1e1ed01a2b02240fa4df&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_free_browser&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/native-free-browser-v1/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;70e3104e5572b63130b6c1ec187b5cd8308ce0a2f435dfb4133a2aa19541e8ef&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_free_export&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W3/native-free-export-v3/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6c0ec1e92ffc7228f5a0b09edef00211cd8c7504e7b069ff2bdba1179d02b768&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;sources&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;build/box3d_web_bridge.c&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;58a0fa7524c3870fdf826e0bd80fabce9142dff37cf6ad07b7cddec8e71b24b7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/box3d_native_web.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fc8aac790f0120b4260b8d55f2bc42253c7bb155970001d222b213aea15ef367&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/language.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2559edce399cc3a3eb8f059f6cdeb51018a2a16f9a90b35419258882f6d20077&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/main.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;f7a75e1aaae246783441e91804339afa9ab5d7032daa2bf665baf09039f2d284&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/managed_callable_common.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5d431359ba6ab6973c61c8db1768e98efa420c685a569fa18272f18f63a17210&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/managed_callable_native.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;05eb4b9354124e85834edb82bc8b6bf6e5a3781ae07fa6e0fab1b3ef1c351991&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;core/managed_callable_web.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8f60481de0ae2816e40f31f32ba632d9f2ea87cdb9d4bf440624311d5b4faba5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8326e0f4aaae1671d2043f281da3897b6e8bb86ec0ffeac5c474d1ccabc860a0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/barge.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;395aabfa2687079bfffeafe874f6be586f3a5f591e2b8d5e296c15a3f15b1a7d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/cargo.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;30b635500485ffc2e18d0f239972f62e2080d45112fad146e923d6d5557ff9c5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/crane.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ce786c218bc1d10791312c32cb915dd25f208f86221baa256918642272d02f95&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/delivery.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8de9737d7ddfaebf072eaf8d18ab2d66dc888b1b24bab2fd08e2181a3e8d24b0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/ground.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;359e3efdcaf32a8463a358118a78788c355c4ac4f652ca84d16d129181c25e2d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/hinge.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;94505474e38cb1262d79433c4195e43de0ca258652817a7abe81094495514d48&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/long.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;08b15b84e9fbd39bf78bf016a5381f13c32510c02f20fd6c9bd85f0db610b296&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/rail.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d221eee588217476bf650759f9bcc754ab175f79e95cf009269a3cb0b9b46db0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/robot.tres&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9b3b6a6ac44a2be408c76f7fc754126441d7f4fc84921c182b4c8a7cbd5cd7b8&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/content/world.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d0dffd4642a15d48a099fc09a21f84d0fb863269dc4d26ca4202384998bfc3f3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/export_presets.cfg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;23f2b56d5f3db7cf10abf49678108bc5c1dc8e83f4dda17cd675f2e45d782ae4&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/launch.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3468e7e253e26b1799151323ea8d016d97b644513b85cae7e967a86e6f39481b&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/main.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;60f6a53c31b6dce7362322a6abef9196abccd992456fccc46ff7dd947874ced6&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/accepted_audit/cursor.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/demo.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b2e29cb264e12f384f84ece00cd2ac80da315d53f92491b0d7d635bc1ba034fc&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/evidence.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6445f06ca305d3f5c4cc546667a79298a993f28b822c013422099fe7b8e412f4&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/images_darwin.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;cebcb16a3f849bfc7b487bd6f15dda47dcb59952c65f6475b5e3bf30fc4a32c1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/images_linux.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;950c7f4e4c58d4c6fbfd43f308d10058e17e820f57f0e4e9badaa6b73f10e6bb&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/launch.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;85ade1dcd08f7e6f890f384298d6c20231c9a9817f238442e26dca6d6ed6d1e9&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/model.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4387fa27a72e33aeef2119a52b1f17569cf6372ddbb15b936a41a459c8f0b7fc&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/process.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9c42edf9186ff79c5eba590af743375d3ad3cdeb8fe980c132b17cbb4d5b1a19&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/startup.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;450fe0aa07b00f81e8ba20e57b437e8f339a79d3324139c092b32d90376aa652&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/telemetry.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8c17c35ee97eddb2a82174f99ad5356085b09bd2a7444bbc2d7ab4358b44c4f1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/modules/dockyard/terminal.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;018196551b3204363c4083e00bb92aad8cc243ac6b7dff58b03cf93392f66f5e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/odin_godot.gdextension&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;88652da1a68a6f8d43fb6e0463a8451cec3f788d76bf59d304d15fc46cb28f18&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/prepare.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7fca36d9ec256bdf76b1c07ccdebd61023eaef9957b45d75fa1e9c5997e11194&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/project.godot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2a568099866ec178db77b8b72186cb753126dc92abb93490a04ff4caafae9e24&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/scripts/boot.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8bb924f7cd50f1fa7a00b972d646ee5171c61ab47faf2b77ad6f8ba49b9a7bce&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;examples/replay_dockyard/view.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4faef6aa50e3ebdbb019129536d98009ee4f4e673d462d8b1459442e6a327e97&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/godot/session.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c11608e94721ef760b8e7bedc16b06d4a817a2f2df237348cb9e5b6cd255bc82&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/godot/transport/rtc.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b5a1a0951e6a32a6dbf73049b67893c51ac072217ffb8dfcb4ec197b75385dd0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/godot/transport/rtc_owned.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2e0538782ccd09e0fdf67128c645cfd2fd41af9696ada651d3bfc1347378d26d&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/godot/transport/rtc_signal.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;656773419abedb04ab289e5187ed4d20757a900cf1b4367e9ef37b9eb1c33cca&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2e948e5957709f594cff055cfe438bea804823e9992f1054987b543fe5f6b3ac&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/drive.mjs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;eac1c1bb1c7c17e998aef5506f03688e46bbc3527eaaba9c8b037f4a7724b9f1&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/export_presets.cfg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0bf4bef7ca4466768dc845e6a055d0aa6858a2391a78ae5bb48d57795e95bea2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/main.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d7b51e1ce7106e5805934adf03c9d8ab3d71e8c7606dc22a1b217b0e382861ee&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/main.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9fe8c5b9a04679e92001bb10609734e9e77189e3f40424a64b705aab5603950f&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/modules/kit_probe/probe.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3ad905b48d30c73bef3e92669862c08b19f4171736cd7c43a8ca726f2cf37fa6&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/odin_godot.gdextension&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1c5c2d08a0c8d6404b9149d779805bd30ce8792a553e92d96a6a152d36787446&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/project.godot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b64d0b5b49b651a9e8e3c0e2a29e1991a60e98338983385613d0ef21cfa1d97e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/project/scripts/boot.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a9bc0434886bc1f450d0c49275ab6db1a16a5511e7b5a6abc554549efbb3ddb2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/kit/run.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;50a89d66e0d8cb9d5c567ba1e91043642bfe85ce99e1c0d1cdb3eee2ba66fbe6&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;de0c66f42414d8448f8d84228068381858f01de3759295a285e043e731be9166&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/browser.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;43831fbf56d5ffd8168a1cfd559bb53ea553254f653b69eeecba7c4e49aa8729&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/drive.mjs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;adb99fcca84c719b3e40a9f4d5f719015d43071657fb6fe2a4f432e1f5dc1393&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/export.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2726908205e5da83e32ee6dfac1fc555afea9cbbeec25e2682fbb3e818f9ab38&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;90df6e8adc34c8dcf8d2ff8b18d3ee3bac38c8ed917bfde2ed6e5fc6839abf67&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/export_presets.cfg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0bf4bef7ca4466768dc845e6a055d0aa6858a2391a78ae5bb48d57795e95bea2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/main.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;f513331f9141dc2ea1eacbda2f8cba671bb46b605f2a65a692e638b679b9a589&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/main.tscn&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;93215056ac75ec6a32dc4aa12a968b38dca2ec72b927beba99d17e38f36201a0&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/modules/window_probe/probe.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;08bc6d2aebda9861bc605b26776f10d209149e9931b2bbb184044a40047fc044&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/odin_godot.gdextension&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1c5c2d08a0c8d6404b9149d779805bd30ce8792a553e92d96a6a152d36787446&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/project.godot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b64d0b5b49b651a9e8e3c0e2a29e1991a60e98338983385613d0ef21cfa1d97e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_web/replay/recovery_project/scripts/boot.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a9bc0434886bc1f450d0c49275ab6db1a16a5511e7b5a6abc554549efbb3ddb2&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;browser_pair&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;same_wasm_cohort&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;processes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;browser&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Chrome/156.0.8078.80&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">120</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;rendering&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3D disabled functional software-GL&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;chrome_local_ip_flag&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;host_nonzero_by_seat&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-number">119</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-number">113</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;all_five_parts_byte_equal&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_terminal_ack_both&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_engine_shutdown_both&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;network&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;host&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;host&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;compact_observations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;observation_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_samples&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_wall_us&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_max_us&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_max_depth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;profile_errors&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_histogram&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rx_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">136</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;tx_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">155</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rx_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">21202</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;tx_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">860140</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duplicate_actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;held_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">6</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fenced_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;corrections&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replayed_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;resyncs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;stalls&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;reused_correction_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_catchups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;watch_catchups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;timing_samples&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;timing_rejected&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;lead_updates&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;full_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;delta_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;baseline_misses&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_acks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;egress_deferred&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;large_reliable_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;lz4_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffled_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffle_attempts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffle_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;redundant_facts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;redundant_fact_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;compact_recent_facts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;recent_fact_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_requests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repairs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_oversize&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_batches&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copies&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_oversize&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fragmented_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_sent&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_received&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_expired&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_sent&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_received&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_shards_recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_replica_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;filtered_events&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;expired_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;action_outcomes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;action_applied&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;accepted_actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;boost_fx&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;issued_sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;boosts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;repair_available&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;repair_profile_limit&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;last_planned_depth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;last_executed_steps&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;client&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;role&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;client&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;stats&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+          <span class="hljs-attr">&quot;compact_observations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;observation_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_samples&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_wall_us&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_max_us&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_max_depth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;profile_errors&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replay_histogram&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0</span>
+          <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rx_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">155</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;tx_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">138</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rx_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">860140</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;tx_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">21394</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;duplicate_actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;held_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fenced_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;corrections&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">52</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;replayed_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">260</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;resyncs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;stalls&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">4</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;reused_correction_ticks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_catchups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;watch_catchups&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;timing_samples&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">16</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;timing_rejected&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;lead_updates&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;full_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;delta_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;baseline_misses&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_acks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;egress_deferred&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;large_reliable_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;lz4_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffled_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffle_attempts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;shuffle_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;redundant_facts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;redundant_fact_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;compact_recent_facts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;recent_fact_bytes_saved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_requests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repairs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fact_repair_oversize&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_batches&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copies&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;action_copy_oversize&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;fragmented_snapshots&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_sent&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_received&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parts_expired&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_sent&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_received&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_parity_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;snapshot_shards_recovered&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_replica_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;filtered_events&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;rejected_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;expired_views&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span>
+        <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;action_outcomes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;action_applied&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;accepted_actions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+          <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-number">1</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;boost_fx&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;issued_sequence&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;boosts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;repair_available&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;repair_profile_limit&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;last_planned_depth&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;last_executed_steps&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;cleanup&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;host&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;wrapper&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;meter&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;observed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+      <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;client&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;wrapper&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;meter&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;owners_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">&quot;observed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+      <span class="hljs-punctuation">}</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;canonical_history_loss&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;baseline_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">160</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;baseline_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;confirmed&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">160</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;discarded_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">109620</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;discarded_packets&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">129</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;gap&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">159</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;generation_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;generation_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;notice&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ok&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;owners_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;owners_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;part_bytes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-number">3091</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-number">16</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-number">4</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-number">4</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;resyncs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;serial_after&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;serial_before&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_free&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;wrapper&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;transport&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;public Memory, receiver discard inside actual browser Core/Meter/Replay; distinct from WebRTC loss&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;architecture&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;backend&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;one selected C backend linked into each existing Core/game AOT extension&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;rtc&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;existing Replay Rtc + Session/complete codec/Timeline; existing relay carries only signalling&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ownership&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual Meter-backed configuration/container/allocator/callback contexts; existing Core-managed Callable/Capsule API, real pthread metadata mutex, off-thread free never invokes producer&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual Native managed-callable reload/decline/reentrancy suite PASS and current native ENet game pair PASS&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;separate actual Kit provider/World2/complete-codec source-free fixture; no second game&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;retained_failures&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;browser-pair-v1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;missed ENet-only connect guard before simulation; corrected for owned RTC&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;browser-pair-v2_v3&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;actual managed SDP/ICE callbacks but default headless mDNS candidate discovery did not connect; local harness flag is explicit, default-browser connectivity still unqualified&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;browser-pair-v4&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;rendered software-GL ran at low frame cadence and authority committed zero remote nonzero controls; startup evidence any field also failed encoding, so no multiplayer PASS&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;game-export-v4&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;local syntax typo in typed JSON evidence declaration, corrected without simulation change&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit-compat-v1&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;local fixture omitted Session send callback; actual native diagnostic confirmed nil send; explicit local sink added&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit-compat-v2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;adapter passed, immediate shutdown raced Web template AudioWorklet initialization; normal engine frames added before synchronous case&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native-free-export-v1_v2&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fixture staging/dependency failures; no product verdict, old prepared source files absent and boot leaf name incorrect; v3 stages original repository arithmetic source&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;limits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;Chrome functional localhost only at this stage; 3D drawing disabled and local-IP flag declared. No default-browser/Internet/TURN admission.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Canonical H128 proof uses actual public Memory receiver discard, not a claim about lost SCTP reliable packets.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Native Replay RTC requires its separate native WebRTC extension; this card preserves and tests native ENet.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Stats.replay_max_depth is legacy timing telemetry and remains0 here; actual latest successful physics repair is reported separately with the live profile limit8. This is not a maximum-duration or rendering-budget result.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Only current same-Wasm browser cohort; native/browser and differing-target deterministic cross-play are not admitted.&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Full timed rounds, room security/rejoin/observers, foreground performance, long final cohort and deployment are subsequent cards.&quot;</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/box3d_web/replay/report.json · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/tests/box3d_web/replay/report.json" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

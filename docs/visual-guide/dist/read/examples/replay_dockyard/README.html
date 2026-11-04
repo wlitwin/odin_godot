@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Dockyard Duo · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../replay_scrapyard/code-guide.html">Code guide</a><a href="../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Dockyard Duo</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/examples/replay_dockyard/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#run-a-prepared-candidate">Run a prepared candidate</a><a href="#play">Play</a><a href="#build-from-source">Build from source</a><a href="#create-an-itchio-zip-or-upload-with-butler">Create an itch.io ZIP or upload with Butler</a><a href="#code-and-evidence">Code and evidence</a></nav></details>
+<article class="reading-body "><p>Two salvage robots haul awkward cargo onto an escape barge. Odin owns the game
+rules, Replay owns prediction/recovery, Box3D owns physics, and Godot owns
+editor authoring and presentation.</p>
+<p><strong>Unreleased review candidate.</strong> Actual native/browser multiplayer, full state,
+recovery, rendered play and audio work in the recorded local cases. Both final
+610-second browser arrangements meet the original normal-frame limits. Firefox
+had one 45.92 ms eight-step correction against a 25 ms maximum; qualification remains
+rejected. The public Room service is deployed and passed relay/recovery checks
+from the reference network. Independent off-network acceptance and two-human
+co-op feedback remain open.
+See the <a href="../../tests/replay_dockyard/online/current-handoff-status.json.html">current build status</a>
+and <a href="../../docs/design/box3d/showcase-candidate.html">handoff</a>.
+The newer <a href="../../tests/replay_dockyard/online/invite-usability-report.json.html">invite usability update</a>
+adds short room codes and browser-native copy/paste. Its two-player and native
+checks pass; the public spectator terminal audit remains unresolved. The earlier
+performance measurements have not been rebound to this newer artifact.</p>
+<h2 id="run-a-prepared-candidate">Run a prepared candidate<a class="heading-anchor" href="#run-a-prepared-candidate" aria-label="Link to this section">#</a></h2>
+<p>Use Godot 4.7.1. The included Native SDK project is macOS ARM64, requiring at least
+macOS 14.0. It is not a signed app or universal SDK. From the candidate directory,
+open separate terminals:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 native-macos-arm64/launch.py host --project native-macos-arm64 --godot /PATH/TO/GODOT
+python3 native-macos-arm64/launch.py client --project native-macos-arm64 --godot /PATH/TO/GODOT</code></pre></div><p><code>practice</code> opens one mint-robot window. A compatible native client on another
+machine can use <code>--address HOST_LAN_IP</code>; both roles use port49791 by default,
+changed with <code>--port</code>. Native/Web crossplay remains unqualified.</p>
+<p>For browser files, run <code>python3 serve-web.py --port 8080</code> from the candidate.
+Open the served page with a compatible room service:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">http://127.0.0.1:8080/index.html?service=ENCODED_COMPATIBLE_WSS_URL&amp;relay=1</code></pre></div><p>The local file server supplies the required isolation headers. A room service
+and TURN relay are separate processes; the package includes operator templates
+and no credentials. Public hosting requires HTTPS/WSS, those headers and actual
+remote connectivity checks. See <a href="deploy/README.html">deployment configuration</a>.
+The deployed review Room endpoint is
+<code>wss://mc.laserturtle.net:62127/replay-room/dockyard</code>; use <code>relay=1</code> for its
+authenticated TURN provider. The package README includes the encoded launch URL.
+Choose a name and <strong>Host</strong> or <strong>Join</strong>, sharing the five-character room code.
+The host&#39;s copy button displays the code so a crewmate can also type it directly.
+On Web, clicking the code field opens a native browser text field: paste with
+Cmd/Ctrl+V and choose <strong>Use code</strong>, then <strong>Join</strong>. The copy dialog uses a native
+<strong>Copy code</strong> button and also supports Cmd/Ctrl+C. This works inside itch&#39;s iframe
+without clipboard-read permission. Older complete invitation tickets are still
+accepted. Separate browser profiles have separate stored identities.
+<strong>Recent Crew</strong> reuses membership. <strong>Watch</strong> uses the same short code to enroll a
+receive-only observer through its separate invitation.</p>
+<h2 id="play">Play<a class="heading-anchor" href="#play" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WASD / arrows</td>
+<td>Drive relative to the camera</td>
+</tr>
+<tr>
+<td>Aim and hold left mouse</td>
+<td>Pull eligible cargo within reach</td>
+</tr>
+<tr>
+<td>Space</td>
+<td>Acknowledged boost action with cooldown</td>
+</tr>
+<tr>
+<td>1 / 2 / 3</td>
+<td>Select a load for aim height; hold to aim directly at it</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>Local sound, camera distance and reduced-effects settings</td>
+</tr>
+<tr>
+<td>Escape</td>
+<td>Crew / leave menu while the shared job continues</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>Actual session diagnostics</td>
+</tr>
+</tbody></table>
+</div><p>Mint is player1; coral is player2. Pull together up the ramp and match each load
+to its bay. Release the magnet and allow two seconds to latch. The long load
+benefits from both players. Robots recover after a fall; lost cargo reduces the
+payout. Jobs have a150-second deadline, three loads and payouts. At results the
+host can retry or select the next of three arrangements through a Replay action.</p>
+<p>Host loss or expired hosting permission ends the job and offers <strong>Start a New
+Crew</strong> after closing the old runtime. Seamless takeover and full-match replay
+are outside this candidate. See <a href="../../tests/replay_dockyard/recovery/README.html">recovery evidence</a>.</p>
+<h2 id="build-from-source">Build from source<a class="heading-anchor" href="#build-from-source" aria-label="Link to this section">#</a></h2>
+<p>Enter <code>nix develop</code> at the repository root and use new cache/output directories.
+The backend pins Box3D 33626332 from2026-10-28. The driver verifies the complete
+source/archive and the small shim adaptation.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_box3d.sh Release /tmp/dockyard-native
+python3 examples/replay_dockyard/prepare.py \
+  --out /tmp/dockyard-build \
+  --native-library /tmp/dockyard-native/build/Release/libogb3.dylib \
+  --sqlite-library <span class="hljs-string">&quot;<span class="hljs-subst">$(pkg-config --variable=libdir sqlite3)</span>/libsqlite3.a&quot;</span> --build
+python3 examples/replay_dockyard/launch.py host --project /tmp/dockyard-build/project
+python3 examples/replay_dockyard/launch.py client --project /tmp/dockyard-build/project</code></pre></div><p>The static SQLite input preserves strict Native dependency admission.
+<code>REPLAY_SQLITE_LIBRARY</code> supplies the same option. Browsers use IndexedDB.
+Other native targets need their own backend builds and runtime checks; the
+candidate relocation proof covers macOS ARM64.</p>
+<p>For Web, build the SIMD archive and use its printed absolute path:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/build_box3d.sh WebSIMD /tmp/dockyard-web
+python3 build/web_rtc_template.py derive \
+  --<span class="hljs-built_in">source</span> <span class="hljs-string">&quot;<span class="hljs-variable">$HOME</span>/Library/Application Support/Godot/export_templates/4.7.1.stable/web_dlink_release.zip&quot;</span> \
+  --out /tmp/dockyard-rtc-template
+REPLAY_SQLITE_LIBRARY=<span class="hljs-string">&quot;<span class="hljs-subst">$(pkg-config --variable=libdir sqlite3)</span>/libsqlite3.a&quot;</span> \
+BINARYEN_CORES=1 python3 -B tests/box3d_web/replay/export.py \
+  --out /tmp/dockyard-export \
+  --native-library /tmp/dockyard-native/build/Release/libogb3.dylib \
+  --web-archive /ABSOLUTE/PRINTED/PATH/libogb3.a \
+  --odin <span class="hljs-string">&quot;<span class="hljs-subst">$(command -v odin)</span>&quot;</span> --godot <span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --emcc <span class="hljs-string">&quot;<span class="hljs-subst">$(command -v emcc)</span>&quot;</span> \
+  --web-template-record /tmp/dockyard-rtc-template/template-record.json</code></pre></div><p>This uses the normal SDK/import/Godot exporter. <code>BINARYEN_CORES=1</code> is the controlled
+optimizer setting used after a retained parallel optimizer crash. It changes no
+simulation worker, assertion or floating-point policy. The <a href="../../tests/box3d_web/replay/README.html">browser checks</a>
+exercise separate actual clients. Serve one identical artifact to the browser
+cohort; native/Web crossplay remains unqualified. The pinned custom template
+changes only the RTC send-copy function in Godot&#39;s JavaScript. Its record and
+reproduction helper accompany the review package; both official engine Wasm
+payloads stay byte-identical.</p>
+<p>After checking those exact runtime bytes, create a review package. The runtime
+record supplies the compatible room cohort:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 examples/replay_dockyard/package.py collect \
+  --export-record /ABSOLUTE/EXPORT/report.json \
+  --runtime-report /ABSOLUTE/RUNTIME/report.json \
+  --qualification-report tests/replay_dockyard/online/current-handoff-status.json \
+  --include-native-sdk --out /tmp/dockyard-candidate
+python3 examples/replay_dockyard/package.py verify --package /tmp/dockyard-candidate</code></pre></div><p>Packaging starts no compiler, game or external deployment. It verifies ordinary
+export bytes, fills the operator cohort from the matching runtime, and retains
+qualification rejection. It excludes fixture bridges, profiles, private databases,
+credentials and private keys. Editing the frozen Native project needs the source
+SDK/tools and a fresh build.</p>
+<p>To include Godot&#39;s compiled license notices, extract them from the installed
+engine with <a href="../../tests/replay_dockyard/package/engine_notices.gd.html">engine_notices.gd</a>
+and pass that output directory as <code>--godot-notices</code> to <code>collect</code>. The extractor
+records its actual engine version; compiled module inventories can vary by target.</p>
+<h2 id="create-an-itchio-zip-or-upload-with-butler">Create an itch.io ZIP or upload with Butler<a class="heading-anchor" href="#create-an-itchio-zip-or-upload-with-butler" aria-label="Link to this section">#</a></h2>
+<p>From the repository root, point the publishing script at a prepared candidate
+(the directory containing <code>manifest.json</code>, <code>web/</code> and <code>qa/</code>, or its review
+<code>.tar.gz</code> archive):</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash examples/replay_dockyard/publish.sh --package /PATH/TO/dockyard-candidate
+<span class="hljs-comment"># Or: --package /PATH/TO/Dockyard-Duo-review-public-room-macos-arm64-web.tar.gz</span></code></pre></div><p>The command prints the ZIP path under <code>examples/replay_dockyard/out/itch-BUILD_ID/</code>.
+It puts <code>index.html</code> at the archive root, includes the licenses and QA status,
+and configures the deployed Room endpoint from the candidate&#39;s QA record with
+authenticated TURN enabled. Players can launch without adding URL parameters.
+<code>--service-url wss://HOST/PATH</code> selects another compatible deployment.
+The script changes the copied HTML launch defaults; engine JavaScript, Wasm and
+game PCK bytes retain their candidate hashes. The original candidate is preserved.
+An identical repeat verifies and reuses the output. <code>--out /NEW/DIRECTORY</code> selects
+another location. This packages an existing build; source changes require a fresh
+export and candidate through the commands above.</p>
+<p>Upload the printed ZIP on an itch.io <strong>HTML</strong> project, mark it <strong>playable in the
+browser</strong>, and enable <strong>SharedArrayBuffer support</strong> in its embed settings. Choose
+a 1280×720 viewport or fullscreen launch. See the
+<a href="https://itch.io/docs/creators/html5" rel="noreferrer">itch.io HTML5 upload guide</a>.
+For a local preview, serve the printed <code>web/</code> directory with isolation headers:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">bash build/serve.sh /PATH/TO/itch-BUILD_ID/web 8080
+<span class="hljs-comment"># Open http://127.0.0.1:8080/</span></code></pre></div><p>For an upload workflow similar to Scrapyard&#39;s standalone <code>publish.sh</code>, log in
+once and add an explicit destination:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix run nixpkgs#butler -- login
+bash examples/replay_dockyard/publish.sh \
+  --package /PATH/TO/dockyard-candidate --push YOUR_ACCOUNT/YOUR_GAME</code></pre></div><p>The script uses Butler on <code>PATH</code>, falling back to <code>nix run nixpkgs#butler</code>, and
+uploads the same unpacked ZIP contents to <code>html5</code>. <code>--channel</code> and <code>--version</code>
+override those defaults. The upload does not create the itch project or configure
+its embed options; set those once on the edit page. See the
+<a href="https://itch.io/docs/butler/pushing.html" rel="noreferrer">Butler upload guide</a>.
+The existing open qualification and playtest gates stay recorded in the ZIP.</p>
+<h2 id="code-and-evidence">Code and evidence<a class="heading-anchor" href="#code-and-evidence" aria-label="Link to this section">#</a></h2>
+<p>The scene has19 bodies/shapes, eight geometries and one hinge, within the35-body/
+shape, one-joint and64MiB admission profile. Magnets use Native ray hits, point
+impulses and damping. Godot meshes/effects add no physics bodies. Loading draws
+visual variants before enrollment; tethers/confetti share one opaque material
+style. Web voices use stream playback through suspend/resume. Confirmed
+<code>Cue_Route</code> changes drive a bounded sound/effect FIFO once.</p>
+<p>The checked flat C body-type addition preserves ABI1/POD layouts and requires
+current rebuilt libraries. Kit and Replay share the reusable backend.
+See <a href="CONTRIBUTING.html">the contributor tour</a>, <a href="../../tests/replay_dockyard/rounds/README.html">round checks</a>,
+<a href="../../tests/replay_dockyard/presentation/README.html">presentation checks</a>,
+<a href="../../tests/replay_dockyard/qualification/README.html">qualification</a> and
+<a href="../../tests/replay_dockyard/package/README.html">packaging checks</a>.
+Earlier reports retain their original build/hardware scopes. Automation,
+screenshots and nonzero audio signal do not supply human co-op feedback.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../docs/design/box3d/showcase-candidate.html"><span>Dockyard Duo review handoff</span><span aria-hidden="true">→</span></a><a href="deploy/README.html"><span>Dockyard service configuration</span><span aria-hidden="true">→</span></a><a href="../../tests/replay_dockyard/recovery/README.html"><span>Dockyard lifecycle checks</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_dockyard/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#run-a-prepared-candidate" class="">Run a prepared candidate</a><a href="#play" class="">Play</a><a href="#build-from-source" class="">Build from source</a><a href="#create-an-itchio-zip-or-upload-with-butler" class="">Create an itch.io ZIP or upload with Butler</a><a href="#code-and-evidence" class="">Code and evidence</a></nav><div class="outline-actions"><a href="../../../reference/examples/replay_dockyard/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

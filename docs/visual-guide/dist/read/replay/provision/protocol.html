@@ -47,6 +47,15 @@ bound handshakes, connections, ingress and buffers. These limits do not replace
 account authorization, per-user creation quotas or room retirement. Rooms remain
 resident for the hub&#39;s lifetime and persist across restarts.</p>
 <h2 id="wire-and-retry-contract">Wire and retry contract<a class="heading-anchor" href="#wire-and-retry-contract" aria-label="Link to this section">#</a></h2>
+<p>The optional human-entered <strong>short room code v1</strong> is a client-side recipe using
+this existing protocol. <code>short_code</code> maps a random creator claim and content ID
+to five characters from <code>ABCDEFGHJKLMNPQRSTUVWXYZ23456789</code>. Separate HMAC-SHA256
+domains derive the room locator and two invitation secrets (crew index 0, watch
+index 1). <code>creator_short_invite</code> registers only <code>.Player</code>, one-use invitations;
+the normal server authorization checks still require the full creator claim.
+Codes are case-insensitive and trimmed at the edges. Other input is rejected.
+The independent member/creator credentials, message shapes, protocol version,
+stored bundle schema, request budgets and long <code>RP1</code> ticket format are unchanged.</p>
 <p>Protocol version 1 uses canonical envelopes: request kind <code>0x5051</code>, reply kind
 <code>0x5053</code>, epoch 1, tick zero and the configured content ID. Fixed-size messages
 fit within <code>PACKET_BYTES</code> (1024). Wrong schema/version/content, noncanonical fields,
@@ -134,5 +143,5 @@ reproducible co-op invite. Other game menus, general invite-operation persistenc
 public TLS/relay deployment and account/room lifecycle remain work.
 Original games and their existing fixture provisioning remain separately runnable.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/protocol.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="enrollment.html"><span>Durable client enrollment</span><span aria-hidden="true">→</span></a><a href="../../examples/replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/provision/protocol.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#server-ownership" class="">Server ownership</a><a href="#wire-and-retry-contract" class="">Wire and retry contract</a><a href="#godot-connection-and-tls" class="">Godot connection and TLS</a><a href="#remaining-integration" class="">Remaining integration</a></nav><div class="outline-actions"><a href="../../../reference/replay/provision/protocol.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

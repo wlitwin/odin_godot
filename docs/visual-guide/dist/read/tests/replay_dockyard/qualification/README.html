@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Browser qualification · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Browser qualification</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../../reference/tests/replay_dockyard/qualification/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p><code>plan.json</code> declares the sample populations and bounds before operation timing.
+<code>tests/box3d_web/contract.json</code> owns the unchanged acceptance thresholds.
+The game emits telemetry only when explicitly launched with <code>profile=1|2|3|4</code> or
+<code>DOCKYARD_PROFILE=1|2|3|4</code>. Mode 1 emits batches during play. Mode 2 stores at most
+65536 rows in an SDK-metered allocation and emits them after successful
+Room/Session close, then frees the allocation before checked cleanup statistics.
+The ordinary game leaves telemetry disabled. Each row times the entire existing public <code>Room.frame</code>
+or <code>Session.frame</code> call with Godot&#39;s monotonic microsecond clock. No timing
+overhead is subtracted. Buffered fields contain values with stable lifetimes.</p>
+<p>Rows include the before/after head, confirmation, generation, serial and actual
+repair counter. Eight-step repair samples require exactly one committed repair
+and actual planned/executed counts of eight. Bootstrap, pump, replacement,
+other repair depths, multiple-step advances, errors and outliers remain in the
+raw console file. The sampler has a fixed capacity and reports overflow.</p>
+<p><code>run.py</code> reuses the existing local Room/Party/TURN runner. It runs two independent
+installed browser processes through real production canvas widgets and collects
+raw operation batches, presentation intervals, visibility changes, timer deltas,
+linear-memory observations, real selected ICE routes and actual five-part final
+state/acknowledgement/cleanup evidence. It does not install a test autoload.
+Select <code>Q1_BROWSER=chrome</code> or <code>Q1_BROWSER=firefox</code>. Use a fresh output directory
+and a separate copied service project; do not rebuild the service used by an
+interactive game or run simultaneous benchmark actors on shared Native inputs.
+Select <code>Q1_BUFFERED=1</code> for mode 2, as declared in <code>buffered-plan.json</code>.</p>
+<p>An example inside the development shell, with absolute paths filled in:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">Q1_BROWSER=chrome python3 -B tests/replay_dockyard/qualification/run.py \
+  --production-ui --export-record <span class="hljs-string">&quot;<span class="hljs-variable">$EXPORT_RECORD</span>&quot;</span> \
+  --service-record <span class="hljs-string">&quot;<span class="hljs-variable">$SERVICE_RECORD</span>&quot;</span> --out <span class="hljs-string">&quot;<span class="hljs-variable">$NEW_OUTPUT</span>&quot;</span> \
+  --godot <span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --ticks 1800 --turnserver <span class="hljs-string">&quot;<span class="hljs-variable">$COTURN</span>&quot;</span> --provider
+python3 -B tests/replay_dockyard/qualification/assess.py <span class="hljs-string">&quot;<span class="hljs-variable">$NEW_OUTPUT</span>&quot;</span> \
+  --out <span class="hljs-string">&quot;<span class="hljs-variable">$NEW_OUTPUT</span>/assessment.json&quot;</span></code></pre></div><p>The optional <code>--turn-bind-address</code> selects a specific private IPv4 interface
+for the owned local relay; its default is loopback. It does not establish
+public Internet reachability. Browser security preferences are not disabled.
+Firefox does not accept Chromium&#39;s clipboard permission names through BiDi.
+On this macOS reference host its real Copy button is observed using <code>pbpaste</code>,
+with the original clipboard restored using <code>pbcopy</code>; the page implementation
+and the production invitation validation remain intact.</p>
+<p>Set <code>Q1_SOAK=1</code> and <code>--ticks 36600</code> for the declared sustained case in
+<code>soak-plan.json</code>. It attempts the real host NEXT JOB widget after 90 seconds
+and then every 10 seconds, requires actual round/layout progression, and
+checks at least 600 seconds from the real GO to <code>SAMPLE_OPERATION_END</code>, emitted
+before close and telemetry serialization. Older artifacts use the checked
+result marker. A buffered run must have exactly one end marker and retain every
+operation row in sequence; teardown emission cannot extend measured play time.
+It retains the first result-panel screenshot and every input attempt. It does
+not write Game fields or replace the production action path.</p>
+<p>Cold-load admission uses <code>cold_usable_menu_ms</code>, which includes visual preparation
+and stored-membership readiness. The earlier <code>cold_lobby_ms</code> backend marker is
+retained separately. The Compatibility renderer draws the real effects during
+loading before crew enrollment can acquire a live lease. Tethers and confetti
+share the dock&#39;s opaque material family; this does not add physics bodies.</p>
+<p>The assessor uses nearest-rank quantiles in milliseconds and retains all rows.
+An incomplete population or short duration cannot pass the whole contract.
+The complete producer transfer is observed through public <code>complete_inspect</code>;
+the entire attachment is a conservative upper bound on its Native payload,
+not an exact Native byte measurement. Memory readings are sampled values,
+with the existing Native admission limit and cleanup checks assessed separately.
+Browser presentation intervals include startup stalls and live logging work.
+All raw intervals remain available; the end marker separates teardown intervals
+from the measured presentation population. Terminal Wasm memory is also read
+after emission so linear-memory growth during serialization is retained. The
+operation boundary does not include separately called presentation/getter APIs.</p>
+<p>The later <a href="telemetry-report.json.html">telemetry experiment</a> retained all 73798 rows
+from a 610-second Firefox 159.0.1/Chrome pair and passed Native/Web cleanup.
+Its Firefox normal maximum was 29.56 ms against the unchanged 10 ms limit.
+Buffered telemetry did not resolve the rare stalls, whose cause remains unknown.
+The earlier candidate report and packaged review archive retain their own hashes
+and measurements; this experiment does not relabel them or admit a release.</p>
+<p>The <a href="tx-signature-report.json.html">Snapshot signature reuse experiment</a> checks work
+reduction separately from latency. Its Native fixture counts actual solver-part
+materializations, compares all five parts and the complete wire against the
+standalone encoder, confirms driver/observer state, and checks corrupt-header
+fallback, serialization failure and balanced resources. Run it with a built
+Native archive in the development shell:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">odin <span class="hljs-built_in">test</span> tests/replay_dockyard/qualification/tx_signature \
+  -collection:godot=<span class="hljs-string">&quot;<span class="hljs-variable">$PWD</span>&quot;</span> -define:BOX3D_LIBRARY=<span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE_ARCHIVE</span>&quot;</span> \
+  -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FANCY=<span class="hljs-literal">false</span></code></pre></div><p>The declared short browser comparison still rejects the original maximum:
+30.600 ms baseline and 18.299 ms candidate. Host p95 is 3.799 ms versus
+3.800 ms, so a latency gain is not established. Correct complete state and less
+duplicate encoding work do not qualify that candidate. A sustained run was not
+repeated after its short case had already violated the unchanged threshold.</p>
+<p>Mode 3 (<code>Q1_INTERNAL_PHASES=1</code> in the diagnostic driver) enables the existing
+stateless network profiling clock on the ready authority and reads cumulative
+profile metrics around each whole call. It also binds the current external
+transaction profiler to Godot monotonic microseconds converted to nanoseconds;
+the installed freestanding <code>core:time</code> fallback otherwise returns zero.
+This override is diagnostic only and is recorded as <code>external_godot_clock</code>.
+Callback presence alone must never turn an unsupported zero interval into a
+zero-cost claim. The <a href="godot-clock-report.json.html">clock validation</a> covers actual
+Native and Web actors with state agreement and cleanup. Slow rows get a matching
+<code>SAMPLE_OPERATION_PHASES</code> record; <code>SAMPLE_PHASE_TOTALS</code> precedes checked close.
+The phases are nested or partial: <code>Advance</code> times <code>r.advance</code>, <code>Pump</code> times its
+network pump, and the complete-physics outbound route does not necessarily use
+the ordinary <code>Snapshot</code> metrics. A zero sample count means unobserved work,
+not zero cost. Never sum or subtract these phases into an adjusted call budget.
+Epoch/role replacement, total regressions and clock errors invalidate the phase
+sample. This mode is diagnostic and cannot qualify the uninstrumented contract.
+The external transaction profiler additionally reports open, model-scope and
+staged-capture totals/counts/clock errors. They aggregate repeated replay steps
+within the most recent transaction. The model scope includes its callback and
+accepted-action savepoints; staged capture does not duplicate those nested
+savepoint captures. Disabled clocks leave phases unobserved. Backend failures
+stay in the operation result and are independent of profiling-clock errors.</p>
+<p>Mode 4 (<code>Q1_COUNTERS=1</code>) samples existing host counters before the start clock
+and after the end clock, with no additional clocks or counter updates inside
+<code>Room.frame</code>. A separate <code>SAMPLE_OPERATION_COUNTERS</code> sidecar matches every row by
+sequence. Its 128-row value buffer is allocated only in this mode, metered by
+the SDK, and freed during close. The diagnostic cannot qualify the ordinary
+timing contract and cannot be combined with the other probes.</p>
+<p><code>next_id</code> deltas count successful transfer preparations. Transfer slot tick,
+stored bytes, part progress and waiting state are snapshots, not cumulative
+send counters. Peer slot details require exactly one remote peer and stable
+scope. Server packet/byte totals describe gameplay transport; fragmentation
+adds raw RTC messages. Host <code>executed_steps=0</code> is an unavailable client repair
+metric, not evidence that the host did no work. Lease wall/monotonic deltas
+span clock observations and must not replace the measured whole-call duration.</p>
+<p>The <a href="frame-egress-report.json.html">frame egress regression</a> reproduces a delayed ACK
+with a pump-before-step Snapshot for the old head and a separate new-head fact.
+It checks one current-head materialization, normative complete-wire equality,
+real receiver confirmation, zero-step flushing, permit refusal and balanced
+resources. The default standalone pump behavior remains unchanged. This work
+reduction is separate from the unresolved strict maximum and requires actual
+browser validation before any latency claim.</p>
+<p><code>Q1_GECKO_PROFILE=1</code> enables the installed Firefox startup CPU sampler only in
+the owned isolated browser processes. It retains four million entries at a
+one-millisecond sampling interval and writes per-actor <code>gecko-profile.json</code> on
+normal browser shutdown. <code>profile_summary.py</code> reads those files without starting
+processes, reports their retained ring-buffer ranges and leaves unresolved
+frames explicit. Such a run is marked <code>CPU_PROFILER_DIAGNOSTIC_NOT_ADMISSION</code>;
+its timing cannot qualify the unprofiled contract. A failure to reproduce a rare
+spike while sampling does not establish its cause or erase the earlier failure.</p>
+<p><code>Q1_TRACE_FIRST_SLOW=1</code> stops an owned profiler diagnostic after the first normal
+whole-call row over 10 ms. It records a browser clock marker and requests checked
+Engine shutdown before closing the browsers, preserving the sampler&#39;s recent
+window. <code>trace-plan.json</code> declares this trigger; the stopped diagnostic does not
+claim a complete round, final five-part comparison, or qualification pass.
+<code>trigger_summary.py</code> reads the retained profile and reports nearby samples and
+markers with explicit console-delivery and sampling uncertainty. Its four format
+tests cover sparse rows and split marker boundaries, whose unused time fields
+must not be interpreted as real intervals.</p>
+<p>The broad <code>Q1_TRACE_SYSTEM</code> experiment is archived and rejected by the active
+runner after malformed, incomplete and failed-save recording attempts.
+<code>Q1_PROCESS_STATE=1</code> instead uses a companion owned-process controller with
+<code>process-state.controller.json</code>, ready, stop, saved and failed handshakes.
+The runner waits for terminal status while that exact controller is alive.
+It is not a standalone option without the companion. <code>process_state.py</code> samples
+one verified-owned process through read-only <code>proc_pidinfo</code>, retaining at most
+8192 rows and 8 MiB. Its CPU counters include every thread, use the observed
+Mach timebase, and are calibrated against the observer&#39;s process clock before
+measurement. They are an upper bound for game-thread CPU, not exact call CPU.
+The first <a href="process-observer-report.json.html">bounded observer run</a> saved about 800 KB
+cleanly but captured no slow call; it cannot attribute a missing event.
+Never replace missing trace data or a wait timeout with a scheduling-cause claim.
+See the retained <a href="trace-report.json.html">causal trace observations</a>, including failed
+recording attempts and unresolved clock alignment.</p>
+<p><code>Q1_SHADER_DIAGNOSTIC=1</code> on the startup probe records transparent WebGL method
+durations and shader feature summaries through the real visual-preparation
+marker, without online configuration. It is a graphics startup diagnosis, not
+multiplayer or frame-budget qualification. Its own earlier failed setup and
+subsequent corrections remain separate records.</p>
+<p><code>capability.py</code> and <code>automation_probe.py</code> record bounded startup and automation
+prerequisites only. They do not qualify multiplayer, complete state or frame
+performance. Actual Safari requires its own working automation prerequisite
+and actual runtime evidence before admission; WebKit emulation is separate.</p>
+<p>Keep failed attempts, raw files, cold starts, browser versions, source/tool and
+artifact hashes alongside the assessment. Local functional success does not
+complete the separate public-endpoint, human co-op review or release gates.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_dockyard/qualification/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/tests/replay_dockyard/qualification/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

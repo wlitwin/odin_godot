@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>turret_test.odin · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>turret_test.odin</h1><div class="reader-meta"><span>153 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/tests/replay_turret/model/turret_test.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>turret_test.odin</h1><div class="reader-meta"><span>329 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/tests/replay_turret/model/turret_test.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> turret_test
 <span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:testing&quot;</span>
@@ -15,147 +15,323 @@
 <span class="hljs-keyword">import</span> scenario <span class="hljs-string">&quot;godot:replay/testing&quot;</span>
 
 TURRET :: <span class="hljs-type">u8</span>(<span class="hljs-number">7</span>)
-Input :: <span class="hljs-keyword">struct</span> {mount,release,deploy,fire:[game.SEATS]<span class="hljs-type">bool</span>,move:[game.SEATS][<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,target:r.Handle(game.Turret)}
-step :: <span class="hljs-keyword">proc</span>(w:^game.World,input:Input,ctx:^r.Step(game.Event)) {
-    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.&lt;game.SEATS {
-        <span class="hljs-keyword">if</span> input.deploy[i] {game.cast_ability(w,<span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>),<span class="hljs-number">0</span>,[<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{<span class="hljs-number">630</span>,<span class="hljs-number">1040</span>},<span class="hljs-literal">true</span>,ctx)}
-        <span class="hljs-keyword">if</span> input.release[i] {game.action(w,<span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>),game.Action{kind=.Turret_Dismount,turret=input.target},ctx)}
-        <span class="hljs-keyword">if</span> input.mount[i] {game.action(w,<span class="hljs-type">u16</span>(i+<span class="hljs-number">1</span>),game.Action{kind=.Turret_Mount,turret=input.target},ctx)}
-    }
-    controls:[game.SEATS]game.Control
-    <span class="hljs-keyword">for</span> &amp;c,i <span class="hljs-keyword">in</span> controls {c={move=input.move[i],aim={<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},fire=input.fire[i]}}
-    game.step(w,controls,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,ctx)
+
+Input :: <span class="hljs-keyword">struct</span> {
+    mount, release, deploy, fire: [game.SEATS]<span class="hljs-type">bool</span>,
+    move:                         [game.SEATS][<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+    target:                       r.Handle(game.Turret),
 }
-yard :: <span class="hljs-keyword">proc</span>(ammo:<span class="hljs-type">u16</span>=<span class="hljs-number">3</span>)-&gt;game.World {
-    w:=game.initial(encounter_count=<span class="hljs-number">0</span>);w.stage=.Yard
-    <span class="hljs-keyword">for</span> &amp;player,i <span class="hljs-keyword">in</span> w.players[:<span class="hljs-number">2</span>] {player.connected,player.in_yard=<span class="hljs-literal">true</span>,<span class="hljs-literal">true</span>;player.position={<span class="hljs-number">600</span>,<span class="hljs-type">f32</span>(<span class="hljs-number">1030</span>+i*<span class="hljs-number">20</span>)};player.profile.abilities={TURRET,<span class="hljs-number">2</span>}}
-    w.catalog.abilities[TURRET].turret.ammo=ammo;w.catalog.abilities[TURRET].turret.cadence=<span class="hljs-number">1</span>
+
+step :: <span class="hljs-keyword">proc</span>(w: ^game.World, input: Input, ctx: ^r.Step(game.Event)) {
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; game.SEATS {
+        <span class="hljs-keyword">if</span> input.deploy[i] {
+            game.cast_ability(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), <span class="hljs-number">0</span>, [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{<span class="hljs-number">630</span>, <span class="hljs-number">1040</span>}, <span class="hljs-literal">true</span>, ctx)
+        }
+
+        <span class="hljs-keyword">if</span> input.release[i] {
+            game.action(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), game.Action{kind = .Turret_Dismount, turret = input.target}, ctx)
+        }
+
+        <span class="hljs-keyword">if</span> input.mount[i] {
+            game.action(w, <span class="hljs-type">u16</span>(i + <span class="hljs-number">1</span>), game.Action{kind = .Turret_Mount, turret = input.target}, ctx)
+        }
+    }
+
+    controls: [game.SEATS]game.Control
+
+    <span class="hljs-keyword">for</span> &amp;c, i <span class="hljs-keyword">in</span> controls {
+        c = {
+            move = input.move[i],
+            aim  = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>},
+            fire = input.fire[i],
+        }
+    }
+
+    game.step(w, controls, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, ctx)
+}
+
+yard :: <span class="hljs-keyword">proc</span>(ammo: <span class="hljs-type">u16</span> = <span class="hljs-number">3</span>) -&gt; game.World {
+    w := game.initial(encounter_count = <span class="hljs-number">0</span>)
+    w.stage = .Yard
+
+    <span class="hljs-keyword">for</span> &amp;player, i <span class="hljs-keyword">in</span> w.players[:<span class="hljs-number">2</span>] {
+        player.connected, player.in_yard = <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>
+        player.position = {<span class="hljs-number">600</span>, <span class="hljs-type">f32</span>(<span class="hljs-number">1030</span> + i * <span class="hljs-number">20</span>)}
+        player.profile.abilities = {TURRET, <span class="hljs-number">2</span>}
+    }
+
+    w.catalog.abilities[TURRET].turret.ammo = ammo
+    w.catalog.abilities[TURRET].turret.cadence = <span class="hljs-number">1</span>
     <span class="hljs-keyword">return</span> w
 }
-spawned :: <span class="hljs-keyword">proc</span>(ammo:<span class="hljs-type">u16</span>=<span class="hljs-number">3</span>)-&gt;game.World {
-    timeline:r.Timeline(game.World,Input,game.Event);assert(r.init(&amp;timeline,r.Frame(game.World){state=yard(ammo)},step)==.None);<span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
-    result:=r.advance(&amp;timeline,Input{deploy={<span class="hljs-number">0</span>=<span class="hljs-literal">true</span>}});assert(result.error==.None)
-    frame,_:=r.current(&amp;timeline);assert(frame.state.turrets.count==<span class="hljs-number">1</span>);<span class="hljs-keyword">return</span> frame.state
+
+spawned :: <span class="hljs-keyword">proc</span>(ammo: <span class="hljs-type">u16</span> = <span class="hljs-number">3</span>) -&gt; game.World {
+    timeline: r.Timeline(game.World, Input, game.Event)
+    assert(r.init(&amp;timeline, r.Frame(game.World){state = yard(ammo)}, step) == .None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
+    result := r.advance(&amp;timeline, Input{deploy = {<span class="hljs-number">0</span> = <span class="hljs-literal">true</span>}})
+    assert(result.error == .None)
+    frame, _ := r.current(&amp;timeline)
+    assert(frame.state.turrets.count == <span class="hljs-number">1</span>)
+    <span class="hljs-keyword">return</span> frame.state
 }
+
 <span class="hljs-meta">@(test)</span>
-shared_ammo_handoff_and_final_shot_dismount :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=spawned();target:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]}
-    timeline:r.Timeline(game.World,Input,game.Event);assert(r.init(&amp;timeline,r.Frame(game.World){tick=w.clock,state=w},step)==.None);<span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
+shared_ammo_handoff_and_final_shot_dismount :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := spawned()
+    target := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    timeline: r.Timeline(game.World, Input, game.Event)
+    assert(r.init(&amp;timeline, r.Frame(game.World){tick = w.clock, state = w}, step) == .None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
     <span class="hljs-comment">// Same tick claims have the normal deterministic seat ordering in this input.</span>
-    assert(r.advance(&amp;timeline,Input{mount={<span class="hljs-number">0</span>=<span class="hljs-literal">true</span>,<span class="hljs-number">1</span>=<span class="hljs-literal">true</span>},target=target,fire={<span class="hljs-number">0</span>=<span class="hljs-literal">true</span>}}).error==.None)
-    frame,_:=r.current(&amp;timeline)
-    testing.expect(t,frame.state.turrets.values[<span class="hljs-number">0</span>].operator.seat==<span class="hljs-number">1</span> &amp;&amp; frame.state.turrets.values[<span class="hljs-number">0</span>].ammo==<span class="hljs-number">2</span>)
-    p0:=frame.state.players[<span class="hljs-number">0</span>].position
-    assert(r.advance(&amp;timeline,Input{move={<span class="hljs-number">0</span>={<span class="hljs-number">1</span>,<span class="hljs-number">0</span>}},target=target}).error==.None)
-    frame,_=r.current(&amp;timeline);testing.expect_value(t,frame.state.players[<span class="hljs-number">0</span>].position,p0)
-    assert(r.advance(&amp;timeline,Input{release={<span class="hljs-number">0</span>=<span class="hljs-literal">true</span>},mount={<span class="hljs-number">1</span>=<span class="hljs-literal">true</span>},fire={<span class="hljs-number">1</span>=<span class="hljs-literal">true</span>},target=target}).error==.None)
-    frame,_=r.current(&amp;timeline);testing.expect(t,frame.state.turrets.values[<span class="hljs-number">0</span>].operator.seat==<span class="hljs-number">2</span> &amp;&amp; frame.state.turrets.values[<span class="hljs-number">0</span>].ammo==<span class="hljs-number">1</span>)
-    assert(r.advance(&amp;timeline,Input{fire={<span class="hljs-number">1</span>=<span class="hljs-literal">true</span>},target=target}).error==.None)
-    frame,_=r.current(&amp;timeline)
-    testing.expect(t,frame.state.turrets.count==<span class="hljs-number">0</span> &amp;&amp; !game.turret_operator(&amp;frame.state,<span class="hljs-number">2</span>))
-    testing.expect(t,frame.state.players[<span class="hljs-number">0</span>].shots==<span class="hljs-number">1</span> &amp;&amp; frame.state.players[<span class="hljs-number">1</span>].shots==<span class="hljs-number">2</span>,<span class="hljs-string">&quot;last turret round must not also fire the handheld gun&quot;</span>)
-    testing.expect(t,game.state_valid(frame.state))
-}
-<span class="hljs-meta">@(test)</span>
-rejects_stale_remote_and_occupied_targets :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=spawned();target:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]}
-    testing.expect(t,game.turret_mount(&amp;w,<span class="hljs-number">1</span>,target))
-    testing.expect(t,!game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target) &amp;&amp; !game.turret_dismount(&amp;w,<span class="hljs-number">2</span>,target))
-    w.players[<span class="hljs-number">0</span>].connected=<span class="hljs-literal">false</span>;game.turret_cleanup(&amp;w)
-    testing.expect(t,w.turrets.values[<span class="hljs-number">0</span>].operator.seat==<span class="hljs-number">0</span> &amp;&amp; game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target))
-    w.players[<span class="hljs-number">1</span>].warp+=<span class="hljs-number">1</span>;game.turret_cleanup(&amp;w);testing.expect(t,!game.turret_operator(&amp;w,<span class="hljs-number">2</span>))
-    assert(game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target));w.players[<span class="hljs-number">1</span>].generation+=<span class="hljs-number">1</span>;game.turret_cleanup(&amp;w)
-    testing.expect(t,w.turrets.values[<span class="hljs-number">0</span>].operator==(game.Credit{}))
-    w.players[<span class="hljs-number">1</span>].position={<span class="hljs-number">100</span>,<span class="hljs-number">100</span>};testing.expect(t,!game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target))
-    saved:=w.turrets.values[<span class="hljs-number">0</span>];assert(r.pool_remove(&amp;w.turrets,target))
-    next,ok:=r.pool_insert(&amp;w.turrets,saved);assert(ok)
-    testing.expect(t,next.generation!=target.generation &amp;&amp; !game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target))
+    assert(
+        r.advance(&amp;timeline, Input{mount = {<span class="hljs-number">0</span> = <span class="hljs-literal">true</span>, <span class="hljs-number">1</span> = <span class="hljs-literal">true</span>}, target = target, fire = {<span class="hljs-number">0</span> = <span class="hljs-literal">true</span>}}).error == .None,
+    )
+    frame, _ := r.current(&amp;timeline)
+    testing.expect(t, frame.state.turrets.values[<span class="hljs-number">0</span>].operator.seat == <span class="hljs-number">1</span> &amp;&amp; frame.state.turrets.values[<span class="hljs-number">0</span>].ammo == <span class="hljs-number">2</span>)
+    p0 := frame.state.players[<span class="hljs-number">0</span>].position
+    assert(r.advance(&amp;timeline, Input{move = {<span class="hljs-number">0</span> = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}}, target = target}).error == .None)
+    frame, _ = r.current(&amp;timeline)
+    testing.expect_value(t, frame.state.players[<span class="hljs-number">0</span>].position, p0)
+    assert(
+        r.advance(&amp;timeline, Input{release = {<span class="hljs-number">0</span> = <span class="hljs-literal">true</span>}, mount = {<span class="hljs-number">1</span> = <span class="hljs-literal">true</span>}, fire = {<span class="hljs-number">1</span> = <span class="hljs-literal">true</span>}, target = target}).error ==
+        .None,
+    )
+    frame, _ = r.current(&amp;timeline)
+    testing.expect(t, frame.state.turrets.values[<span class="hljs-number">0</span>].operator.seat == <span class="hljs-number">2</span> &amp;&amp; frame.state.turrets.values[<span class="hljs-number">0</span>].ammo == <span class="hljs-number">1</span>)
+    assert(r.advance(&amp;timeline, Input{fire = {<span class="hljs-number">1</span> = <span class="hljs-literal">true</span>}, target = target}).error == .None)
+    frame, _ = r.current(&amp;timeline)
+    testing.expect(t, frame.state.turrets.count == <span class="hljs-number">0</span> &amp;&amp; !game.turret_operator(&amp;frame.state, <span class="hljs-number">2</span>))
+    testing.expect(
+        t,
+        frame.state.players[<span class="hljs-number">0</span>].shots == <span class="hljs-number">1</span> &amp;&amp; frame.state.players[<span class="hljs-number">1</span>].shots == <span class="hljs-number">2</span>,
+        <span class="hljs-string">&quot;last turret round must not also fire the handheld gun&quot;</span>,
+    )
+    testing.expect(t, game.state_valid(frame.state))
 }
 
 <span class="hljs-meta">@(test)</span>
-placement_occlusion_capacity_and_muzzle_clearance :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=yard();w.layout.covers={};w.players[<span class="hljs-number">0</span>].position={<span class="hljs-number">500</span>,<span class="hljs-number">500</span>}
-    w.layout.covers[<span class="hljs-number">0</span>]={x=<span class="hljs-number">520</span>,y=<span class="hljs-number">480</span>,w=<span class="hljs-number">20</span>,h=<span class="hljs-number">40</span>}
-    events:[<span class="hljs-number">16</span>]r.Occurrence(game.Event);ctx:=r.Step(game.Event){tick=<span class="hljs-number">1</span>,epoch=<span class="hljs-number">1</span>,events=events[:]}
+rejects_stale_remote_and_occupied_targets :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := spawned()
+    target := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    testing.expect(t, game.turret_mount(&amp;w, <span class="hljs-number">1</span>, target))
+    testing.expect(t, !game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target) &amp;&amp; !game.turret_dismount(&amp;w, <span class="hljs-number">2</span>, target))
+    w.players[<span class="hljs-number">0</span>].connected = <span class="hljs-literal">false</span>
+    game.turret_cleanup(&amp;w)
+    testing.expect(t, w.turrets.values[<span class="hljs-number">0</span>].operator.seat == <span class="hljs-number">0</span> &amp;&amp; game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target))
+    w.players[<span class="hljs-number">1</span>].warp += <span class="hljs-number">1</span>
+    game.turret_cleanup(&amp;w)
+    testing.expect(t, !game.turret_operator(&amp;w, <span class="hljs-number">2</span>))
+    assert(game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target))
+    w.players[<span class="hljs-number">1</span>].generation += <span class="hljs-number">1</span>
+    game.turret_cleanup(&amp;w)
+    testing.expect(t, w.turrets.values[<span class="hljs-number">0</span>].operator == (game.Credit{}))
+    w.players[<span class="hljs-number">1</span>].position = {<span class="hljs-number">100</span>, <span class="hljs-number">100</span>}
+    testing.expect(t, !game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target))
+    saved := w.turrets.values[<span class="hljs-number">0</span>]
+    assert(r.pool_remove(&amp;w.turrets, target))
+    next, ok := r.pool_insert(&amp;w.turrets, saved)
+    assert(ok)
+    testing.expect(t, next.generation != target.generation &amp;&amp; !game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target))
+}
+
+<span class="hljs-meta">@(test)</span>
+placement_occlusion_capacity_and_muzzle_clearance :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := yard()
+    w.layout.covers = {}
+    w.players[<span class="hljs-number">0</span>].position = {<span class="hljs-number">500</span>, <span class="hljs-number">500</span>}
+    w.layout.covers[<span class="hljs-number">0</span>] = {
+        x = <span class="hljs-number">520</span>,
+        y = <span class="hljs-number">480</span>,
+        w = <span class="hljs-number">20</span>,
+        h = <span class="hljs-number">40</span>,
+    }
+    events: [<span class="hljs-number">16</span>]r.Occurrence(game.Event)
+    ctx := r.Step(game.Event) {
+        tick   = <span class="hljs-number">1</span>,
+        epoch  = <span class="hljs-number">1</span>,
+        events = events[:],
+    }
     <span class="hljs-comment">// Both intersecting cover and throwing through it reject without spending a cast.</span>
-    testing.expect(t,!game.cast_ability(&amp;w,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>,{<span class="hljs-number">530</span>,<span class="hljs-number">500</span>},<span class="hljs-literal">true</span>,&amp;ctx))
-    testing.expect(t,!game.cast_ability(&amp;w,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>,{<span class="hljs-number">560</span>,<span class="hljs-number">500</span>},<span class="hljs-literal">true</span>,&amp;ctx))
-    testing.expect(t,w.players[<span class="hljs-number">0</span>].casts==<span class="hljs-number">0</span> &amp;&amp; w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>].remaining==<span class="hljs-number">0</span> &amp;&amp; w.turrets.count==<span class="hljs-number">0</span>)
-    testing.expect(t,!game.turret_deploy(&amp;w,{<span class="hljs-number">500</span>,<span class="hljs-number">500</span>},<span class="hljs-number">255</span>,{<span class="hljs-number">1</span>,<span class="hljs-number">1</span>},&amp;ctx))
-    testing.expect(t,!game.turret_deploy(&amp;w,{<span class="hljs-number">0</span>,<span class="hljs-number">500</span>},TURRET,{<span class="hljs-number">1</span>,<span class="hljs-number">1</span>},&amp;ctx))
-    assert(game.cast_ability(&amp;w,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>,{<span class="hljs-number">500</span>,<span class="hljs-number">500</span>},<span class="hljs-literal">true</span>,&amp;ctx))
-    handle:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]}
-    w.players[<span class="hljs-number">1</span>].position={<span class="hljs-number">560</span>,<span class="hljs-number">500</span>}
-    testing.expect(t,!game.turret_mount(&amp;w,<span class="hljs-number">2</span>,handle),<span class="hljs-string">&quot;cannot operate through cover even within use radius&quot;</span>)
-    assert(game.turret_mount(&amp;w,<span class="hljs-number">1</span>,handle));w.players[<span class="hljs-number">0</span>].aim={<span class="hljs-number">1</span>,<span class="hljs-number">0</span>}
-    game.turret_fire(&amp;w,<span class="hljs-number">1</span>,&amp;ctx)
-    testing.expect_value(t,w.shots.values[<span class="hljs-number">0</span>].position,[<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{<span class="hljs-number">512</span>,<span class="hljs-number">500</span>})
-    feedback:game.Notices;game.shot_step(&amp;w,&amp;feedback,&amp;ctx)
-    testing.expect(t,w.shots.count==<span class="hljs-number">0</span>,<span class="hljs-string">&quot;first turret bullet must hit nearby cover&quot;</span>)
-    assert(game.turret_dismount(&amp;w,<span class="hljs-number">1</span>,handle))
-    w.layout.covers={}
+    testing.expect(t, !game.cast_ability(&amp;w, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {<span class="hljs-number">530</span>, <span class="hljs-number">500</span>}, <span class="hljs-literal">true</span>, &amp;ctx))
+    testing.expect(t, !game.cast_ability(&amp;w, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {<span class="hljs-number">560</span>, <span class="hljs-number">500</span>}, <span class="hljs-literal">true</span>, &amp;ctx))
+    testing.expect(t, w.players[<span class="hljs-number">0</span>].casts == <span class="hljs-number">0</span> &amp;&amp; w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>].remaining == <span class="hljs-number">0</span> &amp;&amp; w.turrets.count == <span class="hljs-number">0</span>)
+    testing.expect(t, !game.turret_deploy(&amp;w, {<span class="hljs-number">500</span>, <span class="hljs-number">500</span>}, <span class="hljs-number">255</span>, {<span class="hljs-number">1</span>, <span class="hljs-number">1</span>}, &amp;ctx))
+    testing.expect(t, !game.turret_deploy(&amp;w, {<span class="hljs-number">0</span>, <span class="hljs-number">500</span>}, TURRET, {<span class="hljs-number">1</span>, <span class="hljs-number">1</span>}, &amp;ctx))
+    assert(game.cast_ability(&amp;w, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {<span class="hljs-number">500</span>, <span class="hljs-number">500</span>}, <span class="hljs-literal">true</span>, &amp;ctx))
+    handle := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    w.players[<span class="hljs-number">1</span>].position = {<span class="hljs-number">560</span>, <span class="hljs-number">500</span>}
+    testing.expect(t, !game.turret_mount(&amp;w, <span class="hljs-number">2</span>, handle), <span class="hljs-string">&quot;cannot operate through cover even within use radius&quot;</span>)
+    assert(game.turret_mount(&amp;w, <span class="hljs-number">1</span>, handle))
+    w.players[<span class="hljs-number">0</span>].aim = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}
+    game.turret_fire(&amp;w, <span class="hljs-number">1</span>, &amp;ctx)
+    testing.expect_value(t, w.shots.values[<span class="hljs-number">0</span>].position, [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>{<span class="hljs-number">512</span>, <span class="hljs-number">500</span>})
+    feedback: game.Notices
+    game.shot_step(&amp;w, &amp;feedback, &amp;ctx)
+    testing.expect(t, w.shots.count == <span class="hljs-number">0</span>, <span class="hljs-string">&quot;first turret bullet must hit nearby cover&quot;</span>)
+    assert(game.turret_dismount(&amp;w, <span class="hljs-number">1</span>, handle))
+    w.layout.covers = {}
+
     <span class="hljs-comment">// Capacity refusal leaves the already established cooldown/cast counts intact.</span>
-    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span>.&lt;game.MAX_TURRETS {
-        assert(game.turret_deploy(&amp;w,{<span class="hljs-number">500</span>+<span class="hljs-type">f32</span>(i)*<span class="hljs-number">40</span>,<span class="hljs-number">500</span>},TURRET,{<span class="hljs-number">1</span>,<span class="hljs-number">1</span>},&amp;ctx))
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">1</span> ..&lt; game.MAX_TURRETS {
+        assert(game.turret_deploy(&amp;w, {<span class="hljs-number">500</span> + <span class="hljs-type">f32</span>(i) * <span class="hljs-number">40</span>, <span class="hljs-number">500</span>}, TURRET, {<span class="hljs-number">1</span>, <span class="hljs-number">1</span>}, &amp;ctx))
     }
-    w.players[<span class="hljs-number">0</span>].position={<span class="hljs-number">900</span>,<span class="hljs-number">500</span>};w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>]={}
-    casts:=w.players[<span class="hljs-number">0</span>].casts
-    testing.expect(t,!game.cast_ability(&amp;w,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>,{<span class="hljs-number">900</span>,<span class="hljs-number">500</span>},<span class="hljs-literal">true</span>,&amp;ctx))
-    testing.expect(t,w.turrets.count==game.MAX_TURRETS &amp;&amp; w.players[<span class="hljs-number">0</span>].casts==casts &amp;&amp; w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>].remaining==<span class="hljs-number">0</span>)
-}
-<span class="hljs-meta">@(test)</span>
-late_claim_correction_removes_predicted_shots_and_ammo_spend :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=spawned();target:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]}
-    predicted,actual:[<span class="hljs-number">12</span>]Input
-    <span class="hljs-keyword">for</span> &amp;input <span class="hljs-keyword">in</span> predicted {input.fire[<span class="hljs-number">0</span>]=<span class="hljs-literal">true</span>;input.target=target}
-    predicted[<span class="hljs-number">0</span>].mount[<span class="hljs-number">0</span>]=<span class="hljs-literal">true</span>
-    <span class="hljs-keyword">for</span> &amp;input <span class="hljs-keyword">in</span> actual {input.target=target};actual[<span class="hljs-number">0</span>].mount[<span class="hljs-number">1</span>]=<span class="hljs-literal">true</span>
-    result:=scenario.correction(r.Frame(game.World){tick=w.clock,state=w},step,predicted[:],actual[:],w.clock+<span class="hljs-number">1</span>)
-    testing.expect(t,result.report.phase==.Complete &amp;&amp; result.before.state.players[<span class="hljs-number">0</span>].shots&gt;<span class="hljs-number">0</span> &amp;&amp; result.after.state.players[<span class="hljs-number">0</span>].shots==<span class="hljs-number">0</span>)
-    testing.expect(t,result.after.state.turrets.values[<span class="hljs-number">0</span>].ammo==<span class="hljs-number">3</span> &amp;&amp; result.after.state.turrets.values[<span class="hljs-number">0</span>].operator.seat==<span class="hljs-number">2</span>)
-}
-<span class="hljs-meta">@(test)</span>
-content50_checkpoint_upgrades_with_no_turret_or_occupation :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    bytes,error:=os.read_entire_file(<span class="hljs-string">&quot;tests/replay_turret/fixtures/content50.checkpoint&quot;</span>,<span class="hljs-keyword">context</span>.allocator);assert(error==<span class="hljs-literal">nil</span>);<span class="hljs-keyword">defer</span> delete(bytes)
-    source:net.Checkpoint(upgrade.World_50,game.Control,upgrade.Action_50,game.SEATS);<span class="hljs-keyword">defer</span> net.checkpoint_destroy(&amp;source)
-    assert(net.checkpoint_decode(&amp;source,bytes,upgrade.model_50(),upgrade.CONTENT_50)==.None)
-    converted,result:=upgrade.root_50(bytes);testing.expect_value(t,result,net.Error.None);<span class="hljs-keyword">defer</span> delete(converted);<span class="hljs-keyword">if</span> result!=.None {<span class="hljs-keyword">return</span>}
-    target:net.Checkpoint(game.World,game.Control,game.Action,game.SEATS);<span class="hljs-keyword">defer</span> net.checkpoint_destroy(&amp;target)
-    assert(net.checkpoint_decode(&amp;target,converted,game.model(),game.CONTENT)==.None)
-    expected,ok:=upgrade.map_world_50(source.frame.state)
-    testing.expect(t,ok &amp;&amp; reflect.equal(target.frame.state,expected) &amp;&amp; target.frame.state.turrets.count==<span class="hljs-number">0</span>)
-    <span class="hljs-keyword">for</span> ability <span class="hljs-keyword">in</span> target.frame.state.catalog.abilities {testing.expect_value(t,ability.turret,game.World{}.catalog.abilities[<span class="hljs-number">0</span>].turret)}
+
+    w.players[<span class="hljs-number">0</span>].position = {<span class="hljs-number">900</span>, <span class="hljs-number">500</span>}
+    w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>] = {}
+    casts := w.players[<span class="hljs-number">0</span>].casts
+    testing.expect(t, !game.cast_ability(&amp;w, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {<span class="hljs-number">900</span>, <span class="hljs-number">500</span>}, <span class="hljs-literal">true</span>, &amp;ctx))
+    testing.expect(
+        t,
+        w.turrets.count == game.MAX_TURRETS &amp;&amp;
+        w.players[<span class="hljs-number">0</span>].casts == casts &amp;&amp;
+        w.players[<span class="hljs-number">0</span>].ability_cd[<span class="hljs-number">0</span>].remaining == <span class="hljs-number">0</span>,
+    )
 }
 
 <span class="hljs-meta">@(test)</span>
-occupied_checkpoint_takeover_preserves_ammo_operator_and_cadence :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=spawned(<span class="hljs-number">5</span>);w.catalog.abilities[TURRET].turret.cadence=<span class="hljs-number">10</span>
-    target:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]};assert(game.turret_mount(&amp;w,<span class="hljs-number">1</span>,target))
-    cfg:=net.DEFAULT_CONFIG;cfg.content=game.CONTENT;model:=game.model();model.reset_player=<span class="hljs-literal">nil</span>
-    drive:=<span class="hljs-keyword">proc</span>(s:^net.Server(game.World,game.Control,game.Action,game.Event,game.SEATS),tick:<span class="hljs-type">u64</span>)-&gt;net.Error {
-        <span class="hljs-keyword">return</span> net.server_local(s,game.Control{aim={<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},fire=tick&lt;=<span class="hljs-number">42</span>})
+late_claim_correction_removes_predicted_shots_and_ammo_spend :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := spawned()
+    target := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    predicted, actual: [<span class="hljs-number">12</span>]Input
+
+    <span class="hljs-keyword">for</span> &amp;input <span class="hljs-keyword">in</span> predicted {
+        input.fire[<span class="hljs-number">0</span>] = <span class="hljs-literal">true</span>
+        input.target = target
     }
-    result:=scenario.takeover(r.Frame(game.World){tick=w.clock,state=w},model,cfg,<span class="hljs-number">5</span>,<span class="hljs-number">60</span>,drive)
-    testing.expect(t,result.report.phase==.Complete)
-    testing.expect(t,result.before.state.turrets.values[<span class="hljs-number">0</span>].operator.seat==<span class="hljs-number">1</span> &amp;&amp; result.before.state.turrets.values[<span class="hljs-number">0</span>].ammo==<span class="hljs-number">4</span> &amp;&amp; result.before.state.turrets.values[<span class="hljs-number">0</span>].next_shot==<span class="hljs-number">12</span>)
-    testing.expect(t,result.after.state.turrets.count==<span class="hljs-number">0</span> &amp;&amp; result.after.state.players[<span class="hljs-number">0</span>].shots==<span class="hljs-number">5</span> &amp;&amp; !game.turret_operator(&amp;result.after.state,<span class="hljs-number">1</span>))
+
+    predicted[<span class="hljs-number">0</span>].mount[<span class="hljs-number">0</span>] = <span class="hljs-literal">true</span>
+
+    <span class="hljs-keyword">for</span> &amp;input <span class="hljs-keyword">in</span> actual {
+        input.target = target
+    }
+
+    actual[<span class="hljs-number">0</span>].mount[<span class="hljs-number">1</span>] = <span class="hljs-literal">true</span>
+    result := scenario.correction(
+        r.Frame(game.World){tick = w.clock, state = w},
+        step,
+        predicted[:],
+        actual[:],
+        w.clock + <span class="hljs-number">1</span>,
+    )
+    testing.expect(
+        t,
+        result.report.phase == .Complete &amp;&amp;
+        result.before.state.players[<span class="hljs-number">0</span>].shots &gt; <span class="hljs-number">0</span> &amp;&amp;
+        result.after.state.players[<span class="hljs-number">0</span>].shots == <span class="hljs-number">0</span>,
+    )
+    testing.expect(
+        t,
+        result.after.state.turrets.values[<span class="hljs-number">0</span>].ammo == <span class="hljs-number">3</span> &amp;&amp; result.after.state.turrets.values[<span class="hljs-number">0</span>].operator.seat == <span class="hljs-number">2</span>,
+    )
 }
+
 <span class="hljs-meta">@(test)</span>
-mounted_actions_saturation_death_and_floor_cleanup :: <span class="hljs-keyword">proc</span>(t:^testing.T) {
-    w:=spawned();target:=r.Handle(game.Turret){<span class="hljs-number">0</span>,w.turrets.generations[<span class="hljs-number">0</span>]};assert(game.turret_mount(&amp;w,<span class="hljs-number">1</span>,target))
-    timeline:r.Timeline(game.World,Input,game.Event);assert(r.init(&amp;timeline,r.Frame(game.World){tick=w.clock,state=w},step)==.None);<span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
-    events:[<span class="hljs-number">16</span>]r.Occurrence(game.Event)
-    ctx:=r.Step(game.Event){tick=w.clock+<span class="hljs-number">1</span>,epoch=<span class="hljs-number">1</span>,events=events[:]}
-    testing.expect(t,!game.dash_start(&amp;w,<span class="hljs-number">1</span>,{<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},&amp;ctx) &amp;&amp; !game.cast_ability(&amp;w,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,{<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},<span class="hljs-literal">false</span>,&amp;ctx))
-    ammo:=w.turrets.values[<span class="hljs-number">0</span>].ammo
-    <span class="hljs-keyword">for</span> w.shots.count&lt;game.MAX_SHOTS {_,ok:=r.pool_insert(&amp;w.shots,game.Shot{kind=.Ballistic,seat=<span class="hljs-number">1</span>,generation=<span class="hljs-number">1</span>,serial=<span class="hljs-number">1</span>,position={<span class="hljs-number">600</span>,<span class="hljs-number">1040</span>},velocity={<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},ttl=<span class="hljs-number">40</span>,damage=<span class="hljs-number">1</span>});assert(ok)}
-    game.turret_fire(&amp;w,<span class="hljs-number">1</span>,&amp;ctx)
-    testing.expect(t,w.turrets.values[<span class="hljs-number">0</span>].ammo==ammo &amp;&amp; w.players[<span class="hljs-number">0</span>].shots==<span class="hljs-number">0</span> &amp;&amp; w.turrets.values[<span class="hljs-number">0</span>].next_shot==<span class="hljs-number">0</span>)
-    notices:game.Notices;game.hurt_player(&amp;w,<span class="hljs-number">0</span>,<span class="hljs-number">255</span>,w.players[<span class="hljs-number">0</span>].position,&amp;notices,&amp;ctx)
-    testing.expect(t,!game.turret_operator(&amp;w,<span class="hljs-number">1</span>) &amp;&amp; game.turret_mount(&amp;w,<span class="hljs-number">2</span>,target))
-    game.turn_floor(&amp;w,<span class="hljs-literal">false</span>,&amp;ctx)
-    testing.expect(t,w.turrets.count==<span class="hljs-number">0</span> &amp;&amp; !game.turret_operator(&amp;w,<span class="hljs-number">2</span>))
+content50_checkpoint_upgrades_with_no_turret_or_occupation :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    bytes, error := os.read_entire_file(<span class="hljs-string">&quot;tests/replay_turret/fixtures/content50.checkpoint&quot;</span>, <span class="hljs-keyword">context</span>.allocator)
+    assert(error == <span class="hljs-literal">nil</span>)
+    <span class="hljs-keyword">defer</span> delete(bytes)
+    source: net.Checkpoint(upgrade.World_50, game.Control, upgrade.Action_50, game.SEATS)
+    <span class="hljs-keyword">defer</span> net.checkpoint_destroy(&amp;source)
+    assert(net.checkpoint_decode(&amp;source, bytes, upgrade.model_50(), upgrade.CONTENT_50) == .None)
+    converted, result := upgrade.root_50(bytes)
+    testing.expect_value(t, result, net.Error.None)
+    <span class="hljs-keyword">defer</span> delete(converted)
+
+    <span class="hljs-keyword">if</span> result != .None {
+        <span class="hljs-keyword">return</span>
+    }
+
+    target: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
+    <span class="hljs-keyword">defer</span> net.checkpoint_destroy(&amp;target)
+    assert(net.checkpoint_decode(&amp;target, converted, game.model(), game.CONTENT) == .None)
+    expected, ok := upgrade.map_world_50(source.frame.state)
+    testing.expect(t, ok &amp;&amp; reflect.equal(target.frame.state, expected) &amp;&amp; target.frame.state.turrets.count == <span class="hljs-number">0</span>)
+
+    <span class="hljs-keyword">for</span> ability <span class="hljs-keyword">in</span> target.frame.state.catalog.abilities {
+        testing.expect_value(t, ability.turret, game.World{}.catalog.abilities[<span class="hljs-number">0</span>].turret)
+    }
+}
+
+<span class="hljs-meta">@(test)</span>
+occupied_checkpoint_takeover_preserves_ammo_operator_and_cadence :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := spawned(<span class="hljs-number">5</span>)
+    w.catalog.abilities[TURRET].turret.cadence = <span class="hljs-number">10</span>
+    target := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    assert(game.turret_mount(&amp;w, <span class="hljs-number">1</span>, target))
+    cfg := net.DEFAULT_CONFIG
+    cfg.content = game.CONTENT
+    model := game.model()
+    model.reset_player = <span class="hljs-literal">nil</span>
+
+    drive := <span class="hljs-keyword">proc</span>(
+        s: ^net.Server(game.World, game.Control, game.Action, game.Event, game.SEATS),
+        tick: <span class="hljs-type">u64</span>,
+    ) -&gt; net.Error {
+        <span class="hljs-keyword">return</span> net.server_local(s, game.Control{aim = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, fire = tick &lt;= <span class="hljs-number">42</span>})
+    }
+
+    result := scenario.takeover(r.Frame(game.World){tick = w.clock, state = w}, model, cfg, <span class="hljs-number">5</span>, <span class="hljs-number">60</span>, drive)
+    testing.expect(t, result.report.phase == .Complete)
+    testing.expect(
+        t,
+        result.before.state.turrets.values[<span class="hljs-number">0</span>].operator.seat == <span class="hljs-number">1</span> &amp;&amp;
+        result.before.state.turrets.values[<span class="hljs-number">0</span>].ammo == <span class="hljs-number">4</span> &amp;&amp;
+        result.before.state.turrets.values[<span class="hljs-number">0</span>].next_shot == <span class="hljs-number">12</span>,
+    )
+    testing.expect(
+        t,
+        result.after.state.turrets.count == <span class="hljs-number">0</span> &amp;&amp;
+        result.after.state.players[<span class="hljs-number">0</span>].shots == <span class="hljs-number">5</span> &amp;&amp;
+        !game.turret_operator(&amp;result.after.state, <span class="hljs-number">1</span>),
+    )
+}
+
+<span class="hljs-meta">@(test)</span>
+mounted_actions_saturation_death_and_floor_cleanup :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
+    w := spawned()
+    target := r.Handle(game.Turret){<span class="hljs-number">0</span>, w.turrets.generations[<span class="hljs-number">0</span>]}
+    assert(game.turret_mount(&amp;w, <span class="hljs-number">1</span>, target))
+    timeline: r.Timeline(game.World, Input, game.Event)
+    assert(r.init(&amp;timeline, r.Frame(game.World){tick = w.clock, state = w}, step) == .None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;timeline)
+    events: [<span class="hljs-number">16</span>]r.Occurrence(game.Event)
+    ctx := r.Step(game.Event) {
+        tick   = w.clock + <span class="hljs-number">1</span>,
+        epoch  = <span class="hljs-number">1</span>,
+        events = events[:],
+    }
+    testing.expect(t, !game.dash_start(&amp;w, <span class="hljs-number">1</span>, {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, &amp;ctx) &amp;&amp; !game.cast_ability(&amp;w, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, <span class="hljs-literal">false</span>, &amp;ctx))
+    ammo := w.turrets.values[<span class="hljs-number">0</span>].ammo
+
+    <span class="hljs-keyword">for</span> w.shots.count &lt; game.MAX_SHOTS {
+        _, ok := r.pool_insert(
+            &amp;w.shots,
+            game.Shot {
+                kind = .Ballistic,
+                seat = <span class="hljs-number">1</span>,
+                generation = <span class="hljs-number">1</span>,
+                serial = <span class="hljs-number">1</span>,
+                position = {<span class="hljs-number">600</span>, <span class="hljs-number">1040</span>},
+                velocity = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>},
+                ttl = <span class="hljs-number">40</span>,
+                damage = <span class="hljs-number">1</span>,
+            },
+        )
+        assert(ok)
+    }
+
+    game.turret_fire(&amp;w, <span class="hljs-number">1</span>, &amp;ctx)
+    testing.expect(
+        t,
+        w.turrets.values[<span class="hljs-number">0</span>].ammo == ammo &amp;&amp; w.players[<span class="hljs-number">0</span>].shots == <span class="hljs-number">0</span> &amp;&amp; w.turrets.values[<span class="hljs-number">0</span>].next_shot == <span class="hljs-number">0</span>,
+    )
+    notices: game.Notices
+    game.hurt_player(&amp;w, <span class="hljs-number">0</span>, <span class="hljs-number">255</span>, w.players[<span class="hljs-number">0</span>].position, &amp;notices, &amp;ctx)
+    testing.expect(t, !game.turret_operator(&amp;w, <span class="hljs-number">1</span>) &amp;&amp; game.turret_mount(&amp;w, <span class="hljs-number">2</span>, target))
+    game.turn_floor(&amp;w, <span class="hljs-literal">false</span>, &amp;ctx)
+    testing.expect(t, w.turrets.count == <span class="hljs-number">0</span> &amp;&amp; !game.turret_operator(&amp;w, <span class="hljs-number">2</span>))
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_turret/model/turret_test.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay_turret/model/turret_test.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/tests/replay_turret/model/turret_test.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

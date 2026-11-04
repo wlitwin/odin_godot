@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>API.md · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>API.md</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../reference/box3d/authoring/API.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Shared authoring API: legacy schema 1, motion schema 2.</p>
+<p>Package <code>godot:box3d/authoring</code>, input types are in <code>types.odin</code>.
+<code>bake(Scene_Input, allocator=context.allocator) -&gt; (Baked_Scene, Diagnostic)</code>;
+<code>parse_and_bake(json_bytes:[]u8, allocator=context.allocator) -&gt; (Baked_Scene, Diagnostic)</code>;
+<code>destroy(^Baked_Scene)</code>; <code>build(^Baked_Scene, profile:u64) -&gt; (Built_Scene, Diagnostic)</code>;
+<code>built_destroy(^Built_Scene) -&gt; b.Status</code>.</p>
+<p>JSON uses the EXACT field names/types of Scene_Input, Body_Input and Shape_Input.
+Vectors are arrays, poses are <code>{position:[x,y,z],rotation:[x,y,z,w]}</code>. Types/kinds
+are lowercase strings. Body.shapes is the resource list, copied inline; no engine
+values, paths, instance IDs or runtime handles. Extractors emit all fields using
+the defaults in types.odin, not omitted implicit defaults. Sphere <code>center</code> and
+Capsule <code>centers_a</code>/<code>centers_b</code> are exact local endpoints, not height surrogates.
+Heightfield rows are Z and columns X, positive spacing.
+Positive scale only; sphere/capsule require uniform scale. Body/world transforms
+are rigid; all resource scale/local_pose is baked into exact native geometry.</p>
+<p>Body identity hashes namespace+body key. Shape identity hashes
+namespace+body key+resource key. Authored resource identity hashes namespace+key.
+Native catalog identity hashes canonical baked geometry and namespace: identical
+geometry has ONE catalog ID even for distinct resources. Scene_Data.resources
+preserves each authored resource key/logical ID/catalog mapping.
+The same resource key may be reused on different bodies ONLY with identical
+baked geometry; it is one immutable catalog asset. Duplicate body keys or duplicate
+shape keys on a body, conflicting reused resources, u64/u32 collisions and zero
+IDs fail before publication. Authored logical IDs do not depend on insertion
+order or geometry content; native catalog IDs bind geometry content. SHA256
+scene identity binds the baked semantic data. Arrays are sorted by
+stable keys before native construction. No native allocation identities are IDs.</p>
+<p>Limits preserve current 35 bodies/35 shapes/32 dynamic/8 catalog assets and
+64MiB envelope; Hull 4..256 points, Mesh 4096 vertices/24576 indices,
+64x64 heightfield and 2MiB input.
+Non-origin/rotated boxes become exact eight-vertex hulls. Mesh/heightfield require
+Static, non-sensor and enable_sensor_events=false (the mesh/heightfield default).
+Explicit unsupported flags fail validation; the builder never drops them.
+Builder owns a native world, immutable trusted catalog and
+local logical-ID-to-native-key maps; geometry temporaries are released after
+shape retention. Every failure destroys the partial unpublished candidate.</p>
+<p>Native advanced-catalog ABI is in <code>box3d/native/authoring_catalog.h</code>: V2 descriptor
+size72/align8 on supported64-bit targets, verified through actual C layout queries.
+Legacy primitive catalogs remain recovery1; authored catalogs are recovery2.
+Pure5, Native-facing Odin3 and both framework cases pass on the declared macOS
+reference; Native Debug/Release/ASanUBSan11each and actual Godot SDK resource/scene
+roundtrip/source-free construction pass. Export GateC remains separate.</p>
+<p>P5.2 motion additions (validated on the recorded P5.2 graph):</p>
+<p><code>scene_input_default(namespace, schema_version=1)</code> preserves the P5.1 default;
+pass <code>2</code> for motion. Schema1 accepts no joints/characters and retains its exact
+old content-hash projection and authored recovery2 catalog. Schema2 binds appended
+motion arrays and uses <code>recovery_catalog_create_v3</code>/recovery3. Both schemas retain
+the original body/shape/resource IDs. Logical joint/character IDs use distinct
+<code>joint</code>/<code>character</code> domains, namespace+stable_key, never native keys.</p>
+<p><code>Scene_Input.joints:[]Joint_Input</code> (maximum ONE) contains stable_key, lowercase
+kind (<code>pin</code>, <code>hinge</code>, <code>slider</code>, <code>spherical</code>, <code>distance</code>, <code>motor</code>, <code>weld</code>, <code>wheel</code>),
+body_a/body_b authored stable-key strings, local_frame_a/b Pose_Input, common
+force_threshold/torque_threshold/constraint_hertz/constraint_damping_ratio f32,
+collide_connected bool, and named <code>axis</code>, <code>distance</code>, <code>spherical</code>, <code>motor</code>, <code>weld</code>,
+<code>wheel</code> settings. These named settings exactly mirror the public fixed-width types
+in box3d/joints.odin / native/motion.h. Their Vec3/Quat values are JSON objects
+<code>{x,y,z}</code> / <code>{x,y,z,w}</code>; frame poses remain arrays as above. Unused setting blocks
+must be zero. <code>joint_input_default</code> is a pure explicit authoring default, while
+<code>b.motion_joint_default</code> exposes the pinned engine&#39;s actual defaults. Angles are
+radians, linear lengths metres. Axis flags spring1/limit2/motor4; spherical flags
+spring1/cone2/twist4/motor8; wheel flags suspensionSpring1/suspensionLimit2/
+spinMotor4/steering8/steeringLimit16. Pin maps Spherical with angular flags OFF;
+Hinge maps Revolute Z; Slider maps Prismatic X. Reject missing/self/two-static
+bodies, invalid poses/settings/flags/limits and unsupported unused blocks before
+publishing a bake. Build resolves Body_Key only after all bodies, then creates
+actual constraints transactionally and publishes local Joint_Key maps.</p>
+<p><code>Scene_Input.characters:[]Character_Input</code> contains stable_key, optional
+exclude_body authored body key (empty means none), config and initial.
+Config fields are max_slides (1..8), capsule <code>{center1:[3],center2:[3],radius}</code>,
+up[3] (normalized by bake), floor_cosine[0..1], category_bits/mask_bits:u64 and
+include_sensors:bool. Initial is <code>{position:[3],velocity:[3]}</code>. Initial grounding
+is explicitly unavailable/zero until actual movement; no authored native ground
+key. <code>character_input_default</code> gives the exact source defaults. All storage is
+copied; config/state are not live Godot references. Built character maps contain
+the copied config with resolved optional self Body_Key and initial POD.</p>
+<p>Public runtime wrappers are <code>b.motion_joint_default/create</code>, <code>b.query_aabb</code>,
+<code>b.query_ray_sorted</code> (old query_ray unchanged), <code>b.query_capsule/capsule_cast</code>,
+and <code>b.character_step(world,config,state,dt)-&gt;(Character_Result,Status)</code>.
+All 13 C record layouts/fields are independently queried by motion_abi_check.
+New queries return COMPLETE sorted Motion_Hit sets keyed by Shape_Key/Body_Key;
+Capacity returns exact required count with no truncated prefix. Character uses
+the actual engine capsule/plane mover; dt0 is no-op, otherwise fixed1/60 only.
+It returns explicit caller-owned POD, never changes a body or owns a tick. The
+framework is responsible for storing/reverting that state with its transaction.</p>
+<p>P5.3 detached artifact/editor surface (first source checkpoint, uncompiled):</p>
+<p><code>artifact_create(definition_json, Import_Metadata, allocator)-&gt;(Owned_Artifact, Artifact_Diagnostic)</code>;
+<code>artifact_load(encoded, allocator)-&gt;(Owned_Artifact, Artifact_Diagnostic)</code>;
+<code>artifact_destroy(^Owned_Artifact)</code>; <code>import_metadata(source_uri,source_revision)</code>.
+One owning artifact contains its owning shared Baked_Scene, copied source/import
+metadata and encoded bytes; definition_json is a read-only view into encoded and
+must not be deleted separately. Assignment aliases ownership. Failure publishes
+empty output and cleans the local candidate. Loading makes an independent owner.</p>
+<p>Version1 binary header is exactly200 bytes, little-endian: magic OGB3ART1[8],
+artifact_version:u32,header_bytes:u32,scene_schema:u32,import_version:u32,
+source_length:u32,metadata_length:u32,payload_length:u64; then source_sha256,
+bake_sha256,metadata_sha256,payload_sha256,shared_bake_sha256 (each32 bytes).
+Payload is canonical Import_Metadata JSON followed by EXACT source JSON bytes.
+Lengths must match the whole file with no trailing bytes. Source&lt;=2MiB,
+metadata&lt;=16KiB, bounded parser scratch and all existing bake limits apply.
+Importer ogb3.authoring/version1 and nonempty source_uri are explicit; an empty
+source_revision is unavailable. Shared-bake identity fingerprints actual
+types/bake/motion source. Load checks all versions/hashes, rebakes once, compares
+semantic identity and canonical envelope. No Native memory/ABI/handles are stored.
+Semantic bake identity survives equivalent scene order while exact source and
+artifact identity correctly change. This is corruption checking, not authentication.</p>
+<p><code>artifact_inspect_json</code> returns one owning JSON buffer. Durable u64 IDs are exact
+16hex strings, catalog IDs8hex; metadata includes source/import/schema/bake
+identities/counts. Optional authored SHAPE preview delegates debug_preview (the
+shared pure outline generator), no fake frame/stamp or Native world. Optional
+Godot module methods and installation are in addons/box3d_authoring/tool_module.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">box3d/authoring/API.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/box3d/authoring/API.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

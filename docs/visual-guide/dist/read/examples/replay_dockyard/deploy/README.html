@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Dockyard service configuration · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Replay</a><span>/</span><span>Guide</span></div><p class="eyebrow">Replay</p><h1>Dockyard service configuration</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/examples/replay_dockyard/deploy/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#itchio-connections-and-local-dns">itch.io connections and local DNS</a></nav></details>
+<article class="reading-body "><p>The selected <a href="pi.html">Pi deployment</a> serves
+<code>wss://mc.laserturtle.net:62127/replay-room/dockyard</code>, alongside the existing
+Scrapyard <code>/rtc</code> route and shared TURN relay. The files here also include generic
+templates for another deployment. Public-origin iframe checks and off-network
+acceptance are separate from local HTTPS/WSS and relay tests.</p>
+<p>Serve the <strong>ordinary production export</strong>, including its PCK and Wasm files, from
+one HTTPS origin. Never publish the test-bridge project, browser profiles,
+enrollment databases, private fixture directories, certificates&#39; private keys or
+TURN credentials. The <span class="local-reference" title="examples/replay_dockyard/deploy/Caddyfile · available in the repository">Caddyfile</span> sets the same COOP/COEP/CORP response
+headers used by the browser checks. It takes <code>DOCKYARD_HTTPS_ADDRESS</code>,
+<code>DOCKYARD_WEB_ROOT</code>, <code>DOCKYARD_TLS_CERT</code> and <code>DOCKYARD_TLS_KEY</code> from the operator&#39;s
+environment and uses supplied certificates. It performs no automatic certificate
+enrollment. Its syntax follows Caddy&#39;s <a href="https://caddyserver.com/docs/caddyfile/directives/header" rel="noreferrer">header</a>
+and <a href="https://caddyserver.com/docs/caddyfile/directives/tls" rel="noreferrer">TLS</a> directives.</p>
+<p>Use the existing <a href="../../replay_room_service/README.html">Replay room service</a>, built
+with the selected Native library and explicit static SQLite input. It owns
+enrollment, authority leases, signaling and relay credential issuance. It does
+not simulate Dockyard. Set <code>REPLAY_ROOM_CHECKPOINT_MODEL=disabled</code>; this release
+does not supply durable-world publication or host takeover. Use the selected
+artifact&#39;s exact <code>DOCKYARD_LOBBY</code> cohort in <code>REPLAY_ROOM_CONTENT</code>, with separate
+databases/services for incompatible cohorts. Native and Web cohorts differ.</p>
+<p>Copy <span class="local-reference" title="examples/replay_dockyard/deploy/service.env.example · available in the repository">service.env.example</span> to a private operator file, replace
+the paths/addresses and explicitly initialize the database once. Subsequent starts
+must not silently recreate a missing database. Run the service&#39;s prepared project
+with <code>ODIN_SCRIPTS_DLL</code> pointing to its exact scripts library. The service itself
+serves WSS using its certificate and key; the static-file Caddy server is separate.</p>
+<p>For a public relay, complete <span class="local-reference" title="examples/replay_dockyard/deploy/turnserver.conf.template · available in the repository">turnserver.conf.template</span>
+using the <a href="https://github.com/coturn/coturn/blob/4.9.0/examples/etc/turnserver.conf" rel="noreferrer">pinned Coturn configuration reference</a>.
+The room service and Coturn share the server-only secret. Clients receive short
+lived credentials through authenticated membership. Set the listener/relay IPs,
+any actual NAT mapping and firewall rules for the chosen UDP/TCP/TLS listeners
+and relay port range. The public template deliberately has no loopback-peer
+exception; that exception belongs only to the isolated local tests.</p>
+<p>Open the game with public routing configuration, for example:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">https://game.example.invalid/index.html?service=wss%3A%2F%2Frooms.example.invalid%3A49740&amp;relay=1</code></pre></div><p>The URL contains no credentials. Players choose a name and Host or Join; they share
+the explicit invitation code through Copy Invite. Invite codes are capabilities,
+so keep them out of logs, public URLs and screenshots. Recent Crew uses the stored
+membership, rather than reusing a consumed invitation. Serve the same qualified
+Wasm artifact to both browser players. Public Internet acceptance still requires
+two actual remote endpoints, valid public trust and recorded selected candidate
+pairs with transferred traffic. Local certificate pins and local TURN success
+do not establish that result.</p>
+<h2 id="itchio-connections-and-local-dns">itch.io connections and local DNS<a class="heading-anchor" href="#itchio-connections-and-local-dns" aria-label="Link to this section">#</a></h2>
+<p>An itch page is a public origin. If the room hostname resolves to a private LAN
+address on the player&#39;s network, browser local-network restrictions can block
+the WebSocket before a room request reaches the proxy. The observed itch iframe
+does not delegate the <code>local-network</code> permission. A successful localhost preview
+or command-line WebSocket handshake does not test that permission boundary.</p>
+<p>Compare the system resolver with a public resolver:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">dig +short mc.laserturtle.net
+dig @1.1.1.1 +short mc.laserturtle.net</code></pre></div><p>For this public game endpoint, remove a local DNS rewrite to <code>10.0.0.10</code> so clients
+use the public DNS record. Keep LAN-only names separate. Restart the browser after
+the DNS correction. The existing public port and proxy paths remain the same.
+Keep the WSS hostname for certificate validation; changing the URL to an IP literal
+does not preserve that validation.</p>
+<p>The retained itch-origin probes reproduced failures on both <code>/rtc</code> and
+<code>/replay-room/dockyard</code> with local DNS. Using public DNS restored WebSocket
+connections in Chrome and Firefox without disabling browser protections. Chrome
+reported <code>ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS</code>; Firefox reported a generic
+connection failure. The separate Firefox <code>Source Map URL: null</code> diagnostic concerns
+debugging metadata, not the WebSocket route. See
+<a href="https://groups.google.com/a/chromium.org/g/blink-dev/c/O6GMKt44Ups" rel="noreferrer">Chrome&#39;s WebSocket rollout</a>
+and the <a href="https://wicg.github.io/local-network-access/#permissions" rel="noreferrer">Local Network Access permission model</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="pi.html"><span>Existing Pi deployment</span><span aria-hidden="true">→</span></a><a href="../../replay_room_service/README.html"><span>Replay room service</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_dockyard/deploy/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#itchio-connections-and-local-dns" class="">itch.io connections and local DNS</a></nav><div class="outline-actions"><a href="../../../../reference/examples/replay_dockyard/deploy/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

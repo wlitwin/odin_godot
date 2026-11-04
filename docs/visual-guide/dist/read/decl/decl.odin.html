@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>decl.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>decl.odin</h1><div class="reader-meta"><span>562 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/decl/decl.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>decl.odin</h1><div class="reader-meta"><span>614 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/decl/decl.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> gd_decl
 
@@ -43,8 +43,8 @@
 
 <span class="hljs-comment">// How a token is recognized. A Prefix token carries a value after its `=`.</span>
 Match :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Exact,
-	Prefix
+    Exact,
+    Prefix,
 }
 
 <span class="hljs-comment">// Where a token may appear inside the tag. FIRST tokens select the field&#x27;s</span>
@@ -60,8 +60,8 @@ Match :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span
 <span class="hljs-comment">// names, a lane&#x27;s tuning knobs. The `fingerprint` column below is the tell —</span>
 <span class="hljs-comment">// every true row is a First.</span>
 Slot :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	First,
-	Spec
+    First,
+    Spec,
 }
 
 <span class="hljs-comment">// WHO consumes the token — the fact the runtime&#x27;s skip list is a projection</span>
@@ -83,36 +83,36 @@ Slot :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span>
 <span class="hljs-comment">// cannot.) A Scriptgen token has no such fallback, so scriptgen type-checks it</span>
 <span class="hljs-comment">// at EVERY depth. See the seam note in scriptgen/parse.odin&#x27;s Tagged_Field.</span>
 Home :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Reflect, <span class="hljs-comment">// the runtime&#x27;s reflection registrar acts on it (and type-checks it, at any depth)</span>
-	Scriptgen, <span class="hljs-comment">// consumed entirely at build time; nothing to reflect — scriptgen type-checks it</span>
+    Reflect, <span class="hljs-comment">// the runtime&#x27;s reflection registrar acts on it (and type-checks it, at any depth)</span>
+    Scriptgen, <span class="hljs-comment">// consumed entirely at build time; nothing to reflect — scriptgen type-checks it</span>
 }
 
 Field_Token :: <span class="hljs-keyword">struct</span> {
-	name:        <span class="hljs-type">string</span>,
-	match:       Match,
-	slot:        Slot,
-	home:        Home,
-	<span class="hljs-comment">// Its shape folds into NET_FINGERPRINT, so a build that disagrees about it</span>
-	<span class="hljs-comment">// is refused at the JOIN door rather than misparsing packets. This column</span>
-	<span class="hljs-comment">// is what makes &quot;a declaration that crosses the wire but not the version</span>
-	<span class="hljs-comment">// door&quot; a thing you can SEE instead of a thing you discover in the field.</span>
-	<span class="hljs-comment">//</span>
-	<span class="hljs-comment">// It is checked, not merely written down: scriptgen&#x27;s FINGERPRINT_CONTRIB</span>
-	<span class="hljs-comment">// carries one row per token naming the line net_fingerprint writes for it,</span>
-	<span class="hljs-comment">// and refuses the build if a row and this column disagree, or if a token</span>
-	<span class="hljs-comment">// this column claims is declared by the corpus and left no trace in the</span>
-	<span class="hljs-comment">// hashed string. That check found the column&#x27;s first lie on the day it was</span>
-	<span class="hljs-comment">// added — `backup` shipped as true and was never serialized. FALSE is right:</span>
-	<span class="hljs-comment">// a backup is guarded by the codec&#x27;s own fnv1a32 format stamp at the LOAD</span>
-	<span class="hljs-comment">// door, and refusing a JOIN over save-file shape would ground two peers</span>
-	<span class="hljs-comment">// whose saves were never going to meet. The general rule the row follows:</span>
-	<span class="hljs-comment">// true iff the declaration&#x27;s shape must match across a SOCKET, not merely</span>
-	<span class="hljs-comment">// across a file.</span>
-	fingerprint: <span class="hljs-type">bool</span>,
-	<span class="hljs-comment">// How the token is spelled in an error message (&quot;`onready=PATH`&quot;), and the</span>
-	<span class="hljs-comment">// one-line gloss the docs table shows.</span>
-	spelling:    <span class="hljs-type">string</span>,
-	blurb:       <span class="hljs-type">string</span>
+    name:        <span class="hljs-type">string</span>,
+    match:       Match,
+    slot:        Slot,
+    home:        Home,
+    <span class="hljs-comment">// Its shape folds into NET_FINGERPRINT, so a build that disagrees about it</span>
+    <span class="hljs-comment">// is refused at the JOIN door rather than misparsing packets. This column</span>
+    <span class="hljs-comment">// is what makes &quot;a declaration that crosses the wire but not the version</span>
+    <span class="hljs-comment">// door&quot; a thing you can SEE instead of a thing you discover in the field.</span>
+    <span class="hljs-comment">//</span>
+    <span class="hljs-comment">// It is checked, not merely written down: scriptgen&#x27;s FINGERPRINT_CONTRIB</span>
+    <span class="hljs-comment">// carries one row per token naming the line net_fingerprint writes for it,</span>
+    <span class="hljs-comment">// and refuses the build if a row and this column disagree, or if a token</span>
+    <span class="hljs-comment">// this column claims is declared by the corpus and left no trace in the</span>
+    <span class="hljs-comment">// hashed string. That check found the column&#x27;s first lie on the day it was</span>
+    <span class="hljs-comment">// added — `backup` shipped as true and was never serialized. FALSE is right:</span>
+    <span class="hljs-comment">// a backup is guarded by the codec&#x27;s own fnv1a32 format stamp at the LOAD</span>
+    <span class="hljs-comment">// door, and refusing a JOIN over save-file shape would ground two peers</span>
+    <span class="hljs-comment">// whose saves were never going to meet. The general rule the row follows:</span>
+    <span class="hljs-comment">// true iff the declaration&#x27;s shape must match across a SOCKET, not merely</span>
+    <span class="hljs-comment">// across a file.</span>
+    fingerprint: <span class="hljs-type">bool</span>,
+    <span class="hljs-comment">// How the token is spelled in an error message (&quot;`onready=PATH`&quot;), and the</span>
+    <span class="hljs-comment">// one-line gloss the docs table shows.</span>
+    spelling:    <span class="hljs-type">string</span>,
+    blurb:       <span class="hljs-type">string</span>,
 }
 
 <span class="hljs-comment">// THE THREE LANES ARE THREE TOKENS. `owner` and `predict` used to be options</span>
@@ -124,82 +124,113 @@ Field_Token :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-comment">// lane makes each lane&#x27;s option set CLOSED and checkable on its own, and makes</span>
 <span class="hljs-comment">// the illegal combinations unspellable instead of merely rejected.</span>
 FIELD_TOKENS :: []Field_Token {
-	{<span class="hljs-string">&quot;export&quot;</span>, .Exact, .First, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`export`&quot;</span>, <span class="hljs-string">&quot;an editor-visible property&quot;</span>},
-	{<span class="hljs-string">&quot;onready=&quot;</span>, .Prefix, .First, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`onready=PATH`&quot;</span>, <span class="hljs-string">&quot;an auto-wired node reference&quot;</span>},
-	{<span class="hljs-string">&quot;replicate&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`replicate`&quot;</span>, <span class="hljs-string">&quot;a networked field on the DELTA lane (kit/net descriptors)&quot;</span>},
-	{<span class="hljs-string">&quot;owner&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`owner`&quot;</span>, <span class="hljs-string">&quot;a networked field streamed from its owning peer&quot;</span>},
-	{<span class="hljs-string">&quot;predict&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`predict`&quot;</span>, <span class="hljs-string">&quot;a networked field the sim predicts and reconciles (kit/sim)&quot;</span>},
-	{<span class="hljs-string">&quot;backup&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`backup`&quot;</span>, <span class="hljs-string">&quot;a field the session backup carries&quot;</span>},
-	{<span class="hljs-string">&quot;manual&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`manual`&quot;</span>, <span class="hljs-string">&quot;I call the generated thing myself&quot;</span>},
-	{<span class="hljs-string">&quot;profile=&quot;</span>, .Prefix, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`profile=T`&quot;</span>, <span class="hljs-string">&quot;the per-player profile row type&quot;</span>},
-	{<span class="hljs-string">&quot;entity=&quot;</span>, .Prefix, .First, .Reflect, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`entity=Name:id`&quot;</span>, <span class="hljs-string">&quot;a spawnable entity type and its stable id (an exported PackedScene slot, synthesized)&quot;</span>},
-	{<span class="hljs-string">&quot;args=&quot;</span>, .Prefix, .Spec, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`args=a,b`&quot;</span>, <span class="hljs-string">&quot;a signal payload&#x27;s parameter names&quot;</span>}
+    {<span class="hljs-string">&quot;export&quot;</span>, .Exact, .First, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`export`&quot;</span>, <span class="hljs-string">&quot;an editor-visible property&quot;</span>},
+    {<span class="hljs-string">&quot;onready=&quot;</span>, .Prefix, .First, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`onready=PATH`&quot;</span>, <span class="hljs-string">&quot;an auto-wired node reference&quot;</span>},
+    {
+        <span class="hljs-string">&quot;replicate&quot;</span>,
+        .Exact,
+        .First,
+        .Scriptgen,
+        <span class="hljs-literal">true</span>,
+        <span class="hljs-string">&quot;`replicate`&quot;</span>,
+        <span class="hljs-string">&quot;a networked field on the DELTA lane (kit/net descriptors)&quot;</span>,
+    },
+    {<span class="hljs-string">&quot;owner&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`owner`&quot;</span>, <span class="hljs-string">&quot;a networked field streamed from its owning peer&quot;</span>},
+    {
+        <span class="hljs-string">&quot;predict&quot;</span>,
+        .Exact,
+        .First,
+        .Scriptgen,
+        <span class="hljs-literal">true</span>,
+        <span class="hljs-string">&quot;`predict`&quot;</span>,
+        <span class="hljs-string">&quot;a networked field the sim predicts and reconciles (kit/sim)&quot;</span>,
+    },
+    {<span class="hljs-string">&quot;backup&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`backup`&quot;</span>, <span class="hljs-string">&quot;a field the session backup carries&quot;</span>},
+    {<span class="hljs-string">&quot;manual&quot;</span>, .Exact, .First, .Scriptgen, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`manual`&quot;</span>, <span class="hljs-string">&quot;I call the generated thing myself&quot;</span>},
+    {<span class="hljs-string">&quot;profile=&quot;</span>, .Prefix, .First, .Scriptgen, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`profile=T`&quot;</span>, <span class="hljs-string">&quot;the per-player profile row type&quot;</span>},
+    {
+        <span class="hljs-string">&quot;entity=&quot;</span>,
+        .Prefix,
+        .First,
+        .Reflect,
+        <span class="hljs-literal">true</span>,
+        <span class="hljs-string">&quot;`entity=Name:id`&quot;</span>,
+        <span class="hljs-string">&quot;a spawnable entity type and its stable id (an exported PackedScene slot, synthesized)&quot;</span>,
+    },
+    {<span class="hljs-string">&quot;args=&quot;</span>, .Prefix, .Spec, .Reflect, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`args=a,b`&quot;</span>, <span class="hljs-string">&quot;a signal payload&#x27;s parameter names&quot;</span>},
 }
 
 <span class="hljs-comment">// The three replication lanes, in the order the docs table reads. Each is a</span>
 <span class="hljs-comment">// FIRST token; `replicate_lane` answers &quot;is this token a lane, and which&quot;.</span>
 Lane :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	None,
-	Delta, <span class="hljs-comment">// `replicate` — host-authoritative, byte-diffed, `_edge` halves pair here</span>
-	Owner, <span class="hljs-comment">// `owner`     — streamed from the owning peer, interpolated</span>
-	Predict, <span class="hljs-comment">// `predict`   — sim-predicted, reconciled against server truth</span>
+    None,
+    Delta, <span class="hljs-comment">// `replicate` — host-authoritative, byte-diffed, `_edge` halves pair here</span>
+    Owner, <span class="hljs-comment">// `owner`     — streamed from the owning peer, interpolated</span>
+    Predict, <span class="hljs-comment">// `predict`   — sim-predicted, reconciled against server truth</span>
 }
 
 replicate_lane :: <span class="hljs-keyword">proc</span>(tok: <span class="hljs-type">string</span>) -&gt; Lane {
-	<span class="hljs-keyword">switch</span> tok {
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;replicate&quot;</span>:
-		<span class="hljs-keyword">return</span> .Delta
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;owner&quot;</span>:
-		<span class="hljs-keyword">return</span> .Owner
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;predict&quot;</span>:
-		<span class="hljs-keyword">return</span> .Predict
-	}
-	<span class="hljs-keyword">return</span> .None
+    <span class="hljs-keyword">switch</span> tok {
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;replicate&quot;</span>:
+        <span class="hljs-keyword">return</span> .Delta
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;owner&quot;</span>:
+        <span class="hljs-keyword">return</span> .Owner
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;predict&quot;</span>:
+        <span class="hljs-keyword">return</span> .Predict
+    }
+
+    <span class="hljs-keyword">return</span> .None
 }
 
 <span class="hljs-comment">// The token `tok` selects, if the vocabulary knows it. `tok` is one</span>
 <span class="hljs-comment">// comma-separated piece of a tag, already trimmed.</span>
 field_token :: <span class="hljs-keyword">proc</span>(tok: <span class="hljs-type">string</span>) -&gt; (Field_Token, <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> FIELD_TOKENS {
-		<span class="hljs-keyword">switch</span> t.match {
-		<span class="hljs-keyword">case</span> .Exact:
-			<span class="hljs-keyword">if</span> tok == t.name {
-				<span class="hljs-keyword">return</span> t, <span class="hljs-literal">true</span>
-			}
-		<span class="hljs-keyword">case</span> .Prefix:
-			<span class="hljs-keyword">if</span> strings.has_prefix(tok, t.name) {
-				<span class="hljs-keyword">return</span> t, <span class="hljs-literal">true</span>
-			}
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> FIELD_TOKENS {
+        <span class="hljs-keyword">switch</span> t.match {
+        <span class="hljs-keyword">case</span> .Exact:
+            <span class="hljs-keyword">if</span> tok == t.name {
+                <span class="hljs-keyword">return</span> t, <span class="hljs-literal">true</span>
+            }
+        <span class="hljs-keyword">case</span> .Prefix:
+            <span class="hljs-keyword">if</span> strings.has_prefix(tok, t.name) {
+                <span class="hljs-keyword">return</span> t, <span class="hljs-literal">true</span>
+            }
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 <span class="hljs-comment">// PROJECTION — the runtime&#x27;s skip list: true when the token was consumed</span>
 <span class="hljs-comment">// whole at build time, so reflection must pass over it in silence.</span>
 field_is_build_only :: <span class="hljs-keyword">proc</span>(tok: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">bool</span> {
-	t, ok := field_token(tok)
-	<span class="hljs-keyword">return</span> ok &amp;&amp; t.home == .Scriptgen
+    t, ok := field_token(tok)
+    <span class="hljs-keyword">return</span> ok &amp;&amp; t.home == .Scriptgen
 }
 
 <span class="hljs-comment">// PROJECTION — the &quot;expected …&quot; half of an unknown-tag error, in declaration</span>
 <span class="hljs-comment">// order, first tokens only (a spec&#x27;s error names its own carrier).</span>
 field_expected :: <span class="hljs-keyword">proc</span>(allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; <span class="hljs-type">string</span> {
-	firsts: [<span class="hljs-keyword">dynamic</span>]<span class="hljs-type">string</span>
-	<span class="hljs-keyword">defer</span> delete(firsts)
-	<span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> FIELD_TOKENS {
-		<span class="hljs-keyword">if</span> t.slot == .First {
-			append(&amp;firsts, t.spelling)
-		}
-	}
-	b := strings.builder_make(allocator)
-	<span class="hljs-keyword">for</span> sp, i <span class="hljs-keyword">in</span> firsts {
-		<span class="hljs-keyword">if</span> i &gt; <span class="hljs-number">0</span> {
-			strings.write_string(&amp;b, i == len(firsts) - <span class="hljs-number">1</span> ? <span class="hljs-string">&quot;, or &quot;</span> : <span class="hljs-string">&quot;, &quot;</span>)
-		}
-		strings.write_string(&amp;b, sp)
-	}
-	<span class="hljs-keyword">return</span> strings.to_string(b)
+    firsts: [<span class="hljs-keyword">dynamic</span>]<span class="hljs-type">string</span>
+    <span class="hljs-keyword">defer</span> delete(firsts)
+
+    <span class="hljs-keyword">for</span> t <span class="hljs-keyword">in</span> FIELD_TOKENS {
+        <span class="hljs-keyword">if</span> t.slot == .First {
+            append(&amp;firsts, t.spelling)
+        }
+    }
+
+    b := strings.builder_make(allocator)
+
+    <span class="hljs-keyword">for</span> sp, i <span class="hljs-keyword">in</span> firsts {
+        <span class="hljs-keyword">if</span> i &gt; <span class="hljs-number">0</span> {
+            strings.write_string(&amp;b, i == len(firsts) - <span class="hljs-number">1</span> ? <span class="hljs-string">&quot;, or &quot;</span> : <span class="hljs-string">&quot;, &quot;</span>)
+        }
+
+        strings.write_string(&amp;b, sp)
+    }
+
+    <span class="hljs-keyword">return</span> strings.to_string(b)
 }
 
 <span class="hljs-comment">// PROJECTION — the wrong-namespace sniff: is this payload UNMISTAKABLY ours?</span>
@@ -207,8 +238,8 @@ field_expected :: <span class="hljs-keyword">proc</span>(allocator := <span clas
 <span class="hljs-comment">// so a tag whose first token is one of ours is flagged whatever namespace it</span>
 <span class="hljs-comment">// wears.</span>
 field_token_shaped :: <span class="hljs-keyword">proc</span>(tok: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">bool</span> {
-	_, ok := field_token(tok)
-	<span class="hljs-keyword">return</span> ok
+    _, ok := field_token(tok)
+    <span class="hljs-keyword">return</span> ok
 }
 
 <span class="hljs-comment">// ---- the per-context policy: WHERE a tag may appear, and what it means there ---</span>
@@ -230,8 +261,8 @@ field_token_shaped :: <span class="hljs-keyword">proc</span>(tok: <span class="h
 <span class="hljs-comment">// Fields and procs are two dispatches; this is the field one. Named here so the</span>
 <span class="hljs-comment">// sketch&#x27;s missing column reads as a ruling, not an oversight.</span>
 Field_Site :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Top_Level, <span class="hljs-comment">// a field of the script struct itself</span>
-	Nested, <span class="hljs-comment">// a field reached through a `using`/embedded block</span>
+    Top_Level, <span class="hljs-comment">// a field of the script struct itself</span>
+    Nested, <span class="hljs-comment">// a field reached through a `using`/embedded block</span>
 }
 
 <span class="hljs-comment">// What the shared dispatch does with a KNOWN token at a site, BEFORE any</span>
@@ -240,21 +271,21 @@ Field_Site :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8<
 <span class="hljs-comment">// question the two walks used to answer inconsistently, and nothing about what a</span>
 <span class="hljs-comment">// token MEANS once it is allowed, which stays scriptgen&#x27;s to know.</span>
 Field_Action :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Handle, <span class="hljs-comment">// the dispatch&#x27;s arm acts on it (whether it RECORDS may still narrow by site)</span>
-	Caller, <span class="hljs-comment">// consumed by the CALLER before the shared dispatch — reaching it is a toolchain bug</span>
-	Refuse, <span class="hljs-comment">// illegal at this site; `reason` says why, in the author&#x27;s own terms</span>
+    Handle, <span class="hljs-comment">// the dispatch&#x27;s arm acts on it (whether it RECORDS may still narrow by site)</span>
+    Caller, <span class="hljs-comment">// consumed by the CALLER before the shared dispatch — reaching it is a toolchain bug</span>
+    Refuse, <span class="hljs-comment">// illegal at this site; `reason` says why, in the author&#x27;s own terms</span>
 }
 
 Field_Policy :: <span class="hljs-keyword">struct</span> {
-	token:  <span class="hljs-type">string</span>, <span class="hljs-comment">// a FIELD_TOKENS name, verbatim</span>
-	site:   Field_Site,
-	action: Field_Action,
-	<span class="hljs-comment">// For Refuse: the whole sentence after &quot;&lt;Class&gt;.&lt;path&gt;: &quot;, its own backticked</span>
-	<span class="hljs-comment">// token spelling included. It lives here as DATA, not as a literal in the</span>
-	<span class="hljs-comment">// dispatch, so the same refusal can never again be worded two ways in two</span>
-	<span class="hljs-comment">// places — which is exactly how the two sites drifted apart. &quot;&quot; for Handle /</span>
-	<span class="hljs-comment">// Caller (the completeness check enforces the pairing both directions).</span>
-	reason: <span class="hljs-type">string</span>
+    token:  <span class="hljs-type">string</span>, <span class="hljs-comment">// a FIELD_TOKENS name, verbatim</span>
+    site:   Field_Site,
+    action: Field_Action,
+    <span class="hljs-comment">// For Refuse: the whole sentence after &quot;&lt;Class&gt;.&lt;path&gt;: &quot;, its own backticked</span>
+    <span class="hljs-comment">// token spelling included. It lives here as DATA, not as a literal in the</span>
+    <span class="hljs-comment">// dispatch, so the same refusal can never again be worded two ways in two</span>
+    <span class="hljs-comment">// places — which is exactly how the two sites drifted apart. &quot;&quot; for Handle /</span>
+    <span class="hljs-comment">// Caller (the completeness check enforces the pairing both directions).</span>
+    reason: <span class="hljs-type">string</span>,
 }
 
 <span class="hljs-comment">// THE TABLE. One row per (FIELD_TOKENS token x Field_Site); scriptgen&#x27;s</span>
@@ -264,71 +295,72 @@ Field_Policy :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-comment">// fingerprint column honest. A new token added above without two rows here fails</span>
 <span class="hljs-comment">// the build, naming itself.</span>
 FIELD_POLICY :: []Field_Policy {
-	<span class="hljs-comment">// The three lanes and backup: a networked or host-local field means the same</span>
-	<span class="hljs-comment">// thing at any depth (the kit bundles carry replicate fields several levels</span>
-	<span class="hljs-comment">// down; scrapyard tags backup fields inside a `using` embed).</span>
-	{<span class="hljs-string">&quot;replicate&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;replicate&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;owner&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;owner&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;predict&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;predict&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;backup&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;backup&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	<span class="hljs-comment">// Editor dressing, registered by the runtime reflection walk at every depth:</span>
-	<span class="hljs-comment">// scriptgen validates the tag in both places (the spelling + arity gates) and</span>
-	<span class="hljs-comment">// RECORDS only at top level — an embed&#x27;s exports register under their</span>
-	<span class="hljs-comment">// namespaced names, not scriptgen&#x27;s own table. &quot;Handle&quot; both; the record-skip</span>
-	<span class="hljs-comment">// is the arm&#x27;s, since it is a what-it-means detail, not a may-it-appear one.</span>
-	{<span class="hljs-string">&quot;export&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;export&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;onready=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{<span class="hljs-string">&quot;onready=&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	<span class="hljs-comment">// The three that name the CLASS&#x27;s OWN field and silently wire nothing nested —</span>
-	<span class="hljs-comment">// each was a real &quot;declared but never installed&quot; failure reached through a</span>
-	<span class="hljs-comment">// block, and each refusal names the specific thing that goes missing.</span>
-	{<span class="hljs-string">&quot;profile=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{
-		<span class="hljs-string">&quot;profile=&quot;</span>,
-		.Nested,
-		.Refuse,
-		<span class="hljs-string">&quot;`profile=` declares on the class&#x27;s OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level&quot;</span>
-	},
-	{<span class="hljs-string">&quot;entity=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
-	{
-		<span class="hljs-string">&quot;entity=&quot;</span>,
-		.Nested,
-		.Refuse,
-		<span class="hljs-string">&quot;`entity=` declares on the class&#x27;s OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level&quot;</span>
-	},
-	<span class="hljs-comment">// `manual` opts an embed&#x27;s tick out of auto-hoist. TOP LEVEL the caller</span>
-	<span class="hljs-comment">// (parse_script) consumes it — it recurses the embed and suppresses only the</span>
-	<span class="hljs-comment">// auto-call — so it must NEVER reach the shared dispatch; Caller is that</span>
-	<span class="hljs-comment">// contract, and the dispatch asserts on it. NESTED it has never meant</span>
-	<span class="hljs-comment">// anything and used to eat the subtree.</span>
-	{<span class="hljs-string">&quot;manual&quot;</span>, .Top_Level, .Caller, <span class="hljs-string">&quot;&quot;</span>},
-	{
-		<span class="hljs-string">&quot;manual&quot;</span>,
-		.Nested,
-		.Refuse,
-		<span class="hljs-string">&quot;`gd:\&quot;manual\&quot;` only works on the class&#x27;s OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there&quot;</span>
-	},
-	<span class="hljs-comment">// A signal payload&#x27;s parameter NAMES: a Spec token (it rides behind a signal</span>
-	<span class="hljs-comment">// TYPE), so as a leading token it is the wrong slot at either site.</span>
-	{<span class="hljs-string">&quot;args=&quot;</span>, .Top_Level, .Refuse, <span class="hljs-string">&quot;`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)&quot;</span>},
-	{<span class="hljs-string">&quot;args=&quot;</span>, .Nested, .Refuse, <span class="hljs-string">&quot;`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)&quot;</span>}
+    <span class="hljs-comment">// The three lanes and backup: a networked or host-local field means the same</span>
+    <span class="hljs-comment">// thing at any depth (the kit bundles carry replicate fields several levels</span>
+    <span class="hljs-comment">// down; scrapyard tags backup fields inside a `using` embed).</span>
+    {<span class="hljs-string">&quot;replicate&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;replicate&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;owner&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;owner&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;predict&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;predict&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;backup&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;backup&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    <span class="hljs-comment">// Editor dressing, registered by the runtime reflection walk at every depth:</span>
+    <span class="hljs-comment">// scriptgen validates the tag in both places (the spelling + arity gates) and</span>
+    <span class="hljs-comment">// RECORDS only at top level — an embed&#x27;s exports register under their</span>
+    <span class="hljs-comment">// namespaced names, not scriptgen&#x27;s own table. &quot;Handle&quot; both; the record-skip</span>
+    <span class="hljs-comment">// is the arm&#x27;s, since it is a what-it-means detail, not a may-it-appear one.</span>
+    {<span class="hljs-string">&quot;export&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;export&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;onready=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {<span class="hljs-string">&quot;onready=&quot;</span>, .Nested, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    <span class="hljs-comment">// The three that name the CLASS&#x27;s OWN field and silently wire nothing nested —</span>
+    <span class="hljs-comment">// each was a real &quot;declared but never installed&quot; failure reached through a</span>
+    <span class="hljs-comment">// block, and each refusal names the specific thing that goes missing.</span>
+    {<span class="hljs-string">&quot;profile=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {
+        <span class="hljs-string">&quot;profile=&quot;</span>,
+        .Nested,
+        .Refuse,
+        <span class="hljs-string">&quot;`profile=` declares on the class&#x27;s OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level&quot;</span>,
+    },
+    {<span class="hljs-string">&quot;entity=&quot;</span>, .Top_Level, .Handle, <span class="hljs-string">&quot;&quot;</span>},
+    {
+        <span class="hljs-string">&quot;entity=&quot;</span>,
+        .Nested,
+        .Refuse,
+        <span class="hljs-string">&quot;`entity=` declares on the class&#x27;s OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level&quot;</span>,
+    },
+    <span class="hljs-comment">// `manual` opts an embed&#x27;s tick out of auto-hoist. TOP LEVEL the caller</span>
+    <span class="hljs-comment">// (parse_script) consumes it — it recurses the embed and suppresses only the</span>
+    <span class="hljs-comment">// auto-call — so it must NEVER reach the shared dispatch; Caller is that</span>
+    <span class="hljs-comment">// contract, and the dispatch asserts on it. NESTED it has never meant</span>
+    <span class="hljs-comment">// anything and used to eat the subtree.</span>
+    {<span class="hljs-string">&quot;manual&quot;</span>, .Top_Level, .Caller, <span class="hljs-string">&quot;&quot;</span>},
+    {
+        <span class="hljs-string">&quot;manual&quot;</span>,
+        .Nested,
+        .Refuse,
+        <span class="hljs-string">&quot;`gd:\&quot;manual\&quot;` only works on the class&#x27;s OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there&quot;</span>,
+    },
+    <span class="hljs-comment">// A signal payload&#x27;s parameter NAMES: a Spec token (it rides behind a signal</span>
+    <span class="hljs-comment">// TYPE), so as a leading token it is the wrong slot at either site.</span>
+    {<span class="hljs-string">&quot;args=&quot;</span>, .Top_Level, .Refuse, <span class="hljs-string">&quot;`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)&quot;</span>},
+    {<span class="hljs-string">&quot;args=&quot;</span>, .Nested, .Refuse, <span class="hljs-string">&quot;`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)&quot;</span>},
 }
 
 <span class="hljs-comment">// The policy for `token` (a FIELD_TOKENS name) at `site`. ok=false means the</span>
 <span class="hljs-comment">// table has no row — a hole the completeness check turns into a build error, so</span>
 <span class="hljs-comment">// a caller may treat !ok as &quot;the schema is incomplete&quot;, never as &quot;allowed&quot;.</span>
 field_policy :: <span class="hljs-keyword">proc</span>(token: <span class="hljs-type">string</span>, site: Field_Site) -&gt; (Field_Policy, <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> FIELD_POLICY {
-		<span class="hljs-keyword">if</span> p.token == token &amp;&amp; p.site == site {
-			<span class="hljs-keyword">return</span> p, <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> FIELD_POLICY {
+        <span class="hljs-keyword">if</span> p.token == token &amp;&amp; p.site == site {
+            <span class="hljs-keyword">return</span> p, <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 <span class="hljs-comment">// ---- export specs: the tokens that ride BEHIND `export` --------------------</span>
@@ -356,46 +388,47 @@ field_policy :: <span class="hljs-keyword">proc</span>(token: <span class="hljs-
 <span class="hljs-comment">// the name EXISTS and which KIND of thing it is, which is exactly what a</span>
 <span class="hljs-comment">// spelling check and a two-way dispatch need and no more.</span>
 Export_Spec_Kind :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Meta, <span class="hljs-comment">// Inspector/codegen plumbing — never a Property_Hint</span>
-	Hint, <span class="hljs-comment">// becomes the field&#x27;s ONE Property_Hint (at most one per field)</span>
+    Meta, <span class="hljs-comment">// Inspector/codegen plumbing — never a Property_Hint</span>
+    Hint, <span class="hljs-comment">// becomes the field&#x27;s ONE Property_Hint (at most one per field)</span>
 }
 
 Export_Spec :: <span class="hljs-keyword">struct</span> {
-	name:  <span class="hljs-type">string</span>,
-	kind:  Export_Spec_Kind,
-	<span class="hljs-comment">// Does the spec carry a `=VALUE`? Tri-state as two bools so `file` (legal</span>
-	<span class="hljs-comment">// bare AND with a filter list) is representable — a spelling check that</span>
-	<span class="hljs-comment">// insisted on one or the other would refuse working tags.</span>
-	bare:  <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as a bare token</span>
-	value: <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as `name=VALUE`</span>
-	blurb: <span class="hljs-type">string</span>
+    name:  <span class="hljs-type">string</span>,
+    kind:  Export_Spec_Kind,
+    <span class="hljs-comment">// Does the spec carry a `=VALUE`? Tri-state as two bools so `file` (legal</span>
+    <span class="hljs-comment">// bare AND with a filter list) is representable — a spelling check that</span>
+    <span class="hljs-comment">// insisted on one or the other would refuse working tags.</span>
+    bare:  <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as a bare token</span>
+    value: <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as `name=VALUE`</span>
+    blurb: <span class="hljs-type">string</span>,
 }
 
 EXPORT_SPECS :: []Export_Spec {
-	{<span class="hljs-string">&quot;group&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;open an Inspector group header here&quot;</span>},
-	{<span class="hljs-string">&quot;subgroup&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;open an Inspector subgroup header here&quot;</span>},
-	{<span class="hljs-string">&quot;default&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a scalar export&#x27;s initial value&quot;</span>},
-	{<span class="hljs-string">&quot;get&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;route reads through a proc&quot;</span>},
-	{<span class="hljs-string">&quot;set&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;route writes through a proc&quot;</span>},
-	{<span class="hljs-string">&quot;range&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`range=MIN:MAX[:STEP]` — a slider&quot;</span>},
-	{<span class="hljs-string">&quot;enum&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`enum=A:B:C` — a dropdown&quot;</span>},
-	{<span class="hljs-string">&quot;multiline&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;a multi-line text box&quot;</span>},
-	{<span class="hljs-string">&quot;file&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a file picker (`file=*.png` filters)&quot;</span>},
-	{<span class="hljs-string">&quot;dir&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a directory picker&quot;</span>},
-	{<span class="hljs-string">&quot;global_file&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a filesystem-wide file picker&quot;</span>},
-	{<span class="hljs-string">&quot;global_dir&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a filesystem-wide directory picker&quot;</span>},
-	{<span class="hljs-string">&quot;resource&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`resource=Class` — a typed Resource slot&quot;</span>},
-	{<span class="hljs-string">&quot;array&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`array=ELEM` — a typed gd.Array&quot;</span>},
-	{<span class="hljs-string">&quot;dict&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`dict=KEY;VALUE` — a typed gd.Dictionary&quot;</span>}
+    {<span class="hljs-string">&quot;group&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;open an Inspector group header here&quot;</span>},
+    {<span class="hljs-string">&quot;subgroup&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;open an Inspector subgroup header here&quot;</span>},
+    {<span class="hljs-string">&quot;default&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a scalar export&#x27;s initial value&quot;</span>},
+    {<span class="hljs-string">&quot;get&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;route reads through a proc&quot;</span>},
+    {<span class="hljs-string">&quot;set&quot;</span>, .Meta, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;route writes through a proc&quot;</span>},
+    {<span class="hljs-string">&quot;range&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`range=MIN:MAX[:STEP]` — a slider&quot;</span>},
+    {<span class="hljs-string">&quot;enum&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`enum=A:B:C` — a dropdown&quot;</span>},
+    {<span class="hljs-string">&quot;multiline&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;a multi-line text box&quot;</span>},
+    {<span class="hljs-string">&quot;file&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a file picker (`file=*.png` filters)&quot;</span>},
+    {<span class="hljs-string">&quot;dir&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a directory picker&quot;</span>},
+    {<span class="hljs-string">&quot;global_file&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a filesystem-wide file picker&quot;</span>},
+    {<span class="hljs-string">&quot;global_dir&quot;</span>, .Hint, <span class="hljs-literal">true</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;a filesystem-wide directory picker&quot;</span>},
+    {<span class="hljs-string">&quot;resource&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`resource=Class` — a typed Resource slot&quot;</span>},
+    {<span class="hljs-string">&quot;array&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`array=ELEM` — a typed gd.Array&quot;</span>},
+    {<span class="hljs-string">&quot;dict&quot;</span>, .Hint, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`dict=KEY;VALUE` — a typed gd.Dictionary&quot;</span>},
 }
 
 export_spec :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-type">string</span>) -&gt; (Export_Spec, <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> EXPORT_SPECS {
-		<span class="hljs-keyword">if</span> s.name == name {
-			<span class="hljs-keyword">return</span> s, <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> EXPORT_SPECS {
+        <span class="hljs-keyword">if</span> s.name == name {
+            <span class="hljs-keyword">return</span> s, <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 <span class="hljs-comment">// THE ENTITY&#x27;S OWN TRAILING TOKENS — knobs of the KIND `entity=Name:id`</span>
@@ -408,24 +441,35 @@ export_spec :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-ty
 <span class="hljs-comment">// drift. (The registration error the first draft logged — &quot;unknown export</span>
 <span class="hljs-comment">// spec `avatar`&quot; — is the failure mode this row prevents.)</span>
 Entity_Spec :: <span class="hljs-keyword">struct</span> {
-	name:  <span class="hljs-type">string</span>,
-	bare:  <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as a bare token</span>
-	value: <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as `name=VALUE`</span>
-	blurb: <span class="hljs-type">string</span>
+    name:  <span class="hljs-type">string</span>,
+    bare:  <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as a bare token</span>
+    value: <span class="hljs-type">bool</span>, <span class="hljs-comment">// legal as `name=VALUE`</span>
+    blurb: <span class="hljs-type">string</span>,
 }
 
 ENTITY_SPECS :: []Entity_Spec {
-	{<span class="hljs-string">&quot;stream_hz&quot;</span>, <span class="hljs-literal">false</span>, <span class="hljs-literal">true</span>, <span class="hljs-string">&quot;`stream_hz=N` — the kind&#x27;s owner-stream rate, applied to every spawn of the type on every peer&quot;</span>},
-	{<span class="hljs-string">&quot;avatar&quot;</span>, <span class="hljs-literal">true</span>, <span class="hljs-literal">false</span>, <span class="hljs-string">&quot;`avatar` — this kind is a seat&#x27;s body: a host takeover parks it with its seat instead of adopting it&quot;</span>}
+    {
+        <span class="hljs-string">&quot;stream_hz&quot;</span>,
+        <span class="hljs-literal">false</span>,
+        <span class="hljs-literal">true</span>,
+        <span class="hljs-string">&quot;`stream_hz=N` — the kind&#x27;s owner-stream rate, applied to every spawn of the type on every peer&quot;</span>,
+    },
+    {
+        <span class="hljs-string">&quot;avatar&quot;</span>,
+        <span class="hljs-literal">true</span>,
+        <span class="hljs-literal">false</span>,
+        <span class="hljs-string">&quot;`avatar` — this kind is a seat&#x27;s body: a host takeover parks it with its seat instead of adopting it&quot;</span>,
+    },
 }
 
 entity_spec :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-type">string</span>) -&gt; (Entity_Spec, <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> ENTITY_SPECS {
-		<span class="hljs-keyword">if</span> s.name == name {
-			<span class="hljs-keyword">return</span> s, <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">for</span> s <span class="hljs-keyword">in</span> ENTITY_SPECS {
+        <span class="hljs-keyword">if</span> s.name == name {
+            <span class="hljs-keyword">return</span> s, <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 <span class="hljs-comment">// PROJECTION — the whole spec set, comma-joined, for the fallback half of a</span>
@@ -435,14 +479,17 @@ entity_spec :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-ty
 <span class="hljs-comment">// its lifecycle-typo warnings, and a second copy here would be exactly the</span>
 <span class="hljs-comment">// kind of hand-kept twin this package exists to delete.</span>
 export_specs_list :: <span class="hljs-keyword">proc</span>(allocator := <span class="hljs-keyword">context</span>.allocator) -&gt; <span class="hljs-type">string</span> {
-	b := strings.builder_make(allocator)
-	<span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> EXPORT_SPECS {
-		<span class="hljs-keyword">if</span> i &gt; <span class="hljs-number">0</span> {
-			strings.write_string(&amp;b, <span class="hljs-string">&quot;, &quot;</span>)
-		}
-		strings.write_string(&amp;b, s.name)
-	}
-	<span class="hljs-keyword">return</span> strings.to_string(b)
+    b := strings.builder_make(allocator)
+
+    <span class="hljs-keyword">for</span> s, i <span class="hljs-keyword">in</span> EXPORT_SPECS {
+        <span class="hljs-keyword">if</span> i &gt; <span class="hljs-number">0</span> {
+            strings.write_string(&amp;b, <span class="hljs-string">&quot;, &quot;</span>)
+        }
+
+        strings.write_string(&amp;b, s.name)
+    }
+
+    <span class="hljs-keyword">return</span> strings.to_string(b)
 }
 
 <span class="hljs-comment">// ---- proc attributes -------------------------------------------------------</span>
@@ -460,16 +507,16 @@ export_specs_list :: <span class="hljs-keyword">proc</span>(allocator := <span c
 <span class="hljs-comment">// claims a wire id; `gd_half` is the one member of Half, and pairing with</span>
 <span class="hljs-comment">// nothing is its error.</span>
 Attr_Family :: <span class="hljs-keyword">enum</span> <span class="hljs-type">u8</span> {
-	Kit_Primary, <span class="hljs-comment">// the toolkit verbs: the proc IS a command / tick / sample / step / fact door</span>
-	Kit_Declaration, <span class="hljs-comment">// a toolkit type declaration (currently @(gd_input) on an input struct)</span>
-	Method, <span class="hljs-comment">// engine-facing: it joins a method, rpc, or signal table</span>
-	Half, <span class="hljs-comment">// it pairs with a declaration made elsewhere</span>
+    Kit_Primary, <span class="hljs-comment">// the toolkit verbs: the proc IS a command / tick / sample / step / fact door</span>
+    Kit_Declaration, <span class="hljs-comment">// a toolkit type declaration (currently @(gd_input) on an input struct)</span>
+    Method, <span class="hljs-comment">// engine-facing: it joins a method, rpc, or signal table</span>
+    Half, <span class="hljs-comment">// it pairs with a declaration made elsewhere</span>
 }
 
 Attr :: <span class="hljs-keyword">struct</span> {
-	name:   <span class="hljs-type">string</span>, <span class="hljs-comment">// WITHOUT the `gd_` prefix stripped — the spelling Odin sees</span>
-	family: Attr_Family,
-	blurb:  <span class="hljs-type">string</span>
+    name:   <span class="hljs-type">string</span>, <span class="hljs-comment">// WITHOUT the `gd_` prefix stripped — the spelling Odin sees</span>
+    family: Attr_Family,
+    blurb:  <span class="hljs-type">string</span>,
 }
 
 <span class="hljs-comment">// THE ALLOWLIST. Odin refuses an unknown custom attribute outright, so every</span>
@@ -479,26 +526,27 @@ Attr :: <span class="hljs-keyword">struct</span> {
 <span class="hljs-comment">// build flags is a compile error in every game, and the test says so at home</span>
 <span class="hljs-comment">// instead of in someone&#x27;s project.</span>
 ATTRS :: []Attr {
-	{<span class="hljs-string">&quot;gd_method&quot;</span>, .Method, <span class="hljs-string">&quot;an engine-callable method&quot;</span>},
-	{<span class="hljs-string">&quot;gd_connect&quot;</span>, .Method, <span class="hljs-string">&quot;a signal handler, connected by name&quot;</span>},
-	{<span class="hljs-string">&quot;gd_rpc&quot;</span>, .Method, <span class="hljs-string">&quot;an engine RPC&quot;</span>},
-	{<span class="hljs-string">&quot;gd_command&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a kit/net command verb&quot;</span>},
-	{<span class="hljs-string">&quot;gd_tick&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a sim tick&quot;</span>},
-	{<span class="hljs-string">&quot;gd_input&quot;</span>, .Kit_Declaration, <span class="hljs-string">&quot;a constrained simulation input struct&quot;</span>},
-	{<span class="hljs-string">&quot;gd_sample&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;an input sample&quot;</span>},
-	{<span class="hljs-string">&quot;gd_step&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a sim step&quot;</span>},
-	{<span class="hljs-string">&quot;gd_event&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a reliable presentation event with declared audience and timing&quot;</span>},
-	{<span class="hljs-string">&quot;gd_message&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a typed app-message handler (kit/session app route)&quot;</span>},
-	{<span class="hljs-string">&quot;gd_half&quot;</span>, .Half, <span class="hljs-string">&quot;a pairing half; the NAME says what it pairs with&quot;</span>}
+    {<span class="hljs-string">&quot;gd_method&quot;</span>, .Method, <span class="hljs-string">&quot;an engine-callable method&quot;</span>},
+    {<span class="hljs-string">&quot;gd_connect&quot;</span>, .Method, <span class="hljs-string">&quot;a signal handler, connected by name&quot;</span>},
+    {<span class="hljs-string">&quot;gd_rpc&quot;</span>, .Method, <span class="hljs-string">&quot;an engine RPC&quot;</span>},
+    {<span class="hljs-string">&quot;gd_command&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a kit/net command verb&quot;</span>},
+    {<span class="hljs-string">&quot;gd_tick&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a sim tick&quot;</span>},
+    {<span class="hljs-string">&quot;gd_input&quot;</span>, .Kit_Declaration, <span class="hljs-string">&quot;a constrained simulation input struct&quot;</span>},
+    {<span class="hljs-string">&quot;gd_sample&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;an input sample&quot;</span>},
+    {<span class="hljs-string">&quot;gd_step&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a sim step&quot;</span>},
+    {<span class="hljs-string">&quot;gd_event&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a reliable presentation event with declared audience and timing&quot;</span>},
+    {<span class="hljs-string">&quot;gd_message&quot;</span>, .Kit_Primary, <span class="hljs-string">&quot;a typed app-message handler (kit/session app route)&quot;</span>},
+    {<span class="hljs-string">&quot;gd_half&quot;</span>, .Half, <span class="hljs-string">&quot;a pairing half; the NAME says what it pairs with&quot;</span>},
 }
 
 attr :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-type">string</span>) -&gt; (Attr, <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">for</span> a <span class="hljs-keyword">in</span> ATTRS {
-		<span class="hljs-keyword">if</span> a.name == name {
-			<span class="hljs-keyword">return</span> a, <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">for</span> a <span class="hljs-keyword">in</span> ATTRS {
+        <span class="hljs-keyword">if</span> a.name == name {
+            <span class="hljs-keyword">return</span> a, <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 <span class="hljs-comment">// ---- ids: the hash law -----------------------------------------------------</span>
@@ -534,37 +582,41 @@ FNV32_OFFSET :: <span class="hljs-type">u32</span>(<span class="hljs-number">0x8
 FNV32_PRIME :: <span class="hljs-type">u32</span>(<span class="hljs-number">0x01000193</span>)
 
 fnv1a64_acc :: <span class="hljs-keyword">proc</span>(h: <span class="hljs-type">u64</span>, s: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">u64</span> {
-	h := h
-	<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; len(s) {
-		h ~= <span class="hljs-type">u64</span>(s[i])
-		h *= FNV64_PRIME
-	}
-	<span class="hljs-keyword">return</span> h
+    h := h
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; len(s) {
+        h ~= <span class="hljs-type">u64</span>(s[i])
+        h *= FNV64_PRIME
+    }
+
+    <span class="hljs-keyword">return</span> h
 }
 
 fnv1a64 :: <span class="hljs-keyword">proc</span>(s: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">u64</span> {
-	<span class="hljs-keyword">return</span> fnv1a64_acc(FNV64_OFFSET, s)
+    <span class="hljs-keyword">return</span> fnv1a64_acc(FNV64_OFFSET, s)
 }
 
 fnv1a32_acc :: <span class="hljs-keyword">proc</span>(h: <span class="hljs-type">u32</span>, s: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">u32</span> {
-	h := h
-	<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; len(s) {
-		h ~= <span class="hljs-type">u32</span>(s[i])
-		h *= FNV32_PRIME
-	}
-	<span class="hljs-keyword">return</span> h
+    h := h
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; len(s) {
+        h ~= <span class="hljs-type">u32</span>(s[i])
+        h *= FNV32_PRIME
+    }
+
+    <span class="hljs-keyword">return</span> h
 }
 
 fnv1a32 :: <span class="hljs-keyword">proc</span>(s: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">u32</span> {
-	<span class="hljs-keyword">return</span> fnv1a32_acc(FNV32_OFFSET, s)
+    <span class="hljs-keyword">return</span> fnv1a32_acc(FNV32_OFFSET, s)
 }
 
 <span class="hljs-comment">// The wire id a verb or fact is known by: FNV-1a of its name, xor-folded to</span>
 <span class="hljs-comment">// u16 (see the namespace note above).</span>
 wire_id16 :: <span class="hljs-keyword">proc</span>(name: <span class="hljs-type">string</span>) -&gt; <span class="hljs-type">u16</span> {
-	h := fnv1a32(name)
-	<span class="hljs-keyword">return</span> <span class="hljs-type">u16</span>(h &gt;&gt; <span class="hljs-number">16</span>) ~ <span class="hljs-type">u16</span>(h &amp; <span class="hljs-number">0xFFFF</span>)
+    h := fnv1a32(name)
+    <span class="hljs-keyword">return</span> <span class="hljs-type">u16</span>(h &gt;&gt; <span class="hljs-number">16</span>) ~ <span class="hljs-type">u16</span>(h &amp; <span class="hljs-number">0xFFFF</span>)
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">decl/decl.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">decl/decl.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/decl/decl.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

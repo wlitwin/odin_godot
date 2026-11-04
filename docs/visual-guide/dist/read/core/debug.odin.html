@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>debug.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>debug.odin</h1><div class="reader-meta"><span>171 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/core/debug.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Source</span></div><p class="eyebrow">Odin × Godot</p><h1>debug.odin</h1><div class="reader-meta"><span>189 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/core/debug.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">#+build darwin, linux
 <span class="hljs-keyword">package</span> core
@@ -38,19 +38,20 @@
 <span class="hljs-comment">// by the core dll. `Dl_info` / `dladdr` are declared package-wide in scripts_native.odin</span>
 <span class="hljs-comment">// (darwin/linux), so we reuse them here.</span>
 <span class="hljs-keyword">when</span> ODIN_OS == .Darwin {
-	<span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libunwind <span class="hljs-string">&quot;system:System&quot;</span>
+    <span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libunwind <span class="hljs-string">&quot;system:System&quot;</span>
 } <span class="hljs-keyword">else</span> {
-	<span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libunwind <span class="hljs-string">&quot;system:c&quot;</span>
+    <span class="hljs-keyword">foreign</span> <span class="hljs-keyword">import</span> libunwind <span class="hljs-string">&quot;system:c&quot;</span>
 }
 
 <span class="hljs-comment">// Opaque libunwind cursor; we only ever pass a pointer to it.</span>
 Unwind_Context :: <span class="hljs-keyword">struct</span> {}
+
 <span class="hljs-comment">// _URC_NO_REASON (0) — returned from the trace callback to keep walking.</span>
 URC_NO_REASON :: <span class="hljs-number">0</span>
 
 <span class="hljs-keyword">foreign</span> libunwind {
-	_Unwind_Backtrace :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (fn: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (ctx: ^Unwind_Context, arg: <span class="hljs-type">rawptr</span>) -&gt; <span class="hljs-type">i32</span>, arg: <span class="hljs-type">rawptr</span>) -&gt; <span class="hljs-type">i32</span> ---
-	_Unwind_GetIP :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (ctx: ^Unwind_Context) -&gt; <span class="hljs-type">uintptr</span> ---
+    _Unwind_Backtrace :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (fn: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (ctx: ^Unwind_Context, arg: <span class="hljs-type">rawptr</span>) -&gt; <span class="hljs-type">i32</span>, arg: <span class="hljs-type">rawptr</span>) -&gt; <span class="hljs-type">i32</span> ---
+    _Unwind_GetIP :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (ctx: ^Unwind_Context) -&gt; <span class="hljs-type">uintptr</span> ---
 }
 
 <span class="hljs-comment">// The substring that identifies a frame as belonging to the compiled scripts dll. Kept</span>
@@ -62,20 +63,22 @@ MAX_FRAMES :: <span class="hljs-number">256</span>
 
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 Stack_Collector :: <span class="hljs-keyword">struct</span> {
-	addrs: [MAX_FRAMES]<span class="hljs-type">rawptr</span>,
-	n:     <span class="hljs-type">int</span>,
+    addrs: [MAX_FRAMES]<span class="hljs-type">rawptr</span>,
+    n:     <span class="hljs-type">int</span>,
 }
 
 <span class="hljs-comment">// libunwind trace callback: record this frame&#x27;s instruction pointer. `proc &quot;c&quot;` (no Odin</span>
 <span class="hljs-comment">// context), so it threads its state through the `arg` pointer.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 unwind_collect :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;c&quot;</span> (ctx: ^Unwind_Context, arg: <span class="hljs-type">rawptr</span>) -&gt; <span class="hljs-type">i32</span> {
-	c := <span class="hljs-keyword">cast</span>(^Stack_Collector)arg
-	<span class="hljs-keyword">if</span> c.n &lt; MAX_FRAMES {
-		c.addrs[c.n] = <span class="hljs-type">rawptr</span>(_Unwind_GetIP(ctx))
-		c.n += <span class="hljs-number">1</span>
-	}
-	<span class="hljs-keyword">return</span> URC_NO_REASON
+    c := <span class="hljs-keyword">cast</span>(^Stack_Collector)arg
+
+    <span class="hljs-keyword">if</span> c.n &lt; MAX_FRAMES {
+        c.addrs[c.n] = <span class="hljs-type">rawptr</span>(_Unwind_GetIP(ctx))
+        c.n += <span class="hljs-number">1</span>
+    }
+
+    <span class="hljs-keyword">return</span> URC_NO_REASON
 }
 
 <span class="hljs-comment">// debug_capture_odin_stack walks the native stack and returns a Godot `Array` of</span>
@@ -87,93 +90,108 @@ unwind_collect :: <span class="hljs-keyword">proc</span> <span class="hljs-strin
 <span class="hljs-comment">// `skip` drops the innermost N frames (this proc + the unwind callback + the virtual</span>
 <span class="hljs-comment">// trampoline) so the reported chain starts at real script code.</span>
 debug_capture_odin_stack :: <span class="hljs-keyword">proc</span>(skip := <span class="hljs-number">0</span>) -&gt; godot.Array {
-	arr := godot.new_array_default()
+    arr := godot.new_array_default()
 
-	col: Stack_Collector
-	_Unwind_Backtrace(unwind_collect, &amp;col)
-	<span class="hljs-keyword">if</span> col.n &lt;= <span class="hljs-number">0</span> {
-		<span class="hljs-keyword">return</span> arr
-	}
+    col: Stack_Collector
+    _Unwind_Backtrace(unwind_collect, &amp;col)
 
-	<span class="hljs-comment">// dladdr resolves each return address to its symbol + owning file. We collect the</span>
-	<span class="hljs-comment">// scripts-dll frames innermost-first, then push them so the engine sees the natural</span>
-	<span class="hljs-comment">// call order (outermost script frame at index 0).</span>
-	Frame :: <span class="hljs-keyword">struct</span> {
-		sym:   <span class="hljs-type">cstring</span>,
-		fname: <span class="hljs-type">cstring</span>,
-	}
-	frames: [MAX_FRAMES]Frame
-	count := <span class="hljs-number">0</span>
-	<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> skip ..&lt; col.n {
-		info: Dl_info
-		<span class="hljs-keyword">if</span> dladdr(col.addrs[i], &amp;info) == <span class="hljs-number">0</span> {
-			<span class="hljs-keyword">continue</span>
-		}
-		<span class="hljs-keyword">if</span> info.dli_sname == <span class="hljs-literal">nil</span> || info.dli_fname == <span class="hljs-literal">nil</span> {
-			<span class="hljs-keyword">continue</span>
-		}
-		fname := <span class="hljs-type">string</span>(info.dli_fname)
-		sym := <span class="hljs-type">string</span>(info.dli_sname)
-		<span class="hljs-comment">// Keep ONLY frames that live in the scripts dll. Odin script procs additionally</span>
-		<span class="hljs-comment">// carry a `pkg::proc` symbol (the `::` check), so engine / libc / core frames —</span>
-		<span class="hljs-comment">// different dll, no `::` — fall away and the engine sees just the Odin chain.</span>
-		in_scripts_dll := strings.contains(fname, SCRIPTS_DLL_MARKER)
-		looks_like_odin := strings.contains(sym, <span class="hljs-string">&quot;::&quot;</span>)
-		<span class="hljs-keyword">if</span> !in_scripts_dll || !looks_like_odin {
-			<span class="hljs-keyword">continue</span>
-		}
-		frames[count] = Frame{sym = info.dli_sname, fname = info.dli_fname}
-		count += <span class="hljs-number">1</span>
-		<span class="hljs-keyword">if</span> count &gt;= len(frames) {
-			<span class="hljs-keyword">break</span>
-		}
-	}
+    <span class="hljs-keyword">if</span> col.n &lt;= <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> arr
+    }
 
-	<span class="hljs-comment">// Honest integration probe: when ODIN_DEBUG_STACK_DUMP=1, echo the captured Odin</span>
-	<span class="hljs-comment">// frames to stderr so a test can observe WHETHER (and when) the engine actually calls</span>
-	<span class="hljs-comment">// `_debug_get_current_stack_info`. No-op in normal runs.</span>
-	<span class="hljs-keyword">if</span> _, dump := os.lookup_env(<span class="hljs-string">&quot;ODIN_DEBUG_STACK_DUMP&quot;</span>, <span class="hljs-keyword">context</span>.allocator); dump {
-		os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_BEGIN\n&quot;</span>)
-		<span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; count {
-			os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_FRAME &quot;</span>)
-			os.write_string(os.stderr, <span class="hljs-type">string</span>(frames[i].sym))
-			os.write_string(os.stderr, <span class="hljs-string">&quot;\n&quot;</span>)
-		}
-		os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_END\n&quot;</span>)
-	}
+    <span class="hljs-comment">// dladdr resolves each return address to its symbol + owning file. We collect the</span>
+    <span class="hljs-comment">// scripts-dll frames innermost-first, then push them so the engine sees the natural</span>
+    <span class="hljs-comment">// call order (outermost script frame at index 0).</span>
+    Frame :: <span class="hljs-keyword">struct</span> {
+        sym:   <span class="hljs-type">cstring</span>,
+        fname: <span class="hljs-type">cstring</span>,
+    }
 
-	<span class="hljs-comment">// Push outermost-first (reverse of the innermost-first capture order).</span>
-	<span class="hljs-keyword">for</span> i := count - <span class="hljs-number">1</span>; i &gt;= <span class="hljs-number">0</span>; i -= <span class="hljs-number">1</span> {
-		d := debug_make_frame_dict(frames[i].sym, frames[i].fname)
-		dv := godot.variant_from_dictionary(&amp;d)
-		godot.array_push_back(&amp;arr, dv)
-	}
-	<span class="hljs-keyword">return</span> arr
+    frames: [MAX_FRAMES]Frame
+    count := <span class="hljs-number">0</span>
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> skip ..&lt; col.n {
+        info: Dl_info
+
+        <span class="hljs-keyword">if</span> dladdr(col.addrs[i], &amp;info) == <span class="hljs-number">0</span> {
+            <span class="hljs-keyword">continue</span>
+        }
+
+        <span class="hljs-keyword">if</span> info.dli_sname == <span class="hljs-literal">nil</span> || info.dli_fname == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">continue</span>
+        }
+
+        fname := <span class="hljs-type">string</span>(info.dli_fname)
+        sym := <span class="hljs-type">string</span>(info.dli_sname)
+        <span class="hljs-comment">// Keep ONLY frames that live in the scripts dll. Odin script procs additionally</span>
+        <span class="hljs-comment">// carry a `pkg::proc` symbol (the `::` check), so engine / libc / core frames —</span>
+        <span class="hljs-comment">// different dll, no `::` — fall away and the engine sees just the Odin chain.</span>
+        in_scripts_dll := strings.contains(fname, SCRIPTS_DLL_MARKER)
+        looks_like_odin := strings.contains(sym, <span class="hljs-string">&quot;::&quot;</span>)
+
+        <span class="hljs-keyword">if</span> !in_scripts_dll || !looks_like_odin {
+            <span class="hljs-keyword">continue</span>
+        }
+
+        frames[count] = Frame {
+            sym   = info.dli_sname,
+            fname = info.dli_fname,
+        }
+        count += <span class="hljs-number">1</span>
+
+        <span class="hljs-keyword">if</span> count &gt;= len(frames) {
+            <span class="hljs-keyword">break</span>
+        }
+    }
+
+    <span class="hljs-comment">// Honest integration probe: when ODIN_DEBUG_STACK_DUMP=1, echo the captured Odin</span>
+    <span class="hljs-comment">// frames to stderr so a test can observe WHETHER (and when) the engine actually calls</span>
+    <span class="hljs-comment">// `_debug_get_current_stack_info`. No-op in normal runs.</span>
+    <span class="hljs-keyword">if</span> _, dump := os.lookup_env(<span class="hljs-string">&quot;ODIN_DEBUG_STACK_DUMP&quot;</span>, <span class="hljs-keyword">context</span>.allocator); dump {
+        os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_BEGIN\n&quot;</span>)
+
+        <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; count {
+            os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_FRAME &quot;</span>)
+            os.write_string(os.stderr, <span class="hljs-type">string</span>(frames[i].sym))
+            os.write_string(os.stderr, <span class="hljs-string">&quot;\n&quot;</span>)
+        }
+
+        os.write_string(os.stderr, <span class="hljs-string">&quot;ODIN_STACK_END\n&quot;</span>)
+    }
+
+    <span class="hljs-comment">// Push outermost-first (reverse of the innermost-first capture order).</span>
+    <span class="hljs-keyword">for</span> i := count - <span class="hljs-number">1</span>; i &gt;= <span class="hljs-number">0</span>; i -= <span class="hljs-number">1</span> {
+        d := debug_make_frame_dict(frames[i].sym, frames[i].fname)
+        dv := godot.variant_from_dictionary(&amp;d)
+        godot.array_push_back(&amp;arr, dv)
+    }
+
+    <span class="hljs-keyword">return</span> arr
 }
 
 <span class="hljs-comment">// Build one `{ &quot;function&quot;, &quot;line&quot;, &quot;source&quot; }` Dictionary for a stack frame.</span>
 <span class="hljs-meta">@(private = &quot;file&quot;)</span>
 debug_make_frame_dict :: <span class="hljs-keyword">proc</span>(symbol: <span class="hljs-type">cstring</span>, source: <span class="hljs-type">cstring</span>) -&gt; godot.Dictionary {
-	d := godot.new_dictionary_default()
+    d := godot.new_dictionary_default()
 
-	set := <span class="hljs-keyword">proc</span>(d: ^godot.Dictionary, key: <span class="hljs-type">cstring</span>, val: godot.Variant) {
-		ks := godot.new_string_cstring(key)
-		kv := godot.variant_from_string(&amp;ks)
-		val := val
-		godot.dictionary_set(d, kv, val)
-	}
+    set := <span class="hljs-keyword">proc</span>(d: ^godot.Dictionary, key: <span class="hljs-type">cstring</span>, val: godot.Variant) {
+        ks := godot.new_string_cstring(key)
+        kv := godot.variant_from_string(&amp;ks)
+        val := val
+        godot.dictionary_set(d, kv, val)
+    }
 
-	fn_s := godot.new_string_cstring(symbol)
-	set(&amp;d, <span class="hljs-string">&quot;function&quot;</span>, godot.variant_from_string(&amp;fn_s))
+    fn_s := godot.new_string_cstring(symbol)
+    set(&amp;d, <span class="hljs-string">&quot;function&quot;</span>, godot.variant_from_string(&amp;fn_s))
 
-	line := godot.Int(<span class="hljs-number">0</span>)
-	set(&amp;d, <span class="hljs-string">&quot;line&quot;</span>, godot.variant_from_int(&amp;line))
+    line := godot.Int(<span class="hljs-number">0</span>)
+    set(&amp;d, <span class="hljs-string">&quot;line&quot;</span>, godot.variant_from_int(&amp;line))
 
-	src_s := godot.new_string_cstring(source)
-	set(&amp;d, <span class="hljs-string">&quot;source&quot;</span>, godot.variant_from_string(&amp;src_s))
+    src_s := godot.new_string_cstring(source)
+    set(&amp;d, <span class="hljs-string">&quot;source&quot;</span>, godot.variant_from_string(&amp;src_s))
 
-	<span class="hljs-keyword">return</span> d
+    <span class="hljs-keyword">return</span> d
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">core/debug.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">core/debug.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/core/debug.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

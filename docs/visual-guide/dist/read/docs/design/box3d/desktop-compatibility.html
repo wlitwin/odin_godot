@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Box3D desktop compatibility · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Box3D desktop compatibility</h1><div class="reader-meta"><span>8 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/desktop-compatibility.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#tested-and-untested-configurations">Tested and untested configurations</a><a href="#exact-build-identity">Exact build identity</a><a href="#compatibility-layers">Compatibility layers</a><a href="#evidence-and-performance-boundaries">Evidence and performance boundaries</a><a href="#later-web-showcase-evidence-2026-11-03">Later Web showcase evidence (2026-11-03)</a></nav></details>
+<article class="reading-body "><p>Evidence snapshot: 2026-11-02. This describes the shared backend and <strong>distinct
+Kit and Replay</strong> adapters. The initial target pair remains macOS arm64 and Linux
+x86_64; a configured CI job is not an executed platform qualification.</p>
+<h2 id="tested-and-untested-configurations">Tested and untested configurations<a class="heading-anchor" href="#tested-and-untested-configurations" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Kit</th>
+<th>Replay</th>
+<th>Actual scope and limits</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>macOS arm64 SDK/Native, official universal Godot launcher</td>
+<td>Exported pair PASS</td>
+<td>Exported pair PASS</td>
+<td>Native ARM64 processes on macOS15.8; target120, complete five-part bytes/signature, nonzero remote inputs, final ACK, natural exits and observed cleanup/one Native image. No Intel/universal SDK claim.</td>
+</tr>
+<tr>
+<td>Linux x86_64 userspace/export, Rosetta in Linux aarch64 VM</td>
+<td>Exported pair PASS</td>
+<td>Exported pair PASS</td>
+<td>Actual ELF x86_64 Host/Client execution, <strong>translated functional</strong> evidence. Native Debug/Release twelve registered commands each were invoked by the direct runner; recorded CTest-run verdict is false, not rewritten to PASS.</td>
+</tr>
+<tr>
+<td>Native Linux x86_64 hardware CI</td>
+<td>Not executed in these records</td>
+<td>Not executed in these records</td>
+<td>Intended CI target. Workflow/plan/source checks do not certify a remote job, throughput or hardware behavior.</td>
+</tr>
+<tr>
+<td>macOS Intel / universal SDK</td>
+<td>Unqualified</td>
+<td>Unqualified</td>
+<td>Launcher contains an x86_64 slice, but supplied Core/scripts/modules/Native and selected execution are ARM64.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Unqualified Box3D runtime</td>
+<td>Unqualified Box3D runtime</td>
+<td>Generic SDK cross-build evidence is separate; no current Box3D exported pair.</td>
+</tr>
+<tr>
+<td>Web/mobile</td>
+<td>Unqualified Box3D runtime</td>
+<td>Unqualified Box3D runtime</td>
+<td>Generic browser SDK evidence does not qualify this Native shared-domain profile. No mobile/export claim.</td>
+</tr>
+</tbody></table>
+</div><p>The authoritative <a href="../../../tests/box3d_gate_c/report.json.html">Gate C report</a>
+(<code>066df8b4a4ecbd8d97d505f06d3eeed6ebe044d5207b144016ba0a6a1dbac9ca</code>)
+binds all four export/runtime records, raw PIDs, artifact hashes and source fences.
+Each pair reached120; all five parts matched within that pair. Each role observed
+one Native image and Native/wrapper/Meter cleanup0, with sample-owned owner delta0
+against its actual baseline4. This is neither cross-platform state equality nor
+a new long-soak, frame-time or manual pixel/usability certification.</p>
+<p>The later <a href="../../../tests/box3d_production/report.json.html">production suite</a> adds
+current Kit and Replay exported108600-tick pairs on both configurations, each
+with more than1809 seconds after both GO observations, complete five-part equality,
+terminal ACKs, natural exits and observed cleanup. All eight300/3000ms service-pause
+cases passed. These headless authored scenes contain four bodies/four assets/one
+hinge; the separate Native stress bounds are unchanged. Sampled process RSS peaks
+were below129MB on macOS and186MB on translated Linux. RSS is separate from the
+64MiB tracked physics admission limit and is not a general process-memory bound.
+See <a href="production-validation.html">production-validation.md</a> for allocation-lifetime
+regressions, the preserved earlier OOM/audit failures, CPU scope and exact records.</p>
+<p><strong>Deployment floor:</strong> the launcher plist declares11.0, but that is not the
+bundle requirement. The actual Kit export inspection <code>inspect-rpaths-1..5.log</code>
+under the report&#39;s <code>p5-gate-c-kit-macos-export-v4</code> record shows SDK14.4/minos14.0
+for the SDK/Native consumers; launcher log0 shows minos11.0. The Native manifest
+also records <code>-mmacosx-version-min=14.0</code>. Treat this bundle as requiring at least
+macOS14.0; actual execution was on15.8. macOS11..13 are not supported by this
+bundle, and a claimed minimum is not a substitute for an execution test.</p>
+<p>Linux used Debian amd64 userspace in the recorded Podman/Rosetta environment.
+The VM6144MiB/container4096MiB/export compiler thread-count1 are build-resource
+settings, not a change to the simulation&#39;s64MiB admission cap. The Gate C report
+records the environment change and its rollback separately from product limits.</p>
+<h2 id="exact-build-identity">Exact build identity<a class="heading-anchor" href="#exact-build-identity" aria-label="Link to this section">#</a></h2>
+<p>Both builds use float32, meters/Y-up/right-handed coordinates, fixed60Hz/four
+substeps and one simulation worker. Assertions and <code>BOX3D_VALIDATE</code> remain on in
+Debug <strong>and Release</strong> (<code>-UNDEBUG</code> overrides Release&#39;s <code>-DNDEBUG</code>). Effective
+engine/shim flags include <code>-fno-fast-math -ffp-contract=off</code>; no reassociation or
+FP-policy relaxation is implied by optimized export. Native observation is OFF.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Recorded input</th>
+<th>macOS reference</th>
+<th>Linux reference</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Native C toolchain</td>
+<td>Nix clang21.1.8, target arm64-apple-darwin; CMake4.1.2; Apple SDK14.4</td>
+<td>Debian clang14.0.6/LLVM14.0.6, target x86_64-pc-linux-gnu; CMake3.25.1</td>
+</tr>
+<tr>
+<td>Resolved SIMD</td>
+<td><code>B3_SIMD_NEON</code>, width4</td>
+<td><code>B3_SIMD_SSE2</code>, width4; <code>__FLT_EVAL_METHOD__=0</code></td>
+</tr>
+<tr>
+<td>ABI environment</td>
+<td>Little-endian, pointer64</td>
+<td>Little-endian, pointer64</td>
+</tr>
+<tr>
+<td>Odin consumer compiler</td>
+<td>dev-2026-04; binary SHA <code>ccdbd934fc1e42bd856cb1a05991d01e8e748b0174a1671cffc99c7812e386f2</code></td>
+<td>dev-2026-04-nightly:a896fb2, actual amd64 executable in toolchain report</td>
+</tr>
+<tr>
+<td>Godot/templates</td>
+<td>4.7.1.stable.official.a13da4feb, matching official templates</td>
+<td>Same release/revision, actual Linux x86_64 executable/templates</td>
+</tr>
+<tr>
+<td>Native source library SHA</td>
+<td><code>bbdc7c61631026f8b322e04897743fe272b60edfd01d5dee7e530c9e7ba4e93d</code></td>
+<td><code>edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a</code></td>
+</tr>
+<tr>
+<td>Native domain build</td>
+<td><code>7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c</code></td>
+<td><code>1cd4bd6c93ef95f4df9a85f46656a61c836f69d82357e260a77d9e73a9620172</code></td>
+</tr>
+<tr>
+<td>Native domain target</td>
+<td><code>fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a</code></td>
+<td><code>39312e841ef1e4f4e62fe204ea39ef75f632a80737fc60798daad3d9a88bb310</code></td>
+</tr>
+</tbody></table>
+</div><p>The Gate C report&#39;s Native and export links contain exact compiler argv, resolved
+macros, manifests and deployed file hashes. macOS ad-hoc signing may change the
+deployment copy&#39;s file SHA; record source-to-deployed mapping and domain identity,
+not an assumed identical file hash. The common manifest version vector is
+recorded literally as <code>[1,1,3,2,1]</code>; catalog-selected recovery formats below are a
+separate contract. Build/target identities differ intentionally across targets.</p>
+<p>The current production runs reused the later verified archive-cache build on
+macOS: source library SHA
+<code>ed2c5fcfa8e0cbba5ee835c8cd9c73c35b6c3e03b4ac4ae1628a1fb946559371</code>.
+The actual signed bundle copies are
+<code>e3264dad2b9d60013bdd5a36e9385b2d62082a74886520e9dfd8e8ce61a8ff1a</code>
+(Kit) and
+<code>df3ddf2629d75cd6b0bf7eed6eb49e5a6eded4796c522644b03039cb201ca0a2</code>
+(Replay). Their recorded domain build/target remain the macOS identities above.
+Linux reused
+the recorded <code>edfe2fd8…</code> Release library and its original direct-command test
+manifest. The older Gate C file hashes remain historical inputs, not rewritten
+to the newer deployment bytes.</p>
+<p>Keep35 bodies/shapes,32 initial dynamics, one joint, eight Native geometry assets,
+H128/prediction8/ordinary repair8 and64MiB tracked Native+snapshot+Host/reservations.
+RSS, rendering/engine overhead and build VM RAM are separate. Historical100/500
+body probes did not expand this admitted profile. A scalar/SIMD/compiler/precision
+change requires a new identity and its own evidence.</p>
+<h2 id="compatibility-layers">Compatibility layers<a class="heading-anchor" href="#compatibility-layers" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Current declared contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Opaque local solver image</td>
+<td>Resource2 / normalized solver dump3. Retained geometry/owners and exact compatible build/target/private ABI are required; bytes alone are not a portable saved state.</td>
+</tr>
+<tr>
+<td>Native canonical recovery</td>
+<td>Primitive catalog format1; authored geometry format2; motion catalog format3. Trusted assets, semantic validation, scratch reconstruction and full reencode/compare remain mandatory.</td>
+</tr>
+<tr>
+<td>Authoring</td>
+<td>Schema1 body/shape/resource identity retained; schema2 adds joint/character definitions. Current parsers explicitly accept the supported versions; no native handle is durable authoring data.</td>
+</tr>
+<tr>
+<td>Owning bake artifact/import</td>
+<td><code>OGB3ART1</code>, artifact/import version1,200-byte little-endian header, bounded definition bytes and checked source/shared-bake/content/integrity identity. Load rebakes once and validates before publication.</td>
+</tr>
+<tr>
+<td>Motion/query API</td>
+<td>Version1, independent C/Odin layout queries for all13 records; this is not a recovery or network wire version.</td>
+</tr>
+<tr>
+<td>Kit network</td>
+<td>World protocol2, current catalog/schema identity and signature/accepted-input confirmation. Native/authoring versions do not silently select another wire.</td>
+</tr>
+<tr>
+<td>Replay network/archive</td>
+<td>Documented base protocol7/archive4 plus complete-physics codec/catalog/game/input contract fingerprints. Keep the actual READY/config/identity records; do not equate this with Kit World2 or Native recovery3.</td>
+</tr>
+<tr>
+<td>Debug/presentation JSON</td>
+<td>Version1 with exact16hex epoch/tick/revision and explicit source; visualization is detached value data, outside canonical Game/Side.</td>
+</tr>
+</tbody></table>
+</div><p>Canonical encoding does not waive Native identity checks or establish mixed-target
+network compatibility. Current exports compare Host/Client on the same target;
+macOS-to-Linux exact solver agreement remains unclaimed. Unsupported versions,
+assets, references or identities must reject before replacing published state.</p>
+<h2 id="evidence-and-performance-boundaries">Evidence and performance boundaries<a class="heading-anchor" href="#evidence-and-performance-boundaries" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><a href="../../../tests/box3d_soak/gate-b-report.json.html">Gate B</a>, bounded macOS32-dynamic
+reference: original whole-call4ms requirement met by its declared final artifact
+streams. Older Dense sample9=8.894ms remains FAIL/causeUNKNOWN. Fact-burst CPU,
+Common normal and later Native feature builds are not inferred from that corpus.</li>
+<li><a href="../../../tests/box3d_authoring/report.json.html">Authoring</a>,
+<a href="../../../tests/box3d_motion/report.json.html">motion</a>,
+<a href="../../../tests/box3d_editor/report.json.html">editor</a> and
+<a href="../../../tests/box3d_samples/report.json.html">authored samples</a> retain their exact
+earlier macOS scopes. <a href="../../../tests/box3d_gate_c/report.json.html">Gate C</a> adds the
+four normal exported pair results; it does not retroactively rerun those suites.</li>
+<li>Remote hardware CI and future release qualification need actual job/run records.
+The desktop CLI&#39;s default is an inspectable plan, not a runtime PASS. See
+<a href="upgrade.html">upgrade.md</a> for the required maintainer gates and release changes.</li>
+</ul>
+<h2 id="later-web-showcase-evidence-2026-11-03">Later Web showcase evidence (2026-11-03)<a class="heading-anchor" href="#later-web-showcase-evidence-2026-11-03" aria-label="Link to this section">#</a></h2>
+<p>The tables above retain their earlier desktop build scope. The later
+<a href="showcase-candidate.html">Dockyard handoff</a> records an executed wasm32 backend and
+actual Chrome/Firefox multiplayer through the same reusable integration, plus
+a relocated macOS ARM64 SDK pair. Its current candidate is functionally passing
+but remains unqualified under the original Firefox correction maximum. This does
+not admit mobile or rewrite the earlier desktop hashes/failures. See the
+<a href="../../../tests/replay_dockyard/qualification/handoff-status.json.html">current build status</a>.</p>
+<p>A later <a href="../../../tests/replay_dockyard/qualification/telemetry-report.json.html">bounded telemetry experiment</a>
+on Firefox 159.0.1 retained every operation row until checked close. Its
+610-second pair completed seven jobs with matching complete state and clean
+Native/Web ownership, but the Firefox normal maximum reached 29.56 ms against
+the unchanged 10 ms limit. Deferring telemetry did not resolve the rare stalls;
+their cause remains unknown. The attempted encoding reuse was restored after
+it showed no measured latency gain. These are separate experimental artifacts,
+and the earlier review archive remains unreleased and byte-identical.</p>
+<p>A separate allocation-free signature reuse experiment copies a checksum-validated
+signature from an already-due, locally owned Snapshot, with exact tick, codec,
+epoch and peer scope checks. It preserves fact-before-chunk delivery and uses
+fresh encoding when reuse is unavailable. Native tests reduced solver-part
+materializations from two to one per recipient and preserved normative full5
+bytes, receiver confirmation, failure recovery and balanced resources.</p>
+<p>Its declared short Firefox 159.0.1 authority / Chrome 156.0.8078.80 comparison
+still rejected the strict maximum: baseline 30.600 ms, candidate 18.299 ms.
+Host p95 was 3.799 ms versus 3.800 ms, so no latency gain is established. Both
+pairs confirmed all five state parts and cleaned up; neither 60-second case
+establishes sustained admission. The unchanged sustained gate was not rerun.
+See the <a href="../../../tests/replay_dockyard/qualification/tx-signature-report.json.html">signature reuse report</a>.</p>
+<p>The optional <a href="../../../tests/replay_dockyard/qualification/core-phase-report.json.html">transaction phase observations</a>
+retain complete call timing and add bounded open/model/capture totals using the
+existing clock. Native and native-free Wasm tests cover nil/backward clocks,
+failed capture and unchanged state/cleanup. Captured slow calls distribute
+differently across the observed envelopes; the cause of the rare wall-time
+stalls remains unresolved. No clock overhead or outlier was subtracted.</p>
+<p>A later <a href="../../../tests/replay_dockyard/qualification/frame-egress-report.json.html">frame egress change</a>
+keeps complete-physics authority reception and publication inside the same public
+Room call, preparing its Snapshot after the current step. An actual browser
+counter run reduced old-head preparations from 486 to zero; native tests retain
+normative complete-wire bytes, receiver confirmation, zero-step publication,
+permission checks and balanced resources. Both final 610-second browser roles
+meet the original normal-frame limits. Firefox authority passes all measured
+budgets; Firefox client retains one 45.92 ms actual eight-step correction against
+the original 25 ms maximum (3,968 samples; p95=8.599 ms, p99=9.640 ms). That role is
+rejected. No outlier was removed and no unchanged sustained retry was run.</p>
+<p>The <a href="../../../tests/replay_dockyard/qualification/audio-drain-report.json.html">audio lifetime fix</a>
+stops and clears voices, then observes weak playback references until the mixer
+has released them before graceful quit or scene reload. Controlled active-sound
+exit, four simultaneous voices, muted exit and real leave/rejoin/rehost checks
+retain their own evidence. The original leaked AudioStreamPlaybackWAV resources
+and prior strict latency failures remain recorded. Public Internet validation,
+two-person feedback and the failed correction limit remain separate gates.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="production-validation.html"><span>Production validation</span><span aria-hidden="true">→</span></a><a href="upgrade.html"><span>Pinned Box3D upgrade and release workflow</span><span aria-hidden="true">→</span></a><a href="showcase-candidate.html"><span>Dockyard Duo review handoff</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/desktop-compatibility.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#tested-and-untested-configurations" class="">Tested and untested configurations</a><a href="#exact-build-identity" class="">Exact build identity</a><a href="#compatibility-layers" class="">Compatibility layers</a><a href="#evidence-and-performance-boundaries" class="">Evidence and performance boundaries</a><a href="#later-web-showcase-evidence-2026-11-03" class="">Later Web showcase evidence (2026-11-03)</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/desktop-compatibility.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

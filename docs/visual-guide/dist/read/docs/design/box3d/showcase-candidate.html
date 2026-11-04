@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Dockyard Duo review handoff · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Dockyard Duo review handoff</h1><div class="reader-meta"><span>3 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/showcase-candidate.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#final-browser-measurements">Final browser measurements</a><a href="#recovery-and-compatibility">Recovery and compatibility</a><a href="#review-package-and-reproduction">Review package and reproduction</a></nav></details>
+<article class="reading-body "><p>Status on 2026-11-03: <strong>playable, unreleased review candidate</strong>. Native and browser
+multiplayer, cooperative rounds, complete-state agreement, recovery, audio and
+checked shutdown work in the recorded local cases. Three release gates remain:
+one failed correction-time limit, public connectivity acceptance and two-human
+cooperative play feedback.</p>
+<p>The <a href="../../../tests/replay_dockyard/qualification/handoff-status.json.html">current build status</a>
+binds the exact frozen export, actual browser versions, raw evidence hashes and
+open requirements. Earlier qualification reports and the original review archive
+retain their earlier artifact scopes.</p>
+<h2 id="final-browser-measurements">Final browser measurements<a class="heading-anchor" href="#final-browser-measurements" aria-label="Link to this section">#</a></h2>
+<p>The same frozen export ran once in each final arrangement, for over 610 seconds
+per arrangement, on the Apple M3 Mac15,13 reference machine, 24 GiB, AC power,
+1280×720/DPR1, visible tabs and hardware rendering. Both used actual authenticated
+forced TURN on a local interface. This establishes local relay behavior.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Arrangement</th>
+<th>Normal whole-call timing</th>
+<th>Actual eight-step corrections</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Firefox 159.0.1 host / Chrome 156.0.8078.80 client</td>
+<td>Firefox p95 3.061 ms, p99 3.581 ms, max 8.000 ms; Chrome max 5.079 ms</td>
+<td>Chrome 3,849 samples, p95 7.014 ms, max 10.486 ms</td>
+<td>All original measured budgets pass.</td>
+</tr>
+<tr>
+<td>Chrome host / Firefox client, same versions</td>
+<td>Chrome p95 2.270 ms, p99 2.729 ms, max 7.880 ms; Firefox max 8.501 ms</td>
+<td>Firefox 3,968 samples, p95 8.599 ms, p99 9.640 ms, max 45.920 ms</td>
+<td>Rejected: one correction exceeds the original 25 ms maximum.</td>
+</tr>
+</tbody></table>
+</div><p>Both arrangements met the presentation, cold-menu and memory limits. They ran
+multiple jobs through the actual NEXT JOB control, agreed on all five final
+state parts, completed the terminal acknowledgement, returned tracked ownership
+to zero and exited the Godot runtime without leaked audio playbacks. The first
+arrangement reached six rounds and nine eligible delivery cues; the second
+reached eleven rounds and thirty cues.</p>
+<p>Every selected sample and outlier remains recorded. There is no timing overhead
+subtraction or unchanged retry for a lucky maximum. Memory growth preceded the
+slow correction by about 102 seconds; its cause remains unestablished. The
+original performance contract remains in force while the user decision is pending.</p>
+<h2 id="recovery-and-compatibility">Recovery and compatibility<a class="heading-anchor" href="#recovery-and-compatibility" aria-label="Link to this section">#</a></h2>
+<p>The current artifact passes late receive-only observation, pending-action
+connection replacement, bounded delay/jitter/loss, complete recovery after a gap
+beyond H128, checked cold rejoin with the same membership and a fresh incarnation,
+and frozen-host permission fencing followed by the actual new-crew flow. These
+cases retain state agreement, acknowledgements, ownership and artifact fences.
+Earlier hidden-client and abrupt host-loss records keep their own build scopes.</p>
+<p>Current macOS ARM64 Native SDK multiplayer passes. The affected complete-physics
+network suite passes all 16 tests, and the broader default network suite passes
+182. The minimal Kit browser case uses the same unchanged backend/custom template
+and covers provider/World2/complete codec/cleanup; it supplies no Kit game or
+network performance claim. Safari remains unadmitted because its actual remote
+automation prerequisite was unavailable. Native/Web crossplay, mobile, Intel SDK
+and current Linux hardware performance remain unqualified.</p>
+<h2 id="review-package-and-reproduction">Review package and reproduction<a class="heading-anchor" href="#review-package-and-reproduction" aria-label="Link to this section">#</a></h2>
+<p>The <span class="local-reference" title="examples/replay_dockyard/package.py · available in the repository">packaging tool</span> creates a new
+candidate directory from verified ordinary export bytes, a frozen macOS ARM64 SDK
+project, operator templates, notices and the current qualification status. Its
+manifest always records <code>release_admitted:false</code>. It includes no room database,
+TURN credential, TLS private key, browser profile or fixture bridge.</p>
+<p>The package preserves the pinned custom Godot template record and reproduction
+helper. Only its RTC JavaScript send-copy function changes; the official engine
+Wasm payloads remain byte-identical. One 64 KiB JavaScript scratch backing store
+belongs to each loaded engine module. The record identifies the original template,
+helper, derived ZIP and every payload. Re-derivation requires the exact official
+Godot 4.7.1 template and a new output directory. Ordinary SDK/export steps still
+build the extension and PCK from the repository. See the <a href="../../../examples/replay_dockyard/README.html">game README</a>.</p>
+<p>The backend remains pinned to unpatched Box3D
+336263320469e5e9febfe18697ab562488f7e97a, with the declared small rollback-shim
+adaptation. The selected Wasm SIMD profile uses float32, 60 Hz, four substeps and
+one simulation worker. Assertions, validation and strict floating-point flags
+remain enabled. There are 19 bodies/shapes, eight geometries and one hinge;
+H128, prediction/repair8 and the 64 MiB tracked backend limit remain unchanged.</p>
+<p>Public hosting requires a selected HTTPS/WSS endpoint, real remote connectivity
+checks and a compatible TURN route. Operator files are templates; no public
+service has been deployed. Two-human feedback on movement, grabbing and readability
+is still needed. Automation and recorded audio signal do not supply that feedback.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../examples/replay_dockyard/README.html"><span>Dockyard Duo</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/showcase-candidate.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#final-browser-measurements" class="">Final browser measurements</a><a href="#recovery-and-compatibility" class="">Recovery and compatibility</a><a href="#review-package-and-reproduction" class="">Review package and reproduction</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/showcase-candidate.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

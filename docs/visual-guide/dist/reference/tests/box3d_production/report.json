@@ -1,0 +1,1850 @@
+{
+  "schema": 1,
+  "task": "t_4e99b039b84944c0",
+  "task_revision": 17,
+  "board": "b_cdde1cdfea104035",
+  "result": "BOUNDED_PRODUCTION_SUITES_PASS",
+  "recorded_utc": "2026-11-03T00:32:56.239705+00:00",
+  "scope": "Current shared Native backend and distinct Kit/Replay authored exports; native macOS arm64 and translated Linux x86_64; no whole-project/release or hardware-CI claim",
+  "requirements": {
+    "long_soak_and_same_target_determinism": "4 pairs, >=1800 actual GO/live-status seconds, target108600, direct complete-five bytes+real terminal ACK+two-seat controls+natural0/EOF/fences",
+    "controlled_service_gap_and_lifecycle": "8 actual owned SIGSTOP/CONT cases; >8 and >128 public observed head gaps, labelled validated canonical recovery or same-scope catchup, complete target proof and cleanup",
+    "shared_native_64MiB_admission": "actual allocated storage plus extra-byte/operation refusal, full-state preservation, resume and cleanup in genuine Core/SDK Kit+Replay contexts; standalone Native explicit-extra accounting is separately labelled",
+    "history_window_and_recovery": "11 public groups including H128 edges/expiry/source-free continuation, real Request/Reset and complete Welcome after actual public receiver discard, inputless ordinary snapshot anchor/full5/effect dedup; no forged rows/heads",
+    "performance": "10 source-bound current Native OFF whole-entry streams, 19 unfiltered samples each; 190 total, all observed below4ms; individual normal-only/repair-only coverage INCOMPLETE retained, no pooled CPU qualification",
+    "callback_lifetime": "actual old-module RED plus current Kit/Replay exact-flat producer TLS/Godot heap checks, checked close/free, real generated ownership releases and affected editor SDK checks"
+  },
+  "exports": [
+    {
+      "framework": "kit",
+      "target": "macos-arm64",
+      "orchestrator": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/report.json",
+        "sha256": "e0da8e2a8fd20ed6b4c766e3bc292bcb1a19a1b56e436ed49f9a28171b362c50"
+      },
+      "export_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/export/export-record.json",
+        "sha256": "22c1d6c6b27c6eaa58db6cbbb77f3348c8de61d63915ed010aa43b0728824656"
+      },
+      "executable": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/export/export/KitBox3DAuthoring.app/Contents/MacOS/Kit authored Box3D",
+      "native_identity": {
+        "input": {
+          "source_library": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/libogb3.dylib",
+          "source_library_sha256": "ed2c5fcfa8e0cbba5ee835c8cd9c73c35b6c3e03b4ac4ae1628a1fb946559371",
+          "native_manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/build-manifest.json",
+          "native_manifest_sha256": "cbeab7d86f2155449d6bc11f9ea4c1078489286394dcf2101a3cbe21373af909",
+          "native_archive_sha256": "6c57e7cd9ea1f95d5195d92e7145fc4f25272360020afce479b2bf4b15e79a1c",
+          "native_sources": {
+            "box3d/dependency.json": "6c5740ecdda86ab02dccaf02433204f9f94cda4d7b5fe1352e63eac2af07276d",
+            "box3d/native/CMakeLists.txt": "4502ce2603d3bb93325f7e8b4a1d8d3a1662cada88b9dc2a715e736969e249e4",
+            "box3d/native/THIRD_PARTY_NOTICES.txt": "41893ffe1c16cb062832ee9e6a8b7718bd5a927c0a9f1ee1286bee47afba398e",
+            "box3d/native/api.c": "19211ad5d1ff9d1282c3bdcab548800f375f630bea3cbc0f740412f7468d1924",
+            "box3d/native/api.h": "f1024e3ca5ab1b596610fccf006d8583104b9b8f82c124bcb97d8f072cbe57ae",
+            "box3d/native/api_internal.h": "85e8a3a48dc2753e3d4dc961495edc3fa81bc6f08a86d3783f076952846817f5",
+            "box3d/native/api_smoke.c": "eec54a0966c13186c11586385a6d2cc344bff248be8f42477f0a1a4df6c39114",
+            "box3d/native/authoring_catalog.c": "b119c3d96a794c64194f3d1709129237e303d2967212ce1558bbcf845c6f5a60",
+            "box3d/native/authoring_catalog.h": "52bd707eab60c7cbab39532bab654bd00a6fec34a2020a3f3561046b9d9c3acd",
+            "box3d/native/motion.c": "e70afe1c1a07b5d29ebaecac83232e0b896ae6e63f4ec1e37433bdf01745c5cb",
+            "box3d/native/motion.h": "d84cb4c3a7a359679e7863f72f48d87ceeb21278dd8f7e99524b87e9bf56b22e",
+            "box3d/native/native_observe.c": "a5a2ccaf5f4d128b67a20a2c08a14d58b6ee61655df8af75cd57bc23ef036b43",
+            "box3d/native/native_observe.h": "f21560512e28fced76d8e1a4b64b49718dfd419c48061a1f8c787bbb87c563ef",
+            "box3d/native/native_observe_internal.h": "66d75b4bbad1f6b7e02676a6a312e6625318212f306519783e858f2e75c6e5bd",
+            "box3d/native/owned_snapshot.c": "0955f56dcddf253fd2888f4120874a6781ac917da87e7fe19732c892f8ba2798",
+            "box3d/native/owned_snapshot.h": "55114fc1870fe2826ab6b18017895d3bfcc32587918e72760a827123e1a61516",
+            "box3d/native/owned_snapshot_internal.h": "b4c74f5f6d88fbbec4d7a15343b17f06b9275a9afa83221510825231d61d66bb",
+            "box3d/native/patches/block_allocator_alignment.patch": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+            "box3d/native/patches/broadphase_rebuild.patch": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+            "box3d/native/patches/compound_geometry_alignment.patch": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+            "box3d/native/recovery_codec.c": "d6dfa509db29e1587bcd1f8458934d7b404711652c807102cd32c5ba6a635606",
+            "box3d/native/recovery_codec.h": "eec31d0b79d9cb88d495fc34a24c0f35f2d0df471bc15845d24b3025d349bb05",
+            "box3d/native/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921",
+            "box3d/native/rollback_shim.h": "992c796ac3b6c79580992378ee10ee4a6dcd3b962c1ef557233b546aee0ab24e",
+            "box3d/native/state_dump.c": "b3933aa0283a8c44d99953a2a816a769af8a51ed04a9df993b20bb8159615c10",
+            "box3d/native/state_dump.h": "59be6b71d0979046be63e488b1b100cfdae1bcd085591f5f210b8f66a7a8d56a",
+            "box3d/native/state_dump_internal.h": "7d48ec8cce7e11724c90539ea1a007771b239f55fb74c6084ae59df6d3944bec",
+            "build/build_box3d.sh": "9578837c325b615aeff2c61ead5d2fa23f350428fc6766871208c42f424027fd",
+            "tests/box3d_authoring/native/authoring_test.c": "5b0a10df26c6206bab0fe6f424b8a8538c78aa0d1ade2b61f39b6a8c9b29d0b2",
+            "tests/box3d_motion/native/motion_test.c": "9881e5603e879fdabe2353103adfb9999d182615476f2bce02b4c212a56d734e",
+            "tests/box3d_native/lifecycle.c": "9022302417fb1ae979aef97b326ca9af19d7d30ed00c9ed11d31a9c6ca16c3ec",
+            "tests/box3d_recovery/generate_fields.py": "0948787666a872ac7529167cc97bbd5d41cab1103c954cea13879de26da91a73",
+            "tests/box3d_recovery/lifecycle_test.c": "ecd48dc4ac86c7085149e7d0177c66b85fc15a97fd570aa310c76ebc1c158c84",
+            "tests/box3d_recovery/native_test.c": "e9971fee090cccf9c0712858c4cd0a20d0ea132d723dbbcb896db75e0eb520a5",
+            "tests/box3d_recovery/profile.c": "d90b8b37a0808babbadd012dd3222d53ecfc9a214ec2151b7829407e24d93979",
+            "tests/box3d_recovery/reference.py": "61f0a22fee35036e5cf196b95576140474ac33719b921560a996b67c51893141",
+            "tests/box3d_soak/native_observe/native_observe_test.c": "ad10043e4a1756713680df28746a942d24e939173da5e6ea583f8a4f5c1810e1"
+          },
+          "identity_record_sha256": "706b7c4de57506d4eea9aa74a5c772307e5fccaf66ef5fc60ea69efda14ba97b",
+          "domain": {
+            "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+            "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+            "versions": [
+              1,
+              1,
+              3,
+              2,
+              1
+            ],
+            "pointer_bits": 64,
+            "endian": 1
+          },
+          "target": "macos",
+          "configuration": "Release",
+          "test_evidence": {
+            "runner": "ctest"
+          },
+          "shared_metadata_executed": true
+        },
+        "export_runtime_record": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/export/prepared/project/.export_build/box3d-runtime.json",
+        "export_runtime_record_sha256": "fba9802b95189a676538f481b7fa9a88857c65b2abb624cd5b686251da955b2f",
+        "domain": {
+          "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+          "endian": 1,
+          "pointer_bits": 64,
+          "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+          "versions": [
+            1,
+            1,
+            3,
+            2,
+            1
+          ]
+        },
+        "packaged_library": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/export/export/KitBox3DAuthoring.app/Contents/Frameworks/libogb3.dylib",
+        "packaged_library_sha256": "e3264dad2b9d60013bdd5a36e9385b2d62082a74886520e9dfd8e8ce61a8ff1a"
+      },
+      "project_overlay": {
+        "version": 2,
+        "directory": "/Users/walter/data/code/odin/odin_godot/tests/box3d_production/runner/pause_overlay",
+        "sha256": "78065f9334becf9b54f6b2fa86c3112b716e7be6b02fc2567dec187c2bd61030",
+        "files": {
+          "overlay.json": "8c1d82809d4b3a348a95901a62c345a8c0eccfeaf0580581089c9d328ad94964",
+          "production_pause.gd": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b"
+        },
+        "helper_sha256": "09981651ca4fd5dfe406f5fc6c1a525d3413f721e5f64d98b13009e7997fdfc7",
+        "project_settings": {
+          "application/run/flush_stdout_on_print": true
+        },
+        "scope": "test-only live stdout flushing for every production case; optional exact self-stop/live host-boundary instrumentation; no simulation or protocol",
+        "settings_changes": [
+          {
+            "key": "application/run/flush_stdout_on_print",
+            "before_present": false,
+            "before_value": null,
+            "after_value": true
+          }
+        ],
+        "project_settings_before_sha256": "b44b0be15fb152566fd542a648e21908170728bcb2b6d46ce4f92097c98d68a1",
+        "project": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/export/prepared/project",
+        "derived_script_sha256": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b",
+        "project_settings_after_sha256": "2869d473cffa8662598007f7e45f5993650551dde84b10f4b30066de3c48ca7b"
+      },
+      "source_fence_unchanged": true,
+      "functional_runtime": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-functional-v1/runtime/report.json",
+        "sha256": "43097da638600723ea2cead7449b823512120f49229d174118265ae8a37c1ce8"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "macos-arm64",
+      "orchestrator": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/report.json",
+        "sha256": "205170b7b1af6f4b0a3991d9d7b4ce5cdc5f6df488e6af287aa0bab4a77af4c3"
+      },
+      "export_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/export/export-record.json",
+        "sha256": "71a3b1ac37ab504b1e755b86c7f7ce37ff2cec54b0385af48f8f6965ab10d82c"
+      },
+      "executable": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/export/export/ReplayBox3DAuthoring.app/Contents/MacOS/Replay authored Box3D",
+      "native_identity": {
+        "input": {
+          "source_library": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/libogb3.dylib",
+          "source_library_sha256": "ed2c5fcfa8e0cbba5ee835c8cd9c73c35b6c3e03b4ac4ae1628a1fb946559371",
+          "native_manifest": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-desktop-cache-actual-v1/native-cache/build/Release/build-manifest.json",
+          "native_manifest_sha256": "cbeab7d86f2155449d6bc11f9ea4c1078489286394dcf2101a3cbe21373af909",
+          "native_archive_sha256": "6c57e7cd9ea1f95d5195d92e7145fc4f25272360020afce479b2bf4b15e79a1c",
+          "native_sources": {
+            "box3d/dependency.json": "6c5740ecdda86ab02dccaf02433204f9f94cda4d7b5fe1352e63eac2af07276d",
+            "box3d/native/CMakeLists.txt": "4502ce2603d3bb93325f7e8b4a1d8d3a1662cada88b9dc2a715e736969e249e4",
+            "box3d/native/THIRD_PARTY_NOTICES.txt": "41893ffe1c16cb062832ee9e6a8b7718bd5a927c0a9f1ee1286bee47afba398e",
+            "box3d/native/api.c": "19211ad5d1ff9d1282c3bdcab548800f375f630bea3cbc0f740412f7468d1924",
+            "box3d/native/api.h": "f1024e3ca5ab1b596610fccf006d8583104b9b8f82c124bcb97d8f072cbe57ae",
+            "box3d/native/api_internal.h": "85e8a3a48dc2753e3d4dc961495edc3fa81bc6f08a86d3783f076952846817f5",
+            "box3d/native/api_smoke.c": "eec54a0966c13186c11586385a6d2cc344bff248be8f42477f0a1a4df6c39114",
+            "box3d/native/authoring_catalog.c": "b119c3d96a794c64194f3d1709129237e303d2967212ce1558bbcf845c6f5a60",
+            "box3d/native/authoring_catalog.h": "52bd707eab60c7cbab39532bab654bd00a6fec34a2020a3f3561046b9d9c3acd",
+            "box3d/native/motion.c": "e70afe1c1a07b5d29ebaecac83232e0b896ae6e63f4ec1e37433bdf01745c5cb",
+            "box3d/native/motion.h": "d84cb4c3a7a359679e7863f72f48d87ceeb21278dd8f7e99524b87e9bf56b22e",
+            "box3d/native/native_observe.c": "a5a2ccaf5f4d128b67a20a2c08a14d58b6ee61655df8af75cd57bc23ef036b43",
+            "box3d/native/native_observe.h": "f21560512e28fced76d8e1a4b64b49718dfd419c48061a1f8c787bbb87c563ef",
+            "box3d/native/native_observe_internal.h": "66d75b4bbad1f6b7e02676a6a312e6625318212f306519783e858f2e75c6e5bd",
+            "box3d/native/owned_snapshot.c": "0955f56dcddf253fd2888f4120874a6781ac917da87e7fe19732c892f8ba2798",
+            "box3d/native/owned_snapshot.h": "55114fc1870fe2826ab6b18017895d3bfcc32587918e72760a827123e1a61516",
+            "box3d/native/owned_snapshot_internal.h": "b4c74f5f6d88fbbec4d7a15343b17f06b9275a9afa83221510825231d61d66bb",
+            "box3d/native/patches/block_allocator_alignment.patch": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+            "box3d/native/patches/broadphase_rebuild.patch": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+            "box3d/native/patches/compound_geometry_alignment.patch": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+            "box3d/native/recovery_codec.c": "d6dfa509db29e1587bcd1f8458934d7b404711652c807102cd32c5ba6a635606",
+            "box3d/native/recovery_codec.h": "eec31d0b79d9cb88d495fc34a24c0f35f2d0df471bc15845d24b3025d349bb05",
+            "box3d/native/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921",
+            "box3d/native/rollback_shim.h": "992c796ac3b6c79580992378ee10ee4a6dcd3b962c1ef557233b546aee0ab24e",
+            "box3d/native/state_dump.c": "b3933aa0283a8c44d99953a2a816a769af8a51ed04a9df993b20bb8159615c10",
+            "box3d/native/state_dump.h": "59be6b71d0979046be63e488b1b100cfdae1bcd085591f5f210b8f66a7a8d56a",
+            "box3d/native/state_dump_internal.h": "7d48ec8cce7e11724c90539ea1a007771b239f55fb74c6084ae59df6d3944bec",
+            "build/build_box3d.sh": "9578837c325b615aeff2c61ead5d2fa23f350428fc6766871208c42f424027fd",
+            "tests/box3d_authoring/native/authoring_test.c": "5b0a10df26c6206bab0fe6f424b8a8538c78aa0d1ade2b61f39b6a8c9b29d0b2",
+            "tests/box3d_motion/native/motion_test.c": "9881e5603e879fdabe2353103adfb9999d182615476f2bce02b4c212a56d734e",
+            "tests/box3d_native/lifecycle.c": "9022302417fb1ae979aef97b326ca9af19d7d30ed00c9ed11d31a9c6ca16c3ec",
+            "tests/box3d_recovery/generate_fields.py": "0948787666a872ac7529167cc97bbd5d41cab1103c954cea13879de26da91a73",
+            "tests/box3d_recovery/lifecycle_test.c": "ecd48dc4ac86c7085149e7d0177c66b85fc15a97fd570aa310c76ebc1c158c84",
+            "tests/box3d_recovery/native_test.c": "e9971fee090cccf9c0712858c4cd0a20d0ea132d723dbbcb896db75e0eb520a5",
+            "tests/box3d_recovery/profile.c": "d90b8b37a0808babbadd012dd3222d53ecfc9a214ec2151b7829407e24d93979",
+            "tests/box3d_recovery/reference.py": "61f0a22fee35036e5cf196b95576140474ac33719b921560a996b67c51893141",
+            "tests/box3d_soak/native_observe/native_observe_test.c": "ad10043e4a1756713680df28746a942d24e939173da5e6ea583f8a4f5c1810e1"
+          },
+          "identity_record_sha256": "706b7c4de57506d4eea9aa74a5c772307e5fccaf66ef5fc60ea69efda14ba97b",
+          "domain": {
+            "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+            "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+            "versions": [
+              1,
+              1,
+              3,
+              2,
+              1
+            ],
+            "pointer_bits": 64,
+            "endian": 1
+          },
+          "target": "macos",
+          "configuration": "Release",
+          "test_evidence": {
+            "runner": "ctest"
+          },
+          "shared_metadata_executed": true
+        },
+        "export_runtime_record": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/export/prepared/project/.export_build/box3d-runtime.json",
+        "export_runtime_record_sha256": "127816e665690e6620c0be37fc22581407856374c6d61161a944e621407b2971",
+        "domain": {
+          "build": "7afc14ca1862570db3148210cf94c226f85bd28fb0cdea81c8c20ddd6700b43c",
+          "endian": 1,
+          "pointer_bits": 64,
+          "target": "fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+          "versions": [
+            1,
+            1,
+            3,
+            2,
+            1
+          ]
+        },
+        "packaged_library": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/export/export/ReplayBox3DAuthoring.app/Contents/Frameworks/libogb3.dylib",
+        "packaged_library_sha256": "df3ddf2629d75cd6b0bf7eed6eb49e5a6eded4796c522644b03039cb201ca0a2"
+      },
+      "project_overlay": {
+        "version": 2,
+        "directory": "/Users/walter/data/code/odin/odin_godot/tests/box3d_production/runner/pause_overlay",
+        "sha256": "78065f9334becf9b54f6b2fa86c3112b716e7be6b02fc2567dec187c2bd61030",
+        "files": {
+          "overlay.json": "8c1d82809d4b3a348a95901a62c345a8c0eccfeaf0580581089c9d328ad94964",
+          "production_pause.gd": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b"
+        },
+        "helper_sha256": "09981651ca4fd5dfe406f5fc6c1a525d3413f721e5f64d98b13009e7997fdfc7",
+        "project_settings": {
+          "application/run/flush_stdout_on_print": true
+        },
+        "scope": "test-only live stdout flushing for every production case; optional exact self-stop/live host-boundary instrumentation; no simulation or protocol",
+        "settings_changes": [
+          {
+            "key": "application/run/flush_stdout_on_print",
+            "before_present": false,
+            "before_value": null,
+            "after_value": true
+          }
+        ],
+        "project_settings_before_sha256": "dad0c56fa639acb41be8eb437ef2459b9e41b14d3a499f9b93efcffdf77522b0",
+        "project": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/export/prepared/project",
+        "derived_script_sha256": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b",
+        "project_settings_after_sha256": "e42f836c4ed4f7fd408d84691714c31ed9ac38f77fa1c0d053466842efae34c4"
+      },
+      "source_fence_unchanged": true,
+      "functional_runtime": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-functional-v1/runtime/report.json",
+        "sha256": "48e9d3d16e1086e8f4ed3127105932cb4030c9bf2c0074a81d4c119fe2a2fe01"
+      }
+    },
+    {
+      "framework": "kit",
+      "target": "linux-x86_64",
+      "orchestrator": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-functional-v1/report.json",
+        "sha256": "679f5793fc26420b1df7bb0003a6b22b57fb368526260abc4dd06c4d4cd67444"
+      },
+      "export_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-functional-v1/export/export-record.json",
+        "sha256": "d394e87305ca962c35f6c6fad661a3f9cafcf83e3b586b603e3baf2ab4395654"
+      },
+      "executable": "/out/p6-production-lifetime-kit-linux-functional-v1/export/export/kit-box3d-authoring.x86_64",
+      "native_identity": {
+        "source_library": "/work/native-v1/native-cache/build/Release/libogb3.so",
+        "sha256": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a",
+        "domain_record": "/work/native-v1/native-cache/build/Release/native-domain-identity.txt",
+        "domain_record_sha256": "d3de53f8b8f2b78164b40a525359de1c6e3bb0ab61ca06ba5b59abc35ee969e4"
+      },
+      "project_overlay": {
+        "version": 2,
+        "directory": "/input/repo/tests/box3d_production/runner/pause_overlay",
+        "sha256": "78065f9334becf9b54f6b2fa86c3112b716e7be6b02fc2567dec187c2bd61030",
+        "files": {
+          "overlay.json": "8c1d82809d4b3a348a95901a62c345a8c0eccfeaf0580581089c9d328ad94964",
+          "production_pause.gd": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b"
+        },
+        "helper_sha256": "09981651ca4fd5dfe406f5fc6c1a525d3413f721e5f64d98b13009e7997fdfc7",
+        "project_settings": {
+          "application/run/flush_stdout_on_print": true
+        },
+        "scope": "test-only live stdout flushing for every production case; optional exact self-stop/live host-boundary instrumentation; no simulation or protocol",
+        "settings_changes": [
+          {
+            "key": "application/run/flush_stdout_on_print",
+            "before_present": false,
+            "before_value": null,
+            "after_value": true
+          }
+        ],
+        "project_settings_before_sha256": "b44b0be15fb152566fd542a648e21908170728bcb2b6d46ce4f92097c98d68a1",
+        "project": "/out/p6-production-lifetime-kit-linux-functional-v1/linux-work/kit-prepared/project",
+        "derived_script_sha256": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b",
+        "project_settings_after_sha256": "2869d473cffa8662598007f7e45f5993650551dde84b10f4b30066de3c48ca7b"
+      },
+      "source_fence_unchanged": true,
+      "functional_runtime": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-functional-v1/runtime/report.json",
+        "sha256": "01a3546af247642338a24b948411335aa9076e1cc2d2568d0de766bd04557abf"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "linux-x86_64",
+      "orchestrator": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-functional-v1/report.json",
+        "sha256": "c38e8999366a98ed56ae262f4c263b6ecb595419846015222ceb332f09dc0810"
+      },
+      "export_record": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-functional-v1/export/export-record.json",
+        "sha256": "d2d83c0558c703e375a5ed22450815291771655f76fbeb2becfeba7c45861f5d"
+      },
+      "executable": "/out/p6-production-lifetime-replay-linux-functional-v1/export/export/replay-box3d-authoring.x86_64",
+      "native_identity": {
+        "source_library": "/work/native-v1/native-cache/build/Release/libogb3.so",
+        "sha256": "edfe2fd8a1703d61cea7aa30d80d897037b0a30200c14923fee7f0780b156f5a",
+        "domain_record": "/work/native-v1/native-cache/build/Release/native-domain-identity.txt",
+        "domain_record_sha256": "d3de53f8b8f2b78164b40a525359de1c6e3bb0ab61ca06ba5b59abc35ee969e4"
+      },
+      "project_overlay": {
+        "version": 2,
+        "directory": "/input/repo/tests/box3d_production/runner/pause_overlay",
+        "sha256": "78065f9334becf9b54f6b2fa86c3112b716e7be6b02fc2567dec187c2bd61030",
+        "files": {
+          "overlay.json": "8c1d82809d4b3a348a95901a62c345a8c0eccfeaf0580581089c9d328ad94964",
+          "production_pause.gd": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b"
+        },
+        "helper_sha256": "09981651ca4fd5dfe406f5fc6c1a525d3413f721e5f64d98b13009e7997fdfc7",
+        "project_settings": {
+          "application/run/flush_stdout_on_print": true
+        },
+        "scope": "test-only live stdout flushing for every production case; optional exact self-stop/live host-boundary instrumentation; no simulation or protocol",
+        "settings_changes": [
+          {
+            "key": "application/run/flush_stdout_on_print",
+            "before_present": false,
+            "before_value": null,
+            "after_value": true
+          }
+        ],
+        "project_settings_before_sha256": "dad0c56fa639acb41be8eb437ef2459b9e41b14d3a499f9b93efcffdf77522b0",
+        "project": "/out/p6-production-lifetime-replay-linux-functional-v1/linux-work/replay-prepared/project",
+        "derived_script_sha256": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b",
+        "project_settings_after_sha256": "e42f836c4ed4f7fd408d84691714c31ed9ac38f77fa1c0d053466842efae34c4"
+      },
+      "source_fence_unchanged": true,
+      "functional_runtime": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-functional-v1/runtime/report.json",
+        "sha256": "7d5828fc9fdf66e7fc79def3ed2f4e590d6281298189d6d609805c7921c4fc72"
+      }
+    }
+  ],
+  "long_soaks": [
+    {
+      "target": "macos-arm64",
+      "framework": "kit",
+      "execution_mode": "native",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/report.json",
+        "sha256": "d8da25ae3499aa89b58edd41e9d5f567de8fcee9c0c6ab132b391129f48b99c2"
+      },
+      "observed_seconds_after_both_GO": 1809.9187175,
+      "terminal_confirmed_tick": 108600,
+      "all_five_byte_equal": true,
+      "parts": {
+        "Solver": {
+          "sha256": "1de3b0e37114c7ddb8b277ab9156f755b068e09598aeb268dfdea78ab74f8ecb",
+          "bytes": 5909
+        },
+        "Game": {
+          "sha256": "4b23cbacc109fdc79798623a77b024ccaa688a454057a3a40393b5591fe7d01d",
+          "bytes": 434
+        },
+        "Side": {
+          "sha256": "ba79789c726e5241a35f41afa184c9aa026a479996d7dd1abeb723eb83760874",
+          "bytes": 100
+        },
+        "Observations": {
+          "sha256": "a3cab394e53f55926b1548e6614bc98ea877ba045e4269a5766e29920715b584",
+          "bytes": 2564
+        },
+        "Occurrences": {
+          "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+          "bytes": 1
+        }
+      },
+      "authority_inputs": {
+        "framework": "kit",
+        "role": "host",
+        "epoch": 1,
+        "tick": 108600,
+        "available": true,
+        "published_tick": 108600,
+        "nonzero_by_seat": [
+          108600,
+          108600
+        ],
+        "pulse_by_seat": [
+          2413,
+          2413
+        ],
+        "submitted": 108600,
+        "held": 0,
+        "authority": 108600,
+        "unavailable": 0,
+        "accepted_through": 108600,
+        "event": "SAMPLE_INPUTS"
+      },
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 108600,
+        "player": 2,
+        "peer": 910688066,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      },
+      "roles": {
+        "host": {
+          "actor": {
+            "role": "host",
+            "pid": 14540,
+            "owned_pgid": 14540,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1804,
+            "records_consumed": 1804,
+            "raw_bytes": 1010374,
+            "stdout_fsynced": true,
+            "raw_log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/host/godot.log",
+            "raw_log_sha256": "0734752d01a17ef9b9c4273177da4932a58f175a9a5450d10f755a719dadeebf",
+            "event_index": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/host/events.sqlite",
+            "event_index_sha256": "7238c1ec16ee152943f87a7ccd3528b167995b8711cab2eed6516c1fc407c141",
+            "actor_identity": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/host/actor.json",
+            "actor_identity_sha256": "b39d409674f43d83f6049d5614ab3ca3703aa30049c378eaffe8d03e7db8b9b7"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 13047332,
+          "rss": {
+            "count": 1799,
+            "unavailable": 0,
+            "first": {
+              "observed": 1.010583666,
+              "bytes": 118603776
+            },
+            "last": {
+              "observed": 1810.338384291,
+              "bytes": 88096768
+            },
+            "peak_bytes": 120553472,
+            "min_bytes": 82771968,
+            "observed_seconds": 1809.327800625,
+            "last_minus_first_bytes": -30507008,
+            "bytes_per_second": -16860.962391370926,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1799
+        },
+        "client": {
+          "actor": {
+            "role": "client",
+            "pid": 14542,
+            "owned_pgid": 14542,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1803,
+            "records_consumed": 1803,
+            "raw_bytes": 994013,
+            "stdout_fsynced": true,
+            "raw_log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/client/godot.log",
+            "raw_log_sha256": "67fcd1e17374cc6d3e1ce7e8220bcda68556deceb637b1e57093100f784b394e",
+            "event_index": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/client/events.sqlite",
+            "event_index_sha256": "6c3fb4e478ab0f6f2ca63bfdd75cfcc6e13b5e8058e21e0c74a6997c57139c80",
+            "actor_identity": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-long-v1/client/actor.json",
+            "actor_identity_sha256": "bc60efa7a94a48b4881297e2278fb07978de0e5406c142c2732e75651a4f3da0"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 13051560,
+          "rss": {
+            "count": 1799,
+            "unavailable": 0,
+            "first": {
+              "observed": 1.013379208,
+              "bytes": 117112832
+            },
+            "last": {
+              "observed": 1810.343203291,
+              "bytes": 93110272
+            },
+            "peak_bytes": 122404864,
+            "min_bytes": 84475904,
+            "observed_seconds": 1809.329824083,
+            "last_minus_first_bytes": -24002560,
+            "bytes_per_second": -13265.994779124872,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1799
+        }
+      },
+      "bundle_fence": true,
+      "helper_fence": true
+    },
+    {
+      "target": "macos-arm64",
+      "framework": "replay",
+      "execution_mode": "native",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/report.json",
+        "sha256": "3d3557ba342fb81fa5ff068f1579bd4b52588476cf6427e6003d9b149f16f993"
+      },
+      "observed_seconds_after_both_GO": 1809.173003958,
+      "terminal_confirmed_tick": 108600,
+      "all_five_byte_equal": true,
+      "parts": {
+        "Solver": {
+          "sha256": "50bb78dcac2d065185be006c248a8fcf404a04f6df44ca50a870138c68a7ef51",
+          "bytes": 5909
+        },
+        "Game": {
+          "sha256": "fd99e969f598bc0f36b3be2250b7acc7a09e4586ff57b988f430378ab24743da",
+          "bytes": 116
+        },
+        "Side": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "Observations": {
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+          "bytes": 4
+        },
+        "Occurrences": {
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+          "bytes": 4
+        }
+      },
+      "authority_inputs": {
+        "framework": "Replay",
+        "role": "host",
+        "first": 1,
+        "last": 108600,
+        "rows": 217200,
+        "sample": 108598,
+        "held": 2,
+        "local": 108600,
+        "neutral": 0,
+        "nonzero": 217193,
+        "coverage_complete": true,
+        "origin_coverage_complete": true,
+        "origin_observed": 217200,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          108600,
+          108600
+        ],
+        "nonzero_by_seat": [
+          108599,
+          108594
+        ],
+        "event": "SAMPLE_INPUTS"
+      },
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 108600,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      },
+      "roles": {
+        "host": {
+          "actor": {
+            "role": "host",
+            "pid": 14541,
+            "owned_pgid": 14541,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1804,
+            "records_consumed": 1804,
+            "raw_bytes": 1694528,
+            "stdout_fsynced": true,
+            "raw_log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/host/godot.log",
+            "raw_log_sha256": "9b35c3edfd41c02004c172aa968cdc0e0f18b92c54b1409c8294bf16a192ca08",
+            "event_index": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/host/events.sqlite",
+            "event_index_sha256": "b06500b5a2aae6966360ee9490f631da2e6a2d31e9b09ea19fe83a3da40e6696",
+            "actor_identity": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/host/actor.json",
+            "actor_identity_sha256": "dc84fa445da33be1e27a23878246887c1dc136c1c21c6e265bb7e6b384916189"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 15304934,
+          "rss": {
+            "count": 1799,
+            "unavailable": 0,
+            "first": {
+              "observed": 1.005662041,
+              "bytes": 121110528
+            },
+            "last": {
+              "observed": 1810.450715458,
+              "bytes": 88948736
+            },
+            "peak_bytes": 124649472,
+            "min_bytes": 83263488,
+            "observed_seconds": 1809.445053417,
+            "last_minus_first_bytes": -32161792,
+            "bytes_per_second": -17774.39549173648,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1798
+        },
+        "client": {
+          "actor": {
+            "role": "client",
+            "pid": 14545,
+            "owned_pgid": 14545,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1804,
+            "records_consumed": 1804,
+            "raw_bytes": 1674751,
+            "stdout_fsynced": true,
+            "raw_log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/client/godot.log",
+            "raw_log_sha256": "cb8fa9de8f42ce5a05e33d2e85d21350f10dd2b4fdc49f699843b231fa3ec9bb",
+            "event_index": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/client/events.sqlite",
+            "event_index_sha256": "a5780c96926a87dfa5616d1f80c66903e16eed50ad3aa06bd67c32fe294a9cf8",
+            "actor_identity": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-long-v1/client/actor.json",
+            "actor_identity_sha256": "c653ba15ac8c28388d4b169584865dbf504d1b95d2d99806b911299e90bc9386"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 16621917,
+          "rss": {
+            "count": 1799,
+            "unavailable": 0,
+            "first": {
+              "observed": 1.008217,
+              "bytes": 124125184
+            },
+            "last": {
+              "observed": 1810.455173833,
+              "bytes": 92209152
+            },
+            "peak_bytes": 128974848,
+            "min_bytes": 86130688,
+            "observed_seconds": 1809.4469568329998,
+            "last_minus_first_bytes": -31916032,
+            "bytes_per_second": -17638.556288967604,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1798
+        }
+      },
+      "bundle_fence": true,
+      "helper_fence": true
+    },
+    {
+      "target": "linux-x86_64",
+      "framework": "kit",
+      "execution_mode": "translated-linux-x86_64",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-long-v1/report.json",
+        "sha256": "1bb03da1083dbdd755dbac36bb93e5389ca7965c18354bedee276fa60b097a4e"
+      },
+      "observed_seconds_after_both_GO": 1810.3640276289989,
+      "terminal_confirmed_tick": 108600,
+      "all_five_byte_equal": true,
+      "parts": {
+        "Solver": {
+          "sha256": "140d4d8ba88da0606c4e1ec08298238184f334e9024a31efbd93968b868cab2a",
+          "bytes": 5909
+        },
+        "Game": {
+          "sha256": "d94ab493e3657bcd27515f60d463579a6ed46ed90deef20dbe65e948a1a826c9",
+          "bytes": 434
+        },
+        "Side": {
+          "sha256": "8adc600d970bf5ac0b60e07891532e435039876cd96e8e9d2ddf2446a60e1f99",
+          "bytes": 100
+        },
+        "Observations": {
+          "sha256": "a3cab394e53f55926b1548e6614bc98ea877ba045e4269a5766e29920715b584",
+          "bytes": 2564
+        },
+        "Occurrences": {
+          "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+          "bytes": 1
+        }
+      },
+      "authority_inputs": {
+        "framework": "kit",
+        "role": "host",
+        "epoch": 1,
+        "tick": 108600,
+        "available": true,
+        "published_tick": 108600,
+        "nonzero_by_seat": [
+          108600,
+          108587
+        ],
+        "pulse_by_seat": [
+          2413,
+          2413
+        ],
+        "submitted": 108587,
+        "held": 13,
+        "authority": 108600,
+        "unavailable": 0,
+        "accepted_through": 108600,
+        "event": "SAMPLE_INPUTS"
+      },
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 108600,
+        "player": 2,
+        "peer": 786196556,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      },
+      "roles": {
+        "host": {
+          "actor": {
+            "role": "host",
+            "pid": 19399,
+            "owned_pgid": 19399,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1805,
+            "records_consumed": 1805,
+            "raw_bytes": 1010927,
+            "stdout_fsynced": true,
+            "raw_log": "/out/p6-production-lifetime-kit-linux-long-v1/host/godot.log",
+            "raw_log_sha256": "f52b79766da48897cdb75396b544263a6688da98f0ec1e10035d9e21b030667c",
+            "event_index": "/out/p6-production-lifetime-kit-linux-long-v1/host/events.sqlite",
+            "event_index_sha256": "b5e28206bfbfb9f3fe9c3a04648e00f3bf0ec05a478d2d6cc684f623048e541f",
+            "actor_identity": "/out/p6-production-lifetime-kit-linux-long-v1/host/actor.json",
+            "actor_identity_sha256": "cff4e1953d80734e0a83bb4c169a82367f87bc079baf5d7191d4df1799b9d285"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 13048673,
+          "rss": {
+            "count": 1802,
+            "unavailable": 0,
+            "first": {
+              "observed": 18033.999369497,
+              "bytes": 38039552
+            },
+            "last": {
+              "observed": 19846.841397573,
+              "bytes": 171331584
+            },
+            "peak_bytes": 171737088,
+            "min_bytes": 38039552,
+            "observed_seconds": 1812.8420280760001,
+            "last_minus_first_bytes": 133292032,
+            "bytes_per_second": 73526.55660872177,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1800
+        },
+        "client": {
+          "actor": {
+            "role": "client",
+            "pid": 19415,
+            "owned_pgid": 19415,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1803,
+            "records_consumed": 1803,
+            "raw_bytes": 994012,
+            "stdout_fsynced": true,
+            "raw_log": "/out/p6-production-lifetime-kit-linux-long-v1/client/godot.log",
+            "raw_log_sha256": "11fc62d36ae9f4495d58a57d3ff87c791cea65d7b98e090c87c2f1b70e5ae843",
+            "event_index": "/out/p6-production-lifetime-kit-linux-long-v1/client/events.sqlite",
+            "event_index_sha256": "f8dbda866ad0ba4a5cf691f71a0bd016e1cc2b99d607022b0ba3ad61b4f7df0b",
+            "actor_identity": "/out/p6-production-lifetime-kit-linux-long-v1/client/actor.json",
+            "actor_identity_sha256": "6afa5bf3cd9c43a93e145deb45cdc887eca069c407c4223947c34cedad4d9e51"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "owners_observed": true,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 13050675,
+          "rss": {
+            "count": 1802,
+            "unavailable": 0,
+            "first": {
+              "observed": 18034.033362073,
+              "bytes": 13729792
+            },
+            "last": {
+              "observed": 19846.867637559,
+              "bytes": 180826112
+            },
+            "peak_bytes": 181174272,
+            "min_bytes": 13729792,
+            "observed_seconds": 1812.8342754859987,
+            "last_minus_first_bytes": 167096320,
+            "bytes_per_second": 92174.07363682128,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1799
+        }
+      },
+      "bundle_fence": true,
+      "helper_fence": true
+    },
+    {
+      "target": "linux-x86_64",
+      "framework": "replay",
+      "execution_mode": "translated-linux-x86_64",
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-long-v1/report.json",
+        "sha256": "2d3eb9056a9d7936697c67e3c897541db6531d47d96799bddaafde7d95dbb95a"
+      },
+      "observed_seconds_after_both_GO": 1809.417124058,
+      "terminal_confirmed_tick": 108600,
+      "all_five_byte_equal": true,
+      "parts": {
+        "Solver": {
+          "sha256": "6614c0bcdf7ef9a3615080fe801da318f398f413a0b2dd5f9be78e19b96f89c2",
+          "bytes": 5909
+        },
+        "Game": {
+          "sha256": "2fd84a45da91b24ec408487671c8284c3fc127a0dedb13923e6156ffd4783008",
+          "bytes": 116
+        },
+        "Side": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "Observations": {
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+          "bytes": 4
+        },
+        "Occurrences": {
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+          "bytes": 4
+        }
+      },
+      "authority_inputs": {
+        "framework": "Replay",
+        "role": "host",
+        "first": 1,
+        "last": 108600,
+        "rows": 217200,
+        "sample": 108560,
+        "held": 40,
+        "local": 108600,
+        "neutral": 0,
+        "nonzero": 217151,
+        "coverage_complete": true,
+        "origin_coverage_complete": true,
+        "origin_observed": 217200,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          108600,
+          108600
+        ],
+        "nonzero_by_seat": [
+          108599,
+          108552
+        ],
+        "event": "SAMPLE_INPUTS"
+      },
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 108600,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      },
+      "roles": {
+        "host": {
+          "actor": {
+            "role": "host",
+            "pid": 19726,
+            "owned_pgid": 19726,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1804,
+            "records_consumed": 1804,
+            "raw_bytes": 1694528,
+            "stdout_fsynced": true,
+            "raw_log": "/out/p6-production-lifetime-replay-linux-long-v1/host/godot.log",
+            "raw_log_sha256": "bb302725ffe1e73f4d4162bfe6b9bdff623ebf8494c2f3e254be660e8321adb5",
+            "event_index": "/out/p6-production-lifetime-replay-linux-long-v1/host/events.sqlite",
+            "event_index_sha256": "bacf426064152949b68d43e7ea1fc27ba26c06ca329d2326619a539bc01f24f6",
+            "actor_identity": "/out/p6-production-lifetime-replay-linux-long-v1/host/actor.json",
+            "actor_identity_sha256": "2801cb90bbc20e53d0b0439bda4003005e4b2ebc3c2e218922750c57a2bd9b88"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 15302798,
+          "rss": {
+            "count": 1800,
+            "unavailable": 0,
+            "first": {
+              "observed": 18117.491893118,
+              "bytes": 32681984
+            },
+            "last": {
+              "observed": 19928.323793118,
+              "bytes": 179425280
+            },
+            "peak_bytes": 179576832,
+            "min_bytes": 32681984,
+            "observed_seconds": 1810.831900000001,
+            "last_minus_first_bytes": 146743296,
+            "bytes_per_second": 81036.39879549279,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1798
+        },
+        "client": {
+          "actor": {
+            "role": "client",
+            "pid": 19734,
+            "owned_pgid": 19734,
+            "actual_exit": 0,
+            "signal_number": null,
+            "natural": true,
+            "intake_drained": true,
+            "error": null,
+            "records_seen": 1804,
+            "records_consumed": 1804,
+            "raw_bytes": 1674748,
+            "stdout_fsynced": true,
+            "raw_log": "/out/p6-production-lifetime-replay-linux-long-v1/client/godot.log",
+            "raw_log_sha256": "1fa073d11cd073759ea8679e3357114001daed6c9328d2f1e013ec2d9e4c2528",
+            "event_index": "/out/p6-production-lifetime-replay-linux-long-v1/client/events.sqlite",
+            "event_index_sha256": "4e77433ee8625210eebfbf6d0dc54de07221bfd936fabfc4de887651d3ee10be",
+            "actor_identity": "/out/p6-production-lifetime-replay-linux-long-v1/client/actor.json",
+            "actor_identity_sha256": "b482959a6798d5d9974aa62df6db7cb06a4ddcfd095757938a706536445a7d3b"
+          },
+          "cleanup": {
+            "native": 0,
+            "wrapper": 0,
+            "meter": 0,
+            "owners": 0,
+            "owners_before": 4,
+            "owners_after": 4,
+            "observed": true
+          },
+          "peak_tracked_admitted_bytes": 16619781,
+          "rss": {
+            "count": 1801,
+            "unavailable": 0,
+            "first": {
+              "observed": 18117.525314568,
+              "bytes": 13582336
+            },
+            "last": {
+              "observed": 19929.328501198,
+              "bytes": 0
+            },
+            "peak_bytes": 185798656,
+            "min_bytes": 0,
+            "observed_seconds": 1811.8031866300007,
+            "last_minus_first_bytes": -13582336,
+            "bytes_per_second": -7496.584673340532,
+            "scope": "sampledOS trend, not Native quota or proof of cause/leak"
+          },
+          "memory_samples": 1798
+        }
+      },
+      "bundle_fence": true,
+      "helper_fence": true
+    }
+  ],
+  "service_pauses": [
+    {
+      "framework": "kit",
+      "target": "macos-arm64",
+      "pause_ms": 300,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-pause300-v1/report.json",
+        "sha256": "22d98f97f4d4855781fd4d455898ae8ece1f3d4567c395516942a95df03eabe2"
+      },
+      "actual_stopped_seconds": 0.31157762499999997,
+      "actual_head_gap": 16,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 1200,
+        "player": 2,
+        "peer": 1560613178,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      }
+    },
+    {
+      "framework": "kit",
+      "target": "macos-arm64",
+      "pause_ms": 3000,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-kit-macos-pause3000-v1/report.json",
+        "sha256": "1f158742a5f57429da0a6845bf32a1ac22aa4fe571142ecfbb806b30ba1550fd"
+      },
+      "actual_stopped_seconds": 3.0020661659999996,
+      "actual_head_gap": 178,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 1200,
+        "player": 2,
+        "peer": 1435396849,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "macos-arm64",
+      "pause_ms": 300,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-pause300-v1/report.json",
+        "sha256": "d57e4d9008e08fc435b34d85b7f38dd1b77494868dd90c0819ad1599a0977957"
+      },
+      "actual_stopped_seconds": 0.3071254589999999,
+      "actual_head_gap": 16,
+      "outcome": "bounded_confirmed_catchup_same_validated_scope",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 1200,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "macos-arm64",
+      "pause_ms": 3000,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-replay-macos-pause3000-v1/report.json",
+        "sha256": "59f8635ad50568dcdb23da7de372b4a84a6fa6acd002ad2fa2daa8cd3123424e"
+      },
+      "actual_stopped_seconds": 3.0074665419999995,
+      "actual_head_gap": 177,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 1200,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      }
+    },
+    {
+      "framework": "kit",
+      "target": "linux-x86_64",
+      "pause_ms": 300,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-pause300-v1/report.json",
+        "sha256": "c6530967677c487507ed7eb2d32268b37840ec406aef30ce66cda5d8f1880749"
+      },
+      "actual_stopped_seconds": 0.30595006099974853,
+      "actual_head_gap": 17,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 1200,
+        "player": 2,
+        "peer": 212128733,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      }
+    },
+    {
+      "framework": "kit",
+      "target": "linux-x86_64",
+      "pause_ms": 3000,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-kit-linux-pause3000-v1/report.json",
+        "sha256": "3279e0de202810081bb47530438b5affd9b66573a34884f9d5b6abde86a5229a"
+      },
+      "actual_stopped_seconds": 3.0022218839985726,
+      "actual_head_gap": 179,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "version": 1,
+        "framework": "kit",
+        "role": "host",
+        "scope": "verified_terminal_signature_ack",
+        "epoch": 1,
+        "tick": 1200,
+        "player": 2,
+        "peer": 834882160,
+        "matched": true,
+        "event": "SAMPLE_ACK"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "linux-x86_64",
+      "pause_ms": 300,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-pause300-v1/report.json",
+        "sha256": "7d39de4f26814e30fc00beae71224f0d27db38b38f16496bffc959e42ff52819"
+      },
+      "actual_stopped_seconds": 0.3095763139972405,
+      "actual_head_gap": 16,
+      "outcome": "bounded_confirmed_catchup_same_validated_scope",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 1200,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      }
+    },
+    {
+      "framework": "replay",
+      "target": "linux-x86_64",
+      "pause_ms": 3000,
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-lifetime-replay-linux-pause3000-v1/report.json",
+        "sha256": "7c0f9de718f34650ad3a542eae0778bfe1e41fcbe547359c57d426c1708572d0"
+      },
+      "actual_stopped_seconds": 3.009966975001589,
+      "actual_head_gap": 176,
+      "outcome": "validated_canonical_recovery",
+      "confirmed_target": 1200,
+      "all_five_byte_equal": true,
+      "actual_final_ACK": {
+        "framework": "Replay",
+        "role": "host",
+        "stage": "final_accepted",
+        "epoch": 1,
+        "tick": 1200,
+        "signature_match": true,
+        "event": "SAMPLE_TAIL"
+      }
+    }
+  ],
+  "public_contracts": {
+    "report": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-contracts-actual-v7/report.json",
+      "sha256": "3dfe48a70b373b7f9c9f426a914b695187005ae9bde776506a74315f390fdfd6"
+    },
+    "log": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-contracts-actual-v7/test.log",
+      "sha256": "7f73a3fe294bb0e024d030711ab270d0803b673353699e301a71329cb85fd317"
+    },
+    "groups": 11,
+    "actual_native_static_archive_sha256": "6c57e7cd9ea1f95d5195d92e7145fc4f25272360020afce479b2bf4b15e79a1c",
+    "source_and_native_fences": true,
+    "scope": "standalone real Native and public adapters; nilOwner/static; SDK ownership pressure is separate; receiver discard is not ENet packet loss"
+  },
+  "sdk_memory_cap": {
+    "report": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-sdk-build-v3/runtime-report.json",
+      "sha256": "58e44d2ac4afa2a6a55265249f4eec51697cd5fbc17b33fbb2cfbdedde158cdf"
+    },
+    "log": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-sdk-build-v3/quota.log",
+      "sha256": "5b6ccc3960b1e70e8ad6e543848f2fac9f155ba83dfc4d12ad20f7bf6752ee03"
+    },
+    "actual_results": {
+      "ok": true,
+      "cases": [
+        {
+          "framework": "Kit",
+          "operation": "lane_world_checkpoint",
+          "error": "",
+          "setup": true,
+          "exact64m": true,
+          "extra_byte_rejected": true,
+          "operation_rejected": true,
+          "aux_unchanged": true,
+          "full_state_preserved": true,
+          "resumed": true,
+          "cleanup": true,
+          "admitted_before": 1984712,
+          "actual_storage_bytes": 65124152,
+          "admitted_at": 67108864,
+          "admitted_after_refusal": 67108864
+        },
+        {
+          "framework": "Replay",
+          "operation": "advance managed complete tick",
+          "error": "",
+          "setup": true,
+          "exact64m": true,
+          "extra_byte_rejected": true,
+          "operation_rejected": true,
+          "aux_unchanged": true,
+          "full_state_preserved": true,
+          "resumed": true,
+          "cleanup": true,
+          "admitted_before": 1808448,
+          "actual_storage_bytes": 65300416,
+          "admitted_at": 67108864,
+          "admitted_after_refusal": 67108864
+        }
+      ],
+      "native": 0,
+      "wrapper": 0,
+      "meter": 0,
+      "owners_before": 3,
+      "owners_after": 3,
+      "observed": true
+    }
+  },
+  "cpu": {
+    "aggregate": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-prepared-v1/current-cpu19-seals-v1.json",
+      "sha256": "0cf00edc22587df67245ea6fae5f5e0e35f18e81dbd13fe0689084d0f029f617"
+    },
+    "streams": [
+      {
+        "name": "kit-normal-a-dense",
+        "framework": "kit",
+        "fixture": "dense",
+        "operation": "client_prediction",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-normal-a-dense/seal.json",
+          "sha256": "d91bfc57e41b3b2657cecfd325552331917b6d16961687e5e0291ec0cd6eb4e2"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 339000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "kit-normal-a-common",
+        "framework": "kit",
+        "fixture": "common",
+        "operation": "client_prediction",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-normal-a-common/seal.json",
+          "sha256": "ac15f7e26d1875ccc5e251899c8aa3b6622e142a964fa641cdd26d50c00a0beb"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 286000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "kit-normal-b-dense",
+        "framework": "kit",
+        "fixture": "dense",
+        "operation": "authority_step_with_due_signature",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-normal-b-dense/seal.json",
+          "sha256": "842f860e216168b3155c5ec41a1051998e000ddad02a29533f266554f9179fa5"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 457000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "kit-normal-b-common",
+        "framework": "kit",
+        "fixture": "common",
+        "operation": "authority_step_with_due_signature",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-normal-b-common/seal.json",
+          "sha256": "d798a982393efd6f05bfd98765deaee47c3401ed07e72fb6f417aad404dfe699"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 396000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "kit-repair8-dense",
+        "framework": "kit",
+        "fixture": "dense",
+        "operation": "repair8",
+        "coverage": "REPAIR8_ONLY_NORMAL_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-repair8-dense/seal.json",
+          "sha256": "f721b5325883667c5fc7bc7afe0f4234e9f18c943880b8ec7f7c43e0af0646dc"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 2119000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "kit-repair8-common",
+        "framework": "kit",
+        "fixture": "common",
+        "operation": "repair8",
+        "coverage": "REPAIR8_ONLY_NORMAL_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/kit-repair8-common/seal.json",
+          "sha256": "c1c4b07348edfade9016dae99d3f9e9a78a805f570c313f85fca51e59d5f0d19"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 1898000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "replay-normal-a-dense",
+        "framework": "replay",
+        "fixture": "dense",
+        "operation": "client_prediction_send",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/replay-normal-a-dense/seal.json",
+          "sha256": "7da9e58fcc60f713ade628a01ea5c042797eeca1aa63affb455ed9c6d681de2e"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 303000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "replay-normal-b-dense",
+        "framework": "replay",
+        "fixture": "dense",
+        "operation": "authority_step_requested_canonical",
+        "coverage": "NORMAL1_ONLY_REPAIR_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/replay-normal-b-dense/seal.json",
+          "sha256": "9ff771efdc2035e9a127729fdbfa5a87b18e165d1ee130d104ad9dea15e8187d"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 1427000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "replay-repair8-dense",
+        "framework": "replay",
+        "fixture": "dense",
+        "operation": "repair8",
+        "coverage": "REPAIR8_ONLY_NORMAL_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/replay-repair8-dense/seal.json",
+          "sha256": "b554eb913c53c3b568701359a84c3b53fd830ec656f630e8f25251f113faa5e9"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 3572000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      },
+      {
+        "name": "replay-repair8-common",
+        "framework": "replay",
+        "fixture": "common",
+        "operation": "repair8",
+        "coverage": "REPAIR8_ONLY_NORMAL_COVERAGE_INCOMPLETE",
+        "seal": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-current-cpu19-seals-v1/replay-repair8-common/seal.json",
+          "sha256": "66841c7209457c89840f7c923cafafba1ec4a7217c0bf58f145bc89da214de63"
+        },
+        "state": "SEALED_SAVED_CURRENT_CPU19_ONLY",
+        "max_ns": 3221000,
+        "over_4ms": 0,
+        "samples_retained": 19,
+        "record_status": "RECORDS_VALID",
+        "cpu_candidate_acceptance": "INCOMPLETE",
+        "error": null
+      }
+    ],
+    "samples": 190,
+    "maximum_whole_ns": 3572000,
+    "over_4ms": 0,
+    "all_numeric_types_values_retained": true,
+    "coverage": "10 separately qualified current offline actual-Core streams; each normal-only/repair-only CPU coverage INCOMPLETE; no pooled percentile or general qualification",
+    "raw_Replay_RESULT_available": false,
+    "Replay_RESULT_origin": "Explicit controller composition from 19 actual saved proofs/exit0/EOF/current fences, never a claimed raw producer RESULT",
+    "old_8_894ms_failure": "Preserved in original Gate B evidence; FAIL/cause unknown; no threshold/filter/subtraction/waiver"
+  },
+  "callback_lifetime": {
+    "old_expected_red": {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-callback-old-replay-linux-v1/report.json",
+        "sha256": "9999f7a19a3e49dbde50f619a54566c2748a8eb5591ad1f9e089472482daadb1"
+      },
+      "measurements": {
+        "batches": 2,
+        "checked_close": true,
+        "errors": [
+          "producer TLS used/capacity/temp_count not restored exactly",
+          "second identical getter batch keeps growing Godot static heap"
+        ],
+        "framework": "replay",
+        "frontier_after": {
+          "confirmed": 0.0,
+          "epoch": 1.0,
+          "frames": 0.0,
+          "go": false,
+          "head": 0.0,
+          "phase": "Host"
+        },
+        "frontier_before": {
+          "confirmed": 0.0,
+          "epoch": 1.0,
+          "frames": 0.0,
+          "go": false,
+          "head": 0.0,
+          "phase": "Host"
+        },
+        "godot_heap_after": 104783859,
+        "godot_heap_before": 31583859,
+        "godot_heap_middle": 68183859,
+        "node_freed": true,
+        "ok": false,
+        "pairs_per_batch": 10000,
+        "scope": "actual SDK producer TLS and Godot static heap; no RSS/Native quota/performance/physics qualification",
+        "tls_after": [
+          231662,
+          33554432,
+          0
+        ],
+        "tls_available": true,
+        "tls_before": [
+          189927,
+          4194304,
+          0
+        ],
+        "tls_fields": [
+          "total_used",
+          "total_capacity",
+          "temp_count"
+        ],
+        "tls_middle": [
+          2307302,
+          16777216,
+          0
+        ],
+        "version": 1,
+        "warmup_pairs": 128
+      }
+    },
+    "current_passes": [
+      {
+        "framework": "replay",
+        "report": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-callback-current-replay-linux-v1/report.json",
+          "sha256": "22510fe79b41491da620938751d4d45acfe1a26bfed417a48e4f50cc90a9f3bb"
+        },
+        "measurements": {
+          "batches": 2,
+          "checked_close": true,
+          "errors": [],
+          "framework": "replay",
+          "frontier_after": {
+            "confirmed": 0.0,
+            "epoch": 1.0,
+            "frames": 0.0,
+            "go": false,
+            "head": 0.0,
+            "phase": "Host"
+          },
+          "frontier_before": {
+            "confirmed": 0.0,
+            "epoch": 1.0,
+            "frames": 0.0,
+            "go": false,
+            "head": 0.0,
+            "phase": "Host"
+          },
+          "godot_heap_after": 31112719,
+          "godot_heap_before": 31112719,
+          "godot_heap_middle": 31112719,
+          "node_freed": true,
+          "ok": true,
+          "pairs_per_batch": 10000,
+          "scope": "actual SDK producer TLS and Godot static heap; no RSS/Native quota/performance/physics qualification",
+          "tls_after": [
+            297,
+            4194304,
+            0
+          ],
+          "tls_available": true,
+          "tls_before": [
+            297,
+            4194304,
+            0
+          ],
+          "tls_fields": [
+            "total_used",
+            "total_capacity",
+            "temp_count"
+          ],
+          "tls_middle": [
+            297,
+            4194304,
+            0
+          ],
+          "version": 1,
+          "warmup_pairs": 128
+        }
+      },
+      {
+        "framework": "kit",
+        "report": {
+          "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-callback-current-kit-linux-v2/report.json",
+          "sha256": "a7ecef0129600f0150652ce5ca8b17fd60371283d25cc6d37c99f3be921c0104"
+        },
+        "measurements": {
+          "batches": 2,
+          "checked_close": true,
+          "errors": [],
+          "framework": "kit",
+          "frontier_after": {
+            "confirmed": null,
+            "epoch": null,
+            "frames": 0.0,
+            "go": false,
+            "head": null,
+            "phase": "Waiting"
+          },
+          "frontier_before": {
+            "confirmed": null,
+            "epoch": null,
+            "frames": 0.0,
+            "go": false,
+            "head": null,
+            "phase": "Waiting"
+          },
+          "godot_heap_after": 31120203,
+          "godot_heap_before": 31120203,
+          "godot_heap_middle": 31120203,
+          "node_freed": true,
+          "ok": true,
+          "pairs_per_batch": 10000,
+          "scope": "actual SDK producer TLS and Godot static heap; no RSS/Native quota/performance/physics qualification",
+          "tls_after": [
+            13,
+            4194304,
+            0
+          ],
+          "tls_available": true,
+          "tls_before": [
+            13,
+            4194304,
+            0
+          ],
+          "tls_fields": [
+            "total_used",
+            "total_capacity",
+            "temp_count"
+          ],
+          "tls_middle": [
+            13,
+            4194304,
+            0
+          ],
+          "version": 1,
+          "warmup_pairs": 128
+        }
+      }
+    ],
+    "editor_sdk": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-editor-callback-lifetime-v1/report.json",
+      "sha256": "d1e98e1b363b9b60ef069c5f7f370e20810f332a4aa4c9c0ef47b2e5824f7e4c"
+    },
+    "kit_fixture_setup": "Kit uses interactive pre-GO close; original scripted-close FAIL preserved. The same compiled SDK project was reused for the corrected environment; criteria unchanged.",
+    "scope": "producer TLS and Godot static heap; no Native/RSS inference. Primitive probe methods exist only in derived test projects; normal exports have no probe API.",
+    "source_repair": "existing owned_return/borrowed_args annotations and nested default temp scopes in exact sample/editor callbacks; no Core/generator/Native/protocol change"
+  },
+  "cgroup": {
+    "before": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-cgroup-before-v1.json",
+      "sha256": "484188459aea71691ca6c806d6905f0a7cd4a2b02c310dc5b0bc847cdedf8521"
+    },
+    "after": {
+      "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-production-lifetime-cgroup-after-v1.json",
+      "sha256": "7e5a2b095313fb0f3bdd39c0cdd30cd61ae5f2b68208a347407ba8885d50cba1"
+    },
+    "oom_kill_before": 1,
+    "oom_kill_after": 1,
+    "memory_limit_bytes": 4294967296,
+    "no_resource_limit_or_counter_reset": true,
+    "historical_peak_scope": "peak includes preserved earlier failed run; it is not current-soak peak"
+  },
+  "preserved_failures": [
+    {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-replay-linux-long-v1/report.json",
+        "sha256": "f9124ed76d8d9dde8dd79c170d958f47f5e6262a3211c8827abf82b241de0ba8"
+      },
+      "scope": "strict input audit rejected unavailable history; saved data did not identify a canonical anchor",
+      "unchanged": true
+    },
+    {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-production-replay-anchor-linux-long-v1/report.json",
+        "sha256": "d29e6fbce851957578b638784980cf880b47a048a4e088667ffca47e87fb4178"
+      },
+      "scope": "Client signal9/no result; container OOM counter and process RSS growth; Host later stopped by Root; kernel victim attribution unproven",
+      "unchanged": true
+    },
+    {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p5-gate-c-linux-v1/out/p6-callback-current-kit-linux-v1/report.json",
+        "sha256": "56029b0fe27fcfb8025206687068544f0058af2c373d0f3244b0135a7beb1fe5"
+      },
+      "scope": "allocation checks flat; pre-GO scripted Kit close legitimately failed its declared-workload contract",
+      "unchanged": true
+    },
+    {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-contracts-actual-v1/report.json",
+        "sha256": "d2cd3b8ea91902156a805a793850b7a95fecc28665f9e9130bcf1fbfc1b21e4f"
+      },
+      "scope": "preserved earlier fixture failure; later public transport/window setup correction is separate evidence",
+      "unchanged": true
+    },
+    {
+      "report": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-public-contracts-actual-v2/report.json",
+        "sha256": "f3a22b42d8e328db1f7254285a207ab95ea418b1b301dbf08519617658e5f515"
+      },
+      "scope": "preserved earlier fixture failure; later public transport/window setup correction is separate evidence",
+      "unchanged": true
+    }
+  ],
+  "memory_failure_external_stop": {
+    "path": "/tmp/odin-box3d-goal-t4jbbj4v/p6-replay-linux-long-memory-failure-v1/stop-result.json",
+    "sha256": "90b6a6a560a1682504b23ea05477798b21a29b23a45bee49385c591669f713e7"
+  },
+  "completion_source_hashes": {
+    "tests/box3d_production/public_contracts/accepted_audit_test.odin": "2526272fa135843e76b53b4c92cbe2abc54d39525ea80187707b8c382f2b0e72",
+    "tests/box3d_production/public_contracts/memory_test.odin": "c3b5666e06a5b55efc6c9b652addf2e5ed43ee33bb460ab8e02f703fc7566baf",
+    "tests/box3d_production/public_contracts/fixture.odin": "932ab900948a84e59856d4c339be3ee8cb545802a1186a807ce0ac6a2e7d0c6d",
+    "tests/box3d_production/public_contracts/window_test.odin": "43fc9dd7d6e00dc30686074b346bde3bdc7d74ee238f8a6db2ec322258cad1e9",
+    "tests/box3d_production/public_contracts/snapshot_anchor_test.odin": "fd1a5e95add0fcea419b68a11cc4fe4377bd7f671816e6cd9be937977a467671",
+    "tests/box3d_production/public_contracts/README.md": "3aa2f62844548eee9c2f68e1c65d71a37fd29b292fb63b698bc715746da97662",
+    "tests/box3d_production/public_contracts/sdk/test_quota.gd": "adcf6cbb1620a6afdd053a374e59354a9a4deb0fa36f2f97c17b127941adc8f4",
+    "tests/box3d_production/public_contracts/sdk/README.md": "3935743c79805f735d0eb63e012b63459eb82a8ac7cc3e2343883f40df167620",
+    "tests/box3d_production/public_contracts/sdk/odin_godot.gdextension": "8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a",
+    "tests/box3d_production/public_contracts/sdk/project.godot": "d72ffbfe5efeb219eb8ae722c6a34980bf65a56080515fda6687202de6362e2a",
+    "tests/box3d_production/public_contracts/sdk/scripts/boot.odin": "183dbae866c0560dc42079ccbbcccbbd0686e97f67b6d253dfd14f54f8a18c8a",
+    "tests/box3d_production/public_contracts/sdk/modules/quota_probe/probe.odin": "f22a85ab7ecad12ca19194a2f2bab17a17e0f25b7900c5c81a9f79b3f1e190f9",
+    "tests/box3d_production/runner/intake.py": "7d9ff771fbf5006ccc3a33cec8652857c0c33cb5409720bc920ee30fef927ece",
+    "tests/box3d_production/runner/overlay.py": "09981651ca4fd5dfe406f5fc6c1a525d3413f721e5f64d98b13009e7997fdfc7",
+    "tests/box3d_production/runner/plan.py": "0d1bd10175923ae69f1531f14aab90b3966486ba9212d9732b646cc413841f51",
+    "tests/box3d_production/runner/run.py": "cd6abdce90ffc9f6226f35604b83c9d21c464fff4fa134ff010a051b6bc3db7e",
+    "tests/box3d_production/runner/controller.py": "7689eee2d2fdf4117b39c0708c9e2b4df0507424b1833ed8780256df18606705",
+    "tests/box3d_production/runner/test_runner.py": "124445e49234a46d8a88ac23888138920f40e146caddb0e228044e12020995c0",
+    "tests/box3d_production/runner/evidence.py": "cd79885326d382e6e6776ecc8a2a4d2c28f1e240a211aa7ff49b0edb4c2def2a",
+    "tests/box3d_production/runner/pause_overlay/overlay.json": "8c1d82809d4b3a348a95901a62c345a8c0eccfeaf0580581089c9d328ad94964",
+    "tests/box3d_production/runner/pause_overlay/production_pause.gd": "ff58d7f389c9f95d618a523cfe1c20eb9aa89185e6cf64623390d07f331e677b",
+    "tests/box3d_production/callback_lifetime/run.py": "4bcf4b3155af51bd28fb34861ed3b2b795e8940b659f3f340d7d91eb28b2d977",
+    "tests/box3d_production/callback_lifetime/callback_lifetime_probe.odin.in": "623e39fccee11bda8e2a916efa98b2a453c39418ab15b95b9c77b17ca9021ecc",
+    "tests/box3d_production/callback_lifetime/callback_lifetime_test.gd": "ae5481a703077047d728ecdf24d26326f963ddcbd0548d2ca2146141a5f9c826",
+    "tests/box3d_production/callback_lifetime/README.md": "fa44436f8609e9378e4bfa80dc49a1840c58a9309be72e1ebf9e07f188d12665",
+    "examples/kit_box3d_authoring/modules/authoring_demo/images_darwin.odin": "232d7f729f8d8782d720529c6ef13f51872718f94b50db0eace8646554189b16",
+    "examples/kit_box3d_authoring/modules/authoring_demo/model.odin": "22e3ddf02865b211af20cf23b55a8631bfbb67b4418a5599ce1218324b4d80ca",
+    "examples/kit_box3d_authoring/modules/authoring_demo/runtime.odin": "886d977e9037158c7be7639ad5c156c95420b047662cc607210642d4729190e3",
+    "examples/kit_box3d_authoring/modules/authoring_demo/demo.odin": "ec263026f6522682650d3f2e5344efb33cf9bdf8ae6276df97ce9af833ce0058",
+    "examples/kit_box3d_authoring/modules/authoring_demo/images_linux.odin": "9860ea7720b8b4bfa74cfa07fe2bf7b030ad405b239382d0fc13ed58048c04d5",
+    "examples/kit_box3d_authoring/modules/authoring_demo/telemetry.odin": "40ab2ad40a42f50931a908b05e19373e48010eb0451201af8075cb23c92c9f6f",
+    "examples/replay_box3d_authoring/modules/authoring_demo/images_darwin.odin": "36b8fc9f8ef111f57a8449c14b7ccda1c7b0d1ac9cfdb62c598ee4a693506415",
+    "examples/replay_box3d_authoring/modules/authoring_demo/evidence.odin": "5e910a0bea7899913ca303813435b2ff60066c19e8bb6ead0df11487b791216a",
+    "examples/replay_box3d_authoring/modules/authoring_demo/model.odin": "69c5f51873999393bb2f2de03fde0013f81a106267e914beaafdac8c2cb3ecc6",
+    "examples/replay_box3d_authoring/modules/authoring_demo/startup.odin": "9a8a1adcc2a89eeb2d0be37e4441fb8733231854d238ea7ca3374b190acc858e",
+    "examples/replay_box3d_authoring/modules/authoring_demo/demo.odin": "ae4da92db9a09e67e61e06d013b073529e397b734a77b1c6070712de014e40b6",
+    "examples/replay_box3d_authoring/modules/authoring_demo/terminal.odin": "495ce280bacacee59c773340abe5ccf70f9c8d25d0afa1404b1ab24eff3d8879",
+    "examples/replay_box3d_authoring/modules/authoring_demo/process.odin": "56bb9b32fe8b081e26d866ffc79f62c58f60f49ca4ac7b0646640eeeeb503673",
+    "examples/replay_box3d_authoring/modules/authoring_demo/images_linux.odin": "4c0625ba14e16b039ebe6ff70d0dbdf938e22d1424a47cf36eb829ccb01fd48a",
+    "examples/replay_box3d_authoring/modules/authoring_demo/telemetry.odin": "2c60b1a539d43004a6f48e5b5003c80dc5307554ebe96555d471ddd02ab0749b",
+    "examples/replay_box3d_authoring/modules/authoring_demo/accepted_audit/cursor.odin": "c013fe444181a2b541a93301d0f8e0ead3f455a3ee2e2be7e21907623e24bd6d",
+    "docs/design/box3d/production-validation.md": "9e77b44f457284159710a682e74e48db3c28a931e701724da8c2f9ca24c37e72",
+    "docs/design/box3d/desktop-compatibility.md": "408b5415998bd6a45ca306f26c675f45d8e145d5c606f35a0653d320b6d610b1",
+    "tests/box3d_gate_c/macos/export.py": "3c18ad4d82d53c4c040d324bfe8dfbb66003ca72fe8eaf1d5fe5aa0ffad61582",
+    "tests/box3d_gate_c/linux/pipeline.py": "8c4e16ad1198b030edc965006b9d7835f866f1dd87ff18d990fdd832a4ce4211",
+    "examples/replay_box3d/shared/adapter/model.odin": "8598ff772aad150437eba1e57b7fe39383b2f8bd26f30361e2cb77b00527140d",
+    "addons/box3d_authoring/tool_module/tools.odin": "eab93cefe8d25e9d1cb7b6af0e520a9c4e5f07f313d205ff4328ed728ce23612"
+  },
+  "source_scope": "authored scoped leaves at completion, excluding this report/generated code; not exact compiler import tracing. Run records bind executed binaries, normal build/export metadata, raw logs and their original source/helper fences. Documentation/report were written after all runtime fences closed.",
+  "limits": {
+    "authored_soak_scene": "4 bodies/4 geometry assets/one hinge",
+    "stress_profile": "35 bodies/shapes,32 initial dynamics,one joint,eight assets; H128,prediction8,repair8,64MiB unchanged",
+    "rss": "all raw startup/teardown values retained, including Linux Replay lastRSS0 during exit; sampled OS trend is outside the Native quota and no longer-horizon/process bound",
+    "unexecuted": "native Linux hardware CI, remote CI, Windows/web/mobile Box3D qualification, cross-target state equality, packet-loss/jitter certification, manual visual/usability qualification"
+  },
+  "whole_goal_complete": false
+}

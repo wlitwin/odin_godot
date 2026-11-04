@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Kit World protocol v2 · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Kit World protocol v2</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/kit-world-protocol-v2.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#normal-traffic-and-confirmation">Normal traffic and confirmation</a><a href="#receipt-feedback-and-caller-timing">Receipt feedback and caller timing</a><a href="#actions-proof-and-cleanup">Actions, proof and cleanup</a></nav></details>
+<article class="reading-body "><p>Status: the cleaned implementation passes eight focused World groups, four
+caller groups, a real32-body Core/SDK short pair and the primary impaired
+600-second Kit policy. Remaining Gate B matrix and CPU validation are open.</p>
+<p>The normal World route must not depend on a reliable full checkpoint every
+three ticks. Its roughly 130 KB checkpoints produced about 2.6 MB/s per client
+and made confirmation wait for bulk reconstruction. This revision replaces
+that normal traffic with accepted inputs and complete canonical signatures.
+Replay and the shared Box3D solver are separate and remain unchanged.</p>
+<h2 id="normal-traffic-and-confirmation">Normal traffic and confirmation<a class="heading-anchor" href="#normal-traffic-and-confirmation" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Bump <code>WORLD_NETWORK_REV</code> and the input-catalog identity to v2. Reject old
+peers explicitly; do not reinterpret v1 packets.</li>
+<li>Keep client INPUT batches bounded to the existing eight-tick redundancy
+window. Bind them to the actual player&#39;s current validated bootstrap scope.</li>
+<li>Send small authoritative ACCEPTED batches reliably, including their bounded
+receipt-feedback entries. Keeping accepted decisions ordered and delivered
+is affordable once bulk state leaves the normal stream.</li>
+<li>At the existing three-tick cadence, send a small reliable SIGNATURE message
+containing the existing complete <code>bd.Signature</code>. It covers identity, epoch,
+tick and all five canonical parts: Solver, Game, Side, Observations and
+Occurrences. The Game part includes the canonical accepted-input window.</li>
+<li>Welcome, Reset and mismatch recovery retain complete canonical states.
+Explicit diagnostic checkpoint APIs remain distinguishable from normal
+transport; automatic normal full Correction broadcasts stop.</li>
+</ul>
+<p>Receiving a signature is not permission to advance confirmation. The client
+must have every accepted driver for every tick from its confirmed frontier
+through T, the canonical accepted prefix needed to sign T, and a locally
+simulated frame T. Missing data stays pending or requests bounded recovery;
+Held/Unknown predictions cannot fill a gap in authoritative evidence.</p>
+<p>Reuse <code>world_operation</code> staging and pre-publication verification. When accepted
+values require repair, verify the staged frame T before publishing. When the
+local state already agrees, a confirmation transaction must still verify before
+advancing its frontier. Catch-up uses real accepted-input simulation, within
+eight ticks, rather than a ticker assignment. On mismatch, preserve the last
+confirmed publication and use the existing Reset request path. Confirmation
+must not replay already confirmed effects.</p>
+<p><code>World_Frame</code> currently stores no canonical signature. The existing signer
+encodes the complete parts and produces a 480-byte signature. Compute at the
+declared cadence; do not introduce an invalid cache over mutable accepted
+metadata or claim that signing is free. Measure the resulting operation.</p>
+<h2 id="receipt-feedback-and-caller-timing">Receipt feedback and caller timing<a class="heading-anchor" href="#receipt-feedback-and-caller-timing" aria-label="Link to this section">#</a></h2>
+<p>Authority feedback reports the newest fully validated class0 proposal received
+from each actual player. It is distinct from the tick accepted by the authority.
+Validate every typed row, sender, schema, epoch, scope, sequence and trailing
+byte before changing receipt state. A valid late receipt can inform timing
+without rewriting an already accepted Held decision.</p>
+<p>Use the actual Welcome/Reset CHUNK sequence as bootstrap context. The host&#39;s
+expected scope is the identifier it generated for that bootstrap, not a claim
+that a void transport callback delivered it. The client adopts a scope only
+after validating and applying the complete state. Old-scope proposals and
+feedback cannot steer the replacement timeline; rejoin binds the real peer.</p>
+<p>Reuse the existing fine lead-control math with a bounded scale near 1
+(approximately 0.98–1.02). Apply scale changes at the zero-delta ingress boundary
+used by the example, and keep it stable during its positive NORMAL call.
+Adapt the tested scale-aware offer/receipt calculations without reviving the
+abandoned TIMING1/INPUT2 checked-send and retirement feature stack. Preserve
+the eight-tick credit bound, exact offered debit, end limits and unresolved
+receipt quarantine. No wall clock enters simulation identity or admission.</p>
+<p>An unavailable or deep deficit is explicit. Re-anchoring must run real bounded
+simulation/bootstrap or a validated Reset, never skip physics or input callbacks
+by assigning a head. Prediction8, ordinary repair8, H128 and the tracked64MiB
+limit remain unchanged.</p>
+<h2 id="actions-proof-and-cleanup">Actions, proof and cleanup<a class="heading-anchor" href="#actions-proof-and-cleanup" aria-label="Link to this section">#</a></h2>
+<p>An input receipt acknowledges a proposal, not a unique gameplay outcome.
+Preserve original action identity and the actual accepted/rejected result.
+Do not turn a Held row into a second logical action. Any retry beyond existing
+packet redundancy needs an explicit stable identity, authority deduplication
+and outcome acknowledgement, with exactly-once effects across recovery.</p>
+<p>The first actual pair completed tick300 with ten complete five-part comparisons,
+no recovery or missing decisions/effects, final acknowledgement and natural
+cleanup0. Normal Host FLOW samples were about40 KB per completed wire window;
+the last sampled counters showed one full bootstrap and96 signatures through
+tick288. These are short-run observations, not final-counter extrapolation or
+a600-second gate pass. The original report SHA is
+<code>5b2cd04d79e13eb9285fe8168def3c934af58df35821ffe5f81b63910018acc6</code>.
+Its source/binary closure was secured before cleanup; old v1 and experimental
+results remain separate evidence.</p>
+<p>After cleanup, the same focused groups and rebuilt SDK short pair passed.
+Runtime&#39;s actual size and requested/live Meter deltas are21,560 bytes per side,
+down from113,328 with the experimental observers. The cleaned primary impaired
+pair then completed610.0597 observed seconds through tick36,600 under the
+unchanged original policy:152/152 contested cycles,152 consecutive cycles,
+1,220 complete state comparisons, no recovery or missing decisions/effects,
+final acknowledgement and natural cleanup0. Host emitted one full bootstrap
+and12,200 signatures; normal FLOW median output was40,802 bytes per wire window.
+The report SHA is
+<code>15f851a0e451161a0a3b4ebea3f0ca9efabab8c267b48dd255a2f9d20883906b</code>;
+the coverage audit SHA is
+<code>007defa8445d647f194ecffdc4774ad32a3947ff0296ebda73e2deb7854a0626</code>.
+This establishes that Kit primary impaired case, not the whole two-framework
+gate, cross-platform determinism or the affected CPU ceilings.</p>
+<p>Prove signature-only confirmation, gap/mismatch/old-version rejection and full
+Reset recovery through public Session/Lane fixtures; then prove real Core/SDK
+input fidelity, full-five-part agreement, effects, ownership, budgets and the
+long matrix on the new wire identity. Historical v1 results remain historical.</p>
+<p>After focused and real functional validation, remove superseded throttle
+experiments, temporary observers and unused prototype paths, retain useful
+regressions and evidence, and update documentation and builds. Audit usage
+before removing any shared Core capability. Certify Gate B on the cleaned graph.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/kit-world-protocol-v2.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#normal-traffic-and-confirmation" class="">Normal traffic and confirmation</a><a href="#receipt-feedback-and-caller-timing" class="">Receipt feedback and caller timing</a><a href="#actions-proof-and-cleanup" class="">Actions, proof and cleanup</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/kit-world-protocol-v2.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

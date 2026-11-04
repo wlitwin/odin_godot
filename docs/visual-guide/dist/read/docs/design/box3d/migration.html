@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Moving a Godot physics scene to an authored Box3D world · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Moving a Godot physics scene to an authored Box3D world</h1><div class="reader-meta"><span>5 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/migration.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#map-scene-content-deliberately">Map scene content deliberately</a><a href="#replace-automatic-callbacks-with-the-existing-tick-model">Replace automatic callbacks with the existing tick model</a><a href="#preserve-complete-checkpoints-and-owner-lifetime">Preserve complete checkpoints and owner lifetime</a><a href="#supported-behavior-and-explicit-boundaries">Supported behavior and explicit boundaries</a><a href="#diagnosing-a-migration">Diagnosing a migration</a></nav></details>
+<article class="reading-body "><p>Box3D is an explicitly stepped backend shared by Kit and Replay. It is not a
+replacement <code>PhysicsServer3D</code> registration, and changing a project physics-server
+setting does not convert an existing scene. The authored nodes describe initial
+content. Each framework owns simulation ticks, history, input and recovery.</p>
+<h2 id="map-scene-content-deliberately">Map scene content deliberately<a class="heading-anchor" href="#map-scene-content-deliberately" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Existing Godot content</th>
+<th>Authored Box3D counterpart</th>
+<th>Required decision</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A group of physics bodies</td>
+<td><code>Box3DWorld3D</code></td>
+<td>Give the world an explicit namespace key and choose Kit or Replay as tick owner.</td>
+</tr>
+<tr>
+<td><code>RigidBody3D</code></td>
+<td><code>Box3DBody3D</code> with Dynamic type</td>
+<td>Move impulses and other mutations into staged tick callbacks.</td>
+</tr>
+<tr>
+<td>Static collision</td>
+<td>Static <code>Box3DBody3D</code></td>
+<td>Assign immutable shape Resources before play.</td>
+</tr>
+<tr>
+<td><code>CollisionShape3D</code></td>
+<td>Box/sphere/capsule/hull/mesh/heightfield Resource</td>
+<td>Supply an explicit shape key; bake supported shape scale and local pose.</td>
+</tr>
+<tr>
+<td><code>Area3D</code> overlap logic</td>
+<td><code>Box3DSensor3D</code> or sensor flags</td>
+<td>Capture actual sensor observations at the tick boundary and route effects after publication.</td>
+</tr>
+<tr>
+<td><code>CharacterBody3D</code></td>
+<td><code>Box3DCharacterMover3D</code> configuration plus value state</td>
+<td>Store position, velocity and grounding in Game/Side and supply desired velocity each fixed tick.</td>
+</tr>
+<tr>
+<td>Godot joint nodes</td>
+<td>The corresponding named Box3D joint node</td>
+<td>Use body stable-key references and explicit rigid local frames.</td>
+</tr>
+<tr>
+<td>PhysicsServer/direct-space queries</td>
+<td>Staged deterministic motion query helpers</td>
+<td>Read copied keyed results from the same execution world as the tick.</td>
+</tr>
+</tbody></table>
+</div><p>Presentation node names and child order are not identity. Give every body,
+resource, joint and character an explicit stable key. Keep those keys when
+renaming display nodes. Duplicate or conflicting keys are errors; do not repair
+them by assigning insertion-order IDs. Changing semantic geometry or simulation
+settings changes content compatibility identity.</p>
+<h2 id="replace-automatic-callbacks-with-the-existing-tick-model">Replace automatic callbacks with the existing tick model<a class="heading-anchor" href="#replace-automatic-callbacks-with-the-existing-tick-model" aria-label="Link to this section">#</a></h2>
+<p>Sample device input into the framework&#39;s control value. The authored callback
+then applies accepted/predicted controls, runs character queries/movement against
+the staged world and performs the framework&#39;s ordinary solver step. Kit&#39;s
+participant performs its step; Replay requires its existing <code>physics.step</code>
+operation exactly once. Do not also step in <code>_physics_process</code>, a visual node,
+an Inspector tool or a renderer.</p>
+<p>Keep gameplay timers, RNG, body/joint allocation-key maps, character values and
+query-dependent decisions in rollback-owned Game or Side. Live Nodes, Resources,
+native handles, process-local Owner tokens and pointers do not belong there.
+Presentation consumes a copied published checkpoint/frame and updates visual
+proxies afterward. A pose change on a proxy does not change the solver.</p>
+<p>Kit and Replay remain distinct. Kit attaches the complete solver/Side participant
+to its Lane and uses its World protocol. Replay&#39;s existing Timeline, complete
+checkpoint provider, revisions and event journal already own resimulation and
+rollback. Do not introduce a second timeline, correction loop or network stack.</p>
+<h2 id="preserve-complete-checkpoints-and-owner-lifetime">Preserve complete checkpoints and owner lifetime<a class="heading-anchor" href="#preserve-complete-checkpoints-and-owner-lifetime" aria-label="Link to this section">#</a></h2>
+<p>A copied transform, ordinary value-only Replay <code>Frame</code>, motion digest or native
+handle is not a complete physics checkpoint. Use the framework&#39;s explicit complete
+capture/view/clone/destroy and canonical codec operations. Recovery compares
+solver, Game, Side, observations and occurrences together. A pose-only reseed
+must not be presented as equivalent recovery.</p>
+<p>Extract and validate a detached bake before play. Shared construction returns a
+world, trusted asset catalog and local logical-ID/allocation-key maps. Transfer or
+borrow the world exactly as the selected adapter documents. Keep catalog and
+allocator owners alive for every checkpoint, codec and callback that retains them.
+SDK code uses real Meter and code/data leases; a raw pointer or a code pin alone
+does not own callback data. Check every teardown result before discarding an owner.</p>
+<p>Source scene nodes and Resources may be destroyed after successful copying. A
+versioned owning artifact can reload through the same shared parser/baker. Exact
+source, import version, content identity and shared-bake fingerprint are checked
+before native publication. Hashes establish identity and corruption checks, not
+publisher authentication.</p>
+<h2 id="supported-behavior-and-explicit-boundaries">Supported behavior and explicit boundaries<a class="heading-anchor" href="#supported-behavior-and-explicit-boundaries" aria-label="Link to this section">#</a></h2>
+<p>Triangle meshes and heightfields are static, non-sensor geometry with sensor
+events disabled. Hulls are convex point clouds. Heightfields bake to triangle
+meshes; transformed boxes can bake to exact hull vertices. Body and World
+transforms are rigid. Do not rely on cancelling body scales, shear, reflections
+in a body pose or top-level ancestry to silently disappear. The mesh import tool
+can explicitly bake a nonsingular affine source transform into geometry and fix
+reflected triangle winding.</p>
+<p>Pin uses a spherical point constraint, Hinge a Revolute constraint and Slider a
+Prismatic constraint. The remaining named types use their matching native
+families. The current profile permits one joint at a time, not an arbitrary
+constraint graph. It also retains 35 bodies/shapes, 32 dynamic bodies, eight
+deduplicated geometry assets, H128, prediction/ordinary repair depth eight and the
+64 MiB tracked admission limit. Debug preview has its own smaller output limits;
+preview Capacity does not change simulation capacity.</p>
+<p>Raw native query traversal order is not a durable gameplay ordering. Use the
+complete sorted motion queries when ordering affects decisions, and check
+Capacity before consuming results. Native allocation keys identify recorded
+history; durable authored logical IDs remain separate.</p>
+<p>Do not access a live solver during render interpolation or resolve a Godot
+Resource during resimulation. Arbitrary runtime geometry edits, unsupported
+callback changes, cross-domain handles and private clock/head setters are not
+fallbacks for a rejected operation. Return the named error and preserve the last
+published state.</p>
+<p>Kit exposes its current public World Reset request. Replay&#39;s public Godot facade
+does not expose a manual Resync command in this version. Its sample reports that
+capability as unsupported while using the existing automatic canonical recovery
+path. A disabled UI action must not silently mutate private client phase.</p>
+<h2 id="diagnosing-a-migration">Diagnosing a migration<a class="heading-anchor" href="#diagnosing-a-migration" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Reported field/status</th>
+<th>Meaning and next action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Key</code>, <code>Duplicate</code>, <code>Collision</code>, <code>Reference</code></td>
+<td>Fix explicit keys and same-world references before construction.</td>
+</tr>
+<tr>
+<td><code>Pose</code>, <code>Scale</code>, <code>Nonfinite</code>, <code>Dimension</code></td>
+<td>Inspect the named field; do not clamp or drop authored content implicitly.</td>
+</tr>
+<tr>
+<td><code>Unsupported</code></td>
+<td>Choose a supported geometry/body/flag/capability combination.</td>
+</tr>
+<tr>
+<td><code>Capacity</code>, resource/budget error</td>
+<td>Reduce the scene or requested bounded output; do not raise runtime caps to hide it.</td>
+</tr>
+<tr>
+<td>Artifact version/hash/shared-bake mismatch</td>
+<td>Reimport from the declared source using the current shared baker.</td>
+</tr>
+<tr>
+<td>Missing complete history or attachment</td>
+<td>Use the existing framework recovery path; do not substitute the live world.</td>
+</tr>
+<tr>
+<td>Declined owner teardown</td>
+<td>Retain the surviving owner and finish the documented release order.</td>
+</tr>
+</tbody></table>
+</div><p>The current functional evidence is a bounded same-build/same-target desktop
+reference. Cross-target determinism, exported platform coverage, performance and
+long-run resource behavior have their own checks. See the separate
+<a href="samples.html">Kit and Replay samples</a>, <a href="authoring.html">authoring API</a>,
+<a href="motion.html">motion contract</a> and <a href="editor.html">editor workflow</a>.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="samples.html"><span>Authored Box3D samples: Kit and Replay</span><span aria-hidden="true">→</span></a><a href="authoring.html"><span>Box3D authoring contract</span><span aria-hidden="true">→</span></a><a href="motion.html"><span>Character movement, queries and joints</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/migration.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#map-scene-content-deliberately" class="">Map scene content deliberately</a><a href="#replace-automatic-callbacks-with-the-existing-tick-model" class="">Replace automatic callbacks with the existing tick model</a><a href="#preserve-complete-checkpoints-and-owner-lifetime" class="">Preserve complete checkpoints and owner lifetime</a><a href="#supported-behavior-and-explicit-boundaries" class="">Supported behavior and explicit boundaries</a><a href="#diagnosing-a-migration" class="">Diagnosing a migration</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/migration.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

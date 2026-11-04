@@ -17,9 +17,10 @@ compile together into the scripts library. Edit the authored source.
 Use [Odin's naming and style conventions](https://github.com/odin-lang/examples/wiki/Naming-and-style-convention):
 `Ada_Case` for types and enum members, `snake_case` for procedures and fields,
 and `SCREAMING_SNAKE_CASE` for constants. Prefer a short, meaningful import alias.
-Use tabs for indentation, spaces for alignment, and explicit error handling in
-examples. Generated Godot bindings retain their existing engine-derived names,
-such as `gd.Node2d` and `gd.node2d_set_position`.
+Indent with four spaces and put each statement on its own line; `make format`
+applies this layout. Use explicit error handling in examples. Generated Godot
+bindings retain their existing engine-derived names, such as `gd.Node2d` and
+`gd.node2d_set_position`.
 
 Script helpers use the snake-case script type as their prefix:
 `Player_Controller` and the existing `PlayerController` spelling both produce

@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>turret.odin · odin_godot</title><link rel="icon" href="../../../../../favicon.svg"><link rel="stylesheet" href="../../../../../style.css"><link rel="stylesheet" href="../../../../../reader.css"><link rel="stylesheet" href="../../../../../sdk.css"><script src="../../../../../reader.js" defer></script><script src="../../../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../../docs.html" aria-current="page">Docs</a><a href="../../../../../guide.html">Field guide</a><a href="../../../../../examples.html">Examples</a><a href="../../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../../docs.html">Overview</a><a href="../../../../../docs/install.html">Installation</a><a href="../../../../../docs/first-script.html">Your first script</a><a href="../../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../../docs/authoring-guide.html">Script API</a><a href="../../../../docs/events.html">Signals and events</a><a href="../../../../docs/workflow.html">Editor workflow</a><a href="../../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../../docs/kit.html">Build with Kit</a><a href="../../../../../docs/replay.html">Build with Replay</a><a href="../../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../../docs/exporting.html">Build and export</a><a href="../../../../docs/exporting.html">Export reference</a><a href="../../../../docs/debugging.html">Debugging</a><a href="../../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../contributor-guide.html">Contributor guide</a><a href="../../code-guide.html">Code guide</a><a href="../../shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../../docs.html">Docs</a><span>/</span><a href="../../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>turret.odin</h1><div class="reader-meta"><span>264 lines · Odin</span><span>Odin × Godot</span><a href="../../../../../reference/examples/replay_scrapyard/shared/game/turret.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../../docs.html">Docs</a><span>/</span><a href="../../../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>turret.odin</h1><div class="reader-meta"><span>311 lines · Odin</span><span>Odin × Godot</span><a href="../../../../../reference/examples/replay_scrapyard/shared/game/turret.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> scrapyard_game
 
@@ -17,256 +17,303 @@ MAX_TURRETS :: <span class="hljs-number">8</span>
 TURRET_SHOT_KEY :: <span class="hljs-type">u64</span>(<span class="hljs-number">0x54555252</span>)
 
 Turret :: <span class="hljs-keyword">struct</span> {
-	position, aim: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
-	ability: <span class="hljs-type">u8</span>,
-	ammo: <span class="hljs-type">u16</span>,
-	deployed_by, operator: Credit,
-	operator_warp: <span class="hljs-type">u32</span>,
-	next_shot, last_shot: <span class="hljs-type">u64</span>,
+    position, aim: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>,
+    ability: <span class="hljs-type">u8</span>,
+    ammo: <span class="hljs-type">u16</span>,
+    deployed_by, operator: Credit,
+    operator_warp: <span class="hljs-type">u32</span>,
+    next_shot, last_shot: <span class="hljs-type">u64</span>,
 }
 
 turret_for :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>) -&gt; (r.Handle(Turret), <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS {
-		<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive &amp;&amp; w.turrets.values[i].operator == (Credit{seat, w.players[seat - <span class="hljs-number">1</span>].generation}) {
-			<span class="hljs-keyword">return</span> {<span class="hljs-type">u32</span>(i), w.turrets.generations[i]}, <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS {
+        <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive &amp;&amp; w.turrets.values[i].operator == (Credit{seat, w.players[seat - <span class="hljs-number">1</span>].generation}) {
+            <span class="hljs-keyword">return</span> {<span class="hljs-type">u32</span>(i), w.turrets.generations[i]}, <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
 }
 
 turret_operator :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>) -&gt; <span class="hljs-type">bool</span> {
-	_, found := turret_for(w, seat)
-	<span class="hljs-keyword">return</span> found
+    _, found := turret_for(w, seat)
+    <span class="hljs-keyword">return</span> found
 }
 
 turret_release_player :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>) {
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive &amp;&amp; w.turrets.values[i].operator.seat == seat {
-			w.turrets.values[i].operator = {}
-			w.turrets.values[i].operator_warp = <span class="hljs-number">0</span>
-		}
-	}
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive &amp;&amp; w.turrets.values[i].operator.seat == seat {
+            w.turrets.values[i].operator = {}
+            w.turrets.values[i].operator_warp = <span class="hljs-number">0</span>
+        }
+    }
 }
 
 turret_cleanup :: <span class="hljs-keyword">proc</span>(w: ^World) {
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive {
-			t := &amp;w.turrets.values[i]
-			<span class="hljs-keyword">if</span> t.operator.seat == <span class="hljs-number">0</span> {
-				<span class="hljs-keyword">continue</span>
-			}
-			player := &amp;w.players[t.operator.seat - <span class="hljs-number">1</span>]
-			radius := w.catalog.abilities[t.ability].turret.use_radius
-			<span class="hljs-keyword">if</span> !player.connected ||
-			   !player.in_yard ||
-			   player.hp == <span class="hljs-number">0</span> ||
-			   player.generation != t.operator.generation ||
-			   player.warp != t.operator_warp ||
-			   !p.in_reach(player.position, t.position, radius) {
-				t.operator = {}
-				t.operator_warp = <span class="hljs-number">0</span>
-			}
-		}
-	}
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive {
+            t := &amp;w.turrets.values[i]
+
+            <span class="hljs-keyword">if</span> t.operator.seat == <span class="hljs-number">0</span> {
+                <span class="hljs-keyword">continue</span>
+            }
+
+            player := &amp;w.players[t.operator.seat - <span class="hljs-number">1</span>]
+            radius := w.catalog.abilities[t.ability].turret.use_radius
+
+            <span class="hljs-keyword">if</span> !player.connected ||
+               !player.in_yard ||
+               player.hp == <span class="hljs-number">0</span> ||
+               player.generation != t.operator.generation ||
+               player.warp != t.operator_warp ||
+               !p.in_reach(player.position, t.position, radius) {
+                t.operator = {}
+                t.operator_warp = <span class="hljs-number">0</span>
+            }
+        }
+    }
 }
 
 turret_deploy :: <span class="hljs-keyword">proc</span>(w: ^World, point: [<span class="hljs-number">2</span>]<span class="hljs-type">f32</span>, ability: <span class="hljs-type">u8</span>, credit: Credit, ctx: ^r.Step(Event)) -&gt; <span class="hljs-type">bool</span> {
-	<span class="hljs-keyword">if</span> !content.ability_present(&amp;w.catalog, ability) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">if</span> !position_valid(point) ||
-	   point[<span class="hljs-number">0</span>] &lt; arena.MARGIN ||
-	   point[<span class="hljs-number">0</span>] &gt; arena.WIDTH - arena.MARGIN ||
-	   point[<span class="hljs-number">1</span>] &lt; arena.MARGIN ||
-	   point[<span class="hljs-number">1</span>] &gt; arena.HEIGHT - arena.MARGIN {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">if</span> !credit_valid(credit) || credit.seat == <span class="hljs-number">0</span> || w.players[credit.seat - <span class="hljs-number">1</span>].generation != credit.generation {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">for</span> cover <span class="hljs-keyword">in</span> w.layout.covers {
-		<span class="hljs-keyword">if</span> point[<span class="hljs-number">0</span>] &gt; <span class="hljs-type">f32</span>(cover.x) - <span class="hljs-number">16</span> &amp;&amp;
-		   point[<span class="hljs-number">0</span>] &lt; (<span class="hljs-type">f32</span>(cover.x) + <span class="hljs-type">f32</span>(cover.w)) + <span class="hljs-number">16</span> &amp;&amp;
-		   point[<span class="hljs-number">1</span>] &gt; <span class="hljs-type">f32</span>(cover.y) - <span class="hljs-number">16</span> &amp;&amp;
-		   point[<span class="hljs-number">1</span>] &lt; (<span class="hljs-type">f32</span>(cover.y) + <span class="hljs-type">f32</span>(cover.h)) + <span class="hljs-number">16</span> {
-			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-		}
-	}
-	origin := w.players[credit.seat - <span class="hljs-number">1</span>].position
-	<span class="hljs-keyword">if</span> _, hit := arena.clip(&amp;w.layout, origin, point - origin); hit {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive &amp;&amp; p.in_reach(point, w.turrets.values[i].position, <span class="hljs-number">32</span>) {
-			<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-		}
-	}
-	row := w.catalog.abilities[ability]
-	<span class="hljs-keyword">if</span> row.family != .Turret || !content.turret_valid(row.turret) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	_, ok := r.pool_insert(
-		&amp;w.turrets,
-		Turret{position = point, aim = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, ability = ability, ammo = row.turret.ammo, deployed_by = credit},
-	)
-	<span class="hljs-keyword">return</span> ok
+    <span class="hljs-keyword">if</span> !content.ability_present(&amp;w.catalog, ability) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">if</span> !position_valid(point) ||
+       point[<span class="hljs-number">0</span>] &lt; arena.MARGIN ||
+       point[<span class="hljs-number">0</span>] &gt; arena.WIDTH - arena.MARGIN ||
+       point[<span class="hljs-number">1</span>] &lt; arena.MARGIN ||
+       point[<span class="hljs-number">1</span>] &gt; arena.HEIGHT - arena.MARGIN {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">if</span> !credit_valid(credit) || credit.seat == <span class="hljs-number">0</span> || w.players[credit.seat - <span class="hljs-number">1</span>].generation != credit.generation {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">for</span> cover <span class="hljs-keyword">in</span> w.layout.covers {
+        <span class="hljs-keyword">if</span> point[<span class="hljs-number">0</span>] &gt; <span class="hljs-type">f32</span>(cover.x) - <span class="hljs-number">16</span> &amp;&amp;
+           point[<span class="hljs-number">0</span>] &lt; (<span class="hljs-type">f32</span>(cover.x) + <span class="hljs-type">f32</span>(cover.w)) + <span class="hljs-number">16</span> &amp;&amp;
+           point[<span class="hljs-number">1</span>] &gt; <span class="hljs-type">f32</span>(cover.y) - <span class="hljs-number">16</span> &amp;&amp;
+           point[<span class="hljs-number">1</span>] &lt; (<span class="hljs-type">f32</span>(cover.y) + <span class="hljs-type">f32</span>(cover.h)) + <span class="hljs-number">16</span> {
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+        }
+    }
+
+    origin := w.players[credit.seat - <span class="hljs-number">1</span>].position
+
+    <span class="hljs-keyword">if</span> _, hit := arena.clip(&amp;w.layout, origin, point - origin); hit {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive &amp;&amp; p.in_reach(point, w.turrets.values[i].position, <span class="hljs-number">32</span>) {
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+        }
+    }
+
+    row := w.catalog.abilities[ability]
+
+    <span class="hljs-keyword">if</span> row.family != .Turret || !content.turret_valid(row.turret) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    _, ok := r.pool_insert(
+        &amp;w.turrets,
+        Turret{position = point, aim = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, ability = ability, ammo = row.turret.ammo, deployed_by = credit},
+    )
+    <span class="hljs-keyword">return</span> ok
 }
 
 turret_mount :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, handle: r.Handle(Turret)) -&gt; <span class="hljs-type">bool</span> {
-	<span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS || w.stage == .Staging || w.stage == .Over || turret_operator(w, seat) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	t, ok := r.pool_get(&amp;w.turrets, handle)
-	<span class="hljs-keyword">if</span> !ok {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	player := &amp;w.players[seat - <span class="hljs-number">1</span>]
-	<span class="hljs-keyword">if</span> !player.connected ||
-	   !player.in_yard ||
-	   player.hp == <span class="hljs-number">0</span> ||
-	   t.operator.seat != <span class="hljs-number">0</span> ||
-	   t.ammo == <span class="hljs-number">0</span> ||
-	   !p.in_reach(player.position, t.position, w.catalog.abilities[t.ability].turret.use_radius) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	<span class="hljs-keyword">if</span> _, hit := arena.clip(&amp;w.layout, player.position, t.position - player.position); hit {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	t.operator = {seat, player.generation}
-	t.operator_warp = player.warp
-	t.aim = player.aim
-	player.dash_until = <span class="hljs-number">0</span>
-	player.dash_velocity = {}
-	player.revive = {}
-	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS || w.stage == .Staging || w.stage == .Over || turret_operator(w, seat) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    t, ok := r.pool_get(&amp;w.turrets, handle)
+
+    <span class="hljs-keyword">if</span> !ok {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    player := &amp;w.players[seat - <span class="hljs-number">1</span>]
+
+    <span class="hljs-keyword">if</span> !player.connected ||
+       !player.in_yard ||
+       player.hp == <span class="hljs-number">0</span> ||
+       t.operator.seat != <span class="hljs-number">0</span> ||
+       t.ammo == <span class="hljs-number">0</span> ||
+       !p.in_reach(player.position, t.position, w.catalog.abilities[t.ability].turret.use_radius) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">if</span> _, hit := arena.clip(&amp;w.layout, player.position, t.position - player.position); hit {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    t.operator = {seat, player.generation}
+    t.operator_warp = player.warp
+    t.aim = player.aim
+    player.dash_until = <span class="hljs-number">0</span>
+    player.dash_velocity = {}
+    player.revive = {}
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
 }
 
 turret_dismount :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, handle: r.Handle(Turret)) -&gt; <span class="hljs-type">bool</span> {
-	t, ok := r.pool_get(&amp;w.turrets, handle)
-	<span class="hljs-keyword">if</span> !ok || seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS || t.operator != (Credit{seat, w.players[seat - <span class="hljs-number">1</span>].generation}) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	t.operator = {}
-	t.operator_warp = <span class="hljs-number">0</span>
-	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    t, ok := r.pool_get(&amp;w.turrets, handle)
+
+    <span class="hljs-keyword">if</span> !ok || seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS || t.operator != (Credit{seat, w.players[seat - <span class="hljs-number">1</span>].generation}) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    t.operator = {}
+    t.operator_warp = <span class="hljs-number">0</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
 }
 
 turret_nearest :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>) -&gt; (r.Handle(Turret), <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS {
-		<span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
-	}
-	best := <span class="hljs-type">f32</span>(max(<span class="hljs-type">f32</span>))
-	result: r.Handle(Turret)
-	found := <span class="hljs-literal">false</span>
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive {
-			t := w.turrets.values[i]
-			delta := t.position - w.players[seat - <span class="hljs-number">1</span>].position
-			distance := delta[<span class="hljs-number">0</span>] * delta[<span class="hljs-number">0</span>] + delta[<span class="hljs-number">1</span>] * delta[<span class="hljs-number">1</span>]
-			radius := w.catalog.abilities[t.ability].turret.use_radius
-			<span class="hljs-keyword">if</span> distance &lt;= radius * radius &amp;&amp; distance &lt; best {
-				best = distance
-				result = {<span class="hljs-type">u32</span>(i), w.turrets.generations[i]}
-				found = <span class="hljs-literal">true</span>
-			}
-		}
-	}
-	<span class="hljs-keyword">return</span> result, found
+    <span class="hljs-keyword">if</span> seat &lt; <span class="hljs-number">1</span> || seat &gt; SEATS {
+        <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    }
+
+    best := <span class="hljs-type">f32</span>(max(<span class="hljs-type">f32</span>))
+    result: r.Handle(Turret)
+    found := <span class="hljs-literal">false</span>
+
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive {
+            t := w.turrets.values[i]
+            delta := t.position - w.players[seat - <span class="hljs-number">1</span>].position
+            distance := delta[<span class="hljs-number">0</span>] * delta[<span class="hljs-number">0</span>] + delta[<span class="hljs-number">1</span>] * delta[<span class="hljs-number">1</span>]
+            radius := w.catalog.abilities[t.ability].turret.use_radius
+
+            <span class="hljs-keyword">if</span> distance &lt;= radius * radius &amp;&amp; distance &lt; best {
+                best = distance
+                result = {<span class="hljs-type">u32</span>(i), w.turrets.generations[i]}
+                found = <span class="hljs-literal">true</span>
+            }
+        }
+    }
+
+    <span class="hljs-keyword">return</span> result, found
 }
 
 turret_fire :: <span class="hljs-keyword">proc</span>(w: ^World, seat: <span class="hljs-type">u16</span>, ctx: ^r.Step(Event)) {
-	handle, found := turret_for(w, seat)
-	<span class="hljs-keyword">if</span> !found {
-		<span class="hljs-keyword">return</span>
-	}
-	t, _ := r.pool_get(&amp;w.turrets, handle)
-	player := &amp;w.players[seat - <span class="hljs-number">1</span>]
-	t.aim = player.aim
-	<span class="hljs-keyword">if</span> ctx.tick &lt; t.next_shot {
-		<span class="hljs-keyword">return</span>
-	}
-	def := w.catalog.abilities[t.ability].turret
-	<span class="hljs-keyword">if</span> player.shots == max(<span class="hljs-type">u32</span>) || ctx.tick &gt; max(<span class="hljs-type">u64</span>) - <span class="hljs-type">u64</span>(def.cadence) {
-		r.abort(ctx)
-		<span class="hljs-keyword">return</span>
-	}
-	<span class="hljs-comment">// Start inside the deployment clearance so the first sweep cannot skip cover.</span>
-	shot := Shot {
-		kind = .Ballistic,
-		seat = seat,
-		generation = player.generation,
-		serial = player.shots + <span class="hljs-number">1</span>,
-		position = t.position + t.aim * <span class="hljs-number">12</span>,
-		velocity = t.aim * def.speed,
-		ttl = def.ttl,
-		damage = def.damage,
-	}
-	<span class="hljs-keyword">if</span> _, ok := r.pool_insert(&amp;w.shots, shot); !ok {
-		<span class="hljs-keyword">return</span>
-	} <span class="hljs-comment">// No projectile: spend no ammo/cadence.</span>
-	player.shots += <span class="hljs-number">1</span>
-	t.ammo -= <span class="hljs-number">1</span>
-	t.next_shot = ctx.tick + <span class="hljs-type">u64</span>(def.cadence)
-	t.last_shot = ctx.tick
-	r.emit(
-		ctx,
-		<span class="hljs-type">u64</span>(player.generation) &lt;&lt; <span class="hljs-number">32</span> | <span class="hljs-type">u64</span>(seat),
-		TURRET_SHOT_KEY,
-		Event{.Shot, seat, player.generation, player.shots, shot.position, <span class="hljs-number">0</span>},
-	)
-	<span class="hljs-keyword">if</span> t.ammo == <span class="hljs-number">0</span> {
-		r.pool_remove(&amp;w.turrets, handle)
-	} <span class="hljs-comment">// Occupancy lives in the removed entity.</span>
+    handle, found := turret_for(w, seat)
+
+    <span class="hljs-keyword">if</span> !found {
+        <span class="hljs-keyword">return</span>
+    }
+
+    t, _ := r.pool_get(&amp;w.turrets, handle)
+    player := &amp;w.players[seat - <span class="hljs-number">1</span>]
+    t.aim = player.aim
+
+    <span class="hljs-keyword">if</span> ctx.tick &lt; t.next_shot {
+        <span class="hljs-keyword">return</span>
+    }
+
+    def := w.catalog.abilities[t.ability].turret
+
+    <span class="hljs-keyword">if</span> player.shots == max(<span class="hljs-type">u32</span>) || ctx.tick &gt; max(<span class="hljs-type">u64</span>) - <span class="hljs-type">u64</span>(def.cadence) {
+        r.abort(ctx)
+        <span class="hljs-keyword">return</span>
+    }
+
+    <span class="hljs-comment">// Start inside the deployment clearance so the first sweep cannot skip cover.</span>
+    shot := Shot {
+        kind = .Ballistic,
+        seat = seat,
+        generation = player.generation,
+        serial = player.shots + <span class="hljs-number">1</span>,
+        position = t.position + t.aim * <span class="hljs-number">12</span>,
+        velocity = t.aim * def.speed,
+        ttl = def.ttl,
+        damage = def.damage,
+    }
+
+    <span class="hljs-keyword">if</span> _, ok := r.pool_insert(&amp;w.shots, shot); !ok {
+        <span class="hljs-keyword">return</span>
+    } <span class="hljs-comment">// No projectile: spend no ammo/cadence.</span>
+
+    player.shots += <span class="hljs-number">1</span>
+    t.ammo -= <span class="hljs-number">1</span>
+    t.next_shot = ctx.tick + <span class="hljs-type">u64</span>(def.cadence)
+    t.last_shot = ctx.tick
+    r.emit(
+        ctx,
+        <span class="hljs-type">u64</span>(player.generation) &lt;&lt; <span class="hljs-number">32</span> | <span class="hljs-type">u64</span>(seat),
+        TURRET_SHOT_KEY,
+        Event{.Shot, seat, player.generation, player.shots, shot.position, <span class="hljs-number">0</span>},
+    )
+
+    <span class="hljs-keyword">if</span> t.ammo == <span class="hljs-number">0</span> {
+        r.pool_remove(&amp;w.turrets, handle)
+    } <span class="hljs-comment">// Occupancy lives in the removed entity.</span>
 }
 
 turrets_valid :: <span class="hljs-keyword">proc</span>(w: ^World) -&gt; <span class="hljs-type">bool</span> {
-	<span class="hljs-keyword">if</span> !pool_valid(w.turrets) {
-		<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-	}
-	occupied: [SEATS]<span class="hljs-type">bool</span>
-	<span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
-		<span class="hljs-keyword">if</span> alive {
-			t := w.turrets.values[i]
-			<span class="hljs-keyword">if</span> !content.ability_present(&amp;w.catalog, t.ability) ||
-			   w.catalog.abilities[t.ability].family != .Turret ||
-			   !position_valid(t.position) ||
-			   !credit_valid(t.deployed_by) ||
-			   t.deployed_by.seat == <span class="hljs-number">0</span> {
-				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-			}
-			def := w.catalog.abilities[t.ability].turret
-			<span class="hljs-keyword">if</span> t.ammo == <span class="hljs-number">0</span> || t.ammo &gt; def.ammo || !credit_valid(t.operator) {
-				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-			}
-			<span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> t.aim {
-				<span class="hljs-keyword">if</span> math.is_nan(x) || math.is_inf(x) || abs(x) &gt; <span class="hljs-number">1</span> {
-					<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-				}
-			}
-			<span class="hljs-keyword">if</span> t.operator.seat == <span class="hljs-number">0</span> {
-				<span class="hljs-keyword">if</span> t.operator_warp != <span class="hljs-number">0</span> {
-					<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-				}
-				<span class="hljs-keyword">continue</span>
-			}
-			player := w.players[t.operator.seat - <span class="hljs-number">1</span>]
-			<span class="hljs-keyword">if</span> occupied[t.operator.seat - <span class="hljs-number">1</span>] ||
-			   !player.connected ||
-			   !player.in_yard ||
-			   player.hp == <span class="hljs-number">0</span> ||
-			   player.generation != t.operator.generation ||
-			   player.warp != t.operator_warp ||
-			   !p.in_reach(player.position, t.position, def.use_radius) {
-				<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
-			}
-			occupied[t.operator.seat - <span class="hljs-number">1</span>] = <span class="hljs-literal">true</span>
-		}
-	}
-	<span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">if</span> !pool_valid(w.turrets) {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    occupied: [SEATS]<span class="hljs-type">bool</span>
+
+    <span class="hljs-keyword">for</span> alive, i <span class="hljs-keyword">in</span> w.turrets.alive {
+        <span class="hljs-keyword">if</span> alive {
+            t := w.turrets.values[i]
+
+            <span class="hljs-keyword">if</span> !content.ability_present(&amp;w.catalog, t.ability) ||
+               w.catalog.abilities[t.ability].family != .Turret ||
+               !position_valid(t.position) ||
+               !credit_valid(t.deployed_by) ||
+               t.deployed_by.seat == <span class="hljs-number">0</span> {
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+            }
+
+            def := w.catalog.abilities[t.ability].turret
+
+            <span class="hljs-keyword">if</span> t.ammo == <span class="hljs-number">0</span> || t.ammo &gt; def.ammo || !credit_valid(t.operator) {
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+            }
+
+            <span class="hljs-keyword">for</span> x <span class="hljs-keyword">in</span> t.aim {
+                <span class="hljs-keyword">if</span> math.is_nan(x) || math.is_inf(x) || abs(x) &gt; <span class="hljs-number">1</span> {
+                    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+                }
+            }
+
+            <span class="hljs-keyword">if</span> t.operator.seat == <span class="hljs-number">0</span> {
+                <span class="hljs-keyword">if</span> t.operator_warp != <span class="hljs-number">0</span> {
+                    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+                }
+
+                <span class="hljs-keyword">continue</span>
+            }
+
+            player := w.players[t.operator.seat - <span class="hljs-number">1</span>]
+
+            <span class="hljs-keyword">if</span> occupied[t.operator.seat - <span class="hljs-number">1</span>] ||
+               !player.connected ||
+               !player.in_yard ||
+               player.hp == <span class="hljs-number">0</span> ||
+               player.generation != t.operator.generation ||
+               player.warp != t.operator_warp ||
+               !p.in_reach(player.position, t.position, def.use_radius) {
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+            }
+
+            occupied[t.operator.seat - <span class="hljs-number">1</span>] = <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/shared/game/turret.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../../docs.html">Documentation</a><a href="../../../../../reading.html">Index</a><a href="../../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/replay_scrapyard/shared/game/turret.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../../docs.html">Documentation</a><a href="../../../../../reading.html">Index</a><a href="../../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../../reference/examples/replay_scrapyard/shared/game/turret.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

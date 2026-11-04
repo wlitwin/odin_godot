@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>replay_test.odin · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>replay_test.odin</h1><div class="reader-meta"><span>326 lines · Odin</span><span>Odin × Godot</span><a href="../../../reference/tests/replay/replay_test.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>replay_test.odin</h1><div class="reader-meta"><span>401 lines · Odin</span><span>Odin × Godot</span><a href="../../../reference/tests/replay/replay_test.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay_test
 
@@ -14,321 +14,396 @@
 
 <span class="hljs-meta">@(test)</span>
 contested_loot_replays_the_world_and_replaces_events :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: loot.Timeline
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step), r.Error.None)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	inputs: [<span class="hljs-number">8</span>]loot.Input
-	inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">0</span>] = {take = <span class="hljs-literal">true</span>, fire = <span class="hljs-literal">true</span>, seq = <span class="hljs-number">1</span>}
-	inputs[<span class="hljs-number">1</span>].players[<span class="hljs-number">1</span>] = {fire = <span class="hljs-literal">true</span>, seq = <span class="hljs-number">2</span>}
-	<span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {testing.expect_value(t, r.advance(&amp;tl, input).error, r.Error.None)}
-	before, _ := r.current(&amp;tl)
-	testing.expect_value(t, before.state.players[<span class="hljs-number">0</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
-	events: [<span class="hljs-number">4</span>]r.Occurrence(loot.Event)
-	n, err := r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
-	testing.expect_value(t, err, r.Error.None)
-	testing.expect_value(t, n, <span class="hljs-number">2</span>)
-	shot_id := events[<span class="hljs-number">1</span>].id
+    tl: loot.Timeline
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step), r.Error.None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    inputs: [<span class="hljs-number">8</span>]loot.Input
+    inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">0</span>] = {
+        take = <span class="hljs-literal">true</span>,
+        fire = <span class="hljs-literal">true</span>,
+        seq  = <span class="hljs-number">1</span>,
+    }
+    inputs[<span class="hljs-number">1</span>].players[<span class="hljs-number">1</span>] = {
+        fire = <span class="hljs-literal">true</span>,
+        seq  = <span class="hljs-number">2</span>,
+    }
 
-	inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">0</span>].take = <span class="hljs-literal">false</span>
-	inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">1</span>].take = <span class="hljs-literal">true</span>
-	inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">1</span>].seq = <span class="hljs-number">1</span>
-	result := r.revise_input(&amp;tl, <span class="hljs-number">1</span>, inputs[<span class="hljs-number">0</span>])
-	testing.expect_value(t, result.error, r.Error.None)
-	testing.expect_value(t, result.steps, <span class="hljs-number">8</span>)
-	after, _ := r.current(&amp;tl)
-	testing.expect_value(t, after.state.players[<span class="hljs-number">0</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">0</span>))
-	testing.expect_value(t, after.state.players[<span class="hljs-number">1</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
-	testing.expect_value(t, after.state.entities.count, <span class="hljs-type">u32</span>(<span class="hljs-number">0</span>))
-	n, err = r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
-	testing.expect_value(t, n, <span class="hljs-number">2</span>)
-	testing.expect_value(t, err, r.Error.None)
-	testing.expect_value(t, events[<span class="hljs-number">0</span>].id, shot_id) <span class="hljs-comment">// stable despite changed emit order</span>
-	testing.expect_value(t, events[<span class="hljs-number">1</span>].value.player, <span class="hljs-type">u8</span>(<span class="hljs-number">1</span>))
-	testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None)
+    <span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {
+        testing.expect_value(t, r.advance(&amp;tl, input).error, r.Error.None)
+    }
 
-	<span class="hljs-comment">// Snapshot reads and event reads cannot modify the stored timeline.</span>
-	after.state.players[<span class="hljs-number">1</span>].bag = <span class="hljs-number">900</span>
-	events[<span class="hljs-number">0</span>].value.amount = <span class="hljs-number">900</span>
-	stored, _ := r.current(&amp;tl)
-	testing.expect_value(t, stored.state.players[<span class="hljs-number">1</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
-	r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
-	testing.expect_value(t, events[<span class="hljs-number">0</span>].value.amount, <span class="hljs-type">u32</span>(<span class="hljs-number">1</span>))
+    before, _ := r.current(&amp;tl)
+    testing.expect_value(t, before.state.players[<span class="hljs-number">0</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
+    events: [<span class="hljs-number">4</span>]r.Occurrence(loot.Event)
+    n, err := r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
+    testing.expect_value(t, err, r.Error.None)
+    testing.expect_value(t, n, <span class="hljs-number">2</span>)
+    shot_id := events[<span class="hljs-number">1</span>].id
+
+    inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">0</span>].take = <span class="hljs-literal">false</span>
+    inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">1</span>].take = <span class="hljs-literal">true</span>
+    inputs[<span class="hljs-number">0</span>].players[<span class="hljs-number">1</span>].seq = <span class="hljs-number">1</span>
+    result := r.revise_input(&amp;tl, <span class="hljs-number">1</span>, inputs[<span class="hljs-number">0</span>])
+    testing.expect_value(t, result.error, r.Error.None)
+    testing.expect_value(t, result.steps, <span class="hljs-number">8</span>)
+    after, _ := r.current(&amp;tl)
+    testing.expect_value(t, after.state.players[<span class="hljs-number">0</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">0</span>))
+    testing.expect_value(t, after.state.players[<span class="hljs-number">1</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
+    testing.expect_value(t, after.state.entities.count, <span class="hljs-type">u32</span>(<span class="hljs-number">0</span>))
+    n, err = r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
+    testing.expect_value(t, n, <span class="hljs-number">2</span>)
+    testing.expect_value(t, err, r.Error.None)
+    testing.expect_value(t, events[<span class="hljs-number">0</span>].id, shot_id) <span class="hljs-comment">// stable despite changed emit order</span>
+    testing.expect_value(t, events[<span class="hljs-number">1</span>].value.player, <span class="hljs-type">u8</span>(<span class="hljs-number">1</span>))
+    testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None)
+
+    <span class="hljs-comment">// Snapshot reads and event reads cannot modify the stored timeline.</span>
+    after.state.players[<span class="hljs-number">1</span>].bag = <span class="hljs-number">900</span>
+    events[<span class="hljs-number">0</span>].value.amount = <span class="hljs-number">900</span>
+    stored, _ := r.current(&amp;tl)
+    testing.expect_value(t, stored.state.players[<span class="hljs-number">1</span>].bag, <span class="hljs-type">u32</span>(<span class="hljs-number">5</span>))
+    r.copy_events(&amp;tl, <span class="hljs-number">1</span>, events[:])
+    testing.expect_value(t, events[<span class="hljs-number">0</span>].value.amount, <span class="hljs-type">u32</span>(<span class="hljs-number">1</span>))
 }
 
 <span class="hljs-meta">@(test)</span>
 checkpoint_restores_rng_lifetime_and_allocation :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: loot.Timeline
-	r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	sample := loot.Input{}
-	sample.players[<span class="hljs-number">0</span>] = {fire = <span class="hljs-literal">true</span>, seq = <span class="hljs-number">1</span>}
-	r.advance(&amp;tl, sample)
-	checkpoint, _ := r.current(&amp;tl)
-	<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">7</span> {r.advance(&amp;tl, sample)}
-	want, _ := r.current(&amp;tl)
-	resumed: loot.Timeline
-	testing.expect_value(t, r.init(&amp;resumed, checkpoint, loot.step, epoch = <span class="hljs-number">2</span>), r.Error.None)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;resumed)
-	<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">7</span> {r.advance(&amp;resumed, sample)}
-	got, _ := r.current(&amp;resumed)
-	testing.expect(t, reflect.equal(got, want))
-	events: [<span class="hljs-number">2</span>]r.Occurrence(loot.Event)
-	n, err := r.copy_events(&amp;resumed, got.tick, events[:])
-	testing.expect_value(t, err, r.Error.None)
-	testing.expect_value(t, n, <span class="hljs-number">1</span>)
-	testing.expect_value(t, events[<span class="hljs-number">0</span>].id.epoch, <span class="hljs-type">u64</span>(<span class="hljs-number">2</span>))
+    tl: loot.Timeline
+    r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    sample := loot.Input{}
+    sample.players[<span class="hljs-number">0</span>] = {
+        fire = <span class="hljs-literal">true</span>,
+        seq  = <span class="hljs-number">1</span>,
+    }
+    r.advance(&amp;tl, sample)
+    checkpoint, _ := r.current(&amp;tl)
+
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">7</span> {
+        r.advance(&amp;tl, sample)
+    }
+
+    want, _ := r.current(&amp;tl)
+    resumed: loot.Timeline
+    testing.expect_value(t, r.init(&amp;resumed, checkpoint, loot.step, epoch = <span class="hljs-number">2</span>), r.Error.None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;resumed)
+
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">7</span> {
+        r.advance(&amp;resumed, sample)
+    }
+
+    got, _ := r.current(&amp;resumed)
+    testing.expect(t, reflect.equal(got, want))
+    events: [<span class="hljs-number">2</span>]r.Occurrence(loot.Event)
+    n, err := r.copy_events(&amp;resumed, got.tick, events[:])
+    testing.expect_value(t, err, r.Error.None)
+    testing.expect_value(t, n, <span class="hljs-number">1</span>)
+    testing.expect_value(t, events[<span class="hljs-number">0</span>].id.epoch, <span class="hljs-type">u64</span>(<span class="hljs-number">2</span>))
 }
 
-Counter :: <span class="hljs-keyword">struct</span> {value: <span class="hljs-type">i32</span>}
-Counter_Input :: <span class="hljs-keyword">struct</span> {add: <span class="hljs-type">i32</span>, stop: <span class="hljs-type">bool</span>}
+Counter :: <span class="hljs-keyword">struct</span> {
+    value: <span class="hljs-type">i32</span>,
+}
+
+Counter_Input :: <span class="hljs-keyword">struct</span> {
+    add:  <span class="hljs-type">i32</span>,
+    stop: <span class="hljs-type">bool</span>,
+}
+
 Counter_Timeline :: r.Timeline(Counter, Counter_Input, <span class="hljs-type">i32</span>)
 
 counter_step :: <span class="hljs-keyword">proc</span>(s: ^Counter, input: Counter_Input, ctx: ^r.Step(<span class="hljs-type">i32</span>)) {
-	s.value += input.add
-	r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, s.value)
-	<span class="hljs-keyword">if</span> input.stop || s.value &gt; <span class="hljs-number">10</span> {r.abort(ctx)}
+    s.value += input.add
+    r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, s.value)
+
+    <span class="hljs-keyword">if</span> input.stop || s.value &gt; <span class="hljs-number">10</span> {
+        r.abort(ctx)
+    }
 }
 
 <span class="hljs-meta">@(test)</span>
 failed_advance_and_late_replay_failure_are_atomic :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: Counter_Timeline
-	r.init(&amp;tl, r.Frame(Counter){}, counter_step)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">3</span> {r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">3</span>})}
-	before, _ := r.current(&amp;tl)
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">4</span>}).error, r.Error.Aborted)
-	<span class="hljs-comment">// Revised tick 1 and tick 2 succeed; tick 3 fails. Nothing commits.</span>
-	result := r.revise_input(&amp;tl, <span class="hljs-number">1</span>, Counter_Input{add = <span class="hljs-number">5</span>})
-	testing.expect_value(t, result.error, r.Error.Aborted)
-	testing.expect_value(t, result.steps, <span class="hljs-number">2</span>)
-	testing.expect_value(t, result.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">3</span>))
-	after, _ := r.current(&amp;tl)
-	testing.expect(t, reflect.equal(before, after))
-	first, _ := r.read(&amp;tl, <span class="hljs-number">1</span>)
-	testing.expect_value(t, first.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">3</span>))
-	events: [<span class="hljs-number">1</span>]r.Occurrence(<span class="hljs-type">i32</span>)
-	r.copy_events(&amp;tl, <span class="hljs-number">2</span>, events[:])
-	testing.expect_value(t, events[<span class="hljs-number">0</span>].value, <span class="hljs-type">i32</span>(<span class="hljs-number">6</span>))
-	testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None) <span class="hljs-comment">// old inputs survived too</span>
+    tl: Counter_Timeline
+    r.init(&amp;tl, r.Frame(Counter){}, counter_step)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">3</span> {
+        r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">3</span>})
+    }
+
+    before, _ := r.current(&amp;tl)
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">4</span>}).error, r.Error.Aborted)
+    <span class="hljs-comment">// Revised tick 1 and tick 2 succeed; tick 3 fails. Nothing commits.</span>
+    result := r.revise_input(&amp;tl, <span class="hljs-number">1</span>, Counter_Input{add = <span class="hljs-number">5</span>})
+    testing.expect_value(t, result.error, r.Error.Aborted)
+    testing.expect_value(t, result.steps, <span class="hljs-number">2</span>)
+    testing.expect_value(t, result.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">3</span>))
+    after, _ := r.current(&amp;tl)
+    testing.expect(t, reflect.equal(before, after))
+    first, _ := r.read(&amp;tl, <span class="hljs-number">1</span>)
+    testing.expect_value(t, first.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">3</span>))
+    events: [<span class="hljs-number">1</span>]r.Occurrence(<span class="hljs-type">i32</span>)
+    r.copy_events(&amp;tl, <span class="hljs-number">2</span>, events[:])
+    testing.expect_value(t, events[<span class="hljs-number">0</span>].value, <span class="hljs-type">i32</span>(<span class="hljs-number">6</span>))
+    testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None) <span class="hljs-comment">// old inputs survived too</span>
 }
 
 <span class="hljs-meta">@(test)</span>
 history_wrap_and_rewind_never_fall_back_to_current_state :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: Counter_Timeline
-	r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {history_frames = <span class="hljs-number">4</span>, events_per_tick = <span class="hljs-number">1</span>})
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	_, zero := r.read(&amp;tl, <span class="hljs-number">0</span>)
-	testing.expect(t, zero)
-	testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">0</span>, Counter_Input{}).error, r.Error.Initial_Frame)
-	<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">5</span> {r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})}
-	_, expired := r.read(&amp;tl, <span class="hljs-number">1</span>)
-	testing.expect(t, !expired)
-	testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">2</span>, Counter_Input{}).error, r.Error.History_Missing)
-	testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">3</span>, Counter_Input{add = <span class="hljs-number">2</span>}).error, r.Error.None)
-	testing.expect_value(t, r.rewind(&amp;tl, <span class="hljs-number">3</span>), r.Error.None)
-	_, future := r.read(&amp;tl, <span class="hljs-number">4</span>)
-	testing.expect(t, !future)
-	events: [<span class="hljs-number">1</span>]r.Occurrence(<span class="hljs-type">i32</span>)
-	_, err := r.copy_events(&amp;tl, <span class="hljs-number">5</span>, events[:])
-	testing.expect_value(t, err, r.Error.History_Missing)
-	r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">2</span>})
-	frame, _ := r.current(&amp;tl)
-	testing.expect_value(t, frame.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">4</span>))
-	testing.expect_value(t, frame.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">6</span>))
+    tl: Counter_Timeline
+    r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {history_frames = <span class="hljs-number">4</span>, events_per_tick = <span class="hljs-number">1</span>})
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    _, zero := r.read(&amp;tl, <span class="hljs-number">0</span>)
+    testing.expect(t, zero)
+    testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">0</span>, Counter_Input{}).error, r.Error.Initial_Frame)
+
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">5</span> {
+        r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})
+    }
+
+    _, expired := r.read(&amp;tl, <span class="hljs-number">1</span>)
+    testing.expect(t, !expired)
+    testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">2</span>, Counter_Input{}).error, r.Error.History_Missing)
+    testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">3</span>, Counter_Input{add = <span class="hljs-number">2</span>}).error, r.Error.None)
+    testing.expect_value(t, r.rewind(&amp;tl, <span class="hljs-number">3</span>), r.Error.None)
+    _, future := r.read(&amp;tl, <span class="hljs-number">4</span>)
+    testing.expect(t, !future)
+    events: [<span class="hljs-number">1</span>]r.Occurrence(<span class="hljs-type">i32</span>)
+    _, err := r.copy_events(&amp;tl, <span class="hljs-number">5</span>, events[:])
+    testing.expect_value(t, err, r.Error.History_Missing)
+    r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">2</span>})
+    frame, _ := r.current(&amp;tl)
+    testing.expect_value(t, frame.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">4</span>))
+    testing.expect_value(t, frame.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">6</span>))
 }
 
 duplicate_step :: <span class="hljs-keyword">proc</span>(s: ^Counter, input: Counter_Input, ctx: ^r.Step(<span class="hljs-type">i32</span>)) {
-	s.value += <span class="hljs-number">1</span>
-	r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">7</span>, <span class="hljs-number">1</span>)
-	r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">7</span>, <span class="hljs-number">2</span>)
+    s.value += <span class="hljs-number">1</span>
+    r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">7</span>, <span class="hljs-number">1</span>)
+    r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">7</span>, <span class="hljs-number">2</span>)
 }
 
 <span class="hljs-meta">@(test)</span>
 event_overflow_duplicates_and_short_output_do_not_leak :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: Counter_Timeline
-	r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {history_frames = <span class="hljs-number">4</span>, events_per_tick = <span class="hljs-number">0</span>})
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>}).error, r.Error.Event_Capacity)
-	f, _ := r.current(&amp;tl)
-	testing.expect_value(t, f.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">0</span>))
-	testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">0</span>))
-	r.destroy(&amp;tl)
-	r.init(&amp;tl, r.Frame(Counter){}, duplicate_step)
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Duplicate_Event)
-	r.destroy(&amp;tl)
-	r.init(&amp;tl, r.Frame(Counter){}, counter_step)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})
-	n, err := r.copy_events(&amp;tl, <span class="hljs-number">1</span>, <span class="hljs-literal">nil</span>)
-	testing.expect_value(t, n, <span class="hljs-number">1</span>)
-	testing.expect_value(t, err, r.Error.Output_Too_Small)
+    tl: Counter_Timeline
+    r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {history_frames = <span class="hljs-number">4</span>, events_per_tick = <span class="hljs-number">0</span>})
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>}).error, r.Error.Event_Capacity)
+    f, _ := r.current(&amp;tl)
+    testing.expect_value(t, f.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">0</span>))
+    testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">0</span>))
+    r.destroy(&amp;tl)
+    r.init(&amp;tl, r.Frame(Counter){}, duplicate_step)
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Duplicate_Event)
+    r.destroy(&amp;tl)
+    r.init(&amp;tl, r.Frame(Counter){}, counter_step)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})
+    n, err := r.copy_events(&amp;tl, <span class="hljs-number">1</span>, <span class="hljs-literal">nil</span>)
+    testing.expect_value(t, n, <span class="hljs-number">1</span>)
+    testing.expect_value(t, err, r.Error.Output_Too_Small)
 }
 
 <span class="hljs-meta">@(test)</span>
 pool_handles_survive_restore_and_reject_recycled_slots :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	p: r.Pool(Counter, <span class="hljs-number">2</span>)
-	a, ok := r.pool_insert(&amp;p, Counter{value = <span class="hljs-number">7</span>})
-	testing.expect(t, ok)
-	saved := p
-	testing.expect(t, r.pool_remove(&amp;p, a))
-	b, _ := r.pool_insert(&amp;p, Counter{value = <span class="hljs-number">8</span>})
-	testing.expect_value(t, a.index, b.index)
-	testing.expect(t, a.generation != b.generation)
-	_, stale := r.pool_get(&amp;p, a)
-	testing.expect(t, !stale)
-	p = saved
-	value, restored := r.pool_get(&amp;p, a)
-	testing.expect(t, restored)
-	testing.expect_value(t, value.value, <span class="hljs-type">i32</span>(<span class="hljs-number">7</span>))
-	_, future := r.pool_get(&amp;p, b)
-	testing.expect(t, !future)
-	p.generations[<span class="hljs-number">1</span>] = max(<span class="hljs-type">u32</span>) <span class="hljs-comment">// exhausted slot stays retired</span>
-	_, exhausted := r.pool_insert(&amp;p, Counter{})
-	testing.expect(t, !exhausted)
-	_, invalid := r.pool_get(&amp;p, r.Handle(Counter){index = max(<span class="hljs-type">u32</span>), generation = <span class="hljs-number">1</span>})
-	testing.expect(t, !invalid)
+    p: r.Pool(Counter, <span class="hljs-number">2</span>)
+    a, ok := r.pool_insert(&amp;p, Counter{value = <span class="hljs-number">7</span>})
+    testing.expect(t, ok)
+    saved := p
+    testing.expect(t, r.pool_remove(&amp;p, a))
+    b, _ := r.pool_insert(&amp;p, Counter{value = <span class="hljs-number">8</span>})
+    testing.expect_value(t, a.index, b.index)
+    testing.expect(t, a.generation != b.generation)
+    _, stale := r.pool_get(&amp;p, a)
+    testing.expect(t, !stale)
+    p = saved
+    value, restored := r.pool_get(&amp;p, a)
+    testing.expect(t, restored)
+    testing.expect_value(t, value.value, <span class="hljs-type">i32</span>(<span class="hljs-number">7</span>))
+    _, future := r.pool_get(&amp;p, b)
+    testing.expect(t, !future)
+    p.generations[<span class="hljs-number">1</span>] = max(<span class="hljs-type">u32</span>) <span class="hljs-comment">// exhausted slot stays retired</span>
+    _, exhausted := r.pool_insert(&amp;p, Counter{})
+    testing.expect(t, !exhausted)
+    _, invalid := r.pool_get(&amp;p, r.Handle(Counter){index = max(<span class="hljs-type">u32</span>), generation = <span class="hljs-number">1</span>})
+    testing.expect(t, !invalid)
 }
 
 bad_step :: <span class="hljs-keyword">proc</span>(s: ^[]<span class="hljs-type">i32</span>, input: <span class="hljs-type">u8</span>, ctx: ^r.Step(<span class="hljs-type">u8</span>)) {}
 
 <span class="hljs-meta">@(test)</span>
 initialization_rejects_reference_state_and_invalid_contracts :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	testing.expect(t, r.value_supported(loot.World))
-	testing.expect(t, r.value_supported(<span class="hljs-keyword">struct</span> {tag: <span class="hljs-type">u8</span>, value: <span class="hljs-type">u64</span>})) <span class="hljs-comment">// padding is legal</span>
-	testing.expect(t, !r.value_supported(<span class="hljs-keyword">struct</span> {nested: [<span class="hljs-number">2</span>]<span class="hljs-keyword">struct</span> {p: ^<span class="hljs-type">i32</span>}}))
-	testing.expect(t, !r.value_supported([<span class="hljs-keyword">dynamic</span>]<span class="hljs-type">i32</span>))
-	testing.expect(t, !r.value_supported(<span class="hljs-keyword">map</span>[<span class="hljs-type">u32</span>]<span class="hljs-type">u32</span>))
-	testing.expect(t, !r.value_supported(<span class="hljs-type">string</span>))
-	testing.expect(t, !r.value_supported(<span class="hljs-keyword">proc</span>()))
-	testing.expect(t, !r.value_supported(<span class="hljs-type">any</span>))
-	testing.expect(t, !r.value_supported(<span class="hljs-keyword">union</span> {<span class="hljs-type">i32</span>, ^<span class="hljs-type">i32</span>}))
-	testing.expect(t, !r.value_supported(<span class="hljs-keyword">struct</span> <span class="hljs-meta">#raw_union</span> {a: <span class="hljs-type">u32</span>, b: <span class="hljs-type">f32</span>}))
-	bad: r.Timeline([]<span class="hljs-type">i32</span>, <span class="hljs-type">u8</span>, <span class="hljs-type">u8</span>)
-	testing.expect_value(t, r.init(&amp;bad, r.Frame([]<span class="hljs-type">i32</span>){}, bad_step), r.Error.Unsupported_Value)
-	r.destroy(&amp;bad)
-	tl: Counter_Timeline
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Not_Initialized)
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, epoch = <span class="hljs-number">0</span>), r.Error.Invalid_Config)
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}), r.Error.Invalid_Config)
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){tick = max(<span class="hljs-type">u64</span>)}, counter_step), r.Error.None)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step), r.Error.Already_Initialized)
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Tick_Overflow)
+    testing.expect(t, r.value_supported(loot.World))
+    testing.expect(t, r.value_supported(<span class="hljs-keyword">struct</span> {
+                tag:   <span class="hljs-type">u8</span>,
+                value: <span class="hljs-type">u64</span>,
+            })) <span class="hljs-comment">// padding is legal</span>
+    testing.expect(t, !r.value_supported(<span class="hljs-keyword">struct</span> {
+                nested: [<span class="hljs-number">2</span>]<span class="hljs-keyword">struct</span> {
+                    p: ^<span class="hljs-type">i32</span>,
+                },
+            }))
+    testing.expect(t, !r.value_supported([<span class="hljs-keyword">dynamic</span>]<span class="hljs-type">i32</span>))
+    testing.expect(t, !r.value_supported(<span class="hljs-keyword">map</span>[<span class="hljs-type">u32</span>]<span class="hljs-type">u32</span>))
+    testing.expect(t, !r.value_supported(<span class="hljs-type">string</span>))
+    testing.expect(t, !r.value_supported(<span class="hljs-keyword">proc</span>()))
+    testing.expect(t, !r.value_supported(<span class="hljs-type">any</span>))
+    testing.expect(t, !r.value_supported(<span class="hljs-keyword">union</span> {
+                <span class="hljs-type">i32</span>,
+                ^<span class="hljs-type">i32</span>,
+            }))
+    testing.expect(t, !r.value_supported(<span class="hljs-keyword">struct</span> <span class="hljs-meta">#raw_union</span> {
+                a: <span class="hljs-type">u32</span>,
+                b: <span class="hljs-type">f32</span>,
+            }))
+    bad: r.Timeline([]<span class="hljs-type">i32</span>, <span class="hljs-type">u8</span>, <span class="hljs-type">u8</span>)
+    testing.expect_value(t, r.init(&amp;bad, r.Frame([]<span class="hljs-type">i32</span>){}, bad_step), r.Error.Unsupported_Value)
+    r.destroy(&amp;bad)
+    tl: Counter_Timeline
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Not_Initialized)
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, epoch = <span class="hljs-number">0</span>), r.Error.Invalid_Config)
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, cfg = {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}), r.Error.Invalid_Config)
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){tick = max(<span class="hljs-type">u64</span>)}, counter_step), r.Error.None)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step), r.Error.Already_Initialized)
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.Tick_Overflow)
 }
 
 <span class="hljs-meta">@(test)</span>
 runtime_keeps_allocator_ownership_and_replay_uses_preallocated_storage :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&amp;track, <span class="hljs-keyword">context</span>.allocator)
-	<span class="hljs-keyword">defer</span> mem.tracking_allocator_destroy(&amp;track)
-	owned_allocator := mem.tracking_allocator(&amp;track)
-	tl: Counter_Timeline
-	testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, allocator = owned_allocator), r.Error.None)
-	allocations := track.total_allocation_count
-	<span class="hljs-comment">// Catch accidental allocations from either the explicit or ambient allocator.</span>
-	{
-		<span class="hljs-keyword">context</span>.allocator = owned_allocator
-		<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">6</span> {r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})}
-		testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">2</span>, Counter_Input{add = <span class="hljs-number">2</span>}).error, r.Error.None)
-		testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None)
-	}
-	testing.expect_value(t, track.total_allocation_count, allocations)
-	<span class="hljs-comment">// Ambient context is back to the test allocator, different from init&#x27;s owner.</span>
-	r.destroy(&amp;tl)
-	testing.expect_value(t, track.current_memory_allocated, <span class="hljs-type">i64</span>(<span class="hljs-number">0</span>))
-	testing.expect_value(t, len(track.allocation_map), <span class="hljs-number">0</span>)
+    track: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&amp;track, <span class="hljs-keyword">context</span>.allocator)
+    <span class="hljs-keyword">defer</span> mem.tracking_allocator_destroy(&amp;track)
+    owned_allocator := mem.tracking_allocator(&amp;track)
+    tl: Counter_Timeline
+    testing.expect_value(t, r.init(&amp;tl, r.Frame(Counter){}, counter_step, allocator = owned_allocator), r.Error.None)
+    allocations := track.total_allocation_count
+
+    <span class="hljs-comment">// Catch accidental allocations from either the explicit or ambient allocator.</span>
+    {
+        <span class="hljs-keyword">context</span>.allocator = owned_allocator
+
+        <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">6</span> {
+            r.advance(&amp;tl, Counter_Input{add = <span class="hljs-number">1</span>})
+        }
+
+        testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-number">2</span>, Counter_Input{add = <span class="hljs-number">2</span>}).error, r.Error.None)
+        testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.None)
+    }
+
+    testing.expect_value(t, track.total_allocation_count, allocations)
+    <span class="hljs-comment">// Ambient context is back to the test allocator, different from init&#x27;s owner.</span>
+    r.destroy(&amp;tl)
+    testing.expect_value(t, track.current_memory_allocated, <span class="hljs-type">i64</span>(<span class="hljs-number">0</span>))
+    testing.expect_value(t, len(track.allocation_map), <span class="hljs-number">0</span>)
 }
 
 reentrant_timeline: ^Counter_Timeline
+
 reentrant_step :: <span class="hljs-keyword">proc</span>(s: ^Counter, input: Counter_Input, ctx: ^r.Step(<span class="hljs-type">i32</span>)) {
-	a := r.advance(reentrant_timeline, Counter_Input{})
-	b := r.revise_input(reentrant_timeline, ctx.tick, Counter_Input{})
-	c := r.rewind(reentrant_timeline, <span class="hljs-number">0</span>)
-	<span class="hljs-keyword">if</span> a.error == .Reentrant &amp;&amp; b.error == .Reentrant &amp;&amp; c == .Reentrant {
-		s.value += <span class="hljs-number">1</span>
-	}
+    a := r.advance(reentrant_timeline, Counter_Input{})
+    b := r.revise_input(reentrant_timeline, ctx.tick, Counter_Input{})
+    c := r.rewind(reentrant_timeline, <span class="hljs-number">0</span>)
+
+    <span class="hljs-keyword">if</span> a.error == .Reentrant &amp;&amp; b.error == .Reentrant &amp;&amp; c == .Reentrant {
+        s.value += <span class="hljs-number">1</span>
+    }
 }
 
 <span class="hljs-meta">@(test)</span>
 step_cannot_reenter_timeline_mutations :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: Counter_Timeline
-	r.init(&amp;tl, r.Frame(Counter){}, reentrant_step)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	reentrant_timeline = &amp;tl
-	<span class="hljs-keyword">defer</span> reentrant_timeline = <span class="hljs-literal">nil</span>
-	testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.None)
-	f, _ := r.current(&amp;tl)
-	testing.expect_value(t, f.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>))
-	testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">1</span>))
+    tl: Counter_Timeline
+    r.init(&amp;tl, r.Frame(Counter){}, reentrant_step)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+    reentrant_timeline = &amp;tl
+    <span class="hljs-keyword">defer</span> reentrant_timeline = <span class="hljs-literal">nil</span>
+    testing.expect_value(t, r.advance(&amp;tl, Counter_Input{}).error, r.Error.None)
+    f, _ := r.current(&amp;tl)
+    testing.expect_value(t, f.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>))
+    testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">1</span>))
 }
 
 <span class="hljs-comment">// Deliberately illegal hidden state proves audit sees a reproducibility failure.</span>
 hidden_value: <span class="hljs-type">i32</span>
+
 hidden_state_step :: <span class="hljs-keyword">proc</span>(s: ^Counter, input: Counter_Input, ctx: ^r.Step(<span class="hljs-type">i32</span>)) {
-	s.value += hidden_value
+    s.value += hidden_value
 }
+
 hidden_event_step :: <span class="hljs-keyword">proc</span>(s: ^Counter, input: Counter_Input, ctx: ^r.Step(<span class="hljs-type">i32</span>)) {
-	s.value += <span class="hljs-number">1</span>
-	r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, hidden_value)
+    s.value += <span class="hljs-number">1</span>
+    r.emit(ctx, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, hidden_value)
 }
 
 <span class="hljs-meta">@(test)</span>
 audit_reports_state_and_event_divergence_without_committing :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	tl: Counter_Timeline
-	hidden_value = <span class="hljs-number">1</span>
-	r.init(&amp;tl, r.Frame(Counter){}, hidden_state_step)
-	r.advance(&amp;tl, Counter_Input{})
-	hidden_value = <span class="hljs-number">2</span>
-	result := r.audit(&amp;tl, <span class="hljs-number">1</span>)
-	testing.expect_value(t, result.error, r.Error.Diverged_State)
-	testing.expect_value(t, result.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>))
-	f, _ := r.current(&amp;tl)
-	testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">1</span>))
-	r.destroy(&amp;tl)
-	r.init(&amp;tl, r.Frame(Counter){}, hidden_event_step)
-	r.advance(&amp;tl, Counter_Input{})
-	hidden_value = <span class="hljs-number">3</span>
-	testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.Diverged_Event)
-	r.destroy(&amp;tl)
+    tl: Counter_Timeline
+    hidden_value = <span class="hljs-number">1</span>
+    r.init(&amp;tl, r.Frame(Counter){}, hidden_state_step)
+    r.advance(&amp;tl, Counter_Input{})
+    hidden_value = <span class="hljs-number">2</span>
+    result := r.audit(&amp;tl, <span class="hljs-number">1</span>)
+    testing.expect_value(t, result.error, r.Error.Diverged_State)
+    testing.expect_value(t, result.tick, <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>))
+    f, _ := r.current(&amp;tl)
+    testing.expect_value(t, f.state.value, <span class="hljs-type">i32</span>(<span class="hljs-number">1</span>))
+    r.destroy(&amp;tl)
+    r.init(&amp;tl, r.Frame(Counter){}, hidden_event_step)
+    r.advance(&amp;tl, Counter_Input{})
+    hidden_value = <span class="hljs-number">3</span>
+    testing.expect_value(t, r.audit(&amp;tl, <span class="hljs-number">1</span>).error, r.Error.Diverged_Event)
+    r.destroy(&amp;tl)
 }
 
 <span class="hljs-meta">@(test)</span>
 revised_corpus_matches_fresh_execution :: <span class="hljs-keyword">proc</span>(t: ^testing.T) {
-	rng := r.rng_make(<span class="hljs-number">12345</span>)
-	inputs: [<span class="hljs-number">24</span>]loot.Input
-	<span class="hljs-keyword">for</span> &amp;input, i <span class="hljs-keyword">in</span> inputs {
-		<span class="hljs-keyword">for</span> &amp;p <span class="hljs-keyword">in</span> input.players {
-			p.move = <span class="hljs-type">i8</span>(r.rng_next(&amp;rng) % <span class="hljs-number">3</span>) - <span class="hljs-number">1</span>
-			p.fire = r.rng_next(&amp;rng) % <span class="hljs-number">3</span> == <span class="hljs-number">0</span>
-			p.take = r.rng_next(&amp;rng) % <span class="hljs-number">2</span> == <span class="hljs-number">0</span>
-			p.seq = <span class="hljs-type">u32</span>(i + <span class="hljs-number">1</span>)
-		}
-	}
-	tl: loot.Timeline
-	r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step)
-	<span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
-	<span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {testing.expect_value(t, r.advance(&amp;tl, input).error, r.Error.None)}
-	<span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">32</span> {
-		at := <span class="hljs-type">int</span>(r.rng_next(&amp;rng) % <span class="hljs-type">u64</span>(len(inputs)))
-		inputs[at].players[<span class="hljs-number">0</span>].take = !inputs[at].players[<span class="hljs-number">0</span>].take
-		inputs[at].players[<span class="hljs-number">1</span>].fire = !inputs[at].players[<span class="hljs-number">1</span>].fire
-		testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-type">u64</span>(at + <span class="hljs-number">1</span>), inputs[at]).error, r.Error.None)
-		ref: loot.Timeline
-		r.init(&amp;ref, r.Frame(loot.World){state = loot.initial()}, loot.step)
-		<span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {r.advance(&amp;ref, input)}
-		got, _ := r.current(&amp;tl)
-		want, _ := r.current(&amp;ref)
-		testing.expect(t, reflect.equal(got, want))
-		<span class="hljs-keyword">for</span> tick <span class="hljs-keyword">in</span> <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>) ..= <span class="hljs-type">u64</span>(len(inputs)) {
-			a, b: [<span class="hljs-number">8</span>]r.Occurrence(loot.Event)
-			an, ae := r.copy_events(&amp;tl, tick, a[:])
-			bn, be := r.copy_events(&amp;ref, tick, b[:])
-			testing.expect_value(t, ae, r.Error.None)
-			testing.expect_value(t, be, r.Error.None)
-			testing.expect(t, reflect.equal(a[:an], b[:bn], <span class="hljs-literal">true</span>))
-		}
-		r.destroy(&amp;ref)
-	}
+    rng := r.rng_make(<span class="hljs-number">12345</span>)
+    inputs: [<span class="hljs-number">24</span>]loot.Input
+
+    <span class="hljs-keyword">for</span> &amp;input, i <span class="hljs-keyword">in</span> inputs {
+        <span class="hljs-keyword">for</span> &amp;p <span class="hljs-keyword">in</span> input.players {
+            p.move = <span class="hljs-type">i8</span>(r.rng_next(&amp;rng) % <span class="hljs-number">3</span>) - <span class="hljs-number">1</span>
+            p.fire = r.rng_next(&amp;rng) % <span class="hljs-number">3</span> == <span class="hljs-number">0</span>
+            p.take = r.rng_next(&amp;rng) % <span class="hljs-number">2</span> == <span class="hljs-number">0</span>
+            p.seq = <span class="hljs-type">u32</span>(i + <span class="hljs-number">1</span>)
+        }
+    }
+
+    tl: loot.Timeline
+    r.init(&amp;tl, r.Frame(loot.World){state = loot.initial()}, loot.step)
+    <span class="hljs-keyword">defer</span> r.destroy(&amp;tl)
+
+    <span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {
+        testing.expect_value(t, r.advance(&amp;tl, input).error, r.Error.None)
+    }
+
+    <span class="hljs-keyword">for</span> _ <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; <span class="hljs-number">32</span> {
+        at := <span class="hljs-type">int</span>(r.rng_next(&amp;rng) % <span class="hljs-type">u64</span>(len(inputs)))
+        inputs[at].players[<span class="hljs-number">0</span>].take = !inputs[at].players[<span class="hljs-number">0</span>].take
+        inputs[at].players[<span class="hljs-number">1</span>].fire = !inputs[at].players[<span class="hljs-number">1</span>].fire
+        testing.expect_value(t, r.revise_input(&amp;tl, <span class="hljs-type">u64</span>(at + <span class="hljs-number">1</span>), inputs[at]).error, r.Error.None)
+        ref: loot.Timeline
+        r.init(&amp;ref, r.Frame(loot.World){state = loot.initial()}, loot.step)
+
+        <span class="hljs-keyword">for</span> input <span class="hljs-keyword">in</span> inputs {
+            r.advance(&amp;ref, input)
+        }
+
+        got, _ := r.current(&amp;tl)
+        want, _ := r.current(&amp;ref)
+        testing.expect(t, reflect.equal(got, want))
+
+        <span class="hljs-keyword">for</span> tick <span class="hljs-keyword">in</span> <span class="hljs-type">u64</span>(<span class="hljs-number">1</span>) ..= <span class="hljs-type">u64</span>(len(inputs)) {
+            a, b: [<span class="hljs-number">8</span>]r.Occurrence(loot.Event)
+            an, ae := r.copy_events(&amp;tl, tick, a[:])
+            bn, be := r.copy_events(&amp;ref, tick, b[:])
+            testing.expect_value(t, ae, r.Error.None)
+            testing.expect_value(t, be, r.Error.None)
+            testing.expect(t, reflect.equal(a[:an], b[:bn], <span class="hljs-literal">true</span>))
+        }
+
+        r.destroy(&amp;ref)
+    }
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay/replay_test.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/replay/replay_test.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/replay/replay_test.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

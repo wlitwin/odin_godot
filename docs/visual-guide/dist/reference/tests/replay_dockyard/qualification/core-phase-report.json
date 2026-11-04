@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "result": "TRANSACTION_PHASES_CAPTURED_CAUSE_UNRESOLVED",
+  "release_admitted": false,
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "source": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/core-phase-profile-v1/source-checkpoint-v3.json",
+    "sha256": "2cfbbb43c14871a63adc361ad6d14285abd5e5c44343a0e89952b70b87d0d718"
+  },
+  "pure_tests": {
+    "terminal": "t1jm",
+    "actual_exit": 0,
+    "native_tests": 16,
+    "new_semantic_cases": 4,
+    "wasm_verify_runs": 3,
+    "wasm_imports": 0,
+    "scope": "Deterministic phase/work/cleanup timing, nil/backward clock and failed-capture atomicity/cleanup; native-free managed-state vectors."
+  },
+  "native_validation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/core-phase-sdk-native-v1/core-phase-validation.json",
+    "sha256": "a13890636b63128692575975666a09786f36604b7d9698bf518222b3038a36e8"
+  },
+  "web_validation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/core-phase-web-check-v1/core-phase-validation.json",
+    "sha256": "0b9c13aad2bdf0926b069923f61d985133bf1bd169602c873938f6ee0ce694c6"
+  },
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/core-phase-export-v1/report.json",
+    "sha256": "7cfe20f40fa2ca0b20ee1a9380b7f14c072617cf5f4a4152bfbe758fdf1ffdc7"
+  },
+  "previous_capture": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-phase-firefox-v1/phase-capture.json",
+    "sha256": "ee99a6bc28a096a5e46bb93faf79681a50eff164c1e4635c47d327d8781219eb"
+  },
+  "definition": "Existing optional external clock, fixed per-transaction open/model/capture totals/counts/clock errors. No callback/userdata/global/cache/physics/wire/transaction-order changes; no adjusted operation budget. Clock overhead remains measured.",
+  "live_case": null,
+  "cause": "UNKNOWN; original29.56ms failure and both captured instrumented events remain failures, never relabeled.",
+  "capture": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/core-phase-firefox-v1/phase-capture.json",
+    "sha256": "8c95361abc9855220a79651d1bd5d01c0229572a28616d24b981493ee1295ae5"
+  },
+  "updated_utc": "2026-11-04T01:34:02.849057+00:00"
+}

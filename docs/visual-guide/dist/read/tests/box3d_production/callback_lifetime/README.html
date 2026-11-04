@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Actual SDK callback lifetime regression · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Validation</a><span>/</span><span>Guide</span></div><p class="eyebrow">Validation</p><h1>Actual SDK callback lifetime regression</h1><div class="reader-meta"><span>2 min read</span><span>Odin × Godot</span><a href="../../../../reference/tests/box3d_production/callback_lifetime/README.md" download>Page source ↓</a></div></div>
+
+<article class="reading-body "><p>Source-only fixture, uncompiled/unrun until Root grants a case. The identical
+criterion runs against an explicitly supplied frozen pre-fix or current
+<code>modules/authoring_demo/</code> directory. A pre-fix RED remains a failed report; the
+runner never promotes an expected failure to PASS.</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 tests/box3d_production/callback_lifetime/run.py \
+  --framework replay --module-source /absolute/selected/authoring_demo \
+  --godot /absolute/Godot --odin /absolute/odin \
+  --native-library /absolute/libogb3.so --native-sha256 <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE_SHA256</span>&quot;</span> \
+  --out /absolute/new-output --port 25130</code></pre></div><p>Default is a no-job plan. <code>--execute</code> performs ordinary shared preparation,
+copies the selected authored package exactly, appends one derived-only Odin
+probe file, then uses the standard SDK build, ordinary import and one headless
+GDScript test. Kit uses the same command with <code>--framework kit</code> and its selected
+package. No shipping method/file or frozen module is edited. Generated source,
+including real method-return wrappers, is preserved and hash-bound. This is an
+SDK fixture, not exported deployment evidence.</p>
+<p>The real authored Sample opens a Host on its unique port with processing
+disabled before it enters the SceneTree. Ready still runs; no Client, GO, frame,
+pump, step or reset is manufactured. Kit&#39;s pre-roster frontiers may honestly be
+null. Kit uses <code>BOX3D_SAMPLE_SCRIPTED=0</code>: its scripted close requires a completed
+target and terminal ACK, which this pre-GO lifetime fixture does not execute.
+Replay retains <code>BOX3D_SAMPLE_SCRIPTED=1</code>. Checked-close assertions are unchanged.
+Actual public status/presentation Strings and JSON are validated, then
+128 warmup pairs precede two identical 10000-pair batches. Returns are discarded
+at each GDScript helper-function boundary. Three preallocated counter snapshots
+avoid retaining a fresh measurement container after each batch.</p>
+<p>The one probe exposes primitive <code>callback_temp_available</code>, <code>callback_temp_used</code>,
+<code>callback_temp_capacity</code>, <code>callback_temp_count</code> methods in the <strong>same producer
+module/TLS</strong>. It first checks the actual context allocator procedure against
+<code>runtime.default_temp_allocator_proc</code> and nonnil data, then reads that actual
+<code>Default_Temp_Allocator.arena</code>. False availability / negative counter sentinel
+fails setup; it is never recast as an observed zero. No arena/context is replaced
+or reset by the probe. Exact <code>total_used</code>, <code>total_capacity</code> and <code>temp_count</code>
+restoration is required between all three snapshots. These are arena counters,
+not malloc totals, Native quota, Core gdext arena observations or RSS.</p>
+<p>Godot <code>OS.get_static_memory_usage()</code> anchors must be nonzero, and the second
+identical batch may not increase that heap relative to the first. Heap and
+producer TLS are reported separately. Frontier equality/no GO/no frame advance,
+actual checked public close and freed Node are independent setup/cleanup gates.
+Source/module/tool/Native/binary fences and strict engine logs remain required.
+No timing, 4 ms, soak, network-recovery or physics correctness claim follows.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/box3d_production/callback_lifetime/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/tests/box3d_production/callback_lifetime/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

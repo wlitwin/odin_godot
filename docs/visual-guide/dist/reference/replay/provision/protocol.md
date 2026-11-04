@@ -52,6 +52,16 @@ resident for the hub's lifetime and persist across restarts.
 
 ## Wire and retry contract
 
+The optional human-entered **short room code v1** is a client-side recipe using
+this existing protocol. `short_code` maps a random creator claim and content ID
+to five characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. Separate HMAC-SHA256
+domains derive the room locator and two invitation secrets (crew index 0, watch
+index 1). `creator_short_invite` registers only `.Player`, one-use invitations;
+the normal server authorization checks still require the full creator claim.
+Codes are case-insensitive and trimmed at the edges. Other input is rejected.
+The independent member/creator credentials, message shapes, protocol version,
+stored bundle schema, request budgets and long `RP1` ticket format are unchanged.
+
 Protocol version 1 uses canonical envelopes: request kind `0x5051`, reply kind
 `0x5053`, epoch 1, tick zero and the configured content ID. Fixed-size messages
 fit within `PACKET_BYTES` (1024). Wrong schema/version/content, noncanonical fields,

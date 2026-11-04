@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Box3D native backend · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="../replay/getting-started.html">Replay sessions and rooms</a><a href="../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Box3D native backend</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../reference/box3d/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#build-and-use">Build and use</a><a href="#simulation-contract">Simulation contract</a><a href="#ownership-and-identity">Ownership and identity</a><a href="#complete-state-and-diagnostics">Complete state and diagnostics</a></nav></details>
+<article class="reading-body "><p>This package is the framework-independent, explicitly stepped Box3D backend
+shared by the separate Kit and Replay adapters. It owns native physics resources.
+Each adapter owns its game state, stable entity mappings, input history,
+transactions and presentation.</p>
+<p>The authoritative foreign boundary is <code>native/api.h</code> and the additive
+<code>native/motion.h</code>, with owned snapshots and
+normalized state diagnostics in <code>native/owned_snapshot.h</code> and
+<code>native/state_dump.h</code>. The Odin declarations mirror that flat C API, not Box3D&#39;s
+private layouts or any C++ class. Engine and shim revisions, notices and build
+configuration are recorded in <code>dependency.json</code> and the native build metadata.</p>
+<h2 id="build-and-use">Build and use<a class="heading-anchor" href="#build-and-use" aria-label="Link to this section">#</a></h2>
+<p>Build one pinned engine and shim archive, then give its absolute path to Odin:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">nix develop --<span class="hljs-built_in">command</span> bash build/build_box3d.sh Debug .box3d-cache
+nix develop --<span class="hljs-built_in">command</span> odin check box3d -no-entry-point \
+  -define:BOX3D_LIBRARY=<span class="hljs-string">&quot;<span class="hljs-subst">$(pwd)</span>/.box3d-cache/build/Debug/libogb3.a&quot;</span>
+nix develop --<span class="hljs-built_in">command</span> bash tests/box3d/run.sh \
+  <span class="hljs-string">&quot;<span class="hljs-subst">$(pwd)</span>/.box3d-cache/build/Debug/libogb3.a&quot;</span></code></pre></div><p>Use <code>Release</code> for the optimized native build. Native assertions, validation and
+the floating-point policy remain enabled. <code>BOX3D_LIBRARY</code> defaults to
+<code>native/libogb3.a</code> relative to this package; no archive is committed. Import the
+package as <code>godot:box3d</code> with the existing repository collection, or use its local
+path. Linux additionally links libm. The supported initial native targets are
+macOS arm64 and Linux x86-64; evidence for each target is recorded separately.</p>
+<div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin">world, status := box3d.world_create(box3d.world_def_default())
+<span class="hljs-keyword">if</span> status != .Ok {<span class="hljs-keyword">return</span>}
+<span class="hljs-keyword">defer</span> box3d.world_destroy(&amp;world)
+
+def := box3d.body_def_default()
+def.type = .Dynamic
+def.pose.position = {<span class="hljs-number">0</span>, <span class="hljs-number">3</span>, <span class="hljs-number">0</span>}
+body, body_status := box3d.body_create(world, def)
+<span class="hljs-keyword">if</span> body_status != .Ok {<span class="hljs-keyword">return</span>}
+_, shape_status := box3d.shape_box(body, box3d.shape_def_default(), {<span class="hljs-number">0.5</span>, <span class="hljs-number">0.5</span>, <span class="hljs-number">0.5</span>})
+<span class="hljs-keyword">if</span> shape_status != .Ok {<span class="hljs-keyword">return</span>}
+<span class="hljs-keyword">if</span> box3d.world_step_fixed(world) != .Ok {<span class="hljs-keyword">return</span>}
+
+snapshot, capture_status := box3d.snapshot_capture(world)
+<span class="hljs-keyword">if</span> capture_status != .Ok {<span class="hljs-keyword">return</span>}
+<span class="hljs-keyword">defer</span> box3d.snapshot_destroy(&amp;snapshot)</code></pre></div><p>Use native default constructors before changing definition fields. POD flag
+fields use <code>u32</code> values 0/1, body kinds use <code>Body_Type</code>, and public body/shape/
+joint mutation helpers accept Odin booleans where applicable. <code>abi_check</code> compares
+the ABI version and every POD field&#39;s offset, size and alignment with C.
+<code>world_create</code> runs it before creation. Default constructors fail loudly on an
+incompatible ABI before C can write to a POD.</p>
+<p>Object operations return <code>Status</code>; validity queries return <code>(bool, Status)</code> and
+report stale handles as <code>false, .Ok</code>. Creation returns <code>(typed_handle, Status)</code>.
+Read outputs only after checking status. Native wrapper allocation failures can
+return <code>.Out_Of_Memory</code>; upstream engine allocations still assert on exhaustion.</p>
+<h2 id="simulation-contract">Simulation contract<a class="heading-anchor" href="#simulation-contract" aria-label="Link to this section">#</a></h2>
+<p>Positions use meters in a Y-up, right-handed coordinate system. Rotations use
+quaternions in <code>(x, y, z, w)</code> order. Transforms are rigid; bake scale into immutable
+geometry. The initial corpus uses one worker, 60 ticks per second and four
+substeps. Process-wide unit settings must be initialized before creating worlds.
+Keep engine configuration and callback identity fixed during a simulation run.</p>
+<p>All mutation, queries, capture and restore happen at settled step boundaries on
+the owning thread. The package does not schedule ticks or mutate Godot scenes.
+Run Odin tests with <code>-define:ODIN_TEST_THREADS=1</code>; the supplied test script does so.</p>
+<p>Query and sensor APIs copy results into caller-owned slices and return the total
+available count. <code>.Capacity</code> means the prefix that fits was copied; retry with
+enough storage for a complete result. Empty slices are valid size queries.
+Query order is the engine&#39;s traversal order; adapters choose any required stable
+game-ID ordering after copying. Ray translation is the full displacement.
+The hinge axis is local Z in both local frames.</p>
+<p>The additive motion API supplies <code>query_aabb</code>, <code>query_ray_sorted</code>,
+<code>query_capsule</code> and <code>query_capsule_cast</code>. These gather complete bounded results,
+return allocation keys and sort by hit fraction and stable key/geometry ties.
+An undersized output returns <code>.Capacity</code> without publishing a partial prefix.
+<code>Motion_Filter</code> includes sensor selection and an explicit self body exclusion.
+The existing raw query functions retain their earlier behavior.</p>
+<p><code>character_step</code> reads the actual world and returns explicit caller-owned
+<code>Character_State</code> through <code>Character_Result</code>. It uses the pinned engine&#39;s
+capsule casts and collision-plane solver; it neither mutates a body nor steps
+the world. Store that value in Game/Side and call it from the existing framework
+tick. The accepted time step is zero or the existing fixed 1/60. See the
+<a href="../docs/design/box3d/motion.html">motion contract</a> for the distinct Kit and Replay
+entry points and the authored node/resource surface.</p>
+<p>Both the sensor and convex visitor shapes must enable sensor events. This initial
+API supports primitive/convex sensors and static mesh collision. Mesh sensor or
+mesh visitor event flags return <code>.Unsupported</code>; the pinned engine&#39;s sensor path
+cannot form a convex proxy for a mesh visitor. Geometry beyond the supported
+surface needs explicit native support and
+evidence before use. <code>Motion_Joint_Def</code> supports Pin, Hinge, Slider, Spherical,
+Distance, Motor, Weld and Wheel. Pin maps to a spherical point constraint,
+Hinge to Revolute and Slider to Prismatic. Each definition uses world-independent
+body allocation keys, and creation returns a joint key. The current profile
+still permits one joint at a time.</p>
+<h2 id="ownership-and-identity">Ownership and identity<a class="heading-anchor" href="#ownership-and-identity" aria-label="Link to this section">#</a></h2>
+<p>Worlds and bodies/shapes/joints use distinct typed native handles. These are
+runtime references, not durable game identities. Destroying a body also destroys
+its shapes and joints. Destroying a world invalidates all its object handles.
+Zero is the empty value. Destruction helpers clear the caller&#39;s owning variable
+after successful destruction; ordinary copies do not create another owner.
+World/body/shape/joint destruction returns <code>.Invalid_Handle</code> for an empty or
+stale handle. Snapshot and geometry destruction accept an empty owner.</p>
+<p><code>Geometry</code> owns copied hull points or indexed mesh vertices. Mesh indices are
+triangle triples. <code>geometry_destroy</code> releases the caller&#39;s lease, and any native
+shape/world ownership remains valid. Native worlds conservatively retain mesh
+asset leases through destroyed-shape history until world destruction; use bounded
+predeclared assets. Snapshot geometry metrics describe reachable retained assets,
+not every native/wrapper allocation.</p>
+<p>Snapshots own their images and immutable geometry dependencies. Clone explicitly
+when a second history entry or checkpoint needs independent ownership, and
+destroy each owner once. Copying a snapshot value aliases its native owner; it
+does not clone. A successful restored world retains the geometry dependencies it
+needs independently of the snapshot that supplied them.</p>
+<p>Restore clears process-local body/shape/joint user data and output event buffers.
+Adapters must reconstruct their associations from rollback-owned stable mappings.
+Snapshot-era handles can become valid again, and future resimulated spawns can
+reuse a numerical handle. A handle&#39;s value therefore does not identify a unique
+gameplay lifetime. Cross-world restore also requires native handle retargeting.
+Use <code>body_retarget</code>, <code>shape_retarget</code> and <code>joint_retarget</code> with snapshot-era
+handles and the destination world. <code>body_identity</code> returns native allocation
+index/generation without the world slot; it still is not durable game identity.</p>
+<p>Capture physics and deterministic game state at the same tick. A physics snapshot
+alone does not include gameplay RNG, entity/body maps, timers, health, pending
+commands or framework events. Stage speculative execution in a separate world;
+publish physics and game state together only after all checks succeed.</p>
+<h2 id="complete-state-and-diagnostics">Complete state and diagnostics<a class="heading-anchor" href="#complete-state-and-diagnostics" aria-label="Link to this section">#</a></h2>
+<p>The motion digest covers poses and awake velocities. It is a diagnostic only.
+It cannot establish complete solver equality or justify reusing a rollback suffix.
+The normalized solver dump/digest carries an explicit coverage/version contract;
+its supported coverage must be checked against the native manifest. Adapters
+still need to include deterministic game side-state in a complete checkpoint or
+comparison. Preserve normalized bytes when diagnosing mismatches.</p>
+<p><code>world_dump</code>/<code>snapshot_dump</code> return <code>(required_bytes, Status)</code>. Any empty slice is
+a successful size query. A nonempty undersized slice returns <code>.Capacity</code> without
+writing a partial dump. <code>world_digests</code>/<code>snapshot_digests</code> return explicitly named
+<code>complete_solver_digest</code> and <code>motion_digest</code> fields. Snapshot diagnostics inspect
+its sealed captured resource directly. <code>state_version</code>, <code>state_coverage</code> and
+<code>build_fingerprint</code> describe compatibility; the fingerprint is diagnostic only.</p>
+<p><code>snapshot_metrics</code> reports image used/capacity and geometry bytes/count. Clones
+have independent leases on one immutable resource, so summing clone metrics can
+double-count shared storage. <code>engine_allocation_stats</code> reports process-wide
+engine calls/requested bytes/live/high-water bytes; it excludes wrapper mallocs
+and snapshot owner/normalized-dump mallocs. Neither counter set alone measures
+total backend memory.
+<code>snapshot_storage</code> additionally reports retained normalized bytes, wrapper malloc
+bytes and native requested bytes for the captured resource. These per-resource
+figures overlap the other counters; consult the native header before totaling
+them, and count shared clone storage once.
+<code>snapshot_allocation_stats</code> reports successful wrapper allocations process-wide,
+including temporary digest storage and branch/restore owners and leases. It uses
+the same <code>Allocation_Stats</code> fields as engine counters. Caller buffers, flat-API
+geometry owners and allocator overhead are excluded; these are requested-byte
+counters, not process resident memory.</p>
+<p>Owned local snapshots are exact-build implementation data. They are separate
+from a portable, validated recovery/network codec. Passing the native ownership
+and ABI checks does not establish Gate A, cross-target determinism, either
+framework integration, or canonical transferred recovery.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../docs/design/box3d/motion.html"><span>Character movement, queries and joints</span><span aria-hidden="true">→</span></a><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">box3d/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#build-and-use" class="">Build and use</a><a href="#simulation-contract" class="">Simulation contract</a><a href="#ownership-and-identity" class="">Ownership and identity</a><a href="#complete-state-and-diagnostics" class="">Complete state and diagnostics</a></nav><div class="outline-actions"><a href="../../reference/box3d/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

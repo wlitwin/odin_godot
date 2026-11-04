@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "result": "BOUNDED_PROCESS_OBSERVER_VALID_NO_TRIGGER_NOT_ADMISSION",
+  "release_admitted": false,
+  "runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-firefox-v1/report.json",
+    "sha256": "49ecbbe24f9b3c828e30634c5a600cea0b1829b9a85942f2d3e3ebca036fb35a"
+  },
+  "binding": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-firefox-v1/export-binding.json",
+    "sha256": "dc4b8ee86b26016e342455e68140c75926b5c3a78a1fde2b12e9287bd007f139"
+  },
+  "observations": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/native-process-firefox-v1/process-state.json",
+    "sha256": "5cf522fdedf209477ae10b4380f547baeb081c6de73863a62f823474fc151aa1"
+  },
+  "process_scope": "All threads in one controller-verified Firefox content process",
+  "calibration": {
+    "result": "SELF_PROCESS_ONLY",
+    "layout_bytes": 96,
+    "observed_raw_cpu_units": "Mach ticks; conversion validated on this host",
+    "mach_timebase": {
+      "numer": 125,
+      "denom": 3
+    },
+    "python_process_cpu_ns": 99825000,
+    "proc_cpu_delta_raw": 2396433,
+    "converted_cpu_ns": 99851375,
+    "ratio": 1.0002642123716503
+  },
+  "retained_rows": 8192,
+  "total_observations": 121949,
+  "observation_bytes": 800476,
+  "error": null,
+  "normal_ms": {
+    "count": 10800,
+    "p95": 3.639,
+    "p99": 4.28,
+    "max": 7.04
+  },
+  "observer_interval_ms": {
+    "count": 8191,
+    "p95": 1.559875,
+    "p99": 1.632292,
+    "max": 12.060417
+  },
+  "query_ms": {
+    "count": 8192,
+    "p95": 0.021125,
+    "p99": 0.060459,
+    "max": 0.331875
+  },
+  "saved_before_browser_close": true,
+  "conclusion": "No slow call occurred in this180s one-job population. The retained ring cannot attribute a missing event or qualify the600s contract. Process CPU includes all threads; own-profile target selection remains a heuristic for tab identity."
+}

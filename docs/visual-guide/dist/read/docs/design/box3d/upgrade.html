@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Pinned Box3D upgrade and release workflow · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Pinned Box3D upgrade and release workflow</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/upgrade.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#october-baseline-refresh">October baseline refresh</a><a href="#prepare-one-explicit-candidate">Prepare one explicit candidate</a><a href="#decide-compatibility-before-accepting-bytes">Decide compatibility before accepting bytes</a><a href="#mandatory-candidate-validation">Mandatory candidate validation</a><a href="#desktop-orchestration-and-ci">Desktop orchestration and CI</a><a href="#caches-and-publication">Caches and publication</a></nav></details>
+<article class="reading-body "><p>The October baseline refresh is recorded below. The backend maintainer owns
+the engine pin/private compatibility boundary and signs off with <strong>both Kit and
+Replay owners</strong>; deployment/export and authoring/editor owners review their
+respective contracts. Upstream does not promise this private ABI remains stable.
+Current evidence and unsupported targets are in
+<a href="desktop-compatibility.html">desktop-compatibility.md</a>.</p>
+<h2 id="october-baseline-refresh">October baseline refresh<a class="heading-anchor" href="#october-baseline-refresh" aria-label="Link to this section">#</a></h2>
+<p>W0 selects <code>336263320469e5e9febfe18697ab562488f7e97a</code> (October 28, 2026),
+30 upstream commits after the preserved July <code>d421e45c</code> build. The exact tree,
+archive and shim patch are in <a href="../../../box3d/dependency.json.html">dependency.json</a>
+and <a href="dependencies.html#current-adopted-source-and-patch-set">dependencies.md</a>.
+The upgrade evidence is <a href="../../../tests/box3d_upgrade/report.json.html">tests/box3d_upgrade/report.json</a>.</p>
+<p>This port covers the new paired-node broadphase, fat AABBs, BodySim inertia and
+safety factor, hull SoA data/edge cosines, restitution propagation/iterations,
+isotropic inertia tolerance and runtime SIMD dispatch. Serialized body-sim index
+caches are derived from the validated body/set graph on import. Canonical checks
+validate tree/proxy/free partitions and bounds before Native construction.</p>
+<p>The normalized solver version is now <strong>4</strong>, coverage
+<code>ogb3-33626332-solver-v4</code>. Resource ownership stays2, the C ABI stays1, and catalog
+recovery capabilities1/2/3 retain their framing with a changed solver schema and
+build identity. July snapshots and mixed-build peers are rejected. There is no
+save converter or native/browser cross-play qualification. Old libraries, demos
+and reports remain available in their original outputs.</p>
+<p>The current registered Native matrix has <strong>13</strong> cases, including
+<code>upgrade_state_fields</code>: non-default new settings, canonical read/reencode,
+source destruction, full-state equality/continuation and a corrupt paired-tree
+moved-marker control. Original allocator/compound/broadphase regressions remain
+active after retiring the three old engine patches. The complete matrix covers
+existing malformed/allocation/geometry/joint/lifetime guarantees as well.</p>
+<p>One existing Replay test assumed a three-tick repair plan despite the actual
+Welcome-calibrated lead. The original assertion failed identically on July and
+October. Its test-only correction requires a real nontrivial suffix and checks
+<code>head - first + 1</code>, while retaining checked-prefix1/executed1, error, publication,
+confirmation, trace and resume assertions. Both old-library control and refreshed
+Replay network suite pass. No production Replay planner changed.</p>
+<p>W0 establishes the refreshed backend and bounded native integration; the old
+CPU/long-run/export results do not qualify this changed build. Browser execution,
+final game performance and sustained qualification belong to the Web Showcase
+cards. Native Linux execution under Rosetta is labelled translated functional
+coverage throughout.</p>
+<h2 id="prepare-one-explicit-candidate">Prepare one explicit candidate<a class="heading-anchor" href="#prepare-one-explicit-candidate" aria-label="Link to this section">#</a></h2>
+<ol>
+<li>Freeze the accepted baseline and preserve reports, failures, source patches,
+Native archives/shared libraries, SDK modules, toolchain manifests and exported
+bundles. Never rewrite an old failure as a pass or overwrite a validated cache.</li>
+<li>Record candidate immutable commits/tree hashes and exact archive checksums for
+Box3D and the isolated rollback-shim reference. Compare the current three
+<a href="dependencies.html">engine patches</a> against their exact
+base/output files. Preserve notices, embedded third-party headers and local
+wrapper provenance; do not import upstream C++ sessions or godot-cpp runtime.</li>
+<li>Review private layouts/enums/unions, world and object identity, collision/event
+buffers, pending sensor ends, geometry registries, ownership and error cleanup.
+Update compile-time checks and independent C/Odin sizeof/alignment/field-offset
+queries. A same-size record or motion hash is not a full solver proof.</li>
+<li>Declare precision/SIMD/compiler/optimization/assertion/FP flags, endian/pointer
+width, OS deployment floor and target triple. Recompute actual Native build
+and target identities; copy/sign changes get actual deployment hashes. Stop
+live worlds/owners before replacing a Native image. Script reload is not a
+backend upgrade. Never independently static-link an engine into each SDK DSO.</li>
+</ol>
+<h2 id="decide-compatibility-before-accepting-bytes">Decide compatibility before accepting bytes<a class="heading-anchor" href="#decide-compatibility-before-accepting-bytes" aria-label="Link to this section">#</a></h2>
+<p>Version/reject each affected boundary explicitly: local resource/dump/private ABI,
+trusted canonical recovery catalog1/2/3, authoring1/2, owning artifact/import1,
+motion API/layout, SDK ownership/module admission and each framework wire/archive
+contract. Preserve declared legacy readers only when their actual tests pass.
+Changed stable IDs, geometry/material/filter semantics, rules or side state need
+a documented content/catalog migration and new identity. Never reinterpret a
+raw local image from a different build as a compatible canonical artifact.</p>
+<p>A migration is explicit conversion from a supported old format into new copied
+validated definitions/state, followed by normal trusted construction/full5
+verification. If no converter is proved, report incompatibility and require a
+fresh bootstrap; do not promise mixed-version peers or cross-target equality.</p>
+<h2 id="mandatory-candidate-validation">Mandatory candidate validation<a class="heading-anchor" href="#mandatory-candidate-validation" aria-label="Link to this section">#</a></h2>
+<p>Run fresh registered Native Debug/Release and unsuppressed ASan/UBSan where
+supported, from the recorded pins/patches. Retain actual runner/exit semantics;
+a direct invocation is not relabelled as CTest. Native tests compare complete
+normalized solver state. Framework tests compare Solver, Game, Side,
+Observations and Occurrences, not only transforms or cached hashes.</p>
+<p>Required controls include clone/source-free geometry and callback/code/data
+lifetimes; same/scratch restore, complete canonical export/import/reencode;
+malformed/version/hash/reference and failed allocation/capacity cleanup; pending
+events/sensors; all six authored shape kinds and eight separate one-joint families;
+deterministic queries/character POD; identity/order/collision and corrupt artifact
+controls. Preserve35/35/32/one-joint/eight-assets and64MiB/H128/8/8 limits; raising
+bounds requires its own approved contract, not a test workaround.</p>
+<p>Validate the <strong>distinct</strong> Kit and Replay transactions: staged advance, repair8,
+rejection/abort/audit/actions, complete checkpoint/source-free recovery, actual
+accepted-input/signature or signed-fact paths, FX/publication and explicit deeper
+hold/resync behavior. Run both same-content authored samples through normal SDK
+build/import/editor/resource roundtrips, ownership/reload/admission and actual
+exported Host/Client pairs on each qualified target. Keep per-target full5,
+nonzero remote controls, actual final ACK, natural exit/intake and cleanup/census
+proof. No alternate packer, project-only run, raw handle or pose-only substitute.</p>
+<p>Re-earn applicable long/lifecycle and whole-call performance gates on the changed
+candidate. Record all retained cold/error/outlier samples, normal and repair
+operations separately, exact boundary/workload/source/target and memory/RSS scope.
+Do not pool unlike percentiles, subtract phases or attribute an old spike to a
+change without measured evidence. Unmeasured workloads/hardware remain unknown.</p>
+<h2 id="desktop-orchestration-and-ci">Desktop orchestration and CI<a class="heading-anchor" href="#desktop-orchestration-and-ci" aria-label="Link to this section">#</a></h2>
+<p>The concrete orchestration interface is <code>tests/box3d_desktop/run.py</code>. It stages an
+inspectable plan by default and starts processes only with <code>--execute</code>. Supply
+explicit official tools and a verified target shared Native library/hash; use a
+NEW output <strong>outside the repository</strong>. Example plan (substitute actual paths):</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 tests/box3d_desktop/run.py \
+  --target macos-arm64 --framework kit --godot <span class="hljs-string">&quot;<span class="hljs-variable">$GODOT</span>&quot;</span> --odin <span class="hljs-string">&quot;<span class="hljs-variable">$ODIN</span>&quot;</span> \
+  --native-library <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE</span>&quot;</span> --native-sha256 <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE_SHA256</span>&quot;</span> \
+  --out <span class="hljs-string">&quot;<span class="hljs-variable">$WORK</span>/kit-macos-plan&quot;</span> --port 45101 --ticks 120</code></pre></div><p>For actual execution use a different NEW output and append <code>--execute</code>; repeat
+separately for Replay. Linux additionally requires <code>--execution-mode native</code> or
+<code>translated-linux-x86_64</code> and <code>--toolchain-report ACTUAL_REPORT</code>. A translated
+preflight must not be presented as native hardware. The CLI reuses normal Gate C
+export and exported-run helpers; the recorded export argv, actual executable,
+artifact map and runtime report remain the evidence. No <code>--path</code> or
+<code>ODIN_SCRIPTS_DLL</code> override substitutes for exported execution.</p>
+<p>The published CI seam is manual <code>workflow_dispatch</code> on explicitly configured
+self-hosted macOS/ARM64 or Linux/X64 desktop runners. Source/config/local checks
+are not a remotely executed GitHub job. No push, remote trigger or platform
+qualification is implied by adding workflow files. Actual CI evidence must bind
+its runner/toolchain and all registered tests/exports separately.</p>
+<h2 id="caches-and-publication">Caches and publication<a class="heading-anchor" href="#caches-and-publication" aria-label="Link to this section">#</a></h2>
+<p>Cache only declared immutable dependency/toolchain <strong>archives</strong> with full content
+keys and checksum validation on restore. A git-archive identity and a downloaded
+compressed archive&#39;s checksum are different values; validate the one declared by
+the cache manifest. Test cold/warm identity and corrupt/wrong-pin/wrong-key
+rejections. Native source/patch/toolchain/flags/target changes invalidate derived
+builds. Every job still configures, builds and runs the required matrix; never
+cache a test verdict, silently admit an extracted mutable tree or reuse target
+DSOs as archive-cache proof. Authoring artifacts carry their own checked schema,
+source/shared-bake/content identities and are not a dependency cache.</p>
+<p>Before release, publish the changed compatibility table, pins/notices/patches,
+version/rejection/conversion policy, target/toolchain/deployment identities and
+actual Kit/Replay report links. List failures/unavailable jobs, translated versus
+native execution, scoped CPU/memory limits and any content/save migration.
+Retain old artifacts and a reproducible baseline. A launcher minimum/universal
+slice list is not the SDK&#39;s deployment floor or Intel qualification. Release
+signing/notarization/upload require their own authorization; local ad-hoc Gate C
+bundles do not constitute distributed release certification.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="desktop-compatibility.html"><span>Box3D desktop compatibility</span><span aria-hidden="true">→</span></a><a href="dependencies.html"><span>Box3D dependency pins and reuse provenance</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/upgrade.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#october-baseline-refresh" class="">October baseline refresh</a><a href="#prepare-one-explicit-candidate" class="">Prepare one explicit candidate</a><a href="#decide-compatibility-before-accepting-bytes" class="">Decide compatibility before accepting bytes</a><a href="#mandatory-candidate-validation" class="">Mandatory candidate validation</a><a href="#desktop-orchestration-and-ci" class="">Desktop orchestration and CI</a><a href="#caches-and-publication" class="">Caches and publication</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/upgrade.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

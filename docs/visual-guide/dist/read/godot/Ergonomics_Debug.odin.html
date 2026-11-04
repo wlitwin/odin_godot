@@ -34,82 +34,82 @@
 
 <span class="hljs-comment">// print logs `s` to the Godot output (stdout + the editor Output panel), like GDScript `print`.</span>
 print :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">cstring</span>) {
-	str := new_string_cstring(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_print(v)
+    str := new_string_cstring(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_print(v)
 }
 
 <span class="hljs-comment">// print_str logs an Odin `string` (e.g. the result of `fmt.tprintf`). Convenience over</span>
 <span class="hljs-comment">// building the cstring yourself.</span>
 print_str :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">string</span>) {
-	str := new_string_odin(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_print(v)
+    str := new_string_odin(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_print(v)
 }
 
 <span class="hljs-comment">// print_value logs any Variant directly (the engine stringifies it the same way GDScript</span>
 <span class="hljs-comment">// `print(var)` does). Use when you already hold a Variant.</span>
 print_value :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (v: Variant) {
-	gd_print(v)
+    gd_print(v)
 }
 
 <span class="hljs-comment">// print_int / print_float / print_bool build the matching Variant and log it.</span>
 print_int :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (v: <span class="hljs-type">i64</span>) {
-	i := Int(v)
-	gd_print(variant_from_int(&amp;i))
+    i := Int(v)
+    gd_print(variant_from_int(&amp;i))
 }
 
 print_float :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (v: <span class="hljs-type">f64</span>) {
-	f := Float(v)
-	gd_print(variant_from_float(&amp;f))
+    f := Float(v)
+    gd_print(variant_from_float(&amp;f))
 }
 
 print_bool :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (v: <span class="hljs-type">bool</span>) {
-	b := v
-	gd_print(variant_from_bool(&amp;b))
+    b := v
+    gd_print(variant_from_bool(&amp;b))
 }
 
 <span class="hljs-comment">// error pushes a Godot error: it shows in the editor&#x27;s Output/Debugger in red WITH the</span>
 <span class="hljs-comment">// originating script context, and is routed to any attached debugger. Use for genuine</span>
 <span class="hljs-comment">// fault conditions (GDScript `push_error`).</span>
 error :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">cstring</span>) {
-	str := new_string_cstring(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_push_error(v)
+    str := new_string_cstring(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_push_error(v)
 }
 
 <span class="hljs-comment">// error_str — `error` for an Odin `string` (e.g. `fmt.tprintf` output).</span>
 error_str :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">string</span>) {
-	str := new_string_odin(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_push_error(v)
+    str := new_string_odin(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_push_error(v)
 }
 
 <span class="hljs-comment">// warn pushes a Godot warning (yellow, non-fatal — GDScript `push_warning`).</span>
 warn :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">cstring</span>) {
-	str := new_string_cstring(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_push_warning(v)
+    str := new_string_cstring(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_push_warning(v)
 }
 
 <span class="hljs-comment">// warn_str — `warn` for an Odin `string`.</span>
 warn_str :: <span class="hljs-keyword">proc</span> <span class="hljs-string">&quot;contextless&quot;</span> (s: <span class="hljs-type">string</span>) {
-	str := new_string_odin(s)
-	<span class="hljs-keyword">defer</span> free_string(str)
-	v := variant_from_string(&amp;str)
-	<span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
-	gd_push_warning(v)
+    str := new_string_odin(s)
+    <span class="hljs-keyword">defer</span> free_string(str)
+    v := variant_from_string(&amp;str)
+    <span class="hljs-keyword">defer</span> variant_destroy(&amp;v)
+    gd_push_warning(v)
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">godot/Ergonomics_Debug.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">godot/Ergonomics_Debug.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/godot/Ergonomics_Debug.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

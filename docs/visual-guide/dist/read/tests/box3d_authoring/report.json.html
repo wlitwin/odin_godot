@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>report.json · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Validation</a><span>/</span><span>Source</span></div><p class="eyebrow">Validation</p><h1>report.json</h1><div class="reader-meta"><span>342 lines · JSON</span><span>Odin × Godot</span><a href="../../../reference/tests/box3d_authoring/report.json" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>JSON</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;schema&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;task&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;t_7f964ca2599b410c&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;status&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;P5_1_PASS&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;configuration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Debug&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;domain_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_modules&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;authoring&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_reference&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_fields&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_lifecycle&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;lifecycle&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;source_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">34</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Debug/libogb3.a&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a0e064a4c8a0e549140c271d2260aa7de6d0037d0d97bbfa90caf03866f58a38&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;cmake_args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;-DOGB3_NATIVE_OBSERVATION=OFF&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;configuration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Release&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;domain_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_modules&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;authoring&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_reference&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_fields&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_lifecycle&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;lifecycle&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;source_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">34</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Release/libogb3.a&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;17f4928081de2ec1f98a75b44f29fa761e50891fa1053405950cc7b1c6619eb5&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;cmake_args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;-DOGB3_NATIVE_OBSERVATION=OFF&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;configuration&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ASanUBSan&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;domain_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;domain_modules&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;authoring&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_reference&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_fields&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;recovery_lifecycle&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_static&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;api_shared&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;lifecycle&quot;</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;source_inputs&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">34</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-sanitized-v1/cache/build/Debug/libogb3.a&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;d07a393c18e53b3e96888215e94fb040e2e1f934b3c9278c0b51475321449993&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;cmake_args&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;-DOGB3_NATIVE_OBSERVATION=OFF&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;suite&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;pure&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;native_archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a0e064a4c8a0e549140c271d2260aa7de6d0037d0d97bbfa90caf03866f58a38&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;coverage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;finite_pose_scale_dimension_and_native_unsupported_controls&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;resource_geometry_dedup_duplicates_and_collisions&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;schema_namespace_keys_bounds_and_invalid_json&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;six_kinds_exact_transforms_and_sensor_flags&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;stable_order_ids_copy_and_json_roundtrip&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;suite&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;native_odin&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;native_archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a0e064a4c8a0e549140c271d2260aa7de6d0037d0d97bbfa90caf03866f58a38&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;coverage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;legacy_primitive_catalog_identity_and_v2_layout_compatibility&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;malformed_canonical_and_mutated_bake_leave_live_world_unchanged&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;suite&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;frameworks&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;tests&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;native_archive_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a0e064a4c8a0e549140c271d2260aa7de6d0037d0d97bbfa90caf03866f58a38&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;coverage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;kit_authored_six_shapes_and_sensor_canonical_welcome_and_reset&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-string">&quot;replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation&quot;</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;sdk_v5&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;steps&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;build&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;import&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;functional&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;domain&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;build&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ed85f071e7dd4d0d199a48fff7137246106f8cdac5ef5f15a02b48afe1a6ec43&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;target&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;versions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">1</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;pointer_bits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">64</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;endian&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;deployed_native_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c8d3875fb0ac3a9084aa94c596c9876262076943009765e92bca44b6d0c12269&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_free&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;resources_tres_and_scene_tscn_roundtrip&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;logical_ids_order_and_name_stable&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;all6_shapes_sensor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;one_native_image_and_cleanup0&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;references&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;Debug&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Debug/build-manifest.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9464a68b075f4ca71e1f9b1d7a398b836adb836b550230adde8b0c21f229d770&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;Release&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Release/build-manifest.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6489126fe98ad41ca47f10f64ce755dcc44a2bbd750c1cfbe971daf9607f598a&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ASanUBSan&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-sanitized-v1/cache/build/Debug/build-manifest.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;80261764457ea80cb83b8df90633c996f3232ae349125af5632887d3960c5e69&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;pure&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-odin-actual-v2/pure/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;39a115b01100decc7e33ce0192ec9c89d2174259be1a4bd92ac0080e1643d2e4&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-odin-actual-v2/native_odin/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e8552ba33d2795d7a302decb6dd8f0f6f6c666a8556a24a5656c32cc9809d365&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;frameworks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-frameworks-actual-v3/frameworks/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;af3fe88754096275a3a46a31d11a82a373642bd74bf71e2dcfe9076aa9958a09&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v5&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v5/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0c6a557af1a1e6ce6b4b604325d413322963625dc6dafb715cc0f082aa3d0f0b&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_native_identity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v5/project/bin/box3d-runtime.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;96e7e42494b7f840e77b4f23b598e70a344eddc1181ae5a1e4f5e07d3c14036f&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;Debug_ctest_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Debug/Testing/Temporary/LastTest.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;bccbdcb999b28eabf9e1b732cdcd4898ddbc5951d122b924d3f0361c2946b34e&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;Release_ctest_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-build-v1/cache/build/Release/Testing/Temporary/LastTest.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c25d5ef92ae9f36249823b8cd7316d554179e35496e6114baa4b43a3fd10c6dc&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ASanUBSan_ctest_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-native-authoring-sanitized-v1/cache/build/Debug/Testing/Temporary/LastTest.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;aba096c317f4c24eed849f15e9da475c98cb9a9144a584976b6b29c964d990b4&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v6&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v6/report.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;afbc738085a3e56030cb1d548f0dbfdef395cd160956d9c6bec16650c6fa814c&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v6_native_identity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v6/project/bin/box3d-runtime.json&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9800b5409b34ad1501f3507db96669eb484e1afaab88eb3c94c25cb5c580f0e9&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v6_build_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v6/build.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7362f89153b2d5609789b67cab63065a2c2801ab3c373d7c6c2a14fd9020a281&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v6_import_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v6/import.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;56b6a3cd3a80cd43034b8a9fcd600cca04c866c3deece707f0a50ad92398939a&quot;</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;sdk_v6_functional_log&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;path&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;/tmp/odin-box3d-goal-t4jbbj4v/p5-authoring-godot-actual-v6/functional.log&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b4ec9ecd34078cc9b9044086e30734caf605217f16e577de58f0bc743e63aa0a&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;requirements&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;shared_immutable_bake_ids_content_validation&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS pure5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_six_kinds_and_sensors&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS Nativeauthoring/Odin3/Godot&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;trusted_advanced_canonical&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS native+bothframeworks; legacy1/authored2 explicit&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;distinct_frameworks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS actual KitSessionLaneWelcomeReset and ReplayServerClientcompleteWelcome/confirmation; nilOwner/static diagnostic scope explicit&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;godot_surface_and_resource_roundtrip&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS actual SDK V6, all prior V5 assertions retained&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_lifetimes_and_failure_atomicity&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS after failed-return fix and source-free probes; negative attempts retained&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;unique_native_asset_limit_not_resource_count&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS actual detached frontend + shared bake; 9 aliases -&gt; 1 asset, 9 distinct -&gt; shared Capacity rejection; checked cleanup0&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;material_limits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;macOS arm64 observed; no unrunplatform/exportGateC claim&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;trianglemesh/heightfield static-only/no sensor or sensor events; explicit diagnostics&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;bounded35body/shape,32dynamic,8uniqueNativegeometry,H128,pred8/repair8,64MiB tracked retained&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;SDKGodotprobe is separate from standalone both-framework tests; no unsupported all-framework-in-engine claim&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;All initial parser/header/ownership/fixture failures remain immutable&quot;</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;whole_goal_complete&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">false</span></span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;result&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;PASS&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;task_revision&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;board&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b_cdde1cdfea104035&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;observed_platform&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;macOS arm64&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;sdk_v6&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;steps&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;build&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;import&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-punctuation">[</span>
+        <span class="hljs-string">&quot;functional&quot;</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">0</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;domain&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;build&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;ed85f071e7dd4d0d199a48fff7137246106f8cdac5ef5f15a02b48afe1a6ec43&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;target&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;versions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">1</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-number">1</span>
+      <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;pointer_bits&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">64</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;endian&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;deployed_native_sha256&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c8d3875fb0ac3a9084aa94c596c9876262076943009765e92bca44b6d0c12269&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;source_free&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;resources_tres_and_scene_tscn_roundtrip&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;logical_ids_order_and_name_stable&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;all6_shapes_sensor&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;one_native_image_and_cleanup0&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;geometry_alias_boundary&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9 logical keys / 1 geometry PASS; 9 unique geometries rejected at shared assets.count Capacity&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;runtime_artifacts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;project/bin/.box3d-runtime.lock&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/box3d-runtime.json&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9800b5409b34ad1501f3507db96669eb484e1afaab88eb3c94c25cb5c580f0e9&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libodin_godot.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9dafe05e0cdfd93d99ff951f929fb6c2135bbcc7ddf8657adf1de20edf07b281&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libodinscripts.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4d101134530d5ac53a8fa837cb83d435861a7860b9dc8386095f22fe20c44ba3&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libodinscripts.dylib.r1.p15872.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4d101134530d5ac53a8fa837cb83d435861a7860b9dc8386095f22fe20c44ba3&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libodinscripts_authoring_probe.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;84017e5dde0497102416c8881ce22fb3f0c8374b3748411ff72017ee97f2f54c&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libodinscripts_authoring_probe.dylib.r2.p15872.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;84017e5dde0497102416c8881ce22fb3f0c8374b3748411ff72017ee97f2f54c&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;project/bin/libogb3.dylib&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c8d3875fb0ac3a9084aa94c596c9876262076943009765e92bca44b6d0c12269&quot;</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;scope&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Completed P5.1 authoring surface and advanced trusted recovery on the declared reference; later movement/joints/gizmos/export tasks and whole goal remain open.&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;completion_source_hashes&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;f0863651c3f8d589a9aedd91dc1a0929f436a8d47b84fe5e435b433982346cf7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/body_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2322f88f722ded5235eedbe2417ca34f06ecf897f1906bf69605e8ceefbadffc&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/box_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;255a7d546195848ccd08739d45b84a91b2446173489b9b13a016d815d43ca5ed&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/capsule_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fd97f03dafd6c67b7e96d219381a296a9731cd5c9c43c82992382de15e99e377&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/data.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;76f54e2b64bb3b2d2834cb85c86238a3965a8a2cbfb530cfe5dda6f6276d0f01&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/heightfield_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;fab4c6e62cf29bc873326c550df236b61ac8e4fc8c4118edf5a403a7660f216a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/hull_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;339a6e07844a8259b38bd7ee80fe6f1cd7f1cd3e5e1ef0e8d98045ab5b32bf49&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/mesh_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b765dcaf0aa1b0b6464e2877e20737100bae7d1336fb60d566dc9187ac67e257&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/plugin.cfg&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;3f03be73f1df384bcdf9be947eebede83aed3cc15207e9359aea5e4143eac617&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/plugin.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;402208ec547d37d1ec92e748d1f4a70491f0cf350fe7a75de63150c47017f973&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/sensor_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;992d36cd6e4bdcbc6fefed384a389109cf13eb8364a052105a393093bfa1d927&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;92a7e54ba9263078cec95c86f89ba82957fe5cd948ca6071d0b8d110fa0c9386&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/sphere_shape_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;4f43f533079244afcc79028eb40054ed2bd5ccd07e53c0f6b7a7b06eb8341c2c&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;addons/box3d_authoring/world_3d.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;dde8aaac5f6cc3645111167ec6153a1ade18bf9ea909834501bcff2362c1b0a3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/authoring/API.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;9b45ae093ab575f047f538d7635cd1f2fdd5e03d381c4c28619ad1ddc6dac7db&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/authoring/bake.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;194466901ec52bd4a33506fa415bae2edee61ee3b7182a0fa18f689888ae7596&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/authoring/build.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6a5a97465a464ca8c534ada702ce82ac52e9b834b2f0157852e41d8893ccadd8&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/authoring/types.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;501d871486002195d58ec358f1caaa67b79ae8e581a4820915ae77fb6843d0c8&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/bindings.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;00390ba5f79403a4dc6b6eb2c287912a22027964332bf2a18e5d9133a296d5a3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/godot/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a61991e354a9386d9609d8b413588f5aaa0e055ffe75c7a1e8de8938d68d2052&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/godot/authoring/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;b7e18023525bced8578a44168ed6c3b88cf7c58d9749d5639ea629da1db283a3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/godot/authoring/extract.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;f2007241a8355885241691dd969b21efdc46e56f252bf4eb22fd021b1a04b940&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;box3d/recovery.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;1c652f9a67972c81b842649e6887aa9fb0fc792fbbe7f2f863b95d933626d554&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;docs/design/box3d/authoring.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;75daef7c2324fa6a79e1b3ec01a40473b2ba544853e7803d1b8e606b9a0b55e3&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit/physics/authoring.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a44e18b3709ca9d0487cf4845c33b94aa06d2b0994ca83f7d5249d916b64c344&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit/physics/network.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;eb144f2f8645022d11fb120b9c87dfb571d4bd26c8016ae876a2404e880ba47b&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;kit/physics/physics.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7186d3656bcff6965ff71cda1faa62529750862ebd5609a27ee32e339908ee26&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/authoring.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;61c39f32deda12c6991c9cd654d470e48a42dd0ec18f073b923e6b78c8cc5f6a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/commands.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;0460a6befa62b03eab27b4cc70243974cc2a5dd4597c1f07921168105c4ba470&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/network_codec.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2192eaa7dd08ecbbab01aeb70504374766fd8c6110a8f6806a56987491a5ae03&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;replay/physics/provider.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;387a26a2134f042320bbda9f8ab10aec47839f8997efe950069d3db1c6d30604&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/frameworks/frameworks_test.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;857cbdb3bc84145bc443c71989dff7690bae79b5f42417ec77079be0029a53ca&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/frameworks/scene.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;7d2578db7b4835a326aa3900594bf3d8a8097561efbcd3437d6be79d3c177988&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;89885c459b830c759c0c747843c9049b853fd41d90e664cd7e358967407bdabc&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/modules/authoring_probe/images_darwin.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;09f118c75a45dc1ce9e798cee1f00e0accdd11aa6d73931480a5fe89c57fe508&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/modules/authoring_probe/images_linux.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;c328a0811da5fbba3f721704f3567f9fcb43059fe0217d396ba592959828dca7&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/modules/authoring_probe/probe.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;a408b44c04b84b899a0a5c129477ce63d29b475e38a5b8ac8e49395ffedfb596&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/odin_godot.gdextension&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;8ea4b5537ca9dacb08e650e812a4e9d6958caeaa0ee9a593880020ed88df8f5a&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/project.godot&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;481c4b9ffe86baa00445006e83cdb5d24b4c8b0a2b5a9c082027b5e7e75251f5&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/scripts/boot.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;49901a634df3394c9062727755cb3dc71c8d34b7034d55250e2fd84998bfc978&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/project/test_authoring.gd&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;af5d537dad4a0761f43eb6ce55e1586b656d2b0a0b80d11fb26390810a864d0e&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/godot/run.py&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;14fb5137b4f899fccc8973a9d06be19c281641a1256b0566c0cafcbc0e748798&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/native/README.md&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;57e0d5515facca5003e87a25384d6210b6d852181816ed2acd9fce9506616750&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/native/authoring_test.c&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;5b0a10df26c6206bab0fe6f424b8a8538c78aa0d1ade2b61f39b6a8c9b29d0b2&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/native_odin/authoring_test.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;6dd933cd6c4777283ea9e26ef9811fd087c217fbc8351049a3ed9066555f5cd8&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;tests/box3d_authoring/pure/authoring_test.odin&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;2e65ebc75a347e4303a3521fd064c6b845eae6ad637a2d33ce917cca33c06ca3&quot;</span>
+  <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;source_hash_scope&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Assigned authoring source/test/docs snapshot and Native manifests, not exact compiler import tracing.&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;prior_failures_preserved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-string">&quot;initial syntax/type/header compile failures&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;failed-return ownership tracking failure before local candidate fix&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;initial Godot runner/probe/root registration and detached-transform failures&quot;</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-string">&quot;Kit framework test request pump setup failure&quot;</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;validation_counts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;native_configurations&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;native_tests_each&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">11</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;odin_pure&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;odin_native&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;odin_frameworks&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;actual_sdk_build_import_functional&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">3</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">tests/box3d_authoring/report.json · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../reference/tests/box3d_authoring/report.json" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

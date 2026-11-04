@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>correction.odin · odin_godot</title><link rel="icon" href="../../favicon.svg"><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../reader.css"><link rel="stylesheet" href="../../sdk.css"><script src="../../reader.js" defer></script><script src="../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../docs.html" aria-current="page">Docs</a><a href="../../guide.html">Field guide</a><a href="../../examples.html">Examples</a><a href="../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../docs.html">Overview</a><a href="../../docs/install.html">Installation</a><a href="../../docs/first-script.html">Your first script</a><a href="../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../docs/authoring-guide.html">Script API</a><a href="../docs/events.html">Signals and events</a><a href="../docs/workflow.html">Editor workflow</a><a href="../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../docs/multiplayer.html">Choose a model</a><a href="../../docs/kit.html">Build with Kit</a><a href="../../docs/replay.html">Build with Replay</a><a href="../docs/kit/timelines.html">Prediction and timelines</a><a href="../docs/kit/profiles.html">Authority profiles</a><a href="getting-started.html">Replay sessions and rooms</a><a href="p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../docs/exporting.html">Build and export</a><a href="../docs/exporting.html">Export reference</a><a href="../docs/debugging.html">Debugging</a><a href="../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../docs.html">Docs</a><span>/</span><a href="../../reading.html">Replay</a><span>/</span><span>Source</span></div><p class="eyebrow">Replay</p><h1>correction.odin</h1><div class="reader-meta"><span>486 lines · Odin</span><span>Odin × Godot</span><a href="../../reference/replay/correction.odin" download>Page source ↓</a></div></div>
+
+<article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-keyword">package</span> replay
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:reflect&quot;</span>
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;core:mem&quot;</span>
+
+<span class="hljs-comment">// Optional correction-time prediction policy. It may use call-local scratch in</span>
+<span class="hljs-comment">// user; the timeline owns only the resulting value inputs, never this callback.</span>
+<span class="hljs-comment">// External side effects in apply are not part of the timeline transaction.</span>
+Input_Rewrite :: <span class="hljs-keyword">struct</span>($Input: <span class="hljs-type">typeid</span>) {
+    user:  <span class="hljs-type">rawptr</span>,
+    apply: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, tick: <span class="hljs-type">u64</span>, original: Input) -&gt; Input,
+}
+
+read_input :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), tick: <span class="hljs-type">u64</span>) -&gt; (input: Input, ok: <span class="hljs-type">bool</span>) {
+    record := record_at(t, tick)
+
+    <span class="hljs-keyword">if</span> record == <span class="hljs-literal">nil</span> || !record.has_input {
+        <span class="hljs-keyword">return</span> {}, <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">return</span> record.input, <span class="hljs-literal">true</span>
+}
+
+<span class="hljs-comment">// Restore occurrences attached to a freshly initialized/reset checkpoint.</span>
+<span class="hljs-comment">// This cannot rewrite a simulated or nonempty committed tick.</span>
+seed_checkpoint_events :: <span class="hljs-keyword">proc</span>(t: ^Timeline($S, $I, $E), events: []Occurrence(E)) -&gt; Error {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> err
+    }
+
+    base := record_at(t, t.head)
+
+    <span class="hljs-keyword">if</span> t.head != t.confirmed || base == <span class="hljs-literal">nil</span> || base.has_input || base.count != <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">return</span> .Committed
+    }
+
+    <span class="hljs-keyword">if</span> len(events) &gt; len(base.events) {
+        <span class="hljs-keyword">return</span> .Event_Capacity
+    }
+
+    <span class="hljs-keyword">for</span> event, i <span class="hljs-keyword">in</span> events {
+        <span class="hljs-keyword">if</span> event.id.epoch != t.epoch || event.id.tick != t.head {
+            <span class="hljs-keyword">return</span> .Invalid_Event
+        }
+
+        <span class="hljs-keyword">for</span> prior <span class="hljs-keyword">in</span> events[:i] {
+            <span class="hljs-keyword">if</span> prior.id == event.id {
+                <span class="hljs-keyword">return</span> .Duplicate_Event
+            }
+        }
+    }
+
+    copy(base.events, events)
+    base.count = len(events)
+    <span class="hljs-keyword">return</span> .None
+}
+
+<span class="hljs-comment">// Replace a speculative suffix from recorded/received decisions without</span>
+<span class="hljs-comment">// advancing confirmation. P2P input arrival is not authority state correction.</span>
+revise_inputs :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), first: <span class="hljs-type">u64</span>, rewrite: Input_Rewrite(Input)) -&gt; Result {
+    check: Revision_Check(State, Event)
+    <span class="hljs-keyword">return</span> revise_inputs_impl(t, first, rewrite, check, <span class="hljs-literal">false</span>)
+}
+
+<span class="hljs-comment">// The callback borrows a complete independently owned clone at exactly tick.</span>
+<span class="hljs-comment">// Core destroys that clone after return. Do not modify/consume/destroy the borrow;</span>
+<span class="hljs-comment">// explicitly complete_checkpoint_clone it to retain another owner. User is an</span>
+<span class="hljs-comment">// operation-local context and is never retained in Timeline or provider state.</span>
+Revision_Check :: <span class="hljs-keyword">struct</span>($State, $Event: <span class="hljs-type">typeid</span>) {
+    tick:  <span class="hljs-type">u64</span>,
+    user:  <span class="hljs-type">rawptr</span>,
+    check: <span class="hljs-keyword">proc</span>(user: <span class="hljs-type">rawptr</span>, checkpoint: ^Complete_Checkpoint(State, Event)) -&gt; Error,
+}
+
+revise_inputs_checked :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    first: <span class="hljs-type">u64</span>,
+    rewrite: Input_Rewrite(Input),
+    check: Revision_Check(State, Event),
+) -&gt; Result {
+    <span class="hljs-keyword">return</span> revise_inputs_impl(t, first, rewrite, check, <span class="hljs-literal">true</span>)
+}
+
+<span class="hljs-meta">@(private)</span>
+revise_inputs_impl :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    first: <span class="hljs-type">u64</span>,
+    rewrite: Input_Rewrite(Input),
+    check: Revision_Check(State, Event),
+    checked: <span class="hljs-type">bool</span>,
+) -&gt; Result {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = first}
+    }
+
+    <span class="hljs-keyword">if</span> checked &amp;&amp; (check.check == <span class="hljs-literal">nil</span> || check.tick &lt; first || check.tick &gt; t.head || !external_enabled(t)) {
+        <span class="hljs-keyword">return</span> {error = .Invalid_Config, tick = check.tick}
+    }
+
+    <span class="hljs-keyword">if</span> checked {
+        check_record := record_at(t, check.tick)
+
+        <span class="hljs-keyword">if</span> check_record == <span class="hljs-literal">nil</span> || !check_record.has_input {
+            <span class="hljs-keyword">return</span> {error = .History_Missing, tick = check.tick}
+        }
+    }
+
+    <span class="hljs-keyword">if</span> first &lt;= t.confirmed {
+        <span class="hljs-keyword">return</span> {error = .Committed, tick = first}
+    }
+
+    <span class="hljs-keyword">if</span> first &gt; t.head || rewrite.apply == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {error = .History_Missing, tick = first}
+    }
+
+    base := record_at(t, first - <span class="hljs-number">1</span>)
+
+    <span class="hljs-keyword">if</span> base == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {error = .History_Missing, tick = first - <span class="hljs-number">1</span>}
+    }
+
+    n := <span class="hljs-type">int</span>(t.head - first + <span class="hljs-number">1</span>)
+    t.busy = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">defer</span> t.busy = <span class="hljs-literal">false</span>
+
+    <span class="hljs-keyword">if</span> err := external_begin(t, base.image, .Revision, <span class="hljs-type">u64</span>(n)); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = first}
+    }
+
+    <span class="hljs-keyword">defer</span> external_finish(t)
+    before := base.frame
+    checks := <span class="hljs-number">0</span>
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n {
+        tick := first + <span class="hljs-type">u64</span>(i)
+        original := record_at(t, tick)
+
+        <span class="hljs-keyword">if</span> original == <span class="hljs-literal">nil</span> || !original.has_input {
+            <span class="hljs-keyword">return</span> {error = .History_Missing, steps = i, tick = tick}
+        }
+
+        input := rewrite.apply(rewrite.user, tick, original.input)
+
+        <span class="hljs-keyword">if</span> err := simulate(t, &amp;t.staged[i], before, input); err != .None {
+            <span class="hljs-keyword">return</span> {error = err, steps = i, tick = tick}
+        }
+
+        <span class="hljs-keyword">if</span> checked &amp;&amp; tick == check.tick {
+            owned, clone_error := clone_record_complete(&amp;t.staged[i], t.external, t.epoch, t.allocator)
+
+            <span class="hljs-keyword">if</span> clone_error != .None {
+                <span class="hljs-keyword">return</span> {error = clone_error, steps = i + <span class="hljs-number">1</span>, tick = tick}
+            }
+
+            <span class="hljs-keyword">if</span> owned._image_bytes &gt; max(<span class="hljs-type">u64</span>) - owned._owned_bytes {
+                complete_checkpoint_destroy(&amp;owned)
+                <span class="hljs-keyword">return</span> {error = .Resource_Limit, steps = i + <span class="hljs-number">1</span>, tick = tick}
+            }
+
+            usage := t.run.usage
+            t.run.usage.image_bytes = t.image_bytes
+            t.run.usage.savepoint_bytes = owned._image_bytes + owned._owned_bytes
+            admission_error := external_usage_check(&amp;t.run, .Revision)
+            t.run.usage = usage
+
+            <span class="hljs-keyword">if</span> admission_error != .None {
+                complete_checkpoint_destroy(&amp;owned)
+                <span class="hljs-keyword">return</span> {error = admission_error, steps = i + <span class="hljs-number">1</span>, tick = tick}
+            }
+
+            checks += <span class="hljs-number">1</span>
+            callback_error := check.check(check.user, &amp;owned)
+            complete_checkpoint_destroy(&amp;owned)
+
+            <span class="hljs-keyword">if</span> callback_error != .None {
+                <span class="hljs-keyword">return</span> {error = callback_error, steps = i + <span class="hljs-number">1</span>, tick = tick}
+            }
+        }
+
+        before = t.staged[i].frame
+    }
+
+    <span class="hljs-keyword">if</span> checked &amp;&amp; checks != <span class="hljs-number">1</span> {
+        <span class="hljs-keyword">return</span> {error = .Invalid_Config, steps = n, tick = check.tick}
+    }
+
+    <span class="hljs-keyword">if</span> err := external_prepare(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, steps = n, tick = t.head}
+    }
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n {
+        commit(t, &amp;t.staged[i])
+    }
+
+    external_publish(t)
+    <span class="hljs-keyword">return</span> {steps = n, tick = t.head}
+}
+
+<span class="hljs-comment">// Ingest a COMPLETE authoritative frame and its complete occurrence batch.</span>
+<span class="hljs-comment">// The caller authenticates authority, epoch, schema, and game invariants before</span>
+<span class="hljs-comment">// calling. Replay every later input in scratch, then atomically commit both the</span>
+<span class="hljs-comment">// checkpoint and its suffix. An optional Input_Rewrite replaces guesses while</span>
+<span class="hljs-comment">// staging. Failure leaves inputs/state/events/confirmation unchanged.</span>
+correct :: <span class="hljs-keyword">proc</span> {
+    correct_plain,
+    correct_rewrite,
+}
+
+<span class="hljs-meta">@(private)</span>
+correct_plain :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    truth: Frame(State),
+    events: []Occurrence(Event),
+) -&gt; Result {
+    <span class="hljs-keyword">return</span> correct_rewrite(t, truth, events, Input_Rewrite(Input){})
+}
+
+<span class="hljs-meta">@(private)</span>
+correct_rewrite :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    truth: Frame(State),
+    events: []Occurrence(Event),
+    rewrite: Input_Rewrite(Input),
+) -&gt; Result {
+    <span class="hljs-keyword">return</span> correct_impl(t, truth, events, rewrite, <span class="hljs-literal">nil</span>)
+}
+
+<span class="hljs-comment">// Explicit deterministic reuse. Complete mutable dependencies belong in State;</span>
+<span class="hljs-comment">// external configuration and the step callback must remain unchanged. Audit and</span>
+<span class="hljs-comment">// ordinary correct still execute every step. Rewriters are always called once</span>
+<span class="hljs-comment">// per visited input. Byte equality is deliberately stricter than float equality.</span>
+correct_reusing :: <span class="hljs-keyword">proc</span> {
+    correct_reusing_plain,
+    correct_reusing_rewrite,
+}
+
+<span class="hljs-meta">@(private)</span>
+correct_reusing_plain :: <span class="hljs-keyword">proc</span>(t: ^Timeline($S, $I, $E), truth: Frame(S), events: []Occurrence(E)) -&gt; (Result, <span class="hljs-type">int</span>) {
+    <span class="hljs-keyword">return</span> correct_reusing_rewrite(t, truth, events, Input_Rewrite(I){})
+}
+
+<span class="hljs-meta">@(private)</span>
+correct_reusing_rewrite :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($S, $I, $E),
+    truth: Frame(S),
+    events: []Occurrence(E),
+    rewrite: Input_Rewrite(I),
+) -&gt; (
+    result: Result,
+    reused: <span class="hljs-type">int</span>,
+) {
+    result = correct_impl(t, truth, events, rewrite, &amp;reused)
+    <span class="hljs-keyword">return</span>
+}
+
+<span class="hljs-meta">@(private)</span>
+correction_bytes_equal :: <span class="hljs-keyword">proc</span>(a: ^$T, b: ^T) -&gt; <span class="hljs-type">bool</span> {
+    <span class="hljs-keyword">if</span> a == b {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    }
+
+    x := (<span class="hljs-keyword">cast</span>([^]<span class="hljs-type">u8</span>)a)[:size_of(T)]
+    y := (<span class="hljs-keyword">cast</span>([^]<span class="hljs-type">u8</span>)b)[:size_of(T)]
+    <span class="hljs-keyword">return</span> mem.compare(x, y) == <span class="hljs-number">0</span>
+}
+
+<span class="hljs-meta">@(private)</span>
+correct_impl :: <span class="hljs-keyword">proc</span>(
+    t: ^Timeline($State, $Input, $Event),
+    truth: Frame(State),
+    events: []Occurrence(Event),
+    rewrite: Input_Rewrite(Input),
+    reuse_count: ^<span class="hljs-type">int</span>,
+    truth_image: <span class="hljs-type">rawptr</span> = <span class="hljs-literal">nil</span>,
+    truth_bytes: <span class="hljs-type">u64</span> = <span class="hljs-number">0</span>,
+    complete: <span class="hljs-type">bool</span> = <span class="hljs-literal">false</span>,
+) -&gt; Result {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = truth.tick}
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        <span class="hljs-keyword">if</span> reuse_count != <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> {error = .Reuse_Disabled, tick = truth.tick}
+        }
+
+        <span class="hljs-keyword">if</span> !complete || truth_image == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> {error = .Incomplete_State, tick = truth.tick}
+        }
+    }
+
+    <span class="hljs-keyword">if</span> truth.tick &lt; t.confirmed {
+        <span class="hljs-keyword">return</span> {error = .Committed, tick = truth.tick}
+    }
+
+    base := record_at(t, truth.tick)
+
+    <span class="hljs-keyword">if</span> base == <span class="hljs-literal">nil</span> {
+        <span class="hljs-keyword">return</span> {error = .History_Missing, tick = truth.tick}
+    }
+
+    <span class="hljs-keyword">if</span> len(events) &gt; len(base.events) {
+        <span class="hljs-keyword">return</span> {error = .Event_Capacity, tick = truth.tick}
+    }
+
+    <span class="hljs-keyword">for</span> event, i <span class="hljs-keyword">in</span> events {
+        <span class="hljs-keyword">if</span> event.id.epoch != t.epoch || event.id.tick != truth.tick {
+            <span class="hljs-keyword">return</span> {error = .Invalid_Event, tick = truth.tick}
+        }
+
+        <span class="hljs-keyword">for</span> previous <span class="hljs-keyword">in</span> events[:i] {
+            <span class="hljs-keyword">if</span> previous.id == event.id {
+                <span class="hljs-keyword">return</span> {error = .Duplicate_Event, tick = truth.tick}
+            }
+        }
+    }
+
+    <span class="hljs-keyword">if</span> truth.tick == t.confirmed {
+        <span class="hljs-keyword">if</span> !reflect.equal(base.frame.state, truth.state) || !reflect.equal(base.events[:base.count], events, <span class="hljs-literal">true</span>) {
+            <span class="hljs-keyword">return</span> {error = .Committed, tick = truth.tick}
+        }
+
+        <span class="hljs-keyword">if</span> external_enabled(t) {
+            equal, err := t.external.equal(base.image, truth_image)
+
+            <span class="hljs-keyword">if</span> err != .None {
+                <span class="hljs-keyword">return</span> {error = err, tick = truth.tick}
+            }
+
+            <span class="hljs-keyword">if</span> !equal {
+                <span class="hljs-keyword">return</span> {error = .Committed, tick = truth.tick}
+            }
+        }
+
+        <span class="hljs-keyword">return</span> {tick = truth.tick} <span class="hljs-comment">// identical replay of a settled checkpoint</span>
+    }
+
+    t.busy = <span class="hljs-literal">true</span>
+    <span class="hljs-keyword">defer</span> t.busy = <span class="hljs-literal">false</span>
+
+    <span class="hljs-keyword">if</span> err := external_begin(t, truth_image, .Revision, t.head - truth.tick); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, tick = truth.tick}
+    }
+
+    <span class="hljs-keyword">defer</span> external_finish(t)
+    checkpoint := &amp;t.staged[<span class="hljs-number">0</span>]
+    external_release_record(t, checkpoint)
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        image, err := t.external.clone(truth_image)
+
+        <span class="hljs-keyword">if</span> err != .None {
+            <span class="hljs-keyword">if</span> image != <span class="hljs-literal">nil</span> {
+                t.external.release(image)
+            }
+
+            <span class="hljs-keyword">return</span> {error = err, tick = truth.tick}
+        }
+
+        <span class="hljs-keyword">if</span> image == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> {error = .External_State, tick = truth.tick}
+        }
+
+        <span class="hljs-keyword">if</span> truth_bytes &gt; max(<span class="hljs-type">u64</span>) - t.image_bytes {
+            t.external.release(image)
+            <span class="hljs-keyword">return</span> {error = .Resource_Limit, tick = truth.tick}
+        }
+
+        checkpoint.image, checkpoint.image_bytes = image, truth_bytes
+        t.image_bytes += truth_bytes
+    }
+
+    checkpoint.valid = <span class="hljs-literal">true</span>
+    checkpoint.has_input = <span class="hljs-literal">false</span> <span class="hljs-comment">// the generating authority input is not known here</span>
+    checkpoint.input = {}
+    checkpoint.frame = truth
+    checkpoint.count = len(events)
+    copy(checkpoint.events, events)
+    n := <span class="hljs-type">int</span>(t.head - truth.tick)
+    reused := <span class="hljs-number">0</span>
+    before := &amp;checkpoint.frame
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..&lt; n {
+        at := truth.tick + <span class="hljs-type">u64</span>(i) + <span class="hljs-number">1</span>
+        original := record_at(t, at)
+
+        <span class="hljs-keyword">if</span> original == <span class="hljs-literal">nil</span> {
+            <span class="hljs-keyword">return</span> {error = .History_Missing, steps = i, tick = at}
+        }
+
+        <span class="hljs-keyword">if</span> !original.has_input {
+            <span class="hljs-keyword">return</span> {error = .Initial_Frame, steps = i, tick = at}
+        }
+
+        dst := &amp;t.staged[i + <span class="hljs-number">1</span>]
+        input := original.input
+
+        <span class="hljs-keyword">if</span> rewrite.apply != <span class="hljs-literal">nil</span> {
+            input = rewrite.apply(rewrite.user, at, input)
+        }
+
+        can_reuse := <span class="hljs-literal">false</span>
+
+        <span class="hljs-keyword">if</span> reuse_count != <span class="hljs-literal">nil</span> {
+            previous := record_at(t, at - <span class="hljs-number">1</span>)
+            can_reuse =
+                previous != <span class="hljs-literal">nil</span> &amp;&amp;
+                correction_bytes_equal(&amp;before.state, &amp;previous.frame.state) &amp;&amp;
+                correction_bytes_equal(&amp;input, &amp;original.input)
+        }
+
+        <span class="hljs-keyword">if</span> can_reuse {
+            <span class="hljs-comment">// The existing record already contains the required input/state/events.</span>
+            <span class="hljs-comment">// Leave it untouched at commit, and never alias its event slice in scratch.</span>
+            dst.valid = <span class="hljs-literal">false</span>
+            before = &amp;original.frame
+            reused += <span class="hljs-number">1</span>
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">if</span> err := simulate(t, dst, before^, input); err != .None {
+                <span class="hljs-keyword">return</span> {error = err, steps = i, tick = at}
+            }
+
+            before = &amp;dst.frame
+        }
+    }
+
+    <span class="hljs-keyword">if</span> err := external_prepare(t); err != .None {
+        <span class="hljs-keyword">return</span> {error = err, steps = n, tick = t.head}
+    }
+
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-number">0</span> ..= n {
+        <span class="hljs-keyword">if</span> t.staged[i].valid {
+            commit(t, &amp;t.staged[i])
+        }
+    }
+
+    external_publish(t)
+
+    <span class="hljs-keyword">if</span> reuse_count != <span class="hljs-literal">nil</span> {
+        reuse_count^ = reused
+    }
+
+    t.confirmed = truth.tick
+    <span class="hljs-keyword">return</span> {steps = n, tick = t.head}
+}
+
+<span class="hljs-comment">// Explicit resync/recovery. Reuses allocations and discards old speculative</span>
+<span class="hljs-comment">// input/event history. A same-epoch snapshot cannot move behind confirmed state;</span>
+<span class="hljs-comment">// a new authorized epoch may resume an older checkpoint (e.g. host migration).</span>
+<span class="hljs-comment">// An epoch counter alone does not establish legitimate authority.</span>
+reset_checkpoint :: <span class="hljs-keyword">proc</span>(t: ^Timeline($State, $Input, $Event), frame: Frame(State), epoch: <span class="hljs-type">u64</span>) -&gt; Error {
+    <span class="hljs-keyword">if</span> err := available(t); err != .None {
+        <span class="hljs-keyword">return</span> err
+    }
+
+    <span class="hljs-keyword">if</span> external_enabled(t) {
+        <span class="hljs-keyword">return</span> .Incomplete_State
+    }
+
+    <span class="hljs-keyword">if</span> epoch == <span class="hljs-number">0</span> || epoch &lt; t.epoch {
+        <span class="hljs-keyword">return</span> .Invalid_Epoch
+    }
+
+    <span class="hljs-keyword">if</span> epoch == t.epoch &amp;&amp; frame.tick &lt; t.confirmed {
+        <span class="hljs-keyword">return</span> .Committed
+    }
+
+    <span class="hljs-keyword">for</span> &amp;record <span class="hljs-keyword">in</span> t.records {
+        record.valid = <span class="hljs-literal">false</span>
+        record.count = <span class="hljs-number">0</span>
+    }
+
+    <span class="hljs-keyword">for</span> &amp;record <span class="hljs-keyword">in</span> t.staged {
+        record.valid = <span class="hljs-literal">false</span>
+        record.count = <span class="hljs-number">0</span>
+    }
+
+    t.epoch, t.head, t.confirmed = epoch, frame.tick, frame.tick
+    base := &amp;t.records[frame.tick % <span class="hljs-type">u64</span>(len(t.records))]
+    base.valid = <span class="hljs-literal">true</span>
+    base.has_input = <span class="hljs-literal">false</span>
+    base.input = {}
+    base.frame = frame
+    <span class="hljs-keyword">return</span> .None
+}
+</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">replay/correction.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../docs.html">Documentation</a><a href="../../reading.html">Index</a><a href="../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../reference/replay/correction.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

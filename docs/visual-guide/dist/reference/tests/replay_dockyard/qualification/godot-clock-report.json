@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "result": "CLOCK_VALID_PREPARATION_INTERVAL_CAPTURED_CAUSE_UNRESOLVED",
+  "release_admitted": false,
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-04T00:50:09.538296+00:00",
+  "prior_no_trigger": {
+    "runtime": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/external-profile-firefox-v1/report.json",
+      "sha256": "64e8f0bf10329533cfe8c7fffaeba28eaa0bbf07842bd7cdf459dffb26fae20a"
+    },
+    "result": "PHASE_TRACE_WINDOW_NO_TRIGGER_NOT_ADMISSION",
+    "clock_intervals": "UNAVAILABLE: selected core:time implementation is a no-op for this freestanding target; callback presence did not establish a valid interval."
+  },
+  "source_plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-external-clock-v1/plan.json",
+    "sha256": "27e4da30670eb57cc4c50ad78d279cd7fd8accfec24117a9eb812f60cb3fb658"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-external-clock-v1/source-checkpoint.json",
+    "sha256": "bfceff5eb1b3861d2ae37c82598453355b79f4acc5ad82a86677069caf5a66f8"
+  },
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-external-clock-export-v1/report.json",
+    "sha256": "be62e5dbe0ca40d547c48366b5e790fe7bc4d96b1bde99a1fa6d8e098beb8f86"
+  },
+  "native_runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-sdk-native-v1/report.json",
+    "sha256": "a2f2f2e98612deed52093b51f2f904cdd8045b2d31bc026dda3077b9db29b45d"
+  },
+  "native_clock": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-sdk-native-v1/clock-validation.json",
+    "sha256": "c1958d9abbf7a04a379bb1a50f8e60e78730eeb71a29224308a2c45fb09fb163"
+  },
+  "web_runtime": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-web-check-v1/report.json",
+    "sha256": "c81a76dc41ae80ae4b888b6a48dba61577919893d48dec26f7f468bf8d93150a"
+  },
+  "web_clock": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-web-check-v1/clock-validation.json",
+    "sha256": "23a62c227a6db26ba64597e6dcaef65d8bad62e305464d3e648f922d3840c0bf"
+  },
+  "scope": "Opt-in profile3 replaces unsupported transaction clock callbacks with stateless Godot monotonic ticks_usec*1000. No change to default game/profile1/2, original whole-call timer, physics, inputs, framework, C backend or ABI. Diagnostic only.",
+  "live_browser": null,
+  "cause": "UNKNOWN;18.56ms advance-envelope capture and original29.56ms whole-call rejection remain unchanged.",
+  "updated_utc": "2026-11-04T01:12:25.998709+00:00",
+  "browser_capture": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/godot-clock-phase-firefox-v1/phase-capture.json",
+    "sha256": "ee99a6bc28a096a5e46bb93faf79681a50eff164c1e4635c47d327d8781219eb"
+  }
+}

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Production validation · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Production validation</h1><div class="reader-meta"><span>7 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/production-validation.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#recorded-production-runs">Recorded production runs</a><a href="#commands">Commands</a><a href="#controlled-logging-and-deliveryservice-pause-proof">Controlled logging and delivery/service pause proof</a><a href="#retained-evidence-and-bounds">Retained evidence and bounds</a><a href="#callback-allocation-lifetime">Callback allocation lifetime</a></nav></details>
+<article class="reading-body "><p>The production runner uses the ordinary authored Kit and Replay exports. Each
+framework/target/case has a fresh output directory and separate evidence. Current
+runner source and pure Python checks alone establish no exported result. Actual
+current runs are recorded in the <a href="../../../tests/box3d_production/report.json.html">production report</a>.
+Existing Gate B, Gate C and desktop reports remain their original scoped evidence.</p>
+<h2 id="recorded-production-runs">Recorded production runs<a class="heading-anchor" href="#recorded-production-runs" aria-label="Link to this section">#</a></h2>
+<p>The 2026-11-02 execution used the four-body/four-asset/one-hinge authored scene,
+two real exported processes per pair, and scripted inputs from both seats.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Framework</th>
+<th align="right">Observed seconds after both GO</th>
+<th align="right">Final confirmed tick</th>
+<th align="right">Sampled per-process RSS peak, bytes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>macOS arm64, native</td>
+<td>Kit</td>
+<td align="right">1809.9187175</td>
+<td align="right">108600</td>
+<td align="right">122404864</td>
+</tr>
+<tr>
+<td>macOS arm64, native</td>
+<td>Replay</td>
+<td align="right">1809.173003958</td>
+<td align="right">108600</td>
+<td align="right">128974848</td>
+</tr>
+<tr>
+<td>Linux x86_64, translated</td>
+<td>Kit</td>
+<td align="right">1810.3640276289989</td>
+<td align="right">108600</td>
+<td align="right">181174272</td>
+</tr>
+<tr>
+<td>Linux x86_64, translated</td>
+<td>Replay</td>
+<td align="right">1809.417124058</td>
+<td align="right">108600</td>
+<td align="right">185798656</td>
+</tr>
+</tbody></table>
+</div><p>All four pairs matched the five complete state parts byte-for-byte at the target,
+observed their real terminal signature ACK, exited naturally with code0, drained
+and fsynced intake, and returned Native/wrapper/Meter allocations and sample-owned
+owners to their observed baselines. Peak tracked admission was16621917 bytes,
+below67108864. Both300ms and3000ms service-pause cases passed on every pair;
+actual observed head gaps were16–17 and176–179 respectively. Kit used validated
+canonical recovery; Replay&#39;s short pause used bounded same-scope catchup and its
+deep pause used validated canonical recovery.</p>
+<p>The shared-domain64MiB refusal/preservation/resume checks and public H128/window
+tests have separate records. Ten current Native whole-call streams retain all190
+CPU samples: none exceeded4ms and the largest was3.572ms. The analyzer&#39;s individual
+normal-only/repair-only coverage labels remain INCOMPLETE; this is no combined
+hardware or general application CPU qualification. The older8.894ms failure is
+preserved with cause unknown.</p>
+<p>These are bounded headless functional observations. RSS is outside the tracked
+physics quota, includes startup and teardown, and establishes no longer-horizon
+bound. One Linux RSS endpoint was0 during exit; it remains in the raw record and
+is not used as a leak diagnosis. The task container&#39;s OOM-kill counter stayed1
+before/after the corrected runs; that existing count and historical peak belong
+to the preserved earlier failed run. No resource limit or counter was reset.</p>
+<p>Native Linux hardware, remote CI execution, cross-target state equality, packet
+loss/jitter certification and manual visual/usability qualification remain outside
+these records. The remaining hardening cards and whole project are not complete.</p>
+<h2 id="commands">Commands<a class="heading-anchor" href="#commands" aria-label="Link to this section">#</a></h2>
+<p><code>tests/box3d_production/runner/run.py</code> defaults to writing <code>plan.json</code> with
+<code>STAGED_ONLY</code> and zero jobs. Tools and Native inputs are explicit absolute paths;
+the output must be new and outside the repository. A typical declaration is:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">python3 tests/box3d_production/runner/run.py \
+  --target macos-arm64 --framework kit --<span class="hljs-keyword">case</span> functional \
+  --godot /absolute/Godot --odin /absolute/odin \
+  --native-library /absolute/libogb3.dylib --native-sha256 <span class="hljs-string">&quot;<span class="hljs-variable">$NATIVE_SHA256</span>&quot;</span> \
+  --out /absolute/new-case-output --port 42120</code></pre></div><p>Add <code>--execute</code> only for an assigned actual run. It invokes the existing normal
+export helper, then <code>runner/controller.py</code> against the actual export record and
+exported executable, with <code>--headless</code> and no project/runtime-library override.
+<code>--framework replay</code> selects the sibling implementation. Linux uses
+<code>--target linux-x86_64</code>, explicit <code>--execution-mode native</code> or
+<code>translated-linux-x86_64</code>, and <code>--toolchain-report /absolute/preflight.json</code>.
+It runs inside the selected Linux userspace. Native hardware and translated
+functional evidence remain distinct; the runner validates actual tool hashes
+against the existing desktop preflight contract. No VM is started by this CLI.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th align="right">Terminal tick</th>
+<th align="right">Required workload</th>
+<th align="right">Minimum observed duration</th>
+<th align="right">Supervisor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>functional</code></td>
+<td align="right">120 default; explicit 120–3600</td>
+<td align="right">terminal</td>
+<td align="right">0</td>
+<td align="right">180 s default</td>
+</tr>
+<tr>
+<td><code>long</code></td>
+<td align="right">108600</td>
+<td align="right">108000</td>
+<td align="right">1800 s after both actual GO observations</td>
+<td align="right">2400 s</td>
+</tr>
+<tr>
+<td><code>pause300</code></td>
+<td align="right">1200 default</td>
+<td align="right">terminal</td>
+<td align="right">actual stopped interval ≥300 ms</td>
+<td align="right">240 s default</td>
+</tr>
+<tr>
+<td><code>pause3000</code></td>
+<td align="right">1200 default</td>
+<td align="right">terminal</td>
+<td align="right">actual stopped interval ≥3000 ms</td>
+<td align="right">240 s default</td>
+</tr>
+</tbody></table>
+</div><p>Short declarations accept <code>--ticks</code> and <code>--timeout</code>; pause cases also accept
+<code>--pause-at</code> (default confirmed tick 240), with at least 512 ticks of observation
+window plus 120 future ticks before the terminal target. The long declaration
+is fixed: 600 extra terminal ticks provide duration-observation headroom without
+lowering the required 108000 ticks or the measured 1800 seconds.</p>
+<h2 id="controlled-logging-and-deliveryservice-pause-proof">Controlled logging and delivery/service pause proof<a class="heading-anchor" href="#controlled-logging-and-deliveryservice-pause-proof" aria-label="Link to this section">#</a></h2>
+<p>Every production case adds the bound, test-only <code>pause_overlay</code> to a new derived
+project through <code>--project-overlay</code> and <code>--project-overlay-sha256</code> on the normal
+export helpers. Both flags are paired; ordinary exports without them retain
+their default flow. The overlay descriptor, source bytes, helper, copied script
+and derived project settings are hashed and checked before accepting the export.
+Overlay version 2 sets <code>application/run/flush_stdout_on_print=true</code> only in that
+derived project&#39;s <code>[application]</code> section, recording the prior presence/value,
+new value and before/after project hashes. Godot documents this setting as
+flushing stdout for each printed line; release defaults differ from debug.
+See the <a href="https://docs.godotengine.org/en/4.6/classes/class_projectsettings.html#class-projectsettings-property-application-run-flush-stdout-on-print" rel="noreferrer">official ProjectSettings reference</a>.
+This is a controlled logging choice, not proof of the old buffered-arrival cause.
+Old buffered exports/reports remain unchanged. Functional/long cases set no
+pause environment variables, so the overlay&#39;s process callback is inactive.</p>
+<p>The autoload calls the existing public sample <code>status()</code> after normal processing.
+It requires actual GO and available live head/confirmed values. The Client emits
+its original status JSON, then immediately invokes synchronous self SIGSTOP.
+No Session/World frame, network advance, input or reset call occurs between that
+getter and the stop. The external controller verifies the exact owned PID/PGID
+in state <code>T</code>, waits the declared interval, verifies <code>T</code> again and resumes only
+that PID. A bounded Host observation window retains at most 529 live public
+head boundaries; the resume proof requires a recently received boundary and an
+actual head gap strictly greater than 8 or 128. Intake timestamps describe
+external observations, not an invented engine timestamp or a stale 1 Hz estimate.</p>
+<p>Final confirmed complete-five-part equality, real authority controls and the
+actual terminal signature ACK establish resumed progress. Recovery is labelled
+canonical only when actual validated epoch/generation/serial/baseline scope
+metadata and its recovery count establish it. Same-scope catchup is separately
+labelled and also requires that final complete-state proof; a head jump alone
+proves neither. Missing scope/context fails the observation rather than creating
+a notice. There is no manual Replay Reset. These pauses test delivery/service
+gaps, not packet-loss/jitter certification.</p>
+<h2 id="retained-evidence-and-bounds">Retained evidence and bounds<a class="heading-anchor" href="#retained-evidence-and-bounds" aria-label="Link to this section">#</a></h2>
+<p>The controller streams each role&#39;s stdout to a fsynced raw log, with a bounded
+disk SQLite index and at most 64 parsed events consumed per batch. Per-role
+bounds are 128 MiB raw log, 128 MiB index, 65536 events and 1 MiB per line;
+overflow is failure/incomplete evidence. Raw logs, index hashes, actual PIDs,
+argv, role environment, executable/export-record hashes and natural exit/drain
+facts are retained. A signal exit fails immediately even without a producer
+RESULT; an ordinary exit waits for queued stdout and EOF before checking RESULT.
+Signal exits are never labelled natural. Failure/timeout cleanup kills only owned
+remaining process groups and preserves their actual exit codes. Final output
+checks reuse the existing authored-sample five-part manifest/hash helper.
+No whole-run row array, outlier filtering, retry or data reconstruction is used.</p>
+<p><code>SAMPLE_STATUS</code> frontiers are live per getter. Native/Meter values are cached
+public observations at bounded 1 Hz, identified by <code>native_sampled_frame</code> and
+<code>meter_sampled_frame</code>, with null/unavailable preserved. The runner records actual
+admission against 67108864 bytes and component peaks without summing overlapping
+ledgers. OS RSS is sampled separately with first/last/min/peak and an endpoint
+slope; long runs require a measured trend. RSS is neither the Native quota nor
+a leak/cause diagnosis. Historical memory samples are not same-frame reads.</p>
+<p>Actual ACK sources are Kit Host <code>SAMPLE_ACK</code> with scope
+<code>verified_terminal_signature_ack</code>/<code>matched:true</code>, and Replay Host
+<code>SAMPLE_TAIL</code> with <code>stage:final_accepted</code>/<code>signature_match:true</code>. The final epoch
+and terminal tick must match. Both natural exits, Native/wrapper/Meter zero
+cleanup, observed owner-baseline return, one Native image, complete final bytes,
+nonzero remote authority input and current bundle/helper fences are required.
+Exact script-module runtime copies are bound to their actual owned PIDs and
+source hashes; unexpected file/byte changes fail the fence.</p>
+<p>CPU certification remains a separate Root-owned whole-call measurement.
+Public memory-cap and history/window fixtures are separate checks. This runner
+does not establish hardware CI execution, cross-target equality, a protocol
+change, an old-failure cause or a whole Gate/production acceptance by itself.</p>
+<p>The source-only check is:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s tests/box3d_production/runner -p test_runner.py -v</code></pre></div><p>It checks planning/no-process defaults, strict parsing, bounded disk consumption,
+actual-status availability, ACK identity, pause/scope proof rules, overlay byte
+binding and Python syntax. It executes no exporter, compiler, Godot, VM or network.</p>
+<h2 id="callback-allocation-lifetime">Callback allocation lifetime<a class="heading-anchor" href="#callback-allocation-lifetime" aria-label="Link to this section">#</a></h2>
+<p>Fresh owning Godot builtin returns use the existing <code>gd_method=&quot;owned_return&quot;</code>
+contract. Callbacks borrowing converted Godot arguments use <code>borrowed_args</code> when
+their callees do not consume those references. Native callbacks also delimit their
+default TLS temporary arena with Odin&#39;s nested <code>default_temp_allocator_temp_begin</code>
+and <code>default_temp_allocator_temp_end</code>; resetting the default context does not free
+that arena, and <code>free_all</code> would invalidate a caller&#39;s outstanding temporaries.
+These are sample/editor callback boundaries, without a Core, Native or protocol
+change.</p>
+<p>The <a href="../../../tests/box3d_production/callback_lifetime/README.html">callback lifetime fixture</a>
+uses real SDK methods and primitive allocator observations added only to copied
+test projects. After128 warmup pairs it calls the actual status/presentation
+getters in two identical10000-pair batches, drops returned values, and requires
+exact TLS used/capacity/temp-count restoration, non-growing Godot heap on the
+second batch, unchanged pre-GO frontiers, checked close and Node destruction.
+Kit uses its interactive pre-GO close contract; a scripted Kit run correctly
+requires its declared target/ACK before successful close.</p>
+<p>The preserved old Replay module failed: Godot heap grew31583859→68183859→104783859
+bytes, and TLS capacity grew4→16→32MiB. Corrected Replay measured31112719 bytes at
+all three anchors with TLS <code>[297,4194304,0]</code>; corrected Kit measured31120203 bytes
+with TLS <code>[13,4194304,0]</code>. No tolerance, subtraction or relaxed cleanup assertion
+was used. These allocator observations are separate from Native admission and OS
+RSS. The original long-run signal9/OOM observations and the original scripted
+pre-GO fixture failure remain unchanged; the kernel victim attribution of the
+earlier OOM was not established.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../tests/box3d_production/callback_lifetime/README.html"><span>Actual SDK callback lifetime regression</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/production-validation.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#recorded-production-runs" class="">Recorded production runs</a><a href="#commands" class="">Commands</a><a href="#controlled-logging-and-deliveryservice-pause-proof" class="">Controlled logging and delivery/service pause proof</a><a href="#retained-evidence-and-bounds" class="">Retained evidence and bounds</a><a href="#callback-allocation-lifetime" class="">Callback allocation lifetime</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/production-validation.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

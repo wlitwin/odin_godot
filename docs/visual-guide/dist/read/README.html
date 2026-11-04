@@ -95,6 +95,10 @@ helpers wrap common engine calls and their argument conversions:</p>
 <td><strong>Script modules</strong></td>
 <td>opt-in <a href="docs/modules.html">script modules</a>: one dll per <code>res://modules/&lt;name&gt;</code>, rebuilt + hot-swapped independently so edits to one module avoid rebuilding unrelated modules</td>
 </tr>
+<tr>
+<td><strong>Box3D</strong></td>
+<td><a href="docs/box3d-authoring.html">Authored worlds, shapes, characters and joints</a>, one explicitly stepped backend with distinct Kit/Replay complete-state adapters, and optional editor/debug tools; reference-platform limits are stated in the linked reports</td>
+</tr>
 </tbody></table>
 </div><p>Odin compiles ahead of time, so scripts have no <code>eval</code>/REPL or Godot script-line
 breakpoints; use <code>lldb</code> for native debugging. Changing <code>@export</code> declarations
@@ -144,6 +148,10 @@ to browse every published guide, reference page, example, and source listing by 
 <tr>
 <td><strong><a href="docs/workflow.html">Workflow</a></strong></td>
 <td>The development loop: build, reload on save, editor validation/completion/highlighting, debugging (<code>gd.print</code>, <code>lldb</code>, crash backtraces), and AOT limitations</td>
+</tr>
+<tr>
+<td><strong><a href="docs/box3d-authoring.html">Box3D authoring</a></strong></td>
+<td>Separate authored Kit/Replay samples, editor and bake workflow, complete-state ownership, migration and unsupported operations</td>
 </tr>
 <tr>
 <td><strong><a href="docs/exporting.html">Exporting</a></strong></td>
@@ -269,5 +277,5 @@ C-ABI runtime were vendored from
 <a href="https://github.com/dresswithpockets/odin-godot" rel="noreferrer"><code>dresswithpockets/odin-godot</code></a> (Apache-2.0);
 attribution and provenance are kept in <a href="bindgen/ATTRIBUTION.html"><code>bindgen/ATTRIBUTION.md</code></a>.</p>
 </article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="docs/kit/profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">README.md · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../reading.html">Index</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="docs/kit/sim.html"><span>kit/sim: server-authoritative fixed-tick simulation</span><span aria-hidden="true">→</span></a><a href="docs/kit/timelines.html"><span>Choosing a timeline</span><span aria-hidden="true">→</span></a><a href="docs/kit/profiles.html"><span>Network profiles</span><span aria-hidden="true">→</span></a><a href="../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../docs.html">Documentation</a><a href="../reading.html">Index</a><a href="../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#script-example-and-sdk-features" class="">Script example and SDK features</a><a href="#quickstart" class="">Quickstart</a><a href="#documentation" class="">Documentation</a><a href="#examples" class="">Examples</a><a href="#repository-layout" class="">Repository layout</a><a href="#installing-without-cloning-this-repo" class="">Installing (without cloning this repo)</a><a href="#platform-status" class="">Platform status</a><a href="#license--attribution" class="">License / attribution</a></nav><div class="outline-actions"><a href="../reference/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

@@ -1,0 +1,3046 @@
+{
+  "schema_version": 1,
+  "task": "t_dbd2066495184197",
+  "board": "b_cdde1cdfea104035",
+  "worker": "box3d-presentation",
+  "terminal": "t1q",
+  "acceptance_result": "PASS_WITH_DECLARED_LIMITS",
+  "task_status_at_report_creation": "working",
+  "finish_requires_root_confirmation": true,
+  "goal_complete": false,
+  "commits_or_pushes": false,
+  "problem_and_result": "Both sibling scenes consume owned cached poses into bounded read-only proxy presentation, actual framework effect observations, honest status overlays and validated startup impairment settings. Existing Kit/Replay runtimes remain distinct. Actual scene configuration checks and strict preopen rejection/cleanup passed after preserving and fixing the concrete defects below.",
+  "prerequisite": {
+    "task": "t_1b345a977988442b",
+    "status": "DONE",
+    "stored_report": "r_03e61e9cd6ce4325",
+    "evidence": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_slices/report.json",
+      "bytes": 439293,
+      "sha256": "2235dfe04577cd51f1da63c952281bab6608c121e42e0981c67f7f3ffd57dd2b"
+    },
+    "immutable": true
+  },
+  "frozen_helper_contract": {
+    "owned_files": 19,
+    "source_hashes": {
+      "box3d/presentation/frame.odin": "73691968c0aa67f48fa7d2b6eb38e7a81e21f58531e89fa90e4f188d0446a5c9",
+      "box3d/presentation/overlay.odin": "d3edcf9d53cc085d70a642c4bf2eb2c70630a98c5a44571762973b89f619a061",
+      "box3d/presentation/types.odin": "99c62cf1c8ff0db5620105fe8e1a12760478d8325a652a4b1b19be1d94d4fd69",
+      "docs/design/box3d/prediction-presentation.md": "7d856115f0d56445193401be4c7f6bcaaac7a782cde543f1f606f04e95abf8fe",
+      "kit/physics/presentation.odin": "f1eefb92ec1b7277327d8f8cf1dcfcfad4c436fa9c030ce91c287bb0d98e9581",
+      "replay/godot/physics_presentation.odin": "cd69d818b2bd151a45616033c5030a4b6b73da001cce619284fc1cc462ecbecc",
+      "tests/box3d_presentation/import/pure.odin": "5f0200915bef25db7fc1346462088304ae34e9817f5ecc59e8b18a28098cee34",
+      "tests/box3d_presentation/native/fixture.odin": "65e92be22bc92495a9e603948b2dc4a8f5daf9e90c0bc1a8082ecc152788e972",
+      "tests/box3d_presentation/native/presentation_test.odin": "e314c63f58ed28ef6bf3680b932b5eafe9ed78c7037a52b6efd5f650520081a9",
+      "tests/box3d_presentation/project/odin_godot.gdextension": "6aa2abfabecc0f214518c1b83c0580ab59e57650d43c3dec80f6dd379d2b211d",
+      "tests/box3d_presentation/project/presentation.tscn": "c274530cffcec415668f6beee8453074d5a1abdb98b6fd114943a91533c712dc",
+      "tests/box3d_presentation/project/project.godot": "5e35f358ffb84eaad16fa84931ecb02f840f30c5714dc269e0f983840218a220",
+      "tests/box3d_presentation/project/scripts/boot.odin": "32ff3975fda4e045fc0b060447f40cfd4c778870b67732dea92e718f1ddb4d1d",
+      "tests/box3d_presentation/project/scripts/presentation.odin": "344359a98e2ad50d0cd027b5ea0567ca57ead33fadc86ed548c80409f066668d",
+      "tests/box3d_presentation/project/test_presentation.gd": "ed6110203f5ea8fc5938d7da9f296c9dd4019cd99bdf4c9135481b18c164219b",
+      "tests/box3d_presentation/pure/presentation_test.odin": "2079989d3ec5392c5b9ff859a280cc515e7eaa46694b06fbf86ee6729d494649",
+      "tests/box3d_presentation/run.py": "1ae349b15e79ad20f357df93d318a6fd4e5bbdf64a01c506003b2afac8aaa6be",
+      "tests/box3d_presentation/run_godot.py": "58752554f59212fa0a04ff11b31f69c695c63ff0ff03effb795cee2c765c94c2",
+      "tests/box3d_presentation/strict/presentation_test.odin": "84948151f1842b1a40597d8cd5ea630a49ae886991c62bd51c2489106f22a19d"
+    },
+    "unchanged_verified_now": false,
+    "component_report": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-support/p4.3-component-report-v1.json",
+      "bytes": 32413,
+      "sha256": "377a9316b1b0eb9bf386c7879e84e5bc0efa70f7e0f25c86f2791df28af51674"
+    },
+    "version": 1,
+    "note": "Component baseline records19 earlier files. Current map updates only the status document; all18 non-documentation files remain unchanged. No claim that all19 are unchanged since the component run.",
+    "component_baseline_source_hashes": {
+      "box3d/presentation/frame.odin": "73691968c0aa67f48fa7d2b6eb38e7a81e21f58531e89fa90e4f188d0446a5c9",
+      "box3d/presentation/overlay.odin": "d3edcf9d53cc085d70a642c4bf2eb2c70630a98c5a44571762973b89f619a061",
+      "box3d/presentation/types.odin": "99c62cf1c8ff0db5620105fe8e1a12760478d8325a652a4b1b19be1d94d4fd69",
+      "docs/design/box3d/prediction-presentation.md": "bd8c160c9027face880d3dc884d45871ef9e12d9130bde78f3284184f0aa730c",
+      "kit/physics/presentation.odin": "f1eefb92ec1b7277327d8f8cf1dcfcfad4c436fa9c030ce91c287bb0d98e9581",
+      "replay/godot/physics_presentation.odin": "cd69d818b2bd151a45616033c5030a4b6b73da001cce619284fc1cc462ecbecc",
+      "tests/box3d_presentation/import/pure.odin": "5f0200915bef25db7fc1346462088304ae34e9817f5ecc59e8b18a28098cee34",
+      "tests/box3d_presentation/native/fixture.odin": "65e92be22bc92495a9e603948b2dc4a8f5daf9e90c0bc1a8082ecc152788e972",
+      "tests/box3d_presentation/native/presentation_test.odin": "e314c63f58ed28ef6bf3680b932b5eafe9ed78c7037a52b6efd5f650520081a9",
+      "tests/box3d_presentation/project/odin_godot.gdextension": "6aa2abfabecc0f214518c1b83c0580ab59e57650d43c3dec80f6dd379d2b211d",
+      "tests/box3d_presentation/project/presentation.tscn": "c274530cffcec415668f6beee8453074d5a1abdb98b6fd114943a91533c712dc",
+      "tests/box3d_presentation/project/project.godot": "5e35f358ffb84eaad16fa84931ecb02f840f30c5714dc269e0f983840218a220",
+      "tests/box3d_presentation/project/scripts/boot.odin": "32ff3975fda4e045fc0b060447f40cfd4c778870b67732dea92e718f1ddb4d1d",
+      "tests/box3d_presentation/project/scripts/presentation.odin": "344359a98e2ad50d0cd027b5ea0567ca57ead33fadc86ed548c80409f066668d",
+      "tests/box3d_presentation/project/test_presentation.gd": "ed6110203f5ea8fc5938d7da9f296c9dd4019cd99bdf4c9135481b18c164219b",
+      "tests/box3d_presentation/pure/presentation_test.odin": "2079989d3ec5392c5b9ff859a280cc515e7eaa46694b06fbf86ee6729d494649",
+      "tests/box3d_presentation/run.py": "1ae349b15e79ad20f357df93d318a6fd4e5bbdf64a01c506003b2afac8aaa6be",
+      "tests/box3d_presentation/run_godot.py": "58752554f59212fa0a04ff11b31f69c695c63ff0ff03effb795cee2c765c94c2",
+      "tests/box3d_presentation/strict/presentation_test.odin": "84948151f1842b1a40597d8cd5ea630a49ae886991c62bd51c2489106f22a19d"
+    },
+    "code_and_test_sources_unchanged_verified_now": true,
+    "non_documentation_files_unchanged": 18,
+    "documentation_only_finalization": {
+      "path": "docs/design/box3d/prediction-presentation.md",
+      "component_sha256": "bd8c160c9027face880d3dc884d45871ef9e12d9130bde78f3284184f0aa730c",
+      "current_sha256": "7d856115f0d56445193401be4c7f6bcaaac7a782cde543f1f606f04e95abf8fe",
+      "scope": "Opening/footer completion status, actual integration/source-version/positive-scope qualifications and exact report link only. No code, test, binary or rerun changes."
+    }
+  },
+  "additional_owned_test_sources": {
+    "tests/box3d_presentation/scene_controls/accept.py": "8cc40397d4b75cb6cb98fbc0c38e467ab18715aab5d42d595e72899938763c07",
+    "tests/box3d_presentation/scene_controls/test_accept.py": "b5982ec0869db48e668501dabe30342a850b7cbbbbe14c13aa50fcd4227fb460"
+  },
+  "implementation": {
+    "shared": "Native-free fixed value Frame35/View/Change70; atomic capacity/invalid/stale failures; certified body keys distinct from game entity/lifetime; generation rebind; epoch/revision cuts; consecutive-tick hemisphere-aware interpolation; no per-body allocation or solver/render step/restore.",
+    "Kit": "One owned CP with capture-paired explicit epoch; one public Side plus ONE body_states read reused for accepted32 telemetry and bp.frame_make. Existing ticker acc/dt only. Public correction/confirmation markers drive a local monotonic visual revision. p.presentation_effect is consumed only after existing confirmed_events actual-sink match + confirmedCP gate, not every predicted local commit.",
+    "Replay": "physics_presentation_frame performs ONE public owned cache read before typed Game projection; copied previous/current values and actual correction/epoch/serial/view_reset cuts; existing scene.session_tick_phase. Existing session_changes/journal phases/IDs/payloads preserved; no second journal or speculative-confirmed promotion.",
+    "status": "Copied accepted/predicted frontiers with explicit availability; hold/resync/error/depth, complete vs motion labels and unavailable values, profile/actual ledger, observational CPU segments. Missing values remain explicit; no clocks gate gameplay.",
+    "scene_controls": "Same five startup B3 env names/units -> pure Impairment -> existing helpers before construction. Kit uses existing owned Wire; Replay uses existing retained receive Delay. Exact sibling metadata keys: Kit requested, Replay request. Effective/channel metadata checked, no silent aliases. Zero defaults unchanged; unsupported settings explicit; no new runtime API/transport/Game/rules/lead/input policy."
+  },
+  "component_validation": {
+    "scope": "Historical component baseline on the recorded helper/test code, which remains unchanged. Documentation status finalized later only; no reruns after later SDK/consumer amendments are claimed.",
+    "configurations": [
+      {
+        "configuration": "macos_Debug",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Debug/report.json",
+        "report_sha256": "8b45bf749bc70e69d81b1bddcaf6935565cc10e43257ba0d5dcac9e6a2c1dd2a",
+        "source_fence_equal": true,
+        "same_current_odin_graph": true,
+        "odin_source_count": 1485,
+        "native": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Debug/libogb3.a",
+          "sha256": "6ec70fc6e36d22cff129cdbaaeb7c9cb2207a47bebf74ce8c535f43198618a3c"
+        },
+        "native_manifest_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Debug/build-manifest.json",
+        "native_manifest_sha256": "2ce1d613ac76b483b32006e84a025b697e79b4363c7802d2a32def9509620e61",
+        "native_inputs_current": true,
+        "results": [
+          {
+            "name": "pure",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/pure",
+              "-define:ODIN_TEST_THREADS=1",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Debug/pure-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "72f0278752a529576152f540278b1da789a3e99e1dc180a6a8f12a6558e1eb55",
+            "executable_sha256": "b47b37a1348036da76ac1ff311d5d8f87c7d956b8bb14add32bfcd51c6295c52"
+          },
+          {
+            "name": "native",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/native",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Debug/libogb3.a",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Debug/native-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "6941934b1a110898a87f8bcdad130963fdb4f50aed7f3d6aad01ea535c4a8935",
+            "executable_sha256": "0804dc5320549c7cb41124e5d83d5e1830742c326cf7dfe0b6b646fc549ea645"
+          },
+          {
+            "name": "strict",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/strict",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Debug/libogb3.a",
+              "-define:BOX3D_REQUIRE_DOMAIN=true",
+              "-define:BOX3D_EXPECTED_BUILD=sha256:38f1ba1869be018bc8ebeefd8134854ad6c68fd39fbbc2d3d90d6a000e3a3178",
+              "-define:BOX3D_EXPECTED_TARGET=sha256:a7df372468f693e5a110960006a39b0d3d8959c06c39dd55b3aba0e42368917a",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Debug/strict-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "13af5f7dd9464316612fd330cc399aa17440990d6997a66fbc0308039ceac3f3",
+            "executable_sha256": "be7da1353ef3eb2fcc527d81da4b71bf51fd42af6d66cbb5b3be7941064c0cbc"
+          },
+          {
+            "name": "wasm",
+            "command": [
+              "odin",
+              "build",
+              "tests/box3d_presentation/import",
+              "-target:freestanding_wasm32",
+              "-build-mode:obj",
+              "-no-entry-point",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Debug/wasm.o"
+            ],
+            "exit": 0,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "executable_sha256": "10f1d2b9729f01c29604a9e7d29a4cac49ace1d95ef69aeaf8bfd2ad39277c5d"
+          }
+        ],
+        "groups": {
+          "pure": 6,
+          "native": 5,
+          "strict": 1,
+          "wasm_object_compile": 1
+        }
+      },
+      {
+        "configuration": "macos_Release",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Release/report.json",
+        "report_sha256": "697e31cc2bb0ce23a466ca426f0c39d860d5cbd650acd1abc468707b41627b25",
+        "source_fence_equal": true,
+        "same_current_odin_graph": true,
+        "odin_source_count": 1485,
+        "native": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.a",
+          "sha256": "dd2cbab9d617962ba08937a97eedc99d9eb60904c04de3badaf8694550be7262"
+        },
+        "native_manifest_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/build-manifest.json",
+        "native_manifest_sha256": "88de60e4e6427ea14526fad0f062a69ef7bef95c731df6eedf41c041e09b40d6",
+        "native_inputs_current": true,
+        "results": [
+          {
+            "name": "pure",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/pure",
+              "-define:ODIN_TEST_THREADS=1",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Release/pure-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "97a9050247807f7f9fdbfb8c6252be567089e08d680c6563973c4ec4fff49602",
+            "executable_sha256": "82193b829f8f94a713bd8d5712ad31ee46f5490aa90164f5d1aa828ebcc6d9a5"
+          },
+          {
+            "name": "native",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/native",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.a",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Release/native-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "b16cbe2413e4f7d90ef610e35aa8a0887f7d83aabb58e2939e36e3c19e06d28e",
+            "executable_sha256": "53291b3cd57041035ff4fc8c36bc902b9dd254bc78251d0e2584d3bc51060d53"
+          },
+          {
+            "name": "strict",
+            "command": [
+              "odin",
+              "test",
+              "tests/box3d_presentation/strict",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.a",
+              "-define:BOX3D_REQUIRE_DOMAIN=true",
+              "-define:BOX3D_EXPECTED_BUILD=sha256:4bc62d1ec973e244de53a546c2722b317cff7a2041de7254ad81389bbb7786fa",
+              "-define:BOX3D_EXPECTED_TARGET=sha256:fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a",
+              "-keep-executable",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Release/strict-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "d11c0154661e8b3d190dd585af3cef024879ac0df29045594a9c104fa4572c5f",
+            "executable_sha256": "f18d08eae146569eb3ab11cc0df898fef7ec380185d7247d60841e0eb1a30630"
+          },
+          {
+            "name": "wasm",
+            "command": [
+              "odin",
+              "build",
+              "tests/box3d_presentation/import",
+              "-target:freestanding_wasm32",
+              "-build-mode:obj",
+              "-no-entry-point",
+              "-collection:godot=/Users/walter/data/code/odin/odin_godot",
+              "-out:/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/macos/Release/wasm.o"
+            ],
+            "exit": 0,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "executable_sha256": "c813f10438460f551d5fb3972547c4746e918ffa6e8f3b65aa3866d0607d4392"
+          }
+        ],
+        "groups": {
+          "pure": 6,
+          "native": 5,
+          "strict": 1,
+          "wasm_object_compile": 1
+        }
+      },
+      {
+        "configuration": "linux_Debug",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/linux/Debug/report.json",
+        "report_sha256": "9223b950898236296c14c9e94d1a65b2620ded68f35b0aa52704e445a2621011",
+        "source_fence_equal": true,
+        "same_current_odin_graph": true,
+        "odin_source_count": 1485,
+        "native": {
+          "path": "/work/box3d-native-p4/cache/build/Debug/libogb3.a",
+          "sha256": "b7b3f863c500ac1c54a09167280df2de598e0ba2718df29ee45075ba20c8fe16"
+        },
+        "native_manifest_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-support/native-manifests/linux-Debug-build-manifest.json",
+        "native_manifest_sha256": "8dab45aa880f5063ed6385b3991f145daa5d6f2f2027a2d3057765fa7f7c9416",
+        "native_inputs_current": true,
+        "results": [
+          {
+            "name": "pure",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/pure",
+              "-define:ODIN_TEST_THREADS=1",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Debug/pure-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "8ff5af27fd356438b3e6c7d24396b3cc3c09ae67fef18aaec24828f0dba97093",
+            "executable_sha256": "1840a23772f308d189924be6c988d3d5fad77703eaa84f7bdc3646cb81bafce7"
+          },
+          {
+            "name": "native",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/native",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/work/box3d-native-p4/cache/build/Debug/libogb3.a",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Debug/native-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "bd479f17eb15628e4f12a54fb5c0347ecced52a809303a6e75673e97ea4c915a",
+            "executable_sha256": "b1d3dcad3fedf000af427b115eb3229c71650f4bb2c7ccc8f223d5e66c5c5f1d"
+          },
+          {
+            "name": "strict",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/strict",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/work/box3d-native-p4/cache/build/Debug/libogb3.a",
+              "-define:BOX3D_REQUIRE_DOMAIN=true",
+              "-define:BOX3D_EXPECTED_BUILD=sha256:9e41bb3aaab038d77ed2029d867fb047028d5f2d1106fa1d9826fe0143e17a49",
+              "-define:BOX3D_EXPECTED_TARGET=sha256:c830a76ab4dc0d0c3924b9d1726f9cbc32e7c1a5cd116841a26c845389d4e66a",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Debug/strict-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "72bc5fadcbdf0437959b1efef927bcd443440bc74e6d6e300be95e4d83a0dbb0",
+            "executable_sha256": "a279e16fec9398bdd7884500fa7cd8db2bea88ed7dc4c3a99f0b3b9b99e7498a"
+          },
+          {
+            "name": "wasm",
+            "command": [
+              "/work/odin/odin",
+              "build",
+              "tests/box3d_presentation/import",
+              "-target:freestanding_wasm32",
+              "-build-mode:obj",
+              "-no-entry-point",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Debug/wasm.o"
+            ],
+            "exit": 0,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "executable_sha256": "117c11398d89a2b628ac61df2258310c6d2d203c3f19a460ec8058a3247a124d"
+          }
+        ],
+        "groups": {
+          "pure": 6,
+          "native": 5,
+          "strict": 1,
+          "wasm_object_compile": 1
+        }
+      },
+      {
+        "configuration": "linux_Release",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v6/linux/Release/report.json",
+        "report_sha256": "06a9138a8a9e79aa33a8316fb720584c212deba41c34a7c0f05e18cc74b022fd",
+        "source_fence_equal": true,
+        "same_current_odin_graph": true,
+        "odin_source_count": 1485,
+        "native": {
+          "path": "/work/box3d-native-p4/cache/build/Release/libogb3.a",
+          "sha256": "f57bb0a6d75ede0182e5e9c4fa58b78f9b68e0a7e3cc274b4a0a629a4ade9508"
+        },
+        "native_manifest_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-support/native-manifests/linux-Release-build-manifest.json",
+        "native_manifest_sha256": "1606c576a9a67f84920fe04756ab734d259699dc7fe870ab0635c5dd8b9510aa",
+        "native_inputs_current": true,
+        "results": [
+          {
+            "name": "pure",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/pure",
+              "-define:ODIN_TEST_THREADS=1",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Release/pure-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "e2d09c7f6c4a642ff2e8a4377fbb750dd8056b1c63358d9041b54c5a337eeada",
+            "executable_sha256": "ed825a2a6f260b1fff79c869330f9ff8979cbb5ae9120ee82c26fc569786ab6a"
+          },
+          {
+            "name": "native",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/native",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/work/box3d-native-p4/cache/build/Release/libogb3.a",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Release/native-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "97ec908185c579d5381ac24ad5fd08f959b133db7e3949801a87c87fcd16370d",
+            "executable_sha256": "03ebb9075f88574a1d8656d09756dc3f16646b9d3033b97c5c772bd48169ab70"
+          },
+          {
+            "name": "strict",
+            "command": [
+              "/work/odin/odin",
+              "test",
+              "tests/box3d_presentation/strict",
+              "-define:ODIN_TEST_THREADS=1",
+              "-define:BOX3D_LIBRARY=/work/box3d-native-p4/cache/build/Release/libogb3.a",
+              "-define:BOX3D_REQUIRE_DOMAIN=true",
+              "-define:BOX3D_EXPECTED_BUILD=sha256:c2de15550bccd87cf438e2c553230bb4e7c15c28a66470cf2916f691933ee679",
+              "-define:BOX3D_EXPECTED_TARGET=sha256:39312e841ef1e4f4e62fe204ea39ef75f632a80737fc60798daad3d9a88bb310",
+              "-keep-executable",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Release/strict-tests"
+            ],
+            "exit": 0,
+            "log_sha256": "a1c53537380835817e0c8740411c935cbcca219b1c53708d7af76b9ccfabc7e8",
+            "executable_sha256": "f48601bc9cf12d5146eac378dd876fd6ad77b79244e366b1bbeb96949550a930"
+          },
+          {
+            "name": "wasm",
+            "command": [
+              "/work/odin/odin",
+              "build",
+              "tests/box3d_presentation/import",
+              "-target:freestanding_wasm32",
+              "-build-mode:obj",
+              "-no-entry-point",
+              "-collection:godot=/workspace",
+              "-out:/work/box3d-presentation-v6/Release/wasm.o"
+            ],
+            "exit": 0,
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "executable_sha256": "4146b85dc1f3ed50c13b7066313e8d5d5b563ded9f900dc03d5dc82b70c2497e"
+          }
+        ],
+        "groups": {
+          "pure": 6,
+          "native": 5,
+          "strict": 1,
+          "wasm_object_compile": 1
+        }
+      }
+    ],
+    "groups_total": 48,
+    "per_configuration": {
+      "pure": 6,
+      "native_package": 5,
+      "strict_owner": 1
+    },
+    "wasm_objects": 4,
+    "strict_gate_limit": "Core gate and code-image procedure validator are test-only fakes. Actual Core dladdr/generation/outer-return/reload safety remains P4.1 evidence; these tests do not relabel it.",
+    "native_free_godot_values": [
+      {
+        "target": "macos",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/report.json",
+        "report_sha256": "2ddf56ff1ae1748de8987373f1f9f44a008fa3b0e4c34e43e67fe5ad7c5d8052",
+        "source_fence_equal": true,
+        "godot": {
+          "path": "/Applications/Godot.app/Contents/MacOS/Godot",
+          "sha256": "ecc8da2d60100102cfca6e833d3860d7436b46ae062fa072ce89a6c95d664a3f"
+        },
+        "results": [
+          {
+            "name": "build",
+            "command": [
+              "bash",
+              "/Users/walter/data/code/odin/odin_godot/build/build_scripts.sh",
+              "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/build.log",
+            "sha256": "af4253459295d3ed0dfa6a4ef7deddeddc068e0b95710010455d887fe8a723ba"
+          },
+          {
+            "name": "prepare",
+            "command": [
+              "/nix/store/kwnbzccaiqi6iwdchcy6xc8br4x9hn0j-python3-3.13.12/bin/python3",
+              "/Users/walter/data/code/odin/odin_godot/build/box3d_profile.py",
+              "--prepare-import",
+              "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/prepare.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "import",
+            "command": [
+              "/Applications/Godot.app/Contents/MacOS/Godot",
+              "--headless",
+              "--path",
+              "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project",
+              "--import"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/import.log",
+            "sha256": "601e453441d1530011827446e6e7a505b2e6bd5f285fdf8acf30390a02a65e84"
+          },
+          {
+            "name": "run",
+            "command": [
+              "/Applications/Godot.app/Contents/MacOS/Godot",
+              "--headless",
+              "--path",
+              "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project",
+              "--script",
+              "test_presentation.gd"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/run.log",
+            "sha256": "b9b0e59e1a8f3224ed8bae273ce48b1bd7f2caaa208dd677d69d2eddc5577952"
+          }
+        ],
+        "binary_sha256": {
+          "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project/bin/libodin_godot.dylib": "aa057a7012e1aa248862cfbe774a31ca8ce70f7580a39cffcc54b3437632774c",
+          "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v3/project/bin/libodinscripts.dylib": "b47c6f982e9bd83d24e740bd5ad8c36c11a0e8b756a6070241c89b0b4ee145c7"
+        },
+        "scope": "ordinary authored mesh/label values; Native-free Core and scripts; prepared import, not an upstream cold-import fix"
+      },
+      {
+        "target": "linux_rosetta",
+        "status": "PASS",
+        "report_path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-linux-v3/report.json",
+        "report_sha256": "a735b432e5941f26b1758420030cfc60931a1e059f3cedfc4931007b5d1fc300",
+        "source_fence_equal": true,
+        "godot": {
+          "path": "/work/box3d-godot-p4/Godot_v4.7.1-stable_linux.x86_64",
+          "sha256": "32f8d7596c4b41185512b1c49d69f2da3be018fd784a53e349fa92a98a97bcde"
+        },
+        "results": [
+          {
+            "name": "build",
+            "command": [
+              "bash",
+              "/workspace/build/build_scripts.sh",
+              "/work/box3d-presentation-godot-v3/project"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/work/box3d-presentation-godot-v3/build.log",
+            "sha256": "87c4e0dd4165329501dad7cd9325d48bd6ce4398ffdb96077b82f9ab839d5461"
+          },
+          {
+            "name": "prepare",
+            "command": [
+              "/usr/bin/python3",
+              "/workspace/build/box3d_profile.py",
+              "--prepare-import",
+              "/work/box3d-presentation-godot-v3/project"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/work/box3d-presentation-godot-v3/prepare.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "import",
+            "command": [
+              "/work/box3d-godot-p4/Godot_v4.7.1-stable_linux.x86_64",
+              "--headless",
+              "--path",
+              "/work/box3d-presentation-godot-v3/project",
+              "--import"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/work/box3d-presentation-godot-v3/import.log",
+            "sha256": "601e453441d1530011827446e6e7a505b2e6bd5f285fdf8acf30390a02a65e84"
+          },
+          {
+            "name": "run",
+            "command": [
+              "/work/box3d-godot-p4/Godot_v4.7.1-stable_linux.x86_64",
+              "--headless",
+              "--path",
+              "/work/box3d-presentation-godot-v3/project",
+              "--script",
+              "test_presentation.gd"
+            ],
+            "exit": 0,
+            "timed_out": false,
+            "success": true,
+            "log": "/work/box3d-presentation-godot-v3/run.log",
+            "sha256": "b9b0e59e1a8f3224ed8bae273ce48b1bd7f2caaa208dd677d69d2eddc5577952"
+          }
+        ],
+        "binary_sha256": {
+          "/work/box3d-presentation-godot-v3/project/bin/libodin_godot.so": "4d79b6bf3726ceaaf79cd265bed89149ecd6020e06d39820530a5b91f0320984",
+          "/work/box3d-presentation-godot-v3/project/bin/libodinscripts.so": "286e32a1e5dbfd83875869c0b054d075cabb274e997a9f1eabf6095a709a0b3b"
+        },
+        "scope": "ordinary authored mesh/label values; Native-free Core and scripts; prepared import, not an upstream cold-import fix"
+      }
+    ],
+    "layout_macos_arm64_bytes": {
+      "Frame": 2272,
+      "View": 2576,
+      "Change": 160,
+      "Changes70": 11200,
+      "Status": 184,
+      "two_frames_plus_view_changes_status": 18504
+    }
+  },
+  "actual_GUI_consumers": {
+    "Kit": {
+      "evidence": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit-slice/presentation-consumer-final/report.json",
+        "bytes": 12463,
+        "sha256": "751606ff82e4b5f5a58d30b597a293792a3f4adaac45e1fbccd2dd4535810b8d"
+      },
+      "actual_run": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit-slice/presentation-consumer-gui-v1/report.json",
+        "bytes": 3415,
+        "sha256": "11a92415edd97f398f93f77882c656b8aabcfd56f4fe4e8b00bb2cfe32e7d48a"
+      },
+      "host_motion_z": -1.10600197315216,
+      "follower_observed_motion_and_spawn": true,
+      "exits": [
+        0,
+        0
+      ],
+      "all_tracked_zero": true,
+      "screenshot": "host/gui.png in actual run directory",
+      "final_polish": "Capture-error HUD-only polish built after GUI; no GUI rerun or relabelling of binary."
+    },
+    "Replay": {
+      "evidence": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p42/presentation-consumer-gui-fixed1/report.json",
+        "bytes": 8026,
+        "sha256": "9eb5b7e3663e63a733c4d9d1f8528560a94016517beca8522f11301b2d9d571d"
+      },
+      "host_and_client_moved": true,
+      "client_x": [
+        0.6,
+        3.461186
+      ],
+      "same_original_input_probe": true,
+      "unchanged_threshold": true,
+      "exits": [
+        0,
+        0
+      ],
+      "renderer_errors": [],
+      "all_tracked_zero": true,
+      "earlier_GUI_failures_preserved": true
+    }
+  },
+  "GUI_qualification": "Kit proves Host input plus follower projection, not independent client physical-input admission. Replay fixed GUI proves both ordinary keyboard directions after the existing held-bootstrap repair. Screenshots predate later impairment label additions; Kit final capture-error HUD polish was compile-only. No extra GUI reruns claimed.",
+  "scene_controls_acceptance": {
+    "platform": "official macOS Godot4.7.1 a13da4feb / actual ENet; frozen author binaries and imported metadata reused, no test-stage compilation/import pretending success",
+    "Kit": {
+      "evidence": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/stage-report.json",
+        "bytes": 35364,
+        "sha256": "932800cf4817bfb53a840b55d772549f6974e16f10547d91f56cdd91ebfcfa3e"
+      },
+      "positive": {
+        "defaults": {
+          "wrapper_report": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/defaults/report.json",
+          "wrapper_sha256": "443333f6328ab67ef0bc430498de56139f33cc4ef11a13ea274fa7498b4e68a9",
+          "root_report": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/defaults/kit/result.json",
+          "root_sha256": "0b6495230dde6d5b687ebbbf3b4eec230f777960743f8c5899aa736287d32e1e",
+          "compared_full_five_part_frames": 8,
+          "actual_applied_kinds": [
+            "Motor",
+            "Query",
+            "Remove",
+            "Sleep",
+            "Spawn",
+            "Wake"
+          ],
+          "issued_decision_joins": 7,
+          "rejected_simultaneous_second_spawn_count": 1,
+          "matched_actual_settled_effects": 14,
+          "reset_records": 0,
+          "natural_exits": [
+            0,
+            0
+          ],
+          "cleanup": [
+            {
+              "cleanup_errors": 0,
+              "engine": 0,
+              "meter": 0,
+              "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed",
+              "wrapper": 0
+            },
+            {
+              "cleanup_errors": 0,
+              "engine": 0,
+              "meter": 0,
+              "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed",
+              "wrapper": 0
+            }
+          ],
+          "actual_ready": {
+            "client": {
+              "channel": {
+                "reliable": "ordered_loss_adds_delay",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_stream_loss_jitter"
+              },
+              "effective": {
+                "applied": true,
+                "delay_active": false,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": false
+              },
+              "requested": {
+                "duplicate_percent": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            },
+            "host": {
+              "channel": {
+                "reliable": "ordered_loss_adds_delay",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_stream_loss_jitter"
+              },
+              "effective": {
+                "applied": true,
+                "delay_active": false,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": false
+              },
+              "requested": {
+                "duplicate_percent": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            }
+          },
+          "source_fence_unchanged": true,
+          "frozen_inputs_unchanged": true,
+          "binaries": {
+            "bin/.box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bin/.odin_crash.log": "03b99d349767bcefd81034728837597e3013832024edeb4faf3b88495aa0af96",
+            "bin/box3d-runtime.json": "36a7b726411d9e56d59de8baa30da58ddbba6042539dbd7bfa5f0e62cd9dc275",
+            "bin/libodin_godot.dylib": "667831f015e96fd3e73fe69afc06db61746e42b67e3df6766a66e0454035a6bc",
+            "bin/libodinscripts.dylib": "d1685c3dd73c844021ffd13dcda25eaeb164041930f7d54ea4b9afa710702f8f",
+            "bin/libogb3.dylib": "f17d514184a03066c23533b17737577070fe960cc6bcc9e83d0db7ab63722ba8"
+          },
+          "build_steps": [
+            {
+              "executed": false,
+              "name": "build",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "/Users/walter/data/code/odin/odin_godot/build/build_scripts.sh",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/defaults/kit/project"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "core-release",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "-c",
+                "source \"$1/build/common.sh\"; BOX3D_RUNTIME_DIR=\"$2/bin\"; atomic_odin_dll \"$1/core\" \"$2/bin/$3\" -o:speed -debug",
+                "slice-core",
+                "/Users/walter/data/code/odin/odin_godot",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/defaults/kit/project",
+                "libodin_godot.dylib"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "prepared-import",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/defaults/kit/project",
+                "--import"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            }
+          ]
+        },
+        "latency": {
+          "wrapper_report": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/latency/report.json",
+          "wrapper_sha256": "b26c543c9c2d5982c7b317e88c055a497a608a44df65db5a0b0083468e324ad1",
+          "root_report": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/latency/kit/result.json",
+          "root_sha256": "60c1f029def01dc2d7a3860e0b264b0b7b023c1689b62c92bbdedbb655351609",
+          "compared_full_five_part_frames": 8,
+          "actual_applied_kinds": [
+            "Motor",
+            "Query",
+            "Remove",
+            "Sleep",
+            "Spawn",
+            "Wake"
+          ],
+          "issued_decision_joins": 7,
+          "rejected_simultaneous_second_spawn_count": 1,
+          "matched_actual_settled_effects": 14,
+          "reset_records": 0,
+          "natural_exits": [
+            0,
+            0
+          ],
+          "cleanup": [
+            {
+              "cleanup_errors": 0,
+              "engine": 0,
+              "meter": 0,
+              "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed",
+              "wrapper": 0
+            },
+            {
+              "cleanup_errors": 0,
+              "engine": 0,
+              "meter": 0,
+              "owner_evidence": "successful explicit owner drops + retained Meter bytes0 + checked Core shutdown no-not-empty; no direct owner count claimed",
+              "wrapper": 0
+            }
+          ],
+          "actual_ready": {
+            "client": {
+              "channel": {
+                "reliable": "ordered_loss_adds_delay",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_stream_loss_jitter"
+              },
+              "effective": {
+                "applied": true,
+                "delay_active": true,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": true
+              },
+              "requested": {
+                "duplicate_percent": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            },
+            "host": {
+              "channel": {
+                "reliable": "ordered_loss_adds_delay",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_stream_loss_jitter"
+              },
+              "effective": {
+                "applied": true,
+                "delay_active": true,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": true
+              },
+              "requested": {
+                "duplicate_percent": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            }
+          },
+          "source_fence_unchanged": true,
+          "frozen_inputs_unchanged": true,
+          "binaries": {
+            "bin/.box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bin/.odin_crash.log": "03b99d349767bcefd81034728837597e3013832024edeb4faf3b88495aa0af96",
+            "bin/box3d-runtime.json": "36a7b726411d9e56d59de8baa30da58ddbba6042539dbd7bfa5f0e62cd9dc275",
+            "bin/libodin_godot.dylib": "667831f015e96fd3e73fe69afc06db61746e42b67e3df6766a66e0454035a6bc",
+            "bin/libodinscripts.dylib": "d1685c3dd73c844021ffd13dcda25eaeb164041930f7d54ea4b9afa710702f8f",
+            "bin/libogb3.dylib": "f17d514184a03066c23533b17737577070fe960cc6bcc9e83d0db7ab63722ba8"
+          },
+          "build_steps": [
+            {
+              "executed": false,
+              "name": "build",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "/Users/walter/data/code/odin/odin_godot/build/build_scripts.sh",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/latency/kit/project"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "core-release",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "-c",
+                "source \"$1/build/common.sh\"; BOX3D_RUNTIME_DIR=\"$2/bin\"; atomic_odin_dll \"$1/core\" \"$2/bin/$3\" -o:speed -debug",
+                "slice-core",
+                "/Users/walter/data/code/odin/odin_godot",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/latency/kit/project",
+                "libodin_godot.dylib"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "prepared-import",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/latency/kit/project",
+                "--import"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/kit_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            }
+          ]
+        }
+      },
+      "negative": {
+        "report": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/report.json",
+        "sha256": "ac8edd399d69e15dd04b5ceae7ecc5d7d11db730eca015330b113dc43d80d647",
+        "count": 11,
+        "actual_natural_exits": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "cases": [
+          {
+            "name": "invalid-decimal",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/invalid-decimal/godot.log",
+            "log_sha256": "9515fec07aabf71cacfbadb448ff0967ecaf344bcfee6b3f67cefc88bc528489",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 1,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "negative",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/negative/godot.log",
+            "log_sha256": "fa5c3e1ec7391f5d163c2548aa6da0406b108d469b421caa7f5e0991d696b841",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 2,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "integer-overflow",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/integer-overflow/godot.log",
+            "log_sha256": "9515fec07aabf71cacfbadb448ff0967ecaf344bcfee6b3f67cefc88bc528489",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 1,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "latency-bound",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/latency-bound/godot.log",
+            "log_sha256": "9515fec07aabf71cacfbadb448ff0967ecaf344bcfee6b3f67cefc88bc528489",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 1,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "jitter-bound",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/jitter-bound/godot.log",
+            "log_sha256": "fa5c3e1ec7391f5d163c2548aa6da0406b108d469b421caa7f5e0991d696b841",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 2,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "loss-bound",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/loss-bound/godot.log",
+            "log_sha256": "95f021f301dd201110c677d532b06cbea7317e28ed50a332b102e95b1c1091de",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 3,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "duplicate-bound",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/duplicate-bound/godot.log",
+            "log_sha256": "0f42710808c8c8f551dc96a77d5a7fd119a6d72cdbbd9f4036b4be4c68bc4e16",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 4,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "reorder-bound",
+            "status": "PASS",
+            "expected_status": "Invalid",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/reorder-bound/godot.log",
+            "log_sha256": "4aaa4dfa69dc9dca962870f4ce94072c71791d03f44a3ae6bd94afb1d1bd6640",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 5,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Invalid",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "unsupported-duplicate",
+            "status": "PASS",
+            "expected_status": "Unsupported",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/unsupported-duplicate/godot.log",
+            "log_sha256": "2989345e92125d37546d2b94f0ed362f350ed32957096364d06600c342731cce",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 0,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 1,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Unsupported",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "unsupported-reorder",
+            "status": "PASS",
+            "expected_status": "Unsupported",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/unsupported-reorder/godot.log",
+            "log_sha256": "e1a143a012c4cd82ffe48072ad1917173c9091a5fdbc76379442eb0aa3a6fb65",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 0,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 1,
+                    "latency_ms": 0,
+                    "loss_percent": 0,
+                    "reorder": true
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Unsupported",
+                "where": "impairment_preflight"
+              }
+            }
+          },
+          {
+            "name": "unsupported-loss96",
+            "status": "PASS",
+            "expected_status": "Unsupported",
+            "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-kit-v1/rejections/unsupported-loss96/godot.log",
+            "log_sha256": "2ea515c39a66351e08039220a222cf2322d50d08f44f8554a6d27422ec107bcf",
+            "observed": {
+              "cleanup": {
+                "before_physics": true,
+                "before_transport": true,
+                "cleanup_errors": 0,
+                "engine_live": 0,
+                "errors": 1,
+                "event": "RESULT",
+                "framework": "kit",
+                "meter_live": 0,
+                "native_stats_ok": true,
+                "ok": false,
+                "role": "host",
+                "session_generation": 1,
+                "tick": 0,
+                "wrapper_live": 0
+              },
+              "error": {
+                "before_physics": true,
+                "before_transport": true,
+                "event": "ERROR",
+                "field_index": 0,
+                "framework": "kit",
+                "impairment": {
+                  "channel": {
+                    "reliable": "ordered_loss_adds_delay",
+                    "reorder_disable_supported": false,
+                    "scope": "local_receive",
+                    "unreliable": "modeled_stream_loss_jitter"
+                  },
+                  "effective": {
+                    "applied": false,
+                    "delay_active": false,
+                    "duplicate_permyriad": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_permyriad": 0,
+                    "unreliable_may_reorder": false
+                  },
+                  "requested": {
+                    "duplicate_percent": 0,
+                    "jitter_ms": 0,
+                    "latency_ms": 0,
+                    "loss_percent": 96,
+                    "reorder": false
+                  }
+                },
+                "sdk_context_created": false,
+                "session_generation": 1,
+                "status": "Unsupported",
+                "where": "impairment_preflight"
+              }
+            }
+          }
+        ],
+        "source_before": "bb5e49c9594cec5a20d4035f73cfbfbfb529c73c12f15033323607e5feea9f88",
+        "source_after": "bb5e49c9594cec5a20d4035f73cfbfbfb529c73c12f15033323607e5feea9f88"
+      },
+      "request_parent": "requested",
+      "source_freeze": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit-slice/impairment-consumer-frozen-v1/report.json",
+        "bytes": 5810,
+        "sha256": "9ec3a6e1d892c25782a6ec72749da50c226a22fb3b58adc941a26404714ce3f7"
+      }
+    },
+    "Replay": {
+      "positive": {
+        "default0": {
+          "evidence": {
+            "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/defaults-reaudit-v2/report.json",
+            "bytes": 13692,
+            "sha256": "3d00ff8cf65ebbb5cda33d9f6da3272ddcc6f23e66e3afe24eec8117e5a0032a"
+          },
+          "read_only_root_audit": {
+            "path": "/tmp/odin-box3d-goal-t4jbbj4v/presentation-controls-replay-v1/defaults-reaudit-v2/root-audit/report.json",
+            "bytes": 6826,
+            "sha256": "d7cc2ffcd6934bf0a1f04c30bd5e3edbb6b357544b74be7d3994cbdb0b554ebd"
+          },
+          "original_failed_result": {
+            "path": "/tmp/odin-box3d-goal-t4jbbj4v/presentation-controls-replay-v1/defaults/replay/result.json",
+            "bytes": 12725,
+            "sha256": "4f06a13429c8aa42cb9cc452073a965acf63976505612fd9e5fe74cd3d8b50c6"
+          },
+          "physics_rerun": false,
+          "actual_ready": {
+            "host": {
+              "channel": {
+                "reliable": "ordered_no_modeled_loss_or_dup",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_loss_dup_jitter"
+              },
+              "effective": {
+                "delay_active": false,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": false
+              },
+              "request": {
+                "duplicate_percent": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            },
+            "client": {
+              "channel": {
+                "reliable": "ordered_no_modeled_loss_or_dup",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_loss_dup_jitter"
+              },
+              "effective": {
+                "delay_active": false,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": false
+              },
+              "request": {
+                "duplicate_percent": 0,
+                "jitter_ms": 0,
+                "latency_ms": 0,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            }
+          },
+          "agreement": {
+            "client": {
+              "action_timing": "Receipt",
+              "actual_verdicts": {
+                "Motor": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Motor",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 3,
+                    "serial": 0,
+                    "tick": 80
+                  }
+                ],
+                "Query": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 1,
+                    "incarnation": 0,
+                    "kind": "Query",
+                    "origin": "Sample",
+                    "reason": "None",
+                    "seat": 2,
+                    "sequence": 2,
+                    "serial": 1,
+                    "tick": 158
+                  }
+                ],
+                "Remove": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Remove",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 2,
+                    "serial": 0,
+                    "tick": 56
+                  }
+                ],
+                "Sleep": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Sleep",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 4,
+                    "serial": 0,
+                    "tick": 120
+                  }
+                ],
+                "Spawn": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 1,
+                    "incarnation": 0,
+                    "kind": "Spawn",
+                    "origin": "Sample",
+                    "reason": "None",
+                    "seat": 2,
+                    "sequence": 1,
+                    "serial": 1,
+                    "tick": 38
+                  }
+                ],
+                "Wake": [
+                  {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Wake",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 5,
+                    "serial": 0,
+                    "tick": 136
+                  }
+                ]
+              },
+              "compared_confirmed_frames": 231,
+              "confirmed_end": 241,
+              "effect_eligibility": {
+                "excluded_authority": [],
+                "full_stream_actual_count": 10,
+                "full_stream_authority_count": 10,
+                "gaps": [],
+                "matched": 10,
+                "post_recovery_matched_effects": []
+              },
+              "epoch": 1,
+              "intent_causality": [
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 0,
+                    "kind": "Spawn",
+                    "original_requested_tick": 40,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 40,
+                    "sampled_head": 39,
+                    "sampled_tick": 40,
+                    "seat": 1,
+                    "sequence": 1,
+                    "serial": 0,
+                    "submitted_tick": 40
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": false,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Spawn",
+                    "origin": "Local",
+                    "reason": "Predicate",
+                    "seat": 1,
+                    "sequence": 1,
+                    "serial": 0,
+                    "tick": 40
+                  },
+                  "role": "host"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 0,
+                    "kind": "Remove",
+                    "original_requested_tick": 56,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 56,
+                    "sampled_head": 55,
+                    "sampled_tick": 56,
+                    "seat": 1,
+                    "sequence": 2,
+                    "serial": 0,
+                    "submitted_tick": 56
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Remove",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 2,
+                    "serial": 0,
+                    "tick": 56
+                  },
+                  "role": "host"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 0,
+                    "kind": "Motor",
+                    "original_requested_tick": 80,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 80,
+                    "sampled_head": 79,
+                    "sampled_tick": 80,
+                    "seat": 1,
+                    "sequence": 3,
+                    "serial": 0,
+                    "submitted_tick": 80
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Motor",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 3,
+                    "serial": 0,
+                    "tick": 80
+                  },
+                  "role": "host"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 0,
+                    "kind": "Sleep",
+                    "original_requested_tick": 120,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 120,
+                    "sampled_head": 119,
+                    "sampled_tick": 120,
+                    "seat": 1,
+                    "sequence": 4,
+                    "serial": 0,
+                    "submitted_tick": 120
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Sleep",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 4,
+                    "serial": 0,
+                    "tick": 120
+                  },
+                  "role": "host"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 0,
+                    "kind": "Wake",
+                    "original_requested_tick": 136,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 136,
+                    "sampled_head": 135,
+                    "sampled_tick": 136,
+                    "seat": 1,
+                    "sequence": 5,
+                    "serial": 0,
+                    "submitted_tick": 136
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 0,
+                    "incarnation": 0,
+                    "kind": "Wake",
+                    "origin": "Local",
+                    "reason": "None",
+                    "seat": 1,
+                    "sequence": 5,
+                    "serial": 0,
+                    "tick": 136
+                  },
+                  "role": "host"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 1,
+                    "kind": "Spawn",
+                    "original_requested_tick": 40,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 40,
+                    "sampled_head": 39,
+                    "sampled_tick": 40,
+                    "seat": 2,
+                    "sequence": 1,
+                    "serial": 1,
+                    "submitted_tick": 40
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 1,
+                    "incarnation": 0,
+                    "kind": "Spawn",
+                    "origin": "Sample",
+                    "reason": "None",
+                    "seat": 2,
+                    "sequence": 1,
+                    "serial": 1,
+                    "tick": 38
+                  },
+                  "role": "client"
+                },
+                {
+                  "issued": {
+                    "action_timing": "Receipt",
+                    "epoch": 1,
+                    "generation": 1,
+                    "kind": "Query",
+                    "original_requested_tick": 160,
+                    "process_generation": 1,
+                    "rebased_before_sampling": false,
+                    "recovery_serial": 0,
+                    "requested_tick": 160,
+                    "sampled_head": 159,
+                    "sampled_tick": 160,
+                    "seat": 2,
+                    "sequence": 2,
+                    "serial": 1,
+                    "submitted_tick": 160
+                  },
+                  "published": {
+                    "accepted": true,
+                    "action_timing": "Receipt",
+                    "applied": true,
+                    "epoch": 1,
+                    "generation": 1,
+                    "incarnation": 0,
+                    "kind": "Query",
+                    "origin": "Sample",
+                    "reason": "None",
+                    "seat": 2,
+                    "sequence": 2,
+                    "serial": 1,
+                    "tick": 158
+                  },
+                  "role": "client"
+                }
+              ],
+              "overlapping_decisions": 7,
+              "reconciled_effects": 10,
+              "recovery": [],
+              "rejected_second_spawn": [],
+              "spawn_conflict": {
+                "execution_order": "actual authority Receipt execution order",
+                "policy": "Receipt",
+                "rejected": {
+                  "accepted": true,
+                  "action_timing": "Receipt",
+                  "applied": false,
+                  "epoch": 1,
+                  "generation": 0,
+                  "incarnation": 0,
+                  "kind": "Spawn",
+                  "origin": "Local",
+                  "reason": "Predicate",
+                  "seat": 1,
+                  "sequence": 1,
+                  "serial": 0,
+                  "tick": 40
+                },
+                "winner": {
+                  "accepted": true,
+                  "action_timing": "Receipt",
+                  "applied": true,
+                  "epoch": 1,
+                  "generation": 1,
+                  "incarnation": 0,
+                  "kind": "Spawn",
+                  "origin": "Sample",
+                  "reason": "None",
+                  "seat": 2,
+                  "sequence": 1,
+                  "serial": 1,
+                  "tick": 38
+                }
+              },
+              "welcome_baseline": 1
+            }
+          },
+          "processes": [
+            {
+              "cleanup": {
+                "engine": 0,
+                "managed_callbacks": 0,
+                "meter": 0,
+                "owners": 0,
+                "wrapper": 0
+              },
+              "exit_code": 0,
+              "log_sha256": "60b20d788789a334d82c037aab4e4a299ea8c17bfbc068437b9123f7d0294f88",
+              "pid": 41801,
+              "role": "host"
+            },
+            {
+              "cleanup": {
+                "engine": 0,
+                "managed_callbacks": 0,
+                "meter": 0,
+                "owners": 0,
+                "wrapper": 0
+              },
+              "exit_code": 0,
+              "log_sha256": "528118d287ae216e6184ee2ac6b4169966b57b61745501300ac027825cd9a54b",
+              "pid": 41802,
+              "role": "client"
+            }
+          ]
+        },
+        "latency10_jitter1_loss0": {
+          "evidence": {
+            "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/replay/result.json",
+            "bytes": 18531,
+            "sha256": "2b860e37701e6a7054ad4323c0075b9d9631f069de542a6f966c24edf795ef1f"
+          },
+          "wrapper": {
+            "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/report.json",
+            "bytes": 5912,
+            "sha256": "d4e1c787d96637f1439b846b39ea42faea1e619e78fef9d3272733226e9d58b6"
+          },
+          "compared_full_five_part_frames": 224,
+          "actual_applied_kinds": [
+            "Motor",
+            "Query",
+            "Remove",
+            "Sleep",
+            "Spawn",
+            "Wake"
+          ],
+          "issued_decision_joins": 7,
+          "matched_settled_effects": 9,
+          "spawn_conflict": {
+            "execution_order": "actual authority Receipt execution order",
+            "policy": "Receipt",
+            "rejected": {
+              "accepted": true,
+              "action_timing": "Receipt",
+              "applied": false,
+              "epoch": 1,
+              "generation": 1,
+              "incarnation": 0,
+              "kind": "Spawn",
+              "origin": "Held",
+              "reason": "Predicate",
+              "seat": 2,
+              "sequence": 1,
+              "serial": 1,
+              "tick": 42
+            },
+            "winner": {
+              "accepted": true,
+              "action_timing": "Receipt",
+              "applied": true,
+              "epoch": 1,
+              "generation": 0,
+              "incarnation": 0,
+              "kind": "Spawn",
+              "origin": "Local",
+              "reason": "None",
+              "seat": 1,
+              "sequence": 1,
+              "serial": 0,
+              "tick": 40
+            }
+          },
+          "recovery": [],
+          "cleanup": [
+            {
+              "engine": 0,
+              "managed_callbacks": 0,
+              "meter": 0,
+              "owners": 0,
+              "wrapper": 0
+            },
+            {
+              "engine": 0,
+              "managed_callbacks": 0,
+              "meter": 0,
+              "owners": 0,
+              "wrapper": 0
+            }
+          ],
+          "exits": [
+            0,
+            0
+          ],
+          "source_fence_unchanged": true,
+          "frozen_inputs_unchanged": true,
+          "binaries": {
+            "bin/.box3d-runtime.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bin/box3d-runtime.json": "96b18ebed06de0c9c339e0334595b398a49ef81959f3381ae88c7cf6ff4e2286",
+            "bin/libodin_godot.dylib": "ed8de0a5ed599f61345be0307c5d2d1a4bf5029b99a12ab698bdc5b720a2e45e",
+            "bin/libodinscripts.dylib": "a32ca85205cc945fcb047071a751bb85bb95e6856e5de71f85fe7f18cf4c36b0",
+            "bin/libogb3.dylib": "f17d514184a03066c23533b17737577070fe960cc6bcc9e83d0db7ab63722ba8"
+          },
+          "build_steps": [
+            {
+              "executed": false,
+              "name": "build",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "/Users/walter/data/code/odin/odin_godot/build/build_scripts.sh",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/replay/project"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/replay_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "core-release",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "bash",
+                "-c",
+                "source \"$1/build/common.sh\"; BOX3D_RUNTIME_DIR=\"$2/bin\"; atomic_odin_dll \"$1/core\" \"$2/bin/$3\" -o:speed -debug",
+                "slice-core",
+                "/Users/walter/data/code/odin/odin_godot",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/replay/project",
+                "libodin_godot.dylib"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/replay_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            },
+            {
+              "executed": false,
+              "name": "prepared-import",
+              "reason": "Preserve Root-selected frozen author Core/scripts/Native and imported metadata",
+              "requested_command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/replay/project",
+                "--import"
+              ],
+              "source": "/Users/walter/data/code/odin/odin_godot/examples/replay_box3d",
+              "status": "REUSED_NOT_EXECUTED"
+            }
+          ],
+          "actual_ready": {
+            "client": {
+              "channel": {
+                "reliable": "ordered_no_modeled_loss_or_dup",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_loss_dup_jitter"
+              },
+              "effective": {
+                "delay_active": true,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": true
+              },
+              "request": {
+                "duplicate_percent": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            },
+            "host": {
+              "channel": {
+                "reliable": "ordered_no_modeled_loss_or_dup",
+                "reorder_disable_supported": false,
+                "scope": "local_receive",
+                "unreliable": "modeled_loss_dup_jitter"
+              },
+              "effective": {
+                "delay_active": true,
+                "duplicate_permyriad": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_permyriad": 0,
+                "unreliable_may_reorder": true
+              },
+              "request": {
+                "duplicate_percent": 0,
+                "jitter_ms": 1,
+                "latency_ms": 10,
+                "loss_percent": 0,
+                "reorder": false
+              }
+            }
+          }
+        }
+      },
+      "request_parent": "request",
+      "nine_negatives": {
+        "earlier_two_v2": [
+          {
+            "evidence": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/invalid-decimal/result.json",
+              "bytes": 991,
+              "sha256": "99dc508e5b1980332e20c135381d18bce5324875a5c8962f8e7a559f72880ad7"
+            },
+            "case": {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/invalid-decimal/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "1.5",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/invalid-decimal/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "invalid-decimal",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            }
+          },
+          {
+            "evidence": {
+              "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/negative/result.json",
+              "bytes": 969,
+              "sha256": "17fd75cf879eb418744ec3edffdeca0aa7db4fae74ed0d732b068291476d997d"
+            },
+            "case": {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/negative/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "-1",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/negative/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "negative",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            }
+          }
+        ],
+        "selected_seven_v3": {
+          "evidence": {
+            "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/report.json",
+            "bytes": 10307,
+            "sha256": "ae2c9932da7655e04aec7332592e661c49925c1ef3f93c243d7bb831df9638cd"
+          },
+          "cases": [
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/integer-overflow/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "18446744073709551616",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/integer-overflow/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "integer-overflow",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/latency-bound/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "10001",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/latency-bound/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "latency-bound",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/jitter-bound/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "10001",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/jitter-bound/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "jitter-bound",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/loss-bound/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "101",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/loss-bound/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "loss-bound",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/duplicate-bound/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "101",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "0",
+                "B3_REORDER": "0"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/duplicate-bound/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "duplicate-bound",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/reorder-bound/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "0",
+                "B3_REORDER": "2"
+              },
+              "exit": 1,
+              "expected_status": "Invalid",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/reorder-bound/godot.log",
+              "log_sha256": "aef171c57f33ef69cf9f83b0b6bdfe2dc86a6f48f02621b15ff2f3d3cfe9151c",
+              "name": "reorder-bound",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Invalid",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            },
+            {
+              "command": [
+                "/Applications/Godot.app/Contents/MacOS/Godot",
+                "--headless",
+                "--max-fps",
+                "60",
+                "--path",
+                "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/unsupported-reorder-without-jitter/project"
+              ],
+              "environment": {
+                "B3_DUPLICATE": "0",
+                "B3_JITTER": "0",
+                "B3_LATENCY": "0",
+                "B3_LOSS": "0",
+                "B3_REORDER": "1"
+              },
+              "exit": 1,
+              "expected_status": "Unsupported",
+              "log": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/unsupported-reorder-without-jitter/godot.log",
+              "log_sha256": "39294590b2d14db10a95a591738cef090e97f7b8ac6c4754bf026134fda95140",
+              "name": "unsupported-reorder-without-jitter",
+              "observed": {
+                "cleanup": {
+                  "callback_status": 0,
+                  "cleanup": "None",
+                  "engine_live": 0,
+                  "fx": 0,
+                  "managed_callbacks_live": 0,
+                  "meter_live": 0,
+                  "ok": false,
+                  "owners_live": 0,
+                  "role": "host",
+                  "tick": 0,
+                  "wrapper_live": 0
+                },
+                "error": {
+                  "before_physics": true,
+                  "before_transport": true,
+                  "status": "Unsupported",
+                  "where": "impairment_preflight"
+                }
+              },
+              "result": "PASS",
+              "timed_out": false
+            }
+          ],
+          "driver": {
+            "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/run-selected-negatives-v3.py",
+            "bytes": 1873,
+            "sha256": "3db73a4df4c2384468314ce7777f072f6a8c64e9c36f3555f3305d2470d9090f"
+          },
+          "checker_unchanged": true
+        },
+        "coverage": 9
+      },
+      "source_versions": {
+        "v2_impaired_pair": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/source-freeze-v2.json",
+          "bytes": 8243,
+          "sha256": "e2325007de60385fa05eec48dc19d8d9abd10da8a4f70f7bcf693e1a51b94a0e"
+        },
+        "v3_reject_only_parser": {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/source-freeze-v3.json",
+          "bytes": 8525,
+          "sha256": "67202f2486d365c01ec9370e8cc93a08b3e650cc6c263d6f619a3c7d4f49355e"
+        }
+      },
+      "qualification": "Default0 is the original same-case versioned Receipt re-audit, not a new run. Impaired pair and first2 rejection passes use v2; reject-only parser fix then validates overflow+remaining6 on v3. Per Root no valid-pair/default/first2 reruns for the reject-only fix; actual imported scene parser54 inputs prove valid bounds/defaults unchanged."
+    },
+    "totals": {
+      "accepted_pair_processes_natural0": 8,
+      "expected_preopen_processes_natural1": 20,
+      "accepted_control_stage_processes_total": 28,
+      "full_five_part_checkpoint_matches": 471,
+      "issued_decision_joins": 28,
+      "settled_effect_matches": 47,
+      "no_failed_or_reaudited_process_double_count": true
+    },
+    "source_and_binary_policy": "Each actual pair/preopen sequence checked unchanged source/frozen input manifests; original author projects unchanged. Root state/action/provenance/FX/teardown gates reused. Unknown/missing metrics, timeout, kill, or requested-env-only metadata cannot pass.",
+    "validator_controls": {
+      "groups": 7,
+      "scope": "Synthetic evidence-validator controls only, not scene acceptance",
+      "checks": [
+        "exact sibling key, no aliases",
+        "requested-only cannot prove effective settings",
+        "false active flag rejected",
+        "Reliable scope cannot be relabeled",
+        "bool/int distinct",
+        "configuration error distinct from cleanup failure",
+        "missing metrics/timeouts/late rejection/zero exit rejected"
+      ]
+    }
+  },
+  "defects_preserved_and_repaired": [
+    {
+      "name": "Replay original GUI client physical intent not consumed",
+      "original": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p42/presentation-consumer-gui-v1/report.json",
+        "bytes": 7792,
+        "sha256": "2a7bac34a4b0018e46b23745f580e4dfe7d0a4beafc43861f7c0e892f61dd4bc"
+      },
+      "proof_and_fix": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p42/sampling-fix-final-report-v1.json",
+        "bytes": 7468,
+        "sha256": "65afeb8e2e936d9d7c8e52a97aa5e00142237bec826a3741127a5e521797be5e"
+      },
+      "result": "Same32window actualENet public regression:32aheadcatchups/0consumed/0published before;1catchup/31consumed/30authoritySample100 after exact7line existing held-bootstrap pump fix. Observer/no-catchup and laterWelcome no-double-bootstrap controls, native16/pure182+WASM pass.",
+      "scope": "Root P4.2-owned existing bootstrap pump repair; helper/paint code unchanged; original failed GUI immutable"
+    },
+    {
+      "name": "Receipt winner expectation in auditor",
+      "original": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/defaults/replay/result.json",
+        "bytes": 12725,
+        "sha256": "4f06a13429c8aa42cb9cc452073a965acf63976505612fd9e5fe74cd3d8b50c6"
+      },
+      "new_audit": {
+        "path": "/tmp/odin-box3d-goal-t4jbbj4v/presentation-controls-replay-v1/defaults-reaudit-v2/root-audit/report.json",
+        "bytes": 6826,
+        "sha256": "d7cc2ffcd6934bf0a1f04c30bd5e3edbb6b357544b74be7d3994cbdb0b554ebd"
+      },
+      "actual_rows": {
+        "execution_order": "actual authority Receipt execution order",
+        "policy": "Receipt",
+        "rejected": {
+          "accepted": true,
+          "action_timing": "Receipt",
+          "applied": false,
+          "epoch": 1,
+          "generation": 0,
+          "incarnation": 0,
+          "kind": "Spawn",
+          "origin": "Local",
+          "reason": "Predicate",
+          "seat": 1,
+          "sequence": 1,
+          "serial": 0,
+          "tick": 40
+        },
+        "winner": {
+          "accepted": true,
+          "action_timing": "Receipt",
+          "applied": true,
+          "epoch": 1,
+          "generation": 1,
+          "incarnation": 0,
+          "kind": "Spawn",
+          "origin": "Sample",
+          "reason": "None",
+          "seat": 2,
+          "sequence": 1,
+          "serial": 1,
+          "tick": 38
+        }
+      },
+      "change": "AUDITOR ONLY: Scheduled still same-tick seat1 success/seat2 reject; Receipt requires first Spawn per seat exactly one success then Predicate rejection, no intervening Remove, equal-tick semantic order. Actual full rows retained; legacy rejected_second_spawn remains actual only.",
+      "physics_rerun": false,
+      "root_reported_auditor_controls": 9
+    },
+    {
+      "name": "SDK active owned Delay clock never advanced",
+      "failure": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency/replay/result.json",
+        "bytes": 7281,
+        "sha256": "ad06a50935e338cd35ad1367b7be9c486c153c8026a25cbe9922844acbd2bb83"
+      },
+      "failure_summary": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/stage-failure-v1.json",
+        "bytes": 1802,
+        "sha256": "7299ecf1224870405cca5633bb0a197ace8ad0416c101974f0727f2aaeaa6f9a"
+      },
+      "support": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/active-delay-support-report-v1.json",
+        "bytes": 3445,
+        "sha256": "1742221f37e8872f52186f2f71e72c24b05ee5ef827b950d45625a1c793d534e"
+      },
+      "fix": "SAMEexistingnow; selectconnection.delay whenconnection!=nil elselegacydelay; packets!=nil guard andexistingdelay_time beforeexistingLinkpump. No retired selection.",
+      "focused_actual_controls": {
+        "owned": "actual10/1ms twoSDKSessions/realENet: ownednow817,received1,ClientRunning,0exit/cleanup0",
+        "default": "ownedzeroDelayunallocated,0exit/cleanup0",
+        "legacy": "nilOwnerpurevaluepublicSession+publicDelayconstructor: now508progress,0exit/cleanup0",
+        "retired": "publicauthenticatedsameauthorityredirect holdsoldpubliclaneOwner soolddataretained; oldnow0->0,newactive667; oldretirementfinishesafterrelease,0exit/cleanup0"
+      },
+      "no_cleanup_pass_for_failure": true,
+      "fresh_impaired_pass": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/latency-fixed1/replay/result.json",
+        "bytes": 18531,
+        "sha256": "2b860e37701e6a7054ad4323c0075b9d9631f069de542a6f966c24edf795ef1f"
+      }
+    },
+    {
+      "name": "Oversized decimal wrapped through parse_u64",
+      "failure": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/integer-overflow/result.json",
+        "bytes": 778,
+        "sha256": "e0ebfe7102227bb6b325e5575d1b99e4222f1ae25c49e0504be32bb2a3a97900"
+      },
+      "log": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed1/integer-overflow/godot.log",
+        "bytes": 7712,
+        "sha256": "e3ae71df5d5bd82fd91c7b19deeffc018b195effa065c93dd73294f6d60a217a"
+      },
+      "failure_not_passed": true,
+      "timeout_no_cleanup_pass": true,
+      "support": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/parser-repair-support-report-v1.json",
+        "bytes": 2628,
+        "sha256": "25498fac3ef7012e57ac357ca7d87ba91ebb8668e2acdc9436029672744906e2"
+      },
+      "fix": "Only impairment.odin conversion: digitvalidate, precheckvalue>max/10 or equal+digit>max%10, then*10+digit. Boundedpurehelper calledbyunchangedenvzero-defaultwrapper. Removeuncheckedstrconv call/import.",
+      "actual_imported_scene_parser_inputs": 54,
+      "fresh_selected_case": {
+        "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-controls-replay-v1/rejections-fixed2-selected7/integer-overflow/result.json",
+        "bytes": 1031,
+        "sha256": "c08b59e2ca80169dca31fda5fcaa80d8a8d8fe5645fa9466c2ed06a737809352"
+      }
+    },
+    {
+      "name": "Historical component/fixture attempts",
+      "entries": [
+        {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v4",
+          "status": "PASS_HISTORICAL",
+          "reason": "odin test cleans test executables by default; tests really passed but no retained test binary. Final v6 repeats checks with -keep-executable and requires every output artifact."
+        },
+        {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v1/macos/Debug/report.json",
+          "status": "FAIL",
+          "reason": "new pure test redeclared local error; test-only correction retained"
+        },
+        {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-matrix-v4/macos/Debug/report.json",
+          "status": "PASS_HISTORICAL",
+          "reason": "passed its own fence before approved Replay migration guard; refreshed only Mac Debug in v5"
+        },
+        {
+          "path": "/work/box3d-presentation-godot-v2/report.json",
+          "status": "FAIL",
+          "reason": "test manifest copied from older Mac-only fixture lacked Linux library selector; import errors preserved, own waiting Godot PID24487 terminated; no Native objects created. Corrected fixture and prompt script-load failure check in v3."
+        },
+        {
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/presentation-godot-values-v2/report.json",
+          "status": "PASS_HISTORICAL",
+          "reason": "pre-Linux-manifest fixture version; current Mac v3 revalidated matching new fixture"
+        }
+      ],
+      "not_relabelled": true
+    }
+  ],
+  "delegated_source_support": {
+    "current_source_hashes": {
+      "examples/kit_box3d/scripts/impairment.odin": "f7c5280841ebffde79d379b0105a9af27edad9c55cfffeaaa777b63771c7e593",
+      "examples/kit_box3d/scripts/presentation.odin": "2cb4bcc57f96e322127f58dc3ec7e4e482335055f8f2dc550387e488fb3a564a",
+      "examples/kit_box3d/scripts/runtime.odin": "3ed2e558da12b7dd3c796377cb8539fbe9b73ac03c8906e731857cd1068a38bc",
+      "examples/replay_box3d/scripts/impairment.odin": "4f61438b17eb50c17ffa229edb1e7399e176c45165a491298d34856252ab752a",
+      "examples/replay_box3d/scripts/presentation.odin": "dfedd665bbeb2cb16d8ed3c81b21a1ab3c983a1db0802ac739d06a5dc4a1ebf6",
+      "examples/replay_box3d/scripts/slice.odin": "a32abf6a247793ee74424534c23ce7951fae27e71f5290692a44166b164a9505",
+      "replay/godot/session.odin": "7d9c4f06ad4fc19be6b55ae4fbc0cec434411c0540627c8859a2dafa8b2bf6df"
+    },
+    "Kit_consumer_report": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-kit-slice/presentation-consumer-final/report.json",
+      "bytes": 12463,
+      "sha256": "751606ff82e4b5f5a58d30b597a293792a3f4adaac45e1fbccd2dd4535810b8d"
+    },
+    "Replay_controls_v1": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/support-report-v1.json",
+      "bytes": 1486,
+      "sha256": "7d9053c3f708fd48296396da79185845e31e3aeead937f7c14ca0bc8e356ae61"
+    },
+    "active_delay": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/active-delay-support-report-v1.json",
+      "bytes": 3445,
+      "sha256": "1742221f37e8872f52186f2f71e72c24b05ee5ef827b950d45625a1c793d534e"
+    },
+    "parser": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/box3d-bindings/replay-p43/impairment/parser-repair-support-report-v1.json",
+      "bytes": 2628,
+      "sha256": "25498fac3ef7012e57ac357ca7d87ba91ebb8668e2acdc9436029672744906e2"
+    },
+    "coordination_scope": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-goal-t4jbbj4v/P4.3-coordination.json",
+      "bytes": 1971,
+      "sha256": "5d052632f62b9f8d71e049e7b57738cac132c3816321a3d97b55f81087d893d2"
+    }
+  },
+  "accounting_and_channel_limits": [
+    "Tracked requested/live/reserved bytes, not RSS; Native+wrapper counted once with global Host ledger. Existing Core storage/ledger metadata and Godot/allocator/driver overhead remain separately scoped.",
+    "Kit no direct owner-count invented: successful explicit drops + retained Meter bytes0 + checked Core shutdown. Replay reports actual owner/context/callback counts. Cold preopen rejection queries real counters/status, not synthetic zero.",
+    "Local receive decorator only; applying at both actors adds separate receive delays. Reliable remains ordered/delivered; Kit loss models extra retransmit delay, Replay loss/dup only Unreliable. Jitter may reorder Stream/Unreliable even with no explicit reorder request; no independent reorder-disable claim.",
+    "Positive integration used10ms latency/1ms jitter/loss0; no positive loss/dup/reorder/narrowlink/full-soak claim. Malformed/bounds/unsupported configurations were exercised by the20 actual preopen negatives."
+  ],
+  "remaining_phase_exit": {
+    "P4_3_evidence": "complete for Root review; exact task finish still held",
+    "whole_call_4ms": "UNMET",
+    "long_two_process_contested_physics_soak": "UNMET",
+    "Gate_B_P4_4": "next, not passed",
+    "P5_and_full_goal": "BLOCKED on GateB and later work",
+    "Linux": "Component Debug/Release/WASM/ordinary-node value fixture functional via Podman/Rosetta; current scene-control stages are Mac only, not native Linux throughput or mixed-target exact physics",
+    "timings": "observational only; no simulation/admission time rejection and no new performance pass"
+  },
+  "ownership_and_workflow": {
+    "q": "shared pure helpers, optional public cache bridges and test/evidence wrapper; no example/SDK edits",
+    "n": "Kit example consumer/config support",
+    "p": "Replay example consumer/config + Root-approved narrow SDK activeDelay and example parser support",
+    "Root": "P4.2 completion/integration/harness auditor correction and final acceptance",
+    "no_new_runtime_or_journal": true,
+    "no_private_Image_Working_casts": true,
+    "no_subagents_or_extra_claims": true,
+    "all_own_jobs_exited": true,
+    "stop_after_exact_card_finish": true
+  },
+  "documentation_finalization": {
+    "previous_final_report_sha256": "d7639cffbed7df3ec74a5bccfd87bf6431e1545c91c2831b749fb0d51caea1bc",
+    "documentation_only": true,
+    "code_tests_binaries_changed": false,
+    "reruns": 0,
+    "description": "Root-requested opening/footer status correction: P4.2DONE, integrated consumers/bounded controls, exact report link, preserved component/GUI/source-version/positive10/1 and unmet4ms/long-soak limits."
+  }
+}

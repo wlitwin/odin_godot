@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Box3D snapshot and identity audit · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../authoring-guide.html">Script API</a><a href="../../events.html">Signals and events</a><a href="../../workflow.html">Editor workflow</a><a href="../../modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../kit/timelines.html">Prediction and timelines</a><a href="../../kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../exporting.html">Export reference</a><a href="../../debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Box3D snapshot and identity audit</h1><div class="reader-meta"><span>10 min read</span><span>Odin × Godot</span><a href="../../../../reference/docs/design/box3d/snapshot-audit.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#exact-source-revisions">Exact source revisions</a><a href="#api-ownership-and-snapshot-coverage">API ownership and snapshot coverage</a><a href="#detached-storage-geometry-and-cross-world-restores">Detached storage, geometry, and cross-world restores</a><a href="#image-compatibility-and-hash-limitations">Image compatibility and hash limitations</a><a href="#allocation-and-static-geometry-costs">Allocation and static-geometry costs</a><a href="#requirements-for-the-framework-adapters">Requirements for the framework adapters</a><a href="#focused-native-probe">Focused native probe</a></nav></details>
+<article class="reading-body "><p>Audited on 2026-10-30 for the <strong>Odin Godot / Box 3D Implementation</strong> board,
+task <code>t_e73e0163fcf54470</code> (P0.2). This report applies to both Kit and Replay.
+Replay already supplies full resimulation and rollback; its missing boundary is
+participation of the external solver in its existing state transactions.</p>
+<p>The current snapshot machinery is a useful implementation starting point, but
+the exposed slot API is insufficient for detached Replay frames. Its motion hash
+does not cover complete solver state, and restore is destructive. Those are
+requirements for the adapter design, not reasons to build a second rollback
+framework.</p>
+<h2 id="exact-source-revisions">Exact source revisions<a class="heading-anchor" href="#exact-source-revisions" aria-label="Link to this section">#</a></h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Revision</th>
+<th>Scope of this audit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/pdaddyo/rollback-in-a-box/tree/9e1fe882a0ea4eb52e160d5754a752580b4db462" rel="noreferrer">rollback-in-a-box</a></td>
+<td><code>9e1fe882a0ea4eb52e160d5754a752580b4db462</code></td>
+<td>Current engine-neutral core, C shim, wrapper and documentation</td>
+</tr>
+<tr>
+<td><a href="https://github.com/erincatto/box3d/tree/d421e45c828f6f853a145f726f0b9425d31146eb" rel="noreferrer">Box3D</a></td>
+<td><code>d421e45c828f6f853a145f726f0b9425d31146eb</code></td>
+<td>Exact dependency pinned by that core&#39;s <code>gdext/setup_deps.sh</code></td>
+</tr>
+<tr>
+<td>odin_godot</td>
+<td><code>56e4ab3</code></td>
+<td>Existing Replay value/frame, correction and audit contracts</td>
+</tr>
+</tbody></table>
+</div><p>The baseline investigation found a different game dependency chain:
+<code>multi-box-3d@987f4ca44d0065676f17cab35edad57fcbb63b13</code> vendors
+<code>rollback-in-a-box@91e01dc75e8dfe3fbd890f21361e27b31fa2e994</code>, which pins
+<code>Box3D@540ea387b0c02bf714fbfdcc8fb88c039c35fe6f</code>. Results from that game do
+not automatically establish correctness of the newer neutral core audited here.
+See <a href="upstream-baseline.html">upstream reproduction</a>.</p>
+<h2 id="api-ownership-and-snapshot-coverage">API ownership and snapshot coverage<a class="heading-anchor" href="#api-ownership-and-snapshot-coverage" aria-label="Link to this section">#</a></h2>
+<p>The reusable <a href="https://github.com/pdaddyo/rollback-in-a-box/blob/9e1fe882a0ea4eb52e160d5754a752580b4db462/core/src/rollback_shim.c" rel="noreferrer">C shim</a>
+calls private Box3D recording functions. <code>B3RollbackCtx</code> owns a world ID, reusable
+slot buffers, a long-lived <code>b3Recording</code> geometry registry, and a registry view
+used during restore. The public Box3D step/lifecycle API alone does not supply
+this snapshot contract. Pinning and testing the private ABI is necessary.</p>
+<p>The coverage below comes from the pinned
+<a href="https://github.com/erincatto/box3d/blob/d421e45c828f6f853a145f726f0b9425d31146eb/src/world_snapshot.c#L980" rel="noreferrer">world serializer</a>,
+not from assumptions about node poses:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Reference table"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Captured behavior</th>
+<th>Adapter consequence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>World configuration</td>
+<td>Gravity, contact tuning, speed thresholds, step index, inverse timestep, sleep/warm-start/continuous/speculative flags, capacity and end-event buffer index</td>
+<td>Keep tick/substep policy and immutable host configuration compatible</td>
+</tr>
+<tr>
+<td>Object allocation</td>
+<td>All six ID pools, sparse body/shape/contact/joint arrays, generations and free lists</td>
+<td>Restore gameplay allocation counters and mappings in the same transaction</td>
+</tr>
+<tr>
+<td>Solver sets</td>
+<td>Body simulations/states, joint simulations, contact indices and island simulations, including sleeping sets</td>
+<td>Restoring poses alone would lose required solver state</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>Sparse contact records, manifolds including accumulated impulses, mesh triangle caches</td>
+<td>Useful warm-start/contact restore coverage; contact-heavy tests remain required</td>
+</tr>
+<tr>
+<td>Joints</td>
+<td>Sparse organizational records and joint solver data in sets/graph colors</td>
+<td>Test each supported family and its motor/limit state</td>
+</tr>
+<tr>
+<td>Islands/sleep</td>
+<td>Island membership, constraint-removal counters, body sleep fields and sleeping solver sets</td>
+<td>Test sleep/wake and split-island transitions after rewinds</td>
+</tr>
+<tr>
+<td>Broadphase</td>
+<td>Dynamic trees, nodes, moved-proxy bitsets, move array and pair hash table/probe layout</td>
+<td>Broadphase traversal state is part of the snapshot</td>
+</tr>
+<tr>
+<td>Constraint graph</td>
+<td>Body sets, joint simulations and contact lists by color</td>
+<td>Transient prepared SIMD/constraint buffers are omitted</td>
+</tr>
+<tr>
+<td>Sensors</td>
+<td>Hits and both overlap-history arrays with shape IDs/generations</td>
+<td>Event output buffers are a separate omission below</td>
+</tr>
+<tr>
+<td>Shapes/materials</td>
+<td>Filters, flags, owned material arrays, sphere/capsule geometry; registry IDs for hull/mesh/heightfield/compound data</td>
+<td>Geometry registry lifetime is part of snapshot ownership</td>
+</tr>
+<tr>
+<td>Names</td>
+<td>Name-cache entries</td>
+<td>These contribute snapshot bytes even though they are not gameplay state</td>
+</tr>
+<tr>
+<td><code>userData</code></td>
+<td>Body, shape and joint pointers are written/loaded as null</td>
+<td>Rebind host associations from stable rollback-owned identities; never depend on restored pointers</td>
+</tr>
+<tr>
+<td>Host callbacks</td>
+<td>World filter, pre-solve, friction/restitution, task callbacks and their contexts are not serialized</td>
+<td>Keep callback identity/configuration fixed and put any mutable callback dependencies in rollback state</td>
+</tr>
+<tr>
+<td>Host world wiring</td>
+<td>World slot/generation, scheduler, workers, allocator/scratch/profiling, recording and world <code>userData</code> remain host-owned</td>
+<td>Restore only at a settled, unlocked boundary with no concurrent step/query/registry mutation</td>
+</tr>
+<tr>
+<td>Debug renderer</td>
+<td>Shape renderer handles may be retained for matching slot/generation; vanished handles can invoke host destruction callbacks</td>
+<td>Disable these callbacks in speculative/audit worlds or explicitly isolate their side effects</td>
+</tr>
+<tr>
+<td>Event outputs</td>
+<td>Body moves, begin/end touch arrays, contact hits and joint-event arrays are not serialized</td>
+<td>Fold physics events into framework-owned occurrences before capture; define event-buffer reset/restoration explicitly</td>
+</tr>
+<tr>
+<td>Game side-state</td>
+<td>Entity mappings, gameplay RNG, health, timers, spawn counters, input edges and queued game events are absent</td>
+<td>Kit and Replay must own and restore them alongside the solver</td>
+</tr>
+</tbody></table>
+</div><p><code>b3DeserializeIntoShell</code> also operates over populated worlds, as the shim uses it
+for in-place loads. It tears down/rebuilds per-object storage while retaining
+host wiring. Header validation precedes mutation, but later parsing can fail
+after freeing or modifying the live world. It is <strong>not an atomic transaction</strong>.
+The adapter must never mistake a false return for an untouched published world.</p>
+<p>Event arrays merit a specific regression gate: the focused probe below saved a
+world before stepping, advanced it, and loaded the old snapshot. The future
+<code>bodyMoveEvents</code> entry remained present. Begin/hit outputs clear at the next
+step, while end events are double-buffered; restoring only their buffer index
+does not restore their contents. Verify destroy-before-step and sensor/contact
+end events across rewinds rather than assuming the next step repairs all cases.</p>
+<h2 id="detached-storage-geometry-and-cross-world-restores">Detached storage, geometry, and cross-world restores<a class="heading-anchor" href="#detached-storage-geometry-and-cross-world-restores" aria-label="Link to this section">#</a></h2>
+<p>A slot&#39;s bytes can be copied into independent storage, but those bytes are not
+a self-contained portable world. They contain geometry registry IDs whose
+definitions live in the context. Registry entries append as new geometry appears;
+old blobs remain until context destruction. Meshes and heightfields in a restored
+world point directly into registry bytes; compounds use lazily reconstructed
+registry-owned live data. Hulls are cloned into the world&#39;s hull database.
+Consequently <strong>destroy the world before its context/registry</strong>. Rebuilding a
+context while a live restored mesh/heightfield/compound still borrows its data
+requires particular care.</p>
+<p>The current C shim exposes save/load by slot within one context. It supplies no
+snapshot clone/export/import, retained lease, independent byte-buffer read, or
+destination-world parameter. A copied integer slot number or live <code>rawptr</code> is
+therefore not a detached Replay <code>Frame</code>.</p>
+<p>The underlying internal deserializer accepts another world and a compatible
+registry reader. The focused probe restored a simple hull-body snapshot into a
+different live world and matched one subsequent motion step. That establishes a
+narrow candidate mechanism for scratch worlds, not a general clone guarantee.
+The destination retains its host world identity; application body IDs must
+replace <code>world0</code> with the destination world slot while preserving snapshot-era
+object index/generation. Cross-world contacts, joints, sensors, mesh assets,
+callback wiring and long resimulation still need targeted proof.</p>
+<p>Within the same world, snapshot-era handles become valid again and objects
+created after capture disappear. A post-snapshot handle can subsequently become
+numerically valid again when a resimulated spawn reuses that slot/generation.
+The probe observed this reuse. External presentation objects must use restored
+game identities and mappings, not interpret a raw handle as durable identity.</p>
+<h2 id="image-compatibility-and-hash-limitations">Image compatibility and hash limitations<a class="heading-anchor" href="#image-compatibility-and-hash-limitations" aria-label="Link to this section">#</a></h2>
+<p>The snapshot is raw native struct data plus variable sections. Its header checks
+magic, format version 2, a size-derived layout hash and float/double precision.
+It does not establish endian independence, semantic field compatibility or all
+compiler/configuration compatibility. Size-only layout hashing cannot detect
+every ABI change. Keep images local to the exact supported build and validate
+the dependency/configuration fingerprint separately.</p>
+<p>Snapshot byte equality is not canonical logical equality. Live <code>b3Shape</code> images
+retain their geometry-union pointer bits before the serializer writes the
+separate registry reference; the union is only zeroed for free slots. Native
+padding and other storage details also require normalization. The probe produced
+equal motion hashes but unequal images for equivalent simple worlds. A fixed
+<code>[N]u8</code> array satisfies Replay&#39;s value-type checker without resolving these
+ownership or canonicalization issues.</p>
+<p>The pinned
+<a href="https://github.com/erincatto/box3d/blob/d421e45c828f6f853a145f726f0b9425d31146eb/src/recording.c#L1235" rel="noreferrer"><code>b3HashWorldState</code></a>
+hashes live body positions/orientations and awake linear/angular velocities.
+It does <strong>not</strong> hash gravity/configuration, contacts or warm-start impulses,
+shape definitions/materials, joint settings/impulses, ID pools, sleeping timers,
+sensor histories or gameplay state. The neutral wrapper adds its frame number,
+normalized body index/generation table and convenience rendering metadata.
+Neither function is a complete solver-state digest. The probe changed gravity
+without changing the upstream hash.</p>
+<p>Matching motion hashes remain a useful observation, but cannot establish the
+original plan&#39;s complete confirmed-state equivalence. Before treating hash
+agreement as a correctness gate, implement a documented canonical digest over
+all simulation-affecting state plus game side-state. Exclude pointers, host world
+indices and presentation data; normalize geometry identity independently of
+registry insertion order. The binary&#39;s small simulation fingerprint can reject
+some incompatible builds, but its 90-frame motion probe is not a proof of every
+world or cross-platform determinism.</p>
+<h2 id="allocation-and-static-geometry-costs">Allocation and static-geometry costs<a class="heading-anchor" href="#allocation-and-static-geometry-costs" aria-label="Link to this section">#</a></h2>
+<p><a href="https://github.com/erincatto/box3d/issues/134" rel="noreferrer">Issue #134</a> remains open when
+checked. Its August maintainer reply identifies collision-mesh duplication as
+an obstacle to a public snapshot API. The audited revision already interns
+geometry outside each slot; retain the issue&#39;s concern as historical context,
+then measure the current implementation rather than repeating the older
+blanket cost assumption.</p>
+<p>Interning reduces retained duplicated bytes, but the pinned
+<a href="https://github.com/erincatto/box3d/blob/d421e45c828f6f853a145f726f0b9425d31146eb/src/recording.c#L1190" rel="noreferrer"><code>b3RecInternHull/Mesh/HeightField/Compound</code></a>
+still allocates, copies and hashes a geometry blob on each call. Deduplication
+compares its bytes and frees the temporary duplicate. The warmed single-hull
+probe observed <strong>one Box3D allocation per save</strong>, despite reuse of the slot
+buffer. Do not interpret buffer reuse as an allocation-free snapshot path.
+Restore also rebuilds various arrays/materials/manifolds/trees and allocates
+shape-handle scratch. Benchmark allocation count and bytes as well as wall time.</p>
+<p>The geometry registry is append-only, including geometry first encountered on
+speculative branches. A bounded slot count alone does not bound its retained
+memory. Measure registry bytes/high-water marks, unique geometry spawn/churn,
+slot capacity, save/load allocations, and game-side history separately. Define
+an asset lifetime/cap or safe registry compaction policy before production.</p>
+<h2 id="requirements-for-the-framework-adapters">Requirements for the framework adapters<a class="heading-anchor" href="#requirements-for-the-framework-adapters" aria-label="Link to this section">#</a></h2>
+<p>Kit can extend its existing correction lane, but must include complete external
+solver and side-state restore. Replay must preserve the guarantees already
+provided by <a href="../../../replay/timeline.odin.html">its timeline</a> and
+<a href="../../../replay/correction.odin.html">correction operations</a>:</p>
+<ol>
+<li>Frames and saved checkpoints retain complete detached state. A <code>World</code>
+snapshot token is sufficient only if ownership, export and lifetime are
+explicitly part of the frame contract; <code>ctx.user</code> alone does not provide this.</li>
+<li>Stage suffix resimulation separately from published state. Failed steps,
+rejected commit gates, rejected actions and audit runs leave published solver
+state, mappings and occurrences unchanged. The destructive upstream loader
+needs scratch-world staging or an equally explicit rollback-on-failure design.</li>
+<li>Atomicity includes intermediate action predicates: Replay can restore a
+copied <code>State</code> after an action returns false, so an action that mutated an
+external solver needs the corresponding subtransaction or a deferred command
+policy. Whole-tick save/load alone does not cover this case.</li>
+<li>An audit may execute a complete suffix but must restore/retain the published
+head. <code>rewind</code>, checkpoint reset, frame-copy resume, history wrap and destruction
+need matching solver ownership operations too.</li>
+<li><code>correct_reusing</code> must compare the complete predecessor state. A slot index or
+narrow motion hash cannot justify reusing a record. Disable this optional
+optimization for the first adapter unless complete equivalence is established.</li>
+<li>Deliver physics callbacks/events through framework-owned deterministic inputs
+and occurrences. Keep Godot presentation and debug callbacks outside scratch
+execution. Rebind any required host pointers after load.</li>
+<li>Local opaque images and canonical recovery are different contracts. Do not
+send these raw images as general late-join/migration data, or claim P2P
+support by hiding floating solver data inside integer byte-array schemas.</li>
+</ol>
+<p>These are design requirements inferred from the audited sources. P0.5 must
+select and document the representation and transaction implementation; this
+audit does not change either framework&#39;s runtime.</p>
+<h2 id="focused-native-probe">Focused native probe<a class="heading-anchor" href="#focused-native-probe" aria-label="Link to this section">#</a></h2>
+<p>This audit built Box3D and the current neutral core in an isolated scratch
+project. It did not run the upstream Godot/game suite; those results belong to
+the separate baseline report. Environment: macOS 15.8 arm64, Apple Clang 16.0.0,
+CMake 3.31.3, Unix Makefiles, Debug, default NEON SIMD, single worker,
+<code>-ffp-contract=off</code>, float precision. <code>BOX3D_VALIDATE</code> was not defined in this
+subdirectory build; normal Debug assertions were active.</p>
+<p>Observed results, both probe processes exiting 0:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">motion_hash_ignores_gravity=1
+warmed_hull_save_box3d_allocations=1
+body_user_data_cleared=1 snapshot_bytes=6341 post_restore_future_move_events=1
+future_handle_invalid_after_restore=1 same_handle_reused_on_respawn=1
+equal_motion_hashes_unequal_snapshot_bytes=1 image_bytes=6341 registry_entries=1
+internal_cross_world_import_with_shared_registry=1 retargeted_handle_valid=1 one_step_motion_hash_matches=1
+snapshot_audit_probe: PASS</code></pre></div><p>A separate malformed-image process additionally observed:</p>
+<div class="code-block"><div class="code-title"><span>Text</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-text">truncated_load_returns_false_after_mutating_gravity=1
+corrupt_probe: PASS (isolated process exits without destroying the damaged world)</code></pre></div><p>The malformed image used a valid header with a 112-byte truncated body. An
+exploratory attempt to destroy that partly restored world asserted in the ID
+pool. The final corrupt-image probe deliberately exits its isolated process
+without normal teardown. These images must stay trusted/local, and a failed
+parse must not be installed into the published world. This probe is a narrow
+boundary check, not a memory-safety or fuzzing campaign.</p>
+<p>Scratch evidence for this run:
+<code>/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/box3d-phase0-qu5lt6zn/snapshot/</code>
+contains the pinned clones, <code>audit_probe.c</code>, <code>CMakeLists.txt</code>, <code>configure.log</code>,
+<code>build.log</code>, <code>probe.log</code>, and <code>corrupt-probe.log</code>. The complete probe and build
+recipe follow so the finding does not depend on retaining temporary files.</p>
+<p>Gate A still needs contact/joint/sensor/lifecycle corpus coverage, complete
+logical digest checks, long/random rewinds, 100/500-body timing/memory results,
+and evidence for each supported compiler/target. Neither the source audit nor
+this one-body probe satisfies Gate A.</p>
+<h3 id="reproduce-the-focused-probe">Reproduce the focused probe<a class="heading-anchor" href="#reproduce-the-focused-probe" aria-label="Link to this section">#</a></h3>
+<p>In a fresh scratch directory, fetch the exact revisions and save the two code
+blocks below as <code>CMakeLists.txt</code> and <code>audit_probe.c</code>:</p>
+<div class="code-block"><div class="code-title"><span>Shell</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-sh">git <span class="hljs-built_in">clone</span> https://github.com/erincatto/box3d.git box3d
+git -C box3d checkout --detach d421e45c828f6f853a145f726f0b9425d31146eb
+git <span class="hljs-built_in">clone</span> https://github.com/pdaddyo/rollback-in-a-box.git rollback-in-a-box
+git -C rollback-in-a-box checkout --detach 9e1fe882a0ea4eb52e160d5754a752580b4db462
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --target snapshot_audit_probe -j 6
+./build/snapshot_audit_probe
+./build/snapshot_audit_probe corrupt</code></pre></div><p>The corrupt case is deliberately a separate process. Check both exit statuses.
+No Godot or godot-cpp build is required for this probe.</p>
+<div class="code-block"><div class="code-title"><span>cmake</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-cmake"><span class="hljs-keyword">cmake_minimum_required</span>(VERSION <span class="hljs-number">3.22</span>)
+<span class="hljs-keyword">project</span>(snapshot_audit_probe LANGUAGES C CXX)
+<span class="hljs-keyword">add_compile_options</span>(-ffp-contract=<span class="hljs-keyword">off</span>)
+<span class="hljs-keyword">add_subdirectory</span>(box3d)
+<span class="hljs-keyword">add_subdirectory</span>(rollback-in-a-box/core neutral)
+<span class="hljs-keyword">add_executable</span>(snapshot_audit_probe audit_probe.c)
+<span class="hljs-keyword">target_include_directories</span>(snapshot_audit_probe PRIVATE box3d/src)
+<span class="hljs-keyword">target_link_libraries</span>(snapshot_audit_probe PRIVATE box3d_rollback_neutral)
+<span class="hljs-keyword">set_property</span>(<span class="hljs-keyword">TARGET</span> snapshot_audit_probe PROPERTY C_STANDARD <span class="hljs-number">17</span>)</code></pre></div><div class="code-block"><div class="code-title"><span>c</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdatomic.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;box3d/box3d.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;rollback_shim.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;physics_world.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;recording.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;recording_replay.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;world_snapshot.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> CHECK(condition) do { <span class="hljs-keyword">if</span> (!(condition)) { fprintf(stderr, <span class="hljs-string">&quot;CHECK failed: %s:%d: %s\n&quot;</span>, __FILE__, __LINE__, #condition); exit(1); } } while (0)</span>
+
+<span class="hljs-type">static</span> <span class="hljs-keyword">_Atomic</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> allocation_calls;
+<span class="hljs-type">static</span> <span class="hljs-type">void</span> *<span class="hljs-title function_">count_alloc</span><span class="hljs-params">(<span class="hljs-type">int32_t</span> size, <span class="hljs-type">int32_t</span> alignment)</span> {
+    <span class="hljs-type">void</span> *p = <span class="hljs-literal">NULL</span>;
+    CHECK(posix_memalign(&amp;p, (<span class="hljs-type">size_t</span>)alignment, (<span class="hljs-type">size_t</span>)size) == <span class="hljs-number">0</span>);
+    atomic_fetch_add(&amp;allocation_calls, <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">return</span> p;
+}
+<span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title function_">count_free</span><span class="hljs-params">(<span class="hljs-type">void</span> *p)</span> { <span class="hljs-built_in">free</span>(p); }
+
+<span class="hljs-type">static</span> b3BodyId <span class="hljs-title function_">add_body</span><span class="hljs-params">(b3WorldId world, <span class="hljs-type">float</span> y)</span> {
+    b3BodyDef body_def = b3DefaultBodyDef();
+    body_def.type = b3_dynamicBody;
+    body_def.position = (b3Vec3){<span class="hljs-number">0</span>, y, <span class="hljs-number">0</span>};
+    b3BodyId body = b3CreateBody(world, &amp;body_def);
+    b3ShapeDef shape_def = b3DefaultShapeDef();
+    b3BoxHull hull = b3MakeBoxHull(<span class="hljs-number">0.5f</span>, <span class="hljs-number">0.5f</span>, <span class="hljs-number">0.5f</span>);
+    b3CreateHullShape(body, &amp;shape_def, &amp;hull.base);
+    <span class="hljs-keyword">return</span> body;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> **argv)</span> {
+    (<span class="hljs-type">void</span>)argv;
+    b3SetAllocator(count_alloc, count_free);
+    setvbuf(<span class="hljs-built_in">stdout</span>, <span class="hljs-literal">NULL</span>, _IONBF, <span class="hljs-number">0</span>);
+    b3r_install_exit_on_assert();
+    b3WorldDef def = b3DefaultWorldDef();
+    def.workerCount = <span class="hljs-number">1</span>;
+    b3WorldId a = b3CreateWorld(&amp;def);
+    b3BodyId body_a = add_body(a, <span class="hljs-number">4.0f</span>);
+    B3RollbackCtx *ctx = b3r_create(a, <span class="hljs-number">3</span>);
+    CHECK(ctx != <span class="hljs-literal">NULL</span>);
+    b3World *world_a = b3GetWorldFromId(a);
+
+    <span class="hljs-type">uint64_t</span> hash = b3r_world_hash(a);
+    b3World_SetGravity(a, (b3Vec3){<span class="hljs-number">0</span>, <span class="hljs-number">-99</span>, <span class="hljs-number">0</span>});
+    CHECK(hash == b3r_world_hash(a));
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;motion_hash_ignores_gravity=1\n&quot;</span>);
+    b3World_SetGravity(a, def.gravity);
+
+    b3Body_SetUserData(body_a, (<span class="hljs-type">void</span>*)<span class="hljs-number">0x1234</span>);
+    <span class="hljs-type">int</span> snapshot_bytes = b3r_save(ctx, <span class="hljs-number">0</span>);
+    CHECK(snapshot_bytes &gt; <span class="hljs-number">0</span>);
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> before_save_allocs = <span class="hljs-type">atomic_load</span>(&amp;allocation_calls);
+    CHECK(b3r_save(ctx, <span class="hljs-number">0</span>) == snapshot_bytes);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;warmed_hull_save_box3d_allocations=%lu\n&quot;</span>, <span class="hljs-type">atomic_load</span>(&amp;allocation_calls) - before_save_allocs);
+    CHECK(world_a-&gt;bodyMoveEvents.count == <span class="hljs-number">0</span>);
+    b3World_Step(a, <span class="hljs-number">1.0f</span>/<span class="hljs-number">60.0f</span>, <span class="hljs-number">4</span>);
+    <span class="hljs-type">int</span> future_move_events = world_a-&gt;bodyMoveEvents.count;
+    CHECK(future_move_events &gt; <span class="hljs-number">0</span>);
+    CHECK(b3r_load(ctx, <span class="hljs-number">0</span>));
+    CHECK(b3Body_GetUserData(body_a) == <span class="hljs-literal">NULL</span>);
+    CHECK(world_a-&gt;bodyMoveEvents.count == future_move_events);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;body_user_data_cleared=1 snapshot_bytes=%d post_restore_future_move_events=%d\n&quot;</span>, snapshot_bytes, future_move_events);
+
+    b3BodyId future_body = add_body(a, <span class="hljs-number">8.0f</span>);
+    CHECK(b3r_load(ctx, <span class="hljs-number">0</span>));
+    CHECK(!b3Body_IsValid(future_body));
+    b3BodyId replacement = add_body(a, <span class="hljs-number">20.0f</span>);
+    CHECK(b3StoreBodyId(future_body) == b3StoreBodyId(replacement));
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;future_handle_invalid_after_restore=1 same_handle_reused_on_respawn=1\n&quot;</span>);
+    CHECK(b3r_load(ctx, <span class="hljs-number">0</span>));
+
+    b3WorldId b = b3CreateWorld(&amp;def);
+    add_body(b, <span class="hljs-number">4.0f</span>);
+    b3Recording *rec_a = b3CreateRecording(<span class="hljs-number">0</span>);
+    b3Recording *rec_b = b3CreateRecording(<span class="hljs-number">0</span>);
+    b3RecBuffer image_a = {<span class="hljs-number">0</span>}, image_b = {<span class="hljs-number">0</span>};
+    b3SerializeWorld(world_a, &amp;image_a, rec_a);
+    b3SerializeWorld(b3GetWorldFromId(b), &amp;image_b, rec_b);
+    CHECK(b3r_world_hash(a) == b3r_world_hash(b));
+    CHECK(image_a.size == image_b.size);
+    CHECK(<span class="hljs-built_in">memcmp</span>(image_a.data, image_b.data, image_a.size) != <span class="hljs-number">0</span>);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;equal_motion_hashes_unequal_snapshot_bytes=1 image_bytes=%d registry_entries=%d\n&quot;</span>, image_a.size, rec_a-&gt;registry.count);
+
+    b3RegistrySlot *slots = <span class="hljs-built_in">calloc</span>((<span class="hljs-type">size_t</span>)rec_a-&gt;registry.count, <span class="hljs-keyword">sizeof</span>(*slots));
+    <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> i = <span class="hljs-number">0</span>; i &lt; rec_a-&gt;registry.count; i++) {
+        slots[i].kind = rec_a-&gt;registry.entries[i].kind;
+        slots[i].byteCount = rec_a-&gt;registry.entries[i].byteCount;
+        slots[i].bytes = rec_a-&gt;registry.entries[i].bytes;
+    }
+    b3RecReader reader = {<span class="hljs-number">0</span>};
+    reader.ok = <span class="hljs-literal">true</span>;
+    reader.replayWorldId = b;
+    reader.slots = slots;
+    reader.slotCount = rec_a-&gt;registry.count;
+    CHECK(b3DeserializeIntoShell(image_a.data, image_a.size, b3GetWorldFromId(b), &amp;reader));
+    CHECK(b3r_world_hash(a) == b3r_world_hash(b));
+    b3BodyId retargeted = body_a;
+    retargeted.world0 = b.index1 - <span class="hljs-number">1</span>;
+    CHECK(b3Body_IsValid(retargeted));
+    b3World_Step(a, <span class="hljs-number">1.0f</span>/<span class="hljs-number">60.0f</span>, <span class="hljs-number">4</span>);
+    b3World_Step(b, <span class="hljs-number">1.0f</span>/<span class="hljs-number">60.0f</span>, <span class="hljs-number">4</span>);
+    CHECK(b3r_world_hash(a) == b3r_world_hash(b));
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;internal_cross_world_import_with_shared_registry=1 retargeted_handle_valid=1 one_step_motion_hash_matches=1\n&quot;</span>);
+
+    <span class="hljs-keyword">if</span> (argc &gt; <span class="hljs-number">1</span>) {
+    b3WorldId damaged = b3CreateWorld(&amp;def);
+    b3World_SetGravity(damaged, (b3Vec3){<span class="hljs-number">0</span>, <span class="hljs-number">-77</span>, <span class="hljs-number">0</span>});
+    b3RecReader damaged_reader = reader;
+    damaged_reader.replayWorldId = damaged;
+    CHECK(!b3DeserializeIntoShell(image_a.data, <span class="hljs-number">112</span>, b3GetWorldFromId(damaged), &amp;damaged_reader));
+    CHECK(b3GetWorldFromId(damaged)-&gt;gravity.y == def.gravity.y);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;truncated_load_returns_false_after_mutating_gravity=1\n&quot;</span>);
+
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;corrupt_probe: PASS (isolated process exits without destroying the damaged world)&quot;</span>);
+    _Exit(<span class="hljs-number">0</span>);
+    }
+    b3DestroyWorld(b);
+    b3DestroyWorld(a);
+    b3r_destroy(ctx);
+    b3RecBufFree(&amp;image_a);
+    b3RecBufFree(&amp;image_b);
+    b3DestroyRecording(rec_a);
+    b3DestroyRecording(rec_b);
+    <span class="hljs-built_in">free</span>(slots);
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;snapshot_audit_probe: PASS&quot;</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}</code></pre></div></article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="upstream-baseline.html"><span>Box3D upstream reproduction baseline</span><span aria-hidden="true">→</span></a><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">docs/design/box3d/snapshot-audit.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#exact-source-revisions" class="">Exact source revisions</a><a href="#api-ownership-and-snapshot-coverage" class="">API ownership and snapshot coverage</a><a href="#detached-storage-geometry-and-cross-world-restores" class="">Detached storage, geometry, and cross-world restores</a><a href="#image-compatibility-and-hash-limitations" class="">Image compatibility and hash limitations</a><a href="#allocation-and-static-geometry-costs" class="">Allocation and static-geometry costs</a><a href="#requirements-for-the-framework-adapters" class="">Requirements for the framework adapters</a><a href="#focused-native-probe" class="">Focused native probe</a><a href="#reproduce-the-focused-probe" class="subsection">Reproduce the focused probe</a></nav><div class="outline-actions"><a href="../../../../reference/docs/design/box3d/snapshot-audit.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

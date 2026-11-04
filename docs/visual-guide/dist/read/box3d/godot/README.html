@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>Optional SDK host protocol · odin_godot</title><link rel="icon" href="../../../favicon.svg"><link rel="stylesheet" href="../../../style.css"><link rel="stylesheet" href="../../../reader.css"><link rel="stylesheet" href="../../../sdk.css"><script src="../../../reader.js" defer></script><script src="../../../site.js" defer></script></head>
+<body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../docs.html" aria-current="page">Docs</a><a href="../../../guide.html">Field guide</a><a href="../../../examples.html">Examples</a><a href="../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
+<div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../docs.html">Overview</a><a href="../../../docs/install.html">Installation</a><a href="../../../docs/first-script.html">Your first script</a><a href="../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../docs/authoring-guide.html">Script API</a><a href="../../docs/events.html">Signals and events</a><a href="../../docs/workflow.html">Editor workflow</a><a href="../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../docs/multiplayer.html">Choose a model</a><a href="../../../docs/kit.html">Build with Kit</a><a href="../../../docs/replay.html">Build with Replay</a><a href="../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../docs/kit/profiles.html">Authority profiles</a><a href="../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../docs/exporting.html">Build and export</a><a href="../../docs/exporting.html">Export reference</a><a href="../../docs/debugging.html">Debugging</a><a href="../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../examples/replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../examples/replay_scrapyard/code-guide.html">Code guide</a><a href="../../examples/replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../docs.html">Docs</a><span>/</span><a href="../../../reading.html">Odin × Godot</a><span>/</span><span>Guide</span></div><p class="eyebrow">Odin × Godot</p><h1>Optional SDK host protocol</h1><div class="reader-meta"><span>6 min read</span><span>Odin × Godot</span><a href="../../../reference/box3d/godot/README.md" download>Page source ↓</a></div></div>
+<details class="mobile-toc"><summary>On this page <span>↓</span></summary><nav><a href="#code-data-and-scene-context">Code, data and scene context</a><a href="#shared-request-and-reservation-accounting">Shared request and reservation accounting</a></nav></details>
+<article class="reading-body "><p><code>protocol.h</code> and <code>protocol.odin</code> define the same C-shaped records. The protocol
+package imports no native backend, framework, Godot objects, allocator or typeid.
+Importing <code>Owner</code>/<code>Status</code> activates no native profile. Core&#39;s implementation is
+in <code>host/</code>; the optional producer-side retained allocator is in <code>meter/</code>.</p>
+<p>The public ABI is version 1: Owner 48 bytes, Data_Lease 24, Capsule 32 and
+Service 200 on the supported 64-bit targets. <code>protocol_fingerprint()</code> covers
+actual sizes, alignments and offsets; the independent C reference is in
+<code>tests/box3d_modules/core/protocol_test.c</code>.</p>
+<p>Runtime exports pure <code>odin_scripts_box3d_profile</code>, <code>odin_scripts_box3d_protocol</code>
+and <code>odin_scripts_box3d_contract</code>, and an installation entry
+<code>odin_scripts_box3d_install</code>. A native binding registers discovery/install with
+<code>module_register</code>; optional adapters register pure realm installers with
+<code>module_add_hook</code>. Install hooks configure guards/realms only; they must not
+create resources or invoke authored code. Core validates before boot, creates a
+producer record once its existing Script_Generation exists, then installs before
+instances can use it. Hook installation publishes the module Service only after
+all hooks succeed. Every opted-in SDK module must explicitly declare even
+profile 0; older modules cannot evade admission by omitting the handshake.</p>
+<p><code>BOX3D_HOST_ENABLED=true</code> enables the Core service. Root&#39;s build/deployment code
+supplies <code>BOX3D_NATIVE_LIBRARY</code>, copies the verified shared backend beside Core
+as <code>libogb3.dylib</code>/<code>libogb3.so</code>, and supplies controlled consumer loader paths.
+Core resolves that exact adjacent filename; it does not search a runtime
+environment override. Scripts use <code>BOX3D_REQUIRE_DOMAIN=true</code> and the verified
+<code>BOX3D_EXPECTED_BUILD=sha256:&lt;64hex&gt;</code> and
+<code>BOX3D_EXPECTED_TARGET=sha256:&lt;64hex&gt;</code>. The explicit prefix prevents Odin command
+line numeric inference from truncating hashes such as <code>9e41bb...</code>; comparison
+strips only that prefix and still requires exactly 32 digest bytes. Discovery and binding
+installation compare these compile expectations and the actual native cookie;
+an older mapped ABI-compatible library cannot silently satisfy a new build.
+The cookie and producer realm are process-local lifetime capabilities, never
+Game, network, recovery or durable identity. Standalone/default native-free
+framework behavior remains available without this service.</p>
+<h2 id="code-data-and-scene-context">Code, data and scene context<a class="heading-anchor" href="#code-data-and-scene-context" aria-label="Link to this section">#</a></h2>
+<p>An Owner retains its existing SDK generation independently of its data context.
+Its check/retain/drop functions point into stable Core. The consumer checks its
+module-local realm before any typed object, allocator or type metadata access,
+then calls Core&#39;s protected-origin check. A different producer or reload realm
+requires a C capsule or canonical conversion, even when nominal types match.
+Native-profile <code>script_of</code>/<code>script_any</code> also reject a raw typed userdata handoff
+across producer generations; ordinary non-native targets keep their existing
+behavior.</p>
+<p>Data_Lease callbacks retain an actual managed heap/allocator context. They must
+be paired, have atomic failure behavior, and belong to the originating loaded
+code image (or the known stable Core same-producer Owner hook pair). They do not
+make arbitrary raw pointers owned. Strict factories reject unsupported borrowed
+allocators/users, validate exact declared context pointers or explicit retained
+allocation-block aliases, and use the SDK meter for participating containers.
+Source scene userdata and its subfields cannot be claimed by a Data_Lease; Core
+checks their registered allocation spans before invoking retain callbacks.</p>
+<p><code>context_caps</code> contains MANAGED_DATA=1 plus WEAK_INSTANCE=2 or
+INDEPENDENT_CONTEXT=4. READ=0 permits cached reads, clones and destruction under
+the origin. EXECUTE=1 additionally requires the captured weak scene instance to
+remain live. A weak declaration cannot retain raw self. Logical invalidation
+precedes actual source free; <code>context_release</code> closes the physical span only
+after its userdata allocation is freed. Detached weak owners retain a tombstone
+until their final drop. New instance/reload contexts are bound before any new
+setter/default/reload callback runs. Retained data and code can therefore support
+cached operations after actual scene destruction while authored execution fails.</p>
+<p>Capsule data stays opaque outside its producer. Creation validates and stores
+the origin C dispatcher while the caller is protected. <code>Capsule.invoke</code> and
+<code>Capsule.destroy</code> enter stable Core, acquire the existing execution gate and a
+temporary generation pin, establish the origin, and invoke the whole typed
+operation. That includes fields, events, allocator frees and accounting. The
+producer callback returns into Core before the call pin and gate are released.
+Last release schedules the existing writer-gate collector; no producer-local
+leave-and-return wrapper substitutes for this outer boundary.</p>
+<p>Operations 0 (destroy) and 1 (clone with Capsule_Clone_Args) are common. Other
+operation argument records require the producer&#39;s separately agreed C-shaped
+interface; no typed framework object/allocator/typeid crosses an opaque args
+pointer. Wrong origin/thread and invalid handles reject before dispatch. A
+valid data release is expected to succeed; if its atomic drop declines after a
+payload destructor, Core retains a cleanup-only tombstone, denies reads and
+retries only the final lease drop, never the freed payload destructor.</p>
+<h2 id="shared-request-and-reservation-accounting">Shared request and reservation accounting<a class="heading-anchor" href="#shared-request-and-reservation-accounting" aria-label="Link to this section">#</a></h2>
+<p>Core uses the one native ledger. Fixed bounded Core registry storage is charged
+once. Each producer has ONE aggregate LIVE plus remaining-reservation token;
+category publishers report actual live bytes and monotonic successful HOST
+requests. Forecast admission sizes are not observed live storage. Successful
+requests remain counted after frees, reallocations or admission failure. The
+native engine and snapshot-wrapper requested counters are observed once, and
+all producer HOST requests participate in the cumulative operation observer.
+Metadata/allocator table costs must also be charged. Covered SDK allocations
+must not be counted again by old manual provider/Core estimates.</p>
+<p>Each successful <code>budget_begin</code> returns a unique mark. A same-producer child
+compares its declared bound with the outer ORIGINAL bound, shares the remaining
+promise and adds no ticket. Actual cumulative requests consume that promise;
+net-live differences never substitute. Another producer&#39;s allocation budget or
+increasing account while one is active returns Unsupported before mutation.
+Cached cross-producer reads remain allowed. An allocating A capsule clone under
+caller B is allowed when B has no active allocation budget.</p>
+<p><code>budget_reconcile</code> never ends a mark. Exactly one deferred cleanup owns each
+successful begin. <code>budget_end</code> accepts only the top unique mark; duplicates,
+stale IDs and ending a parent while a child exists return InvalidHandle without
+popping anything. A valid end returning Capacity still ends that mark and
+releases its promise; clear the caller&#39;s mark and abort the candidate, never
+retry the end or accidentally end its parent.</p>
+<p><code>legacy_extra(user,0,0,proposed_extra,out)</code> reconciles first. Within an active
+budget, the proposed request must fit remaining and is already covered; the
+result includes all registered LIVE plus remaining reservations once. Outside
+a budget it additionally counts the unregistered extra. It excludes native
+engine/wrapper bytes because the legacy native/alpha check adds those once.</p>
+<p>An explicit current mark plus <code>implicit_C_reserve</code> excludes only the held
+portion of that operation&#39;s promise, up to <code>min(implicit,remaining)</code>. Native C
+still adds its FULL implicit reserve; any gap is conservative, never a skipped
+check or another producer&#39;s stolen ticket. An ancestor and child cannot both
+exclude an implicit reserve. For opaque custom recovery catalogs, read holds a
+6 MiB operation bound but excludes only the guaranteed native 4 MiB staging
+floor; C still checks actual DTO limit plus 4 MiB. A known exact configured DTO
+limit permits its exact DTO+4 MiB exception. Write retains its 8 MiB operation
+preflight and all original resource/semantic/codec validation.</p>
+<p>Core uses its existing reader/writer gate and generation references. The alpha
+host supports one main-thread caller; other threads return Unsupported before
+native/typed owner use. Core shutdown refuses live native/typed owners and never
+force-frees them. It closes the registry charge only after all producer/data
+owners are gone. This service is not an allocator hard cap or recovery from the
+native engine&#39;s fatal OOM boundary.</p>
+<p>Actual Godot two-module/reload acceptance belongs to the coordinator. C/fake-gate
+controls alone do not certify it. The separate cold editor-import failure in
+Godot 4.7.1 is recorded with original-binary cold/warm controls and LLDB evidence;
+it has no SDK workaround or accepted cold-import pass here. The declared macOS reference Gate B is recorded separately in
+<code>docs/design/box3d/gate-b.md</code>; functional host tests alone do not establish CPU
+or whole-application performance.</p>
+</article>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">box3d/godot/README.md · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../docs.html">Documentation</a><a href="../../../reading.html">Index</a><a href="../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#code-data-and-scene-context" class="">Code, data and scene context</a><a href="#shared-request-and-reservation-accounting" class="">Shared request and reservation accounting</a></nav><div class="outline-actions"><a href="../../../reference/box3d/godot/README.md" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

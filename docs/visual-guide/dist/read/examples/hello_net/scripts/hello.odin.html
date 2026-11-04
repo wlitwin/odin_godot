@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>hello.odin · odin_godot</title><link rel="icon" href="../../../../favicon.svg"><link rel="stylesheet" href="../../../../style.css"><link rel="stylesheet" href="../../../../reader.css"><link rel="stylesheet" href="../../../../sdk.css"><script src="../../../../reader.js" defer></script><script src="../../../../site.js" defer></script></head>
 <body class="sdk-docs"><a class="skip" href="#article">Skip to article</a><header class="sdk-header"><div class="sdk-header-inner"><button class="nav-toggle" type="button" data-nav-toggle aria-controls="docs-navigation" aria-expanded="false" aria-label="Open documentation navigation"><span></span><span></span><span></span></button><a class="sdk-brand" href="../../../../index.html" aria-label="odin_godot home"><span class="mark" aria-hidden="true">o/g</span><span>odin_godot<span class="brand-caption">Odin × Godot</span></span></a><nav class="sdk-topnav" aria-label="Main navigation"><a href="../../../../docs.html" aria-current="page">Docs</a><a href="../../../../guide.html">Field guide</a><a href="../../../../examples.html">Examples</a><a href="../../../../reading.html" data-doc-index>Index</a></nav><div class="sdk-header-actions"><button class="search-trigger" type="button" data-search-open aria-label="Search documentation"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5"/></svg><span>Search docs</span><kbd>⌘ K</kbd></button><a class="github-link" href="https://github.com/wlitwin/odin_godot" aria-label="odin_godot on GitHub">GitHub <span aria-hidden="true">↗</span></a></div></div></header>
 <div class="docs-layout"><div class="nav-scrim" data-nav-close hidden></div><aside class="docs-sidebar" id="docs-navigation" aria-label="Documentation"><div class="sidebar-title">DOCUMENTATION<span class="release-tag">SDK</span></div><a class="sidebar-index" href="../../../../reading.html">Documentation index <span aria-hidden="true">→</span></a><nav><section class="nav-group"><h2>Get started</h2><a href="../../../../docs.html">Overview</a><a href="../../../../docs/install.html">Installation</a><a href="../../../../docs/first-script.html">Your first script</a><a href="../../../../docs/existing-project.html">Existing Godot projects</a></section><section class="nav-group"><h2>Write gameplay</h2><a href="../../../docs/onboarding/02-thinking-in-structs.html">Scripts and structs</a><a href="../../../docs/authoring-guide.html">Script API</a><a href="../../../docs/events.html">Signals and events</a><a href="../../../docs/workflow.html">Editor workflow</a><a href="../../../docs/modules.html">Script modules</a></section><section class="nav-group"><h2>Multiplayer</h2><a href="../../../../docs/multiplayer.html">Choose a model</a><a href="../../../../docs/kit.html">Build with Kit</a><a href="../../../../docs/replay.html">Build with Replay</a><a href="../../../docs/kit/timelines.html">Prediction and timelines</a><a href="../../../docs/kit/profiles.html">Authority profiles</a><a href="../../../replay/getting-started.html">Replay sessions and rooms</a><a href="../../../replay/p2p/README.html">Deterministic peers</a></section><section class="nav-group"><h2>Build and ship</h2><a href="../../../../docs/exporting.html">Build and export</a><a href="../../../docs/exporting.html">Export reference</a><a href="../../../docs/debugging.html">Debugging</a><a href="../../../../examples.html">Examples</a></section><section class="nav-group"><h2>Scrapyard</h2><a href="../../replay_scrapyard/contributor-guide.html">Contributor guide</a><a href="../../replay_scrapyard/code-guide.html">Code guide</a><a href="../../replay_scrapyard/shared-turret.html">Shared turret</a></section></nav><div class="sidebar-links"><a href="../../../../guide.html">Illustrated field guide <span>↗</span></a><a href="https://itchyitches.itch.io/scrapyard" target="_blank" rel="noopener noreferrer">Play Scrapyard <span>↗</span></a></div></aside>
-<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Examples</a><span>/</span><span>Source</span></div><p class="eyebrow">Examples</p><h1>hello.odin</h1><div class="reader-meta"><span>227 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/hello_net/scripts/hello.odin" download>Page source ↓</a></div></div>
+<main class="docs-main" id="article"><div class="reader-hero"><div class="breadcrumbs"><a href="../../../../docs.html">Docs</a><span>/</span><a href="../../../../reading.html">Examples</a><span>/</span><span>Source</span></div><p class="eyebrow">Examples</p><h1>hello.odin</h1><div class="reader-meta"><span>296 lines · Odin</span><span>Odin × Godot</span><a href="../../../../reference/examples/hello_net/scripts/hello.odin" download>Page source ↓</a></div></div>
 
 <article class="reading-body source-article"><div class="code-block"><div class="code-title"><span>Odin</span><button class="copy-code" type="button">Copy</button></div><pre><code class="language-odin"><span class="hljs-comment">//gd:extends Node2D</span>
 <span class="hljs-comment">//gd:class HelloNet</span>
@@ -35,184 +35,250 @@ DEFAULT_PORT :: <span class="hljs-number">4242</span>
 SPEED :: <span class="hljs-type">f32</span>(<span class="hljs-number">160</span>)
 
 HelloNet :: <span class="hljs-keyword">struct</span> {
-	owner:   gd.Node2d,
-	ses:     ksess.Session, <span class="hljs-comment">// identity, roster, replication — the session</span>
-	comms:   kcomms.Comms,  <span class="hljs-comment">// chat + system lines (the stock lobby uses it)</span>
-	boot:    kboot.Boot,    <span class="hljs-comment">// the stock stack: lobby UI, transport, factory</span>
-	<span class="hljs-comment">// (no `running`/`started` pair: kboot.boot_phase answers both, derived from</span>
-	<span class="hljs-comment">// the session — see hello_net_process. The bools drifted, too: `running`</span>
-	<span class="hljs-comment">// never went back to false after a failed join, so the Host button stayed</span>
-	<span class="hljs-comment">// dead for the rest of the run.)</span>
+    owner:        gd.Node2d,
+    ses:          ksess.Session, <span class="hljs-comment">// identity, roster, replication — the session</span>
+    comms:        kcomms.Comms, <span class="hljs-comment">// chat + system lines (the stock lobby uses it)</span>
+    boot:         kboot.Boot, <span class="hljs-comment">// the stock stack: lobby UI, transport, factory</span>
+    <span class="hljs-comment">// (no `running`/`started` pair: kboot.boot_phase answers both, derived from</span>
+    <span class="hljs-comment">// the session — see hello_net_process. The bools drifted, too: `running`</span>
+    <span class="hljs-comment">// never went back to false after a failed join, so the Host button stayed</span>
+    <span class="hljs-comment">// dead for the rest of the run.)</span>
 
-	<span class="hljs-comment">// THE declaration: this exported scene bodies a replicated entity. The</span>
-	<span class="hljs-comment">// tag mints the wire id, the factory, typed player_spawn(), the census</span>
-	<span class="hljs-comment">// (player_mine / player_of / player_all), and the acid probes.</span>
-	player_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Player:1&quot;`</span>,
+    <span class="hljs-comment">// THE declaration: this exported scene bodies a replicated entity. The</span>
+    <span class="hljs-comment">// tag mints the wire id, the factory, typed player_spawn(), the census</span>
+    <span class="hljs-comment">// (player_mine / player_of / player_all), and the acid probes.</span>
+    player_scene: ^gd.Resource <span class="hljs-string">`gd:&quot;entity=Player:1&quot;`</span>,
+    me:           ^Player, <span class="hljs-comment">// my avatar (set by the census hook in player.odin)</span>
 
-	me: ^Player, <span class="hljs-comment">// my avatar (set by the census hook in player.odin)</span>
-
-	<span class="hljs-comment">// JOIN CODES (optional): with HELLO_RELAY set, hosting registers the ENet</span>
-	<span class="hljs-comment">// port under a minted code and a friend joins with the CODE instead of an</span>
-	<span class="hljs-comment">// address — the relay is a phonebook, the game stays plain ENet. The boot</span>
-	<span class="hljs-comment">// doors (boot_host_coded / boot_join_code) run the whole rendezvous.</span>
-	minted: <span class="hljs-type">bool</span>, <span class="hljs-comment">// the code receipt printed once</span>
+    <span class="hljs-comment">// JOIN CODES (optional): with HELLO_RELAY set, hosting registers the ENet</span>
+    <span class="hljs-comment">// port under a minted code and a friend joins with the CODE instead of an</span>
+    <span class="hljs-comment">// address — the relay is a phonebook, the game stays plain ENet. The boot</span>
+    <span class="hljs-comment">// doors (boot_host_coded / boot_join_code) run the whole rendezvous.</span>
+    minted:       <span class="hljs-type">bool</span>, <span class="hljs-comment">// the code receipt printed once</span>
 }
 
 now_s :: knet.now_s
 
 hello_net_ready :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
-	<span class="hljs-comment">// The stock stack: a lobby with Host/Join buttons, chat, a scoreboard,</span>
-	<span class="hljs-comment">// the wire, entity factory, and transport forwards — one generated attach.</span>
-	hello_net_attach(self, kboot.Options{
-		title = <span class="hljs-string">&quot;HELLO, MULTIPLAYER&quot;</span>,
-		status = <span class="hljs-string">&quot;Host a room, or join one at localhost&quot;</span>,
-		legend = <span class="hljs-string">&quot;Arrows move · Enter chat&quot;</span>,
-		env = <span class="hljs-string">&quot;HELLO&quot;</span>, <span class="hljs-comment">// HELLO_PORT/_NAME/_TOKEN identity + the HELLO_LATENCY bad-link shim</span>
-		min_players = <span class="hljs-number">1</span>,
-		<span class="hljs-comment">// (Options.methods defaulted: the on_host/on_join/... procs below are</span>
-		<span class="hljs-comment">// the standard eight names, and scriptgen still validates they exist.)</span>
-	}, kboot.network_profile(.Friends_Coop))
-	<span class="hljs-comment">// With a relay configured, the lobby grows its join-code field — a human</span>
-	<span class="hljs-comment">// types a friend&#x27;s code and presses Join (see on_join).</span>
-	<span class="hljs-keyword">if</span> gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>) != <span class="hljs-string">&quot;&quot;</span> {
-		kui.lobby_show_code(&amp;self.boot.ui, <span class="hljs-literal">true</span>)
-	}
+    <span class="hljs-comment">// The stock stack: a lobby with Host/Join buttons, chat, a scoreboard,</span>
+    <span class="hljs-comment">// the wire, entity factory, and transport forwards — one generated attach.</span>
+    hello_net_attach(
+        self,
+        kboot.Options {
+            title       = <span class="hljs-string">&quot;HELLO, MULTIPLAYER&quot;</span>,
+            status      = <span class="hljs-string">&quot;Host a room, or join one at localhost&quot;</span>,
+            legend      = <span class="hljs-string">&quot;Arrows move · Enter chat&quot;</span>,
+            env         = <span class="hljs-string">&quot;HELLO&quot;</span>, <span class="hljs-comment">// HELLO_PORT/_NAME/_TOKEN identity + the HELLO_LATENCY bad-link shim</span>
+            min_players = <span class="hljs-number">1</span>,
+            <span class="hljs-comment">// (Options.methods defaulted: the on_host/on_join/... procs below are</span>
+            <span class="hljs-comment">// the standard eight names, and scriptgen still validates they exist.)</span>
+        },
+        kboot.network_profile(.Friends_Coop),
+    )
 
-	<span class="hljs-comment">// Headless acids pick a role from the env; humans click the lobby.</span>
-	<span class="hljs-keyword">switch</span> gd.env_string(<span class="hljs-string">&quot;HELLO_ROLE&quot;</span>, <span class="hljs-string">&quot;&quot;</span>) {
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;host&quot;</span>:
-		hello_net_on_host(self)
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;join&quot;</span>:
-		hello_net_on_join(self)
-	<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;code&quot;</span>:
-		<span class="hljs-comment">// Join by CODE: the door asks the relay where the host lives, then</span>
-		<span class="hljs-comment">// it&#x27;s a normal ENet join — boot_pump completes it when the</span>
-		<span class="hljs-comment">// phonebook answers.</span>
-		relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
-		code := gd.env_string(<span class="hljs-string">&quot;HELLO_CODE&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
-		<span class="hljs-keyword">if</span> relay != <span class="hljs-string">&quot;&quot;</span> &amp;&amp; code != <span class="hljs-string">&quot;&quot;</span> {
-			gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_CODE_JOIN code=%s&quot;</span>, code))
-			kboot.boot_join_code(&amp;self.boot, fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay), code, kboot.boot_token(&amp;self.boot), kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
-		}
-	}
+    <span class="hljs-comment">// With a relay configured, the lobby grows its join-code field — a human</span>
+    <span class="hljs-comment">// types a friend&#x27;s code and presses Join (see on_join).</span>
+    <span class="hljs-keyword">if</span> gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>) != <span class="hljs-string">&quot;&quot;</span> {
+        kui.lobby_show_code(&amp;self.boot.ui, <span class="hljs-literal">true</span>)
+    }
+
+    <span class="hljs-comment">// Headless acids pick a role from the env; humans click the lobby.</span>
+    <span class="hljs-keyword">switch</span> gd.env_string(<span class="hljs-string">&quot;HELLO_ROLE&quot;</span>, <span class="hljs-string">&quot;&quot;</span>) {
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;host&quot;</span>:
+        hello_net_on_host(self)
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;join&quot;</span>:
+        hello_net_on_join(self)
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&quot;code&quot;</span>:
+        <span class="hljs-comment">// Join by CODE: the door asks the relay where the host lives, then</span>
+        <span class="hljs-comment">// it&#x27;s a normal ENet join — boot_pump completes it when the</span>
+        <span class="hljs-comment">// phonebook answers.</span>
+        relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+        code := gd.env_string(<span class="hljs-string">&quot;HELLO_CODE&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+
+        <span class="hljs-keyword">if</span> relay != <span class="hljs-string">&quot;&quot;</span> &amp;&amp; code != <span class="hljs-string">&quot;&quot;</span> {
+            gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_CODE_JOIN code=%s&quot;</span>, code))
+            kboot.boot_join_code(
+                &amp;self.boot,
+                fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay),
+                code,
+                kboot.boot_token(&amp;self.boot),
+                kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>),
+            )
+        }
+    }
 }
 
 hello_net_exit_tree :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
-	hello_net_detach(self)
-	ksess.session_destroy(&amp;self.ses)
+    hello_net_detach(self)
+    ksess.session_destroy(&amp;self.ses)
 }
 
 hello_net_process :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, delta: <span class="hljs-type">f64</span>) {
-	<span class="hljs-comment">// THE LIFECYCLE, read not kept. `.Menu` is &quot;no seat and none coming&quot; — the</span>
-	<span class="hljs-comment">// old `running` bool, except this one is derived from the session, so it</span>
-	<span class="hljs-comment">// goes back to false when a join fails instead of latching forever. Read</span>
-	<span class="hljs-comment">// BEFORE the pump on purpose: boot_pump is the only place the phase RISES,</span>
-	<span class="hljs-comment">// so `was` versus the phase after it is the rising edge the `started` bool</span>
-	<span class="hljs-comment">// existed to detect (see the swap at the bottom).</span>
-	was := kboot.boot_phase(&amp;self.boot)
-	<span class="hljs-keyword">if</span> was == .Menu {<span class="hljs-keyword">return</span>}
-	_ = hello_net_frame(self, delta, now_s())
-	<span class="hljs-comment">// The minted code is a FACT to poll, not a callback: show it when it lands</span>
-	<span class="hljs-comment">// (the stock lobby status already carries it; this is the headless receipt).</span>
-	<span class="hljs-keyword">if</span> !self.minted {
-		<span class="hljs-keyword">if</span> room := kboot.boot_room_code(&amp;self.boot); room != <span class="hljs-string">&quot;&quot;</span> {
-			self.minted = <span class="hljs-literal">true</span>
-			gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_CODE room=%s&quot;</span>, room))
-		}
-	}
-	<span class="hljs-keyword">if</span> self.me != <span class="hljs-literal">nil</span> {
-		<span class="hljs-comment">// Drive MY square. The x/y writes are all it takes: they are</span>
-		<span class="hljs-comment">// owner-streamed fields, so every other screen glides this body.</span>
-		dx, dy: <span class="hljs-type">f32</span>
-		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_right&quot;</span>) {dx += <span class="hljs-number">1</span>}
-		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_left&quot;</span>) {dx -= <span class="hljs-number">1</span>}
-		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_down&quot;</span>) {dy += <span class="hljs-number">1</span>}
-		<span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_up&quot;</span>) {dy -= <span class="hljs-number">1</span>}
-		self.me.x = clamp(self.me.x + dx * SPEED * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">632</span>)
-		self.me.y = clamp(self.me.y + dy * SPEED * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">352</span>)
-	}
-	<span class="hljs-comment">// Reactions live in the name-paired halves below; hello_net_pump forwards</span>
-	<span class="hljs-comment">// them through the generated switch and role gates.</span>
+    <span class="hljs-comment">// THE LIFECYCLE, read not kept. `.Menu` is &quot;no seat and none coming&quot; — the</span>
+    <span class="hljs-comment">// old `running` bool, except this one is derived from the session, so it</span>
+    <span class="hljs-comment">// goes back to false when a join fails instead of latching forever. Read</span>
+    <span class="hljs-comment">// BEFORE the pump on purpose: boot_pump is the only place the phase RISES,</span>
+    <span class="hljs-comment">// so `was` versus the phase after it is the rising edge the `started` bool</span>
+    <span class="hljs-comment">// existed to detect (see the swap at the bottom).</span>
+    was := kboot.boot_phase(&amp;self.boot)
 
-	<span class="hljs-comment">// The world ARRIVED this frame — the once-only receipt. boot_phase is a</span>
-	<span class="hljs-comment">// LEVEL and the halves below fire per spawn, so the edge is computed here,</span>
-	<span class="hljs-comment">// from two reads of the level, and needs no bool on this struct.</span>
-	<span class="hljs-keyword">if</span> was != .Playing &amp;&amp; kboot.boot_phase(&amp;self.boot) == .Playing {
-		gd.print_str(<span class="hljs-string">&quot;HELLO_STARTED&quot;</span>)
-	}
+    <span class="hljs-keyword">if</span> was == .Menu {
+        <span class="hljs-keyword">return</span>
+    }
+
+    _ = hello_net_frame(self, delta, now_s())
+
+    <span class="hljs-comment">// The minted code is a FACT to poll, not a callback: show it when it lands</span>
+    <span class="hljs-comment">// (the stock lobby status already carries it; this is the headless receipt).</span>
+    <span class="hljs-keyword">if</span> !self.minted {
+        <span class="hljs-keyword">if</span> room := kboot.boot_room_code(&amp;self.boot); room != <span class="hljs-string">&quot;&quot;</span> {
+            self.minted = <span class="hljs-literal">true</span>
+            gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_CODE room=%s&quot;</span>, room))
+        }
+    }
+
+    <span class="hljs-keyword">if</span> self.me != <span class="hljs-literal">nil</span> {
+        <span class="hljs-comment">// Drive MY square. The x/y writes are all it takes: they are</span>
+        <span class="hljs-comment">// owner-streamed fields, so every other screen glides this body.</span>
+        dx, dy: <span class="hljs-type">f32</span>
+
+        <span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_right&quot;</span>) {
+            dx += <span class="hljs-number">1</span>
+        }
+
+        <span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_left&quot;</span>) {
+            dx -= <span class="hljs-number">1</span>
+        }
+
+        <span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_down&quot;</span>) {
+            dy += <span class="hljs-number">1</span>
+        }
+
+        <span class="hljs-keyword">if</span> gd.is_action_pressed(<span class="hljs-string">&quot;ui_up&quot;</span>) {
+            dy -= <span class="hljs-number">1</span>
+        }
+
+        self.me.x = clamp(self.me.x + dx * SPEED * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">632</span>)
+        self.me.y = clamp(self.me.y + dy * SPEED * <span class="hljs-type">f32</span>(delta), <span class="hljs-number">8</span>, <span class="hljs-number">352</span>)
+    }
+    <span class="hljs-comment">// Reactions live in the name-paired halves below; hello_net_pump forwards</span>
+    <span class="hljs-comment">// them through the generated switch and role gates.</span>
+
+    <span class="hljs-comment">// The world ARRIVED this frame — the once-only receipt. boot_phase is a</span>
+    <span class="hljs-comment">// LEVEL and the halves below fire per spawn, so the edge is computed here,</span>
+    <span class="hljs-comment">// from two reads of the level, and needs no bool on this struct.</span>
+    <span class="hljs-keyword">if</span> was != .Playing &amp;&amp; kboot.boot_phase(&amp;self.boot) == .Playing {
+        gd.print_str(<span class="hljs-string">&quot;HELLO_STARTED&quot;</span>)
+    }
 }
 
 <span class="hljs-comment">// ---- the doors (wired to the stock lobby&#x27;s buttons by name) ----------------</span>
 
 <span class="hljs-meta">@(gd_method)</span>
 hello_net_on_host :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
-	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {<span class="hljs-keyword">return</span>} <span class="hljs-comment">// a door is only a door from the menu</span>
-	port := kboot.boot_port(&amp;self.boot, DEFAULT_PORT)
-	<span class="hljs-comment">// With a relay configured, host WITH a join code — the coded door is</span>
-	<span class="hljs-comment">// boot_host plus &quot;register the port under a code the status line shows&quot;.</span>
-	ok: <span class="hljs-type">bool</span>
-	<span class="hljs-keyword">if</span> relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>); relay != <span class="hljs-string">&quot;&quot;</span> {
-		ok = kboot.boot_host_coded(&amp;self.boot, fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay), port, kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
-	} <span class="hljs-keyword">else</span> {
-		ok = kboot.boot_host(&amp;self.boot, port, kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
-	}
-	<span class="hljs-keyword">if</span> !ok {<span class="hljs-keyword">return</span>}
-	hello_net_on_start(self) <span class="hljs-comment">// a lone host starts at once; joiners drop in</span>
+    <span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {
+        <span class="hljs-keyword">return</span>
+    } <span class="hljs-comment">// a door is only a door from the menu</span>
+
+    port := kboot.boot_port(&amp;self.boot, DEFAULT_PORT)
+    <span class="hljs-comment">// With a relay configured, host WITH a join code — the coded door is</span>
+    <span class="hljs-comment">// boot_host plus &quot;register the port under a code the status line shows&quot;.</span>
+    ok: <span class="hljs-type">bool</span>
+
+    <span class="hljs-keyword">if</span> relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>); relay != <span class="hljs-string">&quot;&quot;</span> {
+        ok = kboot.boot_host_coded(&amp;self.boot, fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay), port, kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
+    } <span class="hljs-keyword">else</span> {
+        ok = kboot.boot_host(&amp;self.boot, port, kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
+    }
+
+    <span class="hljs-keyword">if</span> !ok {
+        <span class="hljs-keyword">return</span>
+    }
+
+    hello_net_on_start(self) <span class="hljs-comment">// a lone host starts at once; joiners drop in</span>
 }
 
 <span class="hljs-meta">@(gd_method)</span>
 hello_net_on_join :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
-	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {<span class="hljs-keyword">return</span>}
-	<span class="hljs-comment">// A code in the lobby&#x27;s field joins THROUGH it; empty joins by address.</span>
-	<span class="hljs-keyword">if</span> code := kui.lobby_code(&amp;self.boot.ui); code != <span class="hljs-string">&quot;&quot;</span> {
-		<span class="hljs-keyword">if</span> relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>); relay != <span class="hljs-string">&quot;&quot;</span> {
-			kboot.boot_join_code(&amp;self.boot, fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay), code, kboot.boot_token(&amp;self.boot), kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
-		}
-		<span class="hljs-keyword">return</span>
-	}
-	kboot.boot_join(&amp;self.boot, <span class="hljs-string">&quot;127.0.0.1&quot;</span>, kboot.boot_port(&amp;self.boot, DEFAULT_PORT), kboot.boot_token(&amp;self.boot), kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>))
+    <span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {
+        <span class="hljs-keyword">return</span>
+    }
+
+    <span class="hljs-comment">// A code in the lobby&#x27;s field joins THROUGH it; empty joins by address.</span>
+    <span class="hljs-keyword">if</span> code := kui.lobby_code(&amp;self.boot.ui); code != <span class="hljs-string">&quot;&quot;</span> {
+        <span class="hljs-keyword">if</span> relay := gd.env_string(<span class="hljs-string">&quot;HELLO_RELAY&quot;</span>, <span class="hljs-string">&quot;&quot;</span>); relay != <span class="hljs-string">&quot;&quot;</span> {
+            kboot.boot_join_code(
+                &amp;self.boot,
+                fmt.ctprintf(<span class="hljs-string">&quot;%s&quot;</span>, relay),
+                code,
+                kboot.boot_token(&amp;self.boot),
+                kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>),
+            )
+        }
+
+        <span class="hljs-keyword">return</span>
+    }
+
+    kboot.boot_join(
+        &amp;self.boot,
+        <span class="hljs-string">&quot;127.0.0.1&quot;</span>,
+        kboot.boot_port(&amp;self.boot, DEFAULT_PORT),
+        kboot.boot_token(&amp;self.boot),
+        kboot.boot_name(&amp;self.boot, <span class="hljs-string">&quot;player&quot;</span>),
+    )
 }
 
 <span class="hljs-meta">@(gd_method)</span>
 hello_net_on_start :: <span class="hljs-keyword">proc</span>(self: ^HelloNet) {
-	<span class="hljs-comment">// .Playing is &quot;the world already reached this screen&quot; — the old `started`</span>
-	<span class="hljs-comment">// bool, minus the frame of lag it carried (it flipped on the drained event,</span>
-	<span class="hljs-comment">// this flips in the same drain).</span>
-	<span class="hljs-keyword">if</span> !self.ses.is_host || kboot.boot_phase(&amp;self.boot) == .Playing {<span class="hljs-keyword">return</span>}
-	<span class="hljs-keyword">for</span> _, p <span class="hljs-keyword">in</span> self.ses.players {
-		<span class="hljs-keyword">if</span> p.connected {spawn_player(self, p.id)}
-	}
-	ksess.session_start_replicating(&amp;self.ses) <span class="hljs-comment">// go live; joiners catch up behind their WELCOME</span>
+    <span class="hljs-comment">// .Playing is &quot;the world already reached this screen&quot; — the old `started`</span>
+    <span class="hljs-comment">// bool, minus the frame of lag it carried (it flipped on the drained event,</span>
+    <span class="hljs-comment">// this flips in the same drain).</span>
+    <span class="hljs-keyword">if</span> !self.ses.is_host || kboot.boot_phase(&amp;self.boot) == .Playing {
+        <span class="hljs-keyword">return</span>
+    }
+
+    <span class="hljs-keyword">for</span> _, p <span class="hljs-keyword">in</span> self.ses.players {
+        <span class="hljs-keyword">if</span> p.connected {
+            spawn_player(self, p.id)
+        }
+    }
+
+    ksess.session_start_replicating(&amp;self.ses) <span class="hljs-comment">// go live; joiners catch up behind their WELCOME</span>
 }
 
 <span class="hljs-meta">@(gd_method)</span>
 hello_net_on_chat :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, text: gd.String) {
-	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {kboot.boot_chat(&amp;self.boot, text)}
+    <span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) != .Menu {
+        kboot.boot_chat(&amp;self.boot, text)
+    }
 }
 
 <span class="hljs-comment">// Host: one square per seat, fanned so nobody spawns inside anybody.</span>
 spawn_player :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, pid: knet.Player_Id) {
-	<span class="hljs-keyword">if</span> _, has := player_owned_by(&amp;self.boot, pid); has {<span class="hljs-keyword">return</span>}
-	p, id := player_spawn(&amp;self.boot, owner = pid) <span class="hljs-comment">// typed, from the entity tag</span>
-	p.pid = <span class="hljs-type">u8</span>(pid)
-	p.x = <span class="hljs-number">120</span> + <span class="hljs-type">f32</span>(<span class="hljs-type">u64</span>(pid) % <span class="hljs-number">8</span>) * <span class="hljs-number">56</span>
-	p.y = <span class="hljs-number">180</span>
-	kboot.boot_spawn_send(&amp;self.boot, id)
+    <span class="hljs-keyword">if</span> _, has := player_owned_by(&amp;self.boot, pid); has {
+        <span class="hljs-keyword">return</span>
+    }
+
+    p, id := player_spawn(&amp;self.boot, owner = pid) <span class="hljs-comment">// typed, from the entity tag</span>
+    p.pid = <span class="hljs-type">u8</span>(pid)
+    p.x = <span class="hljs-number">120</span> + <span class="hljs-type">f32</span>(<span class="hljs-type">u64</span>(pid) % <span class="hljs-number">8</span>) * <span class="hljs-number">56</span>
+    p.y = <span class="hljs-number">180</span>
+    kboot.boot_spawn_send(&amp;self.boot, id)
 }
 
 <span class="hljs-comment">// ---- session event halves (the generated dispatch holds the role gates) ----</span>
 
 <span class="hljs-meta">@(gd_half)</span>
 hello_net_welcomed :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, me: knet.Player_Id) {
-	gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_SEATED me=%d&quot;</span>, <span class="hljs-type">u64</span>(me)))
+    gd.print_str(fmt.tprintf(<span class="hljs-string">&quot;HELLO_SEATED me=%d&quot;</span>, <span class="hljs-type">u64</span>(me)))
 }
 
 <span class="hljs-comment">// The join&#x27;s authority consequence: field a drop-in square for the arrival.</span>
 <span class="hljs-meta">@(gd_half)</span>
 hello_net_player_joined_then :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, id: knet.Player_Id, rejoin: <span class="hljs-type">bool</span>) {
-	<span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) == .Playing &amp;&amp; !rejoin {
-		spawn_player(self, id)
-	}
+    <span class="hljs-keyword">if</span> kboot.boot_phase(&amp;self.boot) == .Playing &amp;&amp; !rejoin {
+        spawn_player(self, id)
+    }
 }
 
 <span class="hljs-comment">// The world reached this peer: the lobby gives way to the game. A LEVEL applied</span>
@@ -221,15 +287,18 @@ hello_net_player_joined_then :: <span class="hljs-keyword">proc</span>(self: ^He
 <span class="hljs-comment">// it rides boot_phase in process(), where the receipt prints exactly once.</span>
 <span class="hljs-meta">@(gd_half)</span>
 hello_net_entity_spawned :: <span class="hljs-keyword">proc</span>(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type; _ = owner
-	<span class="hljs-comment">// BORN = the fields are set: the node&#x27;s FIRST placement is here — the</span>
-	<span class="hljs-comment">// entity&#x27;s _process carries it from the next frame on (Godot runs no</span>
-	<span class="hljs-comment">// _process on a node added mid-_process, which every host-step spawn is).</span>
-	<span class="hljs-keyword">if</span> p, ok := player_of(&amp;self.boot, id); ok {
-		gd.node2d_set_position(<span class="hljs-keyword">cast</span>(gd.Node2d)p.owner, {p.x, p.y})
-	}
-	gd.set_bool(<span class="hljs-keyword">cast</span>(gd.Object)self.boot.ui.root, <span class="hljs-string">&quot;visible&quot;</span>, <span class="hljs-literal">false</span>)
+    _ = type
+    _ = owner
+
+    <span class="hljs-comment">// BORN = the fields are set: the node&#x27;s FIRST placement is here — the</span>
+    <span class="hljs-comment">// entity&#x27;s _process carries it from the next frame on (Godot runs no</span>
+    <span class="hljs-comment">// _process on a node added mid-_process, which every host-step spawn is).</span>
+    <span class="hljs-keyword">if</span> p, ok := player_of(&amp;self.boot, id); ok {
+        gd.node2d_set_position(<span class="hljs-keyword">cast</span>(gd.Node2d)p.owner, {p.x, p.y})
+    }
+
+    gd.set_bool(<span class="hljs-keyword">cast</span>(gd.Object)self.boot.ui.root, <span class="hljs-string">&quot;visible&quot;</span>, <span class="hljs-literal">false</span>)
 }
 </code></pre></div></article>
-<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/hello_net/scripts/hello.odin · source 215976373a2d with local changes.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
+<div class="reader-end"><p class="eyebrow">RELATED DOCUMENTATION</p><a href="../../../../guide.html"><span>Illustrated multiplayer field guide</span><span aria-hidden="true">↗</span></a></div><p class="reader-provenance">examples/hello_net/scripts/hello.odin · source 281e06e8d136.</p><footer class="sdk-footer compact"><div><a class="sdk-brand" href="../../../../index.html"><span class="mark">o/g</span><span>odin_godot</span></a><p>Godot scenes. Odin gameplay.</p></div><nav aria-label="Footer"><a href="../../../../docs.html">Documentation</a><a href="../../../../reading.html">Index</a><a href="../../../../guide.html">Field guide</a><a href="https://github.com/wlitwin/odin_godot">GitHub ↗</a><a href="https://github.com/wlitwin/odin_godot/blob/main/LICENSE">Apache 2.0</a></nav></footer></main>
 <aside class="page-outline" aria-label="On this page"><p>On this page</p><nav><a href="#article">Source example</a></nav><div class="outline-actions"><a href="../../../../reference/examples/hello_net/scripts/hello.odin" download>Download source ↓</a><button type="button" data-print>Print this page</button><a href="../../../../reading.html">Documentation index ↗</a></div></aside></div><div id="toast" role="status" aria-live="polite"></div></body></html>

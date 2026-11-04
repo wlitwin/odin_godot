@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "result": "PASS",
+  "scope": "W0 refreshed native Box3D baseline; not web/game/long/performance qualification",
+  "whole_goal_complete": false,
+  "created_utc": "2026-11-03T05:21:28.359838+00:00",
+  "task": "t_ceeb4031c185401f",
+  "board": "b_c14f6d2a88d84dbe",
+  "pin": {
+    "url": "https://github.com/erincatto/box3d.git",
+    "commit": "336263320469e5e9febfe18697ab562488f7e97a",
+    "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+    "git_archive_sha256": "a9143675b297bb6c6f3d031d1bdf5c265d8642139eea26f265958066bd947935"
+  },
+  "previous_pin": "d421e45c828f6f853a145f726f0b9425d31146eb",
+  "source_selection": "Actual dirty source graph isolated, SHA-guarded promotion; no git reset/clean/commit/push. Original July artifacts and reports unchanged.",
+  "versions": {
+    "abi": 1,
+    "logical_solver": 4,
+    "coverage": "ogb3-33626332-solver-v4",
+    "resource": 2,
+    "catalog_recovery_capabilities": [
+      1,
+      2,
+      3
+    ],
+    "old_images": "rejected; fresh bootstrap required; no converter or mixed-build peers"
+  },
+  "engine_patches": {
+    "current": [],
+    "retired": [
+      {
+        "name": "block_allocator_alignment",
+        "reason": "upstream rounds block stride to B3_BLOCK_ALIGNMENT; actual alignment/free-list regression retained"
+      },
+      {
+        "name": "compound_geometry_alignment",
+        "reason": "upstream aligned packed node/geometry offsets; ownership/alignment regression retained"
+      },
+      {
+        "name": "broadphase_rebuild",
+        "reason": "upstream paired-node tree replaces old move arrays; last-moved-proxy destruction/surviving query regression retained"
+      }
+    ]
+  },
+  "shim_patches": [
+    {
+      "path": "box3d/native/patches/rollback_shim_box3d_33626332.patch",
+      "sha256": "92cc54f8c2dfc27de6d09f92accebbb5f6e8356099c4b75ac6bf03227f63568d",
+      "reason": "Adapt private recording registry/replay header and SIMD-width fingerprint to Box3D33626332; retain explicit original-source preimage and allocator/ownership behavior.",
+      "base_files": {
+        "core/src/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921"
+      },
+      "output_files": {
+        "core/src/rollback_shim.c": "b439f788081230278dec88b676a14b831a0a51b8b4600512067d67e106c30218"
+      }
+    }
+  ],
+  "private_state_port": [
+    "paired nodes/parents/proxies and free partitions/moved markers/DFS ordering",
+    "fat AABBs",
+    "BodySim inertia/safety factor and generated scalar fields",
+    "hull SoA and edge cosines",
+    "restitution propagation/iterations and isotropic inertia tolerance",
+    "body-sim cache indices derived on canonical import",
+    "runtime SIMD selection locked4; actual compiler macros recorded"
+  ],
+  "native_macos": {
+    "Debug": {
+      "result": "PASS",
+      "actual_ctest_cases": 13,
+      "manifest": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Debug/build-manifest.json",
+        "sha256": "2a7f871d18f9eaf150963ea35f765e59521ed167c8eb6779e6146ac2dd7151c5"
+      },
+      "ctest_log": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Debug/LastTest.log",
+        "sha256": "db7a11b2d7943066ed5e65465f144ab74a8c3ecbc04593fdf8f132607b84febc"
+      },
+      "archive": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Debug/libogb3.a",
+        "sha256": "fff1d22647b034bf9d5b0d7018ee4f2977104d236bf593aea80b18b17e6f3a0f"
+      },
+      "library": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Debug/libogb3.dylib",
+        "sha256": "a2fdf18a22cc1c8429e94f84f23bd0e33b09c4872174033c3512074dd1de2788"
+      },
+      "domain_identity": "build=34a8fd8cd56c7a3782185177e6c99537debf6ac9ac6fc759c3c91115d3c74d13\ntarget=a7df372468f693e5a110960006a39b0d3d8959c06c39dd55b3aba0e42368917a\nogb3-native-target-v1;Clang;21.1.8;;Darwin;arm64;8;;/nix/store/rcqgjj8hphkhqark1ibiwfaa7yrzniz3-apple-sdk-14.4/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk;14.0;;-g;Debug;BOX3D_VALIDATE;B3_ENABLE_ASSERT;BOX3D_VALIDATE;B3_ENABLE_ASSERT;OGB3_HAS_SNAPSHOTS;OGB3_HAS_STATE_DUMP;OGB3_HAS_RECOVERY;OGB3_TESTING=1;-UNDEBUG;-fno-fast-math;-ffp-contract=off;-Wall;-Wextra;-UNDEBUG;-fno-fast-math;-ffp-contract=off;-Wall;-Wextra;gnu17;PIC;;\n",
+      "sources_match_promoted_repo": true
+    },
+    "Release": {
+      "result": "PASS",
+      "actual_ctest_cases": 13,
+      "manifest": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Release/build-manifest.json",
+        "sha256": "d31dfc265b541dc690ec9e743a3e8969e7f4113821d942d5d274a39bfb2f39ed"
+      },
+      "ctest_log": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Release/LastTest.log",
+        "sha256": "c817fc9f002bef206e659edefea52ad8f3ccb4e3efafcb3e44aea74ceb688ed7"
+      },
+      "archive": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Release/libogb3.a",
+        "sha256": "6eaa16f3968da2a3c2a2e1e0f8da818fb182d2bebfb311610c8438b262978c4e"
+      },
+      "library": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/native-macos-arm64/Release/libogb3.dylib",
+        "sha256": "9da4156541b43ebfb8022addcad396e3f72398226b6e777e2543cf3f4b28a944"
+      },
+      "domain_identity": "build=80ffb9aecc88942d58c483509a5e3a5f5d8382562501c9bee0290040875f9660\ntarget=fbf45171357f68a60c98378b29bee1e6be069545dfbff27cbd0b6a4214d5455a\nogb3-native-target-v1;Clang;21.1.8;;Darwin;arm64;8;;/nix/store/rcqgjj8hphkhqark1ibiwfaa7yrzniz3-apple-sdk-14.4/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk;14.0;;-O3 -DNDEBUG;Release;BOX3D_VALIDATE;B3_ENABLE_ASSERT;BOX3D_VALIDATE;B3_ENABLE_ASSERT;OGB3_HAS_SNAPSHOTS;OGB3_HAS_STATE_DUMP;OGB3_HAS_RECOVERY;OGB3_TESTING=1;-UNDEBUG;-fno-fast-math;-ffp-contract=off;-Wall;-Wextra;-UNDEBUG;-fno-fast-math;-ffp-contract=off;-Wall;-Wextra;gnu17;PIC;;\n",
+      "sources_match_promoted_repo": true
+    }
+  },
+  "native_sanitizers": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/native-sanitizers-promoted-v1/report.json",
+      "sha256": "3277534dd69752c18efbfb104e94e3e364ecace2d68321e9d49feea22b03dc4f"
+    },
+    "manifest": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/native-sanitizers-promoted-v1/cache/build/Debug/build-manifest.json",
+      "sha256": "dbaf291291ad7b891e592b4f3bce340b0d6d3f418f567a94561b4c586ba356e0"
+    },
+    "actual_ctest_cases": 13,
+    "asan": true,
+    "ubsan": true,
+    "leak_sanitizer": "not supported by Darwin; existing explicit allocation/owner baselines retained"
+  },
+  "linux": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/linux-v2/out/report.json",
+      "sha256": "01fa55b264d1868b84c2e8dcfd4e74fc5d95143975d7b2e27cce647126b43ccd"
+    },
+    "execution_mode": "translated-linux-x86_64",
+    "actual_ctest_run_pass": false,
+    "direct_registered_cases_each_configuration": 13,
+    "odin_tests": {
+      "kit_world2": 14,
+      "replay_net": 16,
+      "replay_physics": 6
+    },
+    "container_plan": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/linux-v2/container-create-argv.json",
+      "sha256": "b2b295f574bf587df5101fc3ab73cf0fe478bab5fcb55a239eb1f9300b8d791d"
+    },
+    "scope": "functional; no native x86 hardware/SDK export/performance/cross-target equality claim"
+  },
+  "odin_macos": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/odin-short-promoted-v1/report.json",
+      "sha256": "2702b82083788ef17ef9bd71aaddbc71c6aac849e34dc8f194f519a623b6f61d"
+    },
+    "cases": {
+      "kit_world2": 14,
+      "replay_net": 16,
+      "replay_physics": 6
+    }
+  },
+  "sdk_macos": {
+    "kit": {
+      "build": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-kit-promoted-v1/build/report.json",
+        "sha256": "ec9aebebf97a6c2ad4c12742a237c61cb9b82587dc87caafaa6c9b4307e39e76"
+      },
+      "functional": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-kit-promoted-v1/functional/report.json",
+        "sha256": "40cfcc73304caeb888bc70a8313e156db26620ceca9a56f7b258f2f69e9ade53"
+      },
+      "outer_fences": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-kit-promoted-v1/report.json",
+        "sha256": "2227b798f5960e63a4ec3303ae30d6eac3d39df65fd06418860947b824948bd3"
+      },
+      "full_five_equal": true,
+      "target": 120,
+      "roles_natural_exit0": true,
+      "terminal_rows": [
+        {
+          "version": 1,
+          "framework": "kit",
+          "role": "host",
+          "scope": "verified_terminal_signature_ack",
+          "epoch": 1,
+          "tick": 120,
+          "player": 2,
+          "peer": 2016785289,
+          "matched": true,
+          "event": "SAMPLE_ACK"
+        }
+      ],
+      "actual_cleanup": {
+        "host": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 4,
+          "owners_after": 4,
+          "owners_observed": true,
+          "observed": true
+        },
+        "client": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 4,
+          "owners_after": 4,
+          "owners_observed": true,
+          "observed": true
+        }
+      },
+      "authority_inputs": {
+        "framework": "kit",
+        "role": "host",
+        "epoch": 1,
+        "tick": 120,
+        "available": true,
+        "published_tick": 120,
+        "nonzero_by_seat": [
+          120,
+          120
+        ],
+        "pulse_by_seat": [
+          2,
+          2
+        ],
+        "submitted": 120,
+        "held": 0,
+        "authority": 120,
+        "unavailable": 0,
+        "accepted_through": 120,
+        "event": "SAMPLE_INPUTS"
+      }
+    },
+    "replay": {
+      "build": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-replay-promoted-v1/build/report.json",
+        "sha256": "e6d26525295c9504a6644affdcf44062ffc2c4ef69f080d39c8bfedf44a9a4d0"
+      },
+      "functional": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-replay-promoted-v1/functional/report.json",
+        "sha256": "1777e2743e092791c3e8bf10e7db60e845ea85b321dd21eb88985adf9f594ec1"
+      },
+      "outer_fences": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/sdk-replay-promoted-v1/report.json",
+        "sha256": "105300b7a8d72e494e20fcc43655bc945168cd4f9229e2831ed63632d71002cb"
+      },
+      "full_five_equal": true,
+      "target": 120,
+      "roles_natural_exit0": true,
+      "terminal_rows": [
+        {
+          "framework": "Replay",
+          "role": "host",
+          "stage": "final_accepted",
+          "epoch": 1,
+          "tick": 120,
+          "signature_match": true,
+          "event": "SAMPLE_TAIL"
+        },
+        {
+          "framework": "Replay",
+          "role": "client",
+          "stage": "close_accepted",
+          "epoch": 1,
+          "tick": 120,
+          "signature_match": true,
+          "event": "SAMPLE_TAIL"
+        }
+      ],
+      "actual_cleanup": {
+        "host": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 4,
+          "owners_after": 4,
+          "observed": true
+        },
+        "client": {
+          "native": 0,
+          "wrapper": 0,
+          "meter": 0,
+          "owners": 0,
+          "owners_before": 4,
+          "owners_after": 4,
+          "observed": true
+        }
+      },
+      "authority_inputs": {
+        "framework": "Replay",
+        "role": "host",
+        "first": 1,
+        "last": 120,
+        "rows": 240,
+        "sample": 118,
+        "held": 2,
+        "local": 120,
+        "neutral": 0,
+        "nonzero": 232,
+        "coverage_complete": true,
+        "origin_coverage_complete": true,
+        "origin_observed": 240,
+        "origin_unavailable": 0,
+        "controls_by_seat": [
+          120,
+          120
+        ],
+        "nonzero_by_seat": [
+          119,
+          113
+        ],
+        "event": "SAMPLE_INPUTS"
+      }
+    }
+  },
+  "existing_fixture_correction": {
+    "path": "tests/replay_physics_net/native/runtime_test.odin",
+    "original_old_library_red": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/prefix-old-baseline-v1/report.json",
+      "sha256": "f36d2bf5100c03675f76e1f268e8dbaf5d3bf43b88beb542ea4c771956a4b807"
+    },
+    "corrected_old_library_pass": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/prefix-old-corrected-v1/report.json",
+      "sha256": "586427d332c0b4a3241720bd287d6f92da81ff1e01de22f1ca84e30a540cd3ed"
+    },
+    "original_before_source": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/runtime-test-before.odin",
+      "sha256": "45f0545395c04ae96837559e750f3a6508446c2e53dc42c0dababf744afc2e4d"
+    },
+    "change": "Expected planned suffix derived from public head-first+1; nontrivial suffix required. Prefix1/executed1/error/full-state preservation/resume unchanged. Production planner untouched."
+  },
+  "current_native_sources": {
+    "box3d/dependency.json": "61a83babf60ff2751f848ba6c37ee5aef37ddfedf5843c2d2f9264dfbfbae8c1",
+    "box3d/native/CMakeLists.txt": "03b7016365d6682d26218aece03fbcbacbea3ccf68aac8839cf37bb99a7ba54f",
+    "box3d/native/THIRD_PARTY_NOTICES.txt": "58f9a9ea9b540decbf3926283731d84bd7f9569e4c16d175d4585de98a5fa99b",
+    "box3d/native/api.c": "28adc04dc859ad8e4e84d25e1d23d932846e8314e085c879742354a2088a1641",
+    "box3d/native/api.h": "f1024e3ca5ab1b596610fccf006d8583104b9b8f82c124bcb97d8f072cbe57ae",
+    "box3d/native/api_internal.h": "85e8a3a48dc2753e3d4dc961495edc3fa81bc6f08a86d3783f076952846817f5",
+    "box3d/native/api_smoke.c": "eec54a0966c13186c11586385a6d2cc344bff248be8f42477f0a1a4df6c39114",
+    "box3d/native/authoring_catalog.c": "b119c3d96a794c64194f3d1709129237e303d2967212ce1558bbcf845c6f5a60",
+    "box3d/native/authoring_catalog.h": "52bd707eab60c7cbab39532bab654bd00a6fec34a2020a3f3561046b9d9c3acd",
+    "box3d/native/motion.c": "e70afe1c1a07b5d29ebaecac83232e0b896ae6e63f4ec1e37433bdf01745c5cb",
+    "box3d/native/motion.h": "d84cb4c3a7a359679e7863f72f48d87ceeb21278dd8f7e99524b87e9bf56b22e",
+    "box3d/native/native_observe.c": "a5a2ccaf5f4d128b67a20a2c08a14d58b6ee61655df8af75cd57bc23ef036b43",
+    "box3d/native/native_observe.h": "f21560512e28fced76d8e1a4b64b49718dfd419c48061a1f8c787bbb87c563ef",
+    "box3d/native/native_observe_internal.h": "66d75b4bbad1f6b7e02676a6a312e6625318212f306519783e858f2e75c6e5bd",
+    "box3d/native/owned_snapshot.c": "620e649679d5863b248d3781005ab117f64f64d81b6dd5c51dc6462d1a4de223",
+    "box3d/native/owned_snapshot.h": "55114fc1870fe2826ab6b18017895d3bfcc32587918e72760a827123e1a61516",
+    "box3d/native/owned_snapshot_internal.h": "b4c74f5f6d88fbbec4d7a15343b17f06b9275a9afa83221510825231d61d66bb",
+    "box3d/native/patches/block_allocator_alignment.patch": "4e1c5c3f567cfbc06987123bc3528a1fe546493faf6db4d4d43b3ac878c90677",
+    "box3d/native/patches/broadphase_rebuild.patch": "f9f69900eb955639745705f057bc838a2284634ff5006c3a2db8bcdbe34b3df6",
+    "box3d/native/patches/compound_geometry_alignment.patch": "d81f1b8d8488c64d4ca9d3044d64a89cebe78084d2c39b890aedcda8cba531d1",
+    "box3d/native/patches/rollback_shim_box3d_33626332.patch": "92cc54f8c2dfc27de6d09f92accebbb5f6e8356099c4b75ac6bf03227f63568d",
+    "box3d/native/recovery_codec.c": "5ffa11a14abf40e69609b1c583fc6f3459a47298f02628d9c61eab3f3ceb40d1",
+    "box3d/native/recovery_codec.h": "eec31d0b79d9cb88d495fc34a24c0f35f2d0df471bc15845d24b3025d349bb05",
+    "box3d/native/rollback_shim.c": "b439f788081230278dec88b676a14b831a0a51b8b4600512067d67e106c30218",
+    "box3d/native/rollback_shim.h": "992c796ac3b6c79580992378ee10ee4a6dcd3b962c1ef557233b546aee0ab24e",
+    "box3d/native/state_dump.c": "5fcba690208676d4c760bebf3f97a25f01ad3ae17a3b56eb35f2e5d33ee2097d",
+    "box3d/native/state_dump.h": "6456837f59e4251603921754c6bb8114621fb038972477a5ac1a193053934c14",
+    "box3d/native/state_dump_internal.h": "7d48ec8cce7e11724c90539ea1a007771b239f55fb74c6084ae59df6d3944bec",
+    "build/build_box3d.sh": "3050196c624ab3720358c36699349943083d732c64423b0571e4361ab6be28f2",
+    "tests/box3d_authoring/native/authoring_test.c": "f714f060c44f737e8f687c73a54f6895ad9c4d1d2ec35b8b50e2106aa7970161",
+    "tests/box3d_modules/native/domain_ledger_test.c": "5890299d819bc8fba9e203978c2f8c6bfd7cb6c2b2755e4baf157b017f002c70",
+    "tests/box3d_modules/native/module_test.c": "37ab61750346551c0197b18c18e01a3ba7824d217cfacd5ade843d7a5ba2ab5a",
+    "tests/box3d_modules/native/producer_module.c": "698e13ece6ecde38a6cda012e6202b0a1b43f742214df81bcaf35ab50e4ff308",
+    "tests/box3d_motion/native/motion_test.c": "9881e5603e879fdabe2353103adfb9999d182615476f2bce02b4c212a56d734e",
+    "tests/box3d_native/fields.json": "7c8dfc917d32dba1082776a6ee10437026c9aa097ca75ac83aefd6c12870a316",
+    "tests/box3d_native/generate_fields.py": "5f4ddb7d617f69bd2f70ff17686437b1c3105a6c2d34d159c717ea731f717ea3",
+    "tests/box3d_native/lifecycle.c": "1268e5f22f218534a30b2ed711e4151a058b95b5e660eca749abf9e0cfc90a44",
+    "tests/box3d_recovery/generate_fields.py": "83863b40f9efe907cfb6dd28ff1d1c5cd70d031a351ffbfa8ece9098b587b562",
+    "tests/box3d_recovery/lifecycle_test.c": "2bed4cb2b9b9518a14c719ca3222e3b70a8a1bb06ee82160ea47bba75c0deae6",
+    "tests/box3d_recovery/native_test.c": "e9971fee090cccf9c0712858c4cd0a20d0ea132d723dbbcb896db75e0eb520a5",
+    "tests/box3d_recovery/profile.c": "d90b8b37a0808babbadd012dd3222d53ecfc9a214ec2151b7829407e24d93979",
+    "tests/box3d_recovery/reference.py": "fc39b25d9fabbfaba29a443861d7bc6929217b13f04f3c27b81d6a1356114bf0",
+    "tests/box3d_soak/native_observe/native_observe_test.c": "ad10043e4a1756713680df28746a942d24e939173da5e6ea583f8a4f5c1810e1",
+    "tests/box3d_upgrade/state_fields.c": "d4e58643291ff8d6b3f8840579765e96006e9c9e198fe37deee02e75123d23eb"
+  },
+  "checks": {
+    "archive_cache_and_desktop_planner_tests": 12,
+    "actual_exit": 0,
+    "hc_log": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/W0/accepted/deployment-pure-hc.log",
+      "sha256": "ec78e0ee2b458795923999f07af781ff7ecc3f03131dcdc3dd9d450938b75df6"
+    },
+    "python_ast": [
+      "build/box3d_profile.py",
+      "tests/box3d_gate_c/linux/pipeline.py"
+    ],
+    "yaml": [
+      ".github/workflows/box3d.yml",
+      ".github/workflows/box3d-desktop.yml"
+    ],
+    "remote_ci": "not executed"
+  },
+  "historical_attempts": "Earlier actual compile/assertion failures remain in W0 attempt directories; mutable development build cache was superseded. Final accepted Native artifacts are separately copied and hashed here. Original July evidence is untouched.",
+  "limits": [
+    "No browser physics execution yet",
+    "No refreshed CPU, long session, exported bundle or mobile qualification inferred",
+    "Old resource/snapshot/wire images are not interchangeable",
+    "Old t9y VM session and interactive container shell untouched",
+    "Two new isolated Linux validation containers exited naturally; no user container/service/resource configuration changed"
+  ]
+}

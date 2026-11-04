@@ -1,0 +1,757 @@
+{
+  "schema_version": 1,
+  "result": "CURRENT_REVIEW_CANDIDATE_ORIGINAL_CORRECTION_MAX_REJECTED",
+  "created_at": "2026-11-04T05:19:30.525023+00:00",
+  "release_admitted": false,
+  "goal_complete": false,
+  "artifact": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-export-v1/report.json",
+    "sha256": "8744e1242516139eccc5d695bcff1282b22a18cc38fca52601dab04f1b25ff07"
+  },
+  "scope": "Exact frozen final egress/audio/RTC-template candidate. Required Chrome/Firefox roles and local authenticated forced TURN. No public Internet or human-review inference. Historical qualification/report.json and old D1 archives retain their earlier artifact scope.",
+  "budgets": {
+    "status": "declared before browser physics measurement; any change needs reason/version and preserved results",
+    "normal_whole_entry_ms": {
+      "p95_max": 4,
+      "p99_max": 6,
+      "max": 10,
+      "minimum_samples": 1000
+    },
+    "correction8_whole_entry_ms": {
+      "p95_max": 16,
+      "max": 25,
+      "minimum_samples": 128
+    },
+    "presentation_frame_interval_ms": {
+      "p95_max": 20,
+      "p99_max": 33.4,
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    "cold_local_load_seconds_max": 20,
+    "compressed_initial_download_bytes_max": 26214400,
+    "wasm_linear_memory_bytes_max": 536870912,
+    "backend_admitted_bytes_max": 67108864,
+    "native_canonical_payload_bytes_max": 524288,
+    "complete_frame_wire_bytes_max": 1048576,
+    "sustained_foreground_pair_seconds_min": 600,
+    "sampling": "retain every selected normal/repair sample including cold/error/outliers; no phase subtraction; capture load separately; distinguish browser wall timer resolution and background state; RSS/UA estimates are diagnostic, not Native ledger"
+  },
+  "contract": {
+    "path": "/Users/walter/data/code/odin/odin_godot/tests/box3d_web/contract.json",
+    "sha256": "a5f2df24bad930db1acf5fe57eb53de70e43fa956cc993308ef1e23d5df14124"
+  },
+  "sustained": {
+    "firefox_authority": {
+      "result": "MEASURED_BUDGETS_PASS",
+      "browsers": {
+        "host": "firefox",
+        "client": "chrome"
+      },
+      "versions": {
+        "host": "firefox/159.0.1",
+        "client": "Chrome/156.0.8078.80"
+      },
+      "violations": [],
+      "missing": [],
+      "observations": {
+        "host": {
+          "operation_rows": 37120,
+          "categories": {
+            "bootstrap": 31,
+            "pump": 492,
+            "advance1": 36594,
+            "advance_many": 3
+          },
+          "normal": {
+            "count": 36594,
+            "p95_ms": 3.061,
+            "p99_ms": 3.581,
+            "max_ms": 8.0
+          },
+          "repair8": {
+            "count": 0,
+            "p95_ms": null,
+            "p99_ms": null,
+            "max_ms": null
+          },
+          "presentation": {
+            "count": 37238,
+            "p95_ms": 16.720000000088476,
+            "p99_ms": 17.239999999990687,
+            "max_ms": 12366.660000000002
+          },
+          "sampled_wasm_linear_peak_bytes": 100466688,
+          "sampled_admitted_peak_bytes": 25219772,
+          "transfers": [
+            {
+              "role": "host",
+              "complete_wire_bytes": 49479,
+              "native_payload_upper_bound_bytes": 17070
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 51805,
+              "native_payload_upper_bound_bytes": 17409
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 51897,
+              "native_payload_upper_bound_bytes": 17409
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52482,
+              "native_payload_upper_bound_bytes": 17719
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52549,
+              "native_payload_upper_bound_bytes": 17743
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52722,
+              "native_payload_upper_bound_bytes": 17820
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52886,
+              "native_payload_upper_bound_bytes": 17918
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52980,
+              "native_payload_upper_bound_bytes": 17957
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 53736,
+              "native_payload_upper_bound_bytes": 18327
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 54417,
+              "native_payload_upper_bound_bytes": 18658
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 54545,
+              "native_payload_upper_bound_bytes": 18738
+            }
+          ],
+          "cold_lobby_ms": 5316.429125000001,
+          "cold_usable_menu_ms": 17563.108750000003,
+          "go_to_checked_result_seconds": 610.1530031670001,
+          "duration_boundary": "operation_end_before_close",
+          "operation_ends": [
+            {
+              "role": "host",
+              "buffered": false,
+              "rows": 37120,
+              "head": 36600,
+              "confirmed": 36600,
+              "arrival_ms": 637820.478708
+            }
+          ],
+          "raw_presentation_intervals": 37245,
+          "measured_presentation_intervals": 37238,
+          "teardown_intervals_retained": 7,
+          "raw_sha256": {
+            "console.ndjson": "c6c645bb38af958b5358a3e6f41bf775ad3e4b6d8a802ddf72bf79e1f8aada0e",
+            "browser-samples.json": "4343e00f3a7de81b2a8a3cc22aa2c78f48a9971fef1268b042bc1132d4420806"
+          }
+        },
+        "client": {
+          "operation_rows": 36659,
+          "categories": {
+            "bootstrap": 22,
+            "pump": 2025,
+            "replacement": 1,
+            "repair": 13161,
+            "advance1": 20499,
+            "advance_many": 951
+          },
+          "normal": {
+            "count": 20499,
+            "p95_ms": 3.264,
+            "p99_ms": 4.176,
+            "max_ms": 5.079
+          },
+          "repair8": {
+            "count": 3849,
+            "p95_ms": 7.014,
+            "p99_ms": 7.925,
+            "max_ms": 10.486
+          },
+          "presentation": {
+            "count": 36996,
+            "p95_ms": 18.279999999998836,
+            "p99_ms": 18.589999999996508,
+            "max_ms": 1216.2649999999999
+          },
+          "sampled_wasm_linear_peak_bytes": 100466688,
+          "sampled_admitted_peak_bytes": 26658568,
+          "transfers": [],
+          "cold_lobby_ms": 1425.1599999999999,
+          "cold_usable_menu_ms": 1696.5283329999984,
+          "go_to_checked_result_seconds": 610.1279727499999,
+          "duration_boundary": "operation_end_before_close",
+          "operation_ends": [
+            {
+              "role": "client",
+              "buffered": false,
+              "rows": 36659,
+              "head": 36600,
+              "confirmed": 36600,
+              "arrival_ms": 637823.271375
+            }
+          ],
+          "raw_presentation_intervals": 37033,
+          "measured_presentation_intervals": 36996,
+          "teardown_intervals_retained": 37,
+          "raw_sha256": {
+            "console.ndjson": "fe8b47c6784728d239e8ca90371305bc9ea0aff3fa268bfbc0bc009ef2d2a5c7",
+            "browser-samples.json": "68c061ac74ed76e55799b7c9ae61076d9feeccc8c37afdd5bef979a859bd524d"
+          }
+        }
+      },
+      "functional_proof": {
+        "result": "ORIGINAL_S0_FIREFOX_AUTHORITY_610S_PASS",
+        "at": "2026-11-04T04:52:36.205899+00:00",
+        "assessment_sha256": "e13ccf79d814500e43d2d979eecb8273b10b7b17cf832dde51d2ec85c693ba50",
+        "report_sha256": "c9251b3207f95d5fa798aa4126cec6d9d7178008f7530fdabc2eb52e06a615a9",
+        "all5_ack_jobs_sdk_audio_godot_exit_and_fences": true,
+        "source_fence_unchanged": true,
+        "actors": {
+          "host": {
+            "round": 6,
+            "layout": 2,
+            "eligible_delivery_cues": 9,
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 3,
+              "owners_after": 3,
+              "observed": true
+            },
+            "audio": {
+              "active_at_request": 0,
+              "elapsed_ms": 0,
+              "frames": 0,
+              "monitored": 0,
+              "pending": 0,
+              "timed_out": false
+            },
+            "godot_runtime_exit_observed": true
+          },
+          "client": {
+            "round": 6,
+            "layout": 2,
+            "eligible_delivery_cues": 9,
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 3,
+              "owners_after": 3,
+              "observed": true
+            },
+            "audio": {
+              "active_at_request": 0,
+              "elapsed_ms": 0,
+              "frames": 0,
+              "monitored": 0,
+              "pending": 0,
+              "timed_out": false
+            },
+            "godot_runtime_exit_observed": true
+          }
+        },
+        "scope": "This exactartifact/reference/browserroleonly; opposite role, publicInternet andhumanfeedback separate."
+      },
+      "assessment": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-firefox-host-v1/assessment.json",
+        "sha256": "e13ccf79d814500e43d2d979eecb8273b10b7b17cf832dde51d2ec85c693ba50"
+      },
+      "runtime_report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-firefox-host-v1/report.json",
+        "sha256": "c9251b3207f95d5fa798aa4126cec6d9d7178008f7530fdabc2eb52e06a615a9"
+      }
+    },
+    "chrome_authority": {
+      "result": "BUDGET_REJECTED",
+      "browsers": {
+        "host": "chrome",
+        "client": "firefox"
+      },
+      "versions": {
+        "host": "Chrome/156.0.8078.80",
+        "client": "firefox/159.0.1"
+      },
+      "violations": [
+        "client: correction8 max_ms"
+      ],
+      "missing": [],
+      "observations": {
+        "host": {
+          "operation_rows": 38076,
+          "categories": {
+            "bootstrap": 30,
+            "pump": 1446,
+            "advance1": 36600
+          },
+          "normal": {
+            "count": 36600,
+            "p95_ms": 2.27,
+            "p99_ms": 2.729,
+            "max_ms": 7.88
+          },
+          "repair8": {
+            "count": 0,
+            "p95_ms": null,
+            "p99_ms": null,
+            "max_ms": null
+          },
+          "presentation": {
+            "count": 38171,
+            "p95_ms": 18.269999999989523,
+            "p99_ms": 18.579999999987194,
+            "max_ms": 1216.6200000000001
+          },
+          "sampled_wasm_linear_peak_bytes": 100466688,
+          "sampled_admitted_peak_bytes": 25016228,
+          "transfers": [
+            {
+              "role": "host",
+              "complete_wire_bytes": 49479,
+              "native_payload_upper_bound_bytes": 17070
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 51805,
+              "native_payload_upper_bound_bytes": 17409
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 51897,
+              "native_payload_upper_bound_bytes": 17409
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52482,
+              "native_payload_upper_bound_bytes": 17719
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52549,
+              "native_payload_upper_bound_bytes": 17743
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52685,
+              "native_payload_upper_bound_bytes": 17811
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52696,
+              "native_payload_upper_bound_bytes": 17811
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52748,
+              "native_payload_upper_bound_bytes": 17833
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52786,
+              "native_payload_upper_bound_bytes": 17876
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 52874,
+              "native_payload_upper_bound_bytes": 17912
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 53110,
+              "native_payload_upper_bound_bytes": 18030
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 53956,
+              "native_payload_upper_bound_bytes": 18437
+            },
+            {
+              "role": "host",
+              "complete_wire_bytes": 54089,
+              "native_payload_upper_bound_bytes": 18502
+            }
+          ],
+          "cold_lobby_ms": 1406.235625,
+          "cold_usable_menu_ms": 1679.016041,
+          "go_to_checked_result_seconds": 610.259428,
+          "duration_boundary": "operation_end_before_close",
+          "operation_ends": [
+            {
+              "role": "host",
+              "buffered": false,
+              "rows": 38076,
+              "head": 36600,
+              "confirmed": 36600,
+              "arrival_ms": 637998.236208
+            }
+          ],
+          "raw_presentation_intervals": 38177,
+          "measured_presentation_intervals": 38171,
+          "teardown_intervals_retained": 6,
+          "raw_sha256": {
+            "console.ndjson": "955a5672d4bd4bd2ea1532df96222fad2686a7a2fc4b67b2dd9f9c55317a3cff",
+            "browser-samples.json": "c885a76c04f1c908e31728475e27079aa91fcd0557c30f389b01be59cb5447b3"
+          }
+        },
+        "client": {
+          "operation_rows": 36667,
+          "categories": {
+            "bootstrap": 21,
+            "pump": 1198,
+            "replacement": 1,
+            "advance1": 18961,
+            "repair": 15978,
+            "advance_many": 508
+          },
+          "normal": {
+            "count": 18961,
+            "p95_ms": 2.2,
+            "p99_ms": 4.781,
+            "max_ms": 8.501
+          },
+          "repair8": {
+            "count": 3968,
+            "p95_ms": 8.599,
+            "p99_ms": 9.64,
+            "max_ms": 45.92
+          },
+          "presentation": {
+            "count": 37028,
+            "p95_ms": 16.760000000009313,
+            "p99_ms": 17.2400000000016,
+            "max_ms": 12516.68
+          },
+          "sampled_wasm_linear_peak_bytes": 120586240,
+          "sampled_admitted_peak_bytes": 26447581,
+          "transfers": [],
+          "cold_lobby_ms": 5541.211959,
+          "cold_usable_menu_ms": 17928.974084,
+          "go_to_checked_result_seconds": 610.2469125,
+          "duration_boundary": "operation_end_before_close",
+          "operation_ends": [
+            {
+              "role": "client",
+              "buffered": false,
+              "rows": 36667,
+              "head": 36600,
+              "confirmed": 36600,
+              "arrival_ms": 638013.525166
+            }
+          ],
+          "raw_presentation_intervals": 37041,
+          "measured_presentation_intervals": 37028,
+          "teardown_intervals_retained": 13,
+          "raw_sha256": {
+            "console.ndjson": "e135ec8c9c3b3dc7718768f8a0f55e672e678f3478bfd4153a8d4132e14e4260",
+            "browser-samples.json": "f1f7ee483ede3689e0a5fb91827dc74d98b9276e0ba8b1d6b2595ee3ce6d6ec5"
+          }
+        }
+      },
+      "functional_proof": {
+        "result": "ORIGINAL_S0_CHROME_AUTHORITY_FIREFOX_CLIENT_REPAIR_MAX_REJECTED",
+        "at": "2026-11-04T05:12:56.780505+00:00",
+        "assessment_sha256": "cdf3a219bdf121322e776ee793df5a3903bfd740645c3007b8f7dabc8687afb5",
+        "report_sha256": "5b528eea6359dbf9b0ede0ebd310d617bab5cae6b9a77030c7b0c8abaac8110a",
+        "all5_ack_jobs_sdk_audio_godot_exit_and_fences": true,
+        "source_fence_unchanged": true,
+        "actors": {
+          "host": {
+            "round": 11,
+            "layout": 1,
+            "eligible_delivery_cues": 30,
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 3,
+              "owners_after": 3,
+              "observed": true
+            },
+            "audio": {
+              "active_at_request": 0,
+              "elapsed_ms": 0,
+              "frames": 0,
+              "monitored": 0,
+              "pending": 0,
+              "timed_out": false
+            },
+            "godot_runtime_exit_observed": true
+          },
+          "client": {
+            "round": 11,
+            "layout": 1,
+            "eligible_delivery_cues": 30,
+            "cleanup": {
+              "native": 0,
+              "wrapper": 0,
+              "meter": 0,
+              "owners": 0,
+              "owners_before": 3,
+              "owners_after": 3,
+              "observed": true
+            },
+            "audio": {
+              "active_at_request": 0,
+              "elapsed_ms": 0,
+              "frames": 0,
+              "monitored": 0,
+              "pending": 0,
+              "timed_out": false
+            },
+            "godot_runtime_exit_observed": true
+          }
+        },
+        "violations": [
+          "client: correction8 max_ms"
+        ],
+        "release_admitted": false,
+        "scope": "This exact artifact/reference/browser role only. One repair8 sample exceeds original 25ms max; all samples retained. Public Internet and human feedback remain separate."
+      },
+      "assessment": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-chrome-host-v1/assessment.json",
+        "sha256": "cdf3a219bdf121322e776ee793df5a3903bfd740645c3007b8f7dabc8687afb5"
+      },
+      "runtime_report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-chrome-host-v1/report.json",
+        "sha256": "5b528eea6359dbf9b0ede0ebd310d617bab5cae6b9a77030c7b0c8abaac8110a"
+      }
+    }
+  },
+  "current_artifact_functional_cases": {
+    "frame-egress-observer-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-observer-v1/report.json",
+        "sha256": "2d27f3118c7a69cf3c0f8140d2a4c5be666c096384f065b4b7bea25011ce4cf4"
+      }
+    },
+    "frame-egress-transient-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-transient-v1/report.json",
+        "sha256": "216d1d0c319302b0ad5ff016a6907c2bef70bc193ae283bb34643b3e06718bff"
+      }
+    },
+    "frame-egress-faults-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-faults-v1/report.json",
+        "sha256": "5b94f7e1d6922ac394c14334c2ba0b21a8b51ef26ec6aa3e00ef22c7ff730235"
+      }
+    },
+    "frame-egress-final-gap-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-final-gap-v1/report.json",
+        "sha256": "d9f944d99109f7cb90cc1b6ef619bc79076d238759267459cde920129ad2cc53"
+      }
+    },
+    "frame-egress-final-cold-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-final-cold-v1/report.json",
+        "sha256": "8fd3e73e3293acebb725f96b1d8b8a698f61e3b6510b5ff1fce2334af5ba3e21"
+      }
+    },
+    "frame-egress-final-hostfrozen-v1": {
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "artifact_helper_service_fences": true,
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-final-hostfrozen-v1/report.json",
+        "sha256": "8593ecc877f34971964a5ba87822ef2f93f48dc4a6ab1300b404b888d104f863"
+      }
+    }
+  },
+  "compatibility": {
+    "native_sdk_current": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-native-sdk-v1/report.json",
+      "sha256": "05bfd4b83a68a2360cc9244662d4a63b5ce589bbe091e799e2562fcb07b6c179"
+    },
+    "native_complete_network_tests": {
+      "handle": "t1mc",
+      "tests": 16,
+      "actual_exit": 0
+    },
+    "broader_default_network_tests": {
+      "handle": "t1md",
+      "tests": 182,
+      "actual_exit": 0
+    },
+    "minimal_kit_custom_template": {
+      "evidence": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/rtc-scratch-kit-v1/report.json",
+        "sha256": "275d04714040573bae2643f320a9ab74fadf0e41eea08d1bdf6abf1ec99fe42c"
+      },
+      "scope": "Same unchanged RTC template/backend; provider, World2, complete codec and cleanup. Separate minimal project, no Kit network/game timing claim."
+    }
+  },
+  "web_compressed_size": {
+    "raw_bytes": 51737982,
+    "gzip_bytes": 12872224,
+    "files": {
+      "index.apple-touch-icon.png": {
+        "raw": 10368,
+        "gzip": 10376
+      },
+      "index.audio.position.worklet.js": {
+        "raw": 2973,
+        "gzip": 1161
+      },
+      "index.audio.worklet.js": {
+        "raw": 7298,
+        "gzip": 2194
+      },
+      "index.html": {
+        "raw": 5460,
+        "gzip": 2199
+      },
+      "index.icon.png": {
+        "raw": 8538,
+        "gzip": 8551
+      },
+      "index.js": {
+        "raw": 2959375,
+        "gzip": 370837
+      },
+      "index.pck": {
+        "raw": 291176,
+        "gzip": 155938
+      },
+      "index.png": {
+        "raw": 21443,
+        "gzip": 19328
+      },
+      "index.side.wasm": {
+        "raw": 43273321,
+        "gzip": 10462300
+      },
+      "index.wasm": {
+        "raw": 1601069,
+        "gzip": 597493
+      },
+      "libodin_godot.wasm": {
+        "raw": 3556961,
+        "gzip": 1241847
+      }
+    },
+    "limit": 26214400,
+    "scope": "Offline sum of gzip members, an upper bound for these files; not a measured HTTP download."
+  },
+  "custom_template": {
+    "schema_version": 1,
+    "result": "DERIVED_TEMPLATE",
+    "profile": "godot4.7.1-web-dlink-rtc-scratch-v1",
+    "godot_version": "4.7.1.stable",
+    "helper_sha256": "880e85748fa2d9b19630d1f42bd69ac0fd3b9c5a3b3385a8d9820d9fb986972e",
+    "source": {
+      "path": "/Users/walter/Library/Application Support/Godot/export_templates/4.7.1.stable/web_dlink_release.zip",
+      "sha256": "3d9a4f7963759b31d9bc19fffe0991b7348eeeb970187c9f09bbf1aa843a0c6c",
+      "javascript_sha256": "878c9ae7fb3c27ce886faea8da0670dc1a97fb93930fac4b433a1bb56e662d3a",
+      "rtc_send_function_sha256": "136788a75549a37ff40a77539fc3a6c64ed017177b3a15c68f48771734c76f4d"
+    },
+    "template": {
+      "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/rtc-template-v1/web_dlink_release.rtc-scratch-v1.zip",
+      "sha256": "6fc6470309be934fc3337999277623185f889f7ba6f090e82be639d00a505611"
+    },
+    "entry_sha256": {
+      "godot.js": "6e775e1323d1705c9b7b010bc604e9b3c603557af77783ee179985fd4ed78e6c",
+      "godot.wasm": "eb7ab9dcb2c2c484f4dca0acaad466b7fd8448fb86a0a552b5c3e5291952115f",
+      "godot.audio.worklet.js": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
+      "godot.audio.position.worklet.js": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
+      "godot.side.wasm": "7524005084798d164449a7bb28595e3e680103898cf26c50cb2bc7335a5c9254",
+      "godot.html": "3a5f265e788646513c32494fc0faead64c6b7f92ef005bf475da0c622bd481f4",
+      "godot.service.worker.js": "c72e9a688cd06978be343fd8481130e89dd81439267e1cfd8aef8343ea9f4139",
+      "godot.offline.html": "b0a5d443e78f58717adac780bac91c1431bfa3b801c41f4707d507fb5ad2e47f"
+    },
+    "changed_entries": [
+      "godot.js"
+    ],
+    "scratch_backing_bytes_max": 65536,
+    "scratch_lifetime": "One backing store per loaded engine JavaScript module; no per-peer/frame growth.",
+    "scope": "Pinned custom Web template derivation only; runtime and performance acceptance separate"
+  },
+  "outlier_analysis": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/final-egress-chrome-host-v1/client/memory-peak-inputs.json",
+    "sha256": "6dbe80ad047dadf722e772bb7f44cc15bbcde9b0a69a6627e735a39b4c6afd1a"
+  },
+  "open_gates": [
+    {
+      "id": "Q1",
+      "requirement": "Original repair8 maximum25ms",
+      "status": "REJECTED",
+      "observed_max_ms": 45.92,
+      "observed_p95_ms": 8.599,
+      "observed_p99_ms": 9.64,
+      "count": 3968,
+      "outliers_over_25ms": 1,
+      "cause": "UNESTABLISHED",
+      "decision": "User question pending. Original limit remains unchanged."
+    },
+    {
+      "id": "N1",
+      "requirement": "Independent public endpoint/HTTPS/WSS and direct or relay connectivity acceptance",
+      "status": "NOT_OBSERVED",
+      "available": "Local TLS/WSS, authenticated forced TURN, credential refusal and isolation refusal proved on earlier scoped records; no chosen public endpoint."
+    },
+    {
+      "id": "P1",
+      "requirement": "Two-human cooperative play feedback",
+      "status": "NOT_OBSERVED",
+      "available": "Actual rendered/audio/settings/readability and scripted cooperative rounds; automation is not human feedback."
+    }
+  ],
+  "safari": {
+    "status": "NOT_ADMITTED",
+    "reason": "Actual Safari remote automation prerequisite unavailable; no WebKit substitution."
+  },
+  "original_review_archive": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/D1/Dockyard-Duo-review-macos-arm64-web.tar.gz",
+    "sha256": "63103866c7daa98d3ca17c6dda795bc5c26dca69307c20060da974d7ce2e0c13",
+    "scope": "Earlier immutable candidate; not rebound to this build."
+  },
+  "license_notices": {
+    "godot": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-v1/godot-license.txt",
+      "sha256": "b0435e3b3e4e55238f05f4b306f30524a1b2e20147810d436eaa554fa6855c80"
+    },
+    "compiled_notices": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/frame-egress-v1/godot-compiled-notices.json",
+      "sha256": "ce454e23fb4ab0e7872913276eec14d27d14e66d803d9f8a226424e3337d1913"
+    },
+    "source": "Extracted via Engine.get_license_text/get_copyright_info/get_license_info from installed official macOS Godot4.7.1; not a claim that every target compiles an identical module inventory."
+  }
+}

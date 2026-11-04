@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "result": "SIGNATURE_WORK_REDUCTION_CORRECTNESS_PASS_STRICT_LATENCY_REJECTED",
+  "release_admitted": false,
+  "task_complete": false,
+  "whole_goal_complete": false,
+  "plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-reuse-v1/plan.json",
+    "sha256": "456c7e3251a6610e39c0dbc2686edddf23e92b7474dddbcabacafde058b4e492"
+  },
+  "source_checkpoint": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-reuse-v1/candidate-source-checkpoint.json",
+    "sha256": "6179bbc04194590921cb12b18d57c529f166d8d075ad93db8fe457556de1f483"
+  },
+  "runtime_source": "replay/net/physics_facts.odin",
+  "runtime_change": "Construct an already-due Snapshot before fact construction; copy its locally owned checksum-valid exact-scope signature by value. Keep fact-before-chunk sends. Fresh fallback for history, missing, corrupt or wrong scope. No new allocation, checkpoint, cache or Tx field.",
+  "baseline": {
+    "terminal": "t1js",
+    "actual_exit": 1,
+    "single_recipient_solver_fills": 2,
+    "driver_observer_solver_fills": 4,
+    "failed_only_new_efficiency_expectations": true
+  },
+  "checks": [
+    {
+      "terminal": "t1jt",
+      "actual_exit": 0,
+      "scope": "single/driver+observer work count, normative full5/wire/signature, real confirmation, serialization failure/recovery, balanced resources"
+    },
+    {
+      "terminal": "t1jx",
+      "actual_exit": 0,
+      "scope": "expanded corrupt-owned-header fallback and cadence2 no-snapshot-due/next-due path"
+    },
+    {
+      "terminal": "t1jy",
+      "actual_exit": 0,
+      "scope": "all16 affected actualNative complete-physics network tests, H128/repair8/dense35/141contacts/canonical/source-free/cleanup; 64MiB edge atomic and balanced"
+    }
+  ],
+  "measured_work": {
+    "single_recipient_solver_fills": 1,
+    "driver_observer_solver_fills": 2
+  },
+  "runtime_latency_gain": "NOT_ESTABLISHED; hostp953.799ms baseline vs3.800ms candidate; strictmax30.600ms vs18.299ms both rejected",
+  "next": "No repeat of unchanged failed latency gate. A further performance change needs a new evidence-supported mechanism or an explicitly revised support/reference contract; public endpoint and two-human feedback gates remain pending.",
+  "ordinary_export": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-export-v1/report.json",
+    "sha256": "b1e3ff6ef41d5eeabc6d1e877762baaa3ce1af2e695b4eb48fac45acd0663b31"
+  },
+  "sdk_native_default_validation": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-sdk-native-v1/report.json",
+    "sha256": "89e2a80ddf2846c6a3359d130029ae2c9f9686ec100b2ce36778cb57d5845576"
+  },
+  "comparison_plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-reuse-v1/comparison-plan.json",
+    "sha256": "22ad00f7763cd3ceab183778e49e1d758ca86cdb07c8ccd9858e62141cf75aae"
+  },
+  "live_case": null,
+  "updated_utc": "2026-11-04T01:54:12.256282+00:00",
+  "comparison": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-reuse-v1/comparison-result.json",
+    "sha256": "d18462b609bb3265dacd2b78d35b74e8c58aaf0272115ccca73450f35d373f0e"
+  },
+  "affected_browser_checks": {
+    "tx-signature-observer-v2": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-observer-v2/report.json",
+        "sha256": "df9838a6f81485ee5527ef9c2fbcf386ae8eb082d7a74edad43b68279e2e72b9"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-observer-v2/export-binding.json",
+        "sha256": "ddeed21970d57f639aaea12222ccc64ffe15f0680874bb736bb96b428baaa2a2"
+      },
+      "fences_and_cleanup_checked": true
+    },
+    "tx-signature-transient-v1": {
+      "result": "PASS",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-transient-v1/report.json",
+        "sha256": "d5e71856b1c89eb0e183d8d38e24dbfdcf932825a95c30dc90fa4be65d147e1e"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-transient-v1/export-binding.json",
+        "sha256": "9841adbe02965a38a3ce15d2768b5e19bf6e9806121c726c271de0d4376732df"
+      },
+      "fences_and_cleanup_checked": true
+    },
+    "tx-signature-faults-v1": {
+      "result": "FUNCTIONAL_SAMPLES_COLLECTED",
+      "report": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-faults-v1/report.json",
+        "sha256": "257705de31f04a14985c13665da01249fe7e2d4bd645af811e30ecebc8534477"
+      },
+      "binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-faults-v1/export-binding.json",
+        "sha256": "7499f0bd374a326f2e79430021a9bf4a4763e92afed133c86e7bd211ba028687"
+      },
+      "fences_and_cleanup_checked": true
+    }
+  },
+  "retained_fixture_failure": {
+    "report": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-observer-v1/report.json",
+      "sha256": "bbcd0afa3b497a800f0e3485169447fa1b9ee71cbfdfc968222e6f55329c7740"
+    },
+    "diagnosis": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-observer-v1/fixture-diagnosis.json",
+      "sha256": "77b95dec9c209e4e59d4ec1370fa2cc831414152e6106657bef376ad847a052f"
+    },
+    "correction": "Observer target1800 rather than1200; source/physics/lease limits unchanged."
+  },
+  "architecture_decision": {
+    "retained": "Small allocation-free reuse of an already-owned exact-scope signature, justified as measured work reduction; no demonstrated wall-latency gain.",
+    "rejected": [
+      "Per-flush owned complete encoding cache: no observed latency gain; restored before this experiment.",
+      "Deferred console emission as a tail fix:610secondcase still29.56ms."
+    ],
+    "performance_cause": "UNKNOWN. Captured whole-call/Advance/Pump/external phase distributions differ; no single CPU or wait mechanism is established. Do not add another cache or retune limits based solely on wall outliers.",
+    "qualification": "Strict10msmaximum unchanged, failed candidate unqualified; no unchanged sustained retry."
+  },
+  "source_fence_unchanged": true,
+  "scope": "This small runtime change and its affected Native/Web correctness guarantees only. Q1 and the whole goal remain incomplete; no release admission.",
+  "affected_browser_plan": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/Q1/tx-signature-reuse-v1/affected-browser-plan.json",
+    "sha256": "48f7a0d51e8bac670d73e024f7775aa735bb1c6f1e6ee79879ce3a4081bae428"
+  },
+  "affected_browser_summary": {
+    "tx-signature-observer-v2": {
+      "roles": [
+        "host",
+        "client",
+        "observer"
+      ],
+      "checked_cleanup_zero": true,
+      "final_tick": 1800
+    },
+    "tx-signature-transient-v1": {
+      "roles": [
+        "host",
+        "client"
+      ],
+      "checked_cleanup_zero": true,
+      "final_tick": 1200
+    },
+    "tx-signature-faults-v1": {
+      "roles": [
+        "host",
+        "client"
+      ],
+      "checked_cleanup_zero": true,
+      "final_tick": 3600,
+      "observed_faults": {
+        "host": {
+          "base_delay_ms": 15,
+          "jitter_ms": 8,
+          "unreliable_loss_permyriad": 300,
+          "delayed": 15534,
+          "dropped": 0,
+          "bytes_delayed": 16600339,
+          "bytes_dropped": 0,
+          "queued": 0,
+          "peak_queued": 16,
+          "closed_before_delivery": 0
+        },
+        "client": {
+          "base_delay_ms": 15,
+          "jitter_ms": 8,
+          "unreliable_loss_permyriad": 300,
+          "delayed": 2480,
+          "dropped": 78,
+          "bytes_delayed": 472779,
+          "bytes_dropped": 15175,
+          "queued": 0,
+          "peak_queued": 5,
+          "closed_before_delivery": 0
+        }
+      }
+    }
+  },
+  "current_task_owner": {
+    "task": "t_c60a7e2d429f4445",
+    "revision": 22,
+    "worker": "box3d-web-showcase-root-qualification",
+    "claim": "[redacted local task claim]"
+  }
+}
