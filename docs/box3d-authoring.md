@@ -1,5 +1,10 @@
 # Box3D authoring and framework samples
 
+For an offline, single-player game, Kit and Replay are optional: see
+[examples/box3d_offline](../examples/box3d_offline/README.md), where one script
+creates a Box3D world, steps it each physics frame and copies body poses onto
+ordinary Godot nodes.
+
 Start with the [shared authoring contract](design/box3d/authoring.md) for World,
 Body, Sensor and six shape Resources. [Character movement, queries and joints](design/box3d/motion.md)
 describe fixed-tick value state and all eight joint families. The

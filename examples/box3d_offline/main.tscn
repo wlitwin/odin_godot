@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://qip5a42gk17f"]
+
+[ext_resource type="Script" uid="uid://cc2dv7wpngtnc" path="res://scripts/tower.odin" id="1"]
+
+[sub_resource type="Environment" id="Environment"]
+background_mode = 1
+background_color = Color(0.07, 0.09, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.62, 0.68, 0.8, 1)
+ambient_light_energy = 0.55
+
+[node name="BoxTower" type="Node3D" unique_id=1933169569]
+script = ExtResource("1")
+
+[node name="Camera" type="Camera3D" parent="." unique_id=72272974]
+transform = Transform3D(1, 0, 0, 0, 0.99026805, 0.1391731, 0, -0.1391731, 0.99026805, 0, 3, 10)
+current = true
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=2006355104]
+transform = Transform3D(0.81915206, 0.43938506, -0.36868784, 0, 0.64278764, 0.76604444, 0.57357645, -0.62750685, 0.5265408, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Environment" type="WorldEnvironment" parent="." unique_id=1878177937]
+environment = SubResource("Environment")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1466797178]
+
+[node name="Status" type="Label" parent="HUD" unique_id=439988163]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 900.0
+offset_bottom = 80.0
+text = "Box3D offline"
