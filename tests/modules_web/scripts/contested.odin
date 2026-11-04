@@ -12,10 +12,10 @@ package modweb_main
 import gd "godot:godot"
 
 Contested :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 @(gd_method)
 contested_claim :: proc(self: ^Contested) -> int {
-	return 1 // main module's brand
+    return 1 // main module's brand
 }

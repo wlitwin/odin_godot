@@ -19,7 +19,9 @@ when REAL_PRECISION == "double" {
     Quat :: quaternion128
     REAL_INF :: math.INF_F32
 } else {
-    #panic("Unknown REAL_PRECISION value; expected \"single\" or \"double\" (-define:REAL_PRECISION=double for a double-precision engine build)")
+    #panic(
+        "Unknown REAL_PRECISION value; expected \"single\" or \"double\" (-define:REAL_PRECISION=double for a double-precision engine build)",
+    )
 }
 
 Bool :: bool
@@ -90,7 +92,11 @@ Signal :: distinct Opaque(4)
 Dictionary :: distinct Opaque(1)
 Array :: distinct Opaque(1)
 
-Typed_Array :: struct($T: typeid) where intrinsics.type_is_variant_of(Variantable_Type, T) || intrinsics.type_is_specialization_of(T, Packed_Array) {
+Typed_Array :: struct(
+    $T: typeid
+) where intrinsics.type_is_variant_of(Variantable_Type, T) ||
+    intrinsics.type_is_specialization_of(T, Packed_Array)
+{
     using untyped: Array,
 }
 
@@ -238,12 +244,7 @@ Plane_PLANE_YZ :: Plane{{1, 0, 0}, 0}
 Plane_PLANE_XZ :: Plane{{0, 1, 0}, 0}
 Plane_PLANE_XY :: Plane{{0, 0, 1}, 0}
 
-QUATERNION_IDENTITY :: quaternion(
-    real = cast(Real)0,
-    imag = cast(Real)0,
-    jmag = cast(Real)0,
-    kmag = cast(Real)1,
-)
+QUATERNION_IDENTITY :: quaternion(real = cast(Real)0, imag = cast(Real)0, jmag = cast(Real)0, kmag = cast(Real)1)
 
 BASIS_IDENTITY :: Basis{Vector3{1, 0, 0}, Vector3{0, 1, 0}, Vector3{0, 0, 1}}
 BASIS_FLIP_X :: Basis{Vector3{-1, 0, 0}, Vector3{0, 1, 0}, Vector3{0, 0, 1}}
@@ -467,9 +468,11 @@ variant_from :: proc {
 
 variant_from_bool :: proc "contextless" (from: ^bool) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Bool)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -477,9 +480,11 @@ variant_from_bool :: proc "contextless" (from: ^bool) -> (ret: Variant) {
 
 variant_from_int :: proc "contextless" (from: ^Int) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Int)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -487,9 +492,11 @@ variant_from_int :: proc "contextless" (from: ^Int) -> (ret: Variant) {
 
 variant_from_float :: proc "contextless" (from: ^Float) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Float)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -497,9 +504,11 @@ variant_from_float :: proc "contextless" (from: ^Float) -> (ret: Variant) {
 
 variant_from_string :: proc "contextless" (from: ^String) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.String)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -507,9 +516,11 @@ variant_from_string :: proc "contextless" (from: ^String) -> (ret: Variant) {
 
 variant_from_vector2 :: proc "contextless" (from: ^Vector2) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector2)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -517,9 +528,11 @@ variant_from_vector2 :: proc "contextless" (from: ^Vector2) -> (ret: Variant) {
 
 variant_from_vector2i :: proc "contextless" (from: ^Vector2i) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector2i)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -527,9 +540,11 @@ variant_from_vector2i :: proc "contextless" (from: ^Vector2i) -> (ret: Variant) 
 
 variant_from_rect2 :: proc "contextless" (from: ^Rect2) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Rect2)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -537,9 +552,11 @@ variant_from_rect2 :: proc "contextless" (from: ^Rect2) -> (ret: Variant) {
 
 variant_from_rect2i :: proc "contextless" (from: ^Rect2i) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Rect2i)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -547,9 +564,11 @@ variant_from_rect2i :: proc "contextless" (from: ^Rect2i) -> (ret: Variant) {
 
 variant_from_vector3 :: proc "contextless" (from: ^Vector3) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector3)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -557,9 +576,11 @@ variant_from_vector3 :: proc "contextless" (from: ^Vector3) -> (ret: Variant) {
 
 variant_from_vector3i :: proc "contextless" (from: ^Vector3i) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector3i)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -567,9 +588,11 @@ variant_from_vector3i :: proc "contextless" (from: ^Vector3i) -> (ret: Variant) 
 
 variant_from_transform2d :: proc "contextless" (from: ^Transform2d) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Transform2d)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -577,9 +600,11 @@ variant_from_transform2d :: proc "contextless" (from: ^Transform2d) -> (ret: Var
 
 variant_from_vector4 :: proc "contextless" (from: ^Vector4) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector4)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -587,9 +612,11 @@ variant_from_vector4 :: proc "contextless" (from: ^Vector4) -> (ret: Variant) {
 
 variant_from_vector4i :: proc "contextless" (from: ^Vector4i) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Vector4i)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -597,9 +624,11 @@ variant_from_vector4i :: proc "contextless" (from: ^Vector4i) -> (ret: Variant) 
 
 variant_from_plane :: proc "contextless" (from: ^Plane) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Plane)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -607,9 +636,11 @@ variant_from_plane :: proc "contextless" (from: ^Plane) -> (ret: Variant) {
 
 variant_from_quaternion :: proc "contextless" (from: ^Quaternion) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Quaternion)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -617,9 +648,11 @@ variant_from_quaternion :: proc "contextless" (from: ^Quaternion) -> (ret: Varia
 
 variant_from_aabb :: proc "contextless" (from: ^Aabb) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Aabb)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -627,9 +660,11 @@ variant_from_aabb :: proc "contextless" (from: ^Aabb) -> (ret: Variant) {
 
 variant_from_basis :: proc "contextless" (from: ^Basis) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Basis)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -637,9 +672,11 @@ variant_from_basis :: proc "contextless" (from: ^Basis) -> (ret: Variant) {
 
 variant_from_transform3d :: proc "contextless" (from: ^Transform3d) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Transform3d)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -647,9 +684,11 @@ variant_from_transform3d :: proc "contextless" (from: ^Transform3d) -> (ret: Var
 
 variant_from_projection :: proc "contextless" (from: ^Projection) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Projection)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -657,9 +696,11 @@ variant_from_projection :: proc "contextless" (from: ^Projection) -> (ret: Varia
 
 variant_from_color :: proc "contextless" (from: ^Color) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Color)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -667,9 +708,11 @@ variant_from_color :: proc "contextless" (from: ^Color) -> (ret: Variant) {
 
 variant_from_string_name :: proc "contextless" (from: ^String_Name) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.String_Name)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -677,9 +720,11 @@ variant_from_string_name :: proc "contextless" (from: ^String_Name) -> (ret: Var
 
 variant_from_node_path :: proc "contextless" (from: ^Node_Path) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Node_Path)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -687,9 +732,11 @@ variant_from_node_path :: proc "contextless" (from: ^Node_Path) -> (ret: Variant
 
 variant_from_rid :: proc "contextless" (from: ^Rid) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Rid)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -697,9 +744,11 @@ variant_from_rid :: proc "contextless" (from: ^Rid) -> (ret: Variant) {
 
 variant_from_object :: proc "contextless" (from: ^Object) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Object)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -707,9 +756,11 @@ variant_from_object :: proc "contextless" (from: ^Object) -> (ret: Variant) {
 
 variant_from_callable :: proc "contextless" (from: ^Callable) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Callable)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -717,9 +768,11 @@ variant_from_callable :: proc "contextless" (from: ^Callable) -> (ret: Variant) 
 
 variant_from_signal :: proc "contextless" (from: ^Signal) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Signal)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -727,9 +780,11 @@ variant_from_signal :: proc "contextless" (from: ^Signal) -> (ret: Variant) {
 
 variant_from_dictionary :: proc "contextless" (from: ^Dictionary) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Dictionary)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -737,9 +792,11 @@ variant_from_dictionary :: proc "contextless" (from: ^Dictionary) -> (ret: Varia
 
 variant_from_array :: proc "contextless" (from: ^Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -747,9 +804,11 @@ variant_from_array :: proc "contextless" (from: ^Array) -> (ret: Variant) {
 
 variant_from_packed_byte_array :: proc "contextless" (from: ^Packed_Byte_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Byte_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -757,9 +816,11 @@ variant_from_packed_byte_array :: proc "contextless" (from: ^Packed_Byte_Array) 
 
 variant_from_packed_int32_array :: proc "contextless" (from: ^Packed_Int32_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Int32_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -767,9 +828,11 @@ variant_from_packed_int32_array :: proc "contextless" (from: ^Packed_Int32_Array
 
 variant_from_packed_int64_array :: proc "contextless" (from: ^Packed_Int64_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Int64_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -777,9 +840,11 @@ variant_from_packed_int64_array :: proc "contextless" (from: ^Packed_Int64_Array
 
 variant_from_packed_float32_array :: proc "contextless" (from: ^Packed_Float32_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Float32_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -787,9 +852,11 @@ variant_from_packed_float32_array :: proc "contextless" (from: ^Packed_Float32_A
 
 variant_from_packed_float64_array :: proc "contextless" (from: ^Packed_Float64_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Float64_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -797,9 +864,11 @@ variant_from_packed_float64_array :: proc "contextless" (from: ^Packed_Float64_A
 
 variant_from_packed_string_array :: proc "contextless" (from: ^Packed_String_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_String_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -807,9 +876,11 @@ variant_from_packed_string_array :: proc "contextless" (from: ^Packed_String_Arr
 
 variant_from_packed_vector2_array :: proc "contextless" (from: ^Packed_Vector2_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Vector2_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -817,9 +888,11 @@ variant_from_packed_vector2_array :: proc "contextless" (from: ^Packed_Vector2_A
 
 variant_from_packed_vector3_array :: proc "contextless" (from: ^Packed_Vector3_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Vector3_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -827,9 +900,11 @@ variant_from_packed_vector3_array :: proc "contextless" (from: ^Packed_Vector3_A
 
 variant_from_packed_color_array :: proc "contextless" (from: ^Packed_Color_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Color_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -837,9 +912,11 @@ variant_from_packed_color_array :: proc "contextless" (from: ^Packed_Color_Array
 
 variant_from_packed_vector4_array :: proc "contextless" (from: ^Packed_Vector4_Array) -> (ret: Variant) {
     @(static) constructor: gd.VariantFromTypeConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_from_type_constructor(.Packed_Vector4_Array)
     }
+
     ret = Variant{}
     constructor(&ret, from)
     return
@@ -989,18 +1066,22 @@ variant_to :: proc "contextless" (
 
 variant_to_bool :: proc "contextless" (from: ^Variant) -> (ret: bool) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Bool)
     }
+
     constructor(&ret, from)
     return
 }
 
 variant_to_int :: proc "contextless" (from: ^Variant) -> (ret: Int) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Int)
     }
+
     ret = Int{}
     constructor(&ret, from)
     return
@@ -1008,9 +1089,11 @@ variant_to_int :: proc "contextless" (from: ^Variant) -> (ret: Int) {
 
 variant_to_float :: proc "contextless" (from: ^Variant) -> (ret: Float) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Float)
     }
+
     ret = Float{}
     constructor(&ret, from)
     return
@@ -1018,9 +1101,11 @@ variant_to_float :: proc "contextless" (from: ^Variant) -> (ret: Float) {
 
 variant_to_string :: proc "contextless" (from: ^Variant) -> (ret: String) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.String)
     }
+
     ret = String{}
     constructor(&ret, from)
     return
@@ -1028,9 +1113,11 @@ variant_to_string :: proc "contextless" (from: ^Variant) -> (ret: String) {
 
 variant_to_vector2 :: proc "contextless" (from: ^Variant) -> (ret: Vector2) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector2)
     }
+
     ret = Vector2{}
     constructor(&ret, from)
     return
@@ -1038,9 +1125,11 @@ variant_to_vector2 :: proc "contextless" (from: ^Variant) -> (ret: Vector2) {
 
 variant_to_vector2i :: proc "contextless" (from: ^Variant) -> (ret: Vector2i) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector2i)
     }
+
     ret = Vector2i{}
     constructor(&ret, from)
     return
@@ -1048,9 +1137,11 @@ variant_to_vector2i :: proc "contextless" (from: ^Variant) -> (ret: Vector2i) {
 
 variant_to_rect2 :: proc "contextless" (from: ^Variant) -> (ret: Rect2) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Rect2)
     }
+
     ret = Rect2{}
     constructor(&ret, from)
     return
@@ -1058,9 +1149,11 @@ variant_to_rect2 :: proc "contextless" (from: ^Variant) -> (ret: Rect2) {
 
 variant_to_rect2i :: proc "contextless" (from: ^Variant) -> (ret: Rect2i) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Rect2i)
     }
+
     ret = Rect2i{}
     constructor(&ret, from)
     return
@@ -1068,9 +1161,11 @@ variant_to_rect2i :: proc "contextless" (from: ^Variant) -> (ret: Rect2i) {
 
 variant_to_vector3 :: proc "contextless" (from: ^Variant) -> (ret: Vector3) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector3)
     }
+
     ret = Vector3{}
     constructor(&ret, from)
     return
@@ -1078,9 +1173,11 @@ variant_to_vector3 :: proc "contextless" (from: ^Variant) -> (ret: Vector3) {
 
 variant_to_vector3i :: proc "contextless" (from: ^Variant) -> (ret: Vector3i) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector3i)
     }
+
     ret = Vector3i{}
     constructor(&ret, from)
     return
@@ -1088,9 +1185,11 @@ variant_to_vector3i :: proc "contextless" (from: ^Variant) -> (ret: Vector3i) {
 
 variant_to_transform2d :: proc "contextless" (from: ^Variant) -> (ret: Transform2d) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Transform2d)
     }
+
     ret = Transform2d{}
     constructor(&ret, from)
     return
@@ -1098,9 +1197,11 @@ variant_to_transform2d :: proc "contextless" (from: ^Variant) -> (ret: Transform
 
 variant_to_vector4 :: proc "contextless" (from: ^Variant) -> (ret: Vector4) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector4)
     }
+
     ret = Vector4{}
     constructor(&ret, from)
     return
@@ -1108,9 +1209,11 @@ variant_to_vector4 :: proc "contextless" (from: ^Variant) -> (ret: Vector4) {
 
 variant_to_vector4i :: proc "contextless" (from: ^Variant) -> (ret: Vector4i) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Vector4i)
     }
+
     ret = Vector4i{}
     constructor(&ret, from)
     return
@@ -1118,9 +1221,11 @@ variant_to_vector4i :: proc "contextless" (from: ^Variant) -> (ret: Vector4i) {
 
 variant_to_plane :: proc "contextless" (from: ^Variant) -> (ret: Plane) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Plane)
     }
+
     ret = Plane{}
     constructor(&ret, from)
     return
@@ -1128,9 +1233,11 @@ variant_to_plane :: proc "contextless" (from: ^Variant) -> (ret: Plane) {
 
 variant_to_quaternion :: proc "contextless" (from: ^Variant) -> (ret: Quaternion) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Quaternion)
     }
+
     ret = Quaternion{}
     constructor(&ret, from)
     return
@@ -1138,9 +1245,11 @@ variant_to_quaternion :: proc "contextless" (from: ^Variant) -> (ret: Quaternion
 
 variant_to_aabb :: proc "contextless" (from: ^Variant) -> (ret: Aabb) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Aabb)
     }
+
     ret = Aabb{}
     constructor(&ret, from)
     return
@@ -1148,9 +1257,11 @@ variant_to_aabb :: proc "contextless" (from: ^Variant) -> (ret: Aabb) {
 
 variant_to_basis :: proc "contextless" (from: ^Variant) -> (ret: Basis) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Basis)
     }
+
     ret = Basis{}
     constructor(&ret, from)
     return
@@ -1158,9 +1269,11 @@ variant_to_basis :: proc "contextless" (from: ^Variant) -> (ret: Basis) {
 
 variant_to_transform3d :: proc "contextless" (from: ^Variant) -> (ret: Transform3d) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Transform3d)
     }
+
     ret = Transform3d{}
     constructor(&ret, from)
     return
@@ -1168,9 +1281,11 @@ variant_to_transform3d :: proc "contextless" (from: ^Variant) -> (ret: Transform
 
 variant_to_projection :: proc "contextless" (from: ^Variant) -> (ret: Projection) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Projection)
     }
+
     ret = Projection{}
     constructor(&ret, from)
     return
@@ -1178,9 +1293,11 @@ variant_to_projection :: proc "contextless" (from: ^Variant) -> (ret: Projection
 
 variant_to_color :: proc "contextless" (from: ^Variant) -> (ret: Color) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Color)
     }
+
     ret = Color{}
     constructor(&ret, from)
     return
@@ -1188,9 +1305,11 @@ variant_to_color :: proc "contextless" (from: ^Variant) -> (ret: Color) {
 
 variant_to_string_name :: proc "contextless" (from: ^Variant) -> (ret: String_Name) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.String_Name)
     }
+
     ret = String_Name{}
     constructor(&ret, from)
     return
@@ -1198,9 +1317,11 @@ variant_to_string_name :: proc "contextless" (from: ^Variant) -> (ret: String_Na
 
 variant_to_node_path :: proc "contextless" (from: ^Variant) -> (ret: Node_Path) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Node_Path)
     }
+
     ret = Node_Path{}
     constructor(&ret, from)
     return
@@ -1208,9 +1329,11 @@ variant_to_node_path :: proc "contextless" (from: ^Variant) -> (ret: Node_Path) 
 
 variant_to_rid :: proc "contextless" (from: ^Variant) -> (ret: Rid) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Rid)
     }
+
     ret = Rid{}
     constructor(&ret, from)
     return
@@ -1218,9 +1341,11 @@ variant_to_rid :: proc "contextless" (from: ^Variant) -> (ret: Rid) {
 
 variant_to_object :: proc "contextless" (from: ^Variant) -> (ret: Object) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Object)
     }
+
     ret = Object{}
     constructor(&ret, from)
     return
@@ -1228,9 +1353,11 @@ variant_to_object :: proc "contextless" (from: ^Variant) -> (ret: Object) {
 
 variant_to_callable :: proc "contextless" (from: ^Variant) -> (ret: Callable) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Callable)
     }
+
     ret = Callable{}
     constructor(&ret, from)
     return
@@ -1238,9 +1365,11 @@ variant_to_callable :: proc "contextless" (from: ^Variant) -> (ret: Callable) {
 
 variant_to_signal :: proc "contextless" (from: ^Variant) -> (ret: Signal) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Signal)
     }
+
     ret = Signal{}
     constructor(&ret, from)
     return
@@ -1248,9 +1377,11 @@ variant_to_signal :: proc "contextless" (from: ^Variant) -> (ret: Signal) {
 
 variant_to_dictionary :: proc "contextless" (from: ^Variant) -> (ret: Dictionary) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Dictionary)
     }
+
     ret = Dictionary{}
     constructor(&ret, from)
     return
@@ -1258,9 +1389,11 @@ variant_to_dictionary :: proc "contextless" (from: ^Variant) -> (ret: Dictionary
 
 variant_to_array :: proc "contextless" (from: ^Variant) -> (ret: Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Array)
     }
+
     ret = Array{}
     constructor(&ret, from)
     return
@@ -1268,9 +1401,11 @@ variant_to_array :: proc "contextless" (from: ^Variant) -> (ret: Array) {
 
 variant_to_packed_byte_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Byte_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Byte_Array)
     }
+
     ret = Packed_Byte_Array{}
     constructor(&ret, from)
     return
@@ -1278,9 +1413,11 @@ variant_to_packed_byte_array :: proc "contextless" (from: ^Variant) -> (ret: Pac
 
 variant_to_packed_int32_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Int32_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Int32_Array)
     }
+
     ret = Packed_Int32_Array{}
     constructor(&ret, from)
     return
@@ -1288,9 +1425,11 @@ variant_to_packed_int32_array :: proc "contextless" (from: ^Variant) -> (ret: Pa
 
 variant_to_packed_int64_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Int64_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Int64_Array)
     }
+
     ret = Packed_Int64_Array{}
     constructor(&ret, from)
     return
@@ -1298,9 +1437,11 @@ variant_to_packed_int64_array :: proc "contextless" (from: ^Variant) -> (ret: Pa
 
 variant_to_packed_float32_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Float32_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Float32_Array)
     }
+
     ret = Packed_Float32_Array{}
     constructor(&ret, from)
     return
@@ -1308,9 +1449,11 @@ variant_to_packed_float32_array :: proc "contextless" (from: ^Variant) -> (ret: 
 
 variant_to_packed_float64_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Float64_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Float64_Array)
     }
+
     ret = Packed_Float64_Array{}
     constructor(&ret, from)
     return
@@ -1318,9 +1461,11 @@ variant_to_packed_float64_array :: proc "contextless" (from: ^Variant) -> (ret: 
 
 variant_to_packed_string_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_String_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_String_Array)
     }
+
     ret = Packed_String_Array{}
     constructor(&ret, from)
     return
@@ -1328,9 +1473,11 @@ variant_to_packed_string_array :: proc "contextless" (from: ^Variant) -> (ret: P
 
 variant_to_packed_vector2_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Vector2_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Vector2_Array)
     }
+
     ret = Packed_Vector2_Array{}
     constructor(&ret, from)
     return
@@ -1338,9 +1485,11 @@ variant_to_packed_vector2_array :: proc "contextless" (from: ^Variant) -> (ret: 
 
 variant_to_packed_vector3_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Vector3_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Vector3_Array)
     }
+
     ret = Packed_Vector3_Array{}
     constructor(&ret, from)
     return
@@ -1348,9 +1497,11 @@ variant_to_packed_vector3_array :: proc "contextless" (from: ^Variant) -> (ret: 
 
 variant_to_packed_color_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Color_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Color_Array)
     }
+
     ret = Packed_Color_Array{}
     constructor(&ret, from)
     return
@@ -1358,9 +1509,11 @@ variant_to_packed_color_array :: proc "contextless" (from: ^Variant) -> (ret: Pa
 
 variant_to_packed_vector4_array :: proc "contextless" (from: ^Variant) -> (ret: Packed_Vector4_Array) {
     @(static) constructor: gd.TypeFromVariantConstructorProc
+
     if constructor == nil {
         constructor = gd.get_variant_to_type_constructor(.Packed_Vector4_Array)
     }
+
     ret = Packed_Vector4_Array{}
     constructor(&ret, from)
     return

@@ -17,9 +17,9 @@ package shared_ids
 
 // The entity vocabulary both dlls agree on.
 Kind :: enum u8 {
-	None   = 0,
-	Player = 1,
-	Enemy  = 2,
+    None   = 0,
+    Player = 1,
+    Enemy  = 2,
 }
 
 // A tuning constant. Edited in place by the reload phase (7 -> 70).
@@ -29,16 +29,16 @@ STEP :: 7
 // scriptgen resolves replicated BUNDLES in the module or a godot: collection, never
 // across the shared tree, and says so if you try).
 Payload :: struct {
-	kind:   Kind,
-	amount: i32,
+    kind:   Kind,
+    amount: i32,
 }
 
 // A pure proc: same inputs, same answer, in whichever dll it was linked into.
 brand :: proc(k: Kind) -> int {
-	return int(k) * 100 + STEP
+    return int(k) * 100 + STEP
 }
 
 // A second pure proc, over the payload struct — the vocabulary's "protocol".
 payload_code :: proc(p: Payload) -> int {
-	return brand(p.kind) + int(p.amount)
+    return brand(p.kind) + int(p.amount)
 }

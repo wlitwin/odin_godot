@@ -20,32 +20,33 @@ package complete
 // ----------------------------------------------------------------------------
 
 Completion_Option_Field :: enum {
-	Kind, // int    -> CodeCompletionKind
-	Display, // String
-	Insert_Text, // String
-	Font_Color, // Color
-	Icon, // Variant (NIL -> empty Ref<Texture2D>; the editor supplies its own icon)
-	Default_Value, // Variant (NIL -> no inline value swatch)
-	Location, // int    -> CodeCompletionLocation
+    Kind, // int    -> CodeCompletionKind
+    Display, // String
+    Insert_Text, // String
+    Font_Color, // Color
+    Icon, // Variant (NIL -> empty Ref<Texture2D>; the editor supplies its own icon)
+    Default_Value, // Variant (NIL -> no inline value swatch)
+    Location, // int    -> CodeCompletionLocation
 }
 
 // The exact Dictionary key string the engine reads for each field.
 completion_option_field_key :: proc(f: Completion_Option_Field) -> cstring {
-	switch f {
-	case .Kind:
-		return "kind"
-	case .Display:
-		return "display"
-	case .Insert_Text:
-		return "insert_text"
-	case .Font_Color:
-		return "font_color"
-	case .Icon:
-		return "icon"
-	case .Default_Value:
-		return "default_value"
-	case .Location:
-		return "location"
-	}
-	return ""
+    switch f {
+    case .Kind:
+        return "kind"
+    case .Display:
+        return "display"
+    case .Insert_Text:
+        return "insert_text"
+    case .Font_Color:
+        return "font_color"
+    case .Icon:
+        return "icon"
+    case .Default_Value:
+        return "default_value"
+    case .Location:
+        return "location"
+    }
+
+    return ""
 }

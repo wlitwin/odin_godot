@@ -8,10 +8,10 @@ package phase4_scripts
 import gd "godot:godot"
 
 RemovedClass :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 @(gd_method)
 removed_class_value :: proc(self: ^RemovedClass) -> int {
-	return 4242
+    return 4242
 }

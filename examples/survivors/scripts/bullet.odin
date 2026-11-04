@@ -19,31 +19,37 @@ import rt "godot:runtime"
 BULLET_LIFETIME :: 1.4
 
 Bullet :: struct {
-	owner:  gd.Area2d,
-	damage: int `gd:"export"`,
-	speed:  f32 `gd:"export"`,
-	pierce: int `gd:"export"`, // extra enemies this bullet passes through before dying
+    owner:  gd.Area2d,
+    damage: int `gd:"export"`,
+    speed:  f32 `gd:"export"`,
+    pierce: int `gd:"export"`, // extra enemies this bullet passes through before dying
 
-	// runtime state:
-	dir:  gd.Vector2, // unit travel direction, set by the weapon at spawn
-	life: f32,
+    // runtime state:
+    dir:    gd.Vector2, // unit travel direction, set by the weapon at spawn
+    life:   f32,
 }
 
 bullet_ready :: proc(self: ^Bullet) {
-	if self.damage == 0 {self.damage = 1}
-	if self.speed == 0 {self.speed = 460}
+    if self.damage == 0 {
+        self.damage = 1
+    }
+
+    if self.speed == 0 {
+        self.speed = 460
+    }
 }
 
 bullet_physics_process :: proc(self: ^Bullet, delta: f64) {
-	pos := gd.node2d_get_global_position(self.owner)
-	pos.x += self.dir.x * self.speed * f32(delta)
-	pos.y += self.dir.y * self.speed * f32(delta)
-	gd.node2d_set_global_position(self.owner, pos)
+    pos := gd.node2d_get_global_position(self.owner)
+    pos.x += self.dir.x * self.speed * f32(delta)
+    pos.y += self.dir.y * self.speed * f32(delta)
+    gd.node2d_set_global_position(self.owner, pos)
 
-	self.life += f32(delta)
-	if self.life >= BULLET_LIFETIME {
-		gd.node_queue_free(self.owner)
-	}
+    self.life += f32(delta)
+
+    if self.life >= BULLET_LIFETIME {
+        gd.node_queue_free(self.owner)
+    }
 }
 
 // on_hit — wired to our own `area_entered` by `@(gd_connect)`. Damage a real Enemy (typed),
@@ -51,12 +57,18 @@ bullet_physics_process :: proc(self: ^Bullet, delta: f64) {
 // nil and are ignored.
 @(gd_method, gd_connect = "area_entered")
 bullet_on_hit :: proc(self: ^Bullet, area: gd.Area2d) {
-	enemy := rt.script_of(area, Enemy)
-	if enemy == nil {return}
-	enemy_take_damage(enemy, self.damage)
-	if self.pierce <= 0 {
-		gd.node_queue_free(self.owner)
-		return
-	}
-	self.pierce -= 1
+    enemy := rt.script_of(area, Enemy)
+
+    if enemy == nil {
+        return
+    }
+
+    enemy_take_damage(enemy, self.damage)
+
+    if self.pierce <= 0 {
+        gd.node_queue_free(self.owner)
+        return
+    }
+
+    self.pierce -= 1
 }

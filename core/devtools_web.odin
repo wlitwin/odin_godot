@@ -46,6 +46,7 @@ lv_finish_session :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
     d := godot.new_dictionary_default()
+
     set_int := proc(d: ^godot.Dictionary, key: cstring, value: i64) {
         k := godot.new_string_cstring(key)
         kv := godot.variant_from_string(&k)
@@ -53,6 +54,7 @@ lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
         vv := godot.variant_from_int(&iv)
         godot.dictionary_set(d, kv, vv)
     }
+
     set_int(&d, "result", 1) // FAILED
     set_int(&d, "type", 0) // LOOKUP_RESULT_SCRIPT_LOCATION
     (cast(^godot.Dictionary)ret)^ = d

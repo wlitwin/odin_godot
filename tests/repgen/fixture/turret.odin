@@ -12,19 +12,19 @@ package repgen_fixture
 import gd "godot:godot"
 
 Turret :: struct {
-	owner:      gd.Node2d,
-	aimx, aimy: f32 `gd:"predict,interp"`
+    owner:      gd.Node2d,
+    aimx, aimy: f32 `gd:"predict,interp"`,
 }
 
 // Distinct from Pawn_Input (a different width, a different intent) — the whole
 // point of a second class is that the two inputs never share a window.
 @(gd_input)
 Turret_Input :: struct {
-	aim: [2]i16 `gd:"range=-1000:1000"`
+    aim: [2]i16 `gd:"range=-1000:1000"`,
 }
 
 @(gd_tick)
 turret_tick :: proc(self: ^Turret, input: Turret_Input) {
-	self.aimx += f32(input.aim[0])
-	self.aimy += f32(input.aim[1])
+    self.aimx += f32(input.aim[0])
+    self.aimy += f32(input.aim[1])
 }

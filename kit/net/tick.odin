@@ -26,75 +26,87 @@ DEFAULT_TICK_HZ :: 20
 g_now: proc "contextless" () -> f64
 
 set_clock :: proc "contextless" (clock: proc "contextless" () -> f64) {
-	g_now = clock
+    g_now = clock
 }
 
 // Monotonic seconds — THE clock the toolkit's time-taking APIs expect
 // (session_tick, php overlays, confirm-latency math). Every game was
 // writing this exact proc; it lives here now.
 now_s :: proc "contextless" () -> f64 {
-	if g_now != nil {return g_now()}
-	return f64(time.tick_now()._nsec) / 1e9
+    if g_now != nil {
+        return g_now()
+    }
+
+    return f64(time.tick_now()._nsec) / 1e9
 }
 
 Ticker :: struct {
-	dt:   f64, // seconds per tick
-	acc:  f64,
-	tick: u64, // total ticks elapsed (the timestamp commands/deltas carry)
+    dt:   f64, // seconds per tick
+    acc:  f64,
+    tick: u64, // total ticks elapsed (the timestamp commands/deltas carry)
 }
 
 ticker_make :: proc(hz := DEFAULT_TICK_HZ) -> Ticker {
-	assert(hz > 0)
-	return Ticker{dt = 1.0 / f64(hz)}
+    assert(hz > 0)
+    return Ticker{dt = 1.0 / f64(hz)}
 }
 
 // Feed a frame's elapsed time; returns how many net ticks fire this frame
 // (usually 0 or 1). Capped at 8 so a multi-second stall resumes cleanly instead
 // of bursting a backlog onto the wire.
 ticker_advance :: proc(t: ^Ticker, frame_dt: f64) -> int {
-	t.acc += frame_dt
-	n := 0
-	for t.acc >= t.dt && n < 8 {
-		t.acc -= t.dt
-		t.tick += 1
-		n += 1
-	}
-	if n == 8 {
-		t.acc = 0 // dropped backlog — deltas are last-value, nothing is lost
-	}
-	return n
+    t.acc += frame_dt
+    n := 0
+
+    for t.acc >= t.dt && n < 8 {
+        t.acc -= t.dt
+        t.tick += 1
+        n += 1
+    }
+
+    if n == 8 {
+        t.acc = 0 // dropped backlog — deltas are last-value, nothing is lost
+    }
+
+    return n
 }
 
 // ---------------------------------------------------------------------------
 
 Clock_Sync :: struct {
-	offset:      f64, // remote_clock - local_clock, seconds
-	rtt:         f64, // smoothed round trip, seconds
-	jitter:      f64, // smoothed |rtt - mean| deviation, seconds — the connection-QUALITY number: a steady 120ms link plays better than one wobbling 40..200
-	initialized: bool,
+    offset:      f64, // remote_clock - local_clock, seconds
+    rtt:         f64, // smoothed round trip, seconds
+    jitter:      f64, // smoothed |rtt - mean| deviation, seconds — the connection-QUALITY number: a steady 120ms link plays better than one wobbling 40..200
+    initialized: bool,
 }
 
 // Feed one ping exchange: we sent at local_send, the peer stamped remote_time,
 // we received at local_recv (all seconds, each in its own clock domain).
 clock_sample :: proc(c: ^Clock_Sync, local_send, remote_time, local_recv: f64) {
-	rtt := local_recv - local_send
-	if rtt < 0 {return} // nonsense sample (clock adjustment mid-flight); drop
-	offset := remote_time + rtt / 2 - local_recv
-	if !c.initialized {
-		c.rtt = rtt
-		c.offset = offset
-		c.initialized = true
-		return
-	}
-	ALPHA :: 0.1 // gentle EWMA: one outlier ping barely moves the estimate
-	c.jitter += (abs(rtt - c.rtt) - c.jitter) * ALPHA // deviation vs the mean BEFORE this sample folds in
-	c.rtt += (rtt - c.rtt) * ALPHA
-	c.offset += (offset - c.offset) * ALPHA
+    rtt := local_recv - local_send
+
+    if rtt < 0 {
+        return
+    } // nonsense sample (clock adjustment mid-flight); drop
+
+    offset := remote_time + rtt / 2 - local_recv
+
+    if !c.initialized {
+        c.rtt = rtt
+        c.offset = offset
+        c.initialized = true
+        return
+    }
+
+    ALPHA :: 0.1 // gentle EWMA: one outlier ping barely moves the estimate
+    c.jitter += (abs(rtt - c.rtt) - c.jitter) * ALPHA // deviation vs the mean BEFORE this sample folds in
+    c.rtt += (rtt - c.rtt) * ALPHA
+    c.offset += (offset - c.offset) * ALPHA
 }
 
 // The remote peer's estimated clock reading "now".
 clock_remote_now :: proc(c: ^Clock_Sync, local_now: f64) -> f64 {
-	return local_now + c.offset
+    return local_now + c.offset
 }
 
 // ---------------------------------------------------------------------------
@@ -106,24 +118,26 @@ clock_remote_now :: proc(c: ^Clock_Sync, local_now: f64) -> f64 {
 
 // [local_send f64] — stamp with this peer's monotonic seconds.
 ping_write :: proc(w: ^Writer, local_now: f64) {
-	write_f64(w, local_now)
+    write_f64(w, local_now)
 }
 
 // Answer a received ping: echo the sender's stamp, add our own clock reading.
 // Pong layout: [their_send f64][remote_time f64].
 ping_answer :: proc(r: ^Reader, w: ^Writer, local_now: f64) {
-	write_f64(w, read_f64(r))
-	write_f64(w, local_now)
+    write_f64(w, read_f64(r))
+    write_f64(w, local_now)
 }
 
 // Feed a received pong into the clock estimate. false = malformed/truncated
 // (nothing sampled).
 pong_apply :: proc(r: ^Reader, c: ^Clock_Sync, local_now: f64) -> bool {
-	local_send := read_f64(r)
-	remote_time := read_f64(r)
-	if r.err {
-		return false
-	}
-	clock_sample(c, local_send, remote_time, local_now)
-	return true
+    local_send := read_f64(r)
+    remote_time := read_f64(r)
+
+    if r.err {
+        return false
+    }
+
+    clock_sample(c, local_send, remote_time, local_now)
+    return true
 }

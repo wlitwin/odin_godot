@@ -20,9 +20,9 @@ import "godot:godot"
 
 @(export)
 odin_scripts_boot :: proc "c" (
-	get_proc_address: gdext.ExtensionInterfaceGetProcAddress,
-	library: gdext.ExtensionClassLibraryPtr,
+    get_proc_address: gdext.ExtensionInterfaceGetProcAddress,
+    library: gdext.ExtensionClassLibraryPtr,
 ) {
-	gdext.init(library, get_proc_address)
-	godot.init()
+    gdext.init(library, get_proc_address)
+    godot.init()
 }

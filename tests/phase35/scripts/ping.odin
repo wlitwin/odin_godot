@@ -18,18 +18,20 @@ import gd "godot:godot"
 // First field MUST be the owner Object pointer (core writes it at offset 0).
 // Tagged fields become @export vars; untagged fields are private instance state.
 Ping :: struct {
-	owner:  gd.Node,
-	// A declared signal is a typed FIELD: name = field name, payload = type parameter,
-	// `args=` names the payload. scriptgen emits the typed `ping_emit_pinged` helper.
-	pinged: gd.Signal1(int) `gd:"args=value"`,
-	speed:  f32   `gd:"export"`,
-	count:  gd.Int `gd:"export"`,
+    owner:  gd.Node,
+    // A declared signal is a typed FIELD: name = field name, payload = type parameter,
+    // `args=` names the payload. scriptgen emits the typed `ping_emit_pinged` helper.
+    pinged: gd.Signal1(int) `gd:"args=value"`,
+    speed:  f32 `gd:"export"`,
+    count:  gd.Int `gd:"export"`,
 }
 
 // Lifecycle by proc name (the `ping_` struct prefix is stripped -> `ready`), bound
 // by the `^Ping` receiver. Plain proc; codegen wraps it as the `proc "c"` slot.
 ping_ready :: proc(self: ^Ping) {
-	if self.speed == 0 {self.speed = 1.5}
+    if self.speed == 0 {
+        self.speed = 1.5
+    }
 }
 
 // Custom methods: `@(gd_method)`, callable from GDScript. The exposed name is the
@@ -37,22 +39,22 @@ ping_ready :: proc(self: ^Ping) {
 // Variant trampoline from this typed signature.
 @(gd_method)
 ping_add :: proc(self: ^Ping, a, b: int) -> int {
-	return a + b
+    return a + b
 }
 
 @(gd_method)
 ping_addf :: proc(self: ^Ping, a, b: f64) -> f64 {
-	return a + b
+    return a + b
 }
 
 @(gd_method)
 ping_get_speed :: proc(self: ^Ping) -> f64 {
-	return f64(self.speed)
+    return f64(self.speed)
 }
 
 @(gd_method)
 ping_emit_ping :: proc(self: ^Ping, value: int) {
-	self.count += gd.Int(value)
-	// `ping_emit_<signal>` is generated from the signal FIELD above.
-	ping_emit_pinged(self, i64(value))
+    self.count += gd.Int(value)
+    // `ping_emit_<signal>` is generated from the signal FIELD above.
+    ping_emit_pinged(self, i64(value))
 }

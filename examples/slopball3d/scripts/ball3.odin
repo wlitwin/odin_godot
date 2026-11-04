@@ -21,22 +21,22 @@ import play "godot:play"
 // so a goal that moves l and won together lands as ONE edge — ball3_score_edge
 // (slopball3d.odin) narrates once, no seen_* mirrors.
 Score :: struct {
-	l, r: u8, // goals by each team (LEFT defends left, scores right)
-	won:  u8, // 0 = playing, 1/2 = that side took the match
+    l, r: u8, // goals by each team (LEFT defends left, scores right)
+    won:  u8, // 0 = playing, 1/2 = that side took the match
 }
 
 Ball3 :: struct {
-	owner:  gd.Rigid_Body3d,
-	look:   gd.Node3d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
-	net_id: knet.Net_Id,
-	puppet: play.Puppet3, // pose + both velocities replicate through the embed
-	score:  Score `gd:"replicate"`, // host-authoritative deltas on the client-streamed entity
+    owner:  gd.Rigid_Body3d,
+    look:   gd.Node3d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
+    net_id: knet.Net_Id,
+    puppet: play.Puppet3, // pose + both velocities replicate through the embed
+    score:  Score `gd:"replicate"`, // host-authoritative deltas on the client-streamed entity
 }
 
 ball3_ready :: proc(self: ^Ball3) {
-	play.puppet3_attach(&self.puppet, self.owner, {PITCH_W / 2, BALL_REST_Y, PITCH_D / 2}, skin = self.look)
+    play.puppet3_attach(&self.puppet, self.owner, {PITCH_W / 2, BALL_REST_Y, PITCH_D / 2}, skin = self.look)
 }
 
 ball3_process :: proc(self: ^Ball3, delta: f64) {
-	play.puppet3_frame(&self.puppet, f32(delta))
+    play.puppet3_frame(&self.puppet, f32(delta))
 }

@@ -52,18 +52,18 @@ package play
 import kcombat "godot:kit/combat"
 
 Ability :: struct {
-	cooldown:     u16 `gd:"replicate"`, // the knob (host-assigned at arm, from the kcombat def row)
-	cd:           u16 `gd:"replicate"`, // ticks until ready (0 = ready); host-decayed, client-predicted
-	aim_x, aim_y: f32,                  // scratch: the last cast's aim/target, for the game's effect hook
-	origin_x, origin_y: f32,            // scratch: the last cast's CLAIMED origin (the caster's own position) — leash it in the hook
+    cooldown:           u16 `gd:"replicate"`, // the knob (host-assigned at arm, from the kcombat def row)
+    cd:                 u16 `gd:"replicate"`, // ticks until ready (0 = ready); host-decayed, client-predicted
+    aim_x, aim_y:       f32, // scratch: the last cast's aim/target, for the game's effect hook
+    origin_x, origin_y: f32, // scratch: the last cast's CLAIMED origin (the caster's own position) — leash it in the hook
 }
 
 // ability_arm — host-only, at spawn or a loadout change: stamp the cooldown from the game's def
 // row and start ready. The row's name feeds ability bars, its cost feeds the game's issue gate —
 // neither rides the block.
 ability_arm :: proc(a: ^Ability, def: kcombat.Ability_Def) {
-	a.cooldown = def.cooldown
-	a.cd = 0
+    a.cooldown = def.cooldown
+    a.cd = 0
 }
 
 // ability_cast — CAST. A composed, PREDICTED command hoisted onto the embedding entity
@@ -76,23 +76,24 @@ ability_arm :: proc(a: ^Ability, def: kcombat.Ability_Def) {
 // in the hook), both stashed for the hook.
 @(gd_command = knet.ACTION_OWNER_PREDICTED)
 ability_cast :: proc(a: ^Ability, dx, dy: f32, ox, oy: f32) -> bool {
-	if !kcombat.cast_gate(&a.cd, a.cooldown) {
-		return false // on cooldown — a rejection, revert the optimistic state
-	}
-	a.aim_x, a.aim_y = dx, dy
-	a.origin_x, a.origin_y = ox, oy
-	return true
+    if !kcombat.cast_gate(&a.cd, a.cooldown) {
+        return false // on cooldown — a rejection, revert the optimistic state
+    }
+
+    a.aim_x, a.aim_y = dx, dy
+    a.origin_x, a.origin_y = ox, oy
+    return true
 }
 
 // ability_tick — HOST per-tick: decay the cooldown toward ready. Call once per net tick per ability
 // on the host; the client watches the replicated countdown (the ability is slow enough that it
 // needn't predict the decay). No-op when ready.
 ability_tick :: proc(a: ^Ability) {
-	kcombat.cd_decay(&a.cd)
+    kcombat.cd_decay(&a.cd)
 }
 
 // ability_ready reports whether the ability can cast this instant — for the HUD and any local
 // pre-gate. `cd` is public (`a.cd`); this just names the intent.
 ability_ready :: proc "contextless" (a: ^Ability) -> bool {
-	return a.cd == 0
+    return a.cd == 0
 }

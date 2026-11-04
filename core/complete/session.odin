@@ -69,16 +69,13 @@ Session :: struct {
     write_mutex:   sync.Mutex, // serializes stdin writes (framed messages)
     req_mutex:     sync.Mutex, // serializes the single outstanding response-bearing request
     state_mutex:   sync.Mutex, // guards everything below + the awaited-reply slot
-    cond:          sync.Cond,  // signalled by the reader on an awaited reply or on death
-
+    cond:          sync.Cond, // signalled by the reader on an awaited reply or on death
     started:       bool,
     dead:          bool,
     closing:       bool, // shutdown in progress: refuse new starts/warm-ups
     warming:       bool, // a background warm-up thread is in flight
     next_retry_ns: i64, // monotonic ns before which a failed start won't be retried
-
     warm_thread:   ^thread.Thread, // last warm-up thread; joined on next warm / shutdown
-
     proc_:         os.Process,
     stdin:         ^os.File,
     stdout_r:      ^os.File,
@@ -90,7 +87,6 @@ Session :: struct {
     root:          string,
     share:         string,
     workspace:     string, // temp workspace dir holding ols.json + per-package overlays
-
     next_id:       int,
     pkg_counter:   int,
 
@@ -126,7 +122,11 @@ Frame_Reader :: struct {
 fr_fill :: proc(fr: ^Frame_Reader) -> bool {
     tmp: [8192]u8
     n, err := os.read(fr.f, tmp[:])
-    if n <= 0 || err != nil {return false}
+
+    if n <= 0 || err != nil {
+        return false
+    }
+
     append(&fr.buf, ..tmp[:n])
     return true
 }
@@ -136,30 +136,46 @@ fr_fill :: proc(fr: ^Frame_Reader) -> bool {
 fr_read :: proc(fr: ^Frame_Reader) -> (body: []u8, ok: bool) {
     for {
         rel := strings.index(string(fr.buf[fr.pos:]), "\r\n\r\n")
+
         if rel >= 0 {
             header := string(fr.buf[fr.pos:fr.pos + rel])
             clen := 0
+
             if ci := strings.index(header, "Content-Length:"); ci >= 0 {
                 rest := strings.trim_space(header[ci + len("Content-Length:"):])
+
                 for ch in rest {
-                    if ch < '0' || ch > '9' {break}
+                    if ch < '0' || ch > '9' {
+                        break
+                    }
+
                     clen = clen * 10 + int(ch - '0')
                 }
             }
+
             body_start := fr.pos + rel + 4
+
             for len(fr.buf) - body_start < clen {
-                if !fr_fill(fr) {return nil, false}
+                if !fr_fill(fr) {
+                    return nil, false
+                }
             }
+
             out := make([]u8, clen, sess_alloc())
             copy(out, fr.buf[body_start:body_start + clen])
             fr.pos = body_start + clen
+
             if fr.pos == len(fr.buf) {
                 clear(&fr.buf)
                 fr.pos = 0
             }
+
             return out, true
         }
-        if !fr_fill(fr) {return nil, false}
+
+        if !fr_fill(fr) {
+            return nil, false
+        }
     }
 }
 
@@ -169,6 +185,7 @@ send_frame :: proc(s: ^Session, payload: string) {
     sync.lock(&s.write_mutex)
     defer sync.unlock(&s.write_mutex)
     hdr := fmt.tprintf("Content-Length: %d\r\n\r\n", len(payload))
+
     if s.stdin != nil {
         os.write(s.stdin, transmute([]u8)hdr)
         os.write(s.stdin, transmute([]u8)payload)
@@ -193,11 +210,14 @@ reader_entry :: proc(data: rawptr) {
     }
     defer runtime.default_temp_allocator_destroy(&temp)
 
-    fr := Frame_Reader{f = s.stdout_r}
+    fr := Frame_Reader {
+        f = s.stdout_r,
+    }
     defer delete(fr.buf)
 
     for {
         body, ok := fr_read(&fr)
+
         if !ok {
             // ols closed stdout / died.
             sync.lock(&s.state_mutex)
@@ -209,17 +229,23 @@ reader_entry :: proc(data: rawptr) {
 
         // Only responses carry our awaited id. Parse just enough to read "id".
         id, is_resp := frame_response_id(body)
+
         if is_resp {
             sync.lock(&s.state_mutex)
+
             if id == s.awaiting_id && !s.awaited_ready {
                 s.awaited_body = body // transfer ownership
                 s.awaited_ready = true
                 body = nil
                 sync.cond_broadcast(&s.cond)
             }
+
             sync.unlock(&s.state_mutex)
         }
-        if body != nil {delete(body, sess_alloc())}
+
+        if body != nil {
+            delete(body, sess_alloc())
+        }
     }
 }
 
@@ -228,17 +254,40 @@ reader_entry :: proc(data: rawptr) {
 @(private = "file")
 frame_response_id :: proc(body: []u8) -> (id: int, is_resp: bool) {
     v, perr := json.parse(body, .JSON, true, context.temp_allocator)
-    if perr != nil {return 0, false}
+
+    if perr != nil {
+        return 0, false
+    }
+
     obj, ok := v.(json.Object)
-    if !ok {return 0, false}
-    if _, has_method := obj["method"]; has_method {return 0, false} // request/notification
+
+    if !ok {
+        return 0, false
+    }
+
+    if _, has_method := obj["method"]; has_method {
+        return 0, false
+    } // request/notification
+
     _, has_res := obj["result"]
     _, has_err := obj["error"]
-    if !has_res && !has_err {return 0, false}
+
+    if !has_res && !has_err {
+        return 0, false
+    }
+
     idv, has_id := obj["id"]
-    if !has_id {return 0, false}
+
+    if !has_id {
+        return 0, false
+    }
+
     iv, iok := as_int(idv)
-    if !iok {return 0, false}
+
+    if !iok {
+        return 0, false
+    }
+
     return iv, true
 }
 
@@ -249,27 +298,37 @@ frame_response_id :: proc(body: []u8) -> (id: int, is_resp: bool) {
 @(private = "file")
 do_request :: proc(s: ^Session, id: int, payload: string, timeout: time.Duration) -> (body: []u8, ok: bool) {
     sync.lock(&s.state_mutex)
+
     if s.dead {
         sync.unlock(&s.state_mutex)
         return nil, false
     }
+
     s.awaiting_id = id
     s.awaited_ready = false
+
     if s.awaited_body != nil {
         delete(s.awaited_body, sess_alloc())
         s.awaited_body = nil
     }
+
     sync.unlock(&s.state_mutex)
 
     send_frame(s, payload)
 
     deadline := time.tick_now()
     sync.lock(&s.state_mutex)
+
     for !s.awaited_ready && !s.dead {
         remaining := timeout - time.tick_since(deadline)
-        if remaining <= 0 {break}
+
+        if remaining <= 0 {
+            break
+        }
+
         sync.cond_wait_with_timeout(&s.cond, &s.state_mutex, remaining)
     }
+
     got := s.awaited_ready
     body = s.awaited_body
     s.awaited_body = nil
@@ -279,9 +338,13 @@ do_request :: proc(s: ^Session, id: int, payload: string, timeout: time.Duration
     sync.unlock(&s.state_mutex)
 
     if !got || dead {
-        if body != nil {delete(body, sess_alloc())}
+        if body != nil {
+            delete(body, sess_alloc())
+        }
+
         return nil, false
     }
+
     return body, true
 }
 
@@ -309,13 +372,23 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
     sync.lock(&s.start_mutex)
     defer sync.unlock(&s.start_mutex)
 
-    if s.closing {return false} // shutting down — don't resurrect ols under teardown
-    if s.started && !s.dead {return true}
+    if s.closing {
+        return false
+    } // shutting down — don't resurrect ols under teardown
 
-    if s.dead {teardown_locked(s)} // reclaim a crashed session before restarting
+    if s.started && !s.dead {
+        return true
+    }
+
+    if s.dead {
+        teardown_locked(s)
+    } // reclaim a crashed session before restarting
 
     now := time.tick_now()._nsec
-    if s.next_retry_ns != 0 && now < s.next_retry_ns {return false}
+
+    if s.next_retry_ns != 0 && now < s.next_retry_ns {
+        return false
+    }
 
     if !s.configured {
         a := sess_alloc()
@@ -324,7 +397,11 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
         s.share = strings.clone(share, a)
         // temp workspace dir
         tmpdir := os.get_env("TMPDIR", a)
-        if tmpdir == "" {tmpdir = strings.clone("/tmp", a)}
+
+        if tmpdir == "" {
+            tmpdir = strings.clone("/tmp", a)
+        }
+
         tmpdir = strings.trim_suffix(tmpdir, "/")
         s.workspace = fmt.aprintf("%s/odin_ols_session_%d", tmpdir, os.get_pid())
         s.pkgs = make(map[string]string, a)
@@ -338,8 +415,10 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
         q_ws := shell_quote(s.workspace, context.temp_allocator)
         libc.system(fmt.ctprintf("rm -rf %s && mkdir -p %s", q_ws, q_ws))
     }
+
     clear(&s.pkgs)
     clear(&s.docs)
+
     if !session_write_ols_json(s) {
         s.next_retry_ns = now + i64(RETRY_BACKOFF)
         return false
@@ -366,25 +445,35 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
 @(private = "file")
 spawn_locked :: proc(s: ^Session) -> bool {
     cin_r, cin_w, e1 := os.pipe()
-    if e1 != nil {return false}
-    cout_r, cout_w, e2 := os.pipe()
-    if e2 != nil {
-        os.close(cin_r); os.close(cin_w)
+
+    if e1 != nil {
         return false
     }
 
-    p, perr := os.process_start({
+    cout_r, cout_w, e2 := os.pipe()
+
+    if e2 != nil {
+        os.close(cin_r)
+        os.close(cin_w)
+        return false
+    }
+
+    p, perr := os.process_start(
+    {
         command     = {s.ols_bin},
         working_dir = s.workspace,
         stdin       = cin_r,
         stdout      = cout_w,
         stderr      = nil, // ols logs to LSP window/logMessage; drop OS stderr
-    })
+    },
+    )
     // Parent never uses the child's ends.
     os.close(cin_r)
     os.close(cout_w)
+
     if perr != nil {
-        os.close(cin_w); os.close(cout_r)
+        os.close(cin_w)
+        os.close(cout_r)
         return false
     }
 
@@ -411,7 +500,11 @@ handshake :: proc(s: ^Session) -> bool {
         root_uri,
     )
     body, ok := do_request(s, INIT_ID, init, INIT_TIMEOUT)
-    if !ok {return false}
+
+    if !ok {
+        return false
+    }
+
     delete(body, sess_alloc())
     notify(s, `{"jsonrpc":"2.0","method":"initialized","params":{}}`)
     return true
@@ -423,22 +516,34 @@ teardown_locked :: proc(s: ^Session) {
     if s.started || s.stdin != nil {
         _ = os.process_kill(s.proc_) // EOFs the reader so it exits
     }
+
     if s.reader != nil {
         thread.join(s.reader)
         thread.destroy(s.reader)
         s.reader = nil
     }
+
     if s.started || s.stdin != nil {
         _, _ = os.process_wait(s.proc_)
     }
-    if s.stdin != nil {os.close(s.stdin); s.stdin = nil}
-    if s.stdout_r != nil {os.close(s.stdout_r); s.stdout_r = nil}
+
+    if s.stdin != nil {
+        os.close(s.stdin)
+        s.stdin = nil
+    }
+
+    if s.stdout_r != nil {
+        os.close(s.stdout_r)
+        s.stdout_r = nil
+    }
 
     sync.lock(&s.state_mutex)
+
     if s.awaited_body != nil {
         delete(s.awaited_body, sess_alloc())
         s.awaited_body = nil
     }
+
     s.awaited_ready = false
     s.awaiting_id = -1
     s.started = false
@@ -447,19 +552,27 @@ teardown_locked :: proc(s: ^Session) {
 
     // Drop opened-doc / package-overlay bookkeeping (the dir itself is recreated on restart).
     a := sess_alloc()
-    for _, ov in s.pkgs {delete(ov, a)}
+
+    for _, ov in s.pkgs {
+        delete(ov, a)
+    }
+
     clear(&s.pkgs)
-    for uri in s.docs {delete(uri, a)}
+
+    for uri in s.docs {
+        delete(uri, a)
+    }
+
     clear(&s.docs)
 }
 
 // ---- background warm-up ------------------------------------------------------
 
 Warm_State :: enum {
-    Cold,    // never started (or torn down); the next start pays the full cold index
+    Cold, // never started (or torn down); the next start pays the full cold index
     Warming, // a background warm-up is in flight
-    Ready,   // live initialized session; session_complete is the fast path
-    Failed,  // last start failed and the retry backoff hasn't elapsed
+    Ready, // live initialized session; session_complete is the fast path
+    Failed, // last start failed and the retry backoff hasn't elapsed
 }
 
 // session_warm_state is a cheap, non-blocking snapshot used by the editor main
@@ -467,9 +580,19 @@ Warm_State :: enum {
 session_warm_state :: proc(s: ^Session) -> Warm_State {
     sync.lock(&s.state_mutex)
     defer sync.unlock(&s.state_mutex)
-    if s.started && !s.dead {return .Ready}
-    if s.warming {return .Warming}
-    if s.next_retry_ns != 0 && time.tick_now()._nsec < s.next_retry_ns {return .Failed}
+
+    if s.started && !s.dead {
+        return .Ready
+    }
+
+    if s.warming {
+        return .Warming
+    }
+
+    if s.next_retry_ns != 0 && time.tick_now()._nsec < s.next_retry_ns {
+        return .Failed
+    }
+
     return .Cold
 }
 
@@ -487,11 +610,15 @@ Warm_Args :: struct {
 // inside the failed-start backoff window. Safe to call on every request.
 session_warm_async :: proc(s: ^Session, ols_bin, root, share: string) {
     sync.lock(&s.state_mutex)
-    if (s.started && !s.dead) || s.warming || s.closing ||
+
+    if (s.started && !s.dead) ||
+       s.warming ||
+       s.closing ||
        (s.next_retry_ns != 0 && time.tick_now()._nsec < s.next_retry_ns) {
         sync.unlock(&s.state_mutex)
         return
     }
+
     s.warming = true
     sync.unlock(&s.state_mutex)
 
@@ -513,6 +640,7 @@ session_warm_async :: proc(s: ^Session, ols_bin, root, share: string) {
     ctx := runtime.default_context()
     ctx.allocator = a
     s.warm_thread = thread.create_and_start_with_data(rawptr(args), warm_entry, init_context = ctx)
+
     if s.warm_thread == nil {
         sync.lock(&s.state_mutex)
         s.warming = false
@@ -550,6 +678,7 @@ session_shutdown :: proc(s: ^Session) {
     sync.lock(&s.state_mutex)
     s.closing = true
     sync.unlock(&s.state_mutex)
+
     if s.warm_thread != nil {
         thread.join(s.warm_thread)
         thread.destroy(s.warm_thread)
@@ -558,21 +687,28 @@ session_shutdown :: proc(s: ^Session) {
 
     sync.lock(&s.start_mutex)
     defer sync.unlock(&s.start_mutex)
+
     defer {
         // allow a later restart (tests reuse sessions); harmless for editor exit
         sync.lock(&s.state_mutex)
         s.closing = false
         sync.unlock(&s.state_mutex)
     }
-    if !s.configured && !s.started {return}
+
+    if !s.configured && !s.started {
+        return
+    }
+
     if s.started && !s.dead {
         // best-effort graceful shutdown before the kill in teardown
         notify(s, fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"method":"shutdown"}}`, ID_BASE - 1))
         notify(s, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
     }
+
     if s.workspace != "" {
         libc.system(fmt.ctprintf("rm -rf %s", shell_quote(s.workspace, context.temp_allocator)))
     }
+
     teardown_locked(s)
 }
 
@@ -583,7 +719,11 @@ session_shutdown :: proc(s: ^Session) {
 @(private = "file")
 ensure_overlay :: proc(s: ^Session, abs_path: string) -> (overlay: string, ok: bool) {
     slash := strings.last_index_byte(abs_path, '/')
-    if slash <= 0 {return "", false}
+
+    if slash <= 0 {
+        return "", false
+    }
+
     pkgdir := abs_path[:slash]
     basename := abs_path[slash + 1:]
 
@@ -592,6 +732,7 @@ ensure_overlay :: proc(s: ^Session, abs_path: string) -> (overlay: string, ok: b
     sync.unlock(&s.state_mutex)
 
     a := sess_alloc()
+
     if !seen {
         sync.lock(&s.start_mutex) // serialize counter + copy with start/teardown
         s.pkg_counter += 1
@@ -604,16 +745,19 @@ ensure_overlay :: proc(s: ^Session, abs_path: string) -> (overlay: string, ok: b
         ov_dir = ov
         cp := strings.clone_to_cstring(setup_cmd, context.temp_allocator)
         delete(setup_cmd, a)
+
         if libc.system(cp) != 0 {
             delete(slot, a)
             delete(ov_dir, a)
             return "", false
         }
+
         delete(slot, a)
         sync.lock(&s.state_mutex)
         s.pkgs[strings.clone(pkgdir, a)] = ov_dir
         sync.unlock(&s.state_mutex)
     }
+
     overlay = fmt.aprintf("%s/%s", ov_dir, basename)
     return overlay, true
 }
@@ -631,20 +775,32 @@ session_complete :: proc(
     share: string,
     ols_bin := "ols",
     allocator := context.allocator,
-) -> (opts: [dynamic]Completion, ok: bool) {
+) -> (
+    opts: [dynamic]Completion,
+    ok: bool,
+) {
     opts = make([dynamic]Completion, allocator)
 
-    if !ensure_started(s, ols_bin, root, share) {return opts, false}
+    if !ensure_started(s, ols_bin, root, share) {
+        return opts, false
+    }
 
     overlay, ook := ensure_overlay(s, abs_path)
-    if !ook {return opts, false}
+
+    if !ook {
+        return opts, false
+    }
+
     defer delete(overlay, sess_alloc())
 
     clean, line, char := caret_from_code(code, context.temp_allocator)
     uri := fmt.tprintf("file://%s", overlay)
 
     text_json, mErr := json.marshal(clean, {}, context.temp_allocator)
-    if mErr != nil {return opts, false}
+
+    if mErr != nil {
+        return opts, false
+    }
 
     // didOpen the first time we see this uri, didChange afterwards (live buffer either way).
     sync.lock(&s.state_mutex)
@@ -657,25 +813,42 @@ session_complete :: proc(
     defer sync.unlock(&s.req_mutex)
 
     if !opened {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     } else {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     }
 
     s.next_id += 1
     id := s.next_id
     req := fmt.tprintf(
         `{{"jsonrpc":"2.0","id":%d,"method":"textDocument/completion","params":{{"textDocument":{{"uri":"%s"}},"position":{{"line":%d,"character":%d}}}}}}`,
-        id, uri, line, char,
+        id,
+        uri,
+        line,
+        char,
     )
     body, rok := do_request(s, id, req, REQUEST_TIMEOUT)
-    if !rok {return opts, false} // timeout / death -> fall back (session marked dead by reader)
+
+    if !rok {
+        return opts, false
+    } // timeout / death -> fall back (session marked dead by reader)
+
     defer delete(body, sess_alloc())
 
     delete(opts)
@@ -696,20 +869,32 @@ session_signature_help :: proc(
     share: string,
     ols_bin := "ols",
     allocator := context.allocator,
-) -> (hint: string, ok: bool) {
+) -> (
+    hint: string,
+    ok: bool,
+) {
     no_hint := strings.clone("", allocator)
 
-    if !ensure_started(s, ols_bin, root, share) {return no_hint, false}
+    if !ensure_started(s, ols_bin, root, share) {
+        return no_hint, false
+    }
 
     overlay, ook := ensure_overlay(s, abs_path)
-    if !ook {return no_hint, false}
+
+    if !ook {
+        return no_hint, false
+    }
+
     defer delete(overlay, sess_alloc())
 
     clean, line, char := caret_from_code(code, context.temp_allocator)
     uri := fmt.tprintf("file://%s", overlay)
 
     text_json, mErr := json.marshal(clean, {}, context.temp_allocator)
-    if mErr != nil {return no_hint, false}
+
+    if mErr != nil {
+        return no_hint, false
+    }
 
     sync.lock(&s.state_mutex)
     ver, opened := s.docs[uri]
@@ -721,25 +906,42 @@ session_signature_help :: proc(
     defer sync.unlock(&s.req_mutex)
 
     if !opened {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     } else {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     }
 
     s.next_id += 1
     id := s.next_id
     req := fmt.tprintf(
         `{{"jsonrpc":"2.0","id":%d,"method":"textDocument/signatureHelp","params":{{"textDocument":{{"uri":"%s"}},"position":{{"line":%d,"character":%d}}}}}}`,
-        id, uri, line, char,
+        id,
+        uri,
+        line,
+        char,
     )
     body, rok := do_request(s, id, req, REQUEST_TIMEOUT)
-    if !rok {return no_hint, false} // timeout / death -> no hint (session marked dead by reader)
+
+    if !rok {
+        return no_hint, false
+    } // timeout / death -> no hint (session marked dead by reader)
+
     defer delete(body, sess_alloc())
 
     delete(no_hint, allocator)
@@ -758,18 +960,30 @@ session_definition :: proc(
     share: string,
     ols_bin := "ols",
     allocator := context.allocator,
-) -> (def: Definition, ok: bool) {
-    if !ensure_started(s, ols_bin, root, share) {return Definition{}, false}
+) -> (
+    def: Definition,
+    ok: bool,
+) {
+    if !ensure_started(s, ols_bin, root, share) {
+        return Definition{}, false
+    }
 
     overlay, ook := ensure_overlay(s, abs_path)
-    if !ook {return Definition{}, false}
+
+    if !ook {
+        return Definition{}, false
+    }
+
     defer delete(overlay, sess_alloc())
 
     clean, line, char := caret_from_code(code, context.temp_allocator)
     uri := fmt.tprintf("file://%s", overlay)
 
     text_json, mErr := json.marshal(clean, {}, context.temp_allocator)
-    if mErr != nil {return Definition{}, false}
+
+    if mErr != nil {
+        return Definition{}, false
+    }
 
     sync.lock(&s.state_mutex)
     ver, opened := s.docs[uri]
@@ -781,31 +995,50 @@ session_definition :: proc(
     defer sync.unlock(&s.req_mutex)
 
     if !opened {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     } else {
-        notify(s, fmt.tprintf(
-            `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
-            uri, ver, string(text_json),
-        ))
+        notify(
+            s,
+            fmt.tprintf(
+                `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
+                uri,
+                ver,
+                string(text_json),
+            ),
+        )
     }
 
     s.next_id += 1
     id := s.next_id
     req := fmt.tprintf(
         `{{"jsonrpc":"2.0","id":%d,"method":"textDocument/definition","params":{{"textDocument":{{"uri":"%s"}},"position":{{"line":%d,"character":%d}}}}}}`,
-        id, uri, line, char,
+        id,
+        uri,
+        line,
+        char,
     )
     body, rok := do_request(s, id, req, REQUEST_TIMEOUT)
-    if !rok {return Definition{}, false}
+
+    if !rok {
+        return Definition{}, false
+    }
+
     defer delete(body, sess_alloc())
 
     def = parse_definition_reply(body, allocator)
+
     if def.ok {
         def.path = remap_overlay_path(s, def.path, allocator)
     }
+
     return def, true
 }
 
@@ -816,6 +1049,7 @@ session_definition :: proc(
 remap_overlay_path :: proc(s: ^Session, path: string, allocator: runtime.Allocator) -> string {
     sync.lock(&s.state_mutex)
     defer sync.unlock(&s.state_mutex)
+
     for real, ov in s.pkgs {
         if strings.has_prefix(path, ov) && len(path) > len(ov) && path[len(ov)] == '/' {
             remapped := strings.concatenate({real, path[len(ov):]}, allocator)
@@ -823,5 +1057,6 @@ remap_overlay_path :: proc(s: ^Session, path: string, allocator: runtime.Allocat
             return remapped
         }
     }
+
     return path
 }

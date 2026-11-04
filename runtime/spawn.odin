@@ -32,27 +32,32 @@ import gd "godot:godot"
 //	b.dir = dir; b.damage = dmg
 //	gd.add_child(arena, node)
 spawn_scripted :: proc "contextless" (scene: gd.Packed_Scene, $T: typeid) -> (node: gd.Node, s: ^T) {
-	if scene == nil {
-		return nil, nil
-	}
-	node = gd.instantiate(scene)
-	if node == nil {
-		return nil, nil
-	}
-	s = script_of(cast(gdext.ObjectPtr)node, T)
-	return
+    if scene == nil {
+        return nil, nil
+    }
+
+    node = gd.instantiate(scene)
+
+    if node == nil {
+        return nil, nil
+    }
+
+    s = script_of(cast(gdext.ObjectPtr)node, T)
+    return
 }
 
 // spawn_as instantiates `scene`, parents it under `parent`, and returns the root's
 // typed script struct — the just-spawn-it form. The spawnee's _ready has RUN by the
 // time this returns; use spawn_scripted when _ready must see poked fields.
 spawn_as :: proc "contextless" (parent: gd.Node, scene: gd.Packed_Scene, $T: typeid) -> ^T {
-	node, s := spawn_scripted(scene, T)
-	if node == nil {
-		return nil
-	}
-	gd.add_child(cast(gd.Object)parent, cast(gd.Object)node)
-	return s
+    node, s := spawn_scripted(scene, T)
+
+    if node == nil {
+        return nil
+    }
+
+    gd.add_child(cast(gd.Object)parent, cast(gd.Object)node)
+    return s
 }
 
 // spawn_as_deferred — spawn_as via add_child_deferred, REQUIRED when spawning from a
@@ -60,10 +65,12 @@ spawn_as :: proc "contextless" (parent: gd.Node, scene: gd.Packed_Scene, $T: typ
 // resolution). The parenting (and thus the spawnee's _ready) happens at idle time, so
 // fields poked through the returned ^T right after this call are ready-visible.
 spawn_as_deferred :: proc "contextless" (parent: gd.Node, scene: gd.Packed_Scene, $T: typeid) -> ^T {
-	node, s := spawn_scripted(scene, T)
-	if node == nil {
-		return nil
-	}
-	gd.add_child_deferred(cast(gd.Object)parent, cast(gd.Object)node)
-	return s
+    node, s := spawn_scripted(scene, T)
+
+    if node == nil {
+        return nil
+    }
+
+    gd.add_child_deferred(cast(gd.Object)parent, cast(gd.Object)node)
+    return s
 }

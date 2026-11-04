@@ -23,60 +23,64 @@ import rt "godot:runtime"
 import "core:fmt"
 
 Hud :: struct {
-	owner:      gd.Node,
-	xp_bar:     gd.Node `gd:"onready=XPBar"`,
-	health_bar: gd.Node `gd:"onready=HealthBar"`,
-	info:       gd.Node `gd:"onready=Info"`,
-
-	hp:     int, // last HP we were told about (via the signal)
-	max_hp: int,
+    owner:      gd.Node,
+    xp_bar:     gd.Node `gd:"onready=XPBar"`,
+    health_bar: gd.Node `gd:"onready=HealthBar"`,
+    info:       gd.Node `gd:"onready=Info"`,
+    hp:         int, // last HP we were told about (via the signal)
+    max_hp:     int,
 }
 
 hud_ready :: proc(self: ^Hud) {
-	// Typed, class-checked group lookup — one call replaces the find-node + rt.script_of pair.
-	p := rt.first_script_in_group(self.owner, GROUP_PLAYER, Player)
-	if p != nil {
-		self.hp = p.health
-		self.max_hp = p.max_health
-		// TYPED cross-script CONNECT: player.health_changed -> this.on_health_changed.
-		// Manual on purpose — a group-resolved emitter has no static path for @(gd_connect).
-		gd.connect_to(p.owner, "health_changed", self.owner, "on_health_changed")
-	}
-	if self.health_bar != nil {
-		gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
-		gd.set_float(self.health_bar, "value", f64(self.hp))
-	}
+    // Typed, class-checked group lookup — one call replaces the find-node + rt.script_of pair.
+    p := rt.first_script_in_group(self.owner, GROUP_PLAYER, Player)
+
+    if p != nil {
+        self.hp = p.health
+        self.max_hp = p.max_health
+        // TYPED cross-script CONNECT: player.health_changed -> this.on_health_changed.
+        // Manual on purpose — a group-resolved emitter has no static path for @(gd_connect).
+        gd.connect_to(p.owner, "health_changed", self.owner, "on_health_changed")
+    }
+
+    if self.health_bar != nil {
+        gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
+        gd.set_float(self.health_bar, "value", f64(self.hp))
+    }
 }
 
 hud_process :: proc(self: ^Hud, delta: f64) {
-	xp := game_state_get_xp()
-	xp_next := game_state_get_xp_to_next()
-	if self.xp_bar != nil {
-		gd.set_float(self.xp_bar, "max_value", f64(xp_next))
-		gd.set_float(self.xp_bar, "value", f64(xp))
-	}
-	if self.health_bar != nil {
-		gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
-		gd.set_float(self.health_bar, "value", f64(self.hp))
-	}
-	if self.info != nil {
-		t := int(game_state_get_run_time())
-		mm := t / 60
-		ss := t % 60
-		text := fmt.ctprintf(
-			"Lv %d   %02d:%02d\nKills %d   Score %d",
-			game_state_get_level(),
-			mm,
-			ss,
-			game_state_get_kills(),
-			game_state_get_score(),
-		)
-		gd.set_string(self.info, "text", text)
-	}
+    xp := game_state_get_xp()
+    xp_next := game_state_get_xp_to_next()
+
+    if self.xp_bar != nil {
+        gd.set_float(self.xp_bar, "max_value", f64(xp_next))
+        gd.set_float(self.xp_bar, "value", f64(xp))
+    }
+
+    if self.health_bar != nil {
+        gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
+        gd.set_float(self.health_bar, "value", f64(self.hp))
+    }
+
+    if self.info != nil {
+        t := int(game_state_get_run_time())
+        mm := t / 60
+        ss := t % 60
+        text := fmt.ctprintf(
+            "Lv %d   %02d:%02d\nKills %d   Score %d",
+            game_state_get_level(),
+            mm,
+            ss,
+            game_state_get_kills(),
+            game_state_get_score(),
+        )
+        gd.set_string(self.info, "text", text)
+    }
 }
 
 // on_health_changed — the signal target (a @(gd_method) so the engine can dispatch to it).
 @(gd_method)
 hud_on_health_changed :: proc(self: ^Hud, value: int) {
-	self.hp = value
+    self.hp = value
 }

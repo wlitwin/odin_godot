@@ -33,20 +33,20 @@ NOTIFICATION_READY :: 13
 // engine hands back to every vtable callback.
 @(private)
 Odin_Instance :: struct {
-	owner:           gdext.ObjectPtr,
-	script:          gdext.ObjectPtr, // the OdinScript object
-	desc:            rt.Class_Desc,
-	user:            rawptr, // the allocated script struct (owner ptr at offset 0)
-	cache:           ^Class_Cache, // interned names + cached Variant constructors (per class)
-	script_identity: string, // OWNED desc_identity copy (normally res:// path); survives dll swaps
-	generation:      rawptr, // native ^Script_Generation lease; nil on web
-	box3d_context:   u64, // stable Core weak liveness token, never a game identity
-	// Reload snapshots pin the bookkeeping object so a synchronous Godot re-entry can
-	// free an instance during lifecycle.reload without invalidating the walk. The retired
-	// flag means Godot called free and the instance is no longer discoverable; destruction
-	// waits for the last snapshot pin.
-	reload_pins:     int,
-	retired:         bool,
+    owner:           gdext.ObjectPtr,
+    script:          gdext.ObjectPtr, // the OdinScript object
+    desc:            rt.Class_Desc,
+    user:            rawptr, // the allocated script struct (owner ptr at offset 0)
+    cache:           ^Class_Cache, // interned names + cached Variant constructors (per class)
+    script_identity: string, // OWNED desc_identity copy (normally res:// path); survives dll swaps
+    generation:      rawptr, // native ^Script_Generation lease; nil on web
+    box3d_context:   u64, // stable Core weak liveness token, never a game identity
+    // Reload snapshots pin the bookkeeping object so a synchronous Godot re-entry can
+    // free an instance during lifecycle.reload without invalidating the walk. The retired
+    // flag means Godot called free and the instance is no longer discoverable; destruction
+    // waits for the last snapshot pin.
+    reload_pins:     int,
+    retired:         bool,
 }
 
 // ----------------------------------------------------------------------------
@@ -74,35 +74,41 @@ live_lock: sync.Mutex
 
 @(private)
 track_live_instance :: proc(oi: ^Odin_Instance) {
-	context.allocator = core_allocator()
-	sync.lock(&live_lock)
-	defer sync.unlock(&live_lock)
-	append(&live_instances, oi)
-	if live_by_owner == nil {
-		live_by_owner = make(map[gdext.ObjectPtr]^Odin_Instance)
-	}
-	live_by_owner[oi.owner] = oi
+    context.allocator = core_allocator()
+    sync.lock(&live_lock)
+    defer sync.unlock(&live_lock)
+    append(&live_instances, oi)
+
+    if live_by_owner == nil {
+        live_by_owner = make(map[gdext.ObjectPtr]^Odin_Instance)
+    }
+
+    live_by_owner[oi.owner] = oi
 }
 
 @(private)
 retire_live_instance :: proc(oi: ^Odin_Instance) -> (destroy_now: bool) {
-	context.allocator = core_allocator()
-	sync.lock(&live_lock)
-	defer sync.unlock(&live_lock)
-	if oi.retired {
-		return false
-	}
-	for x, i in live_instances {
-		if x == oi {
-			unordered_remove(&live_instances, i)
-			break
-		}
-	}
-	if x, ok := live_by_owner[oi.owner]; ok && x == oi {
-		delete_key(&live_by_owner, oi.owner)
-	}
-	oi.retired = true
-	return oi.reload_pins == 0
+    context.allocator = core_allocator()
+    sync.lock(&live_lock)
+    defer sync.unlock(&live_lock)
+
+    if oi.retired {
+        return false
+    }
+
+    for x, i in live_instances {
+        if x == oi {
+            unordered_remove(&live_instances, i)
+            break
+        }
+    }
+
+    if x, ok := live_by_owner[oi.owner]; ok && x == oi {
+        delete_key(&live_by_owner, oi.owner)
+    }
+
+    oi.retired = true
+    return oi.reload_pins == 0
 }
 
 // Stable reload walk: pin every entry while holding the registry lock. The execution
@@ -110,55 +116,67 @@ retire_live_instance :: proc(oi: ^Odin_Instance) -> (destroy_now: bool) {
 // frees caused by Godot calls or lifecycle.reload on the reload-owning thread.
 @(private)
 pin_live_instance_snapshot :: proc(allocator := context.temp_allocator) -> []^Odin_Instance {
-	sync.lock(&live_lock)
-	defer sync.unlock(&live_lock)
-	snapshot := make([]^Odin_Instance, len(live_instances), allocator)
-	copy(snapshot, live_instances[:])
-	for oi in snapshot {
-		if oi != nil {
-			oi.reload_pins += 1
-		}
-	}
-	return snapshot
+    sync.lock(&live_lock)
+    defer sync.unlock(&live_lock)
+    snapshot := make([]^Odin_Instance, len(live_instances), allocator)
+    copy(snapshot, live_instances[:])
+
+    for oi in snapshot {
+        if oi != nil {
+            oi.reload_pins += 1
+        }
+    }
+
+    return snapshot
 }
 
 @(private)
 snapshot_instance_is_live :: proc "contextless" (oi: ^Odin_Instance) -> bool {
-	if oi == nil {return false}
-	sync.lock(&live_lock)
-	live := !oi.retired
-	sync.unlock(&live_lock)
-	return live
+    if oi == nil {
+        return false
+    }
+
+    sync.lock(&live_lock)
+    live := !oi.retired
+    sync.unlock(&live_lock)
+    return live
 }
 
 @(private)
 release_live_instance_snapshot :: proc(snapshot: []^Odin_Instance) {
-	for oi in snapshot {
-		if oi == nil {continue}
-		sync.lock(&live_lock)
-		assert(oi.reload_pins > 0)
-		oi.reload_pins -= 1
-		destroy_now := oi.retired && oi.reload_pins == 0
-		sync.unlock(&live_lock)
-		if destroy_now {
-			destroy_odin_instance(oi)
-		}
-	}
+    for oi in snapshot {
+        if oi == nil {
+            continue
+        }
+
+        sync.lock(&live_lock)
+        assert(oi.reload_pins > 0)
+        oi.reload_pins -= 1
+        destroy_now := oi.retired && oi.reload_pins == 0
+        sync.unlock(&live_lock)
+
+        if destroy_now {
+            destroy_odin_instance(oi)
+        }
+    }
 }
 
 // Clone a string onto the Odin heap allocator (the godot allocator ignores
 // alignment; core-owned bookkeeping must use the heap allocator).
 @(private)
 heap_clone :: proc(s: string) -> string {
-	context.allocator = core_allocator()
-	return strings.clone(s)
+    context.allocator = core_allocator()
+    return strings.clone(s)
 }
 
 @(private)
 heap_delete_string :: proc(s: string) {
-	if s == "" {return}
-	context.allocator = core_allocator()
-	delete(s)
+    if s == "" {
+        return
+    }
+
+    context.allocator = core_allocator()
+    delete(s)
 }
 
 // ----------------------------------------------------------------------------
@@ -171,53 +189,53 @@ heap_delete_string :: proc(s: string) {
 
 @(private)
 Export_Cache :: struct {
-	name:         godot.String_Name,
-	type:         gdext.Variant_Type,
-	offset:       uintptr,
-	size:         int,
-	hint:         i64, // godot.Property_Hint int value (0 == None)
-	hint_string:  godot.String, // companion string for the hint (interned once per class)
-	// Typed-collection element info, parsed from a Type_String hint (hint 23 on an
-	// Array/Dictionary export: "2:" builtin / "24/17:Class" Resource / "K;V" dict).
-	// Drives seed_container_field: a freshly-zeroed gd.Array/gd.Dictionary is NOT a
-	// valid engine value, so instances are seeded with real empty containers, typed
-	// per the hint. key_* are the Dictionary KEY (unused for Arrays).
-	elem_type:    gdext.Variant_Type, // Array element / Dictionary VALUE
-	elem_class:   godot.String_Name,
-	key_type:     gdext.Variant_Type,
-	key_class:    godot.String_Name,
-	to_type:      gdext.TypeFromVariantConstructorProc, // Variant -> field
-	from_type:    gdext.VariantFromTypeConstructorProc, // field   -> Variant
-	// Destructor for the field's engine value (nil for POD types and .Object — see
-	// destruct_export_field). Cached here: inst_set is a hot vtable path.
-	dtor:         gdext.PtrDestructor,
-	// group/subgroup header to emit before this property (richer-authoring #2).
-	group:        godot.String_Name,
-	has_group:    bool,
-	subgroup:     godot.String_Name,
-	has_subgroup: bool,
-	// default value (richer-authoring #3): interned once per class as a Variant.
-	has_default:  bool,
-	default:      godot.Variant,
-	// getter/setter wrappers (richer-authoring #4); nil => plain field access.
-	getter:       proc "c" (self: rawptr, ret: gdext.VariantPtr),
-	setter:       proc "c" (self: rawptr, value: gdext.VariantPtr),
+    name:         godot.String_Name,
+    type:         gdext.Variant_Type,
+    offset:       uintptr,
+    size:         int,
+    hint:         i64, // godot.Property_Hint int value (0 == None)
+    hint_string:  godot.String, // companion string for the hint (interned once per class)
+    // Typed-collection element info, parsed from a Type_String hint (hint 23 on an
+    // Array/Dictionary export: "2:" builtin / "24/17:Class" Resource / "K;V" dict).
+    // Drives seed_container_field: a freshly-zeroed gd.Array/gd.Dictionary is NOT a
+    // valid engine value, so instances are seeded with real empty containers, typed
+    // per the hint. key_* are the Dictionary KEY (unused for Arrays).
+    elem_type:    gdext.Variant_Type, // Array element / Dictionary VALUE
+    elem_class:   godot.String_Name,
+    key_type:     gdext.Variant_Type,
+    key_class:    godot.String_Name,
+    to_type:      gdext.TypeFromVariantConstructorProc, // Variant -> field
+    from_type:    gdext.VariantFromTypeConstructorProc, // field   -> Variant
+    // Destructor for the field's engine value (nil for POD types and .Object — see
+    // destruct_export_field). Cached here: inst_set is a hot vtable path.
+    dtor:         gdext.PtrDestructor,
+    // group/subgroup header to emit before this property (richer-authoring #2).
+    group:        godot.String_Name,
+    has_group:    bool,
+    subgroup:     godot.String_Name,
+    has_subgroup: bool,
+    // default value (richer-authoring #3): interned once per class as a Variant.
+    has_default:  bool,
+    default:      godot.Variant,
+    // getter/setter wrappers (richer-authoring #4); nil => plain field access.
+    getter:       proc "c" (self: rawptr, ret: gdext.VariantPtr),
+    setter:       proc "c" (self: rawptr, value: gdext.VariantPtr),
 }
 
 @(private)
 Class_Cache :: struct {
-	exports:           []Export_Cache,
-	method_names:      []godot.String_Name, // parallels desc.methods
-	// name -> index into exports / method_names, so the per-call vtable hot paths
-	// (inst_set/inst_get/inst_call) are a map probe, not a linear scan. Keyed by the
-	// interned String_Name's raw bits (see sn_bits).
-	export_index:      map[uintptr]int,
-	method_index:      map[uintptr]int,
-	empty_string:      godot.String,
-	empty_string_name: godot.String_Name,
-	instance_refs:     int,
-	metadata_refs:     int,
-	retired:           bool,
+    exports:           []Export_Cache,
+    method_names:      []godot.String_Name, // parallels desc.methods
+    // name -> index into exports / method_names, so the per-call vtable hot paths
+    // (inst_set/inst_get/inst_call) are a map probe, not a linear scan. Keyed by the
+    // interned String_Name's raw bits (see sn_bits).
+    export_index:      map[uintptr]int,
+    method_index:      map[uintptr]int,
+    empty_string:      godot.String,
+    empty_string_name: godot.String_Name,
+    instance_refs:     int,
+    metadata_refs:     int,
+    retired:           bool,
 }
 
 // A String_Name's raw bits as a map key. StringNames are engine-interned: equal names
@@ -225,7 +243,7 @@ Class_Cache :: struct {
 // comparisons throughout this file rely on. (String_Name is one uintptr wide.)
 @(private)
 sn_bits :: #force_inline proc "contextless" (n: godot.String_Name) -> uintptr {
-	return transmute(uintptr)n
+    return transmute(uintptr)n
 }
 
 // Canonical script identity -> its built cache. Generated descriptors use `res://` paths.
@@ -246,179 +264,224 @@ property_list_caches: map[rawptr]^Class_Cache
 
 @(private)
 destroy_class_cache :: proc(cache: ^Class_Cache) {
-	if cache == nil {return}
-	context.allocator = core_allocator()
-	for &ex in cache.exports {
-		godot.free_string(ex.hint_string)
-		if ex.elem_class != cache.empty_string_name {
-			godot.free_string_name(ex.elem_class)
-		}
-		if ex.key_class != cache.empty_string_name {
-			godot.free_string_name(ex.key_class)
-		}
-		gdext.variant_destroy(cast(gdext.VariantPtr)&ex.default)
-	}
-	// Export/method/group names and empty_string_name were interned with
-	// `static=true`; Godot owns them for the process lifetime and rejects unref.
-	delete(cache.export_index)
-	delete(cache.method_index)
-	delete(cache.exports)
-	delete(cache.method_names)
-	godot.free_string(cache.empty_string)
-	free(cache)
+    if cache == nil {
+        return
+    }
+
+    context.allocator = core_allocator()
+
+    for &ex in cache.exports {
+        godot.free_string(ex.hint_string)
+
+        if ex.elem_class != cache.empty_string_name {
+            godot.free_string_name(ex.elem_class)
+        }
+
+        if ex.key_class != cache.empty_string_name {
+            godot.free_string_name(ex.key_class)
+        }
+
+        gdext.variant_destroy(cast(gdext.VariantPtr)&ex.default)
+    }
+
+    // Export/method/group names and empty_string_name were interned with
+    // `static=true`; Godot owns them for the process lifetime and rejects unref.
+    delete(cache.export_index)
+    delete(cache.method_index)
+    delete(cache.exports)
+    delete(cache.method_names)
+    godot.free_string(cache.empty_string)
+    free(cache)
 }
 
 @(private)
 class_cache_retain_instance :: proc "contextless" (cache: ^Class_Cache) {
-	if cache == nil {return}
-	sync.lock(&class_cache_lock)
-	cache.instance_refs += 1
-	sync.unlock(&class_cache_lock)
+    if cache == nil {
+        return
+    }
+
+    sync.lock(&class_cache_lock)
+    cache.instance_refs += 1
+    sync.unlock(&class_cache_lock)
 }
 
 @(private)
 class_cache_release_instance :: proc(cache: ^Class_Cache) {
-	if cache == nil {return}
-	sync.lock(&class_cache_lock)
-	if cache.instance_refs > 0 {cache.instance_refs -= 1}
-	destroy := cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
-	sync.unlock(&class_cache_lock)
-	if destroy {destroy_class_cache(cache)}
+    if cache == nil {
+        return
+    }
+
+    sync.lock(&class_cache_lock)
+
+    if cache.instance_refs > 0 {
+        cache.instance_refs -= 1
+    }
+
+    destroy := cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
+    sync.unlock(&class_cache_lock)
+
+    if destroy {
+        destroy_class_cache(cache)
+    }
 }
 
 // Remove a cache from the current identity map. Existing instances and outstanding
 // metadata lists keep explicit leases; the last release destroys all copied Godot data.
 @(private)
 retire_class_cache :: proc(identity: string) {
-	if class_caches == nil {return}
-	sync.lock(&class_cache_lock)
-	cache, ok := class_caches[identity]
-	if ok {
-		delete_key(&class_caches, identity)
-		cache.retired = true
-	}
-	destroy := ok && cache.instance_refs == 0 && cache.metadata_refs == 0
-	sync.unlock(&class_cache_lock)
-	if destroy {destroy_class_cache(cache)}
+    if class_caches == nil {
+        return
+    }
+
+    sync.lock(&class_cache_lock)
+    cache, ok := class_caches[identity]
+
+    if ok {
+        delete_key(&class_caches, identity)
+        cache.retired = true
+    }
+
+    destroy := ok && cache.instance_refs == 0 && cache.metadata_refs == 0
+    sync.unlock(&class_cache_lock)
+
+    if destroy {
+        destroy_class_cache(cache)
+    }
 }
 
 @(private)
 class_cache_retain_metadata :: proc "contextless" (cache: ^Class_Cache, list: rawptr) {
-	if cache == nil || list == nil {return}
-	sync.lock(&class_cache_lock)
-	if property_list_caches == nil {
-		context = runtime.default_context()
-		context.allocator = core_allocator()
-		property_list_caches = make(map[rawptr]^Class_Cache)
-	}
-	cache.metadata_refs += 1
-	property_list_caches[list] = cache
-	sync.unlock(&class_cache_lock)
+    if cache == nil || list == nil {
+        return
+    }
+
+    sync.lock(&class_cache_lock)
+
+    if property_list_caches == nil {
+        context = runtime.default_context()
+        context.allocator = core_allocator()
+        property_list_caches = make(map[rawptr]^Class_Cache)
+    }
+
+    cache.metadata_refs += 1
+    property_list_caches[list] = cache
+    sync.unlock(&class_cache_lock)
 }
 
 @(private)
 class_cache_release_metadata :: proc(list: rawptr) {
-	if list == nil {return}
-	sync.lock(&class_cache_lock)
-	cache, ok := property_list_caches[list]
-	if ok {
-		delete_key(&property_list_caches, list)
-		if cache.metadata_refs > 0 {cache.metadata_refs -= 1}
-	}
-	destroy := ok && cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
-	sync.unlock(&class_cache_lock)
-	if destroy {destroy_class_cache(cache)}
+    if list == nil {
+        return
+    }
+
+    sync.lock(&class_cache_lock)
+    cache, ok := property_list_caches[list]
+
+    if ok {
+        delete_key(&property_list_caches, list)
+
+        if cache.metadata_refs > 0 {
+            cache.metadata_refs -= 1
+        }
+    }
+
+    destroy := ok && cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
+    sync.unlock(&class_cache_lock)
+
+    if destroy {
+        destroy_class_cache(cache)
+    }
 }
 
 @(private)
 ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
-	// Core-owned bookkeeping must live on the Odin heap allocator (Godot's mem_alloc
-	// ignores alignment; Odin maps assert cache-line alignment).
-	context.allocator = core_allocator()
-	sync.lock(&class_cache_lock)
-	defer sync.unlock(&class_cache_lock)
+    // Core-owned bookkeeping must live on the Odin heap allocator (Godot's mem_alloc
+    // ignores alignment; Odin maps assert cache-line alignment).
+    context.allocator = core_allocator()
+    sync.lock(&class_cache_lock)
+    defer sync.unlock(&class_cache_lock)
 
-	if class_caches == nil {
-		class_caches = make(map[string]^Class_Cache)
-	}
-	key := string(rt.desc_identity(desc))
-	if existing, ok := class_caches[key]; ok {
-		return existing
-	}
+    if class_caches == nil {
+        class_caches = make(map[string]^Class_Cache)
+    }
 
-	cache := new(Class_Cache)
-	cache.empty_string = godot.new_string_cstring("")
-	cache.empty_string_name = godot.new_string_name_cstring("", true)
+    key := string(rt.desc_identity(desc))
 
-	exports := rt.desc_exports(desc)
-	cache.exports = make([]Export_Cache, len(exports))
-	for ex, i in exports {
-		cache.exports[i] = Export_Cache {
-			name         = godot.new_string_name_cstring(ex.name, true),
-			type         = ex.type,
-			offset       = ex.offset,
-			size         = int(ex.size),
-			hint         = ex.hint,
-			hint_string  = godot.new_string_cstring(ex.hint_string == nil ? "" : ex.hint_string),
-			to_type      = gdext.get_variant_to_type_constructor(ex.type),
-			from_type    = gdext.get_variant_from_type_constructor(ex.type),
-			dtor         = (ex.type == .Object || ex.type == .Nil) ? nil : gdext.variant_get_ptr_destructor(ex.type),
-			has_group    = ex.group != nil,
-			group        = godot.new_string_name_cstring(ex.group == nil ? "" : ex.group, true),
-			has_subgroup = ex.subgroup != nil,
-			subgroup     = godot.new_string_name_cstring(
-				ex.subgroup == nil ? "" : ex.subgroup,
-				true,
-			),
-			has_default  = bool(ex.has_default),
-			default      = export_default_variant(ex),
-			getter       = ex.getter,
-			setter       = ex.setter,
-		}
-		// Typed Array/Dictionary: recover the element Variant type (+ Resource class)
-		// from the registration hint_string so seed_container_field can construct
-		// correctly-TYPED empty containers (the engine's scene-load conversion asks the
-		// property for its current typed value before setting it).
-		ec := &cache.exports[i]
-		ec.elem_class = cache.empty_string_name
-		ec.key_class = cache.empty_string_name
-		if ec.hint == i64(godot.Property_Hint.Type_String) && ex.hint_string != nil {
-			hs := string(ex.hint_string)
-			#partial switch ec.type {
-			case .Array:
-				ec.elem_type, ec.elem_class = parse_type_string_part(hs, cache.empty_string_name)
-			case .Dictionary:
-				if semi := strings.index_byte(hs, ';'); semi >= 0 {
-					ec.key_type, ec.key_class = parse_type_string_part(
-						hs[:semi],
-						cache.empty_string_name,
-					)
-					ec.elem_type, ec.elem_class = parse_type_string_part(
-						hs[semi + 1:],
-						cache.empty_string_name,
-					)
-				}
-			}
-		}
-	}
+    if existing, ok := class_caches[key]; ok {
+        return existing
+    }
 
-	methods := rt.desc_methods(desc)
-	cache.method_names = make([]godot.String_Name, len(methods))
-	for m, i in methods {
-		cache.method_names[i] = godot.new_string_name_cstring(m.name, true)
-	}
+    cache := new(Class_Cache)
+    cache.empty_string = godot.new_string_cstring("")
+    cache.empty_string_name = godot.new_string_name_cstring("", true)
 
-	cache.export_index = make(map[uintptr]int, len(cache.exports))
-	for &ex, i in cache.exports {
-		cache.export_index[sn_bits(ex.name)] = i
-	}
-	cache.method_index = make(map[uintptr]int, len(cache.method_names))
-	for mname, i in cache.method_names {
-		cache.method_index[sn_bits(mname)] = i
-	}
+    exports := rt.desc_exports(desc)
+    cache.exports = make([]Export_Cache, len(exports))
 
-	class_caches[key] = cache
-	return cache
+    for ex, i in exports {
+        cache.exports[i] = Export_Cache {
+            name         = godot.new_string_name_cstring(ex.name, true),
+            type         = ex.type,
+            offset       = ex.offset,
+            size         = int(ex.size),
+            hint         = ex.hint,
+            hint_string  = godot.new_string_cstring(ex.hint_string == nil ? "" : ex.hint_string),
+            to_type      = gdext.get_variant_to_type_constructor(ex.type),
+            from_type    = gdext.get_variant_from_type_constructor(ex.type),
+            dtor         = (ex.type == .Object || ex.type == .Nil) ? nil : gdext.variant_get_ptr_destructor(ex.type),
+            has_group    = ex.group != nil,
+            group        = godot.new_string_name_cstring(ex.group == nil ? "" : ex.group, true),
+            has_subgroup = ex.subgroup != nil,
+            subgroup     = godot.new_string_name_cstring(ex.subgroup == nil ? "" : ex.subgroup, true),
+            has_default  = bool(ex.has_default),
+            default      = export_default_variant(ex),
+            getter       = ex.getter,
+            setter       = ex.setter,
+        }
+        // Typed Array/Dictionary: recover the element Variant type (+ Resource class)
+        // from the registration hint_string so seed_container_field can construct
+        // correctly-TYPED empty containers (the engine's scene-load conversion asks the
+        // property for its current typed value before setting it).
+        ec := &cache.exports[i]
+        ec.elem_class = cache.empty_string_name
+        ec.key_class = cache.empty_string_name
+
+        if ec.hint == i64(godot.Property_Hint.Type_String) && ex.hint_string != nil {
+            hs := string(ex.hint_string)
+
+            #partial switch ec.type {
+            case .Array:
+                ec.elem_type, ec.elem_class = parse_type_string_part(hs, cache.empty_string_name)
+            case .Dictionary:
+                if semi := strings.index_byte(hs, ';'); semi >= 0 {
+                    ec.key_type, ec.key_class = parse_type_string_part(hs[:semi], cache.empty_string_name)
+                    ec.elem_type, ec.elem_class = parse_type_string_part(hs[semi + 1:], cache.empty_string_name)
+                }
+            }
+        }
+    }
+
+    methods := rt.desc_methods(desc)
+    cache.method_names = make([]godot.String_Name, len(methods))
+
+    for m, i in methods {
+        cache.method_names[i] = godot.new_string_name_cstring(m.name, true)
+    }
+
+    cache.export_index = make(map[uintptr]int, len(cache.exports))
+
+    for &ex, i in cache.exports {
+        cache.export_index[sn_bits(ex.name)] = i
+    }
+
+    cache.method_index = make(map[uintptr]int, len(cache.method_names))
+
+    for mname, i in cache.method_names {
+        cache.method_index[sn_bits(mname)] = i
+    }
+
+    class_caches[key] = cache
+    return cache
 }
 
 // Build the Variant default for an @export (richer-authoring #3). Scalars only:
@@ -427,25 +490,26 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 // the script-level `_get_property_default_value` virtual (script.odin) can reuse it.
 @(private)
 export_default_variant :: proc "contextless" (ex: rt.Export) -> godot.Variant {
-	if !ex.has_default {
-		return godot.Variant{}
-	}
-	#partial switch ex.type {
-	case .Int:
-		i := godot.Int(i64(ex.default_num))
-		return godot.variant_from_int(&i)
-	case .Float:
-		f := godot.Float(ex.default_num)
-		return godot.variant_from_float(&f)
-	case .Bool:
-		b := ex.default_num != 0
-		return godot.variant_from_bool(&b)
-	case .String:
-		s := godot.new_string_cstring(ex.default_str == nil ? "" : ex.default_str)
-		return godot.variant_from_string(&s)
-	case:
-		return godot.Variant{}
-	}
+    if !ex.has_default {
+        return godot.Variant{}
+    }
+
+    #partial switch ex.type {
+    case .Int:
+        i := godot.Int(i64(ex.default_num))
+        return godot.variant_from_int(&i)
+    case .Float:
+        f := godot.Float(ex.default_num)
+        return godot.variant_from_float(&f)
+    case .Bool:
+        b := ex.default_num != 0
+        return godot.variant_from_bool(&b)
+    case .String:
+        s := godot.new_string_cstring(ex.default_str == nil ? "" : ex.default_str)
+        return godot.variant_from_string(&s)
+    case:
+        return godot.Variant{}
+    }
 }
 
 // One shared vtable for every instance (it is the same dispatch for all classes;
@@ -470,45 +534,47 @@ instance_globals_lock: sync.Mutex
 
 @(private)
 ensure_instance_globals :: proc() {
-	sync.lock(&instance_globals_lock)
-	defer sync.unlock(&instance_globals_lock)
-	if !instance_names_ready {
-		process_name = godot.new_string_name_cstring("_process", true)
-		physics_process_name = godot.new_string_name_cstring("_physics_process", true)
-		variant_to_float = gdext.get_variant_to_type_constructor(.Float)
-		instance_names_ready = true
-	}
-	if !instance_info_ready {
-		instance_info = gdext.ExtensionScriptInstanceInfo3 {
-			set_func                       = inst_set,
-			get_func                       = inst_get,
-			get_property_list_func         = inst_get_property_list,
-			free_property_list_func        = inst_free_property_list,
-			get_class_category_func        = nil,
-			property_can_revert_func       = inst_property_can_revert,
-			property_get_revert_func       = inst_property_get_revert,
-			get_owner_func                 = inst_get_owner,
-			get_property_state_func        = inst_get_property_state,
-			get_method_list_func           = inst_get_method_list,
-			free_method_list_func          = inst_free_method_list,
-			get_property_type_func         = inst_get_property_type,
-			validate_property_func         = inst_validate_property,
-			has_method_func                = inst_has_method,
-			get_method_argument_count_func = inst_get_method_argument_count,
-			call_func                      = inst_call,
-			notification_func              = inst_notification,
-			to_string_func                 = inst_to_string,
-			refcount_incremented_func      = inst_refcount_incremented,
-			refcount_decremented_func      = inst_refcount_decremented,
-			get_script_func                = inst_get_script,
-			is_placeholder_func            = inst_is_placeholder,
-			set_fallback_func              = inst_set,
-			get_fallback_func              = inst_get,
-			get_language_func              = inst_get_language,
-			free_func                      = inst_free,
-		}
-		instance_info_ready = true
-	}
+    sync.lock(&instance_globals_lock)
+    defer sync.unlock(&instance_globals_lock)
+
+    if !instance_names_ready {
+        process_name = godot.new_string_name_cstring("_process", true)
+        physics_process_name = godot.new_string_name_cstring("_physics_process", true)
+        variant_to_float = gdext.get_variant_to_type_constructor(.Float)
+        instance_names_ready = true
+    }
+
+    if !instance_info_ready {
+        instance_info = gdext.ExtensionScriptInstanceInfo3 {
+            set_func                       = inst_set,
+            get_func                       = inst_get,
+            get_property_list_func         = inst_get_property_list,
+            free_property_list_func        = inst_free_property_list,
+            get_class_category_func        = nil,
+            property_can_revert_func       = inst_property_can_revert,
+            property_get_revert_func       = inst_property_get_revert,
+            get_owner_func                 = inst_get_owner,
+            get_property_state_func        = inst_get_property_state,
+            get_method_list_func           = inst_get_method_list,
+            free_method_list_func          = inst_free_method_list,
+            get_property_type_func         = inst_get_property_type,
+            validate_property_func         = inst_validate_property,
+            has_method_func                = inst_has_method,
+            get_method_argument_count_func = inst_get_method_argument_count,
+            call_func                      = inst_call,
+            notification_func              = inst_notification,
+            to_string_func                 = inst_to_string,
+            refcount_incremented_func      = inst_refcount_incremented,
+            refcount_decremented_func      = inst_refcount_decremented,
+            get_script_func                = inst_get_script,
+            is_placeholder_func            = inst_is_placeholder,
+            set_fallback_func              = inst_set,
+            get_fallback_func              = inst_get,
+            get_language_func              = inst_get_language,
+            free_func                      = inst_free,
+        }
+        instance_info_ready = true
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -534,28 +600,37 @@ ensure_instance_globals :: proc() {
 // identity strings on a hot path called every shot/frame.
 @(export)
 odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_identity: cstring) -> rawptr {
-	context = gdext.godot_context()
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	if obj == nil || odin_language_object == nil {
-		return nil
-	}
-	data := gdext.object_get_script_instance(obj, odin_language_object)
-	if data == nil {
-		return nil
-	}
-	oi := cast(^Odin_Instance)data
-	sync.lock(&live_lock)
-	defer sync.unlock(&live_lock)
-	if x, ok := live_by_owner[obj]; ok && x == oi {
-		// Type check: only hand back the struct if its class is the one requested.
-		if want_identity != nil && oi.script_identity == string(want_identity) {
-			if !box3d_typed_instance_allowed(oi.generation) {return nil}
-			return oi.user
-		}
-	}
-	return nil
+    context = gdext.godot_context()
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+
+    if obj == nil || odin_language_object == nil {
+        return nil
+    }
+
+    data := gdext.object_get_script_instance(obj, odin_language_object)
+
+    if data == nil {
+        return nil
+    }
+
+    oi := cast(^Odin_Instance)data
+    sync.lock(&live_lock)
+    defer sync.unlock(&live_lock)
+
+    if x, ok := live_by_owner[obj]; ok && x == oi {
+        // Type check: only hand back the struct if its class is the one requested.
+        if want_identity != nil && oi.script_identity == string(want_identity) {
+            if !box3d_typed_instance_allowed(oi.generation) {
+                return nil
+            }
+
+            return oi.user
+        }
+    }
+
+    return nil
 }
 
 // The ANY-class sibling of odin_script_struct, behind `rt.script_any`: the same live-
@@ -567,32 +642,37 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_identity: cstring) ->
 // dll never registered (a foreign module's instance) resolves to nil there, and a struct
 // can never be handed out under a wrong layout.
 @(export)
-odin_script_struct_any :: proc "c" (
-	obj: gdext.ObjectPtr,
-	identity_ptr: ^[^]u8,
-	identity_len: ^uintptr,
-) -> rawptr {
-	context = gdext.godot_context()
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	if obj == nil || odin_language_object == nil || identity_ptr == nil || identity_len == nil {
-		return nil
-	}
-	data := gdext.object_get_script_instance(obj, odin_language_object)
-	if data == nil {
-		return nil
-	}
-	oi := cast(^Odin_Instance)data
-	sync.lock(&live_lock)
-	defer sync.unlock(&live_lock)
-	if x, ok := live_by_owner[obj]; ok && x == oi {
-		if !box3d_typed_instance_allowed(oi.generation) {return nil}
-		identity_ptr^ = raw_data(oi.script_identity)
-		identity_len^ = uintptr(len(oi.script_identity))
-		return oi.user
-	}
-	return nil
+odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, identity_ptr: ^[^]u8, identity_len: ^uintptr) -> rawptr {
+    context = gdext.godot_context()
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+
+    if obj == nil || odin_language_object == nil || identity_ptr == nil || identity_len == nil {
+        return nil
+    }
+
+    data := gdext.object_get_script_instance(obj, odin_language_object)
+
+    if data == nil {
+        return nil
+    }
+
+    oi := cast(^Odin_Instance)data
+    sync.lock(&live_lock)
+    defer sync.unlock(&live_lock)
+
+    if x, ok := live_by_owner[obj]; ok && x == oi {
+        if !box3d_typed_instance_allowed(oi.generation) {
+            return nil
+        }
+
+        identity_ptr^ = raw_data(oi.script_identity)
+        identity_len^ = uintptr(len(oi.script_identity))
+        return oi.user
+    }
+
+    return nil
 }
 
 // Allocator for the user script struct. Godot's `mem_alloc` guarantees only 16-byte
@@ -602,10 +682,11 @@ odin_script_struct_any :: proc "c" (
 // free on the same allocator the struct was alloc'd from.
 @(private)
 user_struct_allocator :: proc(align: int) -> runtime.Allocator {
-	if align > 16 {
-		return core_allocator()
-	}
-	return gdext.godot_allocator()
+    if align > 16 {
+        return core_allocator()
+    }
+
+    return gdext.godot_allocator()
 }
 
 // Decode ONE part of a PROPERTY_HINT_TYPE_STRING hint_string (register_class's
@@ -614,23 +695,27 @@ user_struct_allocator :: proc(align: int) -> runtime.Allocator {
 // the element's Variant::Type; any text after ':' is the class name.
 @(private)
 parse_type_string_part :: proc(
-	part: string,
-	empty: godot.String_Name,
+    part: string,
+    empty: godot.String_Name,
 ) -> (
-	vt: gdext.Variant_Type,
-	class_name: godot.String_Name,
+    vt: gdext.Variant_Type,
+    class_name: godot.String_Name,
 ) {
-	class_name = empty
-	n := 0
-	i := 0
-	for ; i < len(part) && part[i] >= '0' && part[i] <= '9'; i += 1 {
-		n = n * 10 + int(part[i] - '0')
-	}
-	vt = gdext.Variant_Type(n)
-	if colon := strings.index_byte(part, ':'); colon >= 0 && colon + 1 < len(part) {
-		class_name = godot.new_string_name_odin(part[colon + 1:])
-	}
-	return
+    class_name = empty
+    n := 0
+    i := 0
+
+    for ; i < len(part) && part[i] >= '0' && part[i] <= '9'; i += 1 {
+        n = n * 10 + int(part[i] - '0')
+    }
+
+    vt = gdext.Variant_Type(n)
+
+    if colon := strings.index_byte(part, ':'); colon >= 0 && colon + 1 < len(part) {
+        class_name = godot.new_string_name_odin(part[colon + 1:])
+    }
+
+    return
 }
 
 // A freshly-zeroed gd.Array / gd.Dictionary field is NOT a valid engine value: both are
@@ -644,38 +729,50 @@ parse_type_string_part :: proc(
 // already holds a live value.
 @(private)
 seed_container_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
-	if ex.type != .Array && ex.type != .Dictionary {return}
-	fld := cast(^rawptr)(uintptr(user) + ex.offset)
-	if fld^ != nil {return}
-	typed := ex.hint == i64(godot.Property_Hint.Type_String)
-	// gdextension_*_set_typed dereference the script pointer — pass a real NIL Variant.
-	nil_script: godot.Variant
-	if ex.type == .Array {
-		a := godot.new_array_default()
-		if typed {
-			gdext.array_set_typed(
-				cast(gdext.TypePtr)&a,
-				ex.elem_type,
-				cast(gdext.StringNamePtr)&ex.elem_class,
-				cast(gdext.VariantPtr)&nil_script,
-			)
-		}
-		(cast(^godot.Array)fld)^ = a
-	} else {
-		d := godot.new_dictionary_default()
-		if typed {
-			gdext.dictionary_set_typed(
-				cast(gdext.TypePtr)&d,
-				ex.key_type,
-				cast(gdext.StringNamePtr)&ex.key_class,
-				cast(gdext.VariantPtr)&nil_script,
-				ex.elem_type,
-				cast(gdext.StringNamePtr)&ex.elem_class,
-				cast(gdext.VariantPtr)&nil_script,
-			)
-		}
-		(cast(^godot.Dictionary)fld)^ = d
-	}
+    if ex.type != .Array && ex.type != .Dictionary {
+        return
+    }
+
+    fld := cast(^rawptr)(uintptr(user) + ex.offset)
+
+    if fld^ != nil {
+        return
+    }
+
+    typed := ex.hint == i64(godot.Property_Hint.Type_String)
+    // gdextension_*_set_typed dereference the script pointer — pass a real NIL Variant.
+    nil_script: godot.Variant
+
+    if ex.type == .Array {
+        a := godot.new_array_default()
+
+        if typed {
+            gdext.array_set_typed(
+                cast(gdext.TypePtr)&a,
+                ex.elem_type,
+                cast(gdext.StringNamePtr)&ex.elem_class,
+                cast(gdext.VariantPtr)&nil_script,
+            )
+        }
+
+        (cast(^godot.Array)fld)^ = a
+    } else {
+        d := godot.new_dictionary_default()
+
+        if typed {
+            gdext.dictionary_set_typed(
+                cast(gdext.TypePtr)&d,
+                ex.key_type,
+                cast(gdext.StringNamePtr)&ex.key_class,
+                cast(gdext.VariantPtr)&nil_script,
+                ex.elem_type,
+                cast(gdext.StringNamePtr)&ex.elem_class,
+                cast(gdext.VariantPtr)&nil_script,
+            )
+        }
+
+        (cast(^godot.Dictionary)fld)^ = d
+    }
 }
 
 // Destruct the engine value held by an @export field — for every builtin type with
@@ -689,8 +786,11 @@ seed_container_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
 // instance leaked one COW allocation per engine-typed export for the process lifetime.
 @(private)
 destruct_export_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
-	if ex.dtor == nil {return}
-	ex.dtor(cast(gdext.TypePtr)rawptr(uintptr(user) + ex.offset))
+    if ex.dtor == nil {
+        return
+    }
+
+    ex.dtor(cast(gdext.TypePtr)rawptr(uintptr(user) + ex.offset))
 }
 
 // Apply an @export's declared `default=...` (richer-authoring #3) to its struct field.
@@ -698,91 +798,100 @@ destruct_export_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
 // run; otherwise it is written straight to the field. No-op without a default.
 @(private)
 apply_export_default :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
-	if !ex.has_default {return}
-	dv := ex.default
-	if ex.setter != nil {
-		ex.setter(user, cast(gdext.VariantPtr)&dv)
-	} else {
-		write_export_variant(user, ex, cast(gdext.VariantPtr)&dv)
-	}
+    if !ex.has_default {
+        return
+    }
+
+    dv := ex.default
+
+    if ex.setter != nil {
+        ex.setter(user, cast(gdext.VariantPtr)&dv)
+    } else {
+        write_export_variant(user, ex, cast(gdext.VariantPtr)&dv)
+    }
 }
 
 // Build a real script instance for `owner`, binding it to `desc`. Returns the
 // engine ScriptInstancePtr to hand back from `_instance_create`.
 @(private)
 odin_make_script_instance :: proc(
-	script: gdext.ObjectPtr,
-	owner: gdext.ObjectPtr,
-	desc: rt.Class_Desc,
+    script: gdext.ObjectPtr,
+    owner: gdext.ObjectPtr,
+    desc: rt.Class_Desc,
 ) -> gdext.ScriptInstancePtr {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	ensure_instance_globals()
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    ensure_instance_globals()
 
-	oi := new(Odin_Instance)
-	oi.owner = owner
-	oi.script = script
-	oi.desc = desc
-	oi.cache = ensure_class_cache(desc)
-	class_cache_retain_instance(oi.cache)
-	oi.script_identity = heap_clone(string(rt.desc_identity(desc)))
-	oi.generation = script_generation_for_desc(desc)
-	script_generation_retain(oi.generation)
-	oi.box3d_context = box3d_context_create(oi.generation)
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if host_scope.required && !host_scope.entered {
-		heap_delete_string(oi.script_identity); class_cache_release_instance(oi.cache)
-		script_generation_release(oi.generation); free(oi); return nil
-	}
-	track_live_instance(oi)
+    oi := new(Odin_Instance)
+    oi.owner = owner
+    oi.script = script
+    oi.desc = desc
+    oi.cache = ensure_class_cache(desc)
+    class_cache_retain_instance(oi.cache)
+    oi.script_identity = heap_clone(string(rt.desc_identity(desc)))
+    oi.generation = script_generation_for_desc(desc)
+    script_generation_retain(oi.generation)
+    oi.box3d_context = box3d_context_create(oi.generation)
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
 
-	// Hold a STRONG reference to the OdinScript for as long as this instance lives.
-	// The instance stores `script` as a raw pointer; without our own ref the script
-	// resource can be freed out from under us (e.g. when the PackedScene that carried
-	// the script's ExtResource ref is released after `instantiate()`), leaving a
-	// dangling `oi.script`. The engine then crashes the moment it dereferences the
-	// script via `script_instance->get_script()` — e.g. inside `Object::connect` /
-	// `Object::emit_signalp` for a script-declared signal. This mirrors godot-cpp,
-	// whose ScriptInstance keeps the script alive through a `Ref<Script>` member.
-	refcounted_hold(script)
+    if host_scope.required && !host_scope.entered {
+        heap_delete_string(oi.script_identity)
+        class_cache_release_instance(oi.cache)
+        script_generation_release(oi.generation)
+        free(oi)
+        return nil
+    }
 
-	// Allocate + zero the script's own struct; write the owner Object* at offset 0.
-	// gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin) — the explicit
-	// mem.zero here is belt-and-braces so a future allocator change can't reintroduce
-	// garbage in non-`owner` fields.
-	user, err := mem.alloc(int(desc.size), int(desc.align), user_struct_allocator(int(desc.align)))
-	if err == nil && user != nil {
-		box3d_context_bind(oi.box3d_context, user, u64(desc.size))
-		mem.zero(user, int(desc.size))
-		(cast(^gdext.ObjectPtr)user)^ = owner
+    track_live_instance(oi)
 
-		// Seed Array/Dictionary exports with valid empty containers, then apply
-		// `@export default=...` values (richer-authoring #3) — both BEFORE _ready.
-		for &ex in oi.cache.exports {
-			seed_container_field(user, &ex)
-			apply_export_default(user, &ex)
-		}
-	}
-	oi.user = user
+    // Hold a STRONG reference to the OdinScript for as long as this instance lives.
+    // The instance stores `script` as a raw pointer; without our own ref the script
+    // resource can be freed out from under us (e.g. when the PackedScene that carried
+    // the script's ExtResource ref is released after `instantiate()`), leaving a
+    // dangling `oi.script`. The engine then crashes the moment it dereferences the
+    // script via `script_instance->get_script()` — e.g. inside `Object::connect` /
+    // `Object::emit_signalp` for a script-declared signal. This mirrors godot-cpp,
+    // whose ScriptInstance keeps the script alive through a `Ref<Script>` member.
+    refcounted_hold(script)
 
-	// Enable the engine callbacks this class actually handles. NB: we resolve these
-	// binds LAZILY here (at .Scene/instance-create time) rather than via the generated
-	// `godot.node_set_process`. The core's `godot.init()` ran at the extension entry
-	// point — too early for Node method binds — so those generated pointers are null.
-	// (The scripts dll dodges this by booting at .Scene; the core resolves on demand.)
-	if desc.lifecycle.process != nil {
-		node_enable_process(owner, true)
-	}
-	if desc.lifecycle.physics_process != nil {
-		node_enable_physics_process(owner, true)
-	}
+    // Allocate + zero the script's own struct; write the owner Object* at offset 0.
+    // gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin) — the explicit
+    // mem.zero here is belt-and-braces so a future allocator change can't reintroduce
+    // garbage in non-`owner` fields.
+    user, err := mem.alloc(int(desc.size), int(desc.align), user_struct_allocator(int(desc.align)))
 
-	return gdext.script_instance_create3(
-		&instance_info,
-		cast(gdext.ExtensionScriptInstanceDataPtr)oi,
-	)
+    if err == nil && user != nil {
+        box3d_context_bind(oi.box3d_context, user, u64(desc.size))
+        mem.zero(user, int(desc.size))
+        (cast(^gdext.ObjectPtr)user)^ = owner
+
+        // Seed Array/Dictionary exports with valid empty containers, then apply
+        // `@export default=...` values (richer-authoring #3) — both BEFORE _ready.
+        for &ex in oi.cache.exports {
+            seed_container_field(user, &ex)
+            apply_export_default(user, &ex)
+        }
+    }
+
+    oi.user = user
+
+    // Enable the engine callbacks this class actually handles. NB: we resolve these
+    // binds LAZILY here (at .Scene/instance-create time) rather than via the generated
+    // `godot.node_set_process`. The core's `godot.init()` ran at the extension entry
+    // point — too early for Node method binds — so those generated pointers are null.
+    // (The scripts dll dodges this by booting at .Scene; the core resolves on demand.)
+    if desc.lifecycle.process != nil {
+        node_enable_process(owner, true)
+    }
+
+    if desc.lifecycle.physics_process != nil {
+        node_enable_physics_process(owner, true)
+    }
+
+    return gdext.script_instance_create3(&instance_info, cast(gdext.ExtensionScriptInstanceDataPtr)oi)
 }
 
 // Lazily-resolved RefCounted::reference / unreference binds (both hash 2240911060 in
@@ -795,15 +904,22 @@ unref_bind: gdext.MethodBindPtr
 
 @(private)
 refcounted_hold :: proc "contextless" (obj: gdext.ObjectPtr) {
-	if obj == nil {return}
-	if ref_bind == nil {
-		cn := godot.new_string_name_cstring("RefCounted", true)
-		mn := godot.new_string_name_cstring("reference", true)
-		ref_bind = gdext.classdb_get_method_bind(&cn, &mn, 2240911060)
-	}
-	if ref_bind == nil {return}
-	result: bool
-	gdext.object_method_bind_ptrcall(ref_bind, obj, nil, cast(gdext.TypePtr)&result)
+    if obj == nil {
+        return
+    }
+
+    if ref_bind == nil {
+        cn := godot.new_string_name_cstring("RefCounted", true)
+        mn := godot.new_string_name_cstring("reference", true)
+        ref_bind = gdext.classdb_get_method_bind(&cn, &mn, 2240911060)
+    }
+
+    if ref_bind == nil {
+        return
+    }
+
+    result: bool
+    gdext.object_method_bind_ptrcall(ref_bind, obj, nil, cast(gdext.TypePtr)&result)
 }
 
 // Release the reference taken by refcounted_hold. `unreference` returns true when the
@@ -811,18 +927,26 @@ refcounted_hold :: proc "contextless" (obj: gdext.ObjectPtr) {
 // (this is precisely what `Ref<T>::unref()` does in the engine).
 @(private)
 refcounted_release :: proc "contextless" (obj: gdext.ObjectPtr) {
-	if obj == nil {return}
-	if unref_bind == nil {
-		cn := godot.new_string_name_cstring("RefCounted", true)
-		mn := godot.new_string_name_cstring("unreference", true)
-		unref_bind = gdext.classdb_get_method_bind(&cn, &mn, 2240911060)
-	}
-	if unref_bind == nil {return}
-	result: bool
-	gdext.object_method_bind_ptrcall(unref_bind, obj, nil, cast(gdext.TypePtr)&result)
-	if result {
-		gdext.object_destroy(obj)
-	}
+    if obj == nil {
+        return
+    }
+
+    if unref_bind == nil {
+        cn := godot.new_string_name_cstring("RefCounted", true)
+        mn := godot.new_string_name_cstring("unreference", true)
+        unref_bind = gdext.classdb_get_method_bind(&cn, &mn, 2240911060)
+    }
+
+    if unref_bind == nil {
+        return
+    }
+
+    result: bool
+    gdext.object_method_bind_ptrcall(unref_bind, obj, nil, cast(gdext.TypePtr)&result)
+
+    if result {
+        gdext.object_destroy(obj)
+    }
 }
 
 // Lazily-resolved Node::set_process / set_physics_process binds (hash 2586408642 for
@@ -834,28 +958,36 @@ set_physics_process_bind: gdext.MethodBindPtr
 
 @(private)
 node_enable_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
-	if set_process_bind == nil {
-		cn := godot.new_string_name_cstring("Node", true)
-		mn := godot.new_string_name_cstring("set_process", true)
-		set_process_bind = gdext.classdb_get_method_bind(&cn, &mn, 2586408642)
-	}
-	if set_process_bind == nil {return}
-	enable := enable
-	args := [1]gdext.TypePtr{&enable}
-	gdext.object_method_bind_ptrcall(set_process_bind, owner, &args[0], nil)
+    if set_process_bind == nil {
+        cn := godot.new_string_name_cstring("Node", true)
+        mn := godot.new_string_name_cstring("set_process", true)
+        set_process_bind = gdext.classdb_get_method_bind(&cn, &mn, 2586408642)
+    }
+
+    if set_process_bind == nil {
+        return
+    }
+
+    enable := enable
+    args := [1]gdext.TypePtr{&enable}
+    gdext.object_method_bind_ptrcall(set_process_bind, owner, &args[0], nil)
 }
 
 @(private)
 node_enable_physics_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
-	if set_physics_process_bind == nil {
-		cn := godot.new_string_name_cstring("Node", true)
-		mn := godot.new_string_name_cstring("set_physics_process", true)
-		set_physics_process_bind = gdext.classdb_get_method_bind(&cn, &mn, 2586408642)
-	}
-	if set_physics_process_bind == nil {return}
-	enable := enable
-	args := [1]gdext.TypePtr{&enable}
-	gdext.object_method_bind_ptrcall(set_physics_process_bind, owner, &args[0], nil)
+    if set_physics_process_bind == nil {
+        cn := godot.new_string_name_cstring("Node", true)
+        mn := godot.new_string_name_cstring("set_physics_process", true)
+        set_physics_process_bind = gdext.classdb_get_method_bind(&cn, &mn, 2586408642)
+    }
+
+    if set_physics_process_bind == nil {
+        return
+    }
+
+    enable := enable
+    args := [1]gdext.TypePtr{&enable}
+    gdext.object_method_bind_ptrcall(set_physics_process_bind, owner, &args[0], nil)
 }
 
 // Which onready entries a resolve pass touches. Node handles and SCRIPT refs (a
@@ -866,9 +998,9 @@ node_enable_physics_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
 // instance is rebound (rebind_all_instances).
 @(private)
 Onready_Pass :: enum {
-	All,
-	Nodes_Only,
-	Scripts_Only,
+    All,
+    Nodes_Only,
+    Scripts_Only,
 }
 
 // Resolve `@onready`-style refs (richer-authoring #1): write get_node(owner, path) —
@@ -877,52 +1009,53 @@ Onready_Pass :: enum {
 // Onready_Pass for the split).
 @(private)
 resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance, pass := Onready_Pass.All) {
-	for o in rt.desc_onready(oi.desc) {
-		if o.path == nil {
-			// Neutralized at boot: a `^T` whose T is no registered script class
-			// (fixup_onready_script_targets recorded the error; never write into it).
-			continue
-		}
-		is_script := o.script_class != nil
-		if (pass == .Nodes_Only && is_script) || (pass == .Scripts_Only && !is_script) {
-			continue
-		}
-		if o.count == 0 {
-			resolve_onready_slot(oi, o, o.path, rawptr(uintptr(oi.user) + o.offset))
-			continue
-		}
-		// ARRAY form (`cards: [9]gd.Button `gd:"onready=Shop/Card%d"``): substitute
-		// 0-based indices into the walk-validated `%d` template; elements are
-		// pointer-sized, contiguous from offset. The ctprintf path is temp-arena
-		// memory, consumed by get_node inside the call. scan_onready_template (not a
-		// naive index) finds the substitution point: a scene-unique segment may itself
-		// start with 'd' (`%dock/Card%d`) and must pass through to get_node intact.
-		context = gdext.godot_context()
-		tmpl := string(o.path)
-		di, _, _ := rt.scan_onready_template(tmpl)
-		if di < 0 {
-			// Unreachable via the walk (it refuses template-less array paths); guards
-			// hand-authored descs from substituting into a unique-name marker.
-			godot.error_str(
-				fmt.tprintf(
-					"%s.%s: onready array path %q has no `%%d` template — nothing resolved",
-					oi.script_identity,
-					string(o.field),
-					tmpl,
-				),
-			)
-			continue
-		}
-		for i in 0 ..< int(o.count) {
-			ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
-			resolve_onready_slot(
-				oi,
-				o,
-				ip,
-				rawptr(uintptr(oi.user) + o.offset + uintptr(i) * size_of(rawptr)),
-			)
-		}
-	}
+    for o in rt.desc_onready(oi.desc) {
+        if o.path == nil {
+            // Neutralized at boot: a `^T` whose T is no registered script class
+            // (fixup_onready_script_targets recorded the error; never write into it).
+            continue
+        }
+
+        is_script := o.script_class != nil
+
+        if (pass == .Nodes_Only && is_script) || (pass == .Scripts_Only && !is_script) {
+            continue
+        }
+
+        if o.count == 0 {
+            resolve_onready_slot(oi, o, o.path, rawptr(uintptr(oi.user) + o.offset))
+            continue
+        }
+
+        // ARRAY form (`cards: [9]gd.Button `gd:"onready=Shop/Card%d"``): substitute
+        // 0-based indices into the walk-validated `%d` template; elements are
+        // pointer-sized, contiguous from offset. The ctprintf path is temp-arena
+        // memory, consumed by get_node inside the call. scan_onready_template (not a
+        // naive index) finds the substitution point: a scene-unique segment may itself
+        // start with 'd' (`%dock/Card%d`) and must pass through to get_node intact.
+        context = gdext.godot_context()
+        tmpl := string(o.path)
+        di, _, _ := rt.scan_onready_template(tmpl)
+
+        if di < 0 {
+            // Unreachable via the walk (it refuses template-less array paths); guards
+            // hand-authored descs from substituting into a unique-name marker.
+            godot.error_str(
+                fmt.tprintf(
+                    "%s.%s: onready array path %q has no `%%d` template — nothing resolved",
+                    oi.script_identity,
+                    string(o.field),
+                    tmpl,
+                ),
+            )
+            continue
+        }
+
+        for i in 0 ..< int(o.count) {
+            ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
+            resolve_onready_slot(oi, o, ip, rawptr(uintptr(oi.user) + o.offset + uintptr(i) * size_of(rawptr)))
+        }
+    }
 }
 
 // Cap for the indexed `@(gd_connect="…%d:sig")` probe: generous for button banks,
@@ -936,51 +1069,51 @@ INDEXED_CONNECT_MAX :: 64
 // otherwise reads as "the handler never fires" with no hint why.
 @(private)
 wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connection) {
-	context = gdext.godot_context()
-	tmpl := string(c.path)
-	di, _, _ := rt.scan_onready_template(tmpl)
-	if di < 0 {
-		// Unreachable via scriptgen (indexed is only set when a template exists);
-		// guards hand-authored descs from substituting into a unique-name marker.
-		godot.error_str(
-			fmt.tprintf(
-				"%s.%s: indexed @(gd_connect) path %q has no `%%d` template — nothing wired",
-				oi.script_identity,
-				string(c.method),
-				tmpl,
-			),
-		)
-		return
-	}
-	wired := 0
-	for i in 0 ..< INDEXED_CONNECT_MAX {
-		ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
-		np := godot.new_node_path_cstring(ip)
-		node := godot.node_get_node_or_null(cast(godot.Node)oi.owner, np)
-		godot.free_node_path(np)
-		if node == nil {
-			break
-		}
-		godot.connect_to_bound(
-			cast(godot.Object)node,
-			c.signal,
-			cast(godot.Object)oi.owner,
-			c.method,
-			i64(i),
-		)
-		wired += 1
-	}
-	if wired == 0 {
-		godot.error_str(
-			fmt.tprintf(
-				"%s.%s: @(gd_connect=\"%s:%s\") matched no node at index 0 — nothing wired",
-				oi.script_identity,
-				string(c.method),
-				tmpl,
-				string(c.signal),
-			),
-		)
-	}
+    context = gdext.godot_context()
+    tmpl := string(c.path)
+    di, _, _ := rt.scan_onready_template(tmpl)
+
+    if di < 0 {
+        // Unreachable via scriptgen (indexed is only set when a template exists);
+        // guards hand-authored descs from substituting into a unique-name marker.
+        godot.error_str(
+            fmt.tprintf(
+                "%s.%s: indexed @(gd_connect) path %q has no `%%d` template — nothing wired",
+                oi.script_identity,
+                string(c.method),
+                tmpl,
+            ),
+        )
+        return
+    }
+
+    wired := 0
+
+    for i in 0 ..< INDEXED_CONNECT_MAX {
+        ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
+        np := godot.new_node_path_cstring(ip)
+        node := godot.node_get_node_or_null(cast(godot.Node)oi.owner, np)
+        godot.free_node_path(np)
+
+        if node == nil {
+            break
+        }
+
+        godot.connect_to_bound(cast(godot.Object)node, c.signal, cast(godot.Object)oi.owner, c.method, i64(i))
+        wired += 1
+    }
+
+    if wired == 0 {
+        godot.error_str(
+            fmt.tprintf(
+                "%s.%s: @(gd_connect=\"%s:%s\") matched no node at index 0 — nothing wired",
+                oi.script_identity,
+                string(c.method),
+                tmpl,
+                string(c.signal),
+            ),
+        )
+    }
 }
 
 // Resolve ONE onready slot: get_node, then either the handle write or the class-checked
@@ -989,278 +1122,325 @@ wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connect
 // the path resolved, so a silently-nil typed ref would read as "onready didn't run",
 // not "wrong script on the node".
 @(private)
-resolve_onready_slot :: proc "contextless" (
-	oi: ^Odin_Instance,
-	o: rt.Onready,
-	path: cstring,
-	slot: rawptr,
-) {
-	node := godot.get_node(cast(godot.Object)oi.owner, path)
-	if o.script_class == nil {
-		(cast(^gdext.ObjectPtr)slot)^ = cast(gdext.ObjectPtr)node
-		return
-	}
-	p := odin_script_struct(cast(gdext.ObjectPtr)node, o.script_class)
-	(cast(^rawptr)slot)^ = p
-	if node != nil && p == nil {
-		context = gdext.godot_context()
-		godot.error_str(
-			fmt.tprintf(
-				"%s.%s: onready script ref %q found the node, but it carries no %s Odin script — field left nil",
-				oi.script_identity,
-				string(o.field),
-				string(path),
-				string(o.script_class),
-			),
-		)
-	}
+resolve_onready_slot :: proc "contextless" (oi: ^Odin_Instance, o: rt.Onready, path: cstring, slot: rawptr) {
+    node := godot.get_node(cast(godot.Object)oi.owner, path)
+
+    if o.script_class == nil {
+        (cast(^gdext.ObjectPtr)slot)^ = cast(gdext.ObjectPtr)node
+        return
+    }
+
+    p := odin_script_struct(cast(gdext.ObjectPtr)node, o.script_class)
+    (cast(^rawptr)slot)^ = p
+
+    if node != nil && p == nil {
+        context = gdext.godot_context()
+        godot.error_str(
+            fmt.tprintf(
+                "%s.%s: onready script ref %q found the node, but it carries no %s Odin script — field left nil",
+                oi.script_identity,
+                string(o.field),
+                string(path),
+                string(o.script_class),
+            ),
+        )
+    }
 }
 
 // ---- vtable: the hot path ----
 
 @(private)
-inst_notification :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	what: i32,
-	reversed: bool,
-) {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if host_scope.required && !host_scope.entered {return}
-	if oi == nil || oi.user == nil {
-		return
-	}
-	switch int(what) {
-	case NOTIFICATION_READY:
-		// `//gd:group` memberships first of all: group-based lookups running from ANY
-		// sibling's onready/connections/ready (rt.first_script_in_group and friends)
-		// must already see this node grouped. The names are static cstrings from the
-		// generated table (dll-lifetime), so the static intern in add_to_group is right.
-		for g in rt.desc_groups(oi.desc) {
-			godot.add_to_group(cast(godot.Object)oi.owner, g)
-		}
-		// Resolve `@onready`-style node refs (richer-authoring #1) FIRST, so the user's
-		// _ready (and the gd_connect wiring below) sees fully resolved, non-null references.
-		resolve_onready_refs(oi)
-		// Wire `@(gd_connect="signal")` declarations: connect owner.signal -> owner.method
-		// before the user's ready runs, so the connections are live for the rest of _ready.
-		// The path-qualified form (`"Path/To/Node:signal"`) resolves the EMITTER like an
-		// `onready=` ref first — children ready before parents, so a child emitter's script
-		// (and its declared signals) exists by now.
-		for c in rt.desc_connections(oi.desc) {
-			if c.path == nil {
-				godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
-				continue
-			}
-			if c.indexed {
-				wire_indexed_connection(oi, c)
-				continue
-			}
-			emitter := godot.get_node(cast(godot.Object)oi.owner, c.path)
-			if emitter == nil {
-				// get_node already printed the engine's path error; name the DECLARATION
-				// too, or the red line points at a path with no hint of which class/method
-				// asked for it.
-				context = gdext.godot_context()
-				godot.error_str(
-					fmt.tprintf(
-						"%s.%s: @(gd_connect=\"%s:%s\") found no node at %q — connection skipped",
-						oi.script_identity,
-						string(c.method),
-						string(c.path),
-						string(c.signal),
-						string(c.path),
-					),
-				)
-				continue
-			}
-			godot.connect_to(
-				cast(godot.Object)emitter,
-				c.signal,
-				cast(godot.Object)oi.owner,
-				c.method,
-			)
-		}
-		if oi.desc.lifecycle.ready != nil {
-			oi.desc.lifecycle.ready(oi.user)
-		}
-	case NOTIFICATION_ENTER_TREE:
-		if oi.desc.lifecycle.enter_tree != nil {
-			oi.desc.lifecycle.enter_tree(oi.user)
-		}
-	case NOTIFICATION_EXIT_TREE:
-		if oi.desc.lifecycle.exit_tree != nil {
-			oi.desc.lifecycle.exit_tree(oi.user)
-		}
-	}
+inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, what: i32, reversed: bool) {
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if host_scope.required && !host_scope.entered {
+        return
+    }
+
+    if oi == nil || oi.user == nil {
+        return
+    }
+
+    switch int(what) {
+    case NOTIFICATION_READY:
+        // `//gd:group` memberships first of all: group-based lookups running from ANY
+        // sibling's onready/connections/ready (rt.first_script_in_group and friends)
+        // must already see this node grouped. The names are static cstrings from the
+        // generated table (dll-lifetime), so the static intern in add_to_group is right.
+        for g in rt.desc_groups(oi.desc) {
+            godot.add_to_group(cast(godot.Object)oi.owner, g)
+        }
+
+        // Resolve `@onready`-style node refs (richer-authoring #1) FIRST, so the user's
+        // _ready (and the gd_connect wiring below) sees fully resolved, non-null references.
+        resolve_onready_refs(oi)
+
+        // Wire `@(gd_connect="signal")` declarations: connect owner.signal -> owner.method
+        // before the user's ready runs, so the connections are live for the rest of _ready.
+        // The path-qualified form (`"Path/To/Node:signal"`) resolves the EMITTER like an
+        // `onready=` ref first — children ready before parents, so a child emitter's script
+        // (and its declared signals) exists by now.
+        for c in rt.desc_connections(oi.desc) {
+            if c.path == nil {
+                godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
+                continue
+            }
+
+            if c.indexed {
+                wire_indexed_connection(oi, c)
+                continue
+            }
+
+            emitter := godot.get_node(cast(godot.Object)oi.owner, c.path)
+
+            if emitter == nil {
+                // get_node already printed the engine's path error; name the DECLARATION
+                // too, or the red line points at a path with no hint of which class/method
+                // asked for it.
+                context = gdext.godot_context()
+                godot.error_str(
+                    fmt.tprintf(
+                        "%s.%s: @(gd_connect=\"%s:%s\") found no node at %q — connection skipped",
+                        oi.script_identity,
+                        string(c.method),
+                        string(c.path),
+                        string(c.signal),
+                        string(c.path),
+                    ),
+                )
+                continue
+            }
+
+            godot.connect_to(cast(godot.Object)emitter, c.signal, cast(godot.Object)oi.owner, c.method)
+        }
+
+        if oi.desc.lifecycle.ready != nil {
+            oi.desc.lifecycle.ready(oi.user)
+        }
+    case NOTIFICATION_ENTER_TREE:
+        if oi.desc.lifecycle.enter_tree != nil {
+            oi.desc.lifecycle.enter_tree(oi.user)
+        }
+    case NOTIFICATION_EXIT_TREE:
+        if oi.desc.lifecycle.exit_tree != nil {
+            oi.desc.lifecycle.exit_tree(oi.user)
+        }
+    }
 }
 
 @(private)
 inst_call :: proc "c" (
-	self: gdext.ExtensionScriptInstanceDataPtr,
-	method: gdext.StringNamePtr,
-	args: [^]gdext.VariantPtr,
-	argument_count: i64,
-	ret: gdext.VariantPtr,
-	error: ^gdext.CallError,
+    self: gdext.ExtensionScriptInstanceDataPtr,
+    method: gdext.StringNamePtr,
+    args: [^]gdext.VariantPtr,
+    argument_count: i64,
+    ret: gdext.VariantPtr,
+    error: ^gdext.CallError,
 ) {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)self
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if host_scope.required &&
-	   !host_scope.entered {if error != nil {error.error = .Invalid_Method}; return}
-	if oi == nil || oi.user == nil {
-		if error != nil {error.error = .Invalid_Method}
-		return
-	}
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)self
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
 
-	name := (cast(^godot.String_Name)method)^
+    if host_scope.required && !host_scope.entered {
+        if error != nil {
+            error.error = .Invalid_Method
+        }
 
-	// Custom methods first: GDScript `obj.add(2, 3)` arrives here as a Variant call.
-	// We forward args/ret straight to the class's trampoline (which unpacks/marshals).
-	if oi.cache != nil {
-		if i, found := oi.cache.method_index[sn_bits(name)]; found {
-			// Arity guard: the trampoline reads exactly arg_types_count Variants from
-			// `args`, so a short call would read past the array. Odin methods are never
-			// vararg, so extra args are an error too. `expected` carries the declared
-			// arity, `argument` the passed count (what Godot's call-error text reads).
-			want := int(oi.desc.methods[i].arg_types_count)
-			if int(argument_count) != want {
-				if error != nil {
-					error.error =
-						int(argument_count) < want ? .Too_Few_Arguments : .Too_Many_Arguments
-					error.argument = i32(argument_count)
-					error.expected = i32(want)
-				}
-				return
-			}
-			oi.desc.methods[i].trampoline(oi.user, args, argument_count, ret)
-			if error != nil {error.error = .Ok}
-			return
-		}
-	}
+        return
+    }
 
-	if name == process_name && oi.desc.lifecycle.process != nil {
-		delta: f64
-		if argument_count >= 1 && variant_to_float != nil {
-			variant_to_float(&delta, args[0])
-		}
-		oi.desc.lifecycle.process(oi.user, delta)
-		if error != nil {error.error = .Ok}
-		return
-	}
+    if oi == nil || oi.user == nil {
+        if error != nil {
+            error.error = .Invalid_Method
+        }
 
-	if name == physics_process_name && oi.desc.lifecycle.physics_process != nil {
-		delta: f64
-		if argument_count >= 1 && variant_to_float != nil {
-			variant_to_float(&delta, args[0])
-		}
-		oi.desc.lifecycle.physics_process(oi.user, delta)
-		if error != nil {error.error = .Ok}
-		return
-	}
+        return
+    }
 
-	// Not ours — tell the engine so its built-in dispatch continues.
-	if error != nil {error.error = .Invalid_Method}
+    name := (cast(^godot.String_Name)method)^
+
+    // Custom methods first: GDScript `obj.add(2, 3)` arrives here as a Variant call.
+    // We forward args/ret straight to the class's trampoline (which unpacks/marshals).
+    if oi.cache != nil {
+        if i, found := oi.cache.method_index[sn_bits(name)]; found {
+            // Arity guard: the trampoline reads exactly arg_types_count Variants from
+            // `args`, so a short call would read past the array. Odin methods are never
+            // vararg, so extra args are an error too. `expected` carries the declared
+            // arity, `argument` the passed count (what Godot's call-error text reads).
+            want := int(oi.desc.methods[i].arg_types_count)
+
+            if int(argument_count) != want {
+                if error != nil {
+                    error.error = int(argument_count) < want ? .Too_Few_Arguments : .Too_Many_Arguments
+                    error.argument = i32(argument_count)
+                    error.expected = i32(want)
+                }
+
+                return
+            }
+
+            oi.desc.methods[i].trampoline(oi.user, args, argument_count, ret)
+
+            if error != nil {
+                error.error = .Ok
+            }
+
+            return
+        }
+    }
+
+    if name == process_name && oi.desc.lifecycle.process != nil {
+        delta: f64
+
+        if argument_count >= 1 && variant_to_float != nil {
+            variant_to_float(&delta, args[0])
+        }
+
+        oi.desc.lifecycle.process(oi.user, delta)
+
+        if error != nil {
+            error.error = .Ok
+        }
+
+        return
+    }
+
+    if name == physics_process_name && oi.desc.lifecycle.physics_process != nil {
+        delta: f64
+
+        if argument_count >= 1 && variant_to_float != nil {
+            variant_to_float(&delta, args[0])
+        }
+
+        oi.desc.lifecycle.physics_process(oi.user, delta)
+
+        if error != nil {
+            error.error = .Ok
+        }
+
+        return
+    }
+
+    // Not ours — tell the engine so its built-in dispatch continues.
+    if error != nil {
+        error.error = .Invalid_Method
+    }
 }
 
 @(private)
-inst_has_method :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-) -> bool {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if oi == nil {
-		return false
-	}
-	n := (cast(^godot.String_Name)name)^
-	if n == process_name {return oi.desc.lifecycle.process != nil}
-	if n == physics_process_name {return oi.desc.lifecycle.physics_process != nil}
-	if oi.cache != nil {
-		if _, found := oi.cache.method_index[sn_bits(n)]; found {return true}
-	}
-	return false
+inst_has_method :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr) -> bool {
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if oi == nil {
+        return false
+    }
+
+    n := (cast(^godot.String_Name)name)^
+
+    if n == process_name {
+        return oi.desc.lifecycle.process != nil
+    }
+
+    if n == physics_process_name {
+        return oi.desc.lifecycle.physics_process != nil
+    }
+
+    if oi.cache != nil {
+        if _, found := oi.cache.method_index[sn_bits(n)]; found {
+            return true
+        }
+    }
+
+    return false
 }
 
 @(private)
 inst_get_owner :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> gdext.ObjectPtr {
-	oi := cast(^Odin_Instance)instance
-	return oi != nil ? oi.owner : nil
+    oi := cast(^Odin_Instance)instance
+    return oi != nil ? oi.owner : nil
 }
 
 @(private)
 inst_get_script :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> gdext.ObjectPtr {
-	oi := cast(^Odin_Instance)instance
-	return oi != nil ? oi.script : nil
+    oi := cast(^Odin_Instance)instance
+    return oi != nil ? oi.script : nil
 }
 
 @(private)
-inst_get_language :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-) -> gdext.ExtensionScriptLanguagePtr {
-	return cast(gdext.ExtensionScriptLanguagePtr)odin_language_object
+inst_get_language :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> gdext.ExtensionScriptLanguagePtr {
+    return cast(gdext.ExtensionScriptLanguagePtr)odin_language_object
 }
 
 @(private)
 destroy_odin_instance :: proc(oi: ^Odin_Instance) {
-	host_scope := script_box3d_enter(oi, false)
-	defer script_box3d_leave(host_scope)
-	box3d_context_invalidate(oi.box3d_context)
-	context = gdext.godot_context()
-	refcounted_release(oi.script) // release the ref taken in odin_make_script_instance
-	// Release any resource references retained by RESOURCE-typed @export fields (inst_set),
-	// and destruct every engine-value export field with heap internals (String, packed
-	// arrays, Array, Dictionary, ...) — otherwise each instance leaks those allocations
-	// (and everything they hold, e.g. Resources inside an Array) for the process lifetime.
-	if oi.cache != nil && oi.user != nil {
-		for &ex in oi.cache.exports {
-			if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
-				fld := rawptr(uintptr(oi.user) + ex.offset)
-				refcounted_release((cast(^gdext.ObjectPtr)fld)^)
-			}
-			destruct_export_field(oi.user, &ex)
-		}
-	}
-	heap_delete_string(oi.script_identity)
-	if oi.user != nil {
-		mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
-	}
-	box3d_context_release(oi.box3d_context); oi.box3d_context = 0
-	class_cache_release_instance(oi.cache)
-	script_generation_release(oi.generation)
-	free(oi)
+    host_scope := script_box3d_enter(oi, false)
+    defer script_box3d_leave(host_scope)
+    box3d_context_invalidate(oi.box3d_context)
+    context = gdext.godot_context()
+    refcounted_release(oi.script) // release the ref taken in odin_make_script_instance
+
+    // Release any resource references retained by RESOURCE-typed @export fields (inst_set),
+    // and destruct every engine-value export field with heap internals (String, packed
+    // arrays, Array, Dictionary, ...) — otherwise each instance leaks those allocations
+    // (and everything they hold, e.g. Resources inside an Array) for the process lifetime.
+    if oi.cache != nil && oi.user != nil {
+        for &ex in oi.cache.exports {
+            if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
+                fld := rawptr(uintptr(oi.user) + ex.offset)
+                refcounted_release((cast(^gdext.ObjectPtr)fld)^)
+            }
+
+            destruct_export_field(oi.user, &ex)
+        }
+    }
+
+    heap_delete_string(oi.script_identity)
+
+    if oi.user != nil {
+        mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
+    }
+
+    box3d_context_release(oi.box3d_context)
+    oi.box3d_context = 0
+    class_cache_release_instance(oi.cache)
+    script_generation_release(oi.generation)
+    free(oi)
 }
 
 @(private)
 inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
-	context = gdext.godot_context()
-	script_access_enter()
-	// LIFO: leave the reader lease first, then let the last removed/blocked instance
-	// acquire the writer gate and collect its retired generation immediately.
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if oi == nil {
-		return
-	}
-	box3d_context_invalidate(oi.box3d_context)
-	if retire_live_instance(oi) {
-		destroy_odin_instance(oi)
-	}
+    context = gdext.godot_context()
+    script_access_enter()
+    // LIFO: leave the reader lease first, then let the last removed/blocked instance
+    // acquire the writer gate and collect its retired generation immediately.
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if oi == nil {
+        return
+    }
+
+    box3d_context_invalidate(oi.box3d_context)
+
+    if retire_live_instance(oi) {
+        destroy_odin_instance(oi)
+    }
 }
 
 // ---- vtable: Phase-3 @export property surfaces ----
@@ -1274,362 +1454,423 @@ PROPERTY_USAGE_GROUP :: 64
 PROPERTY_USAGE_SUBGROUP :: 256
 
 @(private)
-inst_find_export :: proc "contextless" (
-	oi: ^Odin_Instance,
-	name: gdext.StringNamePtr,
-) -> ^Export_Cache {
-	if oi == nil || oi.cache == nil {
-		return nil
-	}
-	n := (cast(^godot.String_Name)name)^
-	if i, found := oi.cache.export_index[sn_bits(n)]; found {
-		return &oi.cache.exports[i]
-	}
-	return nil
+inst_find_export :: proc "contextless" (oi: ^Odin_Instance, name: gdext.StringNamePtr) -> ^Export_Cache {
+    if oi == nil || oi.cache == nil {
+        return nil
+    }
+
+    n := (cast(^godot.String_Name)name)^
+
+    if i, found := oi.cache.export_index[sn_bits(n)]; found {
+        return &oi.cache.exports[i]
+    }
+
+    return nil
 }
 
 // Write a Variant into the struct field at `oi.user + ex.offset`, narrowing the
 // Variant's native width (Int=i64, Float=f64) to the field's real width as needed.
 @(private)
 inst_set :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-	value: gdext.VariantPtr,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
+    value: gdext.VariantPtr,
 ) -> bool {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if host_scope.required && !host_scope.entered {return false}
-	if oi == nil || oi.user == nil {
-		return false
-	}
-	ex := inst_find_export(oi, name)
-	if ex == nil {
-		return false
-	}
-	// Getter/setter routing (richer-authoring #4): a setter validates/transforms the write.
-	if ex.setter != nil {
-		// A RESOURCE-typed export needs the same hold/release bookkeeping as the plain
-		// field path below even when the write routes through a setter — inst_free
-		// unconditionally releases every Resource_Type field's final value, so a
-		// setter-written resource that was never held would underflow its refcount.
-		if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
-			fld := cast(^gdext.ObjectPtr)(uintptr(oi.user) + ex.offset)
-			old := fld^
-			ex.setter(oi.user, value)
-			newp := fld^
-			if newp != old {
-				refcounted_hold(newp)
-				refcounted_release(old)
-			}
-		} else {
-			ex.setter(oi.user, value)
-		}
-		return true
-	}
-	if ex.to_type == nil {
-		return false
-	}
-	dst := rawptr(uintptr(oi.user) + ex.offset)
-	#partial switch ex.type {
-	case .Float:
-		tmp: f64
-		ex.to_type(&tmp, value)
-		if ex.size == 4 {
-			(cast(^f32)dst)^ = f32(tmp)
-		} else {
-			(cast(^f64)dst)^ = tmp
-		}
-	case .Int:
-		tmp: i64
-		ex.to_type(&tmp, value)
-		switch ex.size {
-		case 1:
-			(cast(^i8)dst)^ = i8(tmp)
-		case 2:
-			(cast(^i16)dst)^ = i16(tmp)
-		case 4:
-			(cast(^i32)dst)^ = i32(tmp)
-		case:
-			(cast(^i64)dst)^ = tmp
-		}
-	case:
-		// Engine-native types (Vector2, String, Object, ...) match the field width.
-		// Drop the old COW/ref'd value first (String/Array/packed/... — no-op for POD
-		// and .Object): to_type CONSTRUCTS over the bytes, so overwriting leaked the
-		// previous allocation. Safe for self-assignment — the incoming Variant holds
-		// its own reference to the value.
-		destruct_export_field(oi.user, ex)
-		// A RESOURCE-typed Object export (hint Resource_Type) holds a RefCounted; we must
-		// take a reference so the assigned resource stays alive for as long as this instance
-		// references it (a `Ref<Resource>` would do this in godot-cpp). Without it, a resource
-		// assigned from a scene/.tres is freed once the loader's transient ref drops, leaving
-		// the field dangling. We release the previously-held resource (if any) on overwrite,
-		// and release the final one in inst_free.
-		if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
-			old := (cast(^gdext.ObjectPtr)dst)^
-			ex.to_type(dst, value)
-			newp := (cast(^gdext.ObjectPtr)dst)^
-			if newp != old {
-				refcounted_hold(newp)
-				refcounted_release(old)
-			}
-		} else {
-			ex.to_type(dst, value)
-		}
-	}
-	return true
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if host_scope.required && !host_scope.entered {
+        return false
+    }
+
+    if oi == nil || oi.user == nil {
+        return false
+    }
+
+    ex := inst_find_export(oi, name)
+
+    if ex == nil {
+        return false
+    }
+
+    // Getter/setter routing (richer-authoring #4): a setter validates/transforms the write.
+    if ex.setter != nil {
+        // A RESOURCE-typed export needs the same hold/release bookkeeping as the plain
+        // field path below even when the write routes through a setter — inst_free
+        // unconditionally releases every Resource_Type field's final value, so a
+        // setter-written resource that was never held would underflow its refcount.
+        if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
+            fld := cast(^gdext.ObjectPtr)(uintptr(oi.user) + ex.offset)
+            old := fld^
+            ex.setter(oi.user, value)
+            newp := fld^
+
+            if newp != old {
+                refcounted_hold(newp)
+                refcounted_release(old)
+            }
+        } else {
+            ex.setter(oi.user, value)
+        }
+
+        return true
+    }
+
+    if ex.to_type == nil {
+        return false
+    }
+
+    dst := rawptr(uintptr(oi.user) + ex.offset)
+
+    #partial switch ex.type {
+    case .Float:
+        tmp: f64
+        ex.to_type(&tmp, value)
+
+        if ex.size == 4 {
+            (cast(^f32)dst)^ = f32(tmp)
+        } else {
+            (cast(^f64)dst)^ = tmp
+        }
+    case .Int:
+        tmp: i64
+        ex.to_type(&tmp, value)
+
+        switch ex.size {
+        case 1:
+            (cast(^i8)dst)^ = i8(tmp)
+        case 2:
+            (cast(^i16)dst)^ = i16(tmp)
+        case 4:
+            (cast(^i32)dst)^ = i32(tmp)
+        case:
+            (cast(^i64)dst)^ = tmp
+        }
+    case:
+        // Engine-native types (Vector2, String, Object, ...) match the field width.
+        // Drop the old COW/ref'd value first (String/Array/packed/... — no-op for POD
+        // and .Object): to_type CONSTRUCTS over the bytes, so overwriting leaked the
+        // previous allocation. Safe for self-assignment — the incoming Variant holds
+        // its own reference to the value.
+        destruct_export_field(oi.user, ex)
+
+        // A RESOURCE-typed Object export (hint Resource_Type) holds a RefCounted; we must
+        // take a reference so the assigned resource stays alive for as long as this instance
+        // references it (a `Ref<Resource>` would do this in godot-cpp). Without it, a resource
+        // assigned from a scene/.tres is freed once the loader's transient ref drops, leaving
+        // the field dangling. We release the previously-held resource (if any) on overwrite,
+        // and release the final one in inst_free.
+        if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
+            old := (cast(^gdext.ObjectPtr)dst)^
+            ex.to_type(dst, value)
+            newp := (cast(^gdext.ObjectPtr)dst)^
+
+            if newp != old {
+                refcounted_hold(newp)
+                refcounted_release(old)
+            }
+        } else {
+            ex.to_type(dst, value)
+        }
+    }
+
+    return true
 }
 
 @(private)
 inst_get :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-	ret: gdext.VariantPtr,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
+    ret: gdext.VariantPtr,
 ) -> bool {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if host_scope.required && !host_scope.entered {return false}
-	if oi == nil || oi.user == nil {
-		return false
-	}
-	ex := inst_find_export(oi, name)
-	if ex == nil {
-		return false
-	}
-	// Getter/setter routing (richer-authoring #4): a getter computes the reported value.
-	if ex.getter != nil {
-		ex.getter(oi.user, ret)
-		return true
-	}
-	if ex.from_type == nil {
-		return false
-	}
-	// Heal a zeroed Array/Dictionary field (e.g. script code assigned the Odin zero
-	// value) — marshalling a null-internal container into a Variant crashes the engine.
-	seed_container_field(oi.user, ex)
-	src := rawptr(uintptr(oi.user) + ex.offset)
-	#partial switch ex.type {
-	case .Float:
-		tmp: f64
-		if ex.size == 4 {
-			tmp = f64((cast(^f32)src)^)
-		} else {
-			tmp = (cast(^f64)src)^
-		}
-		ex.from_type(ret, &tmp)
-	case .Int:
-		tmp: i64
-		switch ex.size {
-		case 1:
-			tmp = i64((cast(^i8)src)^)
-		case 2:
-			tmp = i64((cast(^i16)src)^)
-		case 4:
-			tmp = i64((cast(^i32)src)^)
-		case:
-			tmp = (cast(^i64)src)^
-		}
-		ex.from_type(ret, &tmp)
-	case:
-		ex.from_type(ret, src)
-	}
-	return true
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if host_scope.required && !host_scope.entered {
+        return false
+    }
+
+    if oi == nil || oi.user == nil {
+        return false
+    }
+
+    ex := inst_find_export(oi, name)
+
+    if ex == nil {
+        return false
+    }
+
+    // Getter/setter routing (richer-authoring #4): a getter computes the reported value.
+    if ex.getter != nil {
+        ex.getter(oi.user, ret)
+        return true
+    }
+
+    if ex.from_type == nil {
+        return false
+    }
+
+    // Heal a zeroed Array/Dictionary field (e.g. script code assigned the Odin zero
+    // value) — marshalling a null-internal container into a Variant crashes the engine.
+    seed_container_field(oi.user, ex)
+    src := rawptr(uintptr(oi.user) + ex.offset)
+
+    #partial switch ex.type {
+    case .Float:
+        tmp: f64
+
+        if ex.size == 4 {
+            tmp = f64((cast(^f32)src)^)
+        } else {
+            tmp = (cast(^f64)src)^
+        }
+
+        ex.from_type(ret, &tmp)
+    case .Int:
+        tmp: i64
+
+        switch ex.size {
+        case 1:
+            tmp = i64((cast(^i8)src)^)
+        case 2:
+            tmp = i64((cast(^i16)src)^)
+        case 4:
+            tmp = i64((cast(^i32)src)^)
+        case:
+            tmp = (cast(^i64)src)^
+        }
+
+        ex.from_type(ret, &tmp)
+    case:
+        ex.from_type(ret, src)
+    }
+
+    return true
 }
 
 @(private)
 inst_get_property_list :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	count: ^u32,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    count: ^u32,
 ) -> [^]gdext.PropertyInfo {
-	context = gdext.godot_context()
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if oi == nil || oi.cache == nil || len(oi.cache.exports) == 0 {
-		if count != nil {count^ = 0}
-		return nil
-	}
-	n := len(oi.cache.exports)
-	// Group/subgroup markers are interleaved before the property that declares them, so the
-	// final count may exceed `n`. Build into a dynamic list, then hand back its raw data.
-	list := make([dynamic]gdext.PropertyInfo, 0, n)
-	for i in 0 ..< n {
-		ex := &oi.cache.exports[i]
-		if ex.has_group {
-			append(
-				&list,
-				gdext.PropertyInfo {
-					type = .Nil,
-					name = cast(gdext.StringNamePtr)&ex.group,
-					class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
-					hint = 0,
-					hint_string = cast(gdext.StringPtr)&oi.cache.empty_string,
-					usage = PROPERTY_USAGE_GROUP,
-				},
-			)
-		}
-		if ex.has_subgroup {
-			append(
-				&list,
-				gdext.PropertyInfo {
-					type = .Nil,
-					name = cast(gdext.StringNamePtr)&ex.subgroup,
-					class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
-					hint = 0,
-					hint_string = cast(gdext.StringPtr)&oi.cache.empty_string,
-					usage = PROPERTY_USAGE_SUBGROUP,
-				},
-			)
-		}
-		append(
-			&list,
-			gdext.PropertyInfo {
-				type = ex.type,
-				name = cast(gdext.StringNamePtr)&ex.name,
-				class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
-				hint = u32(ex.hint),
-				hint_string = cast(gdext.StringPtr)&ex.hint_string,
-				usage = PROPERTY_USAGE_DEFAULT,
-			},
-		)
-	}
-	if count != nil {count^ = u32(len(list))}
-	data := raw_data(list)
-	class_cache_retain_metadata(oi.cache, cast(rawptr)data)
-	return data
+    context = gdext.godot_context()
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if oi == nil || oi.cache == nil || len(oi.cache.exports) == 0 {
+        if count != nil {
+            count^ = 0
+        }
+
+        return nil
+    }
+
+    n := len(oi.cache.exports)
+    // Group/subgroup markers are interleaved before the property that declares them, so the
+    // final count may exceed `n`. Build into a dynamic list, then hand back its raw data.
+    list := make([dynamic]gdext.PropertyInfo, 0, n)
+
+    for i in 0 ..< n {
+        ex := &oi.cache.exports[i]
+
+        if ex.has_group {
+            append(
+                &list,
+                gdext.PropertyInfo {
+                    type = .Nil,
+                    name = cast(gdext.StringNamePtr)&ex.group,
+                    class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
+                    hint = 0,
+                    hint_string = cast(gdext.StringPtr)&oi.cache.empty_string,
+                    usage = PROPERTY_USAGE_GROUP,
+                },
+            )
+        }
+
+        if ex.has_subgroup {
+            append(
+                &list,
+                gdext.PropertyInfo {
+                    type = .Nil,
+                    name = cast(gdext.StringNamePtr)&ex.subgroup,
+                    class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
+                    hint = 0,
+                    hint_string = cast(gdext.StringPtr)&oi.cache.empty_string,
+                    usage = PROPERTY_USAGE_SUBGROUP,
+                },
+            )
+        }
+
+        append(
+            &list,
+            gdext.PropertyInfo {
+                type = ex.type,
+                name = cast(gdext.StringNamePtr)&ex.name,
+                class_name = cast(gdext.StringNamePtr)&oi.cache.empty_string_name,
+                hint = u32(ex.hint),
+                hint_string = cast(gdext.StringPtr)&ex.hint_string,
+                usage = PROPERTY_USAGE_DEFAULT,
+            },
+        )
+    }
+
+    if count != nil {
+        count^ = u32(len(list))
+    }
+
+    data := raw_data(list)
+    class_cache_retain_metadata(oi.cache, cast(rawptr)data)
+    return data
 }
 
 @(private)
 inst_free_property_list :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	list: ^gdext.PropertyInfo,
-	count: u32,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    list: ^gdext.PropertyInfo,
+    count: u32,
 ) {
-	context = gdext.godot_context()
-	if list != nil {
-		// Reconstruct the slice we allocated in inst_get_property_list and free it.
-		// INVARIANT: `count` may be less than the dynamic array's grown CAPACITY, so this
-		// delete passes a smaller size than was allocated — valid only because the godot
-		// allocator's `.Free` ignores size (plain `mem_free`). A size-checking allocator
-		// here would need inst_get_property_list to shrink-to-fit (or pass the capacity).
-		s := transmute([]gdext.PropertyInfo)runtime.Raw_Slice{data = list, len = int(count)}
-		delete(s)
-		class_cache_release_metadata(cast(rawptr)list)
-	}
+    context = gdext.godot_context()
+
+    if list != nil {
+        // Reconstruct the slice we allocated in inst_get_property_list and free it.
+        // INVARIANT: `count` may be less than the dynamic array's grown CAPACITY, so this
+        // delete passes a smaller size than was allocated — valid only because the godot
+        // allocator's `.Free` ignores size (plain `mem_free`). A size-checking allocator
+        // here would need inst_get_property_list to shrink-to-fit (or pass the capacity).
+        s := transmute([]gdext.PropertyInfo)runtime.Raw_Slice{data = list, len = int(count)}
+        delete(s)
+        class_cache_release_metadata(cast(rawptr)list)
+    }
 }
 
 @(private)
 inst_get_property_state :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	add_func: gdext.ExtensionScriptInstancePropertyStateAdd,
-	user_data: rawptr,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    add_func: gdext.ExtensionScriptInstancePropertyStateAdd,
+    user_data: rawptr,
 ) {
 }
 
 @(private)
-inst_get_method_list :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	count: ^u32,
-) -> [^]gdext.MethodInfo {
-	if count != nil {count^ = 0}
-	return nil
+inst_get_method_list :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, count: ^u32) -> [^]gdext.MethodInfo {
+    if count != nil {
+        count^ = 0
+    }
+
+    return nil
 }
 
 @(private)
 inst_free_method_list :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	list: ^gdext.MethodInfo,
-	count: u32,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    list: ^gdext.MethodInfo,
+    count: u32,
 ) {
 }
 
 @(private)
 inst_get_property_type :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-	is_valid: ^bool,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
+    is_valid: ^bool,
 ) -> gdext.Variant_Type {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	ex := inst_find_export(oi, name)
-	if ex != nil {
-		if is_valid != nil {is_valid^ = true}
-		return ex.type
-	}
-	if is_valid != nil {is_valid^ = false}
-	return .Nil
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+    ex := inst_find_export(oi, name)
+
+    if ex != nil {
+        if is_valid != nil {
+            is_valid^ = true
+        }
+
+        return ex.type
+    }
+
+    if is_valid != nil {
+        is_valid^ = false
+    }
+
+    return .Nil
 }
 
 @(private)
 inst_validate_property :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	property: ^gdext.PropertyInfo,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    property: ^gdext.PropertyInfo,
 ) -> bool {
-	return false
+    return false
 }
 
 @(private)
 inst_get_method_argument_count :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-	is_valid: ^bool,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
+    is_valid: ^bool,
 ) -> i64 {
-	script_access_enter()
-	defer script_box3d_collect_pending()
-	defer script_access_leave()
-	oi := cast(^Odin_Instance)instance
-	host_scope := script_box3d_enter(oi)
-	defer script_box3d_leave(host_scope)
-	if oi != nil && oi.cache != nil {
-		n := (cast(^godot.String_Name)name)^
-		if i, found := oi.cache.method_index[sn_bits(n)]; found {
-			if is_valid != nil {is_valid^ = true}
-			return i64(oi.desc.methods[i].arg_types_count)
-		}
-	}
-	if is_valid != nil {is_valid^ = false}
-	return 0
+    script_access_enter()
+    defer script_box3d_collect_pending()
+    defer script_access_leave()
+    oi := cast(^Odin_Instance)instance
+    host_scope := script_box3d_enter(oi)
+    defer script_box3d_leave(host_scope)
+
+    if oi != nil && oi.cache != nil {
+        n := (cast(^godot.String_Name)name)^
+
+        if i, found := oi.cache.method_index[sn_bits(n)]; found {
+            if is_valid != nil {
+                is_valid^ = true
+            }
+
+            return i64(oi.desc.methods[i].arg_types_count)
+        }
+    }
+
+    if is_valid != nil {
+        is_valid^ = false
+    }
+
+    return 0
 }
 
 @(private)
 inst_property_can_revert :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
 ) -> bool {
-	return false
+    return false
 }
 
 @(private)
 inst_property_get_revert :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	name: gdext.StringNamePtr,
-	ret: gdext.VariantPtr,
+    instance: gdext.ExtensionScriptInstanceDataPtr,
+    name: gdext.StringNamePtr,
+    ret: gdext.VariantPtr,
 ) -> bool {
-	return false
+    return false
 }
 
 @(private)
-inst_to_string :: proc "c" (
-	instance: gdext.ExtensionScriptInstanceDataPtr,
-	is_valid: ^bool,
-	out: gdext.StringPtr,
-) {
-	if is_valid != nil {is_valid^ = false}
+inst_to_string :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, is_valid: ^bool, out: gdext.StringPtr) {
+    if is_valid != nil {
+        is_valid^ = false
+    }
 }
 
 @(private)
@@ -1638,15 +1879,15 @@ inst_refcount_incremented :: proc "c" (instance: gdext.ExtensionScriptInstanceDa
 
 @(private)
 inst_refcount_decremented :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> bool {
-	// Godot ANDs this result with its reference-count-zero check. Odin has no
-	// separate GC ownership to defer destruction, so permit normal teardown.
-	// Returning false strands scripted Resources in ObjectDB at count zero.
-	return true
+    // Godot ANDs this result with its reference-count-zero check. Odin has no
+    // separate GC ownership to defer destruction, so permit normal teardown.
+    // Returning false strands scripted Resources in ObjectDB at count zero.
+    return true
 }
 
 @(private)
 inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> bool {
-	return false
+    return false
 }
 
 // ----------------------------------------------------------------------------
@@ -1669,133 +1910,150 @@ inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr)
 // completely untouched). nil == rebind everything (the single-module behavior).
 @(private)
 rebind_all_instances :: proc(only: map[string]bool = nil) {
-	// Pin the registry snapshot, then rebind outside live_lock: this path calls Godot
-	// and script code (including rt.script_of, which takes live_lock). The surrounding
-	// reload writer gate excludes other threads; pins cover a synchronous free caused
-	// by one of those re-entrant calls on this thread.
-	snapshot := pin_live_instance_snapshot()
-	defer release_live_instance_snapshot(snapshot)
-	warned_removed := make(map[string]bool, context.temp_allocator)
-	warned_proc_state := make(map[string]bool, context.temp_allocator)
+    // Pin the registry snapshot, then rebind outside live_lock: this path calls Godot
+    // and script code (including rt.script_of, which takes live_lock). The surrounding
+    // reload writer gate excludes other threads; pins cover a synchronous free caused
+    // by one of those re-entrant calls on this thread.
+    snapshot := pin_live_instance_snapshot()
+    defer release_live_instance_snapshot(snapshot)
+    warned_removed := make(map[string]bool, context.temp_allocator)
+    warned_proc_state := make(map[string]bool, context.temp_allocator)
 
-	for oi in snapshot {
-		if !snapshot_instance_is_live(oi) {
-			continue
-		}
-		if only != nil && !(oi.script_identity in only) {
-			continue // another module's instance — must survive the swap untouched
-		}
-		new_desc, ok := scripts_classes[oi.script_identity]
-		if !ok {
-			// A removed class remains fully operational on its owning generation until
-			// its last live instance dies; other retired generations can still unload.
-			if !(oi.script_identity in warned_removed) {
-				warned_removed[oi.script_identity] = true
-				message := fmt.tprintf(
-					"ODIN_RELOAD_REMOVED_CLASS_PINNED: %s is no longer compiled, but a live instance still uses it; that instance keeps only its owning DLL generation mapped until it is freed.",
-					oi.script_identity,
-				)
-				msg := godot.new_string_odin(message)
-				godot.gd_push_warning(godot.variant_from_string(&msg))
-			}
-			continue
-		}
-		if (oi.desc.generation_bound_state || new_desc.generation_bound_state) &&
-		   new_desc.lifecycle.reload == nil {
-			// Typed proc/rawptr-bearing state may still call the old image. The explicit
-			// ownership boundary is `<struct>_reload`: without it, keep this instance on
-			// exactly one old generation instead of either crashing or retaining every
-			// intermediate generation forever.
-			if !(oi.script_identity in warned_proc_state) {
-				warned_proc_state[oi.script_identity] = true
-				message := fmt.tprintf(
-					"ODIN_RELOAD_PROC_STATE_PINNED: %s contains procedure-bearing or opaque pointer state but defines no reload hook; its live instance stays on the old code. Add `<struct>_reload` and rebuild cached callbacks there to make future generations unloadable.",
-					oi.script_identity,
-				)
-				msg := godot.new_string_odin(message)
-				godot.gd_push_warning(godot.variant_from_string(&msg))
-			}
-			continue
-		}
-		had_process := oi.desc.lifecycle.process != nil
-		had_physics_process := oi.desc.lifecycle.physics_process != nil
-		needs_process := new_desc.lifecycle.process != nil
-		needs_physics_process := new_desc.lifecycle.physics_process != nil
-		new_cache := ensure_class_cache(new_desc)
-		class_cache_retain_instance(new_cache)
-		old_cache := oi.cache
-		old_generation := oi.generation
-		new_generation := script_generation_for_desc(new_desc)
-		script_generation_retain(new_generation)
-		if layout_compatible(oi.desc, new_desc) {
-			oi.desc = new_desc
-			oi.cache = new_cache
-		} else {
-			migrate_instance(oi, new_desc, new_cache)
-		}
-		if oi.generation != new_generation {
-			box3d_context_release(oi.box3d_context)
-			oi.generation = new_generation
-			oi.box3d_context = box3d_context_create(oi.generation)
-			box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
-		}
-		// Godot's process flags live on the owner Node; swapping the descriptor alone
-		// cannot add/remove callbacks for an already-live instance. Mirror fresh instance
-		// creation whenever the new generation changes either lifecycle entry point.
-		if had_process != needs_process {
-			node_enable_process(oi.owner, needs_process)
-		}
-		if had_physics_process != needs_physics_process {
-			node_enable_physics_process(oi.owner, needs_physics_process)
-		}
-		// A synchronous Godot re-entry above may have freed this instance. Its snapshot
-		// pin keeps the bookkeeping memory valid, but a retired instance must not receive
-		// a user reload hook.
-		if !snapshot_instance_is_live(oi) {
-			class_cache_release_instance(old_cache)
-			script_generation_release(old_generation)
-			continue
-		}
-		// Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
-		// migrated) state. Give the script a chance to rebuild what the swap can't fix
-		// itself — chiefly raw proc pointers it cached into its own struct, which on a
-		// same-layout reload survive byte-for-byte and still point at stale old code.
-		// Runs with the new code (nil when the class defines no `<class>_reload`).
-		if oi.desc.lifecycle.reload != nil {
-			scope := script_box3d_enter(oi)
-			oi.desc.lifecycle.reload(oi.user)
-			script_box3d_leave(scope)
-		}
-		class_cache_release_instance(old_cache)
-		script_generation_release(old_generation)
-	}
+    for oi in snapshot {
+        if !snapshot_instance_is_live(oi) {
+            continue
+        }
 
-	// SECOND PASS — script-onready refs (`hud: ^hud`). They point into OTHER instances'
-	// structs, so no instance's refs are trustworthy until EVERY instance is rebound:
-	// a changed-layout target re-allocs its struct, dangling whatever the first loop
-	// (or the pre-reload world) resolved. Same-layout instances need this too — their
-	// bytes survived, but the struct their pointer targets may not have. (The manual
-	// `rt.script_of`-in-ready idiom has exactly this dangle and no second chance;
-	// the declared form is what makes reload safe.) Reload hooks above run BEFORE
-	// this pass, so they must not dereference script-onready refs.
-	for oi in snapshot {
-		if !snapshot_instance_is_live(oi) || oi.desc.onready_count == 0 {
-			continue
-		}
-		if only != nil && !(oi.script_identity in only) {
-			continue
-		}
-		has_script := false
-		for o in rt.desc_onready(oi.desc) {
-			if o.script_class != nil {
-				has_script = true
-				break
-			}
-		}
-		if has_script && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
-			resolve_onready_refs(oi, .Scripts_Only)
-		}
-	}
+        if only != nil && !(oi.script_identity in only) {
+            continue // another module's instance — must survive the swap untouched
+        }
+
+        new_desc, ok := scripts_classes[oi.script_identity]
+
+        if !ok {
+            // A removed class remains fully operational on its owning generation until
+            // its last live instance dies; other retired generations can still unload.
+            if !(oi.script_identity in warned_removed) {
+                warned_removed[oi.script_identity] = true
+                message := fmt.tprintf(
+                    "ODIN_RELOAD_REMOVED_CLASS_PINNED: %s is no longer compiled, but a live instance still uses it; that instance keeps only its owning DLL generation mapped until it is freed.",
+                    oi.script_identity,
+                )
+                msg := godot.new_string_odin(message)
+                godot.gd_push_warning(godot.variant_from_string(&msg))
+            }
+
+            continue
+        }
+
+        if (oi.desc.generation_bound_state || new_desc.generation_bound_state) && new_desc.lifecycle.reload == nil {
+            // Typed proc/rawptr-bearing state may still call the old image. The explicit
+            // ownership boundary is `<struct>_reload`: without it, keep this instance on
+            // exactly one old generation instead of either crashing or retaining every
+            // intermediate generation forever.
+            if !(oi.script_identity in warned_proc_state) {
+                warned_proc_state[oi.script_identity] = true
+                message := fmt.tprintf(
+                    "ODIN_RELOAD_PROC_STATE_PINNED: %s contains procedure-bearing or opaque pointer state but defines no reload hook; its live instance stays on the old code. Add `<struct>_reload` and rebuild cached callbacks there to make future generations unloadable.",
+                    oi.script_identity,
+                )
+                msg := godot.new_string_odin(message)
+                godot.gd_push_warning(godot.variant_from_string(&msg))
+            }
+
+            continue
+        }
+
+        had_process := oi.desc.lifecycle.process != nil
+        had_physics_process := oi.desc.lifecycle.physics_process != nil
+        needs_process := new_desc.lifecycle.process != nil
+        needs_physics_process := new_desc.lifecycle.physics_process != nil
+        new_cache := ensure_class_cache(new_desc)
+        class_cache_retain_instance(new_cache)
+        old_cache := oi.cache
+        old_generation := oi.generation
+        new_generation := script_generation_for_desc(new_desc)
+        script_generation_retain(new_generation)
+
+        if layout_compatible(oi.desc, new_desc) {
+            oi.desc = new_desc
+            oi.cache = new_cache
+        } else {
+            migrate_instance(oi, new_desc, new_cache)
+        }
+
+        if oi.generation != new_generation {
+            box3d_context_release(oi.box3d_context)
+            oi.generation = new_generation
+            oi.box3d_context = box3d_context_create(oi.generation)
+            box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
+        }
+
+        // Godot's process flags live on the owner Node; swapping the descriptor alone
+        // cannot add/remove callbacks for an already-live instance. Mirror fresh instance
+        // creation whenever the new generation changes either lifecycle entry point.
+        if had_process != needs_process {
+            node_enable_process(oi.owner, needs_process)
+        }
+
+        if had_physics_process != needs_physics_process {
+            node_enable_physics_process(oi.owner, needs_physics_process)
+        }
+
+        // A synchronous Godot re-entry above may have freed this instance. Its snapshot
+        // pin keeps the bookkeeping memory valid, but a retired instance must not receive
+        // a user reload hook.
+        if !snapshot_instance_is_live(oi) {
+            class_cache_release_instance(old_cache)
+            script_generation_release(old_generation)
+            continue
+        }
+
+        // Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
+        // migrated) state. Give the script a chance to rebuild what the swap can't fix
+        // itself — chiefly raw proc pointers it cached into its own struct, which on a
+        // same-layout reload survive byte-for-byte and still point at stale old code.
+        // Runs with the new code (nil when the class defines no `<class>_reload`).
+        if oi.desc.lifecycle.reload != nil {
+            scope := script_box3d_enter(oi)
+            oi.desc.lifecycle.reload(oi.user)
+            script_box3d_leave(scope)
+        }
+
+        class_cache_release_instance(old_cache)
+        script_generation_release(old_generation)
+    }
+
+    // SECOND PASS — script-onready refs (`hud: ^hud`). They point into OTHER instances'
+    // structs, so no instance's refs are trustworthy until EVERY instance is rebound:
+    // a changed-layout target re-allocs its struct, dangling whatever the first loop
+    // (or the pre-reload world) resolved. Same-layout instances need this too — their
+    // bytes survived, but the struct their pointer targets may not have. (The manual
+    // `rt.script_of`-in-ready idiom has exactly this dangle and no second chance;
+    // the declared form is what makes reload safe.) Reload hooks above run BEFORE
+    // this pass, so they must not dereference script-onready refs.
+    for oi in snapshot {
+        if !snapshot_instance_is_live(oi) || oi.desc.onready_count == 0 {
+            continue
+        }
+
+        if only != nil && !(oi.script_identity in only) {
+            continue
+        }
+
+        has_script := false
+
+        for o in rt.desc_onready(oi.desc) {
+            if o.script_class != nil {
+                has_script = true
+                break
+            }
+        }
+
+        if has_script && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
+            resolve_onready_refs(oi, .Scripts_Only)
+        }
+    }
 }
 
 // Two descriptors share a struct layout iff size/align match AND every @export keeps
@@ -1804,223 +2062,270 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 // proc bodies, not the struct".
 @(private)
 layout_compatible :: proc(a, b: rt.Class_Desc) -> bool {
-	if a.size != b.size || a.align != b.align {
-		return false
-	}
-	a_exports := rt.desc_exports(a)
-	b_exports := rt.desc_exports(b)
-	if len(a_exports) != len(b_exports) {
-		return false
-	}
-	for i in 0 ..< len(a_exports) {
-		ae := a_exports[i]
-		be := b_exports[i]
-		if ae.offset != be.offset || ae.size != be.size || ae.type != be.type {
-			return false
-		}
-		if string(ae.name) != string(be.name) {
-			return false
-		}
-	}
-	return true
+    if a.size != b.size || a.align != b.align {
+        return false
+    }
+
+    a_exports := rt.desc_exports(a)
+    b_exports := rt.desc_exports(b)
+
+    if len(a_exports) != len(b_exports) {
+        return false
+    }
+
+    for i in 0 ..< len(a_exports) {
+        ae := a_exports[i]
+        be := b_exports[i]
+
+        if ae.offset != be.offset || ae.size != be.size || ae.type != be.type {
+            return false
+        }
+
+        if string(ae.name) != string(be.name) {
+            return false
+        }
+    }
+
+    return true
 }
 
 // Read the script field backing `ex` into a fresh Variant (narrowing handled like
 // inst_get). Scalar reads do not allocate.
 @(private)
 read_export_variant :: proc "contextless" (user: rawptr, ex: ^Export_Cache) -> godot.Variant {
-	v: godot.Variant
-	seed_container_field(user, ex) // never marshal a zeroed (null-internal) container
-	src := rawptr(uintptr(user) + ex.offset)
-	#partial switch ex.type {
-	case .Float:
-		tmp: f64
-		if ex.size == 4 {
-			tmp = f64((cast(^f32)src)^)
-		} else {
-			tmp = (cast(^f64)src)^
-		}
-		ex.from_type(cast(gdext.VariantPtr)&v, &tmp)
-	case .Int:
-		tmp: i64
-		switch ex.size {
-		case 1:
-			tmp = i64((cast(^i8)src)^)
-		case 2:
-			tmp = i64((cast(^i16)src)^)
-		case 4:
-			tmp = i64((cast(^i32)src)^)
-		case:
-			tmp = (cast(^i64)src)^
-		}
-		ex.from_type(cast(gdext.VariantPtr)&v, &tmp)
-	case:
-		ex.from_type(cast(gdext.VariantPtr)&v, src)
-	}
-	return v
+    v: godot.Variant
+    seed_container_field(user, ex) // never marshal a zeroed (null-internal) container
+    src := rawptr(uintptr(user) + ex.offset)
+
+    #partial switch ex.type {
+    case .Float:
+        tmp: f64
+
+        if ex.size == 4 {
+            tmp = f64((cast(^f32)src)^)
+        } else {
+            tmp = (cast(^f64)src)^
+        }
+
+        ex.from_type(cast(gdext.VariantPtr)&v, &tmp)
+    case .Int:
+        tmp: i64
+
+        switch ex.size {
+        case 1:
+            tmp = i64((cast(^i8)src)^)
+        case 2:
+            tmp = i64((cast(^i16)src)^)
+        case 4:
+            tmp = i64((cast(^i32)src)^)
+        case:
+            tmp = (cast(^i64)src)^
+        }
+
+        ex.from_type(cast(gdext.VariantPtr)&v, &tmp)
+    case:
+        ex.from_type(cast(gdext.VariantPtr)&v, src)
+    }
+
+    return v
 }
 
 // Write a Variant into the script field backing `ex` (narrowing handled like inst_set).
 @(private)
-write_export_variant :: proc "contextless" (
-	user: rawptr,
-	ex: ^Export_Cache,
-	value: gdext.VariantPtr,
-) {
-	dst := rawptr(uintptr(user) + ex.offset)
-	#partial switch ex.type {
-	case .Float:
-		tmp: f64
-		ex.to_type(&tmp, value)
-		if ex.size == 4 {
-			(cast(^f32)dst)^ = f32(tmp)
-		} else {
-			(cast(^f64)dst)^ = tmp
-		}
-	case .Int:
-		tmp: i64
-		ex.to_type(&tmp, value)
-		switch ex.size {
-		case 1:
-			(cast(^i8)dst)^ = i8(tmp)
-		case 2:
-			(cast(^i16)dst)^ = i16(tmp)
-		case 4:
-			(cast(^i32)dst)^ = i32(tmp)
-		case:
-			(cast(^i64)dst)^ = tmp
-		}
-	case:
-		// Same overwrite rule as inst_set: drop the old COW/ref'd value before
-		// constructing the new one over its bytes (no-op for POD and .Object).
-		destruct_export_field(user, ex)
-		ex.to_type(dst, value)
-	}
+write_export_variant :: proc "contextless" (user: rawptr, ex: ^Export_Cache, value: gdext.VariantPtr) {
+    dst := rawptr(uintptr(user) + ex.offset)
+
+    #partial switch ex.type {
+    case .Float:
+        tmp: f64
+        ex.to_type(&tmp, value)
+
+        if ex.size == 4 {
+            (cast(^f32)dst)^ = f32(tmp)
+        } else {
+            (cast(^f64)dst)^ = tmp
+        }
+    case .Int:
+        tmp: i64
+        ex.to_type(&tmp, value)
+
+        switch ex.size {
+        case 1:
+            (cast(^i8)dst)^ = i8(tmp)
+        case 2:
+            (cast(^i16)dst)^ = i16(tmp)
+        case 4:
+            (cast(^i32)dst)^ = i32(tmp)
+        case:
+            (cast(^i64)dst)^ = tmp
+        }
+    case:
+        // Same overwrite rule as inst_set: drop the old COW/ref'd value before
+        // constructing the new one over its bytes (no-op for POD and .Object).
+        destruct_export_field(user, ex)
+        ex.to_type(dst, value)
+    }
 }
 
 // Changed-layout fallback: preserve @export values across a re-alloc to the new size.
 @(private)
 migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache: ^Class_Cache) {
-	old_scope := script_box3d_enter(oi, false)
-	defer script_box3d_leave(old_scope)
-	Saved :: struct {
-		name: godot.String_Name,
-		v:    godot.Variant,
-	}
-	saved := make([dynamic]Saved, 0, len(oi.cache.exports), core_allocator())
-	defer delete(saved)
-	for &ex in oi.cache.exports {
-		append(&saved, Saved{ex.name, read_export_variant(oi.user, &ex)})
-	}
+    old_scope := script_box3d_enter(oi, false)
+    defer script_box3d_leave(old_scope)
 
-	// Free/realloc the script struct on the allocator odin_make_script_instance used
-	// (user_struct_allocator — the OLD desc picks the free side, the NEW one the alloc).
-	// Engine-value fields drop their own ref first (the snapshot Variants hold another).
-	for &ex in oi.cache.exports {
-		destruct_export_field(oi.user, &ex)
-	}
-	box3d_context_invalidate(oi.box3d_context)
-	mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
-	box3d_context_release(oi.box3d_context); oi.box3d_context = 0
-	user, _ := mem.alloc(
-		int(new_desc.size),
-		int(new_desc.align),
-		user_struct_allocator(int(new_desc.align)),
-	)
-	if user != nil {
-		(cast(^gdext.ObjectPtr)user)^ = oi.owner
-	}
-	oi.user = user
-	oi.desc = new_desc
-	oi.cache = new_cache
-	oi.generation = script_generation_for_desc(new_desc)
-	oi.box3d_context = box3d_context_create(oi.generation)
-	box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
-	migration_scope := Script_Box3D_Scope{}
-	when !WEB {
-		new_scope, status := box3d_origin_enter(oi.generation, oi.box3d_context)
-		if status == bg.OK {migration_scope = {
-				scope   = new_scope,
-				entered = true,
-			}}
-	}
-	defer script_box3d_leave(migration_scope)
+    Saved :: struct {
+        name: godot.String_Name,
+        v:    godot.Variant,
+    }
 
-	for &nex in oi.cache.exports {
-		restored := false
-		for s in saved {
-			if s.name == nex.name {
-				sv := s.v
-				write_export_variant(oi.user, &nex, cast(gdext.VariantPtr)&sv)
-				restored = true
-				break
-			}
-		}
-		// An export NEW in this layout (absent from the snapshot) starts from a seeded
-		// container + its declared default, exactly like a fresh instance — not from
-		// zeroed memory.
-		if !restored {
-			seed_container_field(oi.user, &nex)
-			apply_export_default(oi.user, &nex)
-		}
-	}
+    saved := make([dynamic]Saved, 0, len(oi.cache.exports), core_allocator())
+    defer delete(saved)
 
-	// The re-alloc zeroed the `@onready` fields; resolve them again so the migrated
-	// instance doesn't run the new code against nil node refs. Guarded: get_node is only
-	// meaningful once the owner is in the tree (pre-READY instances resolve at READY).
-	// NODES ONLY: script refs point into other instances' structs, which the rebind
-	// loop may still re-alloc after this one — they re-resolve in rebind_all_instances'
-	// second pass, once every instance is rebound.
-	if oi.desc.onready_count > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
-		resolve_onready_refs(oi, .Nodes_Only)
-	}
+    for &ex in oi.cache.exports {
+        append(&saved, Saved{ex.name, read_export_variant(oi.user, &ex)})
+    }
 
-	// The snapshot Variants own refs (String/Object/...); destroy them or every
-	// changed-layout reload leaks one Variant per export.
-	for &s in saved {
-		gdext.variant_destroy(cast(gdext.VariantPtr)&s.v)
-	}
+    // Free/realloc the script struct on the allocator odin_make_script_instance used
+    // (user_struct_allocator — the OLD desc picks the free side, the NEW one the alloc).
+    // Engine-value fields drop their own ref first (the snapshot Variants hold another).
+    for &ex in oi.cache.exports {
+        destruct_export_field(oi.user, &ex)
+    }
+
+    box3d_context_invalidate(oi.box3d_context)
+    mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
+    box3d_context_release(oi.box3d_context)
+    oi.box3d_context = 0
+    user, _ := mem.alloc(int(new_desc.size), int(new_desc.align), user_struct_allocator(int(new_desc.align)))
+
+    if user != nil {
+        (cast(^gdext.ObjectPtr)user)^ = oi.owner
+    }
+
+    oi.user = user
+    oi.desc = new_desc
+    oi.cache = new_cache
+    oi.generation = script_generation_for_desc(new_desc)
+    oi.box3d_context = box3d_context_create(oi.generation)
+    box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
+    migration_scope := Script_Box3D_Scope{}
+
+    when !WEB {
+        new_scope, status := box3d_origin_enter(oi.generation, oi.box3d_context)
+
+        if status == bg.OK {
+            migration_scope = {
+                scope   = new_scope,
+                entered = true,
+            }
+        }
+    }
+
+    defer script_box3d_leave(migration_scope)
+
+    for &nex in oi.cache.exports {
+        restored := false
+
+        for s in saved {
+            if s.name == nex.name {
+                sv := s.v
+                write_export_variant(oi.user, &nex, cast(gdext.VariantPtr)&sv)
+                restored = true
+                break
+            }
+        }
+
+        // An export NEW in this layout (absent from the snapshot) starts from a seeded
+        // container + its declared default, exactly like a fresh instance — not from
+        // zeroed memory.
+        if !restored {
+            seed_container_field(oi.user, &nex)
+            apply_export_default(oi.user, &nex)
+        }
+    }
+
+    // The re-alloc zeroed the `@onready` fields; resolve them again so the migrated
+    // instance doesn't run the new code against nil node refs. Guarded: get_node is only
+    // meaningful once the owner is in the tree (pre-READY instances resolve at READY).
+    // NODES ONLY: script refs point into other instances' structs, which the rebind
+    // loop may still re-alloc after this one — they re-resolve in rebind_all_instances'
+    // second pass, once every instance is rebound.
+    if oi.desc.onready_count > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
+        resolve_onready_refs(oi, .Nodes_Only)
+    }
+
+    // The snapshot Variants own refs (String/Object/...); destroy them or every
+    // changed-layout reload leaks one Variant per export.
+    for &s in saved {
+        gdext.variant_destroy(cast(gdext.VariantPtr)&s.v)
+    }
 }
 
 // Core-only origin scope; pure/default callbacks remain unchanged. Backend calls
 // on unsupported threads are denied by stable Core's domain/Owner check.
 @(private)
 Script_Box3D_Scope :: struct {
-	scope:             bg.Origin_Scope,
-	entered, required: bool,
+    scope:             bg.Origin_Scope,
+    entered, required: bool,
 }
+
 @(private)
-script_box3d_enter :: proc "contextless" (
-	oi: ^Odin_Instance,
-	require_live := true,
-) -> Script_Box3D_Scope {
-	when !WEB {
-		if oi != nil && oi.generation != nil {
-			gen := cast(^Script_Generation)oi.generation
-			if gen.box3d_service.realm != 0 {
-				weak := oi.box3d_context; if !require_live {weak = 0}
-				scope, status := box3d_origin_enter(oi.generation, weak)
-				if status == bg.OK {return {scope, true, true}}
-				return {required = true}
-			}
-		}
-	} else {
-  if box3d_web_required(){
-   if oi==nil||oi.generation==nil{return {required=true}}
-   weak:=oi.box3d_context;if !require_live{weak=0}
-   scope,status:=box3d_origin_enter(oi.generation,weak)
-   if status==bg.OK{return {scope,true,true}}
-   return {required=true}
-  }
- }
-	return {}
+script_box3d_enter :: proc "contextless" (oi: ^Odin_Instance, require_live := true) -> Script_Box3D_Scope {
+    when !WEB {
+        if oi != nil && oi.generation != nil {
+            gen := cast(^Script_Generation)oi.generation
+
+            if gen.box3d_service.realm != 0 {
+                weak := oi.box3d_context
+
+                if !require_live {
+                    weak = 0
+                }
+
+                scope, status := box3d_origin_enter(oi.generation, weak)
+
+                if status == bg.OK {
+                    return {scope, true, true}
+                }
+
+                return {required = true}
+            }
+        }
+    } else {
+        if box3d_web_required() {
+            if oi == nil || oi.generation == nil {
+                return {required = true}
+            }
+
+            weak := oi.box3d_context
+
+            if !require_live {
+                weak = 0
+            }
+
+            scope, status := box3d_origin_enter(oi.generation, weak)
+
+            if status == bg.OK {
+                return {scope, true, true}
+            }
+
+            return {required = true}
+        }
+    }
+
+    return {}
 }
+
 @(private)
 script_box3d_leave :: proc "contextless" (scope: Script_Box3D_Scope) {
-	if scope.entered {box3d_origin_leave(scope.scope)}
+    if scope.entered {
+        box3d_origin_leave(scope.scope)
+    }
 }
 
 @(private)
 script_box3d_collect_pending :: proc "contextless" () {
-	when !WEB {script_generations_collect_pending()}
+    when !WEB {
+        script_generations_collect_pending()
+    }
 }

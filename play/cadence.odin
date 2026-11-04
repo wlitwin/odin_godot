@@ -21,11 +21,18 @@ package play
 // The remainder carry makes it a fixed-CADENCE timer; for a cooldown that must NOT
 // burst after a stall, use play.ready with a real clock (see play/pace's header).
 every :: proc "contextless" (acc: ^f32, dt, period: f32) -> bool {
-	if period <= 0 {return false}
-	acc^ += dt
-	if acc^ < period {return false}
-	acc^ -= period
-	return true
+    if period <= 0 {
+        return false
+    }
+
+    acc^ += dt
+
+    if acc^ < period {
+        return false
+    }
+
+    acc^ -= period
+    return true
 }
 
 // latch fires exactly ONCE: the first call where `cond` is true. The stored bool is the
@@ -33,7 +40,10 @@ every :: proc "contextless" (acc: ^f32, dt, period: f32) -> bool {
 //
 //	if play.latch(&self.painted, self.color != 0) { apply_team_color(self) }
 latch :: proc "contextless" (fired: ^bool, cond: bool) -> bool {
-	if fired^ || !cond {return false}
-	fired^ = true
-	return true
+    if fired^ || !cond {
+        return false
+    }
+
+    fired^ = true
+    return true
 }

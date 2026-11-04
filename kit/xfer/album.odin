@@ -33,8 +33,8 @@ import ksess "godot:kit/session"
 
 @(private = "file")
 Fresh :: struct {
-	from: knet.Player_Id,
-	id:   u8,
+    from: knet.Player_Id,
+    id:   u8,
 }
 
 // A queued catch-up shipment: one kept payload, re-cast to ONE peer with the
@@ -43,56 +43,61 @@ Fresh :: struct {
 // broadcast right after).
 @(private = "file")
 Replay :: struct {
-	to:   ksess.Peer_Id,
-	from: knet.Player_Id,
-	id:   u8,
-	data: []u8,
-	seq:  int,
+    to:   ksess.Peer_Id,
+    from: knet.Player_Id,
+    id:   u8,
+    data: []u8,
+    seq:  int,
 }
 
 Album :: struct {
-	x:       Xfer,
-	blobs:   map[Xfer_Key][]u8, // (player, id) -> the latest bytes, owned
-	fresh:   ksess.App_Queue(Fresh), // landed-since-last-poll, the shared rider queue
-	replays: [dynamic]Replay,
+    x:       Xfer,
+    blobs:   map[Xfer_Key][]u8, // (player, id) -> the latest bytes, owned
+    fresh:   ksess.App_Queue(Fresh), // landed-since-last-poll, the shared rider queue
+    replays: [dynamic]Replay,
 }
 
 album_init :: proc(a: ^Album, ses: ^ksess.Session, tag := XFER_TAG) {
-	xfer_init(&a.x, ses, tag)
+    xfer_init(&a.x, ses, tag)
 }
 
 album_destroy :: proc(a: ^Album) {
-	xfer_destroy(&a.x)
-	for _, bytes in a.blobs {
-		delete(bytes)
-	}
-	delete(a.blobs)
-	ksess.appq_destroy(&a.fresh)
-	for r in a.replays {
-		delete(r.data)
-	}
-	delete(a.replays)
-	a^ = {}
+    xfer_destroy(&a.x)
+
+    for _, bytes in a.blobs {
+        delete(bytes)
+    }
+
+    delete(a.blobs)
+    ksess.appq_destroy(&a.fresh)
+
+    for r in a.replays {
+        delete(r.data)
+    }
+
+    delete(a.replays)
+    a^ = {}
 }
 
 // Publish MY payload of `kind`: cached under (me, kind) immediately — my own
 // screen never waits — and shipped to everyone over the next pumps. Returns
 // false on the same size gates as xfer_send.
 album_put :: proc(a: ^Album, id: u8, bytes: []u8) -> bool {
-	if !xfer_send(&a.x, id, bytes) {
-		return false
-	}
-	album_keep(a, a.x.ses.me, id, bytes)
-	ksess.appq_push(&a.fresh, Fresh{from = a.x.ses.me, id = id})
-	return true
+    if !xfer_send(&a.x, id, bytes) {
+        return false
+    }
+
+    album_keep(a, a.x.ses.me, id, bytes)
+    ksess.appq_push(&a.fresh, Fresh{from = a.x.ses.me, id = id})
+    return true
 }
 
 // The latest payload `player` published under `kind` — nil/false until one
 // lands. Bytes are owned by the album: valid until that (player, kind) is
 // superseded or the album dies; decode, don't retain.
 album_get :: proc(a: ^Album, player: knet.Player_Id, id: u8) -> ([]u8, bool) {
-	bytes, has := a.blobs[key_of(player, id)]
-	return bytes, has
+    bytes, has := a.blobs[key_of(player, id)]
+    return bytes, has
 }
 
 // Ship + receive, once per net tick. Landed payloads move into the shelf
@@ -110,31 +115,37 @@ album_get :: proc(a: ^Album, player: knet.Player_Id, id: u8) -> ([]u8, bool) {
 // leaves the joiner without that payload rather than with a stale one (the
 // fresher copy lands via the normal broadcast; an aborted one never does).
 album_pump :: proc(a: ^Album, budget := PUMP_CHUNKS) {
-	xfer_pump(&a.x, budget)
-	for {
-		ev, ok := xfer_poll(&a.x)
-		if !ok {
-			break
-		}
-		switch e in ev {
-		case Ev_Started:
-			cancel_replays(a, e.from, e.id)
-		case Ev_Done:
-			album_keep(a, e.from, e.id, e.bytes)
-			ksess.appq_push(&a.fresh, Fresh{from = e.from, id = e.id})
-		}
-	}
-	replay_pump(a, budget)
+    xfer_pump(&a.x, budget)
+
+    for {
+        ev, ok := xfer_poll(&a.x)
+
+        if !ok {
+            break
+        }
+
+        switch e in ev {
+        case Ev_Started:
+            cancel_replays(a, e.from, e.id)
+        case Ev_Done:
+            album_keep(a, e.from, e.id, e.bytes)
+            ksess.appq_push(&a.fresh, Fresh{from = e.from, id = e.id})
+        }
+    }
+
+    replay_pump(a, budget)
 }
 
 // Landed payloads since the last poll (mine included, the frame it was put)
 // — the decode/repaint hook. Drain until ok = false.
 album_poll :: proc(a: ^Album) -> (from: knet.Player_Id, id: u8, ok: bool) {
-	f, has := ksess.appq_poll(&a.fresh)
-	if !has {
-		return knet.PLAYER_ID_INVALID, 0, false
-	}
-	return f.from, f.id, true
+    f, has := ksess.appq_poll(&a.fresh)
+
+    if !has {
+        return knet.PLAYER_ID_INVALID, 0, false
+    }
+
+    return f.from, f.id, true
 }
 
 // HOST, on Ev_Player_Joined: queue every kept payload for the newcomer —
@@ -142,38 +153,45 @@ album_poll :: proc(a: ^Album) -> (from: knet.Player_Id, id: u8, ok: bool) {
 // (Their own entries are skipped; rejoiners re-put, which also refreshes
 // everyone else.) No-op off the host.
 album_welcome :: proc(a: ^Album, player: knet.Player_Id) {
-	ses := a.x.ses
-	// Same teaching assert as comms_welcome — the identical join-time role
-	// on the identical trigger; a silent no-op here taught the wrong lesson
-	// its sibling refuses loudly.
-	assert(ses == nil || ses.is_host, "album_welcome is the HOST's half — call it from your _player_joined_then")
-	if ses == nil || !ses.is_host || player == ses.me {
-		return
-	}
-	p, ok := ksess.session_player(ses, player)
-	if !ok || p.peer == ksess.NO_PEER {
-		return
-	}
-	for k, bytes in a.blobs {
-		if k.from == player {
-			continue
-		}
-		queue_replay(a, p.peer, k.from, k.id, bytes)
-	}
+    ses := a.x.ses
+    // Same teaching assert as comms_welcome — the identical join-time role
+    // on the identical trigger; a silent no-op here taught the wrong lesson
+    // its sibling refuses loudly.
+    assert(ses == nil || ses.is_host, "album_welcome is the HOST's half — call it from your _player_joined_then")
+
+    if ses == nil || !ses.is_host || player == ses.me {
+        return
+    }
+
+    p, ok := ksess.session_player(ses, player)
+
+    if !ok || p.peer == ksess.NO_PEER {
+        return
+    }
+
+    for k, bytes in a.blobs {
+        if k.from == player {
+            continue
+        }
+
+        queue_replay(a, p.peer, k.from, k.id, bytes)
+    }
 }
 
 // ---- internals --------------------------------------------------------------
 
 @(private = "file")
 album_keep :: proc(a: ^Album, from: knet.Player_Id, id: u8, bytes: []u8) {
-	k := key_of(from, id)
-	if old, has := a.blobs[k]; has {
-		delete(old)
-	}
-	kept := make([]u8, len(bytes))
-	copy(kept, bytes)
-	a.blobs[k] = kept
-	cancel_replays(a, from, id)
+    k := key_of(from, id)
+
+    if old, has := a.blobs[k]; has {
+        delete(old)
+    }
+
+    kept := make([]u8, len(bytes))
+    copy(kept, bytes)
+    a.blobs[k] = kept
+    cancel_replays(a, from, id)
 }
 
 // A fresher payload obsoletes any in-flight catch-up of the old one —
@@ -183,19 +201,19 @@ album_keep :: proc(a: ^Album, from: knet.Player_Id, id: u8, bytes: []u8) {
 // re-send's FIRST relayed chunk — see the drain-order note there).
 @(private = "file")
 cancel_replays :: proc(a: ^Album, from: knet.Player_Id, id: u8) {
-	for i := len(a.replays) - 1; i >= 0; i -= 1 {
-		if a.replays[i].from == from && a.replays[i].id == id {
-			delete(a.replays[i].data)
-			ordered_remove(&a.replays, i)
-		}
-	}
+    for i := len(a.replays) - 1; i >= 0; i -= 1 {
+        if a.replays[i].from == from && a.replays[i].id == id {
+            delete(a.replays[i].data)
+            ordered_remove(&a.replays, i)
+        }
+    }
 }
 
 @(private = "file")
 queue_replay :: proc(a: ^Album, to: ksess.Peer_Id, from: knet.Player_Id, id: u8, bytes: []u8) {
-	data := make([]u8, len(bytes))
-	copy(data, bytes)
-	append(&a.replays, Replay{to = to, from = from, id = id, data = data})
+    data := make([]u8, len(bytes))
+    copy(data, bytes)
+    append(&a.replays, Replay{to = to, from = from, id = id, data = data})
 }
 
 // The catch-up sender: casts addressed to one peer under the player who
@@ -204,17 +222,22 @@ queue_replay :: proc(a: ^Album, to: ksess.Peer_Id, from: knet.Player_Id, id: u8,
 // into the host's own shelf on its way out.
 @(private = "file")
 replay_pump :: proc(a: ^Album, budget: int) {
-	ses := a.x.ses
-	if ses == nil || len(a.replays) == 0 {
-		return
-	}
-	left := budget
-	for left > 0 && len(a.replays) > 0 {
-		r := &a.replays[0]
-		if chunk_send(ksess.relay_begin_as(&a.x.relay, r.from), &a.x.relay, r.id, &r.seq, r.data, r.to) {
-			delete(r.data)
-			ordered_remove(&a.replays, 0)
-		}
-		left -= 1
-	}
+    ses := a.x.ses
+
+    if ses == nil || len(a.replays) == 0 {
+        return
+    }
+
+    left := budget
+
+    for left > 0 && len(a.replays) > 0 {
+        r := &a.replays[0]
+
+        if chunk_send(ksess.relay_begin_as(&a.x.relay, r.from), &a.x.relay, r.id, &r.seq, r.data, r.to) {
+            delete(r.data)
+            ordered_remove(&a.replays, 0)
+        }
+
+        left -= 1
+    }
 }

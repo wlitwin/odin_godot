@@ -36,10 +36,10 @@ package play
 //   * THE BAR — presentation off the replicated pct (play.marker fill/follow), yours to draw.
 
 Channel :: struct {
-	target:  u32 `gd:"owner"`, // net id I'm channeling on (0 = idle) — every screen reads it
-	pct:     u8 `gd:"owner"`,  // progress 0..255 — the bar every screen draws
-	acc:     f32,                        // owner-local: float-precise progress 0..1 (pct is its broadcast)
-	claimed: u32,                        // host scratch: the target the claim carried, for the game hook
+    target:  u32 `gd:"owner"`, // net id I'm channeling on (0 = idle) — every screen reads it
+    pct:     u8 `gd:"owner"`, // progress 0..255 — the bar every screen draws
+    acc:     f32, // owner-local: float-precise progress 0..1 (pct is its broadcast)
+    claimed: u32, // host scratch: the target the claim carried, for the game hook
 }
 
 // channel_run — the OWNER's held frame: advance the channel on `target`, taking `seconds` to
@@ -47,27 +47,33 @@ Channel :: struct {
 // — issue the claim right there (`<entity>_<field>_claim_cmd(ctx, self, target)`). Call this only
 // while the hold is live on a found target; call channel_drop the frame it breaks.
 channel_run :: proc(c: ^Channel, target: u32, dt, seconds: f32) -> (done: bool) {
-	if target == 0 {
-		channel_drop(c)
-		return false
-	}
-	if target != c.target {c.acc = 0} // switched mid-hold — restart on the new target
-	c.target = target
-	c.acc = seconds > 0 ? min(c.acc + dt / seconds, 1) : 1
-	c.pct = u8(c.acc * 255)
-	if c.acc >= 1 {
-		channel_drop(c)
-		return true
-	}
-	return false
+    if target == 0 {
+        channel_drop(c)
+        return false
+    }
+
+    if target != c.target {
+        c.acc = 0
+    } // switched mid-hold — restart on the new target
+
+    c.target = target
+    c.acc = seconds > 0 ? min(c.acc + dt / seconds, 1) : 1
+    c.pct = u8(c.acc * 255)
+
+    if c.acc >= 1 {
+        channel_drop(c)
+        return true
+    }
+
+    return false
 }
 
 // channel_drop — the hold broke (released, walked away, target died) or the channel completed:
 // zero the broadcast so every screen's bar vanishes, and the progress with it.
 channel_drop :: proc(c: ^Channel) {
-	c.target = 0
-	c.pct = 0
-	c.acc = 0
+    c.target = 0
+    c.pct = 0
+    c.acc = 0
 }
 
 // channel_claim — the completion, a composed PLAIN command (no prediction: the effect is a host
@@ -77,13 +83,16 @@ channel_drop :: proc(c: ^Channel) {
 // every REAL gate is the hook's, because only the host can check the world.
 @(gd_command)
 channel_claim :: proc(c: ^Channel, target: u32) -> bool {
-	if target == 0 {return false}
-	c.claimed = target
-	return true
+    if target == 0 {
+        return false
+    }
+
+    c.claimed = target
+    return true
 }
 
 // channel_active — is this channel live (for bars and gates). `c.pct`/`c.target` are public;
 // this names the intent.
 channel_active :: proc "contextless" (c: ^Channel) -> bool {
-	return c.target != 0 && c.pct > 0
+    return c.target != 0 && c.pct > 0
 }

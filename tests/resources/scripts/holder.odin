@@ -13,6 +13,6 @@ package resources_scripts
 import gd "godot:godot"
 
 Holder :: struct {
-	owner: gd.Node,
-	data:  ^gd.Resource `gd:"export,resource=ItemData"`,
+    owner: gd.Node,
+    data:  ^gd.Resource `gd:"export,resource=ItemData"`,
 }

@@ -14,16 +14,16 @@ package barrage_powerups
 import gd "godot:godot"
 
 Powerup_Kind :: enum int {
-	RapidFire   = 0,
-	Spread      = 1,
-	Shield      = 2,
-	SlowEnemies = 3,
+    RapidFire   = 0,
+    Spread      = 1,
+    Shield      = 2,
+    SlowEnemies = 3,
 }
 
 PowerupConfig :: struct {
-	owner:     gd.Resource,
-	name:      gd.String `gd:"export"`,
-	kind:      gd.Int    `gd:"export,enum=RapidFire:Spread:Shield:SlowEnemies"`,
-	magnitude: f32       `gd:"export,range=0.1:10:0.1"`, // meaning depends on kind
-	color:     gd.Color  `gd:"export"`, // pickup tint
+    owner:     gd.Resource,
+    name:      gd.String `gd:"export"`,
+    kind:      gd.Int `gd:"export,enum=RapidFire:Spread:Shield:SlowEnemies"`,
+    magnitude: f32 `gd:"export,range=0.1:10:0.1"`, // meaning depends on kind
+    color:     gd.Color `gd:"export"`, // pickup tint
 }

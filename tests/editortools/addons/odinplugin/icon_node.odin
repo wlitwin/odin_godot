@@ -14,5 +14,5 @@ package odinplugin
 import gd "godot:godot"
 
 IconNode :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }

@@ -27,12 +27,12 @@ GROUP_GAME :: "game"
 // find_player returns the player node (it joins GROUP_PLAYER on _ready), or nil. `from` is
 // any node in the tree — we only use it to reach the SceneTree.
 find_player :: proc "contextless" (from: gd.Object) -> gd.Node2d {
-	return gd.first_in_group(from, GROUP_PLAYER)
+    return gd.first_in_group(from, GROUP_PLAYER)
 }
 
 // find_game returns the Game root node (it joins GROUP_GAME on _ready), or nil.
 find_game :: proc "contextless" (from: gd.Object) -> gd.Node {
-	return gd.first_in_group(from, GROUP_GAME)
+    return gd.first_in_group(from, GROUP_GAME)
 }
 
 // damage_enemies_in_radius deals `dmg` to every "enemies" member within `radius` of `center`
@@ -44,29 +44,32 @@ find_game :: proc "contextless" (from: gd.Object) -> gd.Node {
 // further damage).
 // (a context-using proc — it calls enemy_take_damage, which is an ordinary, non-contextless
 // proc; callers are weapon lifecycle procs, which run with the script context established.)
-damage_enemies_in_radius :: proc(
-	from: gd.Object,
-	center: gd.Vector2,
-	radius: f32,
-	dmg: int,
-) -> int {
-	hit := 0
-	for n in gd.nodes_in_group_within(from, GROUP_ENEMIES, center, radius) {
-		e := rt.script_of(n, Enemy)
-		if e == nil {continue}
-		enemy_take_damage(e, dmg)
-		hit += 1
-	}
-	return hit
+damage_enemies_in_radius :: proc(from: gd.Object, center: gd.Vector2, radius: f32, dmg: int) -> int {
+    hit := 0
+
+    for n in gd.nodes_in_group_within(from, GROUP_ENEMIES, center, radius) {
+        e := rt.script_of(n, Enemy)
+
+        if e == nil {
+            continue
+        }
+
+        enemy_take_damage(e, dmg)
+        hit += 1
+    }
+
+    return hit
 }
 
 // rotate2 rotates `v` by `radians` (used to fan out multishot bullets / orbit blades).
 rotate2 :: proc "contextless" (v: gd.Vector2, radians: f32) -> gd.Vector2 {
-	c := math.cos(radians)
-	s := math.sin(radians)
-	return gd.Vector2{v.x * c - v.y * s, v.x * s + v.y * c}
+    c := math.cos(radians)
+    s := math.sin(radians)
+    return gd.Vector2{v.x * c - v.y * s, v.x * s + v.y * c}
 }
 
 // rand_range — a plain (context-using) uniform in [lo, hi). Wrapped here so the call sites
 // read cleanly.
-rand_range :: proc(lo, hi: f32) -> f32 {return rand.float32_range(lo, hi)}
+rand_range :: proc(lo, hi: f32) -> f32 {
+    return rand.float32_range(lo, hi)
+}

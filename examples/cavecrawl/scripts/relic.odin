@@ -19,10 +19,10 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
 Relic :: struct {
-	owner:  gd.Node2d,
-	glyph:  gd.Label `gd:"onready=Glyph"`,
-	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"owner,wire=f16"`,
+    owner:  gd.Node2d,
+    glyph:  gd.Label `gd:"onready=Glyph"`,
+    net_id: knet.Net_Id,
+    x, y:   f32 `gd:"owner,wire=f16"`,
 }
 
 // Take it (only meaningful while it rests — the consequence checks the
@@ -30,8 +30,11 @@ Relic :: struct {
 // decides).
 @(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 relic_grab :: proc(self: ^Relic, px: f32, py: f32) -> bool {
-	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
-	return true
+    if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {
+        return false
+    }
+
+    return true
 }
 
 // THE HANDOFF ITSELF, host only: first-come — a later grab finds it carried
@@ -39,9 +42,9 @@ relic_grab :: proc(self: ^Relic, px: f32, py: f32) -> bool {
 // accepted grab is a harmless no-op).
 @(gd_half)
 relic_grab_then :: proc(game: ^CaveLobby, self: ^Relic, by: knet.Player_Id, px: f32, py: f32) {
-	if ksess.session_owner_of(&game.ses, self.net_id) == knet.PLAYER_ID_INVALID {
-		ksess.session_set_owner(&game.ses, self.net_id, by)
-	}
+    if ksess.session_owner_of(&game.ses, self.net_id) == knet.PLAYER_ID_INVALID {
+        ksess.session_set_owner(&game.ses, self.net_id, by)
+    }
 }
 
 // Set it down where the carrier stands. Only the carrier may — the
@@ -49,16 +52,16 @@ relic_grab_then :: proc(game: ^CaveLobby, self: ^Relic, by: knet.Player_Id, px: 
 // replicated.
 @(gd_command)
 relic_drop :: proc(self: ^Relic) -> bool {
-	return true
+    return true
 }
 
 @(gd_half)
 relic_drop_then :: proc(game: ^CaveLobby, self: ^Relic, by: knet.Player_Id) {
-	if ksess.session_owner_of(&game.ses, self.net_id) == by {
-		ksess.session_set_owner(&game.ses, self.net_id, knet.PLAYER_ID_INVALID)
-	}
+    if ksess.session_owner_of(&game.ses, self.net_id) == by {
+        ksess.session_set_owner(&game.ses, self.net_id, knet.PLAYER_ID_INVALID)
+    }
 }
 
 relic_process :: proc(self: ^Relic, delta: f64) {
-	gd.node2d_set_position(self.owner, {self.x, self.y})
+    gd.node2d_set_position(self.owner, {self.x, self.y})
 }

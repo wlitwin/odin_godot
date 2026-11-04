@@ -8,12 +8,12 @@ package phase35_scripts
 import gd "godot:godot"
 
 Counter :: struct {
-	owner: gd.Object,
-	count: gd.Int `gd:"export"`,
+    owner: gd.Object,
+    count: gd.Int `gd:"export"`,
 }
 
 @(gd_method)
 counter_increment :: proc(self: ^Counter) -> int {
-	self.count += 1
-	return int(self.count)
+    self.count += 1
+    return int(self.count)
 }

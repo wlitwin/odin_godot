@@ -13,7 +13,7 @@ package scrapyard_defs
 import gd "godot:godot"
 
 ProjectileDef :: struct {
-	owner: gd.Resource,
-	speed: f32 `gd:"export,range=1:40:0.5"`, // px per NET tick (60Hz)
-	ttl: gd.Int `gd:"export,range=1:600:1"`, // ticks to live / fuse / reach term
+    owner: gd.Resource,
+    speed: f32 `gd:"export,range=1:40:0.5"`, // px per NET tick (60Hz)
+    ttl: gd.Int `gd:"export,range=1:600:1"`, // ticks to live / fuse / reach term
 }

@@ -23,47 +23,47 @@ import ids "../../shared/ids"
 local_hits: int
 
 Enemy :: struct {
-	owner:      gd.Node,
-	hp:         gd.Int `gd:"export"`,
-	ready_mark: gd.Int `gd:"export"`,
+    owner:      gd.Node,
+    hp:         gd.Int `gd:"export"`,
+    ready_mark: gd.Int `gd:"export"`,
 }
 
 enemy_ready :: proc(self: ^Enemy) {
-	self.ready_mark = 1
+    self.ready_mark = 1
 }
 
 // The shared tuning constant, as THIS dll compiled it — must equal the main module's.
 @(gd_method)
 enemy_shared_step :: proc(self: ^Enemy) -> int {
-	return ids.STEP
+    return ids.STEP
 }
 
 // brand(.Enemy) == 200 + STEP, from the shared pure proc in the other dll's copy.
 @(gd_method)
 enemy_brand :: proc(self: ^Enemy) -> int {
-	return ids.brand(.Enemy)
+    return ids.brand(.Enemy)
 }
 
 // The shared payload struct, built on this side.
 @(gd_method)
 enemy_pack :: proc(self: ^Enemy, amount: gd.Int) -> int {
-	return ids.payload_code(ids.Payload{kind = .Enemy, amount = i32(amount)})
+    return ids.payload_code(ids.Payload{kind = .Enemy, amount = i32(amount)})
 }
 
 // The cross-module entry point the main module invokes via Object::call.
 @(gd_method)
 enemy_take_hit :: proc(self: ^Enemy, amount: gd.Int) {
-	self.hp -= amount
-	local_hits += 1
+    self.hp -= amount
+    local_hits += 1
 }
 
 @(gd_method)
 enemy_hits :: proc(self: ^Enemy) -> int {
-	return local_hits
+    return local_hits
 }
 
 // Hot-reload hook: fires when THIS module's dll is swapped — a shared edit must swap
 // both modules, so both hooks fire.
 enemy_reload :: proc(self: ^Enemy) {
-	gd.print("ENEMY_RELOAD_FIRED")
+    gd.print("ENEMY_RELOAD_FIRED")
 }

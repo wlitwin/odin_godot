@@ -25,9 +25,9 @@ import "../util"
 HUD_V :: #config(HUD_V, 1)
 
 when HUD_V == 2 {
-	GAIN :: 100
+    GAIN :: 100
 } else {
-	GAIN :: 10
+    GAIN :: 10
 }
 
 // A SUBPACKAGE-local package global. It lives in the module's one dll like every other
@@ -35,39 +35,39 @@ when HUD_V == 2 {
 hud_updates: int
 
 Hud :: struct {
-	owner:      gd.Node,
-	shown:      gd.Int `gd:"export"`,
-	ready_mark: gd.Int `gd:"export"`,
-	// A typed signal declared in a subpackage — the emit helper is generated into
-	// ui/odin_godot_scripts.gen.odin like every other section.
-	bumped:     gd.Signal1(int) `gd:"args=value"`,
+    owner:      gd.Node,
+    shown:      gd.Int `gd:"export"`,
+    ready_mark: gd.Int `gd:"export"`,
+    // A typed signal declared in a subpackage — the emit helper is generated into
+    // ui/odin_godot_scripts.gen.odin like every other section.
+    bumped:     gd.Signal1(int) `gd:"args=value"`,
 }
 
 hud_ready :: proc(self: ^Hud) {
-	self.ready_mark = 1
+    self.ready_mark = 1
 }
 
 @(gd_method)
 hud_bump :: proc(self: ^Hud) -> int {
-	self.shown += GAIN
-	hud_updates += 1
-	hud_emit_bumped(self, self.shown)
-	return int(self.shown)
+    self.shown += GAIN
+    hud_updates += 1
+    hud_emit_bumped(self, self.shown)
+    return int(self.shown)
 }
 
 // Which build (v1/v2) is live — observed by the harness across the reload.
 @(gd_method)
 hud_gain :: proc(self: ^Hud) -> int {
-	return GAIN
+    return GAIN
 }
 
 // The shared HELPER subpackage, reached from a SIBLING subpackage (`../util`).
 @(gd_method)
 hud_base :: proc(self: ^Hud) -> int {
-	return util.STEP
+    return util.STEP
 }
 
 @(gd_method)
 hud_updates_count :: proc(self: ^Hud) -> int {
-	return hud_updates
+    return hud_updates
 }

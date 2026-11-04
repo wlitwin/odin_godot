@@ -30,7 +30,7 @@ package play
 // cooldown wants (no machine-gun after a hitch); a fixed-cadence scheduler would
 // want the accumulating form — a different primitive if a game ever needs it.
 Pace :: struct($T: typeid) {
-	next: T,
+    next: T,
 }
 
 // Deadlines is Pace keyed by a small enum `K` — one bundle of re-armable deadlines
@@ -47,20 +47,20 @@ Pace :: struct($T: typeid) {
 // Host scratch, off the wire like Pace. (The wrapper is a named home for discovery;
 // a raw `[Boss_Clock]play.Pace(u64)` behaves identically if you prefer no wrapper.)
 Deadlines :: struct($K: typeid, $T: typeid) {
-	at: [K]Pace(T),
+    at: [K]Pace(T),
 }
 
 // due reports whether the clock has reached the armed deadline. Cheap and pure —
 // safe inside a compound guard (`play.due(&p, tick) && in_range`), and it does NOT
 // re-arm, so pair it with `arm` when the interval depends on state read afterward.
 due :: proc(p: ^Pace($T), now: T) -> bool {
-	return now >= p.next
+    return now >= p.next
 }
 
 // arm sets the next deadline to the ABSOLUTE moment `at` (e.g. now + cooldown, or a
 // spawn wind-up like tick + 90). The re-arm half of the split idiom.
 arm :: proc(p: ^Pace($T), at: T) {
-	p.next = at
+    p.next = at
 }
 
 // ready is the recurring-cooldown one-liner: if the deadline has passed, re-arm to
@@ -68,9 +68,10 @@ arm :: proc(p: ^Pace($T), at: T) {
 // the deadline. Short-circuits cleanly inside a guard, e.g.
 // `in_range && play.ready(&p, tick, cd)` only re-arms when in range AND due.
 ready :: proc(p: ^Pace($T), now, interval: T) -> bool {
-	if now < p.next {
-		return false
-	}
-	p.next = now + interval
-	return true
+    if now < p.next {
+        return false
+    }
+
+    p.next = now + interval
+    return true
 }

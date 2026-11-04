@@ -1,7 +1,7 @@
 # odin_godot — top-level convenience targets. All real work happens inside the Nix dev
 # shell (toolchain: odin, emcc, godot). These targets wrap `nix develop --command`.
 
-.PHONY: test showcase web bindings api-dump help
+.PHONY: test showcase web bindings api-dump format help
 
 help:
 	@echo "odin_godot targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make web       - build + web-export + (if a browser is present) browser-verify"
 	@echo "  make bindings  - regenerate the godot/ binding from extension_api.json"
 	@echo "  make api-dump  - dump extension_api.json + gdextension_interface.h from \$$GODOT"
+	@echo "  make format    - format the hand-written Odin code (tools/format/format.sh)"
 
 # Full suite. One command, everything green (web is browser-gated — see tests/run_all.sh).
 test:
@@ -24,6 +25,10 @@ web:
 
 bindings:
 	nix develop --command make -C bindgen generate
+
+# Every statement on its own line, then odinfmt; see tools/format/format.sh --help.
+format:
+	nix develop --command bash tools/format/format.sh
 
 # Regenerate the raw engine inputs in the repo root: extension_api.json +
 # gdextension_interface.h. Both are GITIGNORED, so a fresh clone must run this once

@@ -5,9 +5,10 @@ package bad_pointer_wire
 import gd "godot:godot"
 
 Nested :: struct {
-	target: ^u8,
+    target: ^u8,
 }
+
 BadPointerWire :: struct {
-	owner: gd.Node,
-	state: Nested `gd:"replicate"`,
+    owner: gd.Node,
+    state: Nested `gd:"replicate"`,
 }

@@ -19,16 +19,16 @@ package odinplugin
 import gd "godot:godot"
 
 OdinEditorPlugin :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 odin_editor_plugin_enter_tree :: proc(self: ^OdinEditorPlugin) {
-	// Observable sentinel #1: a log line the headless-editor run greps for.
-	gd.print("EDITORTOOLS_PLUGIN_ENTER_TREE")
-	// Observable sentinel #2: a ProjectSetting a driver could read back.
-	gd.set_setting_int("odin/editor_plugin_entered", 1)
+    // Observable sentinel #1: a log line the headless-editor run greps for.
+    gd.print("EDITORTOOLS_PLUGIN_ENTER_TREE")
+    // Observable sentinel #2: a ProjectSetting a driver could read back.
+    gd.set_setting_int("odin/editor_plugin_entered", 1)
 }
 
 odin_editor_plugin_exit_tree :: proc(self: ^OdinEditorPlugin) {
-	gd.print("EDITORTOOLS_PLUGIN_EXIT_TREE")
+    gd.print("EDITORTOOLS_PLUGIN_EXIT_TREE")
 }

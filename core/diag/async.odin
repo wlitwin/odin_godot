@@ -99,11 +99,11 @@ hash_inputs :: proc(source, abs_path: string) -> u64 {
 make_job :: proc(state: ^Async_State, h: u64, source, abs_path, root, odin_bin: string) -> Validate_Job {
     a := async_alloc()
     return Validate_Job {
-        state    = state,
-        hash     = h,
-        source   = strings.clone(source, a),
+        state = state,
+        hash = h,
+        source = strings.clone(source, a),
         abs_path = strings.clone(abs_path, a),
-        root     = strings.clone(root, a),
+        root = strings.clone(root, a),
         odin_bin = strings.clone(odin_bin, a),
     }
 }
@@ -120,9 +120,11 @@ free_job :: proc(job: Validate_Job) {
 @(private)
 free_diags :: proc(diags: ^[dynamic]Diagnostic) {
     a := async_alloc()
+
     for d in diags {
         delete(d.message, a)
     }
+
     delete(diags^)
     diags^ = nil
 }
@@ -130,9 +132,15 @@ free_diags :: proc(diags: ^[dynamic]Diagnostic) {
 @(private)
 clone_diags :: proc(src: []Diagnostic, allocator := context.allocator) -> []Diagnostic {
     out := make([]Diagnostic, len(src), allocator)
+
     for d, i in src {
-        out[i] = Diagnostic{line = d.line, column = d.column, message = strings.clone(d.message, allocator)}
+        out[i] = Diagnostic {
+            line    = d.line,
+            column  = d.column,
+            message = strings.clone(d.message, allocator),
+        }
     }
+
     return out
 }
 
@@ -183,6 +191,7 @@ worker_entry :: proc(data: rawptr) {
     // Coalesce: if newer content arrived while we ran, kick exactly one fresh worker for it.
     next: Validate_Job
     has_next := false
+
     if state.pending {
         next = state.pending_job
         state.pending = false
@@ -191,6 +200,7 @@ worker_entry :: proc(data: rawptr) {
         state.worker_hash = next.hash
         has_next = true
     }
+
     if has_next {
         spawn_worker(next) // transfers ownership of next's cloned strings
     }
@@ -219,12 +229,16 @@ validate_async :: proc(
     state: ^Async_State,
     source, abs_path, root, odin_bin: string,
     allocator := context.allocator,
-) -> (diags: []Diagnostic, valid: bool) {
+) -> (
+    diags: []Diagnostic,
+    valid: bool,
+) {
     h := hash_inputs(source, abs_path)
 
     // 1. Exact cache hit -> return immediately. The published result has now reached a
     // real `_validate` call, so any pending re-validate poke would be redundant.
     sync.lock(&state.mutex)
+
     if state.have_result && state.result_hash == h {
         state.fresh = false
         out := clone_diags(state.result_diags[:], allocator)
@@ -232,6 +246,7 @@ validate_async :: proc(
         sync.unlock(&state.mutex)
         return out, ok
     }
+
     sync.unlock(&state.mutex)
 
     // 2. TIER 1 — the resident parser (~1ms, in-process). A syntax error is published and
@@ -240,6 +255,7 @@ validate_async :: proc(
     // for OLDER content may later overwrite this slot; its fresh-flag poke makes the editor
     // re-ask for THIS content, which re-parses (~1ms) and republishes — converges.
     syn := parse_syntax(source, abs_path, async_alloc())
+
     if len(syn) > 0 {
         sync.lock(&state.mutex)
         free_diags(&state.result_diags)
@@ -252,6 +268,7 @@ validate_async :: proc(
         sync.unlock(&state.mutex)
         return out, false
     }
+
     delete(syn)
 
     sync.lock(&state.mutex)
@@ -265,6 +282,7 @@ validate_async :: proc(
                 if state.pending {
                     free_job(state.pending_job)
                 }
+
                 state.pending_job = make_job(state, h, source, abs_path, root, odin_bin)
                 state.pending = true
             }
@@ -279,6 +297,7 @@ validate_async :: proc(
     if state.have_result {
         return clone_diags(state.result_diags[:], allocator), state.result_valid
     }
+
     return nil, true
 }
 

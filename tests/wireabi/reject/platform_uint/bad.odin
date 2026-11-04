@@ -5,9 +5,10 @@ package bad_uint_wire
 import gd "godot:godot"
 
 Nested :: struct {
-	count: uint,
+    count: uint,
 }
+
 BadUintWire :: struct {
-	owner: gd.Node,
-	state: Nested `gd:"replicate"`,
+    owner: gd.Node,
+    state: Nested `gd:"replicate"`,
 }

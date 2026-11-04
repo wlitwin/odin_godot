@@ -23,13 +23,13 @@ package survivors_scripts
 import gd "godot:godot"
 
 EnemyConfig :: struct {
-	// A Resource's owner handle is `gd.Resource` (a RefCounted), not a node handle.
-	owner:     gd.Resource,
-	hp:        gd.Int   `gd:"export,range=1:400:1"`, // hit points before it dies
-	speed:     f32      `gd:"export,range=10:200:5"`, // chase speed (px/s) — Inspector slider
-	damage:    gd.Int   `gd:"export,range=1:100:1"`, // contact damage dealt to the player
-	xp_value:  gd.Int   `gd:"export,range=1:100:1"`, // XP dropped (as a gem) on death
-	points:    gd.Int   `gd:"export,range=1:100:1"`, // score awarded on death
-	radius:    f32      `gd:"export,range=4:40:1"`, // body size (px) — scales the polygon + shape
-	color:     gd.Color `gd:"export"`, // body tint, applied to the enemy's Polygon2D
+    // A Resource's owner handle is `gd.Resource` (a RefCounted), not a node handle.
+    owner:    gd.Resource,
+    hp:       gd.Int `gd:"export,range=1:400:1"`, // hit points before it dies
+    speed:    f32 `gd:"export,range=10:200:5"`, // chase speed (px/s) — Inspector slider
+    damage:   gd.Int `gd:"export,range=1:100:1"`, // contact damage dealt to the player
+    xp_value: gd.Int `gd:"export,range=1:100:1"`, // XP dropped (as a gem) on death
+    points:   gd.Int `gd:"export,range=1:100:1"`, // score awarded on death
+    radius:   f32 `gd:"export,range=4:40:1"`, // body size (px) — scales the polygon + shape
+    color:    gd.Color `gd:"export"`, // body tint, applied to the enemy's Polygon2D
 }

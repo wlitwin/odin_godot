@@ -20,9 +20,9 @@ import rt "godot:runtime"
 
 // First field MUST be the owner Object pointer (core writes it at offset 0).
 Ping :: struct {
-	owner: gd.Node,
-	speed: f32, // @export
-	count: gd.Int, // @export (i64)
+    owner: gd.Node,
+    speed: f32, // @export
+    count: gd.Int, // @export (i64)
 }
 
 // ---- cached Variant constructors for the trampolines ----
@@ -39,60 +39,63 @@ ctors_ready: bool
 
 @(private = "file")
 ensure_ctors :: proc "contextless" () {
-	if !ctors_ready {
-		to_int = gdext.get_variant_to_type_constructor(.Int)
-		from_int = gdext.get_variant_from_type_constructor(.Int)
-		to_float = gdext.get_variant_to_type_constructor(.Float)
-		from_float = gdext.get_variant_from_type_constructor(.Float)
-		ctors_ready = true
-	}
+    if !ctors_ready {
+        to_int = gdext.get_variant_to_type_constructor(.Int)
+        from_int = gdext.get_variant_from_type_constructor(.Int)
+        to_float = gdext.get_variant_to_type_constructor(.Float)
+        from_float = gdext.get_variant_from_type_constructor(.Float)
+        ctors_ready = true
+    }
 }
 
 // ---- lifecycle ----
 ping_ready :: proc "c" (self_raw: rawptr) {
-	self := cast(^Ping)self_raw
-	// Only set defaults if GDScript hasn't already written the exports.
-	if self.speed == 0 {self.speed = 1.5}
+    self := cast(^Ping)self_raw
+
+    // Only set defaults if GDScript hasn't already written the exports.
+    if self.speed == 0 {
+        self.speed = 1.5
+    }
 }
 
 // ---- custom methods (uniform rt.Method_Proc trampolines) ----
 
 // add(a: int, b: int) -> int
 ping_add :: proc "c" (self: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr) {
-	ensure_ctors()
-	a, b: i64
-	to_int(&a, args[0])
-	to_int(&b, args[1])
-	r := a + b
-	from_int(ret, &r)
+    ensure_ctors()
+    a, b: i64
+    to_int(&a, args[0])
+    to_int(&b, args[1])
+    r := a + b
+    from_int(ret, &r)
 }
 
 // addf(a: float, b: float) -> float  (exercises the float marshalling path)
 ping_addf :: proc "c" (self: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr) {
-	ensure_ctors()
-	a, b: f64
-	to_float(&a, args[0])
-	to_float(&b, args[1])
-	r := a + b
-	from_float(ret, &r)
+    ensure_ctors()
+    a, b: f64
+    to_float(&a, args[0])
+    to_float(&b, args[1])
+    r := a + b
+    from_float(ret, &r)
 }
 
 // get_speed() -> float  (proves the Odin side sees the GDScript-written @export)
 ping_get_speed :: proc "c" (self_raw: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr) {
-	ensure_ctors()
-	self := cast(^Ping)self_raw
-	r := f64(self.speed)
-	from_float(ret, &r)
+    ensure_ctors()
+    self := cast(^Ping)self_raw
+    r := f64(self.speed)
+    from_float(ret, &r)
 }
 
 // emit_ping(value: int) -> void  (emits the `pinged` signal with a payload)
 ping_emit_ping :: proc "c" (self_raw: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr) {
-	ensure_ctors()
-	self := cast(^Ping)self_raw
-	v: i64
-	to_int(&v, args[0])
-	self.count += v
-	emit_pinged(self, v)
+    ensure_ctors()
+    self := cast(^Ping)self_raw
+    v: i64
+    to_int(&v, args[0])
+    self.count += v
+    emit_pinged(self, v)
 }
 
 // ---- signal emission via the Object::emit_signal method bind ----
@@ -106,30 +109,33 @@ emit_bind: gdext.MethodBindPtr
 emit_ready: bool
 
 emit_pinged :: proc "c" (self: ^Ping, value: i64) {
-	if !emit_ready {
-		pinged_name = gd.new_string_name_cstring("pinged", true)
-		emit_signal_name = gd.new_string_name_cstring("emit_signal", true)
-		emit_bind = gdext.classdb_get_method_bind(gd.object_name_ref(), &emit_signal_name, 4047867050)
-		emit_ready = true
-	}
-	if emit_bind == nil {return}
+    if !emit_ready {
+        pinged_name = gd.new_string_name_cstring("pinged", true)
+        emit_signal_name = gd.new_string_name_cstring("emit_signal", true)
+        emit_bind = gdext.classdb_get_method_bind(gd.object_name_ref(), &emit_signal_name, 4047867050)
+        emit_ready = true
+    }
 
-	value := value
-	sig_arg := gd.variant_from(&pinged_name)
-	val_arg := gd.variant_from(&value)
-	call_args := [2]gdext.VariantPtr{&sig_arg, &val_arg}
-	r := gd.Variant{}
-	gdext.object_method_bind_call(emit_bind, self.owner, &call_args[0], len(call_args), &r, nil)
-	gdext.variant_destroy(&r)
-	gdext.variant_destroy(&sig_arg)
-	gdext.variant_destroy(&val_arg)
+    if emit_bind == nil {
+        return
+    }
+
+    value := value
+    sig_arg := gd.variant_from(&pinged_name)
+    val_arg := gd.variant_from(&value)
+    call_args := [2]gdext.VariantPtr{&sig_arg, &val_arg}
+    r := gd.Variant{}
+    gdext.object_method_bind_call(emit_bind, self.owner, &call_args[0], len(call_args), &r, nil)
+    gdext.variant_destroy(&r)
+    gdext.variant_destroy(&sig_arg)
+    gdext.variant_destroy(&val_arg)
 }
 
 // ---- registration (static backing arrays referenced by the Class_Desc pointer+count tables) ----
 @(private = "file")
 ping_exports := [?]rt.Export {
-	{name = "speed", type = .Float, offset = offset_of(Ping, speed), size = size_of(f32)},
-	{name = "count", type = .Int, offset = offset_of(Ping, count), size = size_of(gd.Int)},
+    {name = "speed", type = .Float, offset = offset_of(Ping, speed), size = size_of(f32)},
+    {name = "count", type = .Int, offset = offset_of(Ping, count), size = size_of(gd.Int)},
 }
 
 @(private = "file")
@@ -141,10 +147,28 @@ emit_arg_types := [?]gdext.Variant_Type{.Int}
 
 @(private = "file")
 ping_methods := [?]rt.Method {
-	{name = "add", trampoline = ping_add, arg_types = raw_data(add_arg_types[:]), arg_types_count = len(add_arg_types), return_type = .Int},
-	{name = "addf", trampoline = ping_addf, arg_types = raw_data(addf_arg_types[:]), arg_types_count = len(addf_arg_types), return_type = .Float},
-	{name = "get_speed", trampoline = ping_get_speed, return_type = .Float},
-	{name = "emit_ping", trampoline = ping_emit_ping, arg_types = raw_data(emit_arg_types[:]), arg_types_count = len(emit_arg_types), return_type = .Nil},
+    {
+        name = "add",
+        trampoline = ping_add,
+        arg_types = raw_data(add_arg_types[:]),
+        arg_types_count = len(add_arg_types),
+        return_type = .Int,
+    },
+    {
+        name = "addf",
+        trampoline = ping_addf,
+        arg_types = raw_data(addf_arg_types[:]),
+        arg_types_count = len(addf_arg_types),
+        return_type = .Float,
+    },
+    {name = "get_speed", trampoline = ping_get_speed, return_type = .Float},
+    {
+        name = "emit_ping",
+        trampoline = ping_emit_ping,
+        arg_types = raw_data(emit_arg_types[:]),
+        arg_types_count = len(emit_arg_types),
+        return_type = .Nil,
+    },
 }
 
 @(private = "file")
@@ -154,32 +178,32 @@ pinged_arg_types := [?]gdext.Variant_Type{.Int}
 
 @(private = "file")
 ping_signals := [?]rt.Signal {
-	{
-		name = "pinged",
-		arg_names = raw_data(pinged_arg_names[:]),
-		arg_names_count = len(pinged_arg_names),
-		arg_types = raw_data(pinged_arg_types[:]),
-		arg_types_count = len(pinged_arg_types),
-	},
+    {
+        name = "pinged",
+        arg_names = raw_data(pinged_arg_names[:]),
+        arg_names_count = len(pinged_arg_names),
+        arg_types = raw_data(pinged_arg_types[:]),
+        arg_types_count = len(pinged_arg_types),
+    },
 }
 
 @(init)
 _register_ping :: proc "contextless" () {
-	rt.register(
-		rt.Class_Desc {
-			name = "Ping",
-			path = "res://scripts/ping.odin",
-			global_name = "Ping",
-			base = "Node",
-			size = size_of(Ping),
-			align = align_of(Ping),
-			lifecycle = rt.Lifecycle{ready = ping_ready},
-			exports = raw_data(ping_exports[:]),
-			exports_count = len(ping_exports),
-			methods = raw_data(ping_methods[:]),
-			methods_count = len(ping_methods),
-			signals = raw_data(ping_signals[:]),
-			signals_count = len(ping_signals),
-		},
-	)
+    rt.register(
+        rt.Class_Desc {
+            name = "Ping",
+            path = "res://scripts/ping.odin",
+            global_name = "Ping",
+            base = "Node",
+            size = size_of(Ping),
+            align = align_of(Ping),
+            lifecycle = rt.Lifecycle{ready = ping_ready},
+            exports = raw_data(ping_exports[:]),
+            exports_count = len(ping_exports),
+            methods = raw_data(ping_methods[:]),
+            methods_count = len(ping_methods),
+            signals = raw_data(ping_signals[:]),
+            signals_count = len(ping_signals),
+        },
+    )
 }

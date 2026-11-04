@@ -37,242 +37,284 @@ MAX_BULLETS :: 16384
 INSTANCE_FLOATS :: 12
 
 Bullet :: struct {
-	pos:    [2]f32,
-	vel:    [2]f32,
-	radius: f32,
-	ttl:    f32, // seconds left; expired bullets are swap-removed
-	hue:    gd.Color,
-	hostile: bool, // true = hurts the player; false = player's, hurts enemies
-	damage: i32,
+    pos:     [2]f32,
+    vel:     [2]f32,
+    radius:  f32,
+    ttl:     f32, // seconds left; expired bullets are swap-removed
+    hue:     gd.Color,
+    hostile: bool, // true = hurts the player; false = player's, hurts enemies
+    damage:  i32,
 }
 
 BulletField :: struct {
-	owner: gd.Node2d,
+    owner:         gd.Node2d,
 
-	// ---- typed signal fields (the cross-module OUTPUT — enemies/player listen) ----
-	player_hit: gd.Signal1(int) `gd:"args=damage"`, // a hostile bullet reached the player
-	// SignalN carries a struct payload: which enemy instance, how hard (docs: signals).
-	// enemy_id is an engine ObjectID: ALWAYS i64, never `int` — Odin's int is 32-bit
-	// on the wasm32 web target and would truncate it (enemies become unkillable).
-	enemy_hit:  gd.SignalN(struct {
-		enemy_id: i64,
-		damage:   int,
-	}), // SignalN: the FIELD NAMES are the arg names (no args= tag)
+    // ---- typed signal fields (the cross-module OUTPUT — enemies/player listen) ----
+    player_hit:    gd.Signal1(int) `gd:"args=damage"`, // a hostile bullet reached the player
+    // SignalN carries a struct payload: which enemy instance, how hard (docs: signals).
+    // enemy_id is an engine ObjectID: ALWAYS i64, never `int` — Odin's int is 32-bit
+    // on the wasm32 web target and would truncate it (enemies become unkillable).
+    enemy_hit:     gd.SignalN(struct {
+            enemy_id: i64,
+            damage:   int,
+        }), // SignalN: the FIELD NAMES are the arg names (no args= tag)
 
-	// ---- Inspector tunables ----
-	bullet_scale: f32 `gd:"export,range=2:16:1"`, // quad size in px
-	bounds_pad:   f32 `gd:"export,range=0:400:10"`, // how far offscreen bullets survive
+    // ---- Inspector tunables ----
+    bullet_scale:  f32 `gd:"export,range=2:16:1"`, // quad size in px
+    bounds_pad:    f32 `gd:"export,range=0:400:10"`, // how far offscreen bullets survive
 
-	// ---- runtime (untagged -> private) ----
-	count:      int,
-	bullets:    #soa[MAX_BULLETS]Bullet,
-	multimesh:  gd.Rid,
-	quad:       gd.Quad_Mesh, // kept referenced so its RID stays alive
-	buffer:     gd.Packed_Float32_Array, // reused every frame
-	player:     gd.Object, // resolved lazily from the "player" group
-	player_radius: f32,
-	// enemies register/unregister themselves (by engine call) for player-bullet hits.
-	// ids are engine ObjectIDs — i64 (see enemy_hit above; `int` truncates on wasm32).
-	enemy_ids:  [256]i64,
-	enemy_pos:  [256][2]f32,
-	enemy_radius: [256]f32,
-	enemy_count: int,
+    // ---- runtime (untagged -> private) ----
+    count:         int,
+    bullets:       #soa[MAX_BULLETS]Bullet,
+    multimesh:     gd.Rid,
+    quad:          gd.Quad_Mesh, // kept referenced so its RID stays alive
+    buffer:        gd.Packed_Float32_Array, // reused every frame
+    player:        gd.Object, // resolved lazily from the "player" group
+    player_radius: f32,
+    // enemies register/unregister themselves (by engine call) for player-bullet hits.
+    // ids are engine ObjectIDs — i64 (see enemy_hit above; `int` truncates on wasm32).
+    enemy_ids:     [256]i64,
+    enemy_pos:     [256][2]f32,
+    enemy_radius:  [256]f32,
+    enemy_count:   int,
 }
 
 bullet_field_ready :: proc(self: ^BulletField) {
-	// Scene-entry sentinel: proves the barrage module (a SECOND isolated module) booted —
-	// entering the game scene from the title is the web smoke test's gameplay assertion.
-	gd.print_str("BARRAGE_FIELD_READY")
-	if self.bullet_scale == 0 {self.bullet_scale = 6}
-	if self.bounds_pad == 0 {self.bounds_pad = 64}
+    // Scene-entry sentinel: proves the barrage module (a SECOND isolated module) booted —
+    // entering the game scene from the title is the web smoke test's gameplay assertion.
+    gd.print_str("BARRAGE_FIELD_READY")
 
-	// One quad mesh + one multimesh, allocated once for the pool's capacity; the
-	// per-frame instance COUNT is set with multimesh_set_visible_instances.
-	rs := gd.singleton_rendering_server()
-	self.quad = gd.new_quad_mesh()
-	gd.plane_mesh_set_size(cast(gd.Plane_Mesh)self.quad, gd.Vector2{1, 1}) // unit quad; per-bullet scale rides the transform
-	self.multimesh = gd.rendering_server_multimesh_create(rs)
-	gd.rendering_server_multimesh_set_mesh(
-		rs,
-		self.multimesh,
-		gd.resource_get_rid(cast(gd.Resource)self.quad),
-	)
-	gd.rendering_server_multimesh_allocate_data(
-		rs,
-		self.multimesh,
-		MAX_BULLETS,
-		.Multimesh_Transform_2d,
-		true,  // per-instance color
-		false, // no custom data
-		false, // no indirect
-	)
-	// Attach the multimesh to THIS node's canvas item — one retained draw command; the
-	// buffer updates animate it from then on.
-	gd.rendering_server_canvas_item_add_multimesh(
-		rs,
-		gd.canvas_item_get_canvas_item(cast(gd.Canvas_Item)self.owner),
-		self.multimesh,
-		gd.Rid{},
-	)
-	self.buffer = gd.new_packed_float32_array_default()
-	gd.packed_float32_array_resize(&self.buffer, MAX_BULLETS * INSTANCE_FLOATS)
-	// Discoverability is declarative: the `//gd:group bullet_field` marker up top joins
-	// the group at READY — the other modules gd.first_in_group("bullet_field") us.
+    if self.bullet_scale == 0 {
+        self.bullet_scale = 6
+    }
+
+    if self.bounds_pad == 0 {
+        self.bounds_pad = 64
+    }
+
+    // One quad mesh + one multimesh, allocated once for the pool's capacity; the
+    // per-frame instance COUNT is set with multimesh_set_visible_instances.
+    rs := gd.singleton_rendering_server()
+    self.quad = gd.new_quad_mesh()
+    gd.plane_mesh_set_size(cast(gd.Plane_Mesh)self.quad, gd.Vector2{1, 1}) // unit quad; per-bullet scale rides the transform
+    self.multimesh = gd.rendering_server_multimesh_create(rs)
+    gd.rendering_server_multimesh_set_mesh(rs, self.multimesh, gd.resource_get_rid(cast(gd.Resource)self.quad))
+    gd.rendering_server_multimesh_allocate_data(
+        rs,
+        self.multimesh,
+        MAX_BULLETS,
+        .Multimesh_Transform_2d,
+        true, // per-instance color
+        false, // no custom data
+        false, // no indirect
+    )
+    // Attach the multimesh to THIS node's canvas item — one retained draw command; the
+    // buffer updates animate it from then on.
+    gd.rendering_server_canvas_item_add_multimesh(
+        rs,
+        gd.canvas_item_get_canvas_item(cast(gd.Canvas_Item)self.owner),
+        self.multimesh,
+        gd.Rid{},
+    )
+    self.buffer = gd.new_packed_float32_array_default()
+    gd.packed_float32_array_resize(&self.buffer, MAX_BULLETS * INSTANCE_FLOATS)
+    // Discoverability is declarative: the `//gd:group bullet_field` marker up top joins
+    // the group at READY — the other modules gd.first_in_group("bullet_field") us.
 }
 
 // ---- emitters: the engine-callable API other modules drive ----------------
 
 // spawn_one — the primitive every pattern reduces to.
 @(gd_method)
-bullet_field_spawn_one :: proc(self: ^BulletField, pos: gd.Vector2, vel: gd.Vector2, hostile: gd.Bool, damage: gd.Int) {
-	if self.count >= MAX_BULLETS {return}
-	i := self.count
-	self.count += 1
-	self.bullets[i] = Bullet {
-		pos     = {pos.x, pos.y},
-		vel     = {vel.x, vel.y},
-		radius  = self.bullet_scale * 0.5,
-		ttl     = 8,
-		hostile = bool(hostile),
-		damage  = i32(damage),
-		hue     = hostile ? gd.Color{1.0, 0.35, 0.35, 1.0} : gd.Color{0.4, 0.9, 1.0, 1.0},
-	}
+bullet_field_spawn_one :: proc(
+    self: ^BulletField,
+    pos: gd.Vector2,
+    vel: gd.Vector2,
+    hostile: gd.Bool,
+    damage: gd.Int,
+) {
+    if self.count >= MAX_BULLETS {
+        return
+    }
+
+    i := self.count
+    self.count += 1
+    self.bullets[i] = Bullet {
+        pos     = {pos.x, pos.y},
+        vel     = {vel.x, vel.y},
+        radius  = self.bullet_scale * 0.5,
+        ttl     = 8,
+        hostile = bool(hostile),
+        damage  = i32(damage),
+        hue     = hostile ? gd.Color{1.0, 0.35, 0.35, 1.0} : gd.Color{0.4, 0.9, 1.0, 1.0},
+    }
 }
 
 // spawn_ring — `n` bullets in a circle (the boss's bread and butter).
 @(gd_method)
-bullet_field_spawn_ring :: proc(self: ^BulletField, pos: gd.Vector2, n: gd.Int, speed: f64, phase: f64, damage: gd.Int) {
-	for k in 0 ..< int(n) {
-		a := f32(phase) + f32(k) * math.TAU / f32(n)
-		v := gd.Vector2{math.cos(a) * f32(speed), math.sin(a) * f32(speed)}
-		bullet_field_spawn_one(self, pos, v, true, damage)
-	}
+bullet_field_spawn_ring :: proc(
+    self: ^BulletField,
+    pos: gd.Vector2,
+    n: gd.Int,
+    speed: f64,
+    phase: f64,
+    damage: gd.Int,
+) {
+    for k in 0 ..< int(n) {
+        a := f32(phase) + f32(k) * math.TAU / f32(n)
+        v := gd.Vector2{math.cos(a) * f32(speed), math.sin(a) * f32(speed)}
+        bullet_field_spawn_one(self, pos, v, true, damage)
+    }
 }
 
 // spawn_aimed — a spread of `n` bullets fanned around the direction to `target`.
 @(gd_method)
-bullet_field_spawn_aimed :: proc(self: ^BulletField, pos: gd.Vector2, target: gd.Vector2, n: gd.Int, speed: f64, spread: f64, hostile: gd.Bool, damage: gd.Int) {
-	base := math.atan2(target.y - pos.y, target.x - pos.x)
-	for k in 0 ..< int(n) {
-		t := int(n) == 1 ? 0.5 : f32(k) / f32(int(n) - 1)
-		a := base + (t - 0.5) * f32(spread)
-		v := gd.Vector2{math.cos(a) * f32(speed), math.sin(a) * f32(speed)}
-		bullet_field_spawn_one(self, pos, v, hostile, damage)
-	}
+bullet_field_spawn_aimed :: proc(
+    self: ^BulletField,
+    pos: gd.Vector2,
+    target: gd.Vector2,
+    n: gd.Int,
+    speed: f64,
+    spread: f64,
+    hostile: gd.Bool,
+    damage: gd.Int,
+) {
+    base := math.atan2(target.y - pos.y, target.x - pos.x)
+
+    for k in 0 ..< int(n) {
+        t := int(n) == 1 ? 0.5 : f32(k) / f32(int(n) - 1)
+        a := base + (t - 0.5) * f32(spread)
+        v := gd.Vector2{math.cos(a) * f32(speed), math.sin(a) * f32(speed)}
+        bullet_field_spawn_one(self, pos, v, hostile, damage)
+    }
 }
 
 @(gd_method)
 bullet_field_clear_hostile :: proc(self: ^BulletField) {
-	// A shield powerup wipes the screen: swap-remove every hostile bullet.
-	i := 0
-	for i < self.count {
-		if self.bullets[i].hostile {
-			self.count -= 1
-			self.bullets[i] = self.bullets[self.count]
-		} else {
-			i += 1
-		}
-	}
+    // A shield powerup wipes the screen: swap-remove every hostile bullet.
+    i := 0
+
+    for i < self.count {
+        if self.bullets[i].hostile {
+            self.count -= 1
+            self.bullets[i] = self.bullets[self.count]
+        } else {
+            i += 1
+        }
+    }
 }
 
 @(gd_method)
 bullet_field_live_count :: proc(self: ^BulletField) -> gd.Int {
-	return gd.Int(self.count)
+    return gd.Int(self.count)
 }
 
 // ---- enemy registry: enemies opt in to player-bullet collision ------------
 
 @(gd_method)
 bullet_field_register_enemy :: proc(self: ^BulletField, id: gd.Int, pos: gd.Vector2, radius: f64) {
-	// Update-or-add: enemies re-register each physics tick with their current position
-	// (dumb and robust across module boundaries — no lifetime coupling).
-	for k in 0 ..< self.enemy_count {
-		if self.enemy_ids[k] == i64(id) {
-			self.enemy_pos[k] = {pos.x, pos.y}
-			self.enemy_radius[k] = f32(radius)
-			return
-		}
-	}
-	if self.enemy_count >= len(self.enemy_ids) {return}
-	self.enemy_ids[self.enemy_count] = i64(id)
-	self.enemy_pos[self.enemy_count] = {pos.x, pos.y}
-	self.enemy_radius[self.enemy_count] = f32(radius)
-	self.enemy_count += 1
+    // Update-or-add: enemies re-register each physics tick with their current position
+    // (dumb and robust across module boundaries — no lifetime coupling).
+    for k in 0 ..< self.enemy_count {
+        if self.enemy_ids[k] == i64(id) {
+            self.enemy_pos[k] = {pos.x, pos.y}
+            self.enemy_radius[k] = f32(radius)
+            return
+        }
+    }
+
+    if self.enemy_count >= len(self.enemy_ids) {
+        return
+    }
+
+    self.enemy_ids[self.enemy_count] = i64(id)
+    self.enemy_pos[self.enemy_count] = {pos.x, pos.y}
+    self.enemy_radius[self.enemy_count] = f32(radius)
+    self.enemy_count += 1
 }
 
 @(gd_method)
 bullet_field_unregister_enemy :: proc(self: ^BulletField, id: gd.Int) {
-	for k in 0 ..< self.enemy_count {
-		if self.enemy_ids[k] == i64(id) {
-			self.enemy_count -= 1
-			self.enemy_ids[k] = self.enemy_ids[self.enemy_count]
-			self.enemy_pos[k] = self.enemy_pos[self.enemy_count]
-			self.enemy_radius[k] = self.enemy_radius[self.enemy_count]
-			return
-		}
-	}
+    for k in 0 ..< self.enemy_count {
+        if self.enemy_ids[k] == i64(id) {
+            self.enemy_count -= 1
+            self.enemy_ids[k] = self.enemy_ids[self.enemy_count]
+            self.enemy_pos[k] = self.enemy_pos[self.enemy_count]
+            self.enemy_radius[k] = self.enemy_radius[self.enemy_count]
+            return
+        }
+    }
 }
 
 // ---- simulation ------------------------------------------------------------
 
 bullet_field_physics_process :: proc(self: ^BulletField, delta: f64) {
-	dt := f32(delta)
-	// Player position/size, refreshed lazily from the "player" group (cross-module: the
-	// Player class lives in the MAIN module; we only ever hold an engine Object handle).
-	px, py, prad, have_player := field_player_probe(self)
+    dt := f32(delta)
+    // Player position/size, refreshed lazily from the "player" group (cross-module: the
+    // Player class lives in the MAIN module; we only ever hold an engine Object handle).
+    px, py, prad, have_player := field_player_probe(self)
 
-	// The hot loop: integrate + expire + collide, swap-remove keeps the pool dense.
-	// #soa means each field access below streams through its own contiguous array.
-	i := 0
-	for i < self.count {
-		b := &self.bullets[i]
-		b.pos += b.vel * dt
-		b.ttl -= dt
+    // The hot loop: integrate + expire + collide, swap-remove keeps the pool dense.
+    // #soa means each field access below streams through its own contiguous array.
+    i := 0
 
-		dead := b.ttl <= 0
-		if !dead {
-			if b.hostile {
-				if have_player {
-					d := b.pos - [2]f32{px, py}
-					r := b.radius + prad
-					if d.x * d.x + d.y * d.y < r * r {
-						bullet_field_emit_player_hit(self, i64(b.damage))
-						dead = true
-					}
-				}
-			} else {
-				for k in 0 ..< self.enemy_count {
-					d := b.pos - self.enemy_pos[k]
-					r := b.radius + self.enemy_radius[k]
-					if d.x * d.x + d.y * d.y < r * r {
-						bullet_field_emit_enemy_hit(self, self.enemy_ids[k], i64(b.damage))
-						dead = true
-						break
-					}
-				}
-			}
-		}
+    for i < self.count {
+        b := &self.bullets[i]
+        b.pos += b.vel * dt
+        b.ttl -= dt
 
-		if dead {
-			self.count -= 1
-			self.bullets[i] = self.bullets[self.count]
-		} else {
-			i += 1
-		}
-	}
+        dead := b.ttl <= 0
 
-	field_upload_buffer(self)
+        if !dead {
+            if b.hostile {
+                if have_player {
+                    d := b.pos - [2]f32{px, py}
+                    r := b.radius + prad
+
+                    if d.x * d.x + d.y * d.y < r * r {
+                        bullet_field_emit_player_hit(self, i64(b.damage))
+                        dead = true
+                    }
+                }
+            } else {
+                for k in 0 ..< self.enemy_count {
+                    d := b.pos - self.enemy_pos[k]
+                    r := b.radius + self.enemy_radius[k]
+
+                    if d.x * d.x + d.y * d.y < r * r {
+                        bullet_field_emit_enemy_hit(self, self.enemy_ids[k], i64(b.damage))
+                        dead = true
+                        break
+                    }
+                }
+            }
+        }
+
+        if dead {
+            self.count -= 1
+            self.bullets[i] = self.bullets[self.count]
+        } else {
+            i += 1
+        }
+    }
+
+    field_upload_buffer(self)
 }
 
 @(private = "file")
 field_player_probe :: proc(self: ^BulletField) -> (px, py, prad: f32, ok: bool) {
-	if self.player == nil {
-		self.player = gd.first_in_group(self.owner, "player")
-		if self.player == nil {return}
-		self.player_radius = 10
-	}
-	p := gd.node2d_get_position(cast(gd.Node2d)self.player)
-	return p.x, p.y, self.player_radius, true
+    if self.player == nil {
+        self.player = gd.first_in_group(self.owner, "player")
+
+        if self.player == nil {
+            return
+        }
+
+        self.player_radius = 10
+    }
+
+    p := gd.node2d_get_position(cast(gd.Node2d)self.player)
+    return p.x, p.y, self.player_radius, true
 }
 
 // Flatten live bullets into the multimesh instance buffer. The packed array was
@@ -280,27 +322,29 @@ field_player_probe :: proc(self: ^BulletField) -> (px, py, prad: f32, ok: bool) 
 // upload is one memcpy-shaped loop plus one RenderingServer call.
 @(private = "file")
 field_upload_buffer :: proc(self: ^BulletField) {
-	rs := gd.singleton_rendering_server()
-	data := self.buffer.data_unsafe
-	s := self.bullet_scale
-	for i in 0 ..< self.count {
-		pos := self.bullets[i].pos
-		hue := self.bullets[i].hue
-		o := i * INSTANCE_FLOATS
-		// transform2d rows: [xx xy 0 ox] [yx yy 0 oy] — axis-aligned scaled quad.
-		data[o + 0] = s
-		data[o + 1] = 0
-		data[o + 2] = 0
-		data[o + 3] = pos.x
-		data[o + 4] = 0
-		data[o + 5] = s
-		data[o + 6] = 0
-		data[o + 7] = pos.y
-		data[o + 8] = hue.r
-		data[o + 9] = hue.g
-		data[o + 10] = hue.b
-		data[o + 11] = hue.a
-	}
-	gd.rendering_server_multimesh_set_buffer(rs, self.multimesh, self.buffer)
-	gd.rendering_server_multimesh_set_visible_instances(rs, self.multimesh, gd.Int(self.count))
+    rs := gd.singleton_rendering_server()
+    data := self.buffer.data_unsafe
+    s := self.bullet_scale
+
+    for i in 0 ..< self.count {
+        pos := self.bullets[i].pos
+        hue := self.bullets[i].hue
+        o := i * INSTANCE_FLOATS
+        // transform2d rows: [xx xy 0 ox] [yx yy 0 oy] — axis-aligned scaled quad.
+        data[o + 0] = s
+        data[o + 1] = 0
+        data[o + 2] = 0
+        data[o + 3] = pos.x
+        data[o + 4] = 0
+        data[o + 5] = s
+        data[o + 6] = 0
+        data[o + 7] = pos.y
+        data[o + 8] = hue.r
+        data[o + 9] = hue.g
+        data[o + 10] = hue.b
+        data[o + 11] = hue.a
+    }
+
+    gd.rendering_server_multimesh_set_buffer(rs, self.multimesh, self.buffer)
+    gd.rendering_server_multimesh_set_visible_instances(rs, self.multimesh, gd.Int(self.count))
 }

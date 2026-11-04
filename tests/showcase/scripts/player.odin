@@ -12,8 +12,8 @@ package showcase_scripts
 import gd "godot:godot"
 
 Player :: struct {
-	owner: gd.Node2d, // base is CharacterBody2D (a Node2d); owner handle typed as Node2d.
-	speed: f32 `gd:"export"`,
+    owner: gd.Node2d, // base is CharacterBody2D (a Node2d); owner handle typed as Node2d.
+    speed: f32 `gd:"export"`,
 }
 
 // DEBUGGER FIXTURE — tests/debug_launch renders this file-scope String_Name through the
@@ -24,19 +24,22 @@ Player :: struct {
 left_name: gd.String_Name
 
 player_ready :: proc(self: ^Player) {
-	if self.speed == 0 {self.speed = 220}
-	left_name = gd.sname("ui_left")
-	// A fresh game starts at score 0 (shared module reset).
-	game_state_reset()
-	gd.node2d_set_position(self.owner, gd.Vector2{40, 100})
+    if self.speed == 0 {
+        self.speed = 220
+    }
+
+    left_name = gd.sname("ui_left")
+    // A fresh game starts at score 0 (shared module reset).
+    game_state_reset()
+    gd.node2d_set_position(self.owner, gd.Vector2{40, 100})
 }
 
 player_process :: proc(self: ^Player, delta: f64) {
-	input := gd.singleton_input()
-	dx := f32(gd.input_get_axis(input, left_name, gd.sname("ui_right")))
-	dy := f32(gd.input_get_axis(input, gd.sname("ui_up"), gd.sname("ui_down")))
-	pos := gd.node2d_get_position(self.owner)
-	pos.x += dx * self.speed * f32(delta)
-	pos.y += dy * self.speed * f32(delta)
-	gd.node2d_set_position(self.owner, pos)
+    input := gd.singleton_input()
+    dx := f32(gd.input_get_axis(input, left_name, gd.sname("ui_right")))
+    dy := f32(gd.input_get_axis(input, gd.sname("ui_up"), gd.sname("ui_down")))
+    pos := gd.node2d_get_position(self.owner)
+    pos.x += dx * self.speed * f32(delta)
+    pos.y += dy * self.speed * f32(delta)
+    gd.node2d_set_position(self.owner, pos)
 }

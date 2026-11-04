@@ -19,7 +19,7 @@ import gdext "godot:gdext"
 // payload). The generated `object_emit_signal` can't be used: it ptrcalls, and Godot rejects
 // ptrcall on the vararg `emit_signal` method ("ptrcall can't be used with vararg methods").
 emit :: proc "contextless" (obj: Object, signal: cstring) -> Error {
-	return emit_args(obj, signal)
+    return emit_args(obj, signal)
 }
 
 @(private = "file")
@@ -36,10 +36,13 @@ _emit_ready: bool
 // interned atom; the bind lookup is idempotent).
 @(private = "file")
 _ensure_emit_bind :: proc "contextless" () {
-	if sync.atomic_load_explicit(&_emit_ready, .Acquire) {return}
-	_emit_signal_name = new_string_name_cstring("emit_signal", true)
-	_emit_bind = gdext.classdb_get_method_bind(object_name_ref(), &_emit_signal_name, 4047867050)
-	sync.atomic_store_explicit(&_emit_ready, true, .Release)
+    if sync.atomic_load_explicit(&_emit_ready, .Acquire) {
+        return
+    }
+
+    _emit_signal_name = new_string_name_cstring("emit_signal", true)
+    _emit_bind = gdext.classdb_get_method_bind(object_name_ref(), &_emit_signal_name, 4047867050)
+    sync.atomic_store_explicit(&_emit_ready, true, .Release)
 }
 
 // _EMIT_MAX_ARGS bounds the on-stack VariantPtr scratch buffer (signal name + payload). 31
@@ -58,27 +61,38 @@ _EMIT_MAX_ARGS :: 32
 // (bad argument types/count), otherwise Object::emit_signal's own Error (which reports a
 // misspelled/unknown signal name).
 emit_args :: proc "contextless" (obj: Object, signal: cstring, args: ..Variant) -> Error {
-	_ensure_emit_bind()
-	if _emit_bind == nil {return .Failed}
+    _ensure_emit_bind()
 
-	n := len(args) + 1
-	if n > _EMIT_MAX_ARGS {return .Err_Parameter_Range_Error}
+    if _emit_bind == nil {
+        return .Failed
+    }
 
-	sig_name := new_string_name_cstring(signal, true)
-	sig_v := variant_from_string_name(&sig_name)
+    n := len(args) + 1
 
-	buf: [_EMIT_MAX_ARGS]gdext.VariantPtr
-	buf[0] = cast(gdext.VariantPtr)&sig_v
-	for i in 0 ..< len(args) {
-		buf[i + 1] = cast(gdext.VariantPtr)&args[i]
-	}
+    if n > _EMIT_MAX_ARGS {
+        return .Err_Parameter_Range_Error
+    }
 
-	ret: Variant
-	call_err: gdext.CallError
-	gdext.object_method_bind_call(_emit_bind, obj, &buf[0], i64(n), cast(gdext.VariantPtr)&ret, &call_err)
-	err := variant_to_int(&ret)
-	gdext.variant_destroy(cast(gdext.VariantPtr)&ret)
-	gdext.variant_destroy(cast(gdext.VariantPtr)&sig_v)
-	if call_err.error != .Ok {return .Failed}
-	return Error(err)
+    sig_name := new_string_name_cstring(signal, true)
+    sig_v := variant_from_string_name(&sig_name)
+
+    buf: [_EMIT_MAX_ARGS]gdext.VariantPtr
+    buf[0] = cast(gdext.VariantPtr)&sig_v
+
+    for i in 0 ..< len(args) {
+        buf[i + 1] = cast(gdext.VariantPtr)&args[i]
+    }
+
+    ret: Variant
+    call_err: gdext.CallError
+    gdext.object_method_bind_call(_emit_bind, obj, &buf[0], i64(n), cast(gdext.VariantPtr)&ret, &call_err)
+    err := variant_to_int(&ret)
+    gdext.variant_destroy(cast(gdext.VariantPtr)&ret)
+    gdext.variant_destroy(cast(gdext.VariantPtr)&sig_v)
+
+    if call_err.error != .Ok {
+        return .Failed
+    }
+
+    return Error(err)
 }

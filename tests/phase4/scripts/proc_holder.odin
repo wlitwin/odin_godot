@@ -9,26 +9,32 @@ package phase4_scripts
 import gd "godot:godot"
 
 proc_holder_value :: proc() -> int {
-	when RELOAD_V == 3 {return 300}
-	when RELOAD_V == 2 {return 200}
-	return 100
+    when RELOAD_V == 3 {
+        return 300
+    }
+
+    when RELOAD_V == 2 {
+        return 200
+    }
+
+    return 100
 }
 
 ProcHolder :: struct {
-	owner:    gd.Node,
-	callback: proc() -> int,
+    owner:    gd.Node,
+    callback: proc() -> int,
 }
 
 proc_holder_ready :: proc(self: ^ProcHolder) {
-	self.callback = proc_holder_value
+    self.callback = proc_holder_value
 }
 
 @(gd_method)
 proc_holder_cached_value :: proc(self: ^ProcHolder) -> int {
-	return self.callback != nil ? self.callback() : -1
+    return self.callback != nil ? self.callback() : -1
 }
 
 @(gd_method)
 proc_holder_compiled_value :: proc(self: ^ProcHolder) -> int {
-	return proc_holder_value()
+    return proc_holder_value()
 }

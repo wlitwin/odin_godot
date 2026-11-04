@@ -7,11 +7,11 @@ import gd "godot:godot"
 FIRST :: 3
 
 Mode :: enum u8 {
-	Idle = FIRST,
-	Run,
+    Idle = FIRST,
+    Run,
 }
 
 BadComputedEnumWire :: struct {
-	owner: gd.Node,
-	mode:  Mode `gd:"replicate"`,
+    owner: gd.Node,
+    mode:  Mode `gd:"replicate"`,
 }

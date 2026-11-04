@@ -12,7 +12,7 @@ package odinplugin
 import gd "godot:godot"
 
 ToolWidget :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 // Sentinel the driver asserts. Written ONLY on the editor branch of gd.is_editor(), so the
@@ -21,11 +21,11 @@ ToolWidget :: struct {
 TOOL_EDITOR_SENTINEL :: 4242
 
 tool_widget_ready :: proc(self: ^ToolWidget) {
-	if gd.is_editor() {
-		gd.set_setting_int("odin/tool_widget_editor_ran", TOOL_EDITOR_SENTINEL)
-		gd.print("EDITORTOOLS_TOOL_READY_IN_EDITOR")
-	} else {
-		// At game runtime this branch runs instead (is_editor() == false).
-		gd.set_setting_int("odin/tool_widget_editor_ran", 1)
-	}
+    if gd.is_editor() {
+        gd.set_setting_int("odin/tool_widget_editor_ran", TOOL_EDITOR_SENTINEL)
+        gd.print("EDITORTOOLS_TOOL_READY_IN_EDITOR")
+    } else {
+        // At game runtime this branch runs instead (is_editor() == false).
+        gd.set_setting_int("odin/tool_widget_editor_ran", 1)
+    }
 }

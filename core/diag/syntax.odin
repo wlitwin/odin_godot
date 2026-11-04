@@ -44,12 +44,16 @@ Collector :: struct {
 @(private = "file")
 collect_error :: proc(pos: tokenizer.Pos, msg: string, args: ..any) {
     c := (^Collector)(context.user_ptr)
-    if c == nil {return}
+
+    if c == nil {
+        return
+    }
+
     append(
         c.diags,
         Diagnostic {
-            line    = max(pos.line, 1),
-            column  = max(pos.column, 1),
+            line = max(pos.line, 1),
+            column = max(pos.column, 1),
             message = fmt.aprintf(msg, ..args, allocator = c.allocator),
         },
     )
@@ -69,9 +73,11 @@ parse_syntax :: proc(source: string, abs_path: string, allocator := context.allo
 
     // The AST is garbage the moment this returns — grow it in a scratch arena.
     arena: vmem.Arena
+
     if vmem.arena_init_growing(&arena) != nil {
         return diags // no memory for a parse: report nothing rather than break the editor
     }
+
     defer vmem.arena_destroy(&arena)
 
     p := parser.default_parser()

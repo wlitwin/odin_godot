@@ -26,16 +26,16 @@ package play_sim
 import "core:math"
 
 Roller :: struct {
-	x, y:   f32 `gd:"predict,interp"`,
-	vx, vy: f32 `gd:"predict"`,
+    x, y:                       f32 `gd:"predict,interp"`,
+    vx, vy:                     f32 `gd:"predict"`,
 
-	// Config — law, not state: same numbers on every peer, set at spawn.
-	friction:                   f32, // velocity retained per tick (law #5: self-simulating flight)
-	max_speed:                  f32, // hard per-tick ceiling (law #6: clamp in the tick, every peer alike)
-	bounce:                     f32, // wall restitution — walls eat energy, so a
-	                                 // kicked ball doesn't ping-pong back at full
-	                                 // speed into the foot that sent it
-	min_x, min_y, max_x, max_y: f32, // the walls
+    // Config — law, not state: same numbers on every peer, set at spawn.
+    friction:                   f32, // velocity retained per tick (law #5: self-simulating flight)
+    max_speed:                  f32, // hard per-tick ceiling (law #6: clamp in the tick, every peer alike)
+    bounce:                     f32, // wall restitution — walls eat energy, so a
+    // kicked ball doesn't ping-pong back at full
+    // speed into the foot that sent it
+    min_x, min_y, max_x, max_y: f32, // the walls
 }
 
 // roller_arm — the LAW half, stamped once per peer at spawn (the census hook
@@ -45,13 +45,13 @@ Roller :: struct {
 // with friction 0 on one screen never slows, and every batch reconciles).
 // Config never rides the wire: the SAME args must reach this on every peer.
 roller_arm :: proc(r: ^Roller, friction, max_speed, bounce: f32, min_x, min_y, max_x, max_y: f32) {
-	r.friction = friction
-	r.max_speed = max_speed
-	r.bounce = bounce
-	r.min_x = min_x
-	r.min_y = min_y
-	r.max_x = max_x
-	r.max_y = max_y
+    r.friction = friction
+    r.max_speed = max_speed
+    r.bounce = bounce
+    r.min_x = min_x
+    r.min_y = min_y
+    r.max_x = max_x
+    r.max_y = max_y
 }
 
 // The block tick: friction, cap, integrate, bounce. Inputless and
@@ -59,30 +59,36 @@ roller_arm :: proc(r: ^Roller, friction, max_speed, bounce: f32, min_x, min_y, m
 // it and physics does the rest.
 @(gd_tick)
 roller_tick :: proc(r: ^Roller) {
-	r.vx *= r.friction
-	r.vy *= r.friction
-	sp2 := r.vx * r.vx + r.vy * r.vy
-	if sp2 > r.max_speed * r.max_speed {
-		s := r.max_speed / math.sqrt(sp2)
-		r.vx *= s
-		r.vy *= s
-	}
-	r.x += r.vx
-	r.y += r.vy
-	if r.x <= r.min_x {
-		r.x = r.min_x
-		r.vx = -r.vx * r.bounce
-	}
-	if r.x >= r.max_x {
-		r.x = r.max_x
-		r.vx = -r.vx * r.bounce
-	}
-	if r.y <= r.min_y {
-		r.y = r.min_y
-		r.vy = -r.vy * r.bounce
-	}
-	if r.y >= r.max_y {
-		r.y = r.max_y
-		r.vy = -r.vy * r.bounce
-	}
+    r.vx *= r.friction
+    r.vy *= r.friction
+    sp2 := r.vx * r.vx + r.vy * r.vy
+
+    if sp2 > r.max_speed * r.max_speed {
+        s := r.max_speed / math.sqrt(sp2)
+        r.vx *= s
+        r.vy *= s
+    }
+
+    r.x += r.vx
+    r.y += r.vy
+
+    if r.x <= r.min_x {
+        r.x = r.min_x
+        r.vx = -r.vx * r.bounce
+    }
+
+    if r.x >= r.max_x {
+        r.x = r.max_x
+        r.vx = -r.vx * r.bounce
+    }
+
+    if r.y <= r.min_y {
+        r.y = r.min_y
+        r.vy = -r.vy * r.bounce
+    }
+
+    if r.y >= r.max_y {
+        r.y = r.max_y
+        r.vy = -r.vy * r.bounce
+    }
 }

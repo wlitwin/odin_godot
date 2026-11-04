@@ -15,9 +15,9 @@ package scripts
 import gd "godot:godot"
 
 Hello :: struct {
-	owner: gd.Node, // the engine Node this script instance is attached to
+    owner: gd.Node, // the engine Node this script instance is attached to
 }
 
 hello_ready :: proc(self: ^Hello) {
-	gd.print("Hello from Odin! Edit scripts/hello.odin and press Play again.")
+    gd.print("Hello from Odin! Edit scripts/hello.odin and press Play again.")
 }

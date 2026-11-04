@@ -28,16 +28,19 @@ SUCCESSOR_INFO_MAX_BYTES :: 4096
 // across everything except that player leaving.
 @(private = "file")
 backup_target :: proc(s: ^Session) -> knet.Player_Id {
-	best := knet.PLAYER_ID_INVALID
-	for _, p in s.players {
-		if !p.connected || p.id == s.me || p.spectator {
-			continue // a watcher can never hold the torch
-		}
-		if best == knet.PLAYER_ID_INVALID || p.id < best {
-			best = p.id
-		}
-	}
-	return best
+    best := knet.PLAYER_ID_INVALID
+
+    for _, p in s.players {
+        if !p.connected || p.id == s.me || p.spectator {
+            continue // a watcher can never hold the torch
+        }
+
+        if best == knet.PLAYER_ID_INVALID || p.id < best {
+            best = p.id
+        }
+    }
+
+    return best
 }
 
 // The host's net_tick slot (called at the stats cadence, ~2 Hz): keep the
@@ -47,25 +50,29 @@ backup_target :: proc(s: ^Session) -> knet.Player_Id {
 // model's answer to a host who is also a player leaving; a server restarts.
 @(private)
 backup_slot :: proc(s: ^Session, t: u64) {
-	if !s.replicating || s.dedicated {
-		return
-	}
-	target := backup_target(s)
-	if target == knet.PLAYER_ID_INVALID {
-		return
-	}
-	if target != s.backup_target || t - s.backup_tick >= s.backup_every {
-		if target != s.backup_target {
-			// The torch-bearer changed: tell the game (it computes the
-			// rendezvous info) — the successor broadcast follows from
-			// session_set_successor_info.
-			append(&s.events, Ev_Backup_Target{player = target})
-		}
-		s.backup_target = target
-		s.backup_tick = t
-		p, _ := s.players[target]
-		send_backup(s, p.peer)
-	}
+    if !s.replicating || s.dedicated {
+        return
+    }
+
+    target := backup_target(s)
+
+    if target == knet.PLAYER_ID_INVALID {
+        return
+    }
+
+    if target != s.backup_target || t - s.backup_tick >= s.backup_every {
+        if target != s.backup_target {
+            // The torch-bearer changed: tell the game (it computes the
+            // rendezvous info) — the successor broadcast follows from
+            // session_set_successor_info.
+            append(&s.events, Ev_Backup_Target{player = target})
+        }
+
+        s.backup_target = target
+        s.backup_tick = t
+        p, _ := s.players[target]
+        send_backup(s, p.peer)
+    }
 }
 
 // The re-hostable snapshot: everything needed to BECOME the host of this
@@ -82,56 +89,66 @@ backup_slot :: proc(s: ^Session, t: u64) {
 //         [next_net_id u32]
 //         [entities u16] x the SES_SPAWN tuple
 session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
-	assert(s.is_host, "the authority owns the truth being snapshotted")
-	knet.write_u64(w, u64(s.next_player))
-	// WHO is hosting when this snapshot is taken. A heir reads it back as the
-	// OLD host's id and re-owns that player's entities to itself — the world
-	// entities the dead host was streaming (owner = its player id) would freeze
-	// on every screen otherwise (each game hand-rolled the re-own loop; now the
-	// kit does). It is s.me, not a fixed HOST id, because a heir-turned-host
-	// carries its own id — and the hash-0 "never JOINed" host signal is
-	// ambiguous once a migration leaves the dead host's row in the roster.
-	knet.write_u64(w, u64(s.me))
-	knet.write_u8(w, u8(len(s.stat_names)))
-	for n in s.stat_names {
-		knet.write_string(w, n)
-	}
-	assert(len(s.players) <= int(max(u16)))
-	assert(len(s.players) <= knet.MAX_CONTAINER_ITEMS)
-	knet.write_u16(w, u16(len(s.players)))
-	for _, p in s.players {
-		knet.write_player_id(w, p.id)
-		knet.write_string(w, p.name)
-		hash := u64(0)
-		for h, id in s.tokens {
-			if id == p.id {
-				hash = h
-			}
-		}
-		knet.write_u64(w, hash) // 0 for the host itself (hosts never JOINed)
-		row, _ := s.stats[p.id]
-		for i in 0 ..< len(s.stat_names) {
-			knet.write_i64(w, row[i])
-		}
-	}
-	// The DOOR travels with the roster: a ban outlives the host that issued
-	// it and a locked room stays locked through a takeover — otherwise the
-	// kicked-with-ban player just waits for the migration and walks back in.
-	knet.write_bool(w, s.locked)
-	assert(len(s.denied) <= int(max(u16)))
-	assert(len(s.denied) <= knet.MAX_CONTAINER_ITEMS)
-	knet.write_u16(w, u16(len(s.denied)))
-	for h, id in s.denied {
-		knet.write_u64(w, h)
-		knet.write_player_id(w, id)
-	}
-	knet.write_u32(w, u32(s.reg.next_id))
-	assert(knet.registry_count(&s.reg) <= int(max(u16)))
-	assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
-	knet.write_u16(w, u16(knet.registry_count(&s.reg)))
-	for id in s.types {
-		write_spawn_tuple(s, w, id)
-	}
+    assert(s.is_host, "the authority owns the truth being snapshotted")
+    knet.write_u64(w, u64(s.next_player))
+    // WHO is hosting when this snapshot is taken. A heir reads it back as the
+    // OLD host's id and re-owns that player's entities to itself — the world
+    // entities the dead host was streaming (owner = its player id) would freeze
+    // on every screen otherwise (each game hand-rolled the re-own loop; now the
+    // kit does). It is s.me, not a fixed HOST id, because a heir-turned-host
+    // carries its own id — and the hash-0 "never JOINed" host signal is
+    // ambiguous once a migration leaves the dead host's row in the roster.
+    knet.write_u64(w, u64(s.me))
+    knet.write_u8(w, u8(len(s.stat_names)))
+
+    for n in s.stat_names {
+        knet.write_string(w, n)
+    }
+
+    assert(len(s.players) <= int(max(u16)))
+    assert(len(s.players) <= knet.MAX_CONTAINER_ITEMS)
+    knet.write_u16(w, u16(len(s.players)))
+
+    for _, p in s.players {
+        knet.write_player_id(w, p.id)
+        knet.write_string(w, p.name)
+        hash := u64(0)
+
+        for h, id in s.tokens {
+            if id == p.id {
+                hash = h
+            }
+        }
+
+        knet.write_u64(w, hash) // 0 for the host itself (hosts never JOINed)
+        row, _ := s.stats[p.id]
+
+        for i in 0 ..< len(s.stat_names) {
+            knet.write_i64(w, row[i])
+        }
+    }
+
+    // The DOOR travels with the roster: a ban outlives the host that issued
+    // it and a locked room stays locked through a takeover — otherwise the
+    // kicked-with-ban player just waits for the migration and walks back in.
+    knet.write_bool(w, s.locked)
+    assert(len(s.denied) <= int(max(u16)))
+    assert(len(s.denied) <= knet.MAX_CONTAINER_ITEMS)
+    knet.write_u16(w, u16(len(s.denied)))
+
+    for h, id in s.denied {
+        knet.write_u64(w, h)
+        knet.write_player_id(w, id)
+    }
+
+    knet.write_u32(w, u32(s.reg.next_id))
+    assert(knet.registry_count(&s.reg) <= int(max(u16)))
+    assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
+    knet.write_u16(w, u16(knet.registry_count(&s.reg)))
+
+    for id in s.types {
+        write_spawn_tuple(s, w, id)
+    }
 }
 
 // Host-side state the SESSION cannot know about — wave directors, AI
@@ -144,8 +161,8 @@ Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
 // *_start like the rest). Without one, backups carry an empty blob and a
 // takeover restores the world but not the campaign around it.
 session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Proc) {
-	s.backup_blob_user = user
-	s.backup_blob = write
+    s.backup_blob_user = user
+    s.backup_blob = write
 }
 
 // Split a received backup payload into the game's blob and the re-hostable
@@ -155,30 +172,29 @@ session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Pr
 // about to run RE-INITS the session, which frees the stored payload —
 // slices into it would dangle exactly when you need them.
 session_backup_parts :: proc(
-	s: ^Session,
-	allocator := context.temp_allocator,
+    s: ^Session,
+    allocator := context.temp_allocator,
 ) -> (
-	game_blob: []u8,
-	snapshot: []u8,
-	ok: bool,
+    game_blob: []u8,
+    snapshot: []u8,
+    ok: bool,
 ) {
-	if len(s.backup) < 4 {
-		return nil, nil, false
-	}
-	r := knet.reader_make(s.backup)
-	n := int(knet.read_u32(&r))
-	if r.err ||
-	   n < 0 ||
-	   n > BACKUP_GAME_BLOB_MAX_BYTES ||
-	   r.off > len(s.backup) ||
-	   n > len(s.backup) - r.off { 	// <0: 32-bit wrap on hostile lengths
-		return nil, nil, false
-	}
-	game_blob = make([]u8, n, allocator)
-	copy(game_blob, s.backup[r.off:r.off + n])
-	snapshot = make([]u8, len(s.backup) - r.off - n, allocator)
-	copy(snapshot, s.backup[r.off + n:])
-	return game_blob, snapshot, true
+    if len(s.backup) < 4 {
+        return nil, nil, false
+    }
+
+    r := knet.reader_make(s.backup)
+    n := int(knet.read_u32(&r))
+
+    if r.err || n < 0 || n > BACKUP_GAME_BLOB_MAX_BYTES || r.off > len(s.backup) || n > len(s.backup) - r.off {     // <0: 32-bit wrap on hostile lengths
+        return nil, nil, false
+    }
+
+    game_blob = make([]u8, n, allocator)
+    copy(game_blob, s.backup[r.off:r.off + n])
+    snapshot = make([]u8, len(s.backup) - r.off - n, allocator)
+    copy(snapshot, s.backup[r.off + n:])
+    return game_blob, snapshot, true
 }
 
 // Host: how peers find the successor if you die — an opaque transport blob
@@ -187,16 +203,13 @@ session_backup_parts :: proc(
 // knows WHERE); broadcast immediately and to every later joiner. With no
 // info set, host loss stays v1-shaped: Ev_Host_Left, run over, no auto arc.
 session_set_successor_info :: proc(s: ^Session, info: []u8) {
-	assert(s.is_host)
-	assert(
-		len(info) <= SUCCESSOR_INFO_MAX_BYTES,
-		"successor rendezvous exceeds SUCCESSOR_INFO_MAX_BYTES",
-	)
-	context.allocator = ses_allocator(s) // succ_info is owned run state, freed in run_destroy — copy it under the stored allocator
-	delete(s.succ_info)
-	s.succ_info = make([]u8, len(info))
-	copy(s.succ_info, info)
-	send_successor(s, BROADCAST_PEER)
+    assert(s.is_host)
+    assert(len(info) <= SUCCESSOR_INFO_MAX_BYTES, "successor rendezvous exceeds SUCCESSOR_INFO_MAX_BYTES")
+    context.allocator = ses_allocator(s) // succ_info is owned run state, freed in run_destroy — copy it under the stored allocator
+    delete(s.succ_info)
+    s.succ_info = make([]u8, len(info))
+    copy(s.succ_info, info)
+    send_successor(s, BROADCAST_PEER)
 }
 
 // The torch's bytes, in a shape you cannot print by accident.
@@ -215,7 +228,7 @@ session_set_successor_info :: proc(s: ^Session, info: []u8) {
 // is gone is the accident. To render a torch for a human, decode it —
 // netgd.succession_decode, then netgd.succession_words.
 Successor_Info :: struct {
-	bytes: []u8,
+    bytes: []u8,
 }
 
 // Who carries the torch, and the rendezvous blob. Answers on BOTH roles:
@@ -223,49 +236,54 @@ Successor_Info :: struct {
 // (it wrote the torch — an empty answer to its own question was a wart the
 // backup_target words halves fell into).
 session_successor :: proc(s: ^Session) -> (knet.Player_Id, Successor_Info) {
-	if s.is_host {
-		return s.backup_target, {bytes = s.succ_info}
-	}
-	return s.successor, {bytes = s.successor_info}
+    if s.is_host {
+        return s.backup_target, {bytes = s.succ_info}
+    }
+
+    return s.successor, {bytes = s.successor_info}
 }
 
 // Called here and by the join parade (a late joiner hears the standing torch).
 @(private)
 send_successor :: proc(s: ^Session, to: Peer_Id) {
-	if len(s.succ_info) == 0 {
-		return
-	}
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_SUCCESSOR)
-	knet.write_player_id(&w, s.backup_target)
-	knet.write_bytes(&w, s.succ_info)
-	if to == BROADCAST_PEER {
-		broadcast(s, knet.writer_bytes(&w), .Reliable)
-	} else {
-		session_send_packet(s, to, knet.writer_bytes(&w), .Reliable)
-	}
+    if len(s.succ_info) == 0 {
+        return
+    }
+
+    w := knet.writer_make()
+    defer knet.writer_destroy(&w)
+    knet.write_u8(&w, SES_SUCCESSOR)
+    knet.write_player_id(&w, s.backup_target)
+    knet.write_bytes(&w, s.succ_info)
+
+    if to == BROADCAST_PEER {
+        broadcast(s, knet.writer_bytes(&w), .Reliable)
+    } else {
+        session_send_packet(s, to, knet.writer_bytes(&w), .Reliable)
+    }
 }
 
 @(private = "file")
 send_backup :: proc(s: ^Session, peer: Peer_Id) {
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_BACKUP)
-	// [blob_len u32][game blob][session snapshot] — parts split it back out.
-	blob := knet.writer_make()
-	defer knet.writer_destroy(&blob)
-	if s.backup_blob != nil {
-		s.backup_blob(s.backup_blob_user, &blob)
-	}
-	assert(
-		len(knet.writer_bytes(&blob)) <= BACKUP_GAME_BLOB_MAX_BYTES,
-		"backup game blob exceeds BACKUP_GAME_BLOB_MAX_BYTES",
-	)
-	knet.write_u32(&w, u32(len(knet.writer_bytes(&blob))))
-	append(&w.buf, ..knet.writer_bytes(&blob))
-	session_snapshot(s, &w)
-	session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
+    w := knet.writer_make()
+    defer knet.writer_destroy(&w)
+    knet.write_u8(&w, SES_BACKUP)
+    // [blob_len u32][game blob][session snapshot] — parts split it back out.
+    blob := knet.writer_make()
+    defer knet.writer_destroy(&blob)
+
+    if s.backup_blob != nil {
+        s.backup_blob(s.backup_blob_user, &blob)
+    }
+
+    assert(
+        len(knet.writer_bytes(&blob)) <= BACKUP_GAME_BLOB_MAX_BYTES,
+        "backup game blob exceeds BACKUP_GAME_BLOB_MAX_BYTES",
+    )
+    knet.write_u32(&w, u32(len(knet.writer_bytes(&blob))))
+    append(&w.buf, ..knet.writer_bytes(&blob))
+    session_snapshot(s, &w)
+    session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
 }
 
 // Client: the designated backup host keeps the blob, opaque, replacing any
@@ -273,28 +291,30 @@ send_backup :: proc(s: ^Session, peer: Peer_Id) {
 // role-gates before calling.)
 @(private)
 backup_recv :: proc(s: ^Session, r: ^knet.Reader) {
-	blob := knet.reader_remaining(r)
-	delete(s.backup)
-	s.backup = make([]u8, len(blob))
-	copy(s.backup, blob)
-	s.backup_at = s.now
-	append(&s.events, Ev_Backup_Received{size = len(blob)})
+    blob := knet.reader_remaining(r)
+    delete(s.backup)
+    s.backup = make([]u8, len(blob))
+    copy(s.backup, blob)
+    s.backup_at = s.now
+    append(&s.events, Ev_Backup_Received{size = len(blob)})
 }
 
 // Client: who carries the torch, and how to find them. (Role-gated by the
 // packet switch; sticky r.err rides back for the malformed counter.)
 @(private)
 successor_recv :: proc(s: ^Session, r: ^knet.Reader) {
-	succ := knet.read_player_id(r)
-	info := knet.read_bytes_limited(r, SUCCESSOR_INFO_MAX_BYTES)
-	if r.err || len(knet.reader_remaining(r)) != 0 {
-		r.err = true
-		return
-	}
-	s.successor = succ
-	delete(s.successor_info)
-	s.successor_info = make([]u8, len(info))
-	copy(s.successor_info, info)
+    succ := knet.read_player_id(r)
+    info := knet.read_bytes_limited(r, SUCCESSOR_INFO_MAX_BYTES)
+
+    if r.err || len(knet.reader_remaining(r)) != 0 {
+        r.err = true
+        return
+    }
+
+    s.successor = succ
+    delete(s.successor_info)
+    s.successor_info = make([]u8, len(info))
+    copy(s.successor_info, info)
 }
 
 // Become the host of a run someone else was hosting, from a backup blob this
@@ -320,169 +340,204 @@ successor_recv :: proc(s: ^Session, r: ^knet.Reader) {
 // at all must handle Ev_Owner_Changed.)
 // Returns false on a corrupt blob (destroy the session and start clean).
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
-	assert(
-		s.factory_make != nil,
-		"resume recreates entities through the factory — install it first",
-	)
-	assert(len(name) <= PLAYER_NAME_MAX_BYTES, "player name exceeds PLAYER_NAME_MAX_BYTES")
-	// Pure structural pass before session_init wipes the current run or any
-	// factory/map allocation occurs. A malformed persistence blob is a no-op.
-	probe := knet.reader_make(backup)
-	if !knet.reader_admit_packet(&probe) {
-		return false
-	}
-	_ = knet.read_u64(&probe)
-	_ = knet.read_u64(&probe)
-	pcols := int(knet.read_u8(&probe))
-	if probe.err || pcols == 0 || pcols > MAX_STAT_COLS {
-		return false
-	}
-	for _ in 0 ..< pcols {
-		_ = knet.read_string_limited(&probe, STAT_NAME_MAX_BYTES)
-	}
-	pplayers := int(knet.read_u16(&probe))
-	if !knet.reader_admit_count(&probe, pplayers, 18 + pcols * 8) {
-		return false
-	}
-	for _ in 0 ..< pplayers {
-		_ = knet.read_player_id(&probe)
-		_ = knet.read_string_limited(&probe, PLAYER_NAME_MAX_BYTES)
-		_ = knet.read_u64(&probe)
-		for _ in 0 ..< pcols {
-			_ = knet.read_i64(&probe)
-		}
-	}
-	_ = knet.read_bool(&probe)
-	pdenied := int(knet.read_u16(&probe))
-	if !knet.reader_admit_count(&probe, pdenied, 16) {
-		return false
-	}
-	for _ in 0 ..< pdenied {
-		_ = knet.read_u64(&probe)
-		_ = knet.read_player_id(&probe)
-	}
-	_ = knet.read_u32(&probe)
-	pentities := int(knet.read_u16(&probe))
-	if !knet.reader_admit_count(&probe, pentities, 24) {
-		return false
-	}
-	for _ in 0 ..< pentities {
-		if !spawn_tuple_probe(&probe) {
-			return false
-		}
-	}
-	if probe.err || len(knet.reader_remaining(&probe)) != 0 {
-		return false
-	}
-	// The heir carries every player's profile row into the resumed run —
-	// keep_profiles=true lifts the table over the run wipe (see session_init).
-	session_init(s, true) // resolves + stores s.allocator (a fresh session's first start)
-	context.allocator = ses_allocator(s) // the resumed roster's name/stat clones below ride the stored allocator
-	s.is_host = true
-	s.ctx.is_authority = true
-	s.me = me
-	s.ctx.me = me
-	s.joined = true
+    assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
+    assert(len(name) <= PLAYER_NAME_MAX_BYTES, "player name exceeds PLAYER_NAME_MAX_BYTES")
+    // Pure structural pass before session_init wipes the current run or any
+    // factory/map allocation occurs. A malformed persistence blob is a no-op.
+    probe := knet.reader_make(backup)
 
-	r := knet.reader_make(backup)
-	s.next_player = knet.Player_Id(knet.read_u64(&r))
-	old_host := knet.Player_Id(knet.read_u64(&r)) // who wrote this backup; its entities re-own to us
-	cols := int(knet.read_u8(&r))
-	if r.err || cols == 0 || cols > MAX_STAT_COLS { 	// 0: even a fresh run has "ping"
-		return false
-	}
-	for n in s.stat_names { 	// replace the init-time default schema wholesale
-		delete(n)
-	}
-	clear(&s.stat_names)
-	for _ in 0 ..< cols {
-		append(&s.stat_names, strings.clone(knet.read_string_limited(&r, STAT_NAME_MAX_BYTES)))
-	}
-	players := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< players {
-		id := knet.read_player_id(&r)
-		pname := knet.read_string_limited(&r, PLAYER_NAME_MAX_BYTES)
-		hash := knet.read_u64(&r)
-		row: [MAX_STAT_COLS]i64
-		for i in 0 ..< cols {
-			row[i] = knet.read_i64(&r)
-		}
-		if r.err {
-			return false
-		}
-		mine := id == me
-		s.players[id] = Player {
-			id        = id,
-			name      = strings.clone(mine ? name : pname),
-			peer      = mine ? HOST_PEER : NO_PEER,
-			connected = mine,
-		}
-		if hash != 0 {
-			s.tokens[hash] = id
-		}
-		s.stats[id] = row
-	}
-	// The door: bans + the lock survive the takeover (written by
-	// session_snapshot right after the roster).
-	s.locked = knet.read_bool(&r)
-	nden := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< nden {
-		h := knet.read_u64(&r)
-		s.denied[h] = knet.read_player_id(&r)
-	}
-	next_net := knet.Net_Id(knet.read_u32(&r))
-	entities := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< entities {
-		apply_spawn_tuple(s, &r)
-		if r.err {
-			session_init(s, true)
-			return false
-		}
-	}
-	knet.registry_reserve_ids(&s.reg, next_net)
-	knet.registry_commit_shadows(&s.reg)
+    if !knet.reader_admit_packet(&probe) {
+        return false
+    }
 
-	// RE-OWN THE ORPHANS. The dead host was STREAMING every entity it owned under
-	// its own player id (wanderers, mobs, carried props — anything alive and
-	// moving that a game spawned `owner = ses.me` on the host). That id is gone
-	// for good, so those entities have no one to stream them: they freeze on
-	// every screen, silently, forever. The heir is the new authority — it takes
-	// the leash. Host-authoritative deltas (owner = PLAYER_ID_INVALID: static
-	// world, flora) already flow from whoever is_host and need no move; a still-
-	// connected client's entities keep their owner and resume when that client
-	// rejoins. Only the OLD HOST's are stranded, and only they move here. Fired
-	// before `replicating`, so no SES_SETOWNER goes out (nobody to tell yet — the
-	// corrected owner rides the SES_WORLD every rejoiner gets); Ev_Owner_Changed
-	// still fires, so a game gluing an entity to its owner adopts it here.
-	// The dead host's own AVATAR is the exception: it is PARKED — owner left
-	// as the departed seat, exactly like a disconnected client's body — so the
-	// token holder who dials back in reseats AND re-embodies it. The session
-	// tells the two apart by the entity's declared KIND (session_set_avatar_type,
-	// from the `entity=Runner:2,avatar` tag); an undeclared avatar is an NPC to
-	// this sweep and is adopted — which is every game's old hand-rolled
-	// re-own-back loop waiting to happen. Declare it.
-	if old_host != me && old_host != knet.PLAYER_ID_INVALID {
-		orphans := make([dynamic]knet.Net_Id, context.temp_allocator)
-		for id, type in s.types {
-			if session_owner_of(s, id) == old_host && !session_is_avatar_type(s, type) {
-				append(&orphans, id)
-			}
-		}
-		for id in orphans {
-			session_set_owner(s, id, me)
-		}
-	}
+    _ = knet.read_u64(&probe)
+    _ = knet.read_u64(&probe)
+    pcols := int(knet.read_u8(&probe))
 
-	s.replicating = true // the world is live: rejoiners get SES_WORLD + stats
-	s.stats_dirty = true
-	return true
+    if probe.err || pcols == 0 || pcols > MAX_STAT_COLS {
+        return false
+    }
+
+    for _ in 0 ..< pcols {
+        _ = knet.read_string_limited(&probe, STAT_NAME_MAX_BYTES)
+    }
+
+    pplayers := int(knet.read_u16(&probe))
+
+    if !knet.reader_admit_count(&probe, pplayers, 18 + pcols * 8) {
+        return false
+    }
+
+    for _ in 0 ..< pplayers {
+        _ = knet.read_player_id(&probe)
+        _ = knet.read_string_limited(&probe, PLAYER_NAME_MAX_BYTES)
+        _ = knet.read_u64(&probe)
+
+        for _ in 0 ..< pcols {
+            _ = knet.read_i64(&probe)
+        }
+    }
+
+    _ = knet.read_bool(&probe)
+    pdenied := int(knet.read_u16(&probe))
+
+    if !knet.reader_admit_count(&probe, pdenied, 16) {
+        return false
+    }
+
+    for _ in 0 ..< pdenied {
+        _ = knet.read_u64(&probe)
+        _ = knet.read_player_id(&probe)
+    }
+
+    _ = knet.read_u32(&probe)
+    pentities := int(knet.read_u16(&probe))
+
+    if !knet.reader_admit_count(&probe, pentities, 24) {
+        return false
+    }
+
+    for _ in 0 ..< pentities {
+        if !spawn_tuple_probe(&probe) {
+            return false
+        }
+    }
+
+    if probe.err || len(knet.reader_remaining(&probe)) != 0 {
+        return false
+    }
+
+    // The heir carries every player's profile row into the resumed run —
+    // keep_profiles=true lifts the table over the run wipe (see session_init).
+    session_init(s, true) // resolves + stores s.allocator (a fresh session's first start)
+    context.allocator = ses_allocator(s) // the resumed roster's name/stat clones below ride the stored allocator
+    s.is_host = true
+    s.ctx.is_authority = true
+    s.me = me
+    s.ctx.me = me
+    s.joined = true
+
+    r := knet.reader_make(backup)
+    s.next_player = knet.Player_Id(knet.read_u64(&r))
+    old_host := knet.Player_Id(knet.read_u64(&r)) // who wrote this backup; its entities re-own to us
+    cols := int(knet.read_u8(&r))
+
+    if r.err || cols == 0 || cols > MAX_STAT_COLS {     // 0: even a fresh run has "ping"
+        return false
+    }
+
+    for n in s.stat_names {     // replace the init-time default schema wholesale
+        delete(n)
+    }
+
+    clear(&s.stat_names)
+
+    for _ in 0 ..< cols {
+        append(&s.stat_names, strings.clone(knet.read_string_limited(&r, STAT_NAME_MAX_BYTES)))
+    }
+
+    players := int(knet.read_u16(&r))
+
+    if r.err {
+        return false
+    }
+
+    for _ in 0 ..< players {
+        id := knet.read_player_id(&r)
+        pname := knet.read_string_limited(&r, PLAYER_NAME_MAX_BYTES)
+        hash := knet.read_u64(&r)
+        row: [MAX_STAT_COLS]i64
+
+        for i in 0 ..< cols {
+            row[i] = knet.read_i64(&r)
+        }
+
+        if r.err {
+            return false
+        }
+
+        mine := id == me
+        s.players[id] = Player {
+            id        = id,
+            name      = strings.clone(mine ? name : pname),
+            peer      = mine ? HOST_PEER : NO_PEER,
+            connected = mine,
+        }
+
+        if hash != 0 {
+            s.tokens[hash] = id
+        }
+
+        s.stats[id] = row
+    }
+
+    // The door: bans + the lock survive the takeover (written by
+    // session_snapshot right after the roster).
+    s.locked = knet.read_bool(&r)
+    nden := int(knet.read_u16(&r))
+
+    if r.err {
+        return false
+    }
+
+    for _ in 0 ..< nden {
+        h := knet.read_u64(&r)
+        s.denied[h] = knet.read_player_id(&r)
+    }
+
+    next_net := knet.Net_Id(knet.read_u32(&r))
+    entities := int(knet.read_u16(&r))
+
+    if r.err {
+        return false
+    }
+
+    for _ in 0 ..< entities {
+        apply_spawn_tuple(s, &r)
+
+        if r.err {
+            session_init(s, true)
+            return false
+        }
+    }
+
+    knet.registry_reserve_ids(&s.reg, next_net)
+    knet.registry_commit_shadows(&s.reg)
+
+    // RE-OWN THE ORPHANS. The dead host was STREAMING every entity it owned under
+    // its own player id (wanderers, mobs, carried props — anything alive and
+    // moving that a game spawned `owner = ses.me` on the host). That id is gone
+    // for good, so those entities have no one to stream them: they freeze on
+    // every screen, silently, forever. The heir is the new authority — it takes
+    // the leash. Host-authoritative deltas (owner = PLAYER_ID_INVALID: static
+    // world, flora) already flow from whoever is_host and need no move; a still-
+    // connected client's entities keep their owner and resume when that client
+    // rejoins. Only the OLD HOST's are stranded, and only they move here. Fired
+    // before `replicating`, so no SES_SETOWNER goes out (nobody to tell yet — the
+    // corrected owner rides the SES_WORLD every rejoiner gets); Ev_Owner_Changed
+    // still fires, so a game gluing an entity to its owner adopts it here.
+    // The dead host's own AVATAR is the exception: it is PARKED — owner left
+    // as the departed seat, exactly like a disconnected client's body — so the
+    // token holder who dials back in reseats AND re-embodies it. The session
+    // tells the two apart by the entity's declared KIND (session_set_avatar_type,
+    // from the `entity=Runner:2,avatar` tag); an undeclared avatar is an NPC to
+    // this sweep and is adopted — which is every game's old hand-rolled
+    // re-own-back loop waiting to happen. Declare it.
+    if old_host != me && old_host != knet.PLAYER_ID_INVALID {
+        orphans := make([dynamic]knet.Net_Id, context.temp_allocator)
+
+        for id, type in s.types {
+            if session_owner_of(s, id) == old_host && !session_is_avatar_type(s, type) {
+                append(&orphans, id)
+            }
+        }
+
+        for id in orphans {
+            session_set_owner(s, id, me)
+        }
+    }
+
+    s.replicating = true // the world is live: rejoiners get SES_WORLD + stats
+    s.stats_dirty = true
+    return true
 }

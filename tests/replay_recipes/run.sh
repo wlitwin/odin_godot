@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 # Apply authored style checks to the recipes; imported generated bindings retain
 # their generator's style. Global -strict-style/-disallow-do also cover imports.
-STYLE_FLAGS=(-vet -vet-style -vet-semicolon -vet-tabs -warnings-as-errors -vet-packages:replay_recipes)
+STYLE_FLAGS=(-vet -vet-style -vet-semicolon -warnings-as-errors -vet-packages:replay_recipes)
 odin check "$ROOT/examples/replay_recipes" -collection:godot="$ROOT" -no-entry-point "${STYLE_FLAGS[@]}"
 odin check "$ROOT/examples/replay_recipes" -collection:godot="$ROOT" -target:freestanding_wasm32 -no-entry-point "${STYLE_FLAGS[@]}"
 

@@ -28,20 +28,20 @@ package play
 // Ev_Resynced — the derivation jump is history, not gameplay. (Purely local
 // state never needs it.)
 Edge :: struct($T: typeid) {
-	seen: T,
+    seen: T,
 }
 
 // see updates the shadow to `cur` and reports the value it replaced plus whether
 // it differs. The workhorse — call it once per frame with your replicated value.
 see :: proc(e: ^Edge($T), cur: T) -> (prev: T, changed: bool) {
-	prev = e.seen
-	e.seen = cur
-	return prev, prev != cur
+    prev = e.seen
+    e.seen = cur
+    return prev, prev != cur
 }
 
 // sync re-baselines the shadow to `cur` WITHOUT reporting a change — for the
 // resync pre-pass, so a wholesale snapshot catch-up isn't mistaken for a real
 // transition. (Same as writing e.seen directly; named for intent at the call site.)
 sync :: proc(e: ^Edge($T), cur: T) {
-	e.seen = cur
+    e.seen = cur
 }

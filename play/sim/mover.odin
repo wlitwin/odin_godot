@@ -32,15 +32,15 @@ package play_sim
 // the game's, inside its own tick or world pass.
 
 Mover :: struct {
-	x, y:   f32 `gd:"predict,interp"`,
-	vx, vy: f32 `gd:"predict"`,
+    x, y:                       f32 `gd:"predict,interp"`,
+    vx, vy:                     f32 `gd:"predict"`,
 
-	// Intent — the wielder's tick writes the velocity it wants, every tick.
-	tx, ty: f32,
+    // Intent — the wielder's tick writes the velocity it wants, every tick.
+    tx, ty:                     f32,
 
-	// Config — law, not state: same numbers on every peer, set at spawn.
-	accel:                      f32, // approach per tick (1 = snap)
-	min_x, min_y, max_x, max_y: f32, // position clamp
+    // Config — law, not state: same numbers on every peer, set at spawn.
+    accel:                      f32, // approach per tick (1 = snap)
+    min_x, min_y, max_x, max_y: f32, // position clamp
 }
 
 // mover_arm — the LAW half, stamped once per peer at spawn (the census hook
@@ -51,19 +51,19 @@ Mover :: struct {
 // Config never rides the wire, so the SAME args must reach this on every peer
 // — feed it constants, or values derived identically everywhere (arena size).
 mover_arm :: proc(m: ^Mover, accel: f32, min_x, min_y, max_x, max_y: f32) {
-	m.accel = accel
-	m.min_x = min_x
-	m.min_y = min_y
-	m.max_x = max_x
-	m.max_y = max_y
+    m.accel = accel
+    m.min_x = min_x
+    m.min_y = min_y
+    m.max_x = max_x
+    m.max_y = max_y
 }
 
 // The block tick: approach the intent, integrate, clamp. Inputless by
 // contract — the input already became tx/ty in the wielder's tick.
 @(gd_tick)
 mover_tick :: proc(m: ^Mover) {
-	m.vx += (m.tx - m.vx) * m.accel
-	m.vy += (m.ty - m.vy) * m.accel
-	m.x = clamp(m.x + m.vx, m.min_x, m.max_x)
-	m.y = clamp(m.y + m.vy, m.min_y, m.max_y)
+    m.vx += (m.tx - m.vx) * m.accel
+    m.vy += (m.ty - m.vy) * m.accel
+    m.x = clamp(m.x + m.vx, m.min_x, m.max_x)
+    m.y = clamp(m.y + m.vy, m.min_y, m.max_y)
 }

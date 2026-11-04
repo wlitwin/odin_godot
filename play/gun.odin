@@ -48,35 +48,35 @@ package play
 // what makes it reusable across entity types (a player, an enemy, a turret) unchanged.
 
 Gun_Mode :: enum u8 {
-	Ready,
-	Reloading,
-	Jammed,
+    Ready,
+    Reloading,
+    Jammed,
 }
 
 // The gun's identity as DATA — the knobs. Host-assigned at equip and replicated (it rarely
 // changes, so it's near-free on the wire via delta compression) so both peers resolve the
 // deterministic jam identically and every screen's HUD reads the same numbers.
 Gun_Def :: struct {
-	mag:            u16, // rounds per magazine
-	reload_ticks:   u16, // reload dwell, in NET ticks
-	jam_per_mille:  u16, // per-shot jam chance in ‰ (0 = never jams)
-	jam_taps:       u8, // trigger-pulls to clear a jam
-	_wire_reserved: u8, // explicit protocol byte; prevents target-owned tail padding
+    mag:            u16, // rounds per magazine
+    reload_ticks:   u16, // reload dwell, in NET ticks
+    jam_per_mille:  u16, // per-shot jam chance in ‰ (0 = never jams)
+    jam_taps:       u8, // trigger-pulls to clear a jam
+    _wire_reserved: u8, // explicit protocol byte; prevents target-owned tail padding
 }
 
 Gun :: struct {
-	def:                Gun_Def `gd:"replicate"`, // the knobs (POD blob; host-assigned at equip)
-	ammo:               u16 `gd:"replicate"`, // rounds left in the mag
-	mode:               Gun_Mode `gd:"replicate"`, // Ready / Reloading / Jammed — host-written, every screen reads
-	reload_cd:          u16 `gd:"replicate"`, // host countdown to reload done (0 = not reloading)
-	taps:               u8 `gd:"replicate"`, // clear-taps left on a jam (replicated so the mash reads on every screen)
-	salt:               u32 `gd:"replicate"`, // jam-seed context the game sets (floor/run/player); 0 is fine
-	spent:              u32 `gd:"replicate"`, // lifetime rounds consumed since equip — the jam roll's never-repeating half
-	aim_x, aim_y:       f32, // scratch: the last pull's aim, for the game's effect hook (host-side)
-	origin_x, origin_y: f32, // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
-	fired:              bool, // scratch: did the last pull send a live round — the game's EFFECT signal
-	pull:               Gun_Pull, // scratch: WHICH arm of the FSM the last pull ran — receipts/sfx read it
-	// instead of reverse-engineering the transition from post-state
+    def:                Gun_Def `gd:"replicate"`, // the knobs (POD blob; host-assigned at equip)
+    ammo:               u16 `gd:"replicate"`, // rounds left in the mag
+    mode:               Gun_Mode `gd:"replicate"`, // Ready / Reloading / Jammed — host-written, every screen reads
+    reload_cd:          u16 `gd:"replicate"`, // host countdown to reload done (0 = not reloading)
+    taps:               u8 `gd:"replicate"`, // clear-taps left on a jam (replicated so the mash reads on every screen)
+    salt:               u32 `gd:"replicate"`, // jam-seed context the game sets (floor/run/player); 0 is fine
+    spent:              u32 `gd:"replicate"`, // lifetime rounds consumed since equip — the jam roll's never-repeating half
+    aim_x, aim_y:       f32, // scratch: the last pull's aim, for the game's effect hook (host-side)
+    origin_x, origin_y: f32, // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
+    fired:              bool, // scratch: did the last pull send a live round — the game's EFFECT signal
+    pull:               Gun_Pull, // scratch: WHICH arm of the FSM the last pull ran — receipts/sfx read it
+    // instead of reverse-engineering the transition from post-state
 }
 
 // What one trigger pull actually did — the outcome `fired` compresses to a
@@ -84,12 +84,12 @@ Gun :: struct {
 // as taps == def.jam_taps, an unjam as Ready-and-not-fired), which is exactly
 // the kind of fragile archaeology a scratch enum deletes.
 Gun_Pull :: enum u8 {
-	Held, // reloading: the pull was absorbed (the pacer usually prevents it)
-	Fired, // a live round left the barrel (fired = true)
-	Jammed, // the round was a dud — ejected, the mash begins
-	Empty, // dry click: the reload begins
-	Clear_Tap, // a mash pull chipped a tap (still jammed)
-	Cleared, // the LAST tap — Ready again, no round yet
+    Held, // reloading: the pull was absorbed (the pacer usually prevents it)
+    Fired, // a live round left the barrel (fired = true)
+    Jammed, // the round was a dud — ejected, the mash begins
+    Empty, // dry click: the reload begins
+    Clear_Tap, // a mash pull chipped a tap (still jammed)
+    Cleared, // the LAST tap — Ready again, no round yet
 }
 
 // gun_equip — host-only, at spawn or on a weapon swap: stamp the knobs, top off the mag, go
@@ -97,13 +97,13 @@ Gun_Pull :: enum u8 {
 // floor number, the run seed, the player id) so a dud round can't be memorised across runs; 0 is
 // a fine default.
 gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
-	g.def = def
-	g.ammo = def.mag
-	g.salt = salt
-	g.spent = 0
-	g.reload_cd = 0
-	g.taps = 0
-	g.mode = .Ready
+    g.def = def
+    g.ammo = def.mag
+    g.salt = salt
+    g.spent = 0
+    g.reload_cd = 0
+    g.taps = 0
+    g.mode = .Ready
 }
 
 // gun_fire — PULL THE TRIGGER. A composed, PREDICTED command: scriptgen hoists it onto whatever
@@ -118,58 +118,66 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 // the gun itself is aim- and position-agnostic.
 @(gd_command = knet.ACTION_OWNER_PREDICTED)
 gun_fire :: proc(g: ^Gun, dx, dy: f32, ox, oy: f32) -> bool {
-	g.aim_x, g.aim_y = dx, dy
-	g.origin_x, g.origin_y = ox, oy
-	g.fired = false
-	switch g.mode {
-	case .Reloading:
-		// The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
-		g.pull = .Held
-	case .Jammed:
-		// Mash to clear — each pull chips a tap; no round leaves until it's Ready again.
-		if g.taps > 0 {g.taps -= 1}
-		g.pull = .Clear_Tap
-		if g.taps == 0 {
-			g.mode = .Ready
-			g.pull = .Cleared
-		}
-	case .Ready:
-		if g.ammo == 0 {
-			// Empty — begin the reload; the host counts it down in gun_tick, the pacer holds.
-			g.mode = .Reloading
-			g.reload_cd = g.def.reload_ticks
-			g.pull = .Empty
-		} else if gun_jams(g) {
-			g.ammo -= 1 // the dud is ejected
-			g.spent += 1
-			g.mode = .Jammed
-			g.taps = g.def.jam_taps
-			g.pull = .Jammed
-		} else {
-			g.ammo -= 1
-			g.spent += 1
-			g.fired = true // a live round flew
-			g.pull = .Fired
-			if g.ammo == 0 {
-				g.mode = .Reloading
-				g.reload_cd = g.def.reload_ticks
-			}
-		}
-	}
-	return true // the pull applied — jam/reload/clear-tap are valid outcomes, not rejections
+    g.aim_x, g.aim_y = dx, dy
+    g.origin_x, g.origin_y = ox, oy
+    g.fired = false
+
+    switch g.mode {
+    case .Reloading:
+        // The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
+        g.pull = .Held
+    case .Jammed:
+        // Mash to clear — each pull chips a tap; no round leaves until it's Ready again.
+        if g.taps > 0 {
+            g.taps -= 1
+        }
+
+        g.pull = .Clear_Tap
+
+        if g.taps == 0 {
+            g.mode = .Ready
+            g.pull = .Cleared
+        }
+    case .Ready:
+        if g.ammo == 0 {
+            // Empty — begin the reload; the host counts it down in gun_tick, the pacer holds.
+            g.mode = .Reloading
+            g.reload_cd = g.def.reload_ticks
+            g.pull = .Empty
+        } else if gun_jams(g) {
+            g.ammo -= 1 // the dud is ejected
+            g.spent += 1
+            g.mode = .Jammed
+            g.taps = g.def.jam_taps
+            g.pull = .Jammed
+        } else {
+            g.ammo -= 1
+            g.spent += 1
+            g.fired = true // a live round flew
+            g.pull = .Fired
+
+            if g.ammo == 0 {
+                g.mode = .Reloading
+                g.reload_cd = g.def.reload_ticks
+            }
+        }
+    }
+
+    return true // the pull applied — jam/reload/clear-tap are valid outcomes, not rejections
 }
 
 // gun_tick — HOST per-tick: run the reload dwell. Call once per net tick per gun on the host; the
 // authoritative half of the client's predicted reload gap (they finish within a hair). No-op
 // unless reloading.
 gun_tick :: proc(g: ^Gun) {
-	if g.mode == .Reloading && g.reload_cd > 0 {
-		g.reload_cd -= 1
-		if g.reload_cd == 0 {
-			g.ammo = g.def.mag
-			g.mode = .Ready
-		}
-	}
+    if g.mode == .Reloading && g.reload_cd > 0 {
+        g.reload_cd -= 1
+
+        if g.reload_cd == 0 {
+            g.ammo = g.def.mag
+            g.mode = .Ready
+        }
+    }
 }
 
 // THE MODE'S PRESENTATION is the game's edge half on the embedding entity —
@@ -188,15 +196,23 @@ gun_tick :: proc(g: ^Gun) {
 // player, IDENTICAL on host and client — so the client predicts the jam and shows it with
 // zero lag while the host stays authoritative. `def.jam_per_mille == 0` never jams.
 gun_jams :: proc "contextless" (g: ^Gun) -> bool {
-	if g.def.jam_per_mille == 0 {return false}
-	h := g.salt * 2654435761 + g.spent * 40503 + 668265263
-	h ~= h >> 15
-	h *= 2246822519
-	h ~= h >> 13
-	return u16(h % 1000) < g.def.jam_per_mille
+    if g.def.jam_per_mille == 0 {
+        return false
+    }
+
+    h := g.salt * 2654435761 + g.spent * 40503 + 668265263
+    h ~= h >> 15
+    h *= 2246822519
+    h ~= h >> 13
+    return u16(h % 1000) < g.def.jam_per_mille
 }
 
 // Convenience predicates the pacer and HUD read — the gun's state is public (`g.mode`,
 // `g.ammo`, `g.def`), but these name the intent at the call site.
-gun_reloading :: proc "contextless" (g: ^Gun) -> bool {return g.mode == .Reloading}
-gun_jammed :: proc "contextless" (g: ^Gun) -> bool {return g.mode == .Jammed}
+gun_reloading :: proc "contextless" (g: ^Gun) -> bool {
+    return g.mode == .Reloading
+}
+
+gun_jammed :: proc "contextless" (g: ^Gun) -> bool {
+    return g.mode == .Jammed
+}

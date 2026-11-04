@@ -31,10 +31,12 @@ odin_loader_instance: ^OdinResourceFormatLoader
 @(private = "file")
 get_resource_loader :: proc "contextless" () -> godot.Resource_Loader {
     @(static) ptr: gdext.ObjectPtr
+
     if ptr == nil {
         name := godot.new_string_name_cstring("ResourceLoader", true)
         ptr = gdext.global_get_singleton(&name)
     }
+
     return cast(godot.Resource_Loader)ptr
 }
 
@@ -63,9 +65,11 @@ loader_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.ObjectPtr 
 @(private = "file")
 loader_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
+
     if instance == nil {
         return
     }
+
     free(cast(^OdinResourceFormatLoader)instance)
 }
 
@@ -78,7 +82,11 @@ loader_get_virtual_call_data :: proc "c" (class_user_data: rawptr, name: gdext.S
 // ---- virtuals ----
 
 @(private = "file")
-ld_get_recognized_extensions :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+ld_get_recognized_extensions :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(ret, make_psa("odin"))
 }
@@ -93,11 +101,16 @@ ld_handles_type :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
 }
 
 @(private = "file")
-ld_get_resource_type :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+ld_get_resource_type :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     path := (cast(^godot.String)args[0])^
     odin_path := string_to_odin(path)
     defer delete(odin_path)
+
     // `*.gen.odin` are scriptgen build artifacts that sit beside authored sources in
     // res://. They end in `.odin` but must NOT be treated as attachable scripts.
     if strings.has_suffix(odin_path, ".odin") && !strings.has_suffix(odin_path, ".gen.odin") {
@@ -150,9 +163,11 @@ odin_loader_register :: proc() {
     gdext.string_name_new_with_latin1_chars(&odin_loader_class_name, "OdinResourceFormatLoader", true)
 
     loader_virtuals = make([dynamic]Virtual_Entry, 0, 64) // reserve: gdext allocator .Resize is broken (drops data)
+
     add := proc(name: string, fn: gdext.ExtensionClassCallVirtual) {
         append(&loader_virtuals, Virtual_Entry{name = name, fn = fn})
     }
+
     add("_get_recognized_extensions", ld_get_recognized_extensions)
     add("_handles_type", ld_handles_type)
     add("_get_resource_type", ld_get_resource_type)
@@ -198,6 +213,7 @@ odin_loader_unregister :: proc() {
         odin_loader_object = nil
         odin_loader_instance = nil
     }
+
     delete(loader_virtuals)
     loader_virtuals = nil
 }

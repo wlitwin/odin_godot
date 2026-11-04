@@ -40,38 +40,41 @@ import "core:mem"
 Edge_Thunk :: proc(entity: rawptr, game: rawptr, old: rawptr)
 
 Edge_Desc :: struct {
-	field: int, // index into Entity_Desc.fields — the diff atom is the FIELD
-	fire:  Edge_Thunk,
+    field: int, // index into Entity_Desc.fields — the diff atom is the FIELD
+    fire:  Edge_Thunk,
 }
 
 // Byte size of one entity's edge mirror (its edge-declared fields, packed).
 @(private)
 edge_shadow_size :: proc(set: ^Command_Set) -> int {
-	n := 0
-	for e in set.edges {
-		n += set.entity_desc.fields[e.field].size
-	}
-	return n
+    n := 0
+
+    for e in set.edges {
+        n += set.entity_desc.fields[e.field].size
+    }
+
+    return n
 }
 
 // Pack the entity's current edge-field bytes into its mirror.
 @(private = "file")
 edge_capture :: proc(e: ^Registry_Entry) {
-	off := 0
-	for ed in e.set.edges {
-		f := e.set.entity_desc.fields[ed.field]
-		mem.copy(&e.edge_shadow[off], rawptr(uintptr(e.entity) + f.offset), f.size)
-		off += f.size
-	}
+    off := 0
+
+    for ed in e.set.edges {
+        f := e.set.entity_desc.fields[ed.field]
+        mem.copy(&e.edge_shadow[off], rawptr(uintptr(e.entity) + f.offset), f.size)
+        off += f.size
+    }
 }
 
 // A deferred fire: game code runs AFTER the walk — a half may spawn or
 // despawn entities, and firing mid-iteration would mutate the map under us.
 @(private = "file")
 Edge_Fire :: struct {
-	id:   Net_Id,
-	edge: int, // index into set.edges
-	old:  []u8, // temp copy of the pre-change bytes
+    id:   Net_Id,
+    edge: int, // index into set.edges
+    old:  []u8, // temp copy of the pre-change bytes
 }
 
 // The per-frame pass: diff every edge-declaring entity against its mirror,
@@ -80,40 +83,50 @@ Edge_Fire :: struct {
 // at the end of session_tick, host and client alike: the authority's own
 // mutations edge the same way, zero role branches). Returns fires.
 registry_edges_tick :: proc(reg: ^Registry, game: rawptr) -> int {
-	fires := make([dynamic]Edge_Fire, context.temp_allocator)
-	for _, &e in reg.entries {
-		if len(e.set.edges) == 0 {
-			continue
-		}
-		if !e.edge_seeded {
-			// First sight: the spawn values are the baseline, not an edge.
-			edge_capture(&e)
-			e.edge_seeded = true
-			continue
-		}
-		off := 0
-		for ed, i in e.set.edges {
-			f := e.set.entity_desc.fields[ed.field]
-			cur := ([^]u8)(rawptr(uintptr(e.entity) + f.offset))
-			if mem.compare(cur[:f.size], e.edge_shadow[off:off + f.size]) != 0 {
-				old := make([]u8, f.size, context.temp_allocator)
-				copy(old, e.edge_shadow[off:off + f.size])
-				append(&fires, Edge_Fire{id = e.id, edge = i, old = old})
-				// Commit BEFORE firing: a half that mutates its own field
-				// simply edges again next frame, never re-enters this one.
-				copy(e.edge_shadow[off:off + f.size], cur[:f.size])
-			}
-			off += f.size
-		}
-	}
-	for fr in fires {
-		e, ok := &reg.entries[fr.id]
-		if !ok || fr.edge >= len(e.set.edges) {
-			continue // an earlier half despawned it: nothing left to present on
-		}
-		e.set.edges[fr.edge].fire(e.entity, game, raw_data(fr.old))
-	}
-	return len(fires)
+    fires := make([dynamic]Edge_Fire, context.temp_allocator)
+
+    for _, &e in reg.entries {
+        if len(e.set.edges) == 0 {
+            continue
+        }
+
+        if !e.edge_seeded {
+            // First sight: the spawn values are the baseline, not an edge.
+            edge_capture(&e)
+            e.edge_seeded = true
+            continue
+        }
+
+        off := 0
+
+        for ed, i in e.set.edges {
+            f := e.set.entity_desc.fields[ed.field]
+            cur := ([^]u8)(rawptr(uintptr(e.entity) + f.offset))
+
+            if mem.compare(cur[:f.size], e.edge_shadow[off:off + f.size]) != 0 {
+                old := make([]u8, f.size, context.temp_allocator)
+                copy(old, e.edge_shadow[off:off + f.size])
+                append(&fires, Edge_Fire{id = e.id, edge = i, old = old})
+                // Commit BEFORE firing: a half that mutates its own field
+                // simply edges again next frame, never re-enters this one.
+                copy(e.edge_shadow[off:off + f.size], cur[:f.size])
+            }
+
+            off += f.size
+        }
+    }
+
+    for fr in fires {
+        e, ok := &reg.entries[fr.id]
+
+        if !ok || fr.edge >= len(e.set.edges) {
+            continue // an earlier half despawned it: nothing left to present on
+        }
+
+        e.set.edges[fr.edge].fire(e.entity, game, raw_data(fr.old))
+    }
+
+    return len(fires)
 }
 
 // Silent re-seed for ONE entity: a wholesale catch-up (interest re-entry, a
@@ -122,8 +135,8 @@ registry_edges_tick :: proc(reg: ^Registry, game: rawptr) -> int {
 // session calls this on its Ev_Resynced path; the old hand-rolled version of
 // this rule was net.md's "re-seed your seen_* scratch" gotcha.
 registry_edges_commit :: proc(reg: ^Registry, id: Net_Id) {
-	if e, ok := &reg.entries[id]; ok && len(e.set.edges) > 0 {
-		edge_capture(e)
-		e.edge_seeded = true
-	}
+    if e, ok := &reg.entries[id]; ok && len(e.set.edges) > 0 {
+        edge_capture(e)
+        e.edge_seeded = true
+    }
 }

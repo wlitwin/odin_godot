@@ -689,7 +689,9 @@ ExtensionInterfaceGetVariantFromTypeConstructor :: #type proc "c" (
  *
  * @return A pointer to a function that can get the raw value from a Variant of the given type.
  */
-ExtensionInterfaceGetVariantToTypeConstructor :: #type proc "c" (p_type: Variant_Type) -> TypeFromVariantConstructorProc
+ExtensionInterfaceGetVariantToTypeConstructor :: #type proc "c" (
+    p_type: Variant_Type,
+) -> TypeFromVariantConstructorProc
 
 /**
  * @name variant_get_ptr_internal_getter
@@ -706,9 +708,7 @@ ExtensionInterfaceGetVariantToTypeConstructor :: #type proc "c" (p_type: Variant
  *
  * @return A pointer to a type-specific function that returns a pointer to the internal value of a variant. Check the implementation of this function (gdextension_variant_get_ptr_internal_getter) for pointee type info of each variant type.
  */
-ExtensionInterfaceGetVariantGetInternalPtrFunc :: #type proc "c" (
-    p_type: Variant_Type,
-) -> VariantGetInternalPtrFunc
+ExtensionInterfaceGetVariantGetInternalPtrFunc :: #type proc "c" (p_type: Variant_Type) -> VariantGetInternalPtrFunc
 
 /**
  * @name variant_get_ptr_operator_evaluator
@@ -2388,7 +2388,7 @@ ExtensionInterfaceClassdbRegisterExtensionClass4 :: #type proc "c" (
  * @param p_parent_class_name A pointer to a StringName with the parent class name.
  * @param p_extension_funcs A pointer to a GDExtensionClassCreationInfo5 struct.
  */
- ExtensionInterfaceClassdbRegisterExtensionClass5 :: #type proc "c" (
+ExtensionInterfaceClassdbRegisterExtensionClass5 :: #type proc "c" (
     p_library: ExtensionClassLibraryPtr,
     p_class_name: StringNamePtr,
     p_parent_class_name: StringNamePtr,
@@ -2649,12 +2649,12 @@ ExtensionsInterfaceEditorHelpLoadXmlFromUtf8CharsAndLen :: #type proc "c" (p_dat
  * @param p_library A pointer the library received by the GDExtension's entry point function.
  * @param p_callback The callback to retrieve the list of classes used.
  */
- ExtensionInterfaceEditorRegisterGetClassesUsedCallback :: #type proc "c" (
+ExtensionInterfaceEditorRegisterGetClassesUsedCallback :: #type proc "c" (
     p_library: ExtensionClassLibraryPtr,
     p_callback: ExtensionEditorGetClassesUsedCallback,
- )
+)
 
- /**
+/**
  * @name register_main_loop_callbacks
  * @since 4.5
  *
@@ -2663,7 +2663,7 @@ ExtensionsInterfaceEditorHelpLoadXmlFromUtf8CharsAndLen :: #type proc "c" (p_dat
  * @param p_library A pointer the library received by the GDExtension's entry point function.
  * @param p_callbacks A pointer to the structure that contains the callbacks.
  */
-  ExtensionInterfaceRegisterMainLoopCallbacks :: #type proc "c" (
+ExtensionInterfaceRegisterMainLoopCallbacks :: #type proc "c" (
     p_library: ExtensionClassLibraryPtr,
     p_callback: ^ExtensionMainLoopCallbacks,
- )
+)

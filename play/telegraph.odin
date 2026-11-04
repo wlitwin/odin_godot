@@ -28,39 +28,43 @@ package play
 // brain's policy around telegraph_active.
 
 Telegraph :: struct {
-	left: u16 `gd:"replicate"`, // ticks until it lands (0 = idle) — every screen's countdown
-	wind: u16 `gd:"replicate"`, // the full wind THIS telegraph started with — frac's denominator
+    left: u16 `gd:"replicate"`, // ticks until it lands (0 = idle) — every screen's countdown
+    wind: u16 `gd:"replicate"`, // the full wind THIS telegraph started with — frac's denominator
 }
 
 // telegraph_start — host: begin a wind-up of `wind` ticks. Every screen sees it grow from zero
 // (frac uses this start's own wind, so a hastened wind-up still reads 0 -> 1).
 telegraph_start :: proc(t: ^Telegraph, wind: u16) {
-	t.wind = wind
-	t.left = wind
+    t.wind = wind
+    t.left = wind
 }
 
 // telegraph_tick — host, once per net tick while active: count down. Returns true exactly ON the
 // landing tick — run the payload (the AoE, the barrage) right there. No-op when idle.
 telegraph_tick :: proc(t: ^Telegraph) -> (landed: bool) {
-	if t.left == 0 {return false}
-	t.left -= 1
-	return t.left == 0
+    if t.left == 0 {
+        return false
+    }
+
+    t.left -= 1
+    return t.left == 0
 }
 
 // telegraph_cancel — host: abort a wind-up (the boss died, the trap disarmed). Zeroing `wind`
 // too is what keeps every peer's telegraph_step QUIET — a cancel must never present as a landing.
 telegraph_cancel :: proc(t: ^Telegraph) {
-	t.left = 0
-	t.wind = 0
+    t.left = 0
+    t.wind = 0
 }
 
 // telegraph_active / telegraph_frac — the presentation reads: is it winding, and how grown
 // (0 at the start, 1 as it lands). Drive the ring's scale off frac; gate its visibility on active.
 telegraph_active :: proc "contextless" (t: ^Telegraph) -> bool {
-	return t.left > 0
+    return t.left > 0
 }
+
 telegraph_frac :: proc "contextless" (t: ^Telegraph) -> f32 {
-	return t.wind > 0 ? 1 - f32(t.left) / f32(t.wind) : 0
+    return t.wind > 0 ? 1 - f32(t.left) / f32(t.wind) : 0
 }
 
 // telegraph_landed — the landing test for the game's `<entity>_tele_left_edge` half: did THIS
@@ -70,5 +74,5 @@ telegraph_frac :: proc "contextless" (t: ^Telegraph) -> f32 {
 // edge silently, so a late joiner who never saw the wind-up gets no phantom eruption — that
 // used to be this block's own shadow + sync ritual; the kit's edge halves absorbed it.)
 telegraph_landed :: proc "contextless" (t: ^Telegraph, old_left, new_left: u16) -> bool {
-	return old_left > 0 && new_left == 0 && t.wind > 0
+    return old_left > 0 && new_left == 0 && t.wind > 0
 }

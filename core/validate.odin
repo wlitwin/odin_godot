@@ -53,26 +53,35 @@ warned_no_odin: bool
 // a new worker, so poke -> revalidate -> (hit) -> no new fresh flag -> no loop.
 @(private)
 validate_pump_main_thread :: proc() {
-	if !diag.take_fresh(&diag.g_validate) {
-		return
-	}
-	ei := godot.singleton_editor_interface()
-	if ei == nil {
-		return
-	}
-	se := godot.editor_interface_get_script_editor(ei)
-	if se == nil {
-		return
-	}
-	current := godot.script_editor_get_current_editor(se)
-	if current == nil {
-		return // no script open — the cache still serves the next natural _validate
-	}
-	code_edit := godot.script_editor_base_get_base_editor(current)
-	if code_edit == nil {
-		return
-	}
-	godot.emit(cast(godot.Object)code_edit, "text_changed")
+    if !diag.take_fresh(&diag.g_validate) {
+        return
+    }
+
+    ei := godot.singleton_editor_interface()
+
+    if ei == nil {
+        return
+    }
+
+    se := godot.editor_interface_get_script_editor(ei)
+
+    if se == nil {
+        return
+    }
+
+    current := godot.script_editor_get_current_editor(se)
+
+    if current == nil {
+        return // no script open — the cache still serves the next natural _validate
+    }
+
+    code_edit := godot.script_editor_base_get_base_editor(current)
+
+    if code_edit == nil {
+        return
+    }
+
+    godot.emit(cast(godot.Object)code_edit, "text_changed")
 }
 
 @(private = "file")
@@ -132,7 +141,10 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
 
     n := 0
     odin_bin, found := resolve_odin_bin()
-    defer if found {delete(odin_bin)}
+
+    defer if found {
+        delete(odin_bin)
+    }
 
     if !found {
         // `odin` is unreachable from the editor process — validation can't run. Do NOT
@@ -157,10 +169,15 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
         // editor re-validates on its debounce timer, so a freshly-computed result is picked
         // up on a later call — the UI never freezes waiting on the check. See core/diag/async.
         ds, _ := diag.validate_async(&diag.g_validate, source, abs_path, root, odin_bin)
+
         defer {
-            for d in ds {delete(d.message)}
+            for d in ds {
+                delete(d.message)
+            }
+
             delete(ds)
         }
+
         source_path := string_to_odin(path)
         defer delete(source_path)
         // CLAMP every diagnostic into the CURRENT document's valid caret range before it
@@ -168,6 +185,7 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
         // out-of-range columns (odin's EOF errors carry column 0). Full rationale on
         // diag.clamp_all, pinned by the tests/validate harness.
         diag.clamp_all(ds, source)
+
         for d in ds {
             ed := godot.new_dictionary_default()
             vd_set_int(&ed, "line", i64(d.line))

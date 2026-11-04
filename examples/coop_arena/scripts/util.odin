@@ -16,23 +16,26 @@ import rt "godot:runtime"
 ARENA_W :: f32(640)
 ARENA_H :: f32(360)
 
-GROUP_GAME :: "arena_game"       // joined by arena.odin's //gd:group marker
+GROUP_GAME :: "arena_game" // joined by arena.odin's //gd:group marker
 GROUP_ENEMIES :: "arena_enemies" // joined by arena_enemy.odin's //gd:group marker
-GROUP_PAWNS :: "arena_pawns"     // joined by arena_player.odin's //gd:group marker
+GROUP_PAWNS :: "arena_pawns" // joined by arena_player.odin's //gd:group marker
 
 // find_game returns the ArenaGame SCRIPT on the root node, or nil — the typed handle the
 // pawn/bullet use to reach the orchestrator (to broadcast fire/damage RPCs on a node whose
 // path is identical on every peer).
 find_game :: proc "contextless" (from: gd.Object) -> ^ArenaGame {
-	return rt.first_script_in_group(from, GROUP_GAME, ArenaGame)
+    return rt.first_script_in_group(from, GROUP_GAME, ArenaGame)
 }
 
 // enemy_by_id finds the ArenaEnemy whose synced `id` matches, scanning GROUP_ENEMIES. Returns
 // the node + its script, or (nil, nil). Used by the peer-authoritative damage RPC so every
 // peer resolves the SAME enemy regardless of how the spawner named the node.
 enemy_by_id :: proc(from: gd.Object, id: int) -> (gd.Node, ^ArenaEnemy) {
-	for e in rt.scripts_in_group(from, GROUP_ENEMIES, ArenaEnemy) {
-		if e.id == id {return e.owner, e}
-	}
-	return nil, nil
+    for e in rt.scripts_in_group(from, GROUP_ENEMIES, ArenaEnemy) {
+        if e.id == id {
+            return e.owner, e
+        }
+    }
+
+    return nil, nil
 }

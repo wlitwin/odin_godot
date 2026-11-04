@@ -1,5 +1,7 @@
 {
   "character_width": 120,
+  "tabs": false,
+  "spaces": 4,
   "tabs_width": 4,
   "newline_limit": 2,
   "sort_imports": false,

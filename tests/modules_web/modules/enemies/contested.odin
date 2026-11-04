@@ -13,10 +13,10 @@ package modweb_enemies
 import gd "godot:godot"
 
 Contested :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 @(gd_method)
 contested_claim :: proc(self: ^Contested) -> int {
-	return 2 // enemies module's brand
+    return 2 // enemies module's brand
 }

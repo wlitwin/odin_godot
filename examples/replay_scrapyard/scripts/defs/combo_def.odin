@@ -19,12 +19,12 @@ package scrapyard_defs
 import gd "godot:godot"
 
 ComboDef :: struct {
-	owner: gd.Resource,
-	present: ^gd.Resource `gd:"export,resource=StatusDef"`, // status already on the target
-	incoming: ^gd.Resource `gd:"export,resource=StatusDef"`, // status being applied
-	reaction: gd.Int `gd:"export,enum=Detonate:Transmute:Spread"`,
-	dmg: gd.Int `gd:"export,range=0:250:1"`, // Detonate: the splash's wound
-	radius: f32 `gd:"export,range=0:600:1"`, // Detonate splash / Spread reach
-	output: ^gd.Resource `gd:"export,resource=StatusDef"`, // Transmute/Spread: the status produced (0 = none)
-	consume: bool `gd:"export"`, // the trigger pair vanishes in the reaction
+    owner: gd.Resource,
+    present: ^gd.Resource `gd:"export,resource=StatusDef"`, // status already on the target
+    incoming: ^gd.Resource `gd:"export,resource=StatusDef"`, // status being applied
+    reaction: gd.Int `gd:"export,enum=Detonate:Transmute:Spread"`,
+    dmg: gd.Int `gd:"export,range=0:250:1"`, // Detonate: the splash's wound
+    radius: f32 `gd:"export,range=0:600:1"`, // Detonate splash / Spread reach
+    output: ^gd.Resource `gd:"export,resource=StatusDef"`, // Transmute/Spread: the status produced (0 = none)
+    consume: bool `gd:"export"`, // the trigger pair vanishes in the reaction
 }

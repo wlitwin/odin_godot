@@ -8,16 +8,16 @@ package phase4_scripts
 import gd "godot:godot"
 
 LifecycleToggle :: struct {
-	owner:         gd.Node,
-	process_ticks: gd.Int `gd:"export"`,
-	physics_ticks: gd.Int `gd:"export"`,
+    owner:         gd.Node,
+    process_ticks: gd.Int `gd:"export"`,
+    physics_ticks: gd.Int `gd:"export"`,
 }
 
 lifecycle_toggle_physics_process :: proc(self: ^LifecycleToggle, delta: f64) {
-	self.physics_ticks += 1
+    self.physics_ticks += 1
 }
 
 @(gd_method)
 lifecycle_toggle_get_mode :: proc(self: ^LifecycleToggle) -> int {
-	return 1 // v1: physics only
+    return 1 // v1: physics only
 }

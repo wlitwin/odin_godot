@@ -18,13 +18,13 @@ import gd "godot:godot"
 
 // First field MUST be the owner Object pointer (the core writes it at offset 0).
 Widget :: struct {
-	owner: gd.Node,
-	speed: gd.Float `gd:"export"`,
-	//NEW_FIELD_HERE
+    owner: gd.Node,
+    speed: gd.Float `gd:"export"`,
+    //NEW_FIELD_HERE
 }
 
 // A trivial method so the class is a complete, realistic example (also lets a driver call in).
 @(gd_method)
 widget_get_speed :: proc(self: ^Widget) -> f64 {
-	return self.speed
+    return self.speed
 }

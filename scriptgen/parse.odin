@@ -11,11 +11,18 @@ import decl "godot:decl"
 // Render a type/expr node back to its source text by slicing the original buffer.
 // Robust for arbitrary types (`f32`, `gd.Int`, `^gd.Node2d`, ...).
 node_text :: proc(src: string, n: ^ast.Node) -> string {
-	if n == nil {return ""}
-	lo := n.pos.offset
-	hi := n.end.offset
-	if lo < 0 || hi > len(src) || lo > hi {return ""}
-	return strings.trim_space(src[lo:hi])
+    if n == nil {
+        return ""
+    }
+
+    lo := n.pos.offset
+    hi := n.end.offset
+
+    if lo < 0 || hi > len(src) || lo > hi {
+        return ""
+    }
+
+    return strings.trim_space(src[lo:hi])
 }
 
 // Pull the value of the `gd` key out of an Odin struct-field tag like
@@ -23,39 +30,64 @@ node_text :: proc(src: string, n: ^ast.Node) -> string {
 // START of the tag or after whitespace — a bare substring match would also hit an
 // UNRELATED key that merely ends in "gd" (`msgd:"..."`).
 tag_gd_value :: proc(tag_text: string) -> (string, bool) {
-	t := strings.trim(tag_text, "`")
-	key := "gd:\""
-	for at := 0; at < len(t); {
-		i := strings.index(t[at:], key)
-		if i < 0 {return "", false}
-		abs := at + i
-		at = abs + len(key)
-		if abs != 0 && t[abs - 1] != ' ' && t[abs - 1] != '\t' {continue} // e.g. `msgd:"..."`
-		rest := t[at:]
-		j := strings.index(rest, "\"")
-		if j < 0 {return "", false}
-		return rest[:j], true
-	}
-	return "", false
+    t := strings.trim(tag_text, "`")
+    key := "gd:\""
+
+    for at := 0; at < len(t); {
+        i := strings.index(t[at:], key)
+
+        if i < 0 {
+            return "", false
+        }
+
+        abs := at + i
+        at = abs + len(key)
+
+        if abs != 0 && t[abs - 1] != ' ' && t[abs - 1] != '\t' {
+            continue
+        } // e.g. `msgd:"..."`
+
+        rest := t[at:]
+        j := strings.index(rest, "\"")
+
+        if j < 0 {
+            return "", false
+        }
+
+        return rest[:j], true
+    }
+
+    return "", false
 }
 
 // is_odin_ident — the ASCII identifier rule (letter/underscore first, then alnum/underscore).
 // Signal arg names from `gd:"args=..."` tags are spliced into generated Odin code (the
 // typed emit helpers' parameter names), so anything else must be rejected at parse time.
 is_odin_ident :: proc(s: string) -> bool {
-	if len(s) == 0 {return false}
-	for i in 0 ..< len(s) {
-		c := s[i]
-		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {continue}
-		if i > 0 && c >= '0' && c <= '9' {continue}
-		return false
-	}
-	return true
+    if len(s) == 0 {
+        return false
+    }
+
+    for i in 0 ..< len(s) {
+        c := s[i]
+
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+            continue
+        }
+
+        if i > 0 && c >= '0' && c <= '9' {
+            continue
+        }
+
+        return false
+    }
+
+    return true
 }
 
 @(private = "file")
 is_ident_byte :: proc(c: byte) -> bool {
-	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+    return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 // normalize_godot_qualifier rewrites `<alias>.` -> `gd.` (at identifier boundaries) in a
@@ -64,125 +96,159 @@ is_ident_byte :: proc(c: byte) -> bool {
 // (`godot.Vector2`, `g.Node2d`) must be normalized before they are spliced verbatim into
 // generated code — and before map_variant, which only understands the `gd.` qualifier.
 normalize_godot_qualifier :: proc(text, alias: string) -> string {
-	if alias == "" || alias == "gd" || !strings.contains(text, alias) {return text}
-	b := strings.builder_make()
-	i := 0
-	for i < len(text) {
-		if strings.has_prefix(text[i:], alias) &&
-		   i + len(alias) < len(text) && text[i + len(alias)] == '.' &&
-		   (i == 0 || !is_ident_byte(text[i - 1])) {
-			strings.write_string(&b, "gd.")
-			i += len(alias) + 1
-			continue
-		}
-		strings.write_byte(&b, text[i])
-		i += 1
-	}
-	return strings.to_string(b)
+    if alias == "" || alias == "gd" || !strings.contains(text, alias) {
+        return text
+    }
+
+    b := strings.builder_make()
+    i := 0
+
+    for i < len(text) {
+        if strings.has_prefix(text[i:], alias) &&
+           i + len(alias) < len(text) &&
+           text[i + len(alias)] == '.' &&
+           (i == 0 || !is_ident_byte(text[i - 1])) {
+            strings.write_string(&b, "gd.")
+            i += len(alias) + 1
+            continue
+        }
+
+        strings.write_byte(&b, text[i])
+        i += 1
+    }
+
+    return strings.to_string(b)
 }
 
 // godot_import_alias returns the name the file's `godot:godot` import binds ("" when the
 // file doesn't import it). `import gd "godot:godot"` -> "gd"; a bare `import "godot:godot"`
 // -> the default package name "godot".
 godot_import_alias :: proc(file: ^ast.File) -> string {
-	for imp in file.imports {
-		if strings.trim(imp.fullpath, "\"") != "godot:godot" {continue}
-		if imp.name.text != "" && imp.name.text != "_" {return imp.name.text}
-		return "godot"
-	}
-	return ""
+    for imp in file.imports {
+        if strings.trim(imp.fullpath, "\"") != "godot:godot" {
+            continue
+        }
+
+        if imp.name.text != "" && imp.name.text != "_" {
+            return imp.name.text
+        }
+
+        return "godot"
+    }
+
+    return ""
 }
 
 // Convert Ada_Case and PascalCase identifiers to snake_case. Existing word
 // separators stay single; acronym runs form one word (HUD_View -> hud_view).
 to_snake :: proc(s: string) -> string {
-	b := strings.builder_make()
-	for r, i in s {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 && s[i-1] != '_' {
-				previous_lower := s[i-1] >= 'a' && s[i-1] <= 'z'
-				previous_digit := s[i-1] >= '0' && s[i-1] <= '9'
-				next_lower := i+1 < len(s) && s[i+1] >= 'a' && s[i+1] <= 'z'
-				previous_upper := s[i-1] >= 'A' && s[i-1] <= 'Z'
-				if previous_lower || ((previous_upper || previous_digit) && next_lower) {
-					strings.write_rune(&b, '_')
-				}
-			}
-			strings.write_rune(&b, r + ('a' - 'A'))
-		} else {
-			strings.write_rune(&b, r)
-		}
-	}
-	return strings.to_string(b)
+    b := strings.builder_make()
+
+    for r, i in s {
+        if r >= 'A' && r <= 'Z' {
+            if i > 0 && s[i - 1] != '_' {
+                previous_lower := s[i - 1] >= 'a' && s[i - 1] <= 'z'
+                previous_digit := s[i - 1] >= '0' && s[i - 1] <= '9'
+                next_lower := i + 1 < len(s) && s[i + 1] >= 'a' && s[i + 1] <= 'z'
+                previous_upper := s[i - 1] >= 'A' && s[i - 1] <= 'Z'
+
+                if previous_lower || ((previous_upper || previous_digit) && next_lower) {
+                    strings.write_rune(&b, '_')
+                }
+            }
+
+            strings.write_rune(&b, r + ('a' - 'A'))
+        } else {
+            strings.write_rune(&b, r)
+        }
+    }
+
+    return strings.to_string(b)
 }
 
 // Recognize the former per-capital spelling only to report a migration. It
 // must not silently turn an existing lifecycle callback into an unused helper.
 @(private = "file")
 legacy_script_prefix :: proc(s: string) -> string {
-	b := strings.builder_make(context.temp_allocator)
-	for r, i in s {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 {strings.write_rune(&b, '_')}
-			strings.write_rune(&b, r + ('a' - 'A'))
-		} else {
-			strings.write_rune(&b, r)
-		}
-	}
-	strings.write_rune(&b, '_')
-	return strings.to_string(b)
+    b := strings.builder_make(context.temp_allocator)
+
+    for r, i in s {
+        if r >= 'A' && r <= 'Z' {
+            if i > 0 {
+                strings.write_rune(&b, '_')
+            }
+
+            strings.write_rune(&b, r + ('a' - 'A'))
+        } else {
+            strings.write_rune(&b, r)
+        }
+    }
+
+    strings.write_rune(&b, '_')
+    return strings.to_string(b)
 }
 
 @(private = "file")
 validate_struct_prefix :: proc(proc_name, struct_name: string, loc: Loc) -> bool {
-	prefix := strings.concatenate({to_snake(struct_name), "_"})
-	legacy_prefix := legacy_script_prefix(struct_name)
-	if prefix == legacy_prefix || !strings.has_prefix(proc_name, legacy_prefix) {
-		return true
-	}
-	error_at(
-		loc,
-		"%s now uses the snake_case prefix %q; rename %q to %q and regenerate scripts",
-		struct_name,
-		prefix,
-		proc_name,
-		strings.concatenate({prefix, proc_name[len(legacy_prefix):]}),
-	)
-	return false
+    prefix := strings.concatenate({to_snake(struct_name), "_"})
+    legacy_prefix := legacy_script_prefix(struct_name)
+
+    if prefix == legacy_prefix || !strings.has_prefix(proc_name, legacy_prefix) {
+        return true
+    }
+
+    error_at(
+        loc,
+        "%s now uses the snake_case prefix %q; rename %q to %q and regenerate scripts",
+        struct_name,
+        prefix,
+        proc_name,
+        strings.concatenate({prefix, proc_name[len(legacy_prefix):]}),
+    )
+    return false
 }
 
 // Public facade names normally read `<game>_net_<verb>`. A class already
 // ending in Net (HelloNet -> hello_net) does not stutter `net_net`.
 net_facade_name :: proc(snake, verb: string) -> string {
-	if strings.has_suffix(snake, "_net") {
-		return fmt.tprintf("%s_%s", snake, verb)
-	}
-	return fmt.tprintf("%s_net_%s", snake, verb)
+    if strings.has_suffix(snake, "_net") {
+        return fmt.tprintf("%s_%s", snake, verb)
+    }
+
+    return fmt.tprintf("%s_net_%s", snake, verb)
 }
 
 // Strip a leading `<snake_struct>_` prefix from a proc name, if present.
 strip_struct_prefix :: proc(proc_name, struct_name: string) -> string {
-	prefix := strings.concatenate({to_snake(struct_name), "_"})
-	if strings.has_prefix(proc_name, prefix) {
-		return proc_name[len(prefix):]
-	}
-	return proc_name
+    prefix := strings.concatenate({to_snake(struct_name), "_"})
+
+    if strings.has_prefix(proc_name, prefix) {
+        return proc_name[len(prefix):]
+    }
+
+    return proc_name
 }
 
 lifecycle_keyword :: proc(name: string) -> (string, bool) {
-	for kw in LIFECYCLE_KEYWORDS {
-		if name == kw {return kw, true}
-	}
-	return "", false
+    for kw in LIFECYCLE_KEYWORDS {
+        if name == kw {
+            return kw, true
+        }
+    }
+
+    return "", false
 }
 
 // nearest_lifecycle reports a lifecycle keyword within edit-distance 1 of `name` (excluding
 // an exact match, which lifecycle_keyword already caught). Used only for a typo warning.
 nearest_lifecycle :: proc(name: string) -> (string, bool) {
-	for kw in LIFECYCLE_KEYWORDS {
-		if name != kw && edit_distance_le1(name, kw) {return kw, true}
-	}
-	return "", false
+    for kw in LIFECYCLE_KEYWORDS {
+        if name != kw && edit_distance_le1(name, kw) {
+            return kw, true
+        }
+    }
+
+    return "", false
 }
 
 // one_typo_apart — edit_distance_le1 WIDENED by one adjacent transposition, for
@@ -194,46 +260,76 @@ nearest_lifecycle :: proc(name: string) -> (string, bool) {
 // lifecycle-typo WARNING, where a wider net means more false noise on procs the
 // author never meant as lifecycles.
 one_typo_apart :: proc(a, b: string) -> bool {
-	if edit_distance_le1(a, b) {return true}
-	if len(a) != len(b) {return false}
-	for i in 0 ..< len(a) - 1 {
-		if a[i] == b[i] {continue}
-		// The first disagreement must be the swapped pair, and the rest equal.
-		return a[i] == b[i + 1] && a[i + 1] == b[i] && a[i + 2:] == b[i + 2:]
-	}
-	return false
+    if edit_distance_le1(a, b) {
+        return true
+    }
+
+    if len(a) != len(b) {
+        return false
+    }
+
+    for i in 0 ..< len(a) - 1 {
+        if a[i] == b[i] {
+            continue
+        }
+
+        // The first disagreement must be the swapped pair, and the rest equal.
+        return a[i] == b[i + 1] && a[i + 1] == b[i] && a[i + 2:] == b[i + 2:]
+    }
+
+    return false
 }
 
 // edit_distance_le1 — true iff `a` becomes `b` with at most one insertion, deletion, or
 // substitution. (A tiny single-edit check; not a full Levenshtein.)
 edit_distance_le1 :: proc(a, b: string) -> bool {
-	x, y := a, b // params are immutable; work on locals so we can normalize order
-	lx, ly := len(x), len(y)
-	if lx == ly {
-		diffs := 0
-		for i in 0 ..< lx {
-			if x[i] != y[i] {
-				diffs += 1
-				if diffs > 1 {return false}
-			}
-		}
-		return diffs == 1
-	}
-	// length differs by exactly 1: the longer must equal the shorter with one char inserted.
-	if lx > ly {x, y = y, x; lx, ly = ly, lx}
-	if ly - lx != 1 {return false}
-	i, j := 0, 0
-	skipped := false
-	for i < lx && j < ly {
-		if x[i] == y[j] {
-			i += 1; j += 1
-		} else {
-			if skipped {return false}
-			skipped = true
-			j += 1 // skip one char in the longer string
-		}
-	}
-	return true
+    x, y := a, b // params are immutable; work on locals so we can normalize order
+    lx, ly := len(x), len(y)
+
+    if lx == ly {
+        diffs := 0
+
+        for i in 0 ..< lx {
+            if x[i] != y[i] {
+                diffs += 1
+
+                if diffs > 1 {
+                    return false
+                }
+            }
+        }
+
+        return diffs == 1
+    }
+
+    // length differs by exactly 1: the longer must equal the shorter with one char inserted.
+    if lx > ly {
+        x, y = y, x
+        lx, ly = ly, lx
+    }
+
+    if ly - lx != 1 {
+        return false
+    }
+
+    i, j := 0, 0
+    skipped := false
+
+    for i < lx && j < ly {
+        if x[i] == y[j] {
+            i += 1
+            j += 1
+        } else {
+            if skipped {
+                return false
+            }
+
+            skipped = true
+            j += 1 // skip one char in the longer string
+        }
+    }
+
+    return true
 }
 
 // ---- marker scanning (//gd:extends / //gd:class / //gd:tool / //gd:icon) ----
@@ -244,74 +340,100 @@ edit_distance_le1 :: proc(a, b: string) -> bool {
 // raw string or block comment in the body can never register a phantom marker. A
 // marker-shaped line AFTER the package decl gets a warning (it used to be honored).
 scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
-	it := src
-	ln := 0
-	for line in strings.split_lines_iterator(&it) {
-		ln += 1
-		l := strings.trim_space(line)
-		if !strings.has_prefix(l, "//gd:") {continue}
-		loc := Loc{s.path, ln}
-		if pkg_line > 0 && ln > pkg_line {
-			warn_at(loc, "//gd: marker after the package declaration is ignored — markers go at the top of the file")
-			continue
-		}
-		body := strings.trim_space(l[len("//gd:"):])
-		if rest, ok := marker_arg(body, "extends"); ok {
-			s.marked = true
-			s.base = strings.trim_space(rest)
-			s.base_line = ln
-			if s.base == "" {error_at(loc, "//gd:extends needs a base class name")}
-		} else if rest, ok := marker_arg(body, "class"); ok {
-			s.marked = true
-			s.class_name = strings.trim_space(rest)
-			if s.class_name == "" {error_at(loc, "//gd:class needs a name")}
-		} else if _, ok := marker_arg(body, "tool"); ok {
-			s.marked = true
-			s.tool = true
-		} else if rest, ok := marker_arg(body, "icon"); ok {
-			s.marked = true
-			s.icon = strings.trim_space(rest)
-		} else if rest, ok := marker_arg(body, "group"); ok {
-			// `//gd:group a b` — declarative group membership: the core joins each named
-			// group on READY (before onready/@(gd_connect)/your ready), collapsing the
-			// `gd.add_to_group(self.owner, ...)` ready boilerplate. Space-separated,
-			// repeatable across lines; names accumulate.
-			s.marked = true
-			names := strings.fields(strings.trim_space(rest), context.temp_allocator)
-			if len(names) == 0 {
-				error_at(loc, "//gd:group needs one or more group names (space-separated)")
-			}
-			for n in names {
-				append(&s.groups, n)
-			}
-		} else if rest, ok := marker_arg(body, "replay_view"); ok {
-			s.marked=true
-			parse_replay_view_marker(s,strings.trim_space(rest),loc)
-		} else if _, ok := marker_arg(body, "signal"); ok {
-			// The comment-marker signal form is GONE (breaking change) — signals are typed
-			// struct fields now. Point straight at the replacement instead of "unknown marker".
-			error_at(
-				loc,
-				"//gd:signal was removed — declare the signal as a typed struct field instead, e.g. `collected: gd.Signal1(int) `gd:\"args=value\"`` (gd.Signal0 for no payload; see docs/authoring-guide.md)"
-			)
-		} else {
-			// A `//gd:` line that matches no known marker is almost always a typo
-			// (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
-			// `//gd:` namespace is reserved, so erroring is safe.
-			error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group/replay_view)", body)
-		}
-	}
+    it := src
+    ln := 0
+
+    for line in strings.split_lines_iterator(&it) {
+        ln += 1
+        l := strings.trim_space(line)
+
+        if !strings.has_prefix(l, "//gd:") {
+            continue
+        }
+
+        loc := Loc{s.path, ln}
+
+        if pkg_line > 0 && ln > pkg_line {
+            warn_at(loc, "//gd: marker after the package declaration is ignored — markers go at the top of the file")
+            continue
+        }
+
+        body := strings.trim_space(l[len("//gd:"):])
+
+        if rest, ok := marker_arg(body, "extends"); ok {
+            s.marked = true
+            s.base = strings.trim_space(rest)
+            s.base_line = ln
+
+            if s.base == "" {
+                error_at(loc, "//gd:extends needs a base class name")
+            }
+        } else if rest, ok := marker_arg(body, "class"); ok {
+            s.marked = true
+            s.class_name = strings.trim_space(rest)
+
+            if s.class_name == "" {
+                error_at(loc, "//gd:class needs a name")
+            }
+        } else if _, ok := marker_arg(body, "tool"); ok {
+            s.marked = true
+            s.tool = true
+        } else if rest, ok := marker_arg(body, "icon"); ok {
+            s.marked = true
+            s.icon = strings.trim_space(rest)
+        } else if rest, ok := marker_arg(body, "group"); ok {
+            // `//gd:group a b` — declarative group membership: the core joins each named
+            // group on READY (before onready/@(gd_connect)/your ready), collapsing the
+            // `gd.add_to_group(self.owner, ...)` ready boilerplate. Space-separated,
+            // repeatable across lines; names accumulate.
+            s.marked = true
+            names := strings.fields(strings.trim_space(rest), context.temp_allocator)
+
+            if len(names) == 0 {
+                error_at(loc, "//gd:group needs one or more group names (space-separated)")
+            }
+
+            for n in names {
+                append(&s.groups, n)
+            }
+        } else if rest, ok := marker_arg(body, "replay_view"); ok {
+            s.marked = true
+            parse_replay_view_marker(s, strings.trim_space(rest), loc)
+        } else if _, ok := marker_arg(body, "signal"); ok {
+            // The comment-marker signal form is GONE (breaking change) — signals are typed
+            // struct fields now. Point straight at the replacement instead of "unknown marker".
+            error_at(
+                loc,
+                "//gd:signal was removed — declare the signal as a typed struct field instead, e.g. `collected: gd.Signal1(int) `gd:\"args=value\"`` (gd.Signal0 for no payload; see docs/authoring-guide.md)",
+            )
+        } else {
+            // A `//gd:` line that matches no known marker is almost always a typo
+            // (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
+            // `//gd:` namespace is reserved, so erroring is safe.
+            error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group/replay_view)", body)
+        }
+    }
 }
 
 // marker_arg matches keyword `kw` at a WORD BOUNDARY, returning the text after it. The
 // boundary check is what stops `//gd:tooltip` from matching `tool` and `//gd:extend` (no
 // trailing `s`) from matching `extends` — both previously silently changed behaviour.
 marker_arg :: proc(body, kw: string) -> (rest: string, ok: bool) {
-	if !strings.has_prefix(body, kw) {return "", false}
-	r := body[len(kw):]
-	if len(r) == 0 {return "", true} // bare marker (e.g. `//gd:tool`)
-	if r[0] == ' ' || r[0] == '\t' {return r, true}
-	return "", false // e.g. `tooltip` after `tool` — not a boundary
+    if !strings.has_prefix(body, kw) {
+        return "", false
+    }
+
+    r := body[len(kw):]
+
+    if len(r) == 0 {
+        return "", true
+    } // bare marker (e.g. `//gd:tool`)
+
+    if r[0] == ' ' || r[0] == '\t' {
+        return r, true
+    }
+
+    return "", false // e.g. `tooltip` after `tool` — not a boundary
 }
 
 // ---- signal fields (gd.Signal0 … Signal4, gd.SignalN) ---------------------------
@@ -323,99 +445,153 @@ marker_arg :: proc(body, kw: string) -> (rest: string, ok: bool) {
 // (runtime/register_class.odin signal_field_args, which checks the marker's phantom
 // structure instead); scriptgen only needs them for the typed emit helper's signature.
 signal_type_params :: proc(type_text: string) -> (arity: int, params: string, ok: bool) {
-	t := type_text
-	if strings.has_prefix(t, "gd.") {
-		t = t[3:]
-	} else if strings.has_prefix(t, "godot.") {
-		t = t[6:]
-	} else {
-		return 0, "", false
-	}
-	if t == "Signal0" {return 0, "", true}
-	HEAD :: len("Signal") // "Signal" + one arity digit + "(" ... ")"
-	if !strings.has_prefix(t, "Signal") || len(t) < HEAD + 3 {return 0, "", false}
-	n := int(t[HEAD] - '0')
-	if n < 1 || n > 4 || t[HEAD + 1] != '(' || t[len(t) - 1] != ')' {return 0, "", false}
-	return n, strings.trim_space(t[HEAD + 2:len(t) - 1]), true
+    t := type_text
+
+    if strings.has_prefix(t, "gd.") {
+        t = t[3:]
+    } else if strings.has_prefix(t, "godot.") {
+        t = t[6:]
+    } else {
+        return 0, "", false
+    }
+
+    if t == "Signal0" {
+        return 0, "", true
+    }
+
+    HEAD :: len("Signal") // "Signal" + one arity digit + "(" ... ")"
+
+    if !strings.has_prefix(t, "Signal") || len(t) < HEAD + 3 {
+        return 0, "", false
+    }
+
+    n := int(t[HEAD] - '0')
+
+    if n < 1 || n > 4 || t[HEAD + 1] != '(' || t[len(t) - 1] != ')' {
+        return 0, "", false
+    }
+
+    return n, strings.trim_space(t[HEAD + 2:len(t) - 1]), true
 }
 
 // Split a rendered type-parameter list on TOP-LEVEL commas only — a parameter can itself
 // be parametric (`Typed_Dictionary(gd.String, i64)`), whose inner commas must not split.
 split_type_params :: proc(params: string) -> [dynamic]string {
-	parts := make([dynamic]string)
-	depth := 0
-	start := 0
-	for i in 0 ..< len(params) {
-		switch params[i] {
-		case '(':
-			depth += 1
-		case ')':
-			depth -= 1
-		case ',':
-			if depth == 0 {
-				append(&parts, strings.trim_space(params[start:i]))
-				start = i + 1
-			}
-		}
-	}
-	append(&parts, strings.trim_space(params[start:]))
-	return parts
+    parts := make([dynamic]string)
+    depth := 0
+    start := 0
+
+    for i in 0 ..< len(params) {
+        switch params[i] {
+        case '(':
+            depth += 1
+        case ')':
+            depth -= 1
+        case ',':
+            if depth == 0 {
+                append(&parts, strings.trim_space(params[start:i]))
+                start = i + 1
+            }
+        }
+    }
+
+    append(&parts, strings.trim_space(params[start:]))
+    return parts
 }
 
 // Parse one signal FIELD (`collected: gd.Signal1(int) `gd:\"args=value\"``) into a
 // Signal_Info. The signal name is the field name (already a valid identifier — it parsed);
 // arg names come from the optional `args=` tag or synthesize as argN. Only build-time
 // validation + the emit-helper inputs happen here; registration is the runtime walk's job.
-parse_signal_field :: proc(s: ^Script, floc: Loc, fname: string, arity: int, params: string, tag_val: string, has_tag: bool) {
-	sig := Signal_Info {
-		name = fname,
-		line = floc.line
-	}
+parse_signal_field :: proc(
+    s: ^Script,
+    floc: Loc,
+    fname: string,
+    arity: int,
+    params: string,
+    tag_val: string,
+    has_tag: bool,
+) {
+    sig := Signal_Info {
+        name = fname,
+        line = floc.line,
+    }
 
-	// Payload types: every parameter must be Variant-able (same rule as method args).
-	if arity > 0 {
-		parts := split_type_params(params)
-		defer delete(parts)
-		if len(parts) != arity {
-			error_at(floc, "%s.%s: malformed signal type parameters %q", s.struct_name, fname, params)
-			return
-		}
-		for p, i in parts {
-			vi, ok := map_variant(p)
-			if !ok {
-				error_at(floc, "%s.%s: signal payload parameter %d has unsupported type %q — every parameter must map to a Variant", s.struct_name, fname, i, p)
-				return
-			}
-			append(&sig.args, Signal_Arg{name = fmt.tprintf("arg%d", i), vi = vi})
-		}
-	}
+    // Payload types: every parameter must be Variant-able (same rule as method args).
+    if arity > 0 {
+        parts := split_type_params(params)
+        defer delete(parts)
 
-	// Optional `gd:"args=a,b"` — payload names, one per parameter, positionally. The names
-	// become the emit helper's parameter names (spliced into generated code) and the
-	// registered PropertyInfo names, so they must be plain identifiers.
-	if has_tag {
-		if !strings.has_prefix(tag_val, "args=") {
-			error_at(floc, "%s.%s: a signal field's gd tag must be `args=name1,name2` (signals register by type and cannot be exported)", s.struct_name, fname)
-		} else {
-			names := strings.split(tag_val[len("args="):], ",")
-			defer delete(names)
-			// (split("") is [""] — a zero-payload `args=` also lands here, len 1 != 0.)
-			if len(names) != arity {
-				error_at(floc, "%s.%s: `args=` must name each of the signal's %d payload parameter(s) exactly once", s.struct_name, fname, arity)
-			} else {
-				for nm, i in names {
-					aname := strings.trim_space(nm)
-					if !is_odin_ident(aname) {
-						error_at(floc, "%s.%s: signal arg name %q is not a valid identifier", s.struct_name, fname, aname)
-						continue
-					}
-					sig.args[i].name = aname
-				}
-			}
-		}
-	}
+        if len(parts) != arity {
+            error_at(floc, "%s.%s: malformed signal type parameters %q", s.struct_name, fname, params)
+            return
+        }
 
-	append(&s.signals, sig)
+        for p, i in parts {
+            vi, ok := map_variant(p)
+
+            if !ok {
+                error_at(
+                    floc,
+                    "%s.%s: signal payload parameter %d has unsupported type %q — every parameter must map to a Variant",
+                    s.struct_name,
+                    fname,
+                    i,
+                    p,
+                )
+                return
+            }
+
+            append(&sig.args, Signal_Arg{name = fmt.tprintf("arg%d", i), vi = vi})
+        }
+    }
+
+    // Optional `gd:"args=a,b"` — payload names, one per parameter, positionally. The names
+    // become the emit helper's parameter names (spliced into generated code) and the
+    // registered PropertyInfo names, so they must be plain identifiers.
+    if has_tag {
+        if !strings.has_prefix(tag_val, "args=") {
+            error_at(
+                floc,
+                "%s.%s: a signal field's gd tag must be `args=name1,name2` (signals register by type and cannot be exported)",
+                s.struct_name,
+                fname,
+            )
+        } else {
+            names := strings.split(tag_val[len("args="):], ",")
+            defer delete(names)
+
+            // (split("") is [""] — a zero-payload `args=` also lands here, len 1 != 0.)
+            if len(names) != arity {
+                error_at(
+                    floc,
+                    "%s.%s: `args=` must name each of the signal's %d payload parameter(s) exactly once",
+                    s.struct_name,
+                    fname,
+                    arity,
+                )
+            } else {
+                for nm, i in names {
+                    aname := strings.trim_space(nm)
+
+                    if !is_odin_ident(aname) {
+                        error_at(
+                            floc,
+                            "%s.%s: signal arg name %q is not a valid identifier",
+                            s.struct_name,
+                            fname,
+                            aname,
+                        )
+                        continue
+                    }
+
+                    sig.args[i].name = aname
+                }
+            }
+        }
+    }
+
+    append(&s.signals, sig)
 }
 
 // Detect the general-form marker (gd.SignalN) on a field's type expression and return its
@@ -425,16 +601,37 @@ parse_signal_field :: proc(s: ^Script, floc: Loc, fname: string, arity: int, par
 // The godot qualifier is REQUIRED, same rule as signal_type_params: the file's actual
 // `godot:godot` import alias, or the canonical gd./godot. spellings.
 signal_n_param :: proc(type_expr: ^ast.Expr, alias: string) -> (param: ^ast.Expr, ok: bool) {
-	if type_expr == nil {return nil, false}
-	call, cok := type_expr.derived.(^ast.Call_Expr)
-	if !cok {return nil, false}
-	sel, sok := call.expr.derived.(^ast.Selector_Expr)
-	if !sok || sel.field == nil || sel.field.name != "SignalN" {return nil, false}
-	pkg, pok := sel.expr.derived.(^ast.Ident)
-	if !pok {return nil, false}
-	if pkg.name != alias && pkg.name != "gd" && pkg.name != "godot" {return nil, false}
-	if len(call.args) != 1 {return nil, false}
-	return call.args[0], true
+    if type_expr == nil {
+        return nil, false
+    }
+
+    call, cok := type_expr.derived.(^ast.Call_Expr)
+
+    if !cok {
+        return nil, false
+    }
+
+    sel, sok := call.expr.derived.(^ast.Selector_Expr)
+
+    if !sok || sel.field == nil || sel.field.name != "SignalN" {
+        return nil, false
+    }
+
+    pkg, pok := sel.expr.derived.(^ast.Ident)
+
+    if !pok {
+        return nil, false
+    }
+
+    if pkg.name != alias && pkg.name != "gd" && pkg.name != "godot" {
+        return nil, false
+    }
+
+    if len(call.args) != 1 {
+        return nil, false
+    }
+
+    return call.args[0], true
 }
 
 // Parse one SignalN FIELD (`hit: gd.SignalN(struct { amount: int, who: ^gd.Node2d })`)
@@ -445,44 +642,83 @@ signal_n_param :: proc(type_expr: ^ast.Expr, alias: string) -> (param: ^ast.Expr
 // suggestion), and a gd tag (`args=` included) is an error, field names being
 // authoritative. Registration is still the runtime walk's job.
 parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, param: ^ast.Expr, has_tag: bool) {
-	if has_tag {
-		error_at(floc, "%s.%s: a SignalN field takes no gd tag — the payload struct's field names ARE the arg names", s.struct_name, fname)
-	}
+    if has_tag {
+        error_at(
+            floc,
+            "%s.%s: a SignalN field takes no gd tag — the payload struct's field names ARE the arg names",
+            s.struct_name,
+            fname,
+        )
+    }
 
-	st, is_struct := param.derived.(^ast.Struct_Type)
-	if !is_struct || st.is_raw_union {
-		ptext := normalize_godot_qualifier(node_text(src, param), s.godot_alias)
-		if _, mok := map_variant(ptext); mok && !is_struct {
-			error_at(floc, "%s.%s: SignalN's parameter is the argument LIST as a struct, not a single payload type — use Signal1(%s) or SignalN(struct {{ pos: %s })", s.struct_name, fname, ptext, ptext)
-		} else {
-			error_at(floc, "%s.%s: SignalN's parameter must be an inline payload struct, e.g. SignalN(struct {{ amount: int }) — got %q", s.struct_name, fname, ptext)
-		}
-		return
-	}
+    st, is_struct := param.derived.(^ast.Struct_Type)
 
-	sig := Signal_Info {
-		name = fname,
-		line = floc.line
-	}
-	if st.fields != nil {
-		for f in st.fields.list {
-			atext := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
-			vi, vok := map_variant(atext)
-			if !vok {
-				flabel := "?"
-				if len(f.names) > 0 {flabel = node_text(src, f.names[0])}
-				error_at(floc, "%s.%s: signal payload field %q has unsupported type %q — every field must map to a Variant", s.struct_name, fname, flabel, atext)
-				return
-			}
-			for nm in f.names {
-				ident, iok := nm.derived.(^ast.Ident)
-				if !iok || ident == nil {continue}
-				append(&sig.args, Signal_Arg{name = ident.name, vi = vi})
-			}
-		}
-	}
+    if !is_struct || st.is_raw_union {
+        ptext := normalize_godot_qualifier(node_text(src, param), s.godot_alias)
 
-	append(&s.signals, sig)
+        if _, mok := map_variant(ptext); mok && !is_struct {
+            error_at(
+                floc,
+                "%s.%s: SignalN's parameter is the argument LIST as a struct, not a single payload type — use Signal1(%s) or SignalN(struct {{ pos: %s })",
+                s.struct_name,
+                fname,
+                ptext,
+                ptext,
+            )
+        } else {
+            error_at(
+                floc,
+                "%s.%s: SignalN's parameter must be an inline payload struct, e.g. SignalN(struct {{ amount: int }) — got %q",
+                s.struct_name,
+                fname,
+                ptext,
+            )
+        }
+
+        return
+    }
+
+    sig := Signal_Info {
+        name = fname,
+        line = floc.line,
+    }
+
+    if st.fields != nil {
+        for f in st.fields.list {
+            atext := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+            vi, vok := map_variant(atext)
+
+            if !vok {
+                flabel := "?"
+
+                if len(f.names) > 0 {
+                    flabel = node_text(src, f.names[0])
+                }
+
+                error_at(
+                    floc,
+                    "%s.%s: signal payload field %q has unsupported type %q — every field must map to a Variant",
+                    s.struct_name,
+                    fname,
+                    flabel,
+                    atext,
+                )
+                return
+            }
+
+            for nm in f.names {
+                ident, iok := nm.derived.(^ast.Ident)
+
+                if !iok || ident == nil {
+                    continue
+                }
+
+                append(&sig.args, Signal_Arg{name = ident.name, vi = vi})
+            }
+        }
+    }
+
+    append(&s.signals, sig)
 }
 
 // ---- the field-tag vocabulary, and the ONE place it is dispatched ------------
@@ -559,24 +795,27 @@ parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, 
 // the arms that RECORD loop `names`, and the arms that merely diagnose report
 // once, which is why this is a whole declaration and not one name.
 Tagged_Field :: struct {
-	ctx:       decl.Field_Site,
-	names:     []string, // every name this declaration binds, in source order
-	lines:     []int, // each name's line (parallel to `names`)
-	path_base: []string, // access path to the OWNER of these fields ("" at top level)
-	type_text: string, // gd.-normalized, generic params already substituted
-	type_ctx:  Struct_Def, // package/import context for recursive wire ABI resolution
-	specs:     []string, // the tag's comma-split tokens (specs[0] selects the kind)
-	tok0:      string, // specs[0], trimmed
-	loc:       Loc,
-	doc:       string, // `///` above the field — export descriptions (top level)
+    ctx:       decl.Field_Site,
+    names:     []string, // every name this declaration binds, in source order
+    lines:     []int, // each name's line (parallel to `names`)
+    path_base: []string, // access path to the OWNER of these fields ("" at top level)
+    type_text: string, // gd.-normalized, generic params already substituted
+    type_ctx:  Struct_Def, // package/import context for recursive wire ABI resolution
+    specs:     []string, // the tag's comma-split tokens (specs[0] selects the kind)
+    tok0:      string, // specs[0], trimmed
+    loc:       Loc,
+    doc:       string, // `///` above the field — export descriptions (top level)
 }
 
 // How a diagnostic NAMES this field: the bare name at top level, the full
 // access path (`aim.weapon.ammo`) inside an embed. Derived rather than passed,
 // because the two loops used to spell it two different ways.
 tagged_label :: proc(tf: Tagged_Field) -> string {
-	if len(tf.names) == 0 {return ""}
-	return join_path(extend_path(tf.path_base, tf.names[0]))
+    if len(tf.names) == 0 {
+        return ""
+    }
+
+    return join_path(extend_path(tf.path_base, tf.names[0]))
 }
 
 // Validate the SPECS riding behind `export` (`gd:"export,range=0:100,group=Aim"`).
@@ -590,95 +829,125 @@ tagged_label :: proc(tf: Tagged_Field) -> string {
 // Returns the two specs codegen itself consumes (`get=`/`set=` accessor names,
 // empty in the nested context, which emits no wrapper) plus `resource=`.
 check_export_specs :: proc(
-	s: ^Script,
-	tf: Tagged_Field,
-	entity_first: bool
+    s: ^Script,
+    tf: Tagged_Field,
+    entity_first: bool,
 ) -> (
-	getter, setter, resource_val: string
+    getter, setter, resource_val: string,
 ) {
-	label := tagged_label(tf)
-	for si in 1 ..< len(tf.specs) {
-		spec := strings.trim_space(tf.specs[si])
-		if spec == "" {continue}
-		name := spec
-		value := ""
-		if eq := strings.index(spec, "="); eq >= 0 {
-			name = strings.trim_space(spec[:eq])
-			value = strings.trim_space(spec[eq + 1:])
-		}
-		// A TRAILING `entity=` never reaches here — walk_tagged_field refuses it
-		// for every kind before dispatch, since it is deliberately absent from
-		// EXPORT_SPECS (it LEADS the tag now) and this gate would call it a
-		// misspelling.
-		es, known := decl.export_spec(name)
-		if !known {
-			nearest := ""
-			for cand in decl.EXPORT_SPECS {
-				if one_typo_apart(name, cand.name) {
-					nearest = cand.name
-					break
-				}
-			}
-			if nearest != "" {
-				error_at(
-					tf.loc,
-					"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
-					s.struct_name, label, name, nearest
-				)
-			} else {
-				error_at(
-					tf.loc,
-					"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
-					s.struct_name, label, name, decl.export_specs_list(context.temp_allocator)
-				)
-			}
-			continue
-		}
+    label := tagged_label(tf)
 
-		// PROJECTION — the bare/value columns, which existed to DOCUMENT that
-		// `file` is legal both ways and `multiline` only bare, and which nothing
-		// read. An ARITY typo is the same silent-hint bug the spelling gate was
-		// built for and slips straight through it: `multiline=true` is a
-		// perfectly spelled name whose value the runtime discards, and `range`
-		// bare is a slider with no bounds that dies at BOOT instead of here.
-		// Both columns true (`file`, `dir`, the globals) means both forms are
-		// real and nothing is checked.
-		had_value := strings.index(spec, "=") >= 0
-		if had_value && !es.value {
-			error_at(
-				tf.loc,
-				"%s.%s: `%s` takes no value — write it bare, as `%s` (the runtime discards the value silently, so the hint you meant never reaches the Inspector)",
-				s.struct_name, label, name, name
-			)
-			continue
-		}
-		if !had_value && !es.bare {
-			error_at(
-				tf.loc,
-				"%s.%s: `%s` needs a value — write `%s=…` (%s)",
-				s.struct_name, label, name, name, es.blurb
-			)
-			continue
-		}
+    for si in 1 ..< len(tf.specs) {
+        spec := strings.trim_space(tf.specs[si])
 
-		switch name {
-		case "get":
-			getter = value
-		case "set":
-			setter = value
-		case "resource":
-			if entity_first && si > 1 {
-				error_at(
-					tf.loc,
-					"%s.%s: `entity=` already fixes the resource hint to PackedScene (that is what a spawnable entity IS) — drop `resource=%s`",
-					s.struct_name, label, value
-				)
-				continue
-			}
-			resource_val = value
-		}
-	}
-	return
+        if spec == "" {
+            continue
+        }
+
+        name := spec
+        value := ""
+
+        if eq := strings.index(spec, "="); eq >= 0 {
+            name = strings.trim_space(spec[:eq])
+            value = strings.trim_space(spec[eq + 1:])
+        }
+
+        // A TRAILING `entity=` never reaches here — walk_tagged_field refuses it
+        // for every kind before dispatch, since it is deliberately absent from
+        // EXPORT_SPECS (it LEADS the tag now) and this gate would call it a
+        // misspelling.
+        es, known := decl.export_spec(name)
+
+        if !known {
+            nearest := ""
+
+            for cand in decl.EXPORT_SPECS {
+                if one_typo_apart(name, cand.name) {
+                    nearest = cand.name
+                    break
+                }
+            }
+
+            if nearest != "" {
+                error_at(
+                    tf.loc,
+                    "%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
+                    s.struct_name,
+                    label,
+                    name,
+                    nearest,
+                )
+            } else {
+                error_at(
+                    tf.loc,
+                    "%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
+                    s.struct_name,
+                    label,
+                    name,
+                    decl.export_specs_list(context.temp_allocator),
+                )
+            }
+
+            continue
+        }
+
+        // PROJECTION — the bare/value columns, which existed to DOCUMENT that
+        // `file` is legal both ways and `multiline` only bare, and which nothing
+        // read. An ARITY typo is the same silent-hint bug the spelling gate was
+        // built for and slips straight through it: `multiline=true` is a
+        // perfectly spelled name whose value the runtime discards, and `range`
+        // bare is a slider with no bounds that dies at BOOT instead of here.
+        // Both columns true (`file`, `dir`, the globals) means both forms are
+        // real and nothing is checked.
+        had_value := strings.index(spec, "=") >= 0
+
+        if had_value && !es.value {
+            error_at(
+                tf.loc,
+                "%s.%s: `%s` takes no value — write it bare, as `%s` (the runtime discards the value silently, so the hint you meant never reaches the Inspector)",
+                s.struct_name,
+                label,
+                name,
+                name,
+            )
+            continue
+        }
+
+        if !had_value && !es.bare {
+            error_at(
+                tf.loc,
+                "%s.%s: `%s` needs a value — write `%s=…` (%s)",
+                s.struct_name,
+                label,
+                name,
+                name,
+                es.blurb,
+            )
+            continue
+        }
+
+        switch name {
+        case "get":
+            getter = value
+        case "set":
+            setter = value
+        case "resource":
+            if entity_first && si > 1 {
+                error_at(
+                    tf.loc,
+                    "%s.%s: `entity=` already fixes the resource hint to PackedScene (that is what a spawnable entity IS) — drop `resource=%s`",
+                    s.struct_name,
+                    label,
+                    value,
+                )
+                continue
+            }
+
+            resource_val = value
+        }
+    }
+
+    return
 }
 
 // Classify the '%' characters in an onready/@(gd_connect) node path. A '%' at a
@@ -690,16 +959,23 @@ check_export_specs :: proc(
 // mid-segment `%d` templates and of stray mid-segment '%'s (neither marker nor
 // template — always an error at the call sites).
 scan_path_template :: proc(path: string) -> (tmpl_count: int, stray: int) {
-	for i in 0 ..< len(path) {
-		if path[i] != '%' {continue}
-		if i == 0 || path[i - 1] == '/' {continue}
-		if i + 1 < len(path) && path[i + 1] == 'd' {
-			tmpl_count += 1
-		} else {
-			stray += 1
-		}
-	}
-	return
+    for i in 0 ..< len(path) {
+        if path[i] != '%' {
+            continue
+        }
+
+        if i == 0 || path[i - 1] == '/' {
+            continue
+        }
+
+        if i + 1 < len(path) && path[i + 1] == 'd' {
+            tmpl_count += 1
+        } else {
+            stray += 1
+        }
+    }
+
+    return
 }
 
 // THE DISPATCH. Both field walks funnel every TAGGED field through here (signals
@@ -707,403 +983,540 @@ scan_path_template :: proc(path: string) -> (tmpl_count: int, stray: int) {
 // an embed candidate and recursing is the caller's job, since the two contexts
 // resolve types from different roots).
 walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
-	label := tagged_label(tf)
-	nested := tf.ctx == .Nested
-	tok0 := tf.tok0
-	specs := tf.specs
+    label := tagged_label(tf)
+    nested := tf.ctx == .Nested
+    tok0 := tf.tok0
+    specs := tf.specs
 
-	// `entity=` LEADS the tag (decl.Slot's rule for wire declarations). The
-	// refusal for a TRAILING one used to live inside the export arm, which meant
-	// the rule quietly stopped applying the moment another token led:
-	// `gd:"backup,entity=Mob:1"` reached an arm that never looks past specs[0].
-	// Checked here, once, for every kind — a language rule enforced in one arm
-	// is the same seam this merge exists to remove.
-	for si in 1 ..< len(specs) {
-		spec := strings.trim_space(specs[si])
-		name := spec
-		if eq := strings.index(spec, "="); eq >= 0 {name = strings.trim_space(spec[:eq])}
-		if name != "entity" {continue}
-		value := ""
-		if eq := strings.index(spec, "="); eq >= 0 {value = strings.trim_space(spec[eq + 1:])}
-		if nested {
-			error_at(
-				tf.loc,
-				"%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
-				s.struct_name, label
-			)
-		} else {
-			// Refused, not accepted-as-well: a language with two spellings for one
-			// declaration teaches neither, and the three games vendoring this addon
-			// each carry a dozen of these — the rewritten tag IS their upgrade
-			// instructions.
-			error_at(
-				tf.loc,
-				"%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
-				s.struct_name, label, value
-			)
-		}
-		return
-	}
+    // `entity=` LEADS the tag (decl.Slot's rule for wire declarations). The
+    // refusal for a TRAILING one used to live inside the export arm, which meant
+    // the rule quietly stopped applying the moment another token led:
+    // `gd:"backup,entity=Mob:1"` reached an arm that never looks past specs[0].
+    // Checked here, once, for every kind — a language rule enforced in one arm
+    // is the same seam this merge exists to remove.
+    for si in 1 ..< len(specs) {
+        spec := strings.trim_space(specs[si])
+        name := spec
 
-	// THE CONTEXT GATE (decl.FIELD_POLICY). Whether a KNOWN leading token may
-	// appear at this site is a language rule, answered once here in data; the arms
-	// below run only for a token the gate passed, and decide only what it MEANS.
-	// An UNKNOWN token is not in the table — it falls through to the unknown-tag
-	// refuse at the bottom, which is where its "expected …" message belongs. This
-	// is what used to be a fistful of `if nested { error; return }` blocks copied
-	// into the profile=/entity=/manual arms and worded slightly differently each
-	// time; the wording now has one home.
-	if ft, known := decl.field_token(tok0); known {
-		pol, has := decl.field_policy(ft.name, tf.ctx)
-		// check_field_policy makes this hole a build error before any corpus is
-		// read; treating !has as anything but "the schema is incomplete" would be
-		// the silent-fallthrough this whole merge exists to kill.
-		assert(has, "decl.FIELD_POLICY is missing a row — check_field_policy should have refused the build")
-		switch pol.action {
-		case .Refuse:
-			error_at(tf.loc, "%s.%s: %s", s.struct_name, label, pol.reason)
-			return
-		case .Caller:
-			// Top-level `manual` is consumed by parse_script's embed branch before
-			// the dispatch is ever called; reaching here is a toolchain bug, not a
-			// user error.
-			assert(false, "a Caller-site token reached the shared dispatch (parse_script must consume top-level `manual` first)")
-			return
-		case .Handle:
-		// fall through to the kind-specific arms
-		}
-	}
+        if eq := strings.index(spec, "="); eq >= 0 {
+            name = strings.trim_space(spec[:eq])
+        }
 
-	// richer-authoring #1: `gd:"onready=Sprite"` — a private auto-wired node ref.
-	// The rt.Onready table itself is built by the runtime reflection walk
-	// (runtime/register_class.odin) at EVERY depth, so scriptgen keeps only the
-	// cheap build-time checks — which is precisely why the nested context has to
-	// run them too: "the runtime records it" was read as "the runtime validates
-	// it", and an empty path one comma deep wired nothing, silently.
-	if strings.has_prefix(tok0, "onready=") {
-		path := strings.trim_space(tok0[len("onready="):])
-		if path == "" {
-			error_at(tf.loc, "%s.%s: `onready=` needs a node path", s.struct_name, label)
-			return
-		}
-		// ARRAY form — `cards: [9]gd.Button `gd:"onready=Shop/Card%d"`` (also `[N]^Script`):
-		// strip the `[N]` so the ELEMENT type takes the scalar rules below; the path must
-		// then be a `%d` template (exactly one, 0-based at resolve). A template on a
-		// scalar field is refused — it would wire a literal `%d` node name.
-		t := strings.trim_space(tf.type_text)
-		is_array := false
-		if strings.has_prefix(t, "[") {
-			if rb := strings.index_byte(t, ']'); rb > 1 {
-				if n, nok := strconv.parse_int(strings.trim_space(t[1:rb])); nok && n > 0 {
-					is_array = true
-					t = strings.trim_space(t[rb + 1:])
-				}
-			}
-		}
-		tmpl_count, stray := scan_path_template(path)
-		if is_array && (tmpl_count != 1 || stray != 0) {
-			error_at(tf.loc, "%s.%s: `onready=` on a fixed-array field needs exactly one mid-name `%%d` in the path (e.g. `Shop/Card%%d`, substituted with 0-based indices; a leading `%%Name` is a scene-unique name and fine)", s.struct_name, label)
-			return
-		}
-		if !is_array && (tmpl_count != 0 || stray != 0) {
-			error_at(tf.loc, "%s.%s: `onready=` path has a '%%' inside a node name — only `%%Name` at a segment start (scene-unique name) is valid here; the `%%d` template form is for FIXED-ARRAY fields ([N]gd.Node2d, [N]^Script)", s.struct_name, label)
-			return
-		}
-		// `^Ident` — the SCRIPT-RESOLVING form (`hud: ^hud`): the field wants the target
-		// node's SCRIPT STRUCT (rt.script_of at READY), not the node handle. The target
-		// may be declared in a file that hasn't parsed yet, so it is only RECORDED here;
-		// resolve_onready_scripts validates the name once every file is in. Both depths
-		// ride this (the runtime walk classifies structurally at any depth). `rawptr` is
-		// carved out: `^rawptr` is a hand-spelled refcounted HANDLE, not a struct.
-		if strings.has_prefix(t, "^") {
-			if pointee := strings.trim_space(t[1:]); pointee != "rawptr" && is_odin_ident(pointee) {
-				append(&s.onready_scripts, Onready_Script_Ref{field = label, target = pointee, loc = tf.loc})
-				return
-			}
-		}
-		if !nested {
-			vi, ok := map_variant(t)
-			if !ok || vi.enum_name != ".Object" {
-				error_at(tf.loc, "%s.%s: `onready` field must be an object/node handle or pointer — or a fixed array of them (got %q)", s.struct_name, label, tf.type_text)
-			}
-		}
-		return
-	}
+        if name != "entity" {
+            continue
+        }
 
-	// friendslop toolkit: a LANE token opens a networked field — `replicate`
-	// (delta), `owner` (streamed from the owning peer), or `predict` (kit/sim).
-	// Only names + options are recorded here; generate.odin emits the
-	// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
-	// #assert that rejects non-POD fields at compile time with the field's name.
-	if lane := decl.replicate_lane(tok0); lane != .None {
-		rep, rok := parse_replicate_info(lane, tf.type_text, specs, tf.loc, s.struct_name, label)
-		if !rok {return}
-		for nm in tf.names {
-			r := rep
-			r.field = nm
-			r.path = extend_path(tf.path_base, nm)
-			r.type_dir = tf.type_ctx.dir
-			r.type_imports = tf.type_ctx.imports
-			append(&s.replicates, r)
-		}
-		return
-	}
+        value := ""
 
-	// friendslop toolkit: `gd:"backup"` — HOST-LOCAL state for host migration
-	// AND save/resume (the same bytes ride both, session.odin's split). generate
-	// emits a version-hashed <class>_backup_write/_read codec over these fields,
-	// so a takeover restores the campaign, not a diorama — no hand-matched
-	// write_u8/read_u8 lists to drift. POD (scalars/structs/fixed arrays),
-	// map[POD]POD, and [dynamic]POD are supported; anything else is a build error.
-	// Rides nesting: scrapyard tags host-local fields inside a `using` embed.
-	if tok0 == "backup" {
-		kind, key, elem, bad := classify_backup(tf.type_text)
-		if bad != "" {
-			error_at(tf.loc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, label, bad)
-			return
-		}
-		for nm in tf.names {
-			append(&s.backups, Backup_Info{
-				field = nm,
-				path  = extend_path(tf.path_base, nm),
-				kind  = kind,
-				key   = key,
-				elem  = elem
-			})
-		}
-		return
-	}
+        if eq := strings.index(spec, "="); eq >= 0 {
+            value = strings.trim_space(spec[eq + 1:])
+        }
 
-	// friendslop toolkit: `gd:"profile=Type"` on the class's ksess.Session
-	// field — the DECLARATION form of session_profile_install: the named
-	// POD struct is this game's per-player profile row. scriptgen folds
-	// the row's field-by-field shape into NET_FINGERPRINT (a drifted
-	// profile refuses the join like any other wire skew — the raw install
-	// call left it outside the version door: same-size drift scrambled
-	// rows silently) and installs it inside the generated ready thunk,
-	// before the game's ready can *_start.
-	if strings.has_prefix(tok0, "profile=") {
-		// Nested `profile=` is refused by the context gate above (it silently never
-		// installs — neither the generated ready thunk nor the fingerprint fold
-		// walks nested Sessions), so only the top-level form reaches here.
-		pt := strings.trim_space(tok0[len("profile="):])
-		switch {
-		case pt == "":
-			error_at(tf.loc, "%s.%s: `profile=` names the row struct, e.g. gd:\"profile=Loadout\"", s.struct_name, label)
-		case !strings.has_suffix(tf.type_text, ".Session") && tf.type_text != "Session":
-			error_at(tf.loc, "%s.%s: `profile=` belongs on the ksess.Session field (got %q) — the row installs into that session", s.struct_name, label, tf.type_text)
-		case s.profile_type != "":
-			error_at(tf.loc, "%s.%s: a second profile declaration (%q; already %q) — one row type per session", s.struct_name, label, pt, s.profile_type)
-		case len(tf.names) != 1:
-			error_at(tf.loc, "%s.%s: one session field per profile declaration", s.struct_name, label)
-		case:
-			s.profile_type = pt
-			s.profile_ses = tf.names[0]
-		}
-		return
-	}
+        if nested {
+            error_at(
+                tf.loc,
+                "%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
+                s.struct_name,
+                label,
+            )
+        } else {
+            // Refused, not accepted-as-well: a language with two spellings for one
+            // declaration teaches neither, and the three games vendoring this addon
+            // each carry a dozen of these — the rewritten tag IS their upgrade
+            // instructions.
+            error_at(
+                tf.loc,
+                "%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
+                s.struct_name,
+                label,
+                value,
+            )
+        }
 
-	// `gd:"manual"` (the wielder-drives-this-tick opt-out) has no arm here: at top
-	// level parse_script's embed branch consumes it before the dispatch (the
-	// FIELD_POLICY Caller row), and nested it is refused by the context gate (the
-	// Refuse row). Both meanings live in the table now, not in a token check here.
+        return
+    }
 
-	// `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
-	// decl.Slot now states). It carries a permanent public type id, folds into
-	// NET_FINGERPRINT, and becomes a row in the generated factory table; it used
-	// to ride as a trailing spec of `export` purely by accident of the order the
-	// two features were built, which left `profile=T` leading and this not.
-	entity_first := strings.has_prefix(tok0, "entity=")
-	entity_val := ""
-	entity_stream_hz := 0
-	entity_avatar := false
-	if entity_first {
-		// Nested leading `entity=` is refused by the context gate above (the export
-		// would register but the factory/type row silently never exists), so only
-		// the top-level form reaches here.
-		entity_val = strings.trim_space(tok0[len("entity="):])
-		// BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
-		// exported PackedScene — the scene is what the factory instantiates, and the
-		// Inspector slot is how the author hands it over — so `export` and
-		// `resource=PackedScene` were never a choice the tag was recording, only
-		// ceremony it was demanding. Trailing EXPORT specs still ride behind
-		// (`entity=Mob:3,group=Spawns`); a second `resource=` does not, since it
-		// would be overriding a hint the declaration already fixed.
-		syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
-		append(&syn, "export", "resource=PackedScene")
-		// The ENTITY's own trailing tokens ride here too — knobs of the KIND, not
-		// of the export — and are consumed now so the export-spec walk below never
-		// sees them: `stream_hz=N` (the owner-stream rate every spawn of this type
-		// carries, on every peer) and `avatar` (this kind is a seat's body — a host
-		// takeover parks it with its seat instead of adopting it). Anything else
-		// trailing is still an export spec (`group=`, …).
-		for sp in specs[1:] {
-			t := strings.trim_space(sp)
-			sname, _, sval := strings.partition(t, "=")
-			sname = strings.trim_space(sname)
-			// The vocabulary is godot:decl's ENTITY_SPECS (the runtime skips the
-			// same rows); the MEANING of each row is decided here.
-			if es, is_entity := decl.entity_spec(sname); is_entity {
-				has_val := strings.contains(t, "=")
-				if (has_val && !es.value) || (!has_val && !es.bare) {
-					error_at(tf.loc, "%s.%s: entity token `%s` is spelled %s", s.struct_name, label, sname, es.blurb)
-					continue
-				}
-				switch sname {
-				case "stream_hz":
-					v, ok := strconv.parse_int(strings.trim_space(sval))
-					if !ok || v <= 0 || v > 1000 {
-						error_at(tf.loc, "%s.%s: `stream_hz=` wants a positive rate in Hz (e.g. entity=Mob:3,stream_hz=30) — it is the kind's owner-stream rate, applied by the session to every spawn of the type", s.struct_name, label)
-					} else {
-						entity_stream_hz = v
-					}
-				case "avatar":
-					entity_avatar = true
-				}
-				continue
-			}
-			append(&syn, sp)
-		}
-		specs = syn[:]
-		tok0 = "export"
-	}
+    // THE CONTEXT GATE (decl.FIELD_POLICY). Whether a KNOWN leading token may
+    // appear at this site is a language rule, answered once here in data; the arms
+    // below run only for a token the gate passed, and decide only what it MEANS.
+    // An UNKNOWN token is not in the table — it falls through to the unknown-tag
+    // refuse at the bottom, which is where its "expected …" message belongs. This
+    // is what used to be a fistful of `if nested { error; return }` blocks copied
+    // into the profile=/entity=/manual arms and worded slightly differently each
+    // time; the wording now has one home.
+    if ft, known := decl.field_token(tok0); known {
+        pol, has := decl.field_policy(ft.name, tf.ctx)
+        // check_field_policy makes this hole a build error before any corpus is
+        // read; treating !has as anything but "the schema is incomplete" would be
+        // the silent-fallthrough this whole merge exists to kill.
+        assert(has, "decl.FIELD_POLICY is missing a row — check_field_policy should have refused the build")
 
-	if tok0 != "export" {
-		// `args=` (a signal-only spec used as a leading token) is refused by the
-		// context gate above at both sites, so anything still non-`export` here is
-		// a token the vocabulary does not know at all.
-		//
-		// The field HAS a `gd:"..."` tag but its first token is none the vocabulary
-		// knows — almost certainly a misspelling (`exprot`) that would otherwise
-		// silently leave the field un-exported. The "expected" half is godot:decl's
-		// projection, so a token added to FIELD_TOKENS is known here by construction
-		// rather than by someone remembering this line.
-		//
-		// Nested, this is the bug recorded above: a `gd:"replciate"` one comma deep
-		// was a no-op with zero diagnostic in either half of the toolchain, while
-		// the identical typo at top level had been a hard error for as long as
-		// field_expected has existed. Blocks are exactly where deep tags live.
-		if nested {
-			error_at(
-				tf.loc,
-				"%s.%s: unknown gd tag `%s` (expected %s) — a tag scriptgen doesn't know is silently nothing at this depth, which is how a replicated field stops replicating without a single error",
-				s.struct_name, label, tok0, decl.field_expected(context.temp_allocator)
-			)
-		} else {
-			error_at(
-				tf.loc,
-				"%s.%s: unknown gd tag %q (expected %s)",
-				s.struct_name, label, tok0, decl.field_expected(context.temp_allocator)
-			)
-		}
-		return
-	}
+        switch pol.action {
+        case .Refuse:
+            error_at(tf.loc, "%s.%s: %s", s.struct_name, label, pol.reason)
+            return
+        case .Caller:
+            // Top-level `manual` is consumed by parse_script's embed branch before
+            // the dispatch is ever called; reaching here is a toolchain bug, not a
+            // user error.
+            assert(
+                false,
+                "a Caller-site token reached the shared dispatch (parse_script must consume top-level `manual` first)",
+            )
+            return
+        case .Handle:
+        // fall through to the kind-specific arms
+        }
+    }
 
-	// ---- `export` ------------------------------------------------------------
-	//
-	// The SPEC gate runs in BOTH contexts (it is the whole point of this
-	// unification): every other first token's spec loop refuses what it doesn't
-	// know, so `gd:"replicate,slcak=0.5"` failed the build — but a typo behind
-	// `export` fell through, reached the runtime as an unknown hint, and
-	// surfaced as a boot-time record_error on a field that had silently lost it.
-	// Two tiers, same tag, no way to tell which one you were about to hit; and
-	// one level of nesting used to drop you from the strict tier to the silent
-	// one without saying so.
-	spec_tf := tf
-	spec_tf.specs = specs
-	getter, setter, _ := check_export_specs(s, spec_tf, entity_first)
+    // richer-authoring #1: `gd:"onready=Sprite"` — a private auto-wired node ref.
+    // The rt.Onready table itself is built by the runtime reflection walk
+    // (runtime/register_class.odin) at EVERY depth, so scriptgen keeps only the
+    // cheap build-time checks — which is precisely why the nested context has to
+    // run them too: "the runtime records it" was read as "the runtime validates
+    // it", and an empty path one comma deep wired nothing, silently.
+    if strings.has_prefix(tok0, "onready=") {
+        path := strings.trim_space(tok0[len("onready="):])
 
-	// Past here is RECORDING, and recording is top-level-only: an embed's
-	// exports are registered by the runtime reflection walk under their
-	// namespaced (`aim_sensitivity`) names, not by this table.
-	if strings.trim_space(tf.type_text) == "string" {
-		error_at(tf.loc, "%s.%s: native string exports do not share Godot String storage; use gd.String for an export (native string is supported in methods)", s.struct_name, label)
-		return
-	}
-	if nested {return}
-	vi, ok := map_variant(tf.type_text)
-	if !ok {
-		error_at(tf.loc, "%s.%s: export field of unsupported type %q", s.struct_name, label, tf.type_text)
-		return
-	}
+        if path == "" {
+            error_at(tf.loc, "%s.%s: `onready=` needs a node path", s.struct_name, label)
+            return
+        }
 
-	// OBJECT-typed export: the hint is NOT ceremony here. inst_set's resource
-	// refcounting keys off the Resource_Type hint — a hint-less object export
-	// stores an UNREFERENCED pointer that dangles once the loader's transient
-	// ref drops, a delayed SIGSEGV far from this line. A typed handle
-	// (`gd.Packed_Scene`) derives the hint from the ENGINE CLASS INDEX and
-	// ships it to the runtime via Field_Meta.resource_class (reflection can't:
-	// every refcounted handle erases to the same ^rawptr). A type-erased
-	// `gd.Object` — or a non-Resource handle, which no Inspector slot can hold —
-	// is refused. Index unavailable degrades to silence (classes.odin's rule);
-	// the runtime's registration refusal is the backstop there.
-	res_class := ""
-	if vi.enum_name == ".Object" && entity_val == "" {
-		has_resource_spec := false
-		for sp in specs[1:] {
-			if strings.has_prefix(strings.trim_space(sp), "resource=") {
-				has_resource_spec = true
-				break
-			}
-		}
-		if !has_resource_spec {
-			handle := strings.trim_space(tf.type_text)
-			if strings.has_prefix(handle, "^") {handle = strings.trim_space(handle[1:])}
-			if di := strings.last_index(handle, "."); di >= 0 {handle = handle[di + 1:]}
-			is_resource, known := class_handle_covers("Resource", handle)
-			switch {
-			case known && !is_resource:
-				error_at(
-					tf.loc,
-					"%s.%s: exported object handle %q is not a Resource — only Resources ride an Inspector slot (wire scene nodes with `onready=` instead); a type-erased gd.Object must spell `resource=<Class>`",
-					s.struct_name, label, tf.type_text
-				)
-				return
-			case is_resource:
-				res_class = godot_class_name(handle)
-			}
-		}
-	}
+        // ARRAY form — `cards: [9]gd.Button `gd:"onready=Shop/Card%d"`` (also `[N]^Script`):
+        // strip the `[N]` so the ELEMENT type takes the scalar rules below; the path must
+        // then be a `%d` template (exactly one, 0-based at resolve). A template on a
+        // scalar field is refused — it would wire a literal `%d` node name.
+        t := strings.trim_space(tf.type_text)
+        is_array := false
 
-	// `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
-	// factory declaration (resolve_entities validates the target and pairs the
-	// typed hooks once the full module is parsed). The "must be a PackedScene
-	// export" check that used to live here is gone with the trailing form —
-	// the hint is synthesized, so it cannot be anything else.
-	if entity_val != "" {
-		target, sep, id_text := strings.partition(entity_val, ":")
-		id, id_ok := strconv.parse_int(strings.trim_space(id_text))
-		switch {
-		case sep != ":" || !id_ok:
-			error_at(tf.loc, "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)", s.struct_name, label)
-		case id <= 0 || id > 65535:
-			error_at(tf.loc, "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)", s.struct_name, label, id)
-		case len(tf.names) != 1:
-			error_at(tf.loc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, label)
-		case:
-			append(&s.entities, Entity_Tag{
-				field     = label,
-				target    = strings.trim_space(target),
-				type_id   = id,
-				line      = tf.loc.line,
-				stream_hz = entity_stream_hz,
-				avatar    = entity_avatar
-			})
-		}
-	}
+        if strings.has_prefix(t, "[") {
+            if rb := strings.index_byte(t, ']'); rb > 1 {
+                if n, nok := strconv.parse_int(strings.trim_space(t[1:rb])); nok && n > 0 {
+                    is_array = true
+                    t = strings.trim_space(t[rb + 1:])
+                }
+            }
+        }
 
-	for nm, i in tf.names {
-		append(&s.exports, Export_Info {
-			name      = nm,
-			type_text = tf.type_text,
-			vi        = vi,
-			getter    = getter,
-			setter    = setter,
-			line      = i < len(tf.lines) ? tf.lines[i] : tf.loc.line,
-			doc       = tf.doc,
-			res_class = res_class
-		})
-	}
+        tmpl_count, stray := scan_path_template(path)
+
+        if is_array && (tmpl_count != 1 || stray != 0) {
+            error_at(
+                tf.loc,
+                "%s.%s: `onready=` on a fixed-array field needs exactly one mid-name `%%d` in the path (e.g. `Shop/Card%%d`, substituted with 0-based indices; a leading `%%Name` is a scene-unique name and fine)",
+                s.struct_name,
+                label,
+            )
+            return
+        }
+
+        if !is_array && (tmpl_count != 0 || stray != 0) {
+            error_at(
+                tf.loc,
+                "%s.%s: `onready=` path has a '%%' inside a node name — only `%%Name` at a segment start (scene-unique name) is valid here; the `%%d` template form is for FIXED-ARRAY fields ([N]gd.Node2d, [N]^Script)",
+                s.struct_name,
+                label,
+            )
+            return
+        }
+
+        // `^Ident` — the SCRIPT-RESOLVING form (`hud: ^hud`): the field wants the target
+        // node's SCRIPT STRUCT (rt.script_of at READY), not the node handle. The target
+        // may be declared in a file that hasn't parsed yet, so it is only RECORDED here;
+        // resolve_onready_scripts validates the name once every file is in. Both depths
+        // ride this (the runtime walk classifies structurally at any depth). `rawptr` is
+        // carved out: `^rawptr` is a hand-spelled refcounted HANDLE, not a struct.
+        if strings.has_prefix(t, "^") {
+            if pointee := strings.trim_space(t[1:]); pointee != "rawptr" && is_odin_ident(pointee) {
+                append(&s.onready_scripts, Onready_Script_Ref{field = label, target = pointee, loc = tf.loc})
+                return
+            }
+        }
+
+        if !nested {
+            vi, ok := map_variant(t)
+
+            if !ok || vi.enum_name != ".Object" {
+                error_at(
+                    tf.loc,
+                    "%s.%s: `onready` field must be an object/node handle or pointer — or a fixed array of them (got %q)",
+                    s.struct_name,
+                    label,
+                    tf.type_text,
+                )
+            }
+        }
+
+        return
+    }
+
+    // friendslop toolkit: a LANE token opens a networked field — `replicate`
+    // (delta), `owner` (streamed from the owning peer), or `predict` (kit/sim).
+    // Only names + options are recorded here; generate.odin emits the
+    // knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
+    // #assert that rejects non-POD fields at compile time with the field's name.
+    if lane := decl.replicate_lane(tok0); lane != .None {
+        rep, rok := parse_replicate_info(lane, tf.type_text, specs, tf.loc, s.struct_name, label)
+
+        if !rok {
+            return
+        }
+
+        for nm in tf.names {
+            r := rep
+            r.field = nm
+            r.path = extend_path(tf.path_base, nm)
+            r.type_dir = tf.type_ctx.dir
+            r.type_imports = tf.type_ctx.imports
+            append(&s.replicates, r)
+        }
+
+        return
+    }
+
+    // friendslop toolkit: `gd:"backup"` — HOST-LOCAL state for host migration
+    // AND save/resume (the same bytes ride both, session.odin's split). generate
+    // emits a version-hashed <class>_backup_write/_read codec over these fields,
+    // so a takeover restores the campaign, not a diorama — no hand-matched
+    // write_u8/read_u8 lists to drift. POD (scalars/structs/fixed arrays),
+    // map[POD]POD, and [dynamic]POD are supported; anything else is a build error.
+    // Rides nesting: scrapyard tags host-local fields inside a `using` embed.
+    if tok0 == "backup" {
+        kind, key, elem, bad := classify_backup(tf.type_text)
+
+        if bad != "" {
+            error_at(tf.loc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, label, bad)
+            return
+        }
+
+        for nm in tf.names {
+            append(
+                &s.backups,
+                Backup_Info{field = nm, path = extend_path(tf.path_base, nm), kind = kind, key = key, elem = elem},
+            )
+        }
+
+        return
+    }
+
+    // friendslop toolkit: `gd:"profile=Type"` on the class's ksess.Session
+    // field — the DECLARATION form of session_profile_install: the named
+    // POD struct is this game's per-player profile row. scriptgen folds
+    // the row's field-by-field shape into NET_FINGERPRINT (a drifted
+    // profile refuses the join like any other wire skew — the raw install
+    // call left it outside the version door: same-size drift scrambled
+    // rows silently) and installs it inside the generated ready thunk,
+    // before the game's ready can *_start.
+    if strings.has_prefix(tok0, "profile=") {
+        // Nested `profile=` is refused by the context gate above (it silently never
+        // installs — neither the generated ready thunk nor the fingerprint fold
+        // walks nested Sessions), so only the top-level form reaches here.
+        pt := strings.trim_space(tok0[len("profile="):])
+
+        switch {
+        case pt == "":
+            error_at(
+                tf.loc,
+                "%s.%s: `profile=` names the row struct, e.g. gd:\"profile=Loadout\"",
+                s.struct_name,
+                label,
+            )
+        case !strings.has_suffix(tf.type_text, ".Session") && tf.type_text != "Session":
+            error_at(
+                tf.loc,
+                "%s.%s: `profile=` belongs on the ksess.Session field (got %q) — the row installs into that session",
+                s.struct_name,
+                label,
+                tf.type_text,
+            )
+        case s.profile_type != "":
+            error_at(
+                tf.loc,
+                "%s.%s: a second profile declaration (%q; already %q) — one row type per session",
+                s.struct_name,
+                label,
+                pt,
+                s.profile_type,
+            )
+        case len(tf.names) != 1:
+            error_at(tf.loc, "%s.%s: one session field per profile declaration", s.struct_name, label)
+        case:
+            s.profile_type = pt
+            s.profile_ses = tf.names[0]
+        }
+
+        return
+    }
+
+    // `gd:"manual"` (the wielder-drives-this-tick opt-out) has no arm here: at top
+    // level parse_script's embed branch consumes it before the dispatch (the
+    // FIELD_POLICY Caller row), and nested it is refused by the context gate (the
+    // Refuse row). Both meanings live in the table now, not in a token check here.
+
+    // `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
+    // decl.Slot now states). It carries a permanent public type id, folds into
+    // NET_FINGERPRINT, and becomes a row in the generated factory table; it used
+    // to ride as a trailing spec of `export` purely by accident of the order the
+    // two features were built, which left `profile=T` leading and this not.
+    entity_first := strings.has_prefix(tok0, "entity=")
+    entity_val := ""
+    entity_stream_hz := 0
+    entity_avatar := false
+
+    if entity_first {
+        // Nested leading `entity=` is refused by the context gate above (the export
+        // would register but the factory/type row silently never exists), so only
+        // the top-level form reaches here.
+        entity_val = strings.trim_space(tok0[len("entity="):])
+        // BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
+        // exported PackedScene — the scene is what the factory instantiates, and the
+        // Inspector slot is how the author hands it over — so `export` and
+        // `resource=PackedScene` were never a choice the tag was recording, only
+        // ceremony it was demanding. Trailing EXPORT specs still ride behind
+        // (`entity=Mob:3,group=Spawns`); a second `resource=` does not, since it
+        // would be overriding a hint the declaration already fixed.
+        syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
+        append(&syn, "export", "resource=PackedScene")
+
+        // The ENTITY's own trailing tokens ride here too — knobs of the KIND, not
+        // of the export — and are consumed now so the export-spec walk below never
+        // sees them: `stream_hz=N` (the owner-stream rate every spawn of this type
+        // carries, on every peer) and `avatar` (this kind is a seat's body — a host
+        // takeover parks it with its seat instead of adopting it). Anything else
+        // trailing is still an export spec (`group=`, …).
+        for sp in specs[1:] {
+            t := strings.trim_space(sp)
+            sname, _, sval := strings.partition(t, "=")
+            sname = strings.trim_space(sname)
+
+            // The vocabulary is godot:decl's ENTITY_SPECS (the runtime skips the
+            // same rows); the MEANING of each row is decided here.
+            if es, is_entity := decl.entity_spec(sname); is_entity {
+                has_val := strings.contains(t, "=")
+
+                if (has_val && !es.value) || (!has_val && !es.bare) {
+                    error_at(tf.loc, "%s.%s: entity token `%s` is spelled %s", s.struct_name, label, sname, es.blurb)
+                    continue
+                }
+
+                switch sname {
+                case "stream_hz":
+                    v, ok := strconv.parse_int(strings.trim_space(sval))
+
+                    if !ok || v <= 0 || v > 1000 {
+                        error_at(
+                            tf.loc,
+                            "%s.%s: `stream_hz=` wants a positive rate in Hz (e.g. entity=Mob:3,stream_hz=30) — it is the kind's owner-stream rate, applied by the session to every spawn of the type",
+                            s.struct_name,
+                            label,
+                        )
+                    } else {
+                        entity_stream_hz = v
+                    }
+                case "avatar":
+                    entity_avatar = true
+                }
+
+                continue
+            }
+
+            append(&syn, sp)
+        }
+
+        specs = syn[:]
+        tok0 = "export"
+    }
+
+    if tok0 != "export" {
+        // `args=` (a signal-only spec used as a leading token) is refused by the
+        // context gate above at both sites, so anything still non-`export` here is
+        // a token the vocabulary does not know at all.
+        //
+        // The field HAS a `gd:"..."` tag but its first token is none the vocabulary
+        // knows — almost certainly a misspelling (`exprot`) that would otherwise
+        // silently leave the field un-exported. The "expected" half is godot:decl's
+        // projection, so a token added to FIELD_TOKENS is known here by construction
+        // rather than by someone remembering this line.
+        //
+        // Nested, this is the bug recorded above: a `gd:"replciate"` one comma deep
+        // was a no-op with zero diagnostic in either half of the toolchain, while
+        // the identical typo at top level had been a hard error for as long as
+        // field_expected has existed. Blocks are exactly where deep tags live.
+        if nested {
+            error_at(
+                tf.loc,
+                "%s.%s: unknown gd tag `%s` (expected %s) — a tag scriptgen doesn't know is silently nothing at this depth, which is how a replicated field stops replicating without a single error",
+                s.struct_name,
+                label,
+                tok0,
+                decl.field_expected(context.temp_allocator),
+            )
+        } else {
+            error_at(
+                tf.loc,
+                "%s.%s: unknown gd tag %q (expected %s)",
+                s.struct_name,
+                label,
+                tok0,
+                decl.field_expected(context.temp_allocator),
+            )
+        }
+
+        return
+    }
+
+    // ---- `export` ------------------------------------------------------------
+    //
+    // The SPEC gate runs in BOTH contexts (it is the whole point of this
+    // unification): every other first token's spec loop refuses what it doesn't
+    // know, so `gd:"replicate,slcak=0.5"` failed the build — but a typo behind
+    // `export` fell through, reached the runtime as an unknown hint, and
+    // surfaced as a boot-time record_error on a field that had silently lost it.
+    // Two tiers, same tag, no way to tell which one you were about to hit; and
+    // one level of nesting used to drop you from the strict tier to the silent
+    // one without saying so.
+    spec_tf := tf
+    spec_tf.specs = specs
+    getter, setter, _ := check_export_specs(s, spec_tf, entity_first)
+
+    // Past here is RECORDING, and recording is top-level-only: an embed's
+    // exports are registered by the runtime reflection walk under their
+    // namespaced (`aim_sensitivity`) names, not by this table.
+    if strings.trim_space(tf.type_text) == "string" {
+        error_at(
+            tf.loc,
+            "%s.%s: native string exports do not share Godot String storage; use gd.String for an export (native string is supported in methods)",
+            s.struct_name,
+            label,
+        )
+        return
+    }
+
+    if nested {
+        return
+    }
+
+    vi, ok := map_variant(tf.type_text)
+
+    if !ok {
+        error_at(tf.loc, "%s.%s: export field of unsupported type %q", s.struct_name, label, tf.type_text)
+        return
+    }
+
+    // OBJECT-typed export: the hint is NOT ceremony here. inst_set's resource
+    // refcounting keys off the Resource_Type hint — a hint-less object export
+    // stores an UNREFERENCED pointer that dangles once the loader's transient
+    // ref drops, a delayed SIGSEGV far from this line. A typed handle
+    // (`gd.Packed_Scene`) derives the hint from the ENGINE CLASS INDEX and
+    // ships it to the runtime via Field_Meta.resource_class (reflection can't:
+    // every refcounted handle erases to the same ^rawptr). A type-erased
+    // `gd.Object` — or a non-Resource handle, which no Inspector slot can hold —
+    // is refused. Index unavailable degrades to silence (classes.odin's rule);
+    // the runtime's registration refusal is the backstop there.
+    res_class := ""
+
+    if vi.enum_name == ".Object" && entity_val == "" {
+        has_resource_spec := false
+
+        for sp in specs[1:] {
+            if strings.has_prefix(strings.trim_space(sp), "resource=") {
+                has_resource_spec = true
+                break
+            }
+        }
+
+        if !has_resource_spec {
+            handle := strings.trim_space(tf.type_text)
+
+            if strings.has_prefix(handle, "^") {
+                handle = strings.trim_space(handle[1:])
+            }
+
+            if di := strings.last_index(handle, "."); di >= 0 {
+                handle = handle[di + 1:]
+            }
+
+            is_resource, known := class_handle_covers("Resource", handle)
+
+            switch {
+            case known && !is_resource:
+                error_at(
+                    tf.loc,
+                    "%s.%s: exported object handle %q is not a Resource — only Resources ride an Inspector slot (wire scene nodes with `onready=` instead); a type-erased gd.Object must spell `resource=<Class>`",
+                    s.struct_name,
+                    label,
+                    tf.type_text,
+                )
+                return
+            case is_resource:
+                res_class = godot_class_name(handle)
+            }
+        }
+    }
+
+    // `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
+    // factory declaration (resolve_entities validates the target and pairs the
+    // typed hooks once the full module is parsed). The "must be a PackedScene
+    // export" check that used to live here is gone with the trailing form —
+    // the hint is synthesized, so it cannot be anything else.
+    if entity_val != "" {
+        target, sep, id_text := strings.partition(entity_val, ":")
+        id, id_ok := strconv.parse_int(strings.trim_space(id_text))
+
+        switch {
+        case sep != ":" || !id_ok:
+            error_at(
+                tf.loc,
+                "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)",
+                s.struct_name,
+                label,
+            )
+        case id <= 0 || id > 65535:
+            error_at(
+                tf.loc,
+                "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)",
+                s.struct_name,
+                label,
+                id,
+            )
+        case len(tf.names) != 1:
+            error_at(
+                tf.loc,
+                "%s.%s: one scene field per entity — split the multi-name declaration",
+                s.struct_name,
+                label,
+            )
+        case:
+            append(
+                &s.entities,
+                Entity_Tag {
+                    field = label,
+                    target = strings.trim_space(target),
+                    type_id = id,
+                    line = tf.loc.line,
+                    stream_hz = entity_stream_hz,
+                    avatar = entity_avatar,
+                },
+            )
+        }
+    }
+
+    for nm, i in tf.names {
+        append(
+            &s.exports,
+            Export_Info {
+                name = nm,
+                type_text = tf.type_text,
+                vi = vi,
+                getter = getter,
+                setter = setter,
+                line = i < len(tf.lines) ? tf.lines[i] : tf.loc.line,
+                doc = tf.doc,
+                res_class = res_class,
+            },
+        )
+    }
 }
 
 // ---- AST parsing -------------------------------------------------------------
@@ -1111,337 +1524,448 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 // Parse one script file. Returns ok=false when the file has no owner-struct (so it
 // is not a script — e.g. a boot.odin or a plain helper file).
 parse_script :: proc(path, src: string) -> (Script, bool) {
-	s := Script {
-		path = path,
-		base = "Node"
-	}
+    s := Script {
+        path = path,
+        base = "Node",
+    }
 
-	file := ast.File {
-		fullpath = path,
-		src      = src
-	}
-	p := parser.default_parser()
-	if !parser.parse_file(&p, &file) {
-		error_at(Loc{path = path}, "failed to parse")
-		return s, false
-	}
-	s.pkg = file.pkg_name
-	s.imports = collect_file_imports(&file)
-	// The file's actual `godot:godot` import alias — marker/type spellings under it are
-	// normalized to the gen files' `gd.` before mapping/splicing (see normalize_godot_qualifier).
-	s.godot_alias = godot_import_alias(&file)
-	scan_markers(src, &s, file.pkg_token.pos.line)
+    file := ast.File {
+        fullpath = path,
+        src      = src,
+    }
+    p := parser.default_parser()
 
-	// Pass 1: locate the script struct (first field named `owner`).
-	struct_type: ^ast.Struct_Type
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok {continue}
-		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		st, is_struct := vd.values[0].derived.(^ast.Struct_Type)
-		if !is_struct {continue}
-		if st.fields == nil || len(st.fields.list) == 0 {continue}
-		f0 := st.fields.list[0]
-		if len(f0.names) == 0 {continue}
-		fname, _ := f0.names[0].derived.(^ast.Ident)
-		if fname == nil || fname.name != "owner" {continue}
-		name_ident, _ := vd.names[0].derived.(^ast.Ident)
-		if name_ident == nil {continue}
-		if struct_type != nil {
-			// A second owner-struct used to be silently ignored — its exports/procs then
-			// bound to nothing at runtime with no diagnostic.
-			error_at(
-				Loc{path, name_ident.pos.line},
-				"one script struct per file; found %s and %s — move %s to its own file",
-				s.struct_name,
-				name_ident.name,
-				name_ident.name
-			)
-			continue
-		}
-		s.struct_name = name_ident.name
-		s.doc = extract_doc(vd.docs) // `///` above the struct -> class description
-		struct_type = st
-	}
-	if struct_type == nil {
-		// A `//gd:` marker is an unambiguous declaration that this file IS a script. Finding
-		// one but no script struct almost always means the struct's first field isn't named
-		// `owner` (a typo, wrong name, or wrong position) — fail loudly instead of silently
-		// dropping the class (which left the user with a node that does nothing, no error).
-		if s.marked {
-			error_at(
-				Loc{path = path},
-				"file has //gd: marker(s) (class %q) but no script struct — a script's struct must have its FIRST field named `owner`",
-				s.class_name
-			)
-		}
-		return s, false
-	}
-	// ---- the base class, and the pair that used to be allowed to disagree ----
-	//
-	// `//gd:extends Node2D` and `owner: gd.Node2d` state the same fact twice, and
-	// until now nothing compared them. The dangerous half is a handle NARROWER
-	// than the base: `//gd:extends Node` with `owner: gd.Node2d` registers a plain
-	// Node and then reaches through that handle with `gd.node2d_*` calls, which is
-	// a crash at the engine boundary with nothing pointing back at the tag. The
-	// WIDER half is legal and idiomatic (`//gd:extends CharacterBody2D` with
-	// `owner: gd.Node2d` is how most of examples/ is written — the script only
-	// calls Node2D methods), so the rule is ancestry, not equality.
-	//
-	// With no marker the base is DERIVED from the handle instead of defaulting to
-	// "Node": one declaration, not two. The "Node" fallback survives for a handle
-	// the engine class index can't place (no -godot: root, a non-ClassDB type),
-	// which is exactly the pre-existing behaviour for those files.
-	{
-		owner_handle := ""
-		if struct_type.fields != nil && len(struct_type.fields.list) > 0 {
-			ot := normalize_godot_qualifier(node_text(src, struct_type.fields.list[0].type), s.godot_alias)
-			ot = strings.trim_left(ot, "^")
-			if strings.has_prefix(ot, "gd.") {owner_handle = ot[3:]}
-		}
-		if owner_handle != "" {
-			if s.base_line == 0 {
-				if g := godot_class_name(owner_handle); g != "" {
-					s.base = g
-				}
-			} else if covers, known := class_handle_covers(owner_handle, s.base); known && !covers {
-				derived := godot_class_name(owner_handle)
-				if derived == "" {derived = owner_handle}
-				error_at(
-					Loc{s.path, s.base_line},
-					"%s: `//gd:extends %s` but `owner: gd.%s` is a %s handle — the handle must be the base or one of its ancestors, or every gd.%s_* call reaches through it into an object that isn't one. Write `//gd:extends %s` (the class this really is), widen the owner field to %s's own handle or one of ITS bases, or drop the marker and let the field declare the base",
-					s.struct_name, s.base, owner_handle, derived,
-					// The binding-proc prefix is the handle name lowercased — the same
-					// spelling godot/<snake>.gen.odin is filed under. (to_snake would
-					// double the underscores already in `Character_Body2d`.)
-					strings.to_lower(owner_handle, context.temp_allocator),
-					derived, s.base
-				)
-			}
-		}
-	}
+    if !parser.parse_file(&p, &file) {
+        error_at(Loc{path = path}, "failed to parse")
+        return s, false
+    }
 
-	// The resolution context for nested `using`/embedded fields: this file's package dir
-	// (bare types) and its explicit-alias imports (imported bundles). See lookup_struct.
-	nest_ctx := Struct_Def {
-		dir     = dir_of(path),
-		imports = s.imports
-	}
+    s.pkg = file.pkg_name
+    s.imports = collect_file_imports(&file)
+    // The file's actual `godot:godot` import alias — marker/type spellings under it are
+    // normalized to the gen files' `gd.` before mapping/splicing (see normalize_godot_qualifier).
+    s.godot_alias = godot_import_alias(&file)
+    scan_markers(src, &s, file.pkg_token.pos.line)
 
-	// Exports: struct fields (after owner) tagged `gd:"export"` (or `gd:"onready=PATH"`).
-	for f, i in struct_type.fields.list {
-		if i == 0 {continue} // owner
+    // Pass 1: locate the script struct (first field named `owner`).
+    struct_type: ^ast.Struct_Type
 
-		// Field name (first ident) — for error messages + offset_of.
-		field_label := s.struct_name
-		for nm in f.names {
-			if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
-				field_label = ident.name
-				break
-			}
-		}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
 
-		floc := Loc{s.path, f.pos.line}
+        if !ok {
+            continue
+        }
 
-		// Commands name their entity over the wire: remember whether the struct
-		// declares a `net_id` field (validated iff @(gd_command) procs exist).
-		for nm in f.names {
-			if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil && ident.name == "net_id" {
-				s.net_id_type = strings.trim_space(node_text(src, f.type))
-			}
-		}
+        if len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
 
-		// The conventional game-network stack. A kboot.Boot field is the "this
-		// game rides the boot" declaration — scriptgen generates the standard
-		// transport forwards. One direct Boot + Session + Comms (and one Lane
-		// on a sim owner) also gives the class its generated net facade. Match
-		// IMPORT PATHS, not aliases: authors may name these packages freely.
-		//
-		// The qualifier must RESOLVE to godot:kit/boot. This was a bare
-		// `has_suffix(ftype, ".Boot")` — the loosest match in the language:
-		// any package's `Boot` (a game's own `startup.Boot`, a vendored
-		// library's) silently declared the game shell, and the four transport
-		// forwards were generated onto a class that owns no session. The alias
-		// is free (`kboot`, `boot`, anything) because the IMPORT PATH is what
-		// is checked, not the spelling.
-		{
-			ftype := strings.trim_space(node_text(src, f.type))
-			if dot := strings.index_byte(ftype, '.'); dot > 0 {
-				pkg :=
-			   nest_ctx.imports[ftype[:dot]]
-				name := ftype[dot + 1:]
-				for nm in f.names {
-					if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
-						switch {
-						case pkg == "godot:kit/boot" && name == "Boot":
-							s.boot_fields += 1
-						s.boot_field = ident.name
-						case pkg == "godot:kit/session" && name == "Session":
-							s.session_fields += 1
-							s.session_field = ident.name
-						case pkg == "godot:kit/comms" && name == "Comms":
-							s.comms_fields += 1
-							s.comms_field = ident.name
-						case pkg == "godot:kit/sim" && name == "Lane":
-							s.lane_fields += 1
-							s.lane_field = ident.name
-						}
-					}
-				}
-			}
-		}
+        st, is_struct := vd.values[0].derived.(^ast.Struct_Type)
 
-		val, has := tag_gd_value(f.tag.text)
-		if !has && f.tag.text != "" {
-			// A tag that LOOKS like an attempted gd tag but isn't the required `gd:"..."` form
-			// (missing the inner quotes, or the colon) would otherwise be silently ignored — the
-			// field isn't exported/onready-wired, then reads as nil/garbage and crashes at
-			// runtime when you use it. Catch it at build time.
-			raw := strings.trim(f.tag.text, "`")
-			if strings.contains(raw, "gd:") || strings.contains(raw, "gd\"") {
-				error_at(
-					floc,
-					"%s.%s: malformed gd tag %q — use the quoted form `gd:\"...\"`, e.g. `gd:\"onready=Sprite2D\"` or `gd:\"export\"`",
-					s.struct_name,
-					field_label,
-					raw
-				)
-			} else if ci := strings.index(raw, ":\""); ci > 0 {
-				// A gd-shaped declaration under the WRONG NAMESPACE (`gs:"replicate"`)
-				// contains no "gd:" at all and would silently not replicate/export.
-				// Flag a namespace one edit from `gd`, and any namespace whose first
-				// payload token is unmistakably ours.
-				ns := raw[:ci]
-				payload := raw[ci + 2:]
-				if qi := strings.index(payload, "\""); qi >= 0 {payload = payload[:qi]}
-				tok := payload
-				if comma := strings.index(tok, ","); comma >= 0 {tok = tok[:comma]}
-				tok = strings.trim_space(tok)
-				// The vocabulary's own answer (godot:decl). This sniff used to
-				// carry a third copy of the token list, so a token added to the
-				// language quietly stopped being recognized here.
-				gd_shaped := decl.field_token_shaped(tok)
-				if edit_distance_le1(ns, "gd") || gd_shaped {
-					error_at(
-						floc,
-						"%s.%s: tag namespace %q is not `gd` — %q would silently not apply; write `gd:\"%s\"`",
-						s.struct_name,
-						field_label,
-						ns,
-						payload,
-						payload
-					)
-				}
-			}
-		}
+        if !is_struct {
+            continue
+        }
 
-		// Signal fields declare themselves by TYPE (gd.Signal0 … Signal4, or the general
-		// gd.SignalN) — no tag needed (`gd:"args=..."` optionally names the arity family's
-		// payload; SignalN forbids a tag), so these checks precede the tagged-fields-only
-		// skip below. One field, one signal; multi-name fields (`a, b: gd.Signal0`)
-		// declare one signal per name, like exports.
-		{
-			sig_type := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
-			if arity, params, is_sig := signal_type_params(sig_type); is_sig {
-				for nm in f.names {
-					ident, iok := nm.derived.(^ast.Ident)
-					if !iok || ident == nil {continue}
-					parse_signal_field(&s, floc, ident.name, arity, params, val, has)
-				}
-				continue
-			}
-			if param, is_sn := signal_n_param(f.type, s.godot_alias); is_sn {
-				for nm in f.names {
-					ident, iok := nm.derived.(^ast.Ident)
-					if !iok || ident == nil {continue}
-					parse_signal_n_field(&s, src, floc, ident.name, param, has)
-				}
-				continue
-			}
-		}
+        if st.fields == nil || len(st.fields.list) == 0 {
+            continue
+        }
 
-		// `gd:"manual"` on an embedded sim block opts its @(gd_tick) OUT of
-		// auto-hoist — the wielder's own tick drives it. It still recurses like
-		// an untagged embed (so its predict fields flatten into the descriptor);
-		// only the auto-call is suppressed, via the `manual` flag threaded below.
-		is_manual := has && strings.trim_space(val) == "manual"
-		if !has || is_manual {
-			// No gd tag (or `manual`): this may be a `using`/embedded sub-struct whose
-			// fields carry gd tags. Resolve the field's type (same-package or imported
-			// bundle) and recurse so nested `gd:"replicate"` (and, through `using`,
-			// export/onready/signal) fields are discovered. Non-struct / unresolved /
-			// typo'd types don't resolve and are skipped (nested-replicate-fields).
-			nested := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
-			if def, subst, ok := resolve_type(nest_ctx, nested); ok {
-				if is_manual && def.tick.proc_name == "" {
-					error_at(
-						floc,
-						"%s.%s: `gd:\"manual\"` only applies to an embedded sim block with an @(gd_tick) — %q has none",
-						s.struct_name, field_label, nested
-					)
-				}
-				entry_using := .Using in f.flags
-				for nm in f.names {
-					ident, iok := nm.derived.(^ast.Ident)
-					if !iok || ident == nil {continue}
-					// `using` flattens (members keep their leaf name); a plain embed
-					// namespaces them under `<field>_` (see recurse_into / walk_members).
-					name_prefix := entry_using ? "" : strings.concatenate({ident.name, "_"})
-					visited := make(map[string]bool)
-					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst, is_manual)
-					delete(visited)
-				}
-			} else {
-				if is_manual {
-					error_at(
-						floc,
-						"%s.%s: `gd:\"manual\"` but the type %q didn't resolve to a sim block",
-						s.struct_name, field_label, nested
-					)
-				}
-				unresolved_embed_check(floc, s.struct_name, field_label, nested, .Using in f.flags, nest_ctx.imports, nest_ctx.dir)
-			}
-			continue
-		}
-		// Tag is comma-separated tokens; the FIRST selects the kind. Everything
-		// past this point is the SHARED dispatch (walk_tagged_field) — the same
-		// one recurse_into hands its nested fields to. What used to sit inline
-		// here was one of the two chains that drifted apart.
-		specs := strings.split(val, ",")
-		if len(specs) == 0 {continue}
-		type_text := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+        f0 := st.fields.list[0]
 
-		// A declaration may bind several names (`x, y: f32 `gd:"replicate"``).
-		// The dispatch takes the whole declaration so the arms that RECORD can
-		// loop the names while the arms that merely diagnose report once.
-		fnames := make([dynamic]string, 0, len(f.names), context.temp_allocator)
-		flines := make([dynamic]int, 0, len(f.names), context.temp_allocator)
-		for nm in f.names {
-			ident, iok := nm.derived.(^ast.Ident)
-			if !iok || ident == nil {continue}
-			append(&fnames, ident.name)
-			append(&flines, ident.pos.line)
-		}
-		if len(fnames) == 0 {continue}
+        if len(f0.names) == 0 {
+            continue
+        }
 
-		walk_tagged_field(&s, Tagged_Field{
-			ctx       = .Top_Level,
-			names     = fnames[:],
-			lines     = flines[:],
-			path_base = nil, // the script struct IS the root
-			type_text = type_text,
-			type_ctx  = nest_ctx,
-			specs     = specs,
-			tok0      = strings.trim_space(specs[0]),
-			loc       = floc,
-			doc       = extract_doc(f.docs)
-		})
-	}
+        fname, _ := f0.names[0].derived.(^ast.Ident)
 
-	scan_bound_procs(&s, path, src, &file)
-	validate_replay_view_fields(&s,struct_type,src)
+        if fname == nil || fname.name != "owner" {
+            continue
+        }
 
-	return s, true
+        name_ident, _ := vd.names[0].derived.(^ast.Ident)
+
+        if name_ident == nil {
+            continue
+        }
+
+        if struct_type != nil {
+            // A second owner-struct used to be silently ignored — its exports/procs then
+            // bound to nothing at runtime with no diagnostic.
+            error_at(
+                Loc{path, name_ident.pos.line},
+                "one script struct per file; found %s and %s — move %s to its own file",
+                s.struct_name,
+                name_ident.name,
+                name_ident.name,
+            )
+            continue
+        }
+
+        s.struct_name = name_ident.name
+        s.doc = extract_doc(vd.docs) // `///` above the struct -> class description
+        struct_type = st
+    }
+
+    if struct_type == nil {
+        // A `//gd:` marker is an unambiguous declaration that this file IS a script. Finding
+        // one but no script struct almost always means the struct's first field isn't named
+        // `owner` (a typo, wrong name, or wrong position) — fail loudly instead of silently
+        // dropping the class (which left the user with a node that does nothing, no error).
+        if s.marked {
+            error_at(
+                Loc{path = path},
+                "file has //gd: marker(s) (class %q) but no script struct — a script's struct must have its FIRST field named `owner`",
+                s.class_name,
+            )
+        }
+
+        return s, false
+    }
+
+    // ---- the base class, and the pair that used to be allowed to disagree ----
+    //
+    // `//gd:extends Node2D` and `owner: gd.Node2d` state the same fact twice, and
+    // until now nothing compared them. The dangerous half is a handle NARROWER
+    // than the base: `//gd:extends Node` with `owner: gd.Node2d` registers a plain
+    // Node and then reaches through that handle with `gd.node2d_*` calls, which is
+    // a crash at the engine boundary with nothing pointing back at the tag. The
+    // WIDER half is legal and idiomatic (`//gd:extends CharacterBody2D` with
+    // `owner: gd.Node2d` is how most of examples/ is written — the script only
+    // calls Node2D methods), so the rule is ancestry, not equality.
+    //
+    // With no marker the base is DERIVED from the handle instead of defaulting to
+    // "Node": one declaration, not two. The "Node" fallback survives for a handle
+    // the engine class index can't place (no -godot: root, a non-ClassDB type),
+    // which is exactly the pre-existing behaviour for those files.
+    {
+        owner_handle := ""
+
+        if struct_type.fields != nil && len(struct_type.fields.list) > 0 {
+            ot := normalize_godot_qualifier(node_text(src, struct_type.fields.list[0].type), s.godot_alias)
+            ot = strings.trim_left(ot, "^")
+
+            if strings.has_prefix(ot, "gd.") {
+                owner_handle = ot[3:]
+            }
+        }
+
+        if owner_handle != "" {
+            if s.base_line == 0 {
+                if g := godot_class_name(owner_handle); g != "" {
+                    s.base = g
+                }
+            } else if covers, known := class_handle_covers(owner_handle, s.base); known && !covers {
+                derived := godot_class_name(owner_handle)
+
+                if derived == "" {
+                    derived = owner_handle
+                }
+
+                error_at(
+                    Loc{s.path, s.base_line},
+                    "%s: `//gd:extends %s` but `owner: gd.%s` is a %s handle — the handle must be the base or one of its ancestors, or every gd.%s_* call reaches through it into an object that isn't one. Write `//gd:extends %s` (the class this really is), widen the owner field to %s's own handle or one of ITS bases, or drop the marker and let the field declare the base",
+                    s.struct_name,
+                    s.base,
+                    owner_handle,
+                    derived,
+                    // The binding-proc prefix is the handle name lowercased — the same
+                    // spelling godot/<snake>.gen.odin is filed under. (to_snake would
+                    // double the underscores already in `Character_Body2d`.)
+                    strings.to_lower(owner_handle, context.temp_allocator),
+                    derived,
+                    s.base,
+                )
+            }
+        }
+    }
+
+    // The resolution context for nested `using`/embedded fields: this file's package dir
+    // (bare types) and its explicit-alias imports (imported bundles). See lookup_struct.
+    nest_ctx := Struct_Def {
+        dir     = dir_of(path),
+        imports = s.imports,
+    }
+
+    // Exports: struct fields (after owner) tagged `gd:"export"` (or `gd:"onready=PATH"`).
+    for f, i in struct_type.fields.list {
+        if i == 0 {
+            continue
+        } // owner
+
+        // Field name (first ident) — for error messages + offset_of.
+        field_label := s.struct_name
+
+        for nm in f.names {
+            if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
+                field_label = ident.name
+                break
+            }
+        }
+
+        floc := Loc{s.path, f.pos.line}
+
+        // Commands name their entity over the wire: remember whether the struct
+        // declares a `net_id` field (validated iff @(gd_command) procs exist).
+        for nm in f.names {
+            if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil && ident.name == "net_id" {
+                s.net_id_type = strings.trim_space(node_text(src, f.type))
+            }
+        }
+
+        // The conventional game-network stack. A kboot.Boot field is the "this
+        // game rides the boot" declaration — scriptgen generates the standard
+        // transport forwards. One direct Boot + Session + Comms (and one Lane
+        // on a sim owner) also gives the class its generated net facade. Match
+        // IMPORT PATHS, not aliases: authors may name these packages freely.
+        //
+        // The qualifier must RESOLVE to godot:kit/boot. This was a bare
+        // `has_suffix(ftype, ".Boot")` — the loosest match in the language:
+        // any package's `Boot` (a game's own `startup.Boot`, a vendored
+        // library's) silently declared the game shell, and the four transport
+        // forwards were generated onto a class that owns no session. The alias
+        // is free (`kboot`, `boot`, anything) because the IMPORT PATH is what
+        // is checked, not the spelling.
+        {
+            ftype := strings.trim_space(node_text(src, f.type))
+
+            if dot := strings.index_byte(ftype, '.'); dot > 0 {
+                pkg := nest_ctx.imports[ftype[:dot]]
+                name := ftype[dot + 1:]
+
+                for nm in f.names {
+                    if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
+                        switch {
+                        case pkg == "godot:kit/boot" && name == "Boot":
+                            s.boot_fields += 1
+                            s.boot_field = ident.name
+                        case pkg == "godot:kit/session" && name == "Session":
+                            s.session_fields += 1
+                            s.session_field = ident.name
+                        case pkg == "godot:kit/comms" && name == "Comms":
+                            s.comms_fields += 1
+                            s.comms_field = ident.name
+                        case pkg == "godot:kit/sim" && name == "Lane":
+                            s.lane_fields += 1
+                            s.lane_field = ident.name
+                        }
+                    }
+                }
+            }
+        }
+
+        val, has := tag_gd_value(f.tag.text)
+
+        if !has && f.tag.text != "" {
+            // A tag that LOOKS like an attempted gd tag but isn't the required `gd:"..."` form
+            // (missing the inner quotes, or the colon) would otherwise be silently ignored — the
+            // field isn't exported/onready-wired, then reads as nil/garbage and crashes at
+            // runtime when you use it. Catch it at build time.
+            raw := strings.trim(f.tag.text, "`")
+
+            if strings.contains(raw, "gd:") || strings.contains(raw, "gd\"") {
+                error_at(
+                    floc,
+                    "%s.%s: malformed gd tag %q — use the quoted form `gd:\"...\"`, e.g. `gd:\"onready=Sprite2D\"` or `gd:\"export\"`",
+                    s.struct_name,
+                    field_label,
+                    raw,
+                )
+            } else if ci := strings.index(raw, ":\""); ci > 0 {
+                // A gd-shaped declaration under the WRONG NAMESPACE (`gs:"replicate"`)
+                // contains no "gd:" at all and would silently not replicate/export.
+                // Flag a namespace one edit from `gd`, and any namespace whose first
+                // payload token is unmistakably ours.
+                ns := raw[:ci]
+                payload := raw[ci + 2:]
+
+                if qi := strings.index(payload, "\""); qi >= 0 {
+                    payload = payload[:qi]
+                }
+
+                tok := payload
+
+                if comma := strings.index(tok, ","); comma >= 0 {
+                    tok = tok[:comma]
+                }
+
+                tok = strings.trim_space(tok)
+                // The vocabulary's own answer (godot:decl). This sniff used to
+                // carry a third copy of the token list, so a token added to the
+                // language quietly stopped being recognized here.
+                gd_shaped := decl.field_token_shaped(tok)
+
+                if edit_distance_le1(ns, "gd") || gd_shaped {
+                    error_at(
+                        floc,
+                        "%s.%s: tag namespace %q is not `gd` — %q would silently not apply; write `gd:\"%s\"`",
+                        s.struct_name,
+                        field_label,
+                        ns,
+                        payload,
+                        payload,
+                    )
+                }
+            }
+        }
+
+        // Signal fields declare themselves by TYPE (gd.Signal0 … Signal4, or the general
+        // gd.SignalN) — no tag needed (`gd:"args=..."` optionally names the arity family's
+        // payload; SignalN forbids a tag), so these checks precede the tagged-fields-only
+        // skip below. One field, one signal; multi-name fields (`a, b: gd.Signal0`)
+        // declare one signal per name, like exports.
+        {
+            sig_type := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+
+            if arity, params, is_sig := signal_type_params(sig_type); is_sig {
+                for nm in f.names {
+                    ident, iok := nm.derived.(^ast.Ident)
+
+                    if !iok || ident == nil {
+                        continue
+                    }
+
+                    parse_signal_field(&s, floc, ident.name, arity, params, val, has)
+                }
+
+                continue
+            }
+
+            if param, is_sn := signal_n_param(f.type, s.godot_alias); is_sn {
+                for nm in f.names {
+                    ident, iok := nm.derived.(^ast.Ident)
+
+                    if !iok || ident == nil {
+                        continue
+                    }
+
+                    parse_signal_n_field(&s, src, floc, ident.name, param, has)
+                }
+
+                continue
+            }
+        }
+
+        // `gd:"manual"` on an embedded sim block opts its @(gd_tick) OUT of
+        // auto-hoist — the wielder's own tick drives it. It still recurses like
+        // an untagged embed (so its predict fields flatten into the descriptor);
+        // only the auto-call is suppressed, via the `manual` flag threaded below.
+        is_manual := has && strings.trim_space(val) == "manual"
+
+        if !has || is_manual {
+            // No gd tag (or `manual`): this may be a `using`/embedded sub-struct whose
+            // fields carry gd tags. Resolve the field's type (same-package or imported
+            // bundle) and recurse so nested `gd:"replicate"` (and, through `using`,
+            // export/onready/signal) fields are discovered. Non-struct / unresolved /
+            // typo'd types don't resolve and are skipped (nested-replicate-fields).
+            nested := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+
+            if def, subst, ok := resolve_type(nest_ctx, nested); ok {
+                if is_manual && def.tick.proc_name == "" {
+                    error_at(
+                        floc,
+                        "%s.%s: `gd:\"manual\"` only applies to an embedded sim block with an @(gd_tick) — %q has none",
+                        s.struct_name,
+                        field_label,
+                        nested,
+                    )
+                }
+
+                entry_using := .Using in f.flags
+
+                for nm in f.names {
+                    ident, iok := nm.derived.(^ast.Ident)
+
+                    if !iok || ident == nil {
+                        continue
+                    }
+
+                    // `using` flattens (members keep their leaf name); a plain embed
+                    // namespaces them under `<field>_` (see recurse_into / walk_members).
+                    name_prefix := entry_using ? "" : strings.concatenate({ident.name, "_"})
+                    visited := make(map[string]bool)
+                    recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst, is_manual)
+                    delete(visited)
+                }
+            } else {
+                if is_manual {
+                    error_at(
+                        floc,
+                        "%s.%s: `gd:\"manual\"` but the type %q didn't resolve to a sim block",
+                        s.struct_name,
+                        field_label,
+                        nested,
+                    )
+                }
+
+                unresolved_embed_check(
+                    floc,
+                    s.struct_name,
+                    field_label,
+                    nested,
+                    .Using in f.flags,
+                    nest_ctx.imports,
+                    nest_ctx.dir,
+                )
+            }
+
+            continue
+        }
+
+        // Tag is comma-separated tokens; the FIRST selects the kind. Everything
+        // past this point is the SHARED dispatch (walk_tagged_field) — the same
+        // one recurse_into hands its nested fields to. What used to sit inline
+        // here was one of the two chains that drifted apart.
+        specs := strings.split(val, ",")
+
+        if len(specs) == 0 {
+            continue
+        }
+
+        type_text := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+
+        // A declaration may bind several names (`x, y: f32 `gd:"replicate"``).
+        // The dispatch takes the whole declaration so the arms that RECORD can
+        // loop the names while the arms that merely diagnose report once.
+        fnames := make([dynamic]string, 0, len(f.names), context.temp_allocator)
+        flines := make([dynamic]int, 0, len(f.names), context.temp_allocator)
+
+        for nm in f.names {
+            ident, iok := nm.derived.(^ast.Ident)
+
+            if !iok || ident == nil {
+                continue
+            }
+
+            append(&fnames, ident.name)
+            append(&flines, ident.pos.line)
+        }
+
+        if len(fnames) == 0 {
+            continue
+        }
+
+        walk_tagged_field(
+            &s,
+            Tagged_Field {
+                ctx       = .Top_Level,
+                names     = fnames[:],
+                lines     = flines[:],
+                path_base = nil, // the script struct IS the root
+                type_text = type_text,
+                type_ctx  = nest_ctx,
+                specs     = specs,
+                tok0      = strings.trim_space(specs[0]),
+                loc       = floc,
+                doc       = extract_doc(f.docs),
+            },
+        )
+    }
+
+    scan_bound_procs(&s, path, src, &file)
+    validate_replay_view_fields(&s, struct_type, src)
+
+    return s, true
 }
 
 // scan_bound_procs collects the procs bound to `s`'s script struct (first param
@@ -1451,207 +1975,268 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 // files instead of living in one monolith. `path`/`src` are the file being
 // SCANNED, so diagnostics point at the helper, not the class's home file.
 scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
-	self_type := strings.concatenate({"^", s.struct_name})
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok {continue}
-		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-		if !is_proc {continue}
-		name_ident, _ := vd.names[0].derived.(^ast.Ident)
-		if name_ident == nil {continue}
-		proc_name := name_ident.name
+    self_type := strings.concatenate({"^", s.struct_name})
 
-		pt := pl.type
-		if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
-		first := pt.params.list[0]
-		if node_text(src, first.type) != self_type {continue}
-		if !validate_struct_prefix(proc_name, s.struct_name, Loc{path, name_ident.pos.line}) {continue}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
 
-		// PRIMARY-attribute exclusivity, checked before the dispatch chain
-		// below: that chain takes the FIRST matching attribute and stops, so
-		// a second primary would be silently inert — @(gd_tick) riding a
-		// @(gd_command) parsed as just a command, its tick never scheduled.
-		// The paired halves already refuse double claims (one owner per
-		// name); primaries follow the same rule.
-		kit_primaries := [?]string{"gd_command", "gd_tick", "gd_sample", "gd_step"}
-		worn_count := 0
-		worn: [2]string
-		for a in kit_primaries {
-			if has_attr(vd, a) {
-				if worn_count < 2 {worn[worn_count] = a}
-				worn_count += 1
-			}
-		}
-		if worn_count > 1 {
-			error_at(
-				Loc{path, name_ident.pos.line},
-				"%s: proc %q wears @(%s) AND @(%s) — primaries are mutually exclusive (the first wins, the second silently never fires); split the proc or drop one",
-				s.struct_name, proc_name, worn[0], worn[1]
-			)
-		}
-		if worn_count == 1 {
-			if has_attr(vd, "gd_method") || has_attr(vd, "gd_rpc") || has_attr(vd, "gd_connect") {
-				error_at(
-					Loc{path, name_ident.pos.line},
-					"%s: proc %q wears @(%s) plus a Godot-method attribute — kit verbs/ticks never join the method tables (the method half would silently never register); use two procs",
-					s.struct_name, proc_name, worn[0]
-				)
-			}
-			// The primary would also outrank a lifecycle NAME (the dispatch
-			// continues before names are read) — the hook would silently
-			// never run as one.
-			if kw, is_lc := lifecycle_keyword(strip_struct_prefix(proc_name, s.struct_name)); is_lc {
-				error_at(
-					Loc{path, name_ident.pos.line},
-					"%s: proc %q is named like the `%s` lifecycle hook but wears @(%s) — the attribute wins and the hook would silently never run; rename the proc or split it",
-					s.struct_name, proc_name, kw, worn[0]
-				)
-			}
-		}
+        if !ok {
+            continue
+        }
 
-		// `@(gd_command[=POLICY])` — a toolkit action (kit/net command
-		// loop). NOT a Godot-callable method: it is issued from Odin code via the
-		// generated `<proc>_cmd` wrapper, so it never joins the method tables. Checked
-		// before the lifecycle match so a command can never be misread as a hook.
-		if has_attr(vd, "gd_command") {
-			config := command_config(vd, src)
-			parse_command(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
-			continue
-		}
+        if len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
 
-		// `@(gd_message="TAG")` — a typed app-message handler (kit/session app
-		// routes). Not a Godot method: the generated `<class>_messages` proc
-		// registers it and `<proc>_send` ships it, so it never joins the method
-		// tables. Checked here beside commands so it can't be misread as a hook.
-		if has_attr(vd, "gd_message") {
-			config, _ := attr_value(vd, "gd_message")
-			parse_message(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
-			continue
-		}
+        pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
 
-		// `@(gd_tick[="contested"])` — the class's sim-lane step (kit/sim). Like
-		// commands it is never a Godot method: the generated thunk + Sim_Set
-		// are its only callers.
-		if has_attr(vd, "gd_tick") {
-			config, _ := attr_value(vd, "gd_tick")
-			parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
-			continue
-		}
+        if !is_proc {
+            continue
+        }
 
-		// `@(gd_sample)` / `@(gd_step[="authority"])` — the lane's GAME half:
-		// the device read and the world pass. Never Godot methods: the
-		// generated `<snake>_lane_init` wiring is their only caller.
-		if has_attr(vd, "gd_sample") {
-			config, _ := attr_value(vd, "gd_sample")
-			parse_sample(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
-			continue
-		}
-		if has_attr(vd, "gd_step") {
-			config, _ := attr_value(vd, "gd_step")
-			parse_step(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
-			continue
-		}
+        name_ident, _ := vd.names[0].derived.(^ast.Ident)
 
-		// `gd_rpc` implies `gd_method`: an RPC must be a registered method to be dispatchable.
-		is_gd_rpc := has_attr(vd, "gd_rpc")
-		is_gd_method := has_attr(vd, "gd_method") || is_gd_rpc
-		stripped := strip_struct_prefix(proc_name, s.struct_name)
+        if name_ident == nil {
+            continue
+        }
 
-		if kw, is_lc := lifecycle_keyword(stripped); is_lc {
-			// Lifecycle hooks are matched by NAME and never join the method
-			// tables — @(gd_connect) riding one would silently never connect
-			// (the auto-wire targets a REGISTERED method). Refuse here; the
-			// same check below only sees procs that fall past this branch.
-			if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
-				error_at(
-					Loc{path, name_ident.pos.line},
-					"%s: proc %q is the `%s` lifecycle hook — @(gd_connect) on it silently never connects (the auto-wire targets a registered method); move the connection to a separate @(gd_method) proc",
-					s.struct_name, proc_name, kw
-				)
-			}
-			has_delta := count_params(pt) >= 2
-			append(&s.lifecycles, Lifecycle_Info{keyword = kw, proc_name = proc_name, has_delta = has_delta})
-			continue
-		}
-		// Typo hint: a struct-bound proc whose stripped name is one edit from a lifecycle
-		// keyword, and which isn't an explicit @(gd_method), is very likely a misspelled hook
-		// (`player_redy`) that will silently never run. Warn (non-fatal — it might be a helper).
-		if !is_gd_method {
-			if kw, near := nearest_lifecycle(stripped); near {
-				warnf(
-					"%s: proc %q looks like a misspelled `%s` lifecycle — it will NOT run as one",
-					s.struct_name,
-					proc_name,
-					kw
-				)
-			}
-			// A bare @(gd_connect) compiles and silently never connects — the
-			// auto-wire targets a REGISTERED method. The docs state the rule;
-			// this enforces it.
-			if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
-				error_at(
-					Loc{path, name_ident.pos.line},
-					"%s: proc %q wears @(gd_connect) without @(gd_method) — the connection targets a registered method, so bare it would silently never connect. Add @(gd_method).",
-					s.struct_name, proc_name
-				)
-			}
-		}
-		if is_gd_method {
-			m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false, vd)
-			append(&s.methods, m)
+        proc_name := name_ident.name
 
-			// `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
-			// `@(gd_connect="Path/To/Node:signal")` — the EMITTER is another node, resolved
-			// at READY like an `onready=` ref. Split at the LAST ':' (node names cannot
-			// contain one; NodePath's property-subpath ':' never names a signal).
-			if sig, has := attr_value(vd, "gd_connect"); has {
-				conn_path := ""
-				if ci := strings.last_index_byte(sig, ':'); ci >= 0 {
-					conn_path = strings.trim_space(sig[:ci])
-					sig = strings.trim_space(sig[ci + 1:])
-					switch {
-					case conn_path == "":
-						error_at(
-							Loc{path, name_ident.pos.line},
-							"%s: @(gd_connect) on %q — the path part before ':' is empty; spell the emitter path (`\"Child:sig\"`) or drop the ':' for the owner's own signal (`\"sig\"`)",
-							s.struct_name, proc_name
-						)
-					case sig == "" || !is_odin_ident(sig):
-						error_at(
-							Loc{path, name_ident.pos.line},
-							"%s: @(gd_connect) on %q — %q is not a signal name; the form is \"Path/To/Node:signal\"",
-							s.struct_name, proc_name, sig
-						)
-					}
-				}
-				// INDEXED form: one mid-name `%d` in the path — the core probes Choice0,
-				// Choice1, … and binds each index as the handler's trailing arg. A '%' at
-				// a SEGMENT START is a scene-unique name (`"%SaveButton:pressed"`) and
-				// passes through to get_node; scan_path_template keeps the two apart (a
-				// unique name may itself start with 'd'). A '%' anywhere in the signal
-				// part is never valid.
-				tmpl_count, stray := scan_path_template(conn_path)
-				indexed := tmpl_count > 0
-				if tmpl_count > 1 || stray != 0 || strings.contains(sig, "%") {
-					error_at(
-						Loc{path, name_ident.pos.line},
-						"%s: @(gd_connect) on %q — '%%' is only valid as ONE mid-name `%%d` template in the path part (`\"Panel/Choice%%d:pressed\"`, probing 0,1,2,… with the index bound as the handler's trailing parameter) or as a `%%Name` scene-unique segment (`\"%%SaveButton:pressed\"`)",
-						s.struct_name, proc_name
-					)
-					indexed = false
-				}
-				append(&s.connections, Connection_Info{signal = sig, method = m.gd_name, path = conn_path, indexed = indexed})
-			}
+        pt := pl.type
 
-			// `@(gd_rpc[="..."])` — expose this method to Godot's high-level multiplayer.
-			// `attr_value` is "" for the bare `@(gd_rpc)` form (=> all defaults).
-			if is_gd_rpc {
-				config, _ := attr_value(vd, "gd_rpc")
-				append(&s.rpcs, parse_rpc_config(m.gd_name, config))
-			}
-		}
-	}
+        if pt == nil || pt.params == nil || len(pt.params.list) == 0 {
+            continue
+        }
+
+        first := pt.params.list[0]
+
+        if node_text(src, first.type) != self_type {
+            continue
+        }
+
+        if !validate_struct_prefix(proc_name, s.struct_name, Loc{path, name_ident.pos.line}) {
+            continue
+        }
+
+        // PRIMARY-attribute exclusivity, checked before the dispatch chain
+        // below: that chain takes the FIRST matching attribute and stops, so
+        // a second primary would be silently inert — @(gd_tick) riding a
+        // @(gd_command) parsed as just a command, its tick never scheduled.
+        // The paired halves already refuse double claims (one owner per
+        // name); primaries follow the same rule.
+        kit_primaries := [?]string{"gd_command", "gd_tick", "gd_sample", "gd_step"}
+        worn_count := 0
+        worn: [2]string
+
+        for a in kit_primaries {
+            if has_attr(vd, a) {
+                if worn_count < 2 {
+                    worn[worn_count] = a
+                }
+
+                worn_count += 1
+            }
+        }
+
+        if worn_count > 1 {
+            error_at(
+                Loc{path, name_ident.pos.line},
+                "%s: proc %q wears @(%s) AND @(%s) — primaries are mutually exclusive (the first wins, the second silently never fires); split the proc or drop one",
+                s.struct_name,
+                proc_name,
+                worn[0],
+                worn[1],
+            )
+        }
+
+        if worn_count == 1 {
+            if has_attr(vd, "gd_method") || has_attr(vd, "gd_rpc") || has_attr(vd, "gd_connect") {
+                error_at(
+                    Loc{path, name_ident.pos.line},
+                    "%s: proc %q wears @(%s) plus a Godot-method attribute — kit verbs/ticks never join the method tables (the method half would silently never register); use two procs",
+                    s.struct_name,
+                    proc_name,
+                    worn[0],
+                )
+            }
+
+            // The primary would also outrank a lifecycle NAME (the dispatch
+            // continues before names are read) — the hook would silently
+            // never run as one.
+            if kw, is_lc := lifecycle_keyword(strip_struct_prefix(proc_name, s.struct_name)); is_lc {
+                error_at(
+                    Loc{path, name_ident.pos.line},
+                    "%s: proc %q is named like the `%s` lifecycle hook but wears @(%s) — the attribute wins and the hook would silently never run; rename the proc or split it",
+                    s.struct_name,
+                    proc_name,
+                    kw,
+                    worn[0],
+                )
+            }
+        }
+
+        // `@(gd_command[=POLICY])` — a toolkit action (kit/net command
+        // loop). NOT a Godot-callable method: it is issued from Odin code via the
+        // generated `<proc>_cmd` wrapper, so it never joins the method tables. Checked
+        // before the lifecycle match so a command can never be misread as a hook.
+        if has_attr(vd, "gd_command") {
+            config := command_config(vd, src)
+            parse_command(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+            continue
+        }
+
+        // `@(gd_message="TAG")` — a typed app-message handler (kit/session app
+        // routes). Not a Godot method: the generated `<class>_messages` proc
+        // registers it and `<proc>_send` ships it, so it never joins the method
+        // tables. Checked here beside commands so it can't be misread as a hook.
+        if has_attr(vd, "gd_message") {
+            config, _ := attr_value(vd, "gd_message")
+            parse_message(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+            continue
+        }
+
+        // `@(gd_tick[="contested"])` — the class's sim-lane step (kit/sim). Like
+        // commands it is never a Godot method: the generated thunk + Sim_Set
+        // are its only callers.
+        if has_attr(vd, "gd_tick") {
+            config, _ := attr_value(vd, "gd_tick")
+            parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+            continue
+        }
+
+        // `@(gd_sample)` / `@(gd_step[="authority"])` — the lane's GAME half:
+        // the device read and the world pass. Never Godot methods: the
+        // generated `<snake>_lane_init` wiring is their only caller.
+        if has_attr(vd, "gd_sample") {
+            config, _ := attr_value(vd, "gd_sample")
+            parse_sample(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+            continue
+        }
+
+        if has_attr(vd, "gd_step") {
+            config, _ := attr_value(vd, "gd_step")
+            parse_step(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+            continue
+        }
+
+        // `gd_rpc` implies `gd_method`: an RPC must be a registered method to be dispatchable.
+        is_gd_rpc := has_attr(vd, "gd_rpc")
+        is_gd_method := has_attr(vd, "gd_method") || is_gd_rpc
+        stripped := strip_struct_prefix(proc_name, s.struct_name)
+
+        if kw, is_lc := lifecycle_keyword(stripped); is_lc {
+            // Lifecycle hooks are matched by NAME and never join the method
+            // tables — @(gd_connect) riding one would silently never connect
+            // (the auto-wire targets a REGISTERED method). Refuse here; the
+            // same check below only sees procs that fall past this branch.
+            if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
+                error_at(
+                    Loc{path, name_ident.pos.line},
+                    "%s: proc %q is the `%s` lifecycle hook — @(gd_connect) on it silently never connects (the auto-wire targets a registered method); move the connection to a separate @(gd_method) proc",
+                    s.struct_name,
+                    proc_name,
+                    kw,
+                )
+            }
+
+            has_delta := count_params(pt) >= 2
+            append(&s.lifecycles, Lifecycle_Info{keyword = kw, proc_name = proc_name, has_delta = has_delta})
+            continue
+        }
+
+        // Typo hint: a struct-bound proc whose stripped name is one edit from a lifecycle
+        // keyword, and which isn't an explicit @(gd_method), is very likely a misspelled hook
+        // (`player_redy`) that will silently never run. Warn (non-fatal — it might be a helper).
+        if !is_gd_method {
+            if kw, near := nearest_lifecycle(stripped); near {
+                warnf(
+                    "%s: proc %q looks like a misspelled `%s` lifecycle — it will NOT run as one",
+                    s.struct_name,
+                    proc_name,
+                    kw,
+                )
+            }
+
+            // A bare @(gd_connect) compiles and silently never connects — the
+            // auto-wire targets a REGISTERED method. The docs state the rule;
+            // this enforces it.
+            if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
+                error_at(
+                    Loc{path, name_ident.pos.line},
+                    "%s: proc %q wears @(gd_connect) without @(gd_method) — the connection targets a registered method, so bare it would silently never connect. Add @(gd_method).",
+                    s.struct_name,
+                    proc_name,
+                )
+            }
+        }
+
+        if is_gd_method {
+            m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false, vd)
+            append(&s.methods, m)
+
+            // `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
+            // `@(gd_connect="Path/To/Node:signal")` — the EMITTER is another node, resolved
+            // at READY like an `onready=` ref. Split at the LAST ':' (node names cannot
+            // contain one; NodePath's property-subpath ':' never names a signal).
+            if sig, has := attr_value(vd, "gd_connect"); has {
+                conn_path := ""
+
+                if ci := strings.last_index_byte(sig, ':'); ci >= 0 {
+                    conn_path = strings.trim_space(sig[:ci])
+                    sig = strings.trim_space(sig[ci + 1:])
+
+                    switch {
+                    case conn_path == "":
+                        error_at(
+                            Loc{path, name_ident.pos.line},
+                            "%s: @(gd_connect) on %q — the path part before ':' is empty; spell the emitter path (`\"Child:sig\"`) or drop the ':' for the owner's own signal (`\"sig\"`)",
+                            s.struct_name,
+                            proc_name,
+                        )
+                    case sig == "" || !is_odin_ident(sig):
+                        error_at(
+                            Loc{path, name_ident.pos.line},
+                            "%s: @(gd_connect) on %q — %q is not a signal name; the form is \"Path/To/Node:signal\"",
+                            s.struct_name,
+                            proc_name,
+                            sig,
+                        )
+                    }
+                }
+
+                // INDEXED form: one mid-name `%d` in the path — the core probes Choice0,
+                // Choice1, … and binds each index as the handler's trailing arg. A '%' at
+                // a SEGMENT START is a scene-unique name (`"%SaveButton:pressed"`) and
+                // passes through to get_node; scan_path_template keeps the two apart (a
+                // unique name may itself start with 'd'). A '%' anywhere in the signal
+                // part is never valid.
+                tmpl_count, stray := scan_path_template(conn_path)
+                indexed := tmpl_count > 0
+
+                if tmpl_count > 1 || stray != 0 || strings.contains(sig, "%") {
+                    error_at(
+                        Loc{path, name_ident.pos.line},
+                        "%s: @(gd_connect) on %q — '%%' is only valid as ONE mid-name `%%d` template in the path part (`\"Panel/Choice%%d:pressed\"`, probing 0,1,2,… with the index bound as the handler's trailing parameter) or as a `%%Name` scene-unique segment (`\"%%SaveButton:pressed\"`)",
+                        s.struct_name,
+                        proc_name,
+                    )
+                    indexed = false
+                }
+
+                append(
+                    &s.connections,
+                    Connection_Info{signal = sig, method = m.gd_name, path = conn_path, indexed = indexed},
+                )
+            }
+
+            // `@(gd_rpc[="..."])` — expose this method to Godot's high-level multiplayer.
+            // `attr_value` is "" for the bare `@(gd_rpc)` form (=> all defaults).
+            if is_gd_rpc {
+                config, _ := attr_value(vd, "gd_rpc")
+                append(&s.rpcs, parse_rpc_config(m.gd_name, config))
+            }
+        }
+    }
 }
 
 // validate_script — contract checks that must wait until EVERY file's procs are
@@ -1661,52 +2246,62 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 // the wire header needs the entity's net identity. Missing either is a build
 // error HERE, with the fix spelled out — not a nil-descriptor crash at runtime.
 validate_script :: proc(s: ^Script) {
-	// The coop dirty mask AND the sim predict/command masks are each a single
-	// u64, so an entity tops out at 64 replicated fields (predicted ones are a
-	// subset, bounded by the same ceiling). Past 64 the high fields' bits shift
-	// out and SILENTLY stop replicating — caught here at build time, naming the
-	// class, instead of shadow_make's bare runtime assert or a quiet desync.
-	if len(s.replicates) > 64 {
-		error_at(
-			Loc{path = s.path},
-			"%s has %d replicated fields — at most 64 (the delta dirty mask and the sim predict mask are each one u64); group related fields into a sub-struct (a fixed array counts as one field)",
-			s.struct_name, len(s.replicates)
-		)
-	}
-	if len(s.commands) > 0 {
-		if len(s.replicates) == 0 {
-			error_at(
-				Loc{path = s.path},
-				"%s declares @(gd_command) procs but no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
-				s.struct_name
-			)
-		}
-		nt := s.net_id_type
-		if i := strings.last_index(nt, "."); i >= 0 {nt = nt[i + 1:]}
-		if nt != "Net_Id" {
-			error_at(
-				Loc{path = s.path},
-				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
-				s.struct_name
-			)
-		}
-	}
-	if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
-		has_predict := false
-		for r in s.replicates {
-			if r.predict {
-				has_predict = true
-				break
-			}
-		}
-		if !has_predict {
-			error_at(
-				Loc{path = s.path, line = s.tick.line},
-				"%s ticks (own @(gd_tick) or an embedded block's) but no gd:\"predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the ticks mutate",
-				s.struct_name
-			)
-		}
-	}
+    // The coop dirty mask AND the sim predict/command masks are each a single
+    // u64, so an entity tops out at 64 replicated fields (predicted ones are a
+    // subset, bounded by the same ceiling). Past 64 the high fields' bits shift
+    // out and SILENTLY stop replicating — caught here at build time, naming the
+    // class, instead of shadow_make's bare runtime assert or a quiet desync.
+    if len(s.replicates) > 64 {
+        error_at(
+            Loc{path = s.path},
+            "%s has %d replicated fields — at most 64 (the delta dirty mask and the sim predict mask are each one u64); group related fields into a sub-struct (a fixed array counts as one field)",
+            s.struct_name,
+            len(s.replicates),
+        )
+    }
+
+    if len(s.commands) > 0 {
+        if len(s.replicates) == 0 {
+            error_at(
+                Loc{path = s.path},
+                "%s declares @(gd_command) procs but no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
+                s.struct_name,
+            )
+        }
+
+        nt := s.net_id_type
+
+        if i := strings.last_index(nt, "."); i >= 0 {
+            nt = nt[i + 1:]
+        }
+
+        if nt != "Net_Id" {
+            error_at(
+                Loc{path = s.path},
+                "%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
+                s.struct_name,
+            )
+        }
+    }
+
+    if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
+        has_predict := false
+
+        for r in s.replicates {
+            if r.predict {
+                has_predict = true
+                break
+            }
+        }
+
+        if !has_predict {
+            error_at(
+                Loc{path = s.path, line = s.tick.line},
+                "%s ticks (own @(gd_tick) or an embedded block's) but no gd:\"predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the ticks mutate",
+                s.struct_name,
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1727,12 +2322,12 @@ validate_script :: proc(s: ^Script) {
 // a block ships the verb and the game keeps the consequence — no index keying.
 
 Half_Candidate :: struct {
-	path:    string,
-	line:    int,
-	src:     string,
-	pt:      ^ast.Proc_Type,
-	vd:      ^ast.Value_Decl,
-	claimed: bool, // some resolve_* pass wired it — an unclaimed survivor is a build error
+    path:    string,
+    line:    int,
+    src:     string,
+    pt:      ^ast.Proc_Type,
+    vd:      ^ast.Value_Decl,
+    claimed: bool, // some resolve_* pass wired it — an unclaimed survivor is a build error
 }
 
 // Collect every `@(gd_half)` in one parsed file. Pairing happens in the
@@ -1754,152 +2349,221 @@ Half_Candidate :: struct {
 // heuristics, and it still could not reach the second. A DECLARED intent can
 // be checked against nothing at all: claimed, or a build error.
 scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file: ^ast.File) {
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok {continue}
-		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-		if !is_proc {continue}
-		name_ident, _ := vd.names[0].derived.(^ast.Ident)
-		if name_ident == nil {continue}
-		if !has_attr(vd, "gd_half") {continue}
-		if v, _ := attr_value(vd, "gd_half"); v != "" {
-			error_at(
-				Loc{path, name_ident.pos.line},
-				"%s: @(gd_half) takes no config — the NAME says what it pairs with, which is the only thing there is to configure",
-				name_ident.name
-			)
-			continue
-		}
-		// @(gd_event) is the other side of the line: it DECLARES a presentation
-		// door (scriptgen generates its announce proc and claims a wire id) and
-		// merely requires its bearer be named `<event>_fx`. A half
-		// declares nothing and generates nothing. Wearing both would ask
-		// event resolution to build a door and the unpaired sweep to demand a
-		// partner for the same proc, so it is refused rather than resolved.
-		if has_attr(vd, "gd_event") {
-			error_at(
-				Loc{path, name_ident.pos.line},
-				"%s: @(gd_event) declares the presentation door, while @(gd_half) pairs with a declaration made elsewhere. Drop @(gd_half): the `_fx` name is gd_event's own shape rule",
-				name_ident.name,
-			)
-			continue
-		}
-		if pl.type == nil {continue}
-		idx[name_ident.name] = Half_Candidate{
-			path = path,
-			line = name_ident.pos.line,
-			src  = src,
-			pt   = pl.type,
-			vd   = vd
-		}
-	}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
+
+        if !ok {
+            continue
+        }
+
+        if len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
+
+        pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+
+        if !is_proc {
+            continue
+        }
+
+        name_ident, _ := vd.names[0].derived.(^ast.Ident)
+
+        if name_ident == nil {
+            continue
+        }
+
+        if !has_attr(vd, "gd_half") {
+            continue
+        }
+
+        if v, _ := attr_value(vd, "gd_half"); v != "" {
+            error_at(
+                Loc{path, name_ident.pos.line},
+                "%s: @(gd_half) takes no config — the NAME says what it pairs with, which is the only thing there is to configure",
+                name_ident.name,
+            )
+            continue
+        }
+
+        // @(gd_event) is the other side of the line: it DECLARES a presentation
+        // door (scriptgen generates its announce proc and claims a wire id) and
+        // merely requires its bearer be named `<event>_fx`. A half
+        // declares nothing and generates nothing. Wearing both would ask
+        // event resolution to build a door and the unpaired sweep to demand a
+        // partner for the same proc, so it is refused rather than resolved.
+        if has_attr(vd, "gd_event") {
+            error_at(
+                Loc{path, name_ident.pos.line},
+                "%s: @(gd_event) declares the presentation door, while @(gd_half) pairs with a declaration made elsewhere. Drop @(gd_half): the `_fx` name is gd_event's own shape rule",
+                name_ident.name,
+            )
+            continue
+        }
+
+        if pl.type == nil {
+            continue
+        }
+
+        idx[name_ident.name] = Half_Candidate {
+            path = path,
+            line = name_ident.pos.line,
+            src  = src,
+            pt   = pl.type,
+            vd   = vd,
+        }
+    }
 }
 
 // Pair `s`'s commands with their `<wrapper>_then` consequences and validate the
 // contract at build time — a mispaired consequence must be a build error here,
 // not a proc that silently never fires (the exact bug class the pairing kills).
 resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	for &cmd in s.commands {
-		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
-		then_name := fmt.tprintf("%s_then", wrapper)
-		cand, found := idx[then_name]
-		if !found {
-			// The consequence was WRITTEN and never declared — a stronger
-			// statement than the payload warning below, which only suspects a
-			// consequence is missing. Suppresses it: they are the same proc.
-			if demand_half(procs, then_name, fmt.tprintf("%s's consequence, run on the authority right after the verb applies", wrapper)) {
-				continue
-			}
-			// A direct verb's payload has exactly one consumer — its consequence.
-			// (A COMPOSED verb's payload is the block's offer; declining is fine.)
-			if cmd.payload_count > 0 && len(cmd.path) == 0 {
-				warn_at(
-					Loc{path = s.path},
-					"command %s returns a payload but no `%s` consequence proc consumes it",
-					cmd.proc_name,
-					then_name
-				)
-			}
-			continue
-		}
-		cand.claimed = true
-		idx[then_name] = cand
-		loc := Loc{path = cand.path, line = cand.line}
+    for &cmd in s.commands {
+        wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
+        then_name := fmt.tprintf("%s_then", wrapper)
+        cand, found := idx[then_name]
 
-		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
-			error_at(loc, "consequence %s must be a plain proc — it is generated into the command's authority path, never registered", then_name)
-			continue
-		}
+        if !found {
+            // The consequence was WRITTEN and never declared — a stronger
+            // statement than the payload warning below, which only suspects a
+            // consequence is missing. Suppresses it: they are the same proc.
+            if demand_half(
+                procs,
+                then_name,
+                fmt.tprintf("%s's consequence, run on the authority right after the verb applies", wrapper),
+            ) {
+                continue
+            }
 
-		// Flatten param type texts (a field entry may declare several names).
-		types := make([dynamic]string, context.temp_allocator)
-		if cand.pt.params != nil {
-			for f in cand.pt.params.list {
-				t := strings.trim_space(node_text(cand.src, f.type))
-				for _ in 0 ..< max(1, len(f.names)) {
-					append(&types, t)
-				}
-			}
-		}
+            // A direct verb's payload has exactly one consumer — its consequence.
+            // (A COMPOSED verb's payload is the block's offer; declining is fine.)
+            if cmd.payload_count > 0 && len(cmd.path) == 0 {
+                warn_at(
+                    Loc{path = s.path},
+                    "command %s returns a payload but no `%s` consequence proc consumes it",
+                    cmd.proc_name,
+                    then_name,
+                )
+            }
 
-		self_type := fmt.tprintf("^%s", s.struct_name)
-		at := 0
-		game := ""
-		if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
-			game = types[at][1:] // the leading game param — generated code casts ctx.game_user to it
-			at += 1
-		}
-		if !(len(types) > at && types[at] == self_type) {
-			error_at(
-				loc,
-				"consequence %s: expected `self: %s` %s — the shapes are (self, by, args…, payload…) or (game, self, by, args…, payload…)",
-				then_name, self_type, game == "" ? "first" : "after the game param"
-			)
-			continue
-		}
-		at += 1
+            continue
+        }
 
-		by_ok := false
-		if len(types) > at {
-			base := types[at]
-			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
-			by_ok = base == "Player_Id"
-		}
-		if !by_ok {
-			error_at(loc, "consequence %s: the param after `self` must be the issuer (`by: knet.Player_Id`)", then_name)
-			continue
-		}
-		at += 1
+        cand.claimed = true
+        idx[then_name] = cand
+        loc := Loc {
+            path = cand.path,
+            line = cand.line,
+        }
 
-		rest := len(types) - at
-		if rest != len(cmd.args) + cmd.payload_count {
-			error_at(
-				loc,
-				"consequence %s: expected the verb's %d wire arg(s) then its %d payload value(s) after `by` — found %d param(s)",
-				then_name, len(cmd.args), cmd.payload_count, rest
-			)
-			continue
-		}
-		args_ok := true
-		for a, k in cmd.args {
-			wire, _, wok := command_wire_type(types[at + k])
-			if !wok || wire != a.wire {
-				error_at(
-					loc,
-					"consequence %s: param %q must have the verb's wire arg type %s (found %s)",
-					then_name, a.name, a.type_text, types[at + k]
-				)
-				args_ok = false
-			}
-		}
-		if !args_ok {continue}
-		// Payload param TYPES are the compiler's to hold: the generated call
-		// site passes the verb's returned values straight through.
+        if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+            error_at(
+                loc,
+                "consequence %s must be a plain proc — it is generated into the command's authority path, never registered",
+                then_name,
+            )
+            continue
+        }
 
-		cmd.then_proc = then_name
-		cmd.then_game = game
-	}
+        // Flatten param type texts (a field entry may declare several names).
+        types := make([dynamic]string, context.temp_allocator)
+
+        if cand.pt.params != nil {
+            for f in cand.pt.params.list {
+                t := strings.trim_space(node_text(cand.src, f.type))
+
+                for _ in 0 ..< max(1, len(f.names)) {
+                    append(&types, t)
+                }
+            }
+        }
+
+        self_type := fmt.tprintf("^%s", s.struct_name)
+        at := 0
+        game := ""
+
+        if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+            game = types[at][1:] // the leading game param — generated code casts ctx.game_user to it
+            at += 1
+        }
+
+        if !(len(types) > at && types[at] == self_type) {
+            error_at(
+                loc,
+                "consequence %s: expected `self: %s` %s — the shapes are (self, by, args…, payload…) or (game, self, by, args…, payload…)",
+                then_name,
+                self_type,
+                game == "" ? "first" : "after the game param",
+            )
+            continue
+        }
+
+        at += 1
+
+        by_ok := false
+
+        if len(types) > at {
+            base := types[at]
+
+            if j := strings.last_index(base, "."); j >= 0 {
+                base = base[j + 1:]
+            }
+
+            by_ok = base == "Player_Id"
+        }
+
+        if !by_ok {
+            error_at(
+                loc,
+                "consequence %s: the param after `self` must be the issuer (`by: knet.Player_Id`)",
+                then_name,
+            )
+            continue
+        }
+
+        at += 1
+
+        rest := len(types) - at
+
+        if rest != len(cmd.args) + cmd.payload_count {
+            error_at(
+                loc,
+                "consequence %s: expected the verb's %d wire arg(s) then its %d payload value(s) after `by` — found %d param(s)",
+                then_name,
+                len(cmd.args),
+                cmd.payload_count,
+                rest,
+            )
+            continue
+        }
+
+        args_ok := true
+
+        for a, k in cmd.args {
+            wire, _, wok := command_wire_type(types[at + k])
+
+            if !wok || wire != a.wire {
+                error_at(
+                    loc,
+                    "consequence %s: param %q must have the verb's wire arg type %s (found %s)",
+                    then_name,
+                    a.name,
+                    a.type_text,
+                    types[at + k],
+                )
+                args_ok = false
+            }
+        }
+
+        if !args_ok {
+            continue
+        }
+        // Payload param TYPES are the compiler's to hold: the generated call
+        // site passes the verb's returned values straight through.
+
+        cmd.then_proc = then_name
+        cmd.then_game = game
+    }
 }
 
 // After every script resolved: a `@(gd_half)` that nothing claimed. The
@@ -1921,103 +2585,151 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[str
 // proc. The gate is now arithmetic — claimed, or not — so the message spends
 // its whole budget on the FIX instead of on deciding whether to speak.
 check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Script, by_struct: map[string]^Script) {
-	by_snake := make(map[string]^Script, context.temp_allocator)
-	for s in scripts {
-		by_snake[to_snake(s.struct_name)] = s
-	}
+    by_snake := make(map[string]^Script, context.temp_allocator)
 
-	for name, cand in idx {
-		if cand.claimed {continue}
-		loc := Loc{path = cand.path, line = cand.line}
+    for s in scripts {
+        by_snake[to_snake(s.struct_name)] = s
+    }
 
-		// The census hooks are the one mispairing whose fix is not a rename:
-		// `<target>_spawned`/`_freed` key on the ENTITY-TAGGED struct, so a
-		// hook beside an untagged target is a missing `entity=Name:id`, not a
-		// typo. Matched on the exact snake, so it never fires on a half that
-		// merely resembles one (`cave_lobby_entity_spawned`, the session
-		// event, trims to a prefix no script bears).
-		hook := false
-		for suffix in ([?]string{"_spawned", "_freed"}) {
-			if !strings.has_suffix(name, suffix) {continue}
-			t, known := by_snake[strings.trim_suffix(name, suffix)]
-			if !known {continue}
-			error_at(
-				loc,
-				"@(gd_half) %q is %s's %s hook, but no scene field declares `entity=Name:id` for %s — the entity table is what dispatches it, so it would never fire. Tag the scene export, or rename the proc.",
-				name, t.struct_name, suffix == "_spawned" ? "spawn" : "free", t.struct_name
-			)
-			hook = true
-			break
-		}
-		if hook {continue}
+    for name, cand in idx {
+        if cand.claimed {
+            continue
+        }
 
-		// The classes this half actually touches (its ^Struct params). This is
-		// the deleted hints' target-listing kept whole — it is EXACT (a param
-		// type, not a spelling guess), and only the edit-distance gate that
-		// used to sit in front of it is gone. A declared half always speaks;
-		// the params only decide what it is shown.
-		targets := make([dynamic]^Script, context.temp_allocator)
-		// A ^Struct param naming a class that this package does not have, but the
-		// module's SUBPACKAGE census does: the class moved into a subfolder and left
-		// its half behind. Remembered so the no-targets branch can say so.
-		stranded_cls, stranded_sub: string
-		if cand.pt.params != nil {
-			for f in cand.pt.params.list {
-				t := strings.trim_space(node_text(cand.src, f.type))
-				if !strings.has_prefix(t, "^") {continue}
-				s, ok := by_struct[t[1:]]
-				if !ok {
-					if sub, in_sub := g_subpkg_structs[t[1:]]; in_sub && stranded_cls == "" {
-						stranded_cls, stranded_sub = t[1:], sub
-					}
-					continue
-				}
-				dup := false
-				for x in targets {
-					if x == s {dup = true; break}
-				}
-				if !dup {append(&targets, s)}
-			}
-		}
-		// Checked BEFORE the target listing: a half naming a subpackage class cannot
-		// pair no matter what its other params resolve to (halves pair inside ONE
-		// package), and the shell's thirty-odd session-event names are pure noise
-		// next to the one fact that explains it.
-		if stranded_cls != "" {
-			error_at(
-				loc,
-				"@(gd_half) %q pairs with nothing — it is written against %s, which is declared in the script subpackage %q. Halves pair inside ONE package, so either the half belongs beside its class in %s/, or the class belongs in the module root (a kit-wired class must be there anyway).",
-				name, stranded_cls, stranded_sub, stranded_sub
-			)
-			continue
-		}
-		if len(targets) == 0 {
-			error_at(
-				loc,
-				"@(gd_half) %q pairs with nothing, and it names no script class — every half is written against the class it pairs on (`self: ^Gunner`, or `game: ^Quickdraw, self: ^Gunner`). Give it that parameter and the name that class expects, or drop @(gd_half) if this proc is not a half.",
-				name
-			)
-			continue
-		}
-		// Every half's shape is `(game: ^Shell, self: ^Class, …)` or the
-		// game-less `(self: ^Class, …)` — so when two classes are named, the
-		// LEADING one is the context handle and the rest is what the half pairs
-		// on. Dropping it is positional, not a guess, and it is the difference
-		// between "Gunner pairs: gunner_buy_then, …" and that same answer
-		// buried under the shell's thirty-odd session-event names.
-		pair_on := targets[:]
-		if len(pair_on) > 1 {pair_on = pair_on[1:]}
+        loc := Loc {
+            path = cand.path,
+            line = cand.line,
+        }
 
-		surfaces := make([dynamic]string, context.temp_allocator)
-		for t in pair_on {
-			append(&surfaces, pairing_surface(t, scripts))
-		}
-		error_at(
-			loc,
-			"@(gd_half) %q pairs with nothing — it would silently never fire. %s. Rename it to the half you meant, or drop @(gd_half) if this proc is not a half.",
-			name, strings.join(surfaces[:], "; ", context.temp_allocator)
-		)
-	}
+        // The census hooks are the one mispairing whose fix is not a rename:
+        // `<target>_spawned`/`_freed` key on the ENTITY-TAGGED struct, so a
+        // hook beside an untagged target is a missing `entity=Name:id`, not a
+        // typo. Matched on the exact snake, so it never fires on a half that
+        // merely resembles one (`cave_lobby_entity_spawned`, the session
+        // event, trims to a prefix no script bears).
+        hook := false
+
+        for suffix in ([?]string{"_spawned", "_freed"}) {
+            if !strings.has_suffix(name, suffix) {
+                continue
+            }
+
+            t, known := by_snake[strings.trim_suffix(name, suffix)]
+
+            if !known {
+                continue
+            }
+
+            error_at(
+                loc,
+                "@(gd_half) %q is %s's %s hook, but no scene field declares `entity=Name:id` for %s — the entity table is what dispatches it, so it would never fire. Tag the scene export, or rename the proc.",
+                name,
+                t.struct_name,
+                suffix == "_spawned" ? "spawn" : "free",
+                t.struct_name,
+            )
+            hook = true
+            break
+        }
+
+        if hook {
+            continue
+        }
+
+        // The classes this half actually touches (its ^Struct params). This is
+        // the deleted hints' target-listing kept whole — it is EXACT (a param
+        // type, not a spelling guess), and only the edit-distance gate that
+        // used to sit in front of it is gone. A declared half always speaks;
+        // the params only decide what it is shown.
+        targets := make([dynamic]^Script, context.temp_allocator)
+        // A ^Struct param naming a class that this package does not have, but the
+        // module's SUBPACKAGE census does: the class moved into a subfolder and left
+        // its half behind. Remembered so the no-targets branch can say so.
+        stranded_cls, stranded_sub: string
+
+        if cand.pt.params != nil {
+            for f in cand.pt.params.list {
+                t := strings.trim_space(node_text(cand.src, f.type))
+
+                if !strings.has_prefix(t, "^") {
+                    continue
+                }
+
+                s, ok := by_struct[t[1:]]
+
+                if !ok {
+                    if sub, in_sub := g_subpkg_structs[t[1:]]; in_sub && stranded_cls == "" {
+                        stranded_cls, stranded_sub = t[1:], sub
+                    }
+
+                    continue
+                }
+
+                dup := false
+
+                for x in targets {
+                    if x == s {
+                        dup = true
+                        break
+                    }
+                }
+
+                if !dup {
+                    append(&targets, s)
+                }
+            }
+        }
+
+        // Checked BEFORE the target listing: a half naming a subpackage class cannot
+        // pair no matter what its other params resolve to (halves pair inside ONE
+        // package), and the shell's thirty-odd session-event names are pure noise
+        // next to the one fact that explains it.
+        if stranded_cls != "" {
+            error_at(
+                loc,
+                "@(gd_half) %q pairs with nothing — it is written against %s, which is declared in the script subpackage %q. Halves pair inside ONE package, so either the half belongs beside its class in %s/, or the class belongs in the module root (a kit-wired class must be there anyway).",
+                name,
+                stranded_cls,
+                stranded_sub,
+                stranded_sub,
+            )
+            continue
+        }
+
+        if len(targets) == 0 {
+            error_at(
+                loc,
+                "@(gd_half) %q pairs with nothing, and it names no script class — every half is written against the class it pairs on (`self: ^Gunner`, or `game: ^Quickdraw, self: ^Gunner`). Give it that parameter and the name that class expects, or drop @(gd_half) if this proc is not a half.",
+                name,
+            )
+            continue
+        }
+
+        // Every half's shape is `(game: ^Shell, self: ^Class, …)` or the
+        // game-less `(self: ^Class, …)` — so when two classes are named, the
+        // LEADING one is the context handle and the rest is what the half pairs
+        // on. Dropping it is positional, not a guess, and it is the difference
+        // between "Gunner pairs: gunner_buy_then, …" and that same answer
+        // buried under the shell's thirty-odd session-event names.
+        pair_on := targets[:]
+
+        if len(pair_on) > 1 {
+            pair_on = pair_on[1:]
+        }
+
+        surfaces := make([dynamic]string, context.temp_allocator)
+
+        for t in pair_on {
+            append(&surfaces, pairing_surface(t, scripts))
+        }
+
+        error_at(
+            loc,
+            "@(gd_half) %q pairs with nothing — it would silently never fire. %s. Rename it to the half you meant, or drop @(gd_half) if this proc is not a half.",
+            name,
+            strings.join(surfaces[:], "; ", context.temp_allocator),
+        )
+    }
 }
 
 // Every pairing name `t` really offers, comma-joined — the fix material an
@@ -2030,53 +2742,76 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
 // `@(gd_half)` retires.
 @(private = "file")
 pairing_surface :: proc(t: ^Script, scripts: []^Script) -> string {
-	names := make([dynamic]string, context.temp_allocator)
-	snake := to_snake(t.struct_name)
-	ticks := t.tick.proc_name != "" || len(t.block_ticks) > 0
+    names := make([dynamic]string, context.temp_allocator)
+    snake := to_snake(t.struct_name)
+    ticks := t.tick.proc_name != "" || len(t.block_ticks) > 0
 
-	for cmd in t.commands {
-		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", snake, cmd.name) : cmd.proc_name
-		append(&names, fmt.tprintf("%s_then", wrapper))
-		// `_apply` is the SIM lane's predicted-effect half — resolve_command_applies
-		// refuses one on a class that doesn't tick, so offering it there would
-		// name a fix that is itself an error.
-		if ticks {append(&names, fmt.tprintf("%s_apply", cmd.proc_name))}
-	}
-	if t.tick.proc_name != "" {
-		append(&names, fmt.tprintf("%s_then", t.tick.proc_name))
-		append(&names, fmt.tprintf("%s_fx", t.tick.proc_name))
-	}
-	for r in t.replicates {
-		if r.owner || r.predict {continue} // only the delta lane edges
-		append(&names, fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator)))
-	}
-	tagged := false
-	for other in scripts {
-		for ent in other.entities {
-			if ent.target == t.struct_name {tagged = true; break}
-		}
-		if tagged {break}
-	}
-	if tagged {
-		append(&names, fmt.tprintf("%s_spawned", snake))
-		append(&names, fmt.tprintf("%s_freed", snake))
-	}
-	if t.boot_field != "" {
-		for ev in SESSION_EVENTS {
-			append(&names, fmt.tprintf("%s_%s", snake, ev.suffix))
-			// A `_then` narrows a half to the authority, which only means
-			// something on an event both roles hear.
-			if ev.role == .Every {append(&names, fmt.tprintf("%s_%s_then", snake, ev.suffix))}
-		}
-		for spec in MIGRATION_HALVES {
-			append(&names, fmt.tprintf("%s_%s", snake, spec.suffix))
-		}
-	}
+    for cmd in t.commands {
+        wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", snake, cmd.name) : cmd.proc_name
+        append(&names, fmt.tprintf("%s_then", wrapper))
 
-	if len(names) == 0 {
-		return fmt.tprintf("%s declares nothing that pairs a half", t.struct_name)
-	}
-	return fmt.tprintf("%s pairs: %s", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
+        // `_apply` is the SIM lane's predicted-effect half — resolve_command_applies
+        // refuses one on a class that doesn't tick, so offering it there would
+        // name a fix that is itself an error.
+        if ticks {
+            append(&names, fmt.tprintf("%s_apply", cmd.proc_name))
+        }
+    }
+
+    if t.tick.proc_name != "" {
+        append(&names, fmt.tprintf("%s_then", t.tick.proc_name))
+        append(&names, fmt.tprintf("%s_fx", t.tick.proc_name))
+    }
+
+    for r in t.replicates {
+        if r.owner || r.predict {
+            continue
+        } // only the delta lane edges
+
+        append(&names, fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator)))
+    }
+
+    tagged := false
+
+    for other in scripts {
+        for ent in other.entities {
+            if ent.target == t.struct_name {
+                tagged = true
+                break
+            }
+        }
+
+        if tagged {
+            break
+        }
+    }
+
+    if tagged {
+        append(&names, fmt.tprintf("%s_spawned", snake))
+        append(&names, fmt.tprintf("%s_freed", snake))
+    }
+
+    if t.boot_field != "" {
+        for ev in SESSION_EVENTS {
+            append(&names, fmt.tprintf("%s_%s", snake, ev.suffix))
+
+            // A `_then` narrows a half to the authority, which only means
+            // something on an event both roles hear.
+            if ev.role == .Every {
+                append(&names, fmt.tprintf("%s_%s_then", snake, ev.suffix))
+            }
+        }
+
+        for spec in MIGRATION_HALVES {
+            append(&names, fmt.tprintf("%s_%s", snake, spec.suffix))
+        }
+    }
+
+    if len(names) == 0 {
+        return fmt.tprintf("%s declares nothing that pairs a half", t.struct_name)
+    }
+
+    return fmt.tprintf("%s pairs: %s", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
 }
 
 // ---------------------------------------------------------------------------
@@ -2093,41 +2828,65 @@ pairing_surface :: proc(t: ^Script, scripts: []^Script) -> string {
 //   <t>_freed   :: proc(game: ^Game, self: ^Target, id: knet.Net_Id)
 @(private = "file")
 validate_entity_hook :: proc(cand: Half_Candidate, name, game_struct, target: string, want_owner: bool) -> bool {
-	loc := Loc{path = cand.path, line = cand.line}
-	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
-		error_at(loc, "entity hook %s must be a plain proc — the generated table dispatches it, it is never registered", name)
-		return false
-	}
-	types := make([dynamic]string, context.temp_allocator)
-	if cand.pt.params != nil {
-		for f in cand.pt.params.list {
-			t := strings.trim_space(node_text(cand.src, f.type))
-			for _ in 0 ..< max(1, len(f.names)) {
-				append(&types, t)
-			}
-		}
-	}
-	want := want_owner ? 4 : 3
-	shape := fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id)", game_struct, target)
-	if want_owner {
-		shape = fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id, owner: knet.Player_Id)", game_struct, target)
-	}
-	if len(types) != want ||
-	   types[0] != fmt.tprintf("^%s", game_struct) ||
-	   types[1] != fmt.tprintf("^%s", target) ||
-	   type_base(types[2]) != "Net_Id" ||
-	   (want_owner && type_base(types[3]) != "Player_Id") {
-		error_at(loc, "entity hook %s: expected `%s` — the game param is the struct carrying the entity= tags", name, shape)
-		return false
-	}
-	return true
+    loc := Loc {
+        path = cand.path,
+        line = cand.line,
+    }
+
+    if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+        error_at(
+            loc,
+            "entity hook %s must be a plain proc — the generated table dispatches it, it is never registered",
+            name,
+        )
+        return false
+    }
+
+    types := make([dynamic]string, context.temp_allocator)
+
+    if cand.pt.params != nil {
+        for f in cand.pt.params.list {
+            t := strings.trim_space(node_text(cand.src, f.type))
+
+            for _ in 0 ..< max(1, len(f.names)) {
+                append(&types, t)
+            }
+        }
+    }
+
+    want := want_owner ? 4 : 3
+    shape := fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id)", game_struct, target)
+
+    if want_owner {
+        shape = fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id, owner: knet.Player_Id)", game_struct, target)
+    }
+
+    if len(types) != want ||
+       types[0] != fmt.tprintf("^%s", game_struct) ||
+       types[1] != fmt.tprintf("^%s", target) ||
+       type_base(types[2]) != "Net_Id" ||
+       (want_owner && type_base(types[3]) != "Player_Id") {
+        error_at(
+            loc,
+            "entity hook %s: expected `%s` — the game param is the struct carrying the entity= tags",
+            name,
+            shape,
+        )
+        return false
+    }
+
+    return true
 }
 
 @(private = "file")
 type_base :: proc(t: string) -> string {
-	base := t
-	if i := strings.last_index(base, "."); i >= 0 {base = base[i + 1:]}
-	return base
+    base := t
+
+    if i := strings.last_index(base, "."); i >= 0 {
+        base = base[i + 1:]
+    }
+
+    return base
 }
 
 // Validate the SCRIPT-RESOLVING onready fields (`hud: ^hud `gd:"onready=Path"``): the
@@ -2137,161 +2896,262 @@ type_base :: proc(t: string) -> string {
 // binds the class name; this pass exists so a typo'd or non-script pointee is a BUILD
 // error with a source location, not a boot-time registration error.
 resolve_onready_scripts :: proc(s: ^Script, by_struct: map[string]^Script) {
-	for r in s.onready_scripts {
-		if _, is_script := by_struct[r.target]; is_script {continue}
-		error_at(
-			r.loc,
-			"%s.%s: `onready=` on a `^%s` field auto-resolves the target node's SCRIPT STRUCT (rt.script_of) at ready, but %q is not a script struct in this module — for a plain node reference use the class handle type itself (gd.Node, gd.Node2d, ...), never a pointer to it",
-			s.struct_name, r.field, r.target, r.target
-		)
-	}
+    for r in s.onready_scripts {
+        if _, is_script := by_struct[r.target]; is_script {
+            continue
+        }
+
+        error_at(
+            r.loc,
+            "%s.%s: `onready=` on a `^%s` field auto-resolves the target node's SCRIPT STRUCT (rt.script_of) at ready, but %q is not a script struct in this module — for a plain node reference use the class handle type itself (gd.Node, gd.Node2d, ...), never a pointer to it",
+            s.struct_name,
+            r.field,
+            r.target,
+            r.target,
+        )
+    }
 }
 
 // Pair and validate one script's entity tags against the module. `by_struct`
 // maps every script struct name to its parsed Script; `seen_ids` accumulates
 // wire-id claims across the whole module (ids collide across FILES too).
-resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	// Every generated name on the entity side is keyed by the TARGET struct
-	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `<t>_mine`, `<t>_ids`, and the
-	// `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
-	// same struct is therefore not a second entity — it is the same five procs
-	// generated twice, which surfaced as an Odin redeclaration error pointing at
-	// generated code the author never wrote. The wire-id check below can't catch
-	// it: the two declarations carry DIFFERENT ids, which is precisely why it
-	// looked legal.
-	seen_targets := make(map[string]int, context.temp_allocator)
-	for &e in s.entities {
-		loc := Loc{path = s.path, line = e.line}
-		target, known := by_struct[e.target]
-		if !known {
-			// "no such struct" is only ever true of THIS package: the entity table,
-			// its type ids and its census resolve package-wide. When the name is in
-			// the module's subpackage census the struct exists and is simply in the
-			// wrong place — say which place, and why the root is the right one.
-			if sub, in_sub := g_subpkg_structs[e.target]; in_sub {
-				error_at(
-					loc,
-					"entity %s: %q is declared in the script subpackage %q, not the module root — a wire entity IS the module's contract (its type id, descriptor and census are resolved package-wide in the root), so the struct the tag names lives in the module root too; move %s/%s's file up, or point the tag at a root struct",
-					e.target, e.target, sub, sub, e.target
-				)
-				continue
-			}
-			error_at(loc, "entity %s: no script struct named %q in the module root — the tag names the struct the scene bodies (its //gd:class file)", e.target, e.target)
-			continue
-		}
-		if len(target.replicates) == 0 && len(target.commands) == 0 {
-			error_at(
-				loc,
-				"entity %s: the struct has no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") or @(gd_command) procs — a wire entity needs a descriptor (tag its state, or drop the entity= declaration)",
-				e.target
-			)
-			continue
-		}
-		if prev, dup := seen_ids[e.type_id]; dup {
-			error_at(loc, "entity %s: wire id %d is already claimed by %s — ids are the entity's wire identity and must be unique", e.target, e.type_id, prev)
-			continue
-		}
-		// After the id check, which is the more specific fact when both are true.
-		if prev, dup := seen_targets[e.target]; dup {
-			error_at(
-				loc,
-				"entity %s: %s is already declared at line %d — the generated census is named after the STRUCT (`%s_spawn`, `%s_of`, …), so a second scene for it would generate those procs twice; one entity= per struct",
-				e.target, e.target, prev, to_snake(e.target), to_snake(e.target)
-			)
-			continue
-		}
-		seen_targets[e.target] = e.line
-		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
-		e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
-		e.has_net_id = target.net_id_type != ""
-		for r in target.replicates {
-			if r.owner {e.has_owner_stream = true; break}
-		}
+resolve_entities :: proc(
+    s: ^Script,
+    by_struct: map[string]^Script,
+    seen_ids: ^map[int]string,
+    idx: ^map[string]Half_Candidate,
+    procs: map[string]Proc_Site,
+) {
+    // Every generated name on the entity side is keyed by the TARGET struct
+    // (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `<t>_mine`, `<t>_ids`, and the
+    // `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
+    // same struct is therefore not a second entity — it is the same five procs
+    // generated twice, which surfaced as an Odin redeclaration error pointing at
+    // generated code the author never wrote. The wire-id check below can't catch
+    // it: the two declarations carry DIFFERENT ids, which is precisely why it
+    // looked legal.
+    seen_targets := make(map[string]int, context.temp_allocator)
 
-		tsnake := to_snake(e.target)
-		sp_name := strings.concatenate({tsnake, "_spawned"})
-		if cand, found := idx[sp_name]; found {
-			if validate_entity_hook(cand, sp_name, s.struct_name, e.target, want_owner = true) {
-				e.spawned = sp_name
-			}
-			cand.claimed = true
-			idx[sp_name] = cand
-		} else {
-			demand_half(procs, sp_name, fmt.tprintf("%s's spawn hook, dispatched from %s's entity table", e.target, s.struct_name))
-		}
-		fr_name := strings.concatenate({tsnake, "_freed"})
-		if cand, found := idx[fr_name]; found {
-			if validate_entity_hook(cand, fr_name, s.struct_name, e.target, want_owner = false) {
-				e.freed = fr_name
-			}
-			cand.claimed = true
-			idx[fr_name] = cand
-		} else {
-			demand_half(procs, fr_name, fmt.tprintf("%s's free hook, dispatched from %s's entity table", e.target, s.struct_name))
-		}
-		// `<t>_born` — the BORN moment, typed: Ev_Spawned's arm in the generated
-		// events dispatch resolves the entity through the census and calls it with
-		// the fields SET, on every peer (the host's own inside boot_spawn_send).
-		// The make-time `<t>_spawned` above stays the bookkeeping hook; this is
-		// where the type-switch dress every game wrote in `<game>_entity_spawned`
-		// goes instead. Same shape as _spawned.
-		bn_name := strings.concatenate({tsnake, "_born"})
-		if cand, found := idx[bn_name]; found {
-			if validate_entity_hook(cand, bn_name, s.struct_name, e.target, want_owner = true) {
-				e.born = bn_name
-			}
-			cand.claimed = true
-			idx[bn_name] = cand
-		} else {
-			demand_half(procs, bn_name, fmt.tprintf("%s's born hook, dispatched typed from %s_events' Ev_Spawned arm", e.target, to_snake(s.struct_name)))
-		}
-	}
+    for &e in s.entities {
+        loc := Loc {
+            path = s.path,
+            line = e.line,
+        }
+        target, known := by_struct[e.target]
 
-	// `<game>_embodied(self, id)` — I inhabit a body now: an AVATAR-kind entity
-	// owned by ME was born (my spawn, my drop-in, my reconnect reclaiming its
-	// standing body — each arrives as Ev_Spawned on my screen). The one latch
-	// every game kept as `started`-plus-owner-checks in entity_spawned.
-	em_name := fmt.aprintf("%s_embodied", to_snake(s.struct_name))
-	if cand, found := idx[em_name]; found {
-		has_avatar := false
-		for &e in s.entities {
-			if e.avatar {has_avatar = true}
-		}
-		loc := Loc{path = cand.path, line = cand.line}
-		if !has_avatar {
-			error_at(loc, "%s: no entity kind declares `avatar` — the embodied moment IS an avatar kind of mine being born; tag the body's scene (gd:\"entity=Runner:2,avatar\") or drop the half", em_name)
-		} else if !validate_embodied_hook(cand, em_name, s.struct_name) {
-			// error already reported
-		} else {
-			s.embodied = em_name
-		}
-		cand.claimed = true
-		idx[em_name] = cand
-	}
+        if !known {
+            // "no such struct" is only ever true of THIS package: the entity table,
+            // its type ids and its census resolve package-wide. When the name is in
+            // the module's subpackage census the struct exists and is simply in the
+            // wrong place — say which place, and why the root is the right one.
+            if sub, in_sub := g_subpkg_structs[e.target]; in_sub {
+                error_at(
+                    loc,
+                    "entity %s: %q is declared in the script subpackage %q, not the module root — a wire entity IS the module's contract (its type id, descriptor and census are resolved package-wide in the root), so the struct the tag names lives in the module root too; move %s/%s's file up, or point the tag at a root struct",
+                    e.target,
+                    e.target,
+                    sub,
+                    sub,
+                    e.target,
+                )
+                continue
+            }
+
+            error_at(
+                loc,
+                "entity %s: no script struct named %q in the module root — the tag names the struct the scene bodies (its //gd:class file)",
+                e.target,
+                e.target,
+            )
+            continue
+        }
+
+        if len(target.replicates) == 0 && len(target.commands) == 0 {
+            error_at(
+                loc,
+                "entity %s: the struct has no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") or @(gd_command) procs — a wire entity needs a descriptor (tag its state, or drop the entity= declaration)",
+                e.target,
+            )
+            continue
+        }
+
+        if prev, dup := seen_ids[e.type_id]; dup {
+            error_at(
+                loc,
+                "entity %s: wire id %d is already claimed by %s — ids are the entity's wire identity and must be unique",
+                e.target,
+                e.type_id,
+                prev,
+            )
+            continue
+        }
+
+        // After the id check, which is the more specific fact when both are true.
+        if prev, dup := seen_targets[e.target]; dup {
+            error_at(
+                loc,
+                "entity %s: %s is already declared at line %d — the generated census is named after the STRUCT (`%s_spawn`, `%s_of`, …), so a second scene for it would generate those procs twice; one entity= per struct",
+                e.target,
+                e.target,
+                prev,
+                to_snake(e.target),
+                to_snake(e.target),
+            )
+            continue
+        }
+
+        seen_targets[e.target] = e.line
+        seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
+        e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
+        e.has_net_id = target.net_id_type != ""
+
+        for r in target.replicates {
+            if r.owner {
+                e.has_owner_stream = true
+                break
+            }
+        }
+
+        tsnake := to_snake(e.target)
+        sp_name := strings.concatenate({tsnake, "_spawned"})
+
+        if cand, found := idx[sp_name]; found {
+            if validate_entity_hook(cand, sp_name, s.struct_name, e.target, want_owner = true) {
+                e.spawned = sp_name
+            }
+
+            cand.claimed = true
+            idx[sp_name] = cand
+        } else {
+            demand_half(
+                procs,
+                sp_name,
+                fmt.tprintf("%s's spawn hook, dispatched from %s's entity table", e.target, s.struct_name),
+            )
+        }
+
+        fr_name := strings.concatenate({tsnake, "_freed"})
+
+        if cand, found := idx[fr_name]; found {
+            if validate_entity_hook(cand, fr_name, s.struct_name, e.target, want_owner = false) {
+                e.freed = fr_name
+            }
+
+            cand.claimed = true
+            idx[fr_name] = cand
+        } else {
+            demand_half(
+                procs,
+                fr_name,
+                fmt.tprintf("%s's free hook, dispatched from %s's entity table", e.target, s.struct_name),
+            )
+        }
+
+        // `<t>_born` — the BORN moment, typed: Ev_Spawned's arm in the generated
+        // events dispatch resolves the entity through the census and calls it with
+        // the fields SET, on every peer (the host's own inside boot_spawn_send).
+        // The make-time `<t>_spawned` above stays the bookkeeping hook; this is
+        // where the type-switch dress every game wrote in `<game>_entity_spawned`
+        // goes instead. Same shape as _spawned.
+        bn_name := strings.concatenate({tsnake, "_born"})
+
+        if cand, found := idx[bn_name]; found {
+            if validate_entity_hook(cand, bn_name, s.struct_name, e.target, want_owner = true) {
+                e.born = bn_name
+            }
+
+            cand.claimed = true
+            idx[bn_name] = cand
+        } else {
+            demand_half(
+                procs,
+                bn_name,
+                fmt.tprintf(
+                    "%s's born hook, dispatched typed from %s_events' Ev_Spawned arm",
+                    e.target,
+                    to_snake(s.struct_name),
+                ),
+            )
+        }
+    }
+
+    // `<game>_embodied(self, id)` — I inhabit a body now: an AVATAR-kind entity
+    // owned by ME was born (my spawn, my drop-in, my reconnect reclaiming its
+    // standing body — each arrives as Ev_Spawned on my screen). The one latch
+    // every game kept as `started`-plus-owner-checks in entity_spawned.
+    em_name := fmt.aprintf("%s_embodied", to_snake(s.struct_name))
+
+    if cand, found := idx[em_name]; found {
+        has_avatar := false
+
+        for &e in s.entities {
+            if e.avatar {
+                has_avatar = true
+            }
+        }
+
+        loc := Loc {
+            path = cand.path,
+            line = cand.line,
+        }
+
+        if !has_avatar {
+            error_at(
+                loc,
+                "%s: no entity kind declares `avatar` — the embodied moment IS an avatar kind of mine being born; tag the body's scene (gd:\"entity=Runner:2,avatar\") or drop the half",
+                em_name,
+            )
+        } else if !validate_embodied_hook(cand, em_name, s.struct_name) {
+            // error already reported
+        } else {
+            s.embodied = em_name
+        }
+
+        cand.claimed = true
+        idx[em_name] = cand
+    }
 }
 
 // `<game>_embodied(self: ^Game, id: knet.Net_Id)` — shape check.
 @(private = "file")
 validate_embodied_hook :: proc(cand: Half_Candidate, name, game_struct: string) -> bool {
-	loc := Loc{path = cand.path, line = cand.line}
-	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
-		error_at(loc, "%s must be a plain proc — the generated events dispatch calls it, it is never registered", name)
-		return false
-	}
-	types := make([dynamic]string, context.temp_allocator)
-	if cand.pt.params != nil {
-		for f in cand.pt.params.list {
-			t := strings.trim_space(node_text(cand.src, f.type))
-			for _ in 0 ..< max(1, len(f.names)) {
-				append(&types, t)
-			}
-		}
-	}
-	if len(types) != 2 || types[0] != fmt.tprintf("^%s", game_struct) || type_base(types[1]) != "Net_Id" {
-		error_at(loc, "%s: expected `proc(self: ^%s, id: knet.Net_Id)` — the body itself comes back through the census (`<kind>_of(&boot, id)`)", name, game_struct)
-		return false
-	}
-	return true
+    loc := Loc {
+        path = cand.path,
+        line = cand.line,
+    }
+
+    if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+        error_at(
+            loc,
+            "%s must be a plain proc — the generated events dispatch calls it, it is never registered",
+            name,
+        )
+        return false
+    }
+
+    types := make([dynamic]string, context.temp_allocator)
+
+    if cand.pt.params != nil {
+        for f in cand.pt.params.list {
+            t := strings.trim_space(node_text(cand.src, f.type))
+
+            for _ in 0 ..< max(1, len(f.names)) {
+                append(&types, t)
+            }
+        }
+    }
+
+    if len(types) != 2 || types[0] != fmt.tprintf("^%s", game_struct) || type_base(types[1]) != "Net_Id" {
+        error_at(
+            loc,
+            "%s: expected `proc(self: ^%s, id: knet.Net_Id)` — the body itself comes back through the census (`<kind>_of(&boot, id)`)",
+            name,
+            game_struct,
+        )
+        return false
+    }
+
+    return true
 }
 
 // Classify a `gd:"replicate,interp"` field's type into a knet.Lerp_Kind literal
@@ -2299,32 +3159,39 @@ validate_embodied_hook :: proc(cand: Half_Candidate, name, game_struct: string) 
 // arrays of them, and the engine's float value types (real_t = f32 in standard
 // builds) lerp; everything else returns "" and the caller rejects the tag.
 interp_lerp_kind :: proc(type_text: string) -> string {
-	t := strings.trim_space(type_text)
-	// fixed arrays: [N]f32 / [N]f64 (and nested, e.g. [2][2]f32)
-	if strings.has_prefix(t, "[") {
-		if i := strings.index_byte(t, ']'); i >= 0 {
-			return interp_lerp_kind(t[i + 1:])
-		}
-		return ""
-	}
-	switch t {
-	case "f32":
-		return ".F32"
-	case "f64":
-		return ".F64"
-	}
-	base := t
-	if i := strings.last_index(base, "."); i >= 0 {
-		base = base[i + 1:]
-	}
-	switch base {
-	case "Vector2", "Vector3", "Vector4", "Color":
-		return ".F32"
-	case "Quaternion":
-		// NOT componentwise: rotations need hemisphere-safe nlerp (q == -q).
-		return ".Quat"
-	}
-	return ""
+    t := strings.trim_space(type_text)
+
+    // fixed arrays: [N]f32 / [N]f64 (and nested, e.g. [2][2]f32)
+    if strings.has_prefix(t, "[") {
+        if i := strings.index_byte(t, ']'); i >= 0 {
+            return interp_lerp_kind(t[i + 1:])
+        }
+
+        return ""
+    }
+
+    switch t {
+    case "f32":
+        return ".F32"
+    case "f64":
+        return ".F64"
+    }
+
+    base := t
+
+    if i := strings.last_index(base, "."); i >= 0 {
+        base = base[i + 1:]
+    }
+
+    switch base {
+    case "Vector2", "Vector3", "Vector4", "Color":
+        return ".F32"
+    case "Quaternion":
+        // NOT componentwise: rotations need hemisphere-safe nlerp (q == -q).
+        return ".Quat"
+    }
+
+    return ""
 }
 
 // Map a command-arg type to kit/net's wire read_/write_ proc suffix plus the
@@ -2332,25 +3199,30 @@ interp_lerp_kind :: proc(type_text: string) -> string {
 // normalized to the gen file's `knet.` qualifier whatever the author aliased
 // `godot:kit/net` as. ok=false = not wire-serializable (the caller errors).
 command_wire_type :: proc(type_text: string) -> (wire: string, splice: string, ok: bool) {
-	t := strings.trim_space(type_text)
-	base := t
-	if i := strings.last_index(base, "."); i >= 0 {
-		base = base[i + 1:]
-	}
-	switch base {
-	case "Net_Id":
-		return "net_id", "knet.Net_Id", true
-	case "Player_Id":
-		return "player_id", "knet.Player_Id", true
-	}
-	if base != t {
-		return "", "", false // qualified non-kit/net type (gd.Vector2, ...)
-	}
-	switch t {
-	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool", "string":
-		return t, t, true
-	}
-	return "", "", false
+    t := strings.trim_space(type_text)
+    base := t
+
+    if i := strings.last_index(base, "."); i >= 0 {
+        base = base[i + 1:]
+    }
+
+    switch base {
+    case "Net_Id":
+        return "net_id", "knet.Net_Id", true
+    case "Player_Id":
+        return "player_id", "knet.Player_Id", true
+    }
+
+    if base != t {
+        return "", "", false // qualified non-kit/net type (gd.Vector2, ...)
+    }
+
+    switch t {
+    case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool", "string":
+        return t, t, true
+    }
+
+    return "", "", false
 }
 
 // Build a Command_Info from one @(gd_command[=POLICY]) proc. Cheap build-time
@@ -2367,175 +3239,205 @@ command_wire_type :: proc(type_text: string) -> (wire: string, splice: string, o
 // IS the entity, so owner detection is off there and a pointer arg errors as un-wire-able.
 // ok=false = a hard contract violation was reported (the caller drops the command).
 build_command_info :: proc(
-	src: string,
-	pt: ^ast.Proc_Type,
-	loc: Loc,
-	proc_name, struct_name: string,
-	config: Command_Config,
-	allow_owner: bool
+    src: string,
+    pt: ^ast.Proc_Type,
+    loc: Loc,
+    proc_name, struct_name: string,
+    config: Command_Config,
+    allow_owner: bool,
 ) -> (
-	Command_Info,
-	bool
+    Command_Info,
+    bool,
 ) {
-	if !validate_struct_prefix(proc_name, struct_name, loc) {return {}, false}
-	cmd := Command_Info {
-		proc_name       = proc_name,
-		loc             = loc,
-		name            = strip_struct_prefix(proc_name, struct_name),
-		policy_expr     = "knet.ACTION_OWNER",
-		policy_access   = "owner",
-		policy_max_args = 4096,
-	}
-	ok := true
-	if config.invalid_quote != "" {
-		error_at(
-			loc,
-			"command %s: quoted command policies were removed; use a typed knet.Action_Policy such as knet.ACTION_OWNER_PREDICTED or knet.ACTION_ANY_SEAT",
-			proc_name,
-		)
-		return cmd, false
-	}
-	if config.policy_expr != "" {
-		cmd.policy_expr = config.policy_expr
-	}
-	if pa, pp, pm, pok := wire_policy_shape(cmd.policy_expr); pok {
-		cmd.policy_access = pa
-		cmd.policy_predict = pp
-		cmd.policy_max_args = pm
-	} else {
-		error_at(
-			loc,
-			"command %s: action policy must be a built-in ACTION_* preset or a literal knet.Action_Policy with resolvable access/prediction/max_args_bytes fields — the generator must resolve access, scheduling, and byte bounds into the canonical wire schema",
-			proc_name,
-		)
-		ok = false
-	}
+    if !validate_struct_prefix(proc_name, struct_name, loc) {
+        return {}, false
+    }
 
-	// A composed command may name the embedding entity as its second param (a pointer, hence
-	// never a wire arg). Detect and skip it — the decode thunk passes `self` there.
-	start := 1
-	if allow_owner && len(pt.params.list) > 1 {
-		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
-		if strings.has_prefix(p1, "^") {
-			cmd.owner = true
-			start = 2
-		}
-	}
+    cmd := Command_Info {
+        proc_name       = proc_name,
+        loc             = loc,
+        name            = strip_struct_prefix(proc_name, struct_name),
+        policy_expr     = "knet.ACTION_OWNER",
+        policy_access   = "owner",
+        policy_max_args = 4096,
+    }
+    ok := true
 
-	// The ISSUER param: `by: knet.Player_Id` next (shape-detected like the
-	// wielder — the name AND type together are the declaration) is framework-
-	// filled with the true issuer and never rides the wire, so a predicate can
-	// arbitrate on WHO without trusting a client-claimed argument.
-	if len(pt.params.list) > start && len(pt.params.list[start].names) == 1 {
-		f := pt.params.list[start]
-		if id, iok := f.names[0].derived.(^ast.Ident); iok && id != nil && id.name == "by" {
-			base := strings.trim_space(node_text(src, f.type))
-			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
-			if base == "Player_Id" {
-				cmd.wants_by = true
-				start += 1
-			}
-		}
-	}
+    if config.invalid_quote != "" {
+        error_at(
+            loc,
+            "command %s: quoted command policies were removed; use a typed knet.Action_Policy such as knet.ACTION_OWNER_PREDICTED or knet.ACTION_ANY_SEAT",
+            proc_name,
+        )
+        return cmd, false
+    }
 
-	for fi in start ..< len(pt.params.list) {
-		field := pt.params.list[fi]
-		atext := strings.trim_space(node_text(src, field.type))
-		wire, splice, wok := command_wire_type(atext)
-		if !wok {
-			if atext == "int" || atext == "uint" {
-				error_at(
-					loc,
-					"command %s: arg type %q has platform-dependent width — command args cross the wire; use a fixed-width integer (i32, u16, ...)",
-					proc_name,
-					atext
-				)
-			} else {
-				error_at(
-					loc,
-					"command %s: unsupported arg type %q — command args must be wire primitives (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
-					proc_name,
-					atext
-				)
-			}
-			ok = false
-			continue
-		}
-		for nm in field.names {
-			ident, iok := nm.derived.(^ast.Ident)
-			if !iok || ident == nil {continue}
-			// `by` is the RESERVED issuer name — a wire arg wearing it is either a
-			// misplaced/mistyped issuer declaration or a client-claimed identity
-			// (the exact spoofable-side wart the issuer param deletes). A player
-			// the verb TARGETS stays legal under any other name (`who`, `target`).
-			if ident.name == "by" {
-				error_at(
-					loc,
-					"command %s: `by` is the reserved issuer param — declare it as `by: knet.Player_Id` immediately after the receiver and the framework fills it with the true issuer (it never rides the wire); an arg that merely names a player is fine as `who`/`target`",
-					proc_name
-				)
-				ok = false
-				continue
-			}
-			append(&cmd.args, Command_Arg{name = ident.name, type_text = splice, wire = wire})
-		}
-	}
+    if config.policy_expr != "" {
+        cmd.policy_expr = config.policy_expr
+    }
 
-	// The FIRST result must be the applied bool. Results after it are the verb's
-	// PAYLOAD — facts the run learned ("what was taken", "did a round leave") —
-	// which never cross the wire: they thread straight into the name-paired
-	// `<wrapper>_then` consequence on the authority, replacing the scratch-field
-	// idiom. Payload types are unconstrained (in-process only); the generated
-	// call site lets the compiler hold the `_then` signature to them.
-	ret_ok := false
-	if pt.results != nil && len(pt.results.list) > 0 && len(pt.results.list[0].names) <= 1 {
-		ret_ok = strings.trim_space(node_text(src, pt.results.list[0].type)) == "bool"
-		for extra in pt.results.list[1:] {
-			type_text := strings.trim_space(node_text(src, extra.type))
-			if len(extra.names) == 0 {
-				cmd.payload_count += 1
-				append(
-					&cmd.outcomes,
-					Command_Outcome {
-						name = fmt.tprintf("result_%d", cmd.payload_count),
-						type_text = type_text,
-					},
-				)
-				continue
-			}
-			for result_name in extra.names {
-				ident, named := result_name.derived.(^ast.Ident)
-				cmd.payload_count += 1
-				append(
-					&cmd.outcomes,
-					Command_Outcome {
-						name = named && ident != nil ? ident.name : fmt.tprintf("result_%d", cmd.payload_count),
-						type_text = type_text,
-					},
-				)
-			}
-		}
-	}
-	if !ret_ok {
-		error_at(
-			loc,
-			"command %s must return `bool` first — true = applied, false = rejected (a rejection auto-reverts the declared fields); results after it are the payload handed to a `%s_then` consequence",
-			proc_name,
-			proc_name
-		)
-		ok = false
-	}
+    if pa, pp, pm, pok := wire_policy_shape(cmd.policy_expr); pok {
+        cmd.policy_access = pa
+        cmd.policy_predict = pp
+        cmd.policy_max_args = pm
+    } else {
+        error_at(
+            loc,
+            "command %s: action policy must be a built-in ACTION_* preset or a literal knet.Action_Policy with resolvable access/prediction/max_args_bytes fields — the generator must resolve access, scheduling, and byte bounds into the canonical wire schema",
+            proc_name,
+        )
+        ok = false
+    }
 
-	return cmd, ok
+    // A composed command may name the embedding entity as its second param (a pointer, hence
+    // never a wire arg). Detect and skip it — the decode thunk passes `self` there.
+    start := 1
+
+    if allow_owner && len(pt.params.list) > 1 {
+        p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+
+        if strings.has_prefix(p1, "^") {
+            cmd.owner = true
+            start = 2
+        }
+    }
+
+    // The ISSUER param: `by: knet.Player_Id` next (shape-detected like the
+    // wielder — the name AND type together are the declaration) is framework-
+    // filled with the true issuer and never rides the wire, so a predicate can
+    // arbitrate on WHO without trusting a client-claimed argument.
+    if len(pt.params.list) > start && len(pt.params.list[start].names) == 1 {
+        f := pt.params.list[start]
+
+        if id, iok := f.names[0].derived.(^ast.Ident); iok && id != nil && id.name == "by" {
+            base := strings.trim_space(node_text(src, f.type))
+
+            if j := strings.last_index(base, "."); j >= 0 {
+                base = base[j + 1:]
+            }
+
+            if base == "Player_Id" {
+                cmd.wants_by = true
+                start += 1
+            }
+        }
+    }
+
+    for fi in start ..< len(pt.params.list) {
+        field := pt.params.list[fi]
+        atext := strings.trim_space(node_text(src, field.type))
+        wire, splice, wok := command_wire_type(atext)
+
+        if !wok {
+            if atext == "int" || atext == "uint" {
+                error_at(
+                    loc,
+                    "command %s: arg type %q has platform-dependent width — command args cross the wire; use a fixed-width integer (i32, u16, ...)",
+                    proc_name,
+                    atext,
+                )
+            } else {
+                error_at(
+                    loc,
+                    "command %s: unsupported arg type %q — command args must be wire primitives (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+                    proc_name,
+                    atext,
+                )
+            }
+
+            ok = false
+            continue
+        }
+
+        for nm in field.names {
+            ident, iok := nm.derived.(^ast.Ident)
+
+            if !iok || ident == nil {
+                continue
+            }
+
+            // `by` is the RESERVED issuer name — a wire arg wearing it is either a
+            // misplaced/mistyped issuer declaration or a client-claimed identity
+            // (the exact spoofable-side wart the issuer param deletes). A player
+            // the verb TARGETS stays legal under any other name (`who`, `target`).
+            if ident.name == "by" {
+                error_at(
+                    loc,
+                    "command %s: `by` is the reserved issuer param — declare it as `by: knet.Player_Id` immediately after the receiver and the framework fills it with the true issuer (it never rides the wire); an arg that merely names a player is fine as `who`/`target`",
+                    proc_name,
+                )
+                ok = false
+                continue
+            }
+
+            append(&cmd.args, Command_Arg{name = ident.name, type_text = splice, wire = wire})
+        }
+    }
+
+    // The FIRST result must be the applied bool. Results after it are the verb's
+    // PAYLOAD — facts the run learned ("what was taken", "did a round leave") —
+    // which never cross the wire: they thread straight into the name-paired
+    // `<wrapper>_then` consequence on the authority, replacing the scratch-field
+    // idiom. Payload types are unconstrained (in-process only); the generated
+    // call site lets the compiler hold the `_then` signature to them.
+    ret_ok := false
+
+    if pt.results != nil && len(pt.results.list) > 0 && len(pt.results.list[0].names) <= 1 {
+        ret_ok = strings.trim_space(node_text(src, pt.results.list[0].type)) == "bool"
+
+        for extra in pt.results.list[1:] {
+            type_text := strings.trim_space(node_text(src, extra.type))
+
+            if len(extra.names) == 0 {
+                cmd.payload_count += 1
+                append(
+                    &cmd.outcomes,
+                    Command_Outcome{name = fmt.tprintf("result_%d", cmd.payload_count), type_text = type_text},
+                )
+                continue
+            }
+
+            for result_name in extra.names {
+                ident, named := result_name.derived.(^ast.Ident)
+                cmd.payload_count += 1
+                append(
+                    &cmd.outcomes,
+                    Command_Outcome {
+                        name = named && ident != nil ? ident.name : fmt.tprintf("result_%d", cmd.payload_count),
+                        type_text = type_text,
+                    },
+                )
+            }
+        }
+    }
+
+    if !ret_ok {
+        error_at(
+            loc,
+            "command %s must return `bool` first — true = applied, false = rejected (a rejection auto-reverts the declared fields); results after it are the payload handed to a `%s_then` consequence",
+            proc_name,
+            proc_name,
+        )
+        ok = false
+    }
+
+    return cmd, ok
 }
 
 // A direct @(gd_command) on the entity itself: build it (owner threading is only for
 // embedded blocks — the entity IS `self`) and append. Appended even on a contract error so
 // the diagnostic isn't compounded by a phantom "unknown command"; had_error stops the build
 // before generate() sees it.
-parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: Command_Config) {
-	cmd, _ := build_command_info(src, pt, loc, proc_name, s.struct_name, config, false)
-	append(&s.commands, cmd)
+parse_command :: proc(
+    s: ^Script,
+    src: string,
+    loc: Loc,
+    proc_name: string,
+    pt: ^ast.Proc_Type,
+    config: Command_Config,
+) {
+    cmd, _ := build_command_info(src, pt, loc, proc_name, s.struct_name, config, false)
+    append(&s.commands, cmd)
 }
 
 // Build a Message_Info from one @(gd_message="TAG") handler. Contract checks live
@@ -2545,70 +3447,92 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 // answer one). Unlike a command, a direct call is harmless (no framework bypass),
 // so no lint guards it. ok=false = a reported contract violation (had_error stops
 // the build before generate() sees the half-built record).
-build_message_info :: proc(src: string, pt: ^ast.Proc_Type, loc: Loc, proc_name, struct_name, config: string) -> (Message_Info, bool) {
-	m := Message_Info {
-		proc_name = proc_name,
-		name      = strip_struct_prefix(proc_name, struct_name),
-		game      = struct_name,
-		tag_ident = strings.trim_space(config),
-		line      = loc.line,
-		path      = loc.path
-	}
-	ok := true
+build_message_info :: proc(
+    src: string,
+    pt: ^ast.Proc_Type,
+    loc: Loc,
+    proc_name, struct_name, config: string,
+) -> (
+    Message_Info,
+    bool,
+) {
+    m := Message_Info {
+        proc_name = proc_name,
+        name      = strip_struct_prefix(proc_name, struct_name),
+        game      = struct_name,
+        tag_ident = strings.trim_space(config),
+        line      = loc.line,
+        path      = loc.path,
+    }
+    ok := true
 
-	if m.tag_ident == "" {
-		error_at(
-			loc,
-			"message %s: @(gd_message) needs the SES_APP tag it rides — `@(gd_message=\"TAG_WHISPER\")` with a `TAG_WHISPER :: u8(4)` constant (the kit holds tags 0/2/3; pick a free byte)",
-			proc_name
-		)
-		ok = false
-	}
+    if m.tag_ident == "" {
+        error_at(
+            loc,
+            "message %s: @(gd_message) needs the SES_APP tag it rides — `@(gd_message=\"TAG_WHISPER\")` with a `TAG_WHISPER :: u8(4)` constant (the kit holds tags 0/2/3; pick a free byte)",
+            proc_name,
+        )
+        ok = false
+    }
 
-	// The signature is exactly (self: ^Owner, from: knet.Player_Id, msg: T).
-	if pt.params == nil || len(pt.params.list) != 3 {
-		error_at(
-			loc,
-			"message %s: a @(gd_message) handler is `proc(self: ^%s, from: knet.Player_Id, msg: T)` — the second param is the sender, the third the POD payload decoded for you",
-			proc_name,
-			struct_name
-		)
-		return m, false // no params to read below — bail rather than index-panic
-	}
+    // The signature is exactly (self: ^Owner, from: knet.Player_Id, msg: T).
+    if pt.params == nil || len(pt.params.list) != 3 {
+        error_at(
+            loc,
+            "message %s: a @(gd_message) handler is `proc(self: ^%s, from: knet.Player_Id, msg: T)` — the second param is the sender, the third the POD payload decoded for you",
+            proc_name,
+            struct_name,
+        )
+        return m, false // no params to read below — bail rather than index-panic
+    }
 
-	// param 1: `from: knet.Player_Id` (the resolved sender — host fills it, a
-	// client sees PLAYER_ID_INVALID; name is the author's, only the type gates).
-	from_t := strings.trim_space(node_text(src, pt.params.list[1].type))
-	fb := from_t
-	if j := strings.last_index(fb, "."); j >= 0 {fb = fb[j + 1:]}
-	if fb != "Player_Id" {
-		error_at(loc, "message %s: the second param must be `from: knet.Player_Id` (the sender) — got %q", proc_name, from_t)
-		ok = false
-	}
+    // param 1: `from: knet.Player_Id` (the resolved sender — host fills it, a
+    // client sees PLAYER_ID_INVALID; name is the author's, only the type gates).
+    from_t := strings.trim_space(node_text(src, pt.params.list[1].type))
+    fb := from_t
 
-	// param 2: `msg: T` — the payload type. Its field layout folds into
-	// NET_FINGERPRINT (net_fingerprint), so a drifted payload refuses at the door.
-	m.payload_type = strings.trim_space(node_text(src, pt.params.list[2].type))
-	if m.payload_type == "" {
-		error_at(loc, "message %s: the third param must be `msg: T`, a POD payload struct", proc_name)
-		ok = false
-	}
+    if j := strings.last_index(fb, "."); j >= 0 {
+        fb = fb[j + 1:]
+    }
 
-	// A handler consumes a message; it returns nothing (a reply is another send).
-	if pt.results != nil && len(pt.results.list) > 0 {
-		error_at(loc, "message %s: a @(gd_message) handler returns nothing — to answer, send another message back to `from`", proc_name)
-		ok = false
-	}
+    if fb != "Player_Id" {
+        error_at(
+            loc,
+            "message %s: the second param must be `from: knet.Player_Id` (the sender) — got %q",
+            proc_name,
+            from_t,
+        )
+        ok = false
+    }
 
-	return m, ok
+    // param 2: `msg: T` — the payload type. Its field layout folds into
+    // NET_FINGERPRINT (net_fingerprint), so a drifted payload refuses at the door.
+    m.payload_type = strings.trim_space(node_text(src, pt.params.list[2].type))
+
+    if m.payload_type == "" {
+        error_at(loc, "message %s: the third param must be `msg: T`, a POD payload struct", proc_name)
+        ok = false
+    }
+
+    // A handler consumes a message; it returns nothing (a reply is another send).
+    if pt.results != nil && len(pt.results.list) > 0 {
+        error_at(
+            loc,
+            "message %s: a @(gd_message) handler returns nothing — to answer, send another message back to `from`",
+            proc_name,
+        )
+        ok = false
+    }
+
+    return m, ok
 }
 
 // A @(gd_message) handler on the game class: build it and append. Appended even on
 // a contract error (had_error stops the build before generate runs), keeping the
 // diagnostic clean like parse_command.
 parse_message :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	msg, _ := build_message_info(src, pt, loc, proc_name, s.struct_name, config)
-	append(&s.messages, msg)
+    msg, _ := build_message_info(src, pt, loc, proc_name, s.struct_name, config)
+    append(&s.messages, msg)
 }
 
 // One @(gd_tick) proc — the class's sim-lane step. Accepted shapes, receiver first:
@@ -2623,84 +3547,118 @@ parse_message :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 // assertions in generated code). No results: mutation IS the
 // outcome — validation and rejection belong to @(gd_command) verbs.
 parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	if s.tick.proc_name != "" {
-		error_at(
-			loc,
-			"%s: second @(gd_tick) proc %q — %q already ticks this class; one tick per class, compose behavior inside it",
-			s.struct_name, proc_name, s.tick.proc_name
-		)
-		return
-	}
-	tk := Tick_Info{proc_name = proc_name, line = loc.line}
-	ok := true
+    if s.tick.proc_name != "" {
+        error_at(
+            loc,
+            "%s: second @(gd_tick) proc %q — %q already ticks this class; one tick per class, compose behavior inside it",
+            s.struct_name,
+            proc_name,
+            s.tick.proc_name,
+        )
+        return
+    }
 
-	for part in strings.split(config, ",") {
-		tok := strings.trim_space(part)
-		switch tok {
-		case "":
-		case "contested":
-			// EVERY peer predicts this entity (the ball, the crown): contact
-			// resolves on each screen's own timeline; the server reconciles.
-			tk.contested = true
-		case:
-			error_at(loc, "tick %s: unknown config token %q (expected `contested`)", proc_name, tok)
-			ok = false
-		}
-	}
+    tk := Tick_Info {
+        proc_name = proc_name,
+        line      = loc.line,
+    }
+    ok := true
 
-	// Flatten the params after the receiver (one field entry may declare
-	// several names — each is a param).
-	types := make([dynamic]string, context.temp_allocator)
-	for field in pt.params.list[1:] {
-		text := strings.trim_space(node_text(src, field.type))
-		for _ in 0 ..< max(1, len(field.names)) {
-			append(&types, text)
-		}
-	}
-	for text, i in types {
-		if strings.has_prefix(text, "^") {
-			base := text[1:]
-			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
-			if base != "Lane" || tk.wants_lane || i != len(types) - 1 {
-				error_at(loc, "tick %s: unsupported param %q — the shape is (self[, input][, lane: ^ksim.Lane]); other state rides the entity or the lane", proc_name, text)
-				ok = false
-				continue
-			}
-			tk.wants_lane = true
-			continue
-		}
-		if tk.input_type != "" {
-			error_at(loc, "tick %s: a second value param %q — one input struct per tick; compose the fields into it", proc_name, text)
-			ok = false
-			continue
-		}
-		if text == "int" || text == "uint" {
-			error_at(loc, "tick %s: input type %q has platform-dependent width — inputs cross the wire; wrap fixed-width fields in a struct", proc_name, text)
-			ok = false
-			continue
-		}
-		tk.input_type = text
-	}
+    for part in strings.split(config, ",") {
+        tok := strings.trim_space(part)
 
-	// Results are the tick's PAYLOAD — facts it learned this tick (fired,
-	// dashed, landed), threaded into the name-paired `<proc>_then` (authority
-	// consequence) and `<proc>_fx` (presentation). They are not verdicts (a
-	// tick can't reject), and they stay in-process unless the _fx declares
-	// `mine` — the every-screen form, whose facts cross the wire (validated
-	// against the wire primitives in resolve_tick_then).
-	if pt.results != nil {
-		for r in pt.results.list {
-			text := strings.trim_space(node_text(src, r.type))
-			for _ in 0 ..< max(1, len(r.names)) {
-				tk.payload_count += 1
-				append(&tk.payload_types, text)
-			}
-		}
-	}
+        switch tok {
+        case "":
+        case "contested":
+            // EVERY peer predicts this entity (the ball, the crown): contact
+            // resolves on each screen's own timeline; the server reconciles.
+            tk.contested = true
+        case:
+            error_at(loc, "tick %s: unknown config token %q (expected `contested`)", proc_name, tok)
+            ok = false
+        }
+    }
 
-	if ok {
-		s.tick = tk
-	}
+    // Flatten the params after the receiver (one field entry may declare
+    // several names — each is a param).
+    types := make([dynamic]string, context.temp_allocator)
+
+    for field in pt.params.list[1:] {
+        text := strings.trim_space(node_text(src, field.type))
+
+        for _ in 0 ..< max(1, len(field.names)) {
+            append(&types, text)
+        }
+    }
+
+    for text, i in types {
+        if strings.has_prefix(text, "^") {
+            base := text[1:]
+
+            if j := strings.last_index(base, "."); j >= 0 {
+                base = base[j + 1:]
+            }
+
+            if base != "Lane" || tk.wants_lane || i != len(types) - 1 {
+                error_at(
+                    loc,
+                    "tick %s: unsupported param %q — the shape is (self[, input][, lane: ^ksim.Lane]); other state rides the entity or the lane",
+                    proc_name,
+                    text,
+                )
+                ok = false
+                continue
+            }
+
+            tk.wants_lane = true
+            continue
+        }
+
+        if tk.input_type != "" {
+            error_at(
+                loc,
+                "tick %s: a second value param %q — one input struct per tick; compose the fields into it",
+                proc_name,
+                text,
+            )
+            ok = false
+            continue
+        }
+
+        if text == "int" || text == "uint" {
+            error_at(
+                loc,
+                "tick %s: input type %q has platform-dependent width — inputs cross the wire; wrap fixed-width fields in a struct",
+                proc_name,
+                text,
+            )
+            ok = false
+            continue
+        }
+
+        tk.input_type = text
+    }
+
+    // Results are the tick's PAYLOAD — facts it learned this tick (fired,
+    // dashed, landed), threaded into the name-paired `<proc>_then` (authority
+    // consequence) and `<proc>_fx` (presentation). They are not verdicts (a
+    // tick can't reject), and they stay in-process unless the _fx declares
+    // `mine` — the every-screen form, whose facts cross the wire (validated
+    // against the wire primitives in resolve_tick_then).
+    if pt.results != nil {
+        for r in pt.results.list {
+            text := strings.trim_space(node_text(src, r.type))
+
+            for _ in 0 ..< max(1, len(r.names)) {
+                tk.payload_count += 1
+                append(&tk.payload_types, text)
+            }
+        }
+    }
+
+    if ok {
+        s.tick = tk
+    }
 }
 
 // One @(gd_sample) proc — the lane's device read, the ONE place that touches
@@ -2713,53 +3671,71 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 // tick reads dies here instead of desyncing quietly. One sample per input
 // TYPE — a game driving two entity kinds declares two, one per kind.
 parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	validate := ""
-	for part in strings.split(config, ",") {
-		tok := strings.trim_space(part)
-		switch {
-		case tok == "":
-		case tok == "validate":
-			if validate != "" {
-				error_at(loc, "sample %s: validator declared more than once", proc_name)
-				return
-			}
-			validate = fmt.tprintf("%s_validate", proc_name)
-		case strings.has_prefix(tok, "validate="):
-			if validate != "" {
-				error_at(loc, "sample %s: validator declared more than once", proc_name)
-				return
-			}
-			validate = strings.trim_space(tok[len("validate="):])
-			if validate == "" {
-				error_at(loc, "sample %s: `validate=` needs a proc name", proc_name)
-				return
-			}
-		case:
-			error_at(loc, "sample %s: unknown config token %q (expected `validate` or `validate=PROC`)", proc_name, tok)
-			return
-		}
-	}
-	types := flatten_param_types(src, pt)
-	if len(types) != 2 || types[0] != "u64" || !strings.has_prefix(types[1], "^") {
-		error_at(loc, "sample %s: the shape is (self: ^%s, tick: u64, input: ^Your_Input)", proc_name, s.struct_name)
-		return
-	}
-	if pt.results != nil {
-		error_at(loc, "sample %s: no results — a sample WRITES the input struct; facts belong to ticks", proc_name)
-		return
-	}
-	itype := types[1][1:]
-	for existing in s.samples {
-		if existing.input_type == itype {
-			error_at(
-				loc,
-				"%s: a second @(gd_sample) writes %s — %q already fills that input class; one sample per input TYPE",
-				s.struct_name, itype, existing.proc_name
-			)
-			return
-		}
-	}
-	append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype, validate = validate})
+    validate := ""
+
+    for part in strings.split(config, ",") {
+        tok := strings.trim_space(part)
+
+        switch {
+        case tok == "":
+        case tok == "validate":
+            if validate != "" {
+                error_at(loc, "sample %s: validator declared more than once", proc_name)
+                return
+            }
+
+            validate = fmt.tprintf("%s_validate", proc_name)
+        case strings.has_prefix(tok, "validate="):
+            if validate != "" {
+                error_at(loc, "sample %s: validator declared more than once", proc_name)
+                return
+            }
+
+            validate = strings.trim_space(tok[len("validate="):])
+
+            if validate == "" {
+                error_at(loc, "sample %s: `validate=` needs a proc name", proc_name)
+                return
+            }
+        case:
+            error_at(
+                loc,
+                "sample %s: unknown config token %q (expected `validate` or `validate=PROC`)",
+                proc_name,
+                tok,
+            )
+            return
+        }
+    }
+
+    types := flatten_param_types(src, pt)
+
+    if len(types) != 2 || types[0] != "u64" || !strings.has_prefix(types[1], "^") {
+        error_at(loc, "sample %s: the shape is (self: ^%s, tick: u64, input: ^Your_Input)", proc_name, s.struct_name)
+        return
+    }
+
+    if pt.results != nil {
+        error_at(loc, "sample %s: no results — a sample WRITES the input struct; facts belong to ticks", proc_name)
+        return
+    }
+
+    itype := types[1][1:]
+
+    for existing in s.samples {
+        if existing.input_type == itype {
+            error_at(
+                loc,
+                "%s: a second @(gd_sample) writes %s — %q already fills that input class; one sample per input TYPE",
+                s.struct_name,
+                itype,
+                existing.proc_name,
+            )
+            return
+        }
+    }
+
+    append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype, validate = validate})
 }
 
 // @(gd_step) procs — the lane's world passes, run AFTER entity ticks. Two
@@ -2782,66 +3758,93 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 // param is the LANE's clock — a lane-routed step may take it; the boot-routed
 // coop authority pass (resolve_sim) has no absolute tick and must omit it.
 parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	authority := false
-	for part in strings.split(config, ",") {
-		tok := strings.trim_space(part)
-		switch tok {
-		case "":
-		case "authority":
-			authority = true
-		case:
-			error_at(loc, "step %s: unknown config token %q (expected `authority`)", proc_name, tok)
-			return
-		}
-	}
-	types := flatten_param_types(src, pt)
-	wants_tick := false
-	switch {
-	case len(types) == 0:
-	case len(types) == 1 && types[0] == "u64":
-		wants_tick = true
-	case:
-		error_at(loc, "step %s: the shape is (self: ^%s[, tick: u64])", proc_name, s.struct_name)
-		return
-	}
-	if pt.results != nil {
-		error_at(loc, "step %s: no results — world-pass presentation uses @(gd_event); entity ticks carry payloads", proc_name)
-		return
-	}
-	if authority {
-		if s.step_auth.proc_name != "" {
-			error_at(
-				loc,
-				"%s: second @(gd_step=\"authority\") proc %q — %q already runs the authority pass; one per lane, compose inside it",
-				s.struct_name, proc_name, s.step_auth.proc_name
-			)
-			return
-		}
-		s.step_auth = Sim_Proc_Info{proc_name = proc_name, line = loc.line, wants_tick = wants_tick}
-	} else {
-		if s.step.proc_name != "" {
-			error_at(
-				loc,
-				"%s: second @(gd_step) proc %q — %q already runs the everywhere pass; mark one @(gd_step=\"authority\") if it's host-only adjudication",
-				s.struct_name, proc_name, s.step.proc_name
-			)
-			return
-		}
-		s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line, wants_tick = wants_tick}
-	}
+    authority := false
+
+    for part in strings.split(config, ",") {
+        tok := strings.trim_space(part)
+
+        switch tok {
+        case "":
+        case "authority":
+            authority = true
+        case:
+            error_at(loc, "step %s: unknown config token %q (expected `authority`)", proc_name, tok)
+            return
+        }
+    }
+
+    types := flatten_param_types(src, pt)
+    wants_tick := false
+
+    switch {
+    case len(types) == 0:
+    case len(types) == 1 && types[0] == "u64":
+        wants_tick = true
+    case:
+        error_at(loc, "step %s: the shape is (self: ^%s[, tick: u64])", proc_name, s.struct_name)
+        return
+    }
+
+    if pt.results != nil {
+        error_at(
+            loc,
+            "step %s: no results — world-pass presentation uses @(gd_event); entity ticks carry payloads",
+            proc_name,
+        )
+        return
+    }
+
+    if authority {
+        if s.step_auth.proc_name != "" {
+            error_at(
+                loc,
+                "%s: second @(gd_step=\"authority\") proc %q — %q already runs the authority pass; one per lane, compose inside it",
+                s.struct_name,
+                proc_name,
+                s.step_auth.proc_name,
+            )
+            return
+        }
+
+        s.step_auth = Sim_Proc_Info {
+            proc_name  = proc_name,
+            line       = loc.line,
+            wants_tick = wants_tick,
+        }
+    } else {
+        if s.step.proc_name != "" {
+            error_at(
+                loc,
+                "%s: second @(gd_step) proc %q — %q already runs the everywhere pass; mark one @(gd_step=\"authority\") if it's host-only adjudication",
+                s.struct_name,
+                proc_name,
+                s.step.proc_name,
+            )
+            return
+        }
+
+        s.step = Sim_Proc_Info {
+            proc_name  = proc_name,
+            line       = loc.line,
+            wants_tick = wants_tick,
+        }
+    }
 }
 
 // The param type texts AFTER the receiver, one entry per declared name.
 @(private = "file")
 flatten_param_types :: proc(src: string, pt: ^ast.Proc_Type) -> []string {
-	types := make([dynamic]string, context.temp_allocator)
-	for field in pt.params.list[1:] {
-		text := strings.trim_space(node_text(src, field.type))
-		for _ in 0 ..< max(1, len(field.names)) {
-			append(&types, text)
-		}
-	}
-	return types[:]
+    types := make([dynamic]string, context.temp_allocator)
+
+    for field in pt.params.list[1:] {
+        text := strings.trim_space(node_text(src, field.type))
+
+        for _ in 0 ..< max(1, len(field.names)) {
+            append(&types, text)
+        }
+    }
+
+    return types[:]
 }
 
 // Every top-level proc name in one file — the package-wide name set that
@@ -2860,19 +3863,29 @@ flatten_param_types :: proc(src: string, pt: ^ast.Proc_Type) -> []string {
 // (a config value on the attribute, an @(gd_event) beside it) must never be
 // told to add the attribute it already has.
 Proc_Site :: struct {
-	loc:  Loc,
-	half: bool, // wore @(gd_half) — declared, whether or not collection accepted it
+    loc:  Loc,
+    half: bool, // wore @(gd_half) — declared, whether or not collection accepted it
 }
 
 scan_proc_names :: proc(taken: ^map[string]Proc_Site, path: string, file: ^ast.File) {
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok || len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		if _, is_proc := vd.values[0].derived.(^ast.Proc_Lit); !is_proc {continue}
-		if ident, iok := vd.names[0].derived.(^ast.Ident); iok && ident != nil {
-			taken[ident.name] = Proc_Site{loc = Loc{path, ident.pos.line}, half = has_attr(vd, "gd_half")}
-		}
-	}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
+
+        if !ok || len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
+
+        if _, is_proc := vd.values[0].derived.(^ast.Proc_Lit); !is_proc {
+            continue
+        }
+
+        if ident, iok := vd.names[0].derived.(^ast.Ident); iok && ident != nil {
+            taken[ident.name] = Proc_Site {
+                loc  = Loc{path, ident.pos.line},
+                half = has_attr(vd, "gd_half"),
+            }
+        }
+    }
 }
 
 // THE FORGOTTEN ATTRIBUTE — the last silent hole the pairing had.
@@ -2909,14 +3922,19 @@ scan_proc_names :: proc(taken: ^map[string]Proc_Site, path: string, file: ^ast.F
 // knows it was written.
 @(private = "file")
 demand_half :: proc(procs: map[string]Proc_Site, name, is_the: string) -> bool {
-	site, exists := procs[name]
-	if !exists || site.half {return false}
-	error_at(
-		site.loc,
-		"%s exists but never declared itself — by name it is %s, but scriptgen collects halves by ATTRIBUTE (the name only decides WHAT they pair with), so with no @(gd_half) above it this is an ordinary proc nothing ever calls and the pairing silently never fires. Add @(gd_half), or rename it if it was never meant to pair.",
-		name, is_the
-	)
-	return true
+    site, exists := procs[name]
+
+    if !exists || site.half {
+        return false
+    }
+
+    error_at(
+        site.loc,
+        "%s exists but never declared itself — by name it is %s, but scriptgen collects halves by ATTRIBUTE (the name only decides WHAT they pair with), so with no @(gd_half) above it this is an ordinary proc nothing ever calls and the pairing silently never fires. Add @(gd_half), or rename it if it was never meant to pair.",
+        name,
+        is_the,
+    )
+    return true
 }
 
 // The typed census accessors yield to the game, name by name: an existing
@@ -2925,25 +3943,29 @@ demand_half :: proc(procs: map[string]Proc_Site, name, is_the: string) -> bool {
 // generate() honors. Every yield is ANNOUNCED (note_yield) — a silent one is
 // indistinguishable from a typo in the override's name.
 resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
-	// Presence alone decides a yield — a hand-written override wins whether or
-	// not it wears anything, and none of these census names is a pairing shape,
-	// so demand_half never looks at them and a yield stays silent.
-	yield :: proc(taken: map[string]Proc_Site, name: string) -> bool {
-		if _, hand := taken[name]; !hand {return true}
-		note_yield("census accessor", name)
-		return false
-	}
-	for &e in s.entities {
-		tsnake := to_snake(e.target)
-		e.gen_ref = yield(taken, fmt.tprintf("%s_ref", tsnake))
-		e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
-		e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
-		e.gen_mine = yield(taken, fmt.tprintf("%s_mine", tsnake))
-		e.gen_all = yield(taken, fmt.tprintf("%s_all", tsnake))
-		e.gen_spawn = yield(taken, fmt.tprintf("%s_spawn", tsnake))
-		e.gen_despawn = yield(taken, fmt.tprintf("%s_despawn", tsnake))
-		e.gen_teleport = e.has_owner_stream && yield(taken, fmt.tprintf("%s_teleport", tsnake))
-	}
+    // Presence alone decides a yield — a hand-written override wins whether or
+    // not it wears anything, and none of these census names is a pairing shape,
+    // so demand_half never looks at them and a yield stays silent.
+    yield :: proc(taken: map[string]Proc_Site, name: string) -> bool {
+        if _, hand := taken[name]; !hand {
+            return true
+        }
+
+        note_yield("census accessor", name)
+        return false
+    }
+
+    for &e in s.entities {
+        tsnake := to_snake(e.target)
+        e.gen_ref = yield(taken, fmt.tprintf("%s_ref", tsnake))
+        e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
+        e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
+        e.gen_mine = yield(taken, fmt.tprintf("%s_mine", tsnake))
+        e.gen_all = yield(taken, fmt.tprintf("%s_all", tsnake))
+        e.gen_spawn = yield(taken, fmt.tprintf("%s_spawn", tsnake))
+        e.gen_despawn = yield(taken, fmt.tprintf("%s_despawn", tsnake))
+        e.gen_teleport = e.has_owner_stream && yield(taken, fmt.tprintf("%s_teleport", tsnake))
+    }
 }
 
 // Which probe return a replicated field's declared type maps to. Scalars
@@ -2951,17 +3973,22 @@ resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
 // formatted view is game-shaped, not mechanical.
 @(private = "file")
 probe_scalar :: proc(type_text: string) -> (float, boolish, ok: bool) {
-	t := type_text
-	if i := strings.last_index(t, "."); i >= 0 {t = t[i + 1:]}
-	switch t {
-	case "f16", "f32", "f64", "Float":
-		return true, false, true
-	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Int":
-		return false, false, true
-	case "bool", "b8", "b16", "b32", "b64":
-		return false, true, true
-	}
-	return false, false, false
+    t := type_text
+
+    if i := strings.last_index(t, "."); i >= 0 {
+        t = t[i + 1:]
+    }
+
+    switch t {
+    case "f16", "f32", "f64", "Float":
+        return true, false, true
+    case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Int":
+        return false, false, true
+    case "bool", "b8", "b16", "b32", "b64":
+        return false, true, true
+    }
+
+    return false, false, false
 }
 
 // The generated acid probes — the mechanical half of every game's hand-written
@@ -2970,68 +3997,99 @@ probe_scalar :: proc(type_text: string) -> (float, boolish, ok: bool) {
 // and one per replicated scalar field. Needs the boot (the census resolves
 // through it); a hand-written proc wearing a probe's name wins, name by name.
 resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[string]Proc_Site) {
-	if s.boot_field == "" || len(s.entities) == 0 {
-		return
-	}
-	vi_int, iok := map_variant("gd.Int")
-	vi_float, fok := map_variant("gd.Float")
-	if !iok || !fok {
-		return // unreachable: both are core Variant types
-	}
-	add :: proc(s: ^Script, taken: map[string]Proc_Site, p: Probe_Info, args: ..Arg) -> bool {
-		if _, hand := taken[p.name]; hand {
-			note_yield("acid probe", p.name) // hand-written wins
-			return false
-		}
-		for m in s.methods {
-			if m.gd_name == p.name {
-				note_yield("acid probe", p.name)
-				return false
-			}
-		}
-		m := Method_Info {
-			proc_name = fmt.tprintf("_%s_%s", to_snake(s.struct_name), p.name),
-			gd_name   = p.name,
-			ret       = p.form == .Field && p.float ? _probe_vi_float : _probe_vi_int
-		}
-		for a in args {
-			append(&m.args, a)
-		}
-		append(&s.methods, m)
-		append(&s.probes, p)
-		return true
-	}
-	_probe_vi_int = vi_int
-	_probe_vi_float = vi_float
-	id_arg := Arg{name = "id", type_text = "gd.Int", vi = vi_int}
-	for e in s.entities {
-		tsnake := to_snake(e.target)
-		add(s, taken, Probe_Info{form = .Count, name = fmt.tprintf("probe_%s_count", tsnake), tsnake = tsnake, target = e.target})
-		add(s, taken, Probe_Info{form = .My, name = fmt.tprintf("probe_my_%s", tsnake), tsnake = tsnake, target = e.target})
-		tgt, known := by_struct[e.target]
-		if !known {
-			continue
-		}
-		for r in tgt.replicates {
-			float, boolish, ok := probe_scalar(r.type_text)
-			if !ok {
-				continue
-			}
-			add(
-				s, taken,
-				Probe_Info{
-					form = .Field,
-					name = fmt.tprintf("probe_%s_%s", tsnake, strings.join(r.path, "_", context.temp_allocator)),
-					tsnake = tsnake,
-					target = e.target,
-					access = strings.join(r.path, ".", context.temp_allocator),
-					float = float,
-					boolish = boolish
-				},
-				id_arg
-			)
-		}
-	}
+    if s.boot_field == "" || len(s.entities) == 0 {
+        return
+    }
+
+    vi_int, iok := map_variant("gd.Int")
+    vi_float, fok := map_variant("gd.Float")
+
+    if !iok || !fok {
+        return // unreachable: both are core Variant types
+    }
+
+    add :: proc(s: ^Script, taken: map[string]Proc_Site, p: Probe_Info, args: ..Arg) -> bool {
+        if _, hand := taken[p.name]; hand {
+            note_yield("acid probe", p.name) // hand-written wins
+            return false
+        }
+
+        for m in s.methods {
+            if m.gd_name == p.name {
+                note_yield("acid probe", p.name)
+                return false
+            }
+        }
+
+        m := Method_Info {
+            proc_name = fmt.tprintf("_%s_%s", to_snake(s.struct_name), p.name),
+            gd_name   = p.name,
+            ret       = p.form == .Field && p.float ? _probe_vi_float : _probe_vi_int,
+        }
+
+        for a in args {
+            append(&m.args, a)
+        }
+
+        append(&s.methods, m)
+        append(&s.probes, p)
+        return true
+    }
+
+    _probe_vi_int = vi_int
+    _probe_vi_float = vi_float
+    id_arg := Arg {
+        name      = "id",
+        type_text = "gd.Int",
+        vi        = vi_int,
+    }
+
+    for e in s.entities {
+        tsnake := to_snake(e.target)
+        add(
+            s,
+            taken,
+            Probe_Info {
+                form = .Count,
+                name = fmt.tprintf("probe_%s_count", tsnake),
+                tsnake = tsnake,
+                target = e.target,
+            },
+        )
+        add(
+            s,
+            taken,
+            Probe_Info{form = .My, name = fmt.tprintf("probe_my_%s", tsnake), tsnake = tsnake, target = e.target},
+        )
+        tgt, known := by_struct[e.target]
+
+        if !known {
+            continue
+        }
+
+        for r in tgt.replicates {
+            float, boolish, ok := probe_scalar(r.type_text)
+
+            if !ok {
+                continue
+            }
+
+            add(
+                s,
+                taken,
+                Probe_Info {
+                    form = .Field,
+                    name = fmt.tprintf("probe_%s_%s", tsnake, strings.join(r.path, "_", context.temp_allocator)),
+                    tsnake = tsnake,
+                    target = e.target,
+                    access = strings.join(r.path, ".", context.temp_allocator),
+                    float = float,
+                    boolish = boolish,
+                },
+                id_arg,
+            )
+        }
+    }
 }
 
 // resolve_probes' return-type scratch (Odin nested procs don't capture).
@@ -3050,37 +4108,51 @@ _probe_vi_float: Variant_Info
 // wins, name by name. Runs BEFORE the method-name lint so boot_attach's
 // methods list resolves against them like any @(gd_method).
 resolve_boot_forwards :: proc(s: ^Script) {
-	if s.boot_field == "" {
-		return
-	}
-	vi_int, iok := map_variant("gd.Int")
-	vi_pba, pok := map_variant("gd.Packed_Byte_Array")
-	if !iok || !pok {
-		return // unreachable: both are core Variant types
-	}
-	snake := to_snake(s.struct_name)
-	add :: proc(s: ^Script, snake, name: string, args: ..Arg) {
-		for m in s.methods {
-			if m.gd_name == name {
-				note_yield("standard transport forward", name) // hand-written wins
-				return
-			}
-		}
-		m := Method_Info {
-			proc_name = fmt.tprintf("_%s_std_%s", snake, name),
-			gd_name   = name,
-			ret       = Variant_Info{enum_name = ".Nil", kind = .Nil}
-		}
-		for a in args {
-			append(&m.args, a)
-		}
-		append(&s.methods, m)
-		append(&s.std_forwards, name)
-	}
-	add(s, snake, "on_packet", Arg{name = "id", type_text = "gd.Int", vi = vi_int}, Arg{name = "packet", type_text = "gd.Packed_Byte_Array", vi = vi_pba})
-	add(s, snake, "on_peer_left", Arg{name = "id", type_text = "gd.Int", vi = vi_int})
-	add(s, snake, "on_net_up")
-	add(s, snake, "on_net_down")
+    if s.boot_field == "" {
+        return
+    }
+
+    vi_int, iok := map_variant("gd.Int")
+    vi_pba, pok := map_variant("gd.Packed_Byte_Array")
+
+    if !iok || !pok {
+        return // unreachable: both are core Variant types
+    }
+
+    snake := to_snake(s.struct_name)
+
+    add :: proc(s: ^Script, snake, name: string, args: ..Arg) {
+        for m in s.methods {
+            if m.gd_name == name {
+                note_yield("standard transport forward", name) // hand-written wins
+                return
+            }
+        }
+
+        m := Method_Info {
+            proc_name = fmt.tprintf("_%s_std_%s", snake, name),
+            gd_name = name,
+            ret = Variant_Info{enum_name = ".Nil", kind = .Nil},
+        }
+
+        for a in args {
+            append(&m.args, a)
+        }
+
+        append(&s.methods, m)
+        append(&s.std_forwards, name)
+    }
+
+    add(
+        s,
+        snake,
+        "on_packet",
+        Arg{name = "id", type_text = "gd.Int", vi = vi_int},
+        Arg{name = "packet", type_text = "gd.Packed_Byte_Array", vi = vi_pba},
+    )
+    add(s, snake, "on_peer_left", Arg{name = "id", type_text = "gd.Int", vi = vi_int})
+    add(s, snake, "on_net_up")
+    add(s, snake, "on_net_down")
 }
 
 // The ordinary game shell already names every piece of its network stack as a
@@ -3093,56 +4165,66 @@ resolve_boot_forwards :: proc(s: ^Script) {
 // these names wins independently. That leaves an advanced game free to replace
 // just attach (custom ordering) while retaining the generated pump and detach.
 resolve_net_facade :: proc(s: ^Script, procs: map[string]Proc_Site) {
-	if s.boot_fields != 1 || s.session_fields != 1 || s.comms_fields != 1 {
-		return
-	}
-	has_lane :=
-		len(s.input_classes) > 0 ||
-		s.step.proc_name != "" ||
-		(s.step_auth.proc_name != "" && !s.step_boot)
-	if has_lane && s.lane_fields != 1 {
-		return
-	}
-	snake := to_snake(s.struct_name)
-	add :: proc(flag: ^bool, procs: map[string]Proc_Site, name: string) {
-		if _, hand := procs[name]; hand {
-			note_yield("game-network facade", name)
-			return
-		}
-		flag^ = true
-	}
-	add(&s.net_attach, procs, net_facade_name(snake, "attach"))
-	add(&s.net_pump, procs, net_facade_name(snake, "pump"))
-	add(&s.net_frame, procs, net_facade_name(snake, "frame"))
-	add(&s.net_detach, procs, net_facade_name(snake, "detach"))
+    if s.boot_fields != 1 || s.session_fields != 1 || s.comms_fields != 1 {
+        return
+    }
+
+    has_lane := len(s.input_classes) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot)
+
+    if has_lane && s.lane_fields != 1 {
+        return
+    }
+
+    snake := to_snake(s.struct_name)
+
+    add :: proc(flag: ^bool, procs: map[string]Proc_Site, name: string) {
+        if _, hand := procs[name]; hand {
+            note_yield("game-network facade", name)
+            return
+        }
+
+        flag^ = true
+    }
+
+    add(&s.net_attach, procs, net_facade_name(snake, "attach"))
+    add(&s.net_pump, procs, net_facade_name(snake, "pump"))
+    add(&s.net_frame, procs, net_facade_name(snake, "frame"))
+    add(&s.net_detach, procs, net_facade_name(snake, "detach"))
 }
 
-input_constraint_shape :: proc(
-	type_text: string
-) -> (
-	elem: string,
-	count: int,
-	fixed_array: bool
-) {
-	t := strings.trim_space(type_text)
-	if !strings.has_prefix(t, "[") {return t, 0, false}
-	rb := strings.index_byte(t, ']')
-	if rb <= 1 {return t, 0, false}
-	n, ok := strconv.parse_int(strings.trim_space(t[1:rb]))
-	if !ok || n <= 0 {return t, 0, false}
-	return strings.trim_space(t[rb + 1:]), n, true
+input_constraint_shape :: proc(type_text: string) -> (elem: string, count: int, fixed_array: bool) {
+    t := strings.trim_space(type_text)
+
+    if !strings.has_prefix(t, "[") {
+        return t, 0, false
+    }
+
+    rb := strings.index_byte(t, ']')
+
+    if rb <= 1 {
+        return t, 0, false
+    }
+
+    n, ok := strconv.parse_int(strings.trim_space(t[1:rb]))
+
+    if !ok || n <= 0 {
+        return t, 0, false
+    }
+
+    return strings.trim_space(t[rb + 1:]), n, true
 }
 
 input_integer_type :: proc(t: string) -> bool {
-	switch t {
-	case "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128":
-		return true
-	}
-	return false
+    switch t {
+    case "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128":
+        return true
+    }
+
+    return false
 }
 
 input_float_type :: proc(t: string) -> bool {
-	return t == "f16" || t == "f32" || t == "f64"
+    return t == "f16" || t == "f32" || t == "f64"
 }
 
 // Parse the gd tags on an @(gd_input) struct. Rules are deliberately field-
@@ -3151,151 +4233,172 @@ input_float_type :: proc(t: string) -> bool {
 // reject bytes with no legal authored meaning. A sample validator may still
 // add cross-field and game-state predicates after these generated rules.
 parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
-	if !def.input_decl {return nil}
-	if strings.trim_space(def.input_config) != "" {
-		error_at(
-			def.input_loc,
-			"%s: @(gd_input) is a marker with no value — put rules on fields, e.g. `move: [2]i8 `gd:\"range=-1:1\"``",
-			def.name
-		)
-	}
-	rules := make([dynamic]Input_Field_Constraint)
-	for f in def.fields {
-		value, has := tag_gd_value(f.tag)
-		if !has {continue}
-		rule := Input_Field_Constraint {
-			field     = f.name,
-			type_text = f.type_text
-		}
-		elem, count, is_array := input_constraint_shape(f.type_text)
-		if is_array {rule.array_len = count}
-		seen := false
-		for raw in strings.split(value, ",") {
-			tok := strings.trim_space(raw)
-			if tok == "" {continue}
-			switch {
-			case strings.has_prefix(tok, "range="):
-				if rule.range_min != "" {
-					error_at(f.loc, "%s.%s: duplicate input `range=` rule", def.name, f.name)
-					continue
-				}
-				bounds := strings.trim_space(tok[len("range="):])
-				colon := strings.index_byte(bounds, ':')
-				if colon <= 0 || colon == len(bounds) - 1 {
-					error_at(
-						f.loc,
-						"%s.%s: `range=` wants min:max, e.g. `gd:\"range=-1:1\"`",
-						def.name,
-						f.name
-					)
-					continue
-				}
-				lo := strings.trim_space(bounds[:colon])
-				hi := strings.trim_space(bounds[colon + 1:])
-				lo_num, lok := strconv.parse_f64(lo)
-				hi_num, hok := strconv.parse_f64(hi)
-				if !lok || !hok || lo_num > hi_num {
-					error_at(
-						f.loc,
-						"%s.%s: `range=` needs ordered numeric min:max bounds (got %q)",
-						def.name,
-						f.name,
-						bounds
-					)
-					continue
-				}
-				if !input_integer_type(elem) && !input_float_type(elem) {
-					error_at(
-						f.loc,
-						"%s.%s: `range=` supports fixed-width integer/float fields and fixed arrays of them (got %q)",
-						def.name,
-						f.name,
-						f.type_text
-					)
-					continue
-				}
-				rule.range_min, rule.range_max = lo, hi
-				seen = true
-			case strings.has_prefix(tok, "mask="):
-				if rule.mask != "" {
-					error_at(f.loc, "%s.%s: duplicate input `mask=` rule", def.name, f.name)
-					continue
-				}
-				mask := strings.trim_space(tok[len("mask="):])
-				_, mok := strconv.parse_int(mask)
-				if !mok || !input_integer_type(elem) {
-					error_at(
-						f.loc,
-						"%s.%s: `mask=` wants an integer bit mask on a fixed-width integer field, e.g. `gd:\"mask=0x03\"`",
-						def.name,
-						f.name
-					)
-					continue
-				}
-				rule.mask = mask
-				seen = true
-			case tok == "finite":
-				if !input_float_type(elem) {
-					error_at(
-						f.loc,
-						"%s.%s: `finite` supports float fields and fixed arrays of floats (got %q)",
-						def.name,
-						f.name,
-						f.type_text
-					)
-					continue
-				}
-				rule.finite = true
-				seen = true
-			case tok == "unit" || tok == "normalized":
-				if !is_array || count < 2 || count > 4 || (elem != "f32" && elem != "f64") {
-					error_at(
-						f.loc,
-						"%s.%s: `unit` wants [2]..[4]f32/f64; it rejects non-finite components and scales magnitudes above one (got %q)",
-						def.name,
-						f.name,
-						f.type_text
-					)
-					continue
-				}
-				rule.unit = true
-				seen = true
-			case tok == "enum":
-				if is_array ||
-				   input_integer_type(elem) ||
-				   input_float_type(elem) ||
-				   elem == "bool" {
-					error_at(
-						f.loc,
-						"%s.%s: `enum` wants a scalar enum field (got %q)",
-						def.name,
-						f.name,
-						f.type_text
-					)
-					continue
-				}
-				rule.enum_check = true
-				seen = true
-			case:
-				error_at(
-					f.loc,
-					"%s.%s: unknown @(gd_input) rule %q — use range=min:max, finite, unit, enum, or mask=bits",
-					def.name,
-					f.name,
-					tok
-				)
-			}
-		}
-		if seen {append(&rules, rule)}
-	}
-	if len(rules) == 0 {
-		error_at(
-			def.input_loc,
-			"%s: @(gd_input) declares no field rules — add `gd:\"range=min:max\"`, `finite`, `unit`, `enum`, or `mask=bits`; keep @(gd_sample=\"validate\") for cross-field predicates",
-			def.name
-		)
-	}
-	return rules[:]
+    if !def.input_decl {
+        return nil
+    }
+
+    if strings.trim_space(def.input_config) != "" {
+        error_at(
+            def.input_loc,
+            "%s: @(gd_input) is a marker with no value — put rules on fields, e.g. `move: [2]i8 `gd:\"range=-1:1\"``",
+            def.name,
+        )
+    }
+
+    rules := make([dynamic]Input_Field_Constraint)
+
+    for f in def.fields {
+        value, has := tag_gd_value(f.tag)
+
+        if !has {
+            continue
+        }
+
+        rule := Input_Field_Constraint {
+            field     = f.name,
+            type_text = f.type_text,
+        }
+        elem, count, is_array := input_constraint_shape(f.type_text)
+
+        if is_array {
+            rule.array_len = count
+        }
+
+        seen := false
+
+        for raw in strings.split(value, ",") {
+            tok := strings.trim_space(raw)
+
+            if tok == "" {
+                continue
+            }
+
+            switch {
+            case strings.has_prefix(tok, "range="):
+                if rule.range_min != "" {
+                    error_at(f.loc, "%s.%s: duplicate input `range=` rule", def.name, f.name)
+                    continue
+                }
+
+                bounds := strings.trim_space(tok[len("range="):])
+                colon := strings.index_byte(bounds, ':')
+
+                if colon <= 0 || colon == len(bounds) - 1 {
+                    error_at(f.loc, "%s.%s: `range=` wants min:max, e.g. `gd:\"range=-1:1\"`", def.name, f.name)
+                    continue
+                }
+
+                lo := strings.trim_space(bounds[:colon])
+                hi := strings.trim_space(bounds[colon + 1:])
+                lo_num, lok := strconv.parse_f64(lo)
+                hi_num, hok := strconv.parse_f64(hi)
+
+                if !lok || !hok || lo_num > hi_num {
+                    error_at(
+                        f.loc,
+                        "%s.%s: `range=` needs ordered numeric min:max bounds (got %q)",
+                        def.name,
+                        f.name,
+                        bounds,
+                    )
+                    continue
+                }
+
+                if !input_integer_type(elem) && !input_float_type(elem) {
+                    error_at(
+                        f.loc,
+                        "%s.%s: `range=` supports fixed-width integer/float fields and fixed arrays of them (got %q)",
+                        def.name,
+                        f.name,
+                        f.type_text,
+                    )
+                    continue
+                }
+
+                rule.range_min, rule.range_max = lo, hi
+                seen = true
+            case strings.has_prefix(tok, "mask="):
+                if rule.mask != "" {
+                    error_at(f.loc, "%s.%s: duplicate input `mask=` rule", def.name, f.name)
+                    continue
+                }
+
+                mask := strings.trim_space(tok[len("mask="):])
+                _, mok := strconv.parse_int(mask)
+
+                if !mok || !input_integer_type(elem) {
+                    error_at(
+                        f.loc,
+                        "%s.%s: `mask=` wants an integer bit mask on a fixed-width integer field, e.g. `gd:\"mask=0x03\"`",
+                        def.name,
+                        f.name,
+                    )
+                    continue
+                }
+
+                rule.mask = mask
+                seen = true
+            case tok == "finite":
+                if !input_float_type(elem) {
+                    error_at(
+                        f.loc,
+                        "%s.%s: `finite` supports float fields and fixed arrays of floats (got %q)",
+                        def.name,
+                        f.name,
+                        f.type_text,
+                    )
+                    continue
+                }
+
+                rule.finite = true
+                seen = true
+            case tok == "unit" || tok == "normalized":
+                if !is_array || count < 2 || count > 4 || (elem != "f32" && elem != "f64") {
+                    error_at(
+                        f.loc,
+                        "%s.%s: `unit` wants [2]..[4]f32/f64; it rejects non-finite components and scales magnitudes above one (got %q)",
+                        def.name,
+                        f.name,
+                        f.type_text,
+                    )
+                    continue
+                }
+
+                rule.unit = true
+                seen = true
+            case tok == "enum":
+                if is_array || input_integer_type(elem) || input_float_type(elem) || elem == "bool" {
+                    error_at(f.loc, "%s.%s: `enum` wants a scalar enum field (got %q)", def.name, f.name, f.type_text)
+                    continue
+                }
+
+                rule.enum_check = true
+                seen = true
+            case:
+                error_at(
+                    f.loc,
+                    "%s.%s: unknown @(gd_input) rule %q — use range=min:max, finite, unit, enum, or mask=bits",
+                    def.name,
+                    f.name,
+                    tok,
+                )
+            }
+        }
+
+        if seen {
+            append(&rules, rule)
+        }
+    }
+
+    if len(rules) == 0 {
+        error_at(
+            def.input_loc,
+            "%s: @(gd_input) declares no field rules — add `gd:\"range=min:max\"`, `finite`, `unit`, `enum`, or `mask=bits`; keep @(gd_sample=\"validate\") for cross-field predicates",
+            def.name,
+        )
+    }
+
+    return rules[:]
 }
 
 // Resolve the package's lane authoring surface, module-wide:
@@ -3307,168 +4410,249 @@ parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
 //   - @(gd_sample)/@(gd_step) live on ONE class — the game whose gen file
 //     carries `<snake>_lane_init`.
 resolve_sim :: proc(scripts: []^Script) {
-	// The distinct input types across every tick in the package.
-	types: [dynamic]string
-	defer delete(types)
-	for s in scripts {
-		if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
-		seen := false
-		for e in types {
-			if e == s.tick.input_type {seen = true; break}
-		}
-		if !seen {append(&types, s.tick.input_type)}
-	}
-	slice.sort(types[:]) // stable ids: all peers rebuild together, so self-consistent is enough
+    // The distinct input types across every tick in the package.
+    types: [dynamic]string
+    defer delete(types)
 
-	// Annotate each input-driven tick with the wire class its input rides.
-	for s in scripts {
-		if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
-		for ty, i in types {
-			if ty == s.tick.input_type {
-				s.tick.input_class = i
-				break
-			}
-		}
-	}
+    for s in scripts {
+        if s.tick.proc_name == "" || s.tick.input_type == "" {
+            continue
+        }
 
-	// A package with no @(gd_tick) classes has no lane — an authority pass
-	// there is the COOP game's fixed step, and it routes through the BOOT
-	// accumulator instead: generate `<snake>_step(self, ticks)` (role gate +
-	// same-frame edge pass inside), not lane wiring. The declaration is the
-	// same either way — promoting a coop game to the sim lane just re-routes it.
-	any_ticks := false
-	for s in scripts {
-		if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
-			any_ticks = true
-			break
-		}
-	}
+        seen := false
 
-	// One lane owner per package: the class carrying @(gd_sample)/@(gd_step).
-	// Its gen file gets <snake>_lane_init and every class registration.
-	owner: ^Script
-	for s in scripts {
-		if len(s.samples) == 0 && s.step.proc_name == "" && s.step_auth.proc_name == "" {continue}
-		if !any_ticks && len(s.samples) == 0 && s.step.proc_name == "" {
-			// The boot-routed coop authority step.
-			loc := Loc{path = s.path, line = s.step_auth.line}
-			snake := to_snake(s.struct_name)
-			if s.boot_field == "" {
-				error_at(
-					loc,
-					"%s: @(gd_step=\"authority\") in a package with no @(gd_tick) classes rides the boot loop — %s needs a kboot.Boot field for the generated %s_step to gate on (or add the lane surface)",
-					s.step_auth.proc_name, s.struct_name, snake
-				)
-			} else if s.step_auth.wants_tick {
-				error_at(
-					loc,
-					"%s: the boot-routed authority step is (self: ^%s) — there is no lane tick in the coop loop; count ticks in your own field (tag it gd:\"backup\" so a takeover resumes the count)",
-					s.step_auth.proc_name, s.struct_name
-				)
-			} else if s.step_auth.proc_name == fmt.tprintf("%s_step", snake) {
-				error_at(
-					loc,
-					"%s: `%s_step` is the GENERATED wrapper's name (the role-gated per-frame call) — rename the authored pass (e.g. %s_host_tick)",
-					s.step_auth.proc_name, snake, snake
-				)
-			} else {
-				s.step_boot = true
-			}
-			continue
-		}
-		if owner != nil {
-			line := max(s.step.line, s.step_auth.line)
-			if len(s.samples) > 0 {line = max(line, s.samples[0].line)}
-			error_at(
-				Loc{path = s.path, line = line},
-				"%s declares @(gd_sample)/@(gd_step), but %s already does — one lane per package; a second lane is the hand-driven lane_set_sim's job",
-				s.struct_name, owner.struct_name
-			)
-			continue
-		}
-		owner = s
-	}
-	if owner == nil {return}
+        for e in types {
+            if e == s.tick.input_type {
+                seen = true
+                break
+            }
+        }
 
-	// Pair each class with the sample that fills it (matched by input type). A
-	// class with no sample is legal — those entities coast until owned, and the
-	// wire registration takes a nil sample.
-	for t, i in types {
-		info := Input_Class_Info{class_id = i, type_name = t
-		}
-		// Input declarations are package types, like the field-by-field input
-		// fingerprint below. Unmarked structs keep the existing manual-validator
-		// path; marking one opts into generated constraints.
-		dir := dir_of(owner.path)
-		index_pkg_dir(dir)
-		if pkg, pok := g_pkgs[dir]; pok {
-			if def, dok := pkg[t]; dok && def.input_decl {
-				info.constraints = parse_input_constraints(def)
-			}}
-		for sm in owner.samples {
-			if sm.input_type == t {
-				info.sample = sm.proc_name
-				info.validate = sm.validate
-				info.line = sm.line
-				break
-			}
-		}
-		append(&owner.input_classes, info)
-	}
+        if !seen {
+            append(&types, s.tick.input_type)
+        }
+    }
 
-	// No orphan samples: a @(gd_sample) writing a struct no @(gd_tick) reads
-	// would feed nobody — the build error the single-input lane always raised.
-	for sm in owner.samples {
-		is_tick_input := false
-		for t in types {
-			if t == sm.input_type {is_tick_input = true; break}
-		}
-		if !is_tick_input {
-			error_at(
-				Loc{path = owner.path, line = sm.line},
-				"%s: @(gd_sample) writes %s, but no @(gd_tick) in the package takes that input — the sample would feed nobody",
-				sm.proc_name, sm.input_type
-			)
-		}
-	}
+    slice.sort(types[:]) // stable ids: all peers rebuild together, so self-consistent is enough
+
+    // Annotate each input-driven tick with the wire class its input rides.
+    for s in scripts {
+        if s.tick.proc_name == "" || s.tick.input_type == "" {
+            continue
+        }
+
+        for ty, i in types {
+            if ty == s.tick.input_type {
+                s.tick.input_class = i
+                break
+            }
+        }
+    }
+
+    // A package with no @(gd_tick) classes has no lane — an authority pass
+    // there is the COOP game's fixed step, and it routes through the BOOT
+    // accumulator instead: generate `<snake>_step(self, ticks)` (role gate +
+    // same-frame edge pass inside), not lane wiring. The declaration is the
+    // same either way — promoting a coop game to the sim lane just re-routes it.
+    any_ticks := false
+
+    for s in scripts {
+        if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
+            any_ticks = true
+            break
+        }
+    }
+
+    // One lane owner per package: the class carrying @(gd_sample)/@(gd_step).
+    // Its gen file gets <snake>_lane_init and every class registration.
+    owner: ^Script
+
+    for s in scripts {
+        if len(s.samples) == 0 && s.step.proc_name == "" && s.step_auth.proc_name == "" {
+            continue
+        }
+
+        if !any_ticks && len(s.samples) == 0 && s.step.proc_name == "" {
+            // The boot-routed coop authority step.
+            loc := Loc {
+                path = s.path,
+                line = s.step_auth.line,
+            }
+            snake := to_snake(s.struct_name)
+
+            if s.boot_field == "" {
+                error_at(
+                    loc,
+                    "%s: @(gd_step=\"authority\") in a package with no @(gd_tick) classes rides the boot loop — %s needs a kboot.Boot field for the generated %s_step to gate on (or add the lane surface)",
+                    s.step_auth.proc_name,
+                    s.struct_name,
+                    snake,
+                )
+            } else if s.step_auth.wants_tick {
+                error_at(
+                    loc,
+                    "%s: the boot-routed authority step is (self: ^%s) — there is no lane tick in the coop loop; count ticks in your own field (tag it gd:\"backup\" so a takeover resumes the count)",
+                    s.step_auth.proc_name,
+                    s.struct_name,
+                )
+            } else if s.step_auth.proc_name == fmt.tprintf("%s_step", snake) {
+                error_at(
+                    loc,
+                    "%s: `%s_step` is the GENERATED wrapper's name (the role-gated per-frame call) — rename the authored pass (e.g. %s_host_tick)",
+                    s.step_auth.proc_name,
+                    snake,
+                    snake,
+                )
+            } else {
+                s.step_boot = true
+            }
+
+            continue
+        }
+
+        if owner != nil {
+            line := max(s.step.line, s.step_auth.line)
+
+            if len(s.samples) > 0 {
+                line = max(line, s.samples[0].line)
+            }
+
+            error_at(
+                Loc{path = s.path, line = line},
+                "%s declares @(gd_sample)/@(gd_step), but %s already does — one lane per package; a second lane is the hand-driven lane_set_sim's job",
+                s.struct_name,
+                owner.struct_name,
+            )
+            continue
+        }
+
+        owner = s
+    }
+
+    if owner == nil {
+        return
+    }
+
+    // Pair each class with the sample that fills it (matched by input type). A
+    // class with no sample is legal — those entities coast until owned, and the
+    // wire registration takes a nil sample.
+    for t, i in types {
+        info := Input_Class_Info {
+            class_id  = i,
+            type_name = t,
+        }
+        // Input declarations are package types, like the field-by-field input
+        // fingerprint below. Unmarked structs keep the existing manual-validator
+        // path; marking one opts into generated constraints.
+        dir := dir_of(owner.path)
+        index_pkg_dir(dir)
+
+        if pkg, pok := g_pkgs[dir]; pok {
+            if def, dok := pkg[t]; dok && def.input_decl {
+                info.constraints = parse_input_constraints(def)
+            }
+        }
+
+        for sm in owner.samples {
+            if sm.input_type == t {
+                info.sample = sm.proc_name
+                info.validate = sm.validate
+                info.line = sm.line
+                break
+            }
+        }
+
+        append(&owner.input_classes, info)
+    }
+
+    // No orphan samples: a @(gd_sample) writing a struct no @(gd_tick) reads
+    // would feed nobody — the build error the single-input lane always raised.
+    for sm in owner.samples {
+        is_tick_input := false
+
+        for t in types {
+            if t == sm.input_type {
+                is_tick_input = true
+                break
+            }
+        }
+
+        if !is_tick_input {
+            error_at(
+                Loc{path = owner.path, line = sm.line},
+                "%s: @(gd_sample) writes %s, but no @(gd_tick) in the package takes that input — the sample would feed nobody",
+                sm.proc_name,
+                sm.input_type,
+            )
+        }
+    }
 }
 
 // A `@(gd_event)` declaration found in the package scan. Collected by
 // ATTRIBUTE, not suffix, so a misnamed declaration surfaces as a build error
 // instead of a proc that silently never fires.
 Fact_Candidate :: struct {
-	path: string,
-	line: int,
-	src:  string,
-	name: string,
-	pt:   ^ast.Proc_Type,
-	vd:   ^ast.Value_Decl
+    path: string,
+    line: int,
+    src:  string,
+    name: string,
+    pt:   ^ast.Proc_Type,
+    vd:   ^ast.Value_Decl,
 }
 
 scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: ^ast.File) {
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok {continue}
-		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-		if !is_proc {continue}
-		name_ident, _ := vd.names[0].derived.(^ast.Ident)
-		if name_ident == nil {continue}
-		if has_attr(vd, "gd_cue") || has_attr(vd, "gd_fact") {
-			error_at(
-				Loc{path = path, line = name_ident.pos.line},
-				"%s: gd_cue and gd_fact were removed; declare this presentation occurrence with @(gd_event)",
-				name_ident.name,
-			)
-			continue
-		}
-		if !has_attr(vd, "gd_event") {continue}
-		if pl.type == nil {continue}
-		append(out, Fact_Candidate{
-			path = path, line = name_ident.pos.line, src = src,
-			name = name_ident.name, pt = pl.type, vd = vd
-		})
-	}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
+
+        if !ok {
+            continue
+        }
+
+        if len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
+
+        pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+
+        if !is_proc {
+            continue
+        }
+
+        name_ident, _ := vd.names[0].derived.(^ast.Ident)
+
+        if name_ident == nil {
+            continue
+        }
+
+        if has_attr(vd, "gd_cue") || has_attr(vd, "gd_fact") {
+            error_at(
+                Loc{path = path, line = name_ident.pos.line},
+                "%s: gd_cue and gd_fact were removed; declare this presentation occurrence with @(gd_event)",
+                name_ident.name,
+            )
+            continue
+        }
+
+        if !has_attr(vd, "gd_event") {
+            continue
+        }
+
+        if pl.type == nil {
+            continue
+        }
+
+        append(
+            out,
+            Fact_Candidate {
+                path = path,
+                line = name_ident.pos.line,
+                src = src,
+                name = name_ident.name,
+                pt = pl.type,
+                vd = vd,
+            },
+        )
+    }
 }
 
 
@@ -3485,61 +4669,82 @@ scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: 
 // call, so a stray half surfaces as an undeclared-name error at the call
 // site, never a silent no-fire).
 resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	if s.boot_field == "" {
-		return
-	}
-	snake := to_snake(s.struct_name)
-	for ev, ei in SESSION_EVENTS {
-		bare_name := fmt.tprintf("%s_%s", snake, ev.suffix)
-		then_name := fmt.tprintf("%s_then", bare_name)
-		half := Event_Half{ev = ei}
-		// The `_then` is only DEMANDED on a two-role event. On a one-role one
-		// the declared form is refused outright below (that role never hears
-		// it), so @(gd_half) is not the fix there and naming it would send the
-		// author into a different error to learn the real answer.
-		if ev.role == .Every {
-			demand_half(procs, then_name, fmt.tprintf("the %s shell's authority-only ksess.%s half", s.struct_name, ev.variant))
-		}
-		if cand, found := idx[bare_name]; found {
-			cand.claimed = true
-			idx[bare_name] = cand
-			if check_event_half(s, ev, bare_name, cand) {
-				half.bare = bare_name
-			}
-		} else {
-			demand_half(procs, bare_name, fmt.tprintf("the %s shell's ksess.%s half", s.struct_name, ev.variant))
-		}
-		if cand, found := idx[then_name]; found {
-			// Claimed either way — a `_then` on a one-role event is a REAL
-			// pairing attempt at a half that cannot exist, and saying which
-			// role never hears it beats the unpaired-half fallback listing
-			// every other name on the shell.
-			cand.claimed = true
-			idx[then_name] = cand
-			loc := Loc{path = cand.path, line = cand.line}
-			switch ev.role {
-			case .Client:
-				error_at(
-					loc,
-					"%s: ksess.%s never reaches the authority — there is no `_then` half; react in %s",
-					then_name, ev.variant, bare_name
-				)
-			case .Host:
-				error_at(
-					loc,
-					"%s: ksess.%s is already authority-only — declare %s (the bare half) instead",
-					then_name, ev.variant, bare_name
-				)
-			case .Every:
-				if check_event_half(s, ev, then_name, cand) {
-					half.then_proc = then_name
-				}
-			}
-		}
-		if half.bare != "" || half.then_proc != "" {
-			append(&s.event_halves, half)
-		}
-	}
+    if s.boot_field == "" {
+        return
+    }
+
+    snake := to_snake(s.struct_name)
+
+    for ev, ei in SESSION_EVENTS {
+        bare_name := fmt.tprintf("%s_%s", snake, ev.suffix)
+        then_name := fmt.tprintf("%s_then", bare_name)
+        half := Event_Half {
+            ev = ei,
+        }
+
+        // The `_then` is only DEMANDED on a two-role event. On a one-role one
+        // the declared form is refused outright below (that role never hears
+        // it), so @(gd_half) is not the fix there and naming it would send the
+        // author into a different error to learn the real answer.
+        if ev.role == .Every {
+            demand_half(
+                procs,
+                then_name,
+                fmt.tprintf("the %s shell's authority-only ksess.%s half", s.struct_name, ev.variant),
+            )
+        }
+
+        if cand, found := idx[bare_name]; found {
+            cand.claimed = true
+            idx[bare_name] = cand
+
+            if check_event_half(s, ev, bare_name, cand) {
+                half.bare = bare_name
+            }
+        } else {
+            demand_half(procs, bare_name, fmt.tprintf("the %s shell's ksess.%s half", s.struct_name, ev.variant))
+        }
+
+        if cand, found := idx[then_name]; found {
+            // Claimed either way — a `_then` on a one-role event is a REAL
+            // pairing attempt at a half that cannot exist, and saying which
+            // role never hears it beats the unpaired-half fallback listing
+            // every other name on the shell.
+            cand.claimed = true
+            idx[then_name] = cand
+            loc := Loc {
+                path = cand.path,
+                line = cand.line,
+            }
+
+            switch ev.role {
+            case .Client:
+                error_at(
+                    loc,
+                    "%s: ksess.%s never reaches the authority — there is no `_then` half; react in %s",
+                    then_name,
+                    ev.variant,
+                    bare_name,
+                )
+            case .Host:
+                error_at(
+                    loc,
+                    "%s: ksess.%s is already authority-only — declare %s (the bare half) instead",
+                    then_name,
+                    ev.variant,
+                    bare_name,
+                )
+            case .Every:
+                if check_event_half(s, ev, then_name, cand) {
+                    half.then_proc = then_name
+                }
+            }
+        }
+
+        if half.bare != "" || half.then_proc != "" {
+            append(&s.event_halves, half)
+        }
+    }
 }
 
 // One event half's contract: a plain proc, `(self: ^Game, <the event's
@@ -3547,49 +4752,74 @@ resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate, proc
 // struct's fields through positionally.
 @(private = "file")
 check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Half_Candidate) -> bool {
-	loc := Loc{path = cand.path, line = cand.line}
-	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
-		error_at(loc, "%s must be a plain proc — the generated %s_events dispatch calls it, it is never registered", name, to_snake(s.struct_name))
-		return false
-	}
-	base_of :: proc(t: string) -> string {
-		b := t
-		if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
-		return b
-	}
-	types := make([dynamic]string, context.temp_allocator)
-	if cand.pt.params != nil {
-		for f in cand.pt.params.list {
-			t := strings.trim_space(node_text(cand.src, f.type))
-			for _ in 0 ..< max(1, len(f.names)) {
-				append(&types, t)
-			}
-		}
-	}
-	ok := len(types) == 1 + len(ev.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
-	if ok {
-		for p, i in ev.params {
-			if base_of(types[1 + i]) != base_of(p.type_) {
-				ok = false
-				break
-			}
-		}
-	}
-	if !ok || cand.pt.results != nil {
-		shape := strings.builder_make(context.temp_allocator)
-		fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
-		for p in ev.params {
-			fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
-		}
-		strings.write_string(&shape, ")")
-		error_at(
-			loc,
-			"%s: the shape is %s, no results — the generated dispatch passes ksess.%s's fields through",
-			name, strings.to_string(shape), ev.variant
-		)
-		return false
-	}
-	return true
+    loc := Loc {
+        path = cand.path,
+        line = cand.line,
+    }
+
+    if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+        error_at(
+            loc,
+            "%s must be a plain proc — the generated %s_events dispatch calls it, it is never registered",
+            name,
+            to_snake(s.struct_name),
+        )
+        return false
+    }
+
+    base_of :: proc(t: string) -> string {
+        b := t
+
+        if j := strings.last_index(b, "."); j >= 0 {
+            b = b[j + 1:]
+        }
+
+        return b
+    }
+
+    types := make([dynamic]string, context.temp_allocator)
+
+    if cand.pt.params != nil {
+        for f in cand.pt.params.list {
+            t := strings.trim_space(node_text(cand.src, f.type))
+
+            for _ in 0 ..< max(1, len(f.names)) {
+                append(&types, t)
+            }
+        }
+    }
+
+    ok := len(types) == 1 + len(ev.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
+
+    if ok {
+        for p, i in ev.params {
+            if base_of(types[1 + i]) != base_of(p.type_) {
+                ok = false
+                break
+            }
+        }
+    }
+
+    if !ok || cand.pt.results != nil {
+        shape := strings.builder_make(context.temp_allocator)
+        fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
+
+        for p in ev.params {
+            fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
+        }
+
+        strings.write_string(&shape, ")")
+        error_at(
+            loc,
+            "%s: the shape is %s, no results — the generated dispatch passes ksess.%s's fields through",
+            name,
+            strings.to_string(shape),
+            ev.variant,
+        )
+        return false
+    }
+
+    return true
 }
 
 // Pair a game shell's MIGRATION halves — kboot.boot_migration's four seams
@@ -3599,84 +4829,109 @@ check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Half_Ca
 // `<snake>_events` tail drains the kit's noted succession, so no fork, no
 // wipe, no chase cap survives in game code.
 resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	if s.boot_field == "" {
-		return
-	}
-	snake := to_snake(s.struct_name)
-	slots := [?]^string{&s.succ_backup, &s.succ_took_over, &s.succ_wiped, &s.succ_migrating}
-	for spec, i in MIGRATION_HALVES {
-		name := fmt.tprintf("%s_%s", snake, spec.suffix)
-		if cand, found := idx[name]; found {
-			cand.claimed = true
-			idx[name] = cand
-			if check_migration_half(s, spec, name, cand) {
-				slots[i]^ = strings.clone(name)
-			}
-		} else {
-			demand_half(procs, name, fmt.tprintf("the %s shell's %q migration seam", s.struct_name, spec.suffix))
-		}
-		// No demand on the `_then`: migration seams have no two-role form, so
-		// the declared version is refused below and @(gd_half) is never its fix.
-		then_name := fmt.tprintf("%s_then", name)
-		if cand, found := idx[then_name]; found {
-			cand.claimed = true
-			idx[then_name] = cand
-			error_at(
-				Loc{path = cand.path, line = cand.line},
-				"%s: migration halves have no `_then` — %s already runs on its fixed role (backup/took_over on the authority, wiped/migrating wherever the dance lands)",
-				then_name, name
-			)
-		}
-	}
+    if s.boot_field == "" {
+        return
+    }
+
+    snake := to_snake(s.struct_name)
+    slots := [?]^string{&s.succ_backup, &s.succ_took_over, &s.succ_wiped, &s.succ_migrating}
+
+    for spec, i in MIGRATION_HALVES {
+        name := fmt.tprintf("%s_%s", snake, spec.suffix)
+
+        if cand, found := idx[name]; found {
+            cand.claimed = true
+            idx[name] = cand
+
+            if check_migration_half(s, spec, name, cand) {
+                slots[i]^ = strings.clone(name)
+            }
+        } else {
+            demand_half(procs, name, fmt.tprintf("the %s shell's %q migration seam", s.struct_name, spec.suffix))
+        }
+
+        // No demand on the `_then`: migration seams have no two-role form, so
+        // the declared version is refused below and @(gd_half) is never its fix.
+        then_name := fmt.tprintf("%s_then", name)
+
+        if cand, found := idx[then_name]; found {
+            cand.claimed = true
+            idx[then_name] = cand
+            error_at(
+                Loc{path = cand.path, line = cand.line},
+                "%s: migration halves have no `_then` — %s already runs on its fixed role (backup/took_over on the authority, wiped/migrating wherever the dance lands)",
+                then_name,
+                name,
+            )
+        }
+    }
 }
 
 // One migration half's contract: a plain proc, `(self: ^Game, <the seam's
 // params>)` exactly, no results — kboot calls it through the generated table.
 @(private = "file")
 check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string, cand: Half_Candidate) -> bool {
-	loc := Loc{path = cand.path, line = cand.line}
-	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
-		error_at(loc, "%s must be a plain proc — kboot.boot_migration's generated table calls it, it is never registered", name)
-		return false
-	}
-	base_of :: proc(t: string) -> string {
-		b := t
-		if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
-		return b
-	}
-	types := make([dynamic]string, context.temp_allocator)
-	if cand.pt.params != nil {
-		for f in cand.pt.params.list {
-			t := strings.trim_space(node_text(cand.src, f.type))
-			for _ in 0 ..< max(1, len(f.names)) {
-				append(&types, t)
-			}
-		}
-	}
-	ok := len(types) == 1 + len(spec.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
-	if ok {
-		for p, i in spec.params {
-			if base_of(types[1 + i]) != base_of(p.type_) {
-				ok = false
-				break
-			}
-		}
-	}
-	if !ok || cand.pt.results != nil {
-		shape := strings.builder_make(context.temp_allocator)
-		fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
-		for p in spec.params {
-			fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
-		}
-		strings.write_string(&shape, ")")
-		error_at(
-			loc,
-			"%s: the shape is %s, no results — %s",
-			name, strings.to_string(shape), spec.what
-		)
-		return false
-	}
-	return true
+    loc := Loc {
+        path = cand.path,
+        line = cand.line,
+    }
+
+    if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+        error_at(
+            loc,
+            "%s must be a plain proc — kboot.boot_migration's generated table calls it, it is never registered",
+            name,
+        )
+        return false
+    }
+
+    base_of :: proc(t: string) -> string {
+        b := t
+
+        if j := strings.last_index(b, "."); j >= 0 {
+            b = b[j + 1:]
+        }
+
+        return b
+    }
+
+    types := make([dynamic]string, context.temp_allocator)
+
+    if cand.pt.params != nil {
+        for f in cand.pt.params.list {
+            t := strings.trim_space(node_text(cand.src, f.type))
+
+            for _ in 0 ..< max(1, len(f.names)) {
+                append(&types, t)
+            }
+        }
+    }
+
+    ok := len(types) == 1 + len(spec.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
+
+    if ok {
+        for p, i in spec.params {
+            if base_of(types[1 + i]) != base_of(p.type_) {
+                ok = false
+                break
+            }
+        }
+    }
+
+    if !ok || cand.pt.results != nil {
+        shape := strings.builder_make(context.temp_allocator)
+        fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
+
+        for p in spec.params {
+            fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
+        }
+
+        strings.write_string(&shape, ")")
+        error_at(loc, "%s: the shape is %s, no results — %s", name, strings.to_string(shape), spec.what)
+        return false
+    }
+
+    return true
 }
 
 // Pair a SIM-lane verb with its `<verb>_apply` half: the predicted-effect
@@ -3687,57 +4942,87 @@ check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string
 // exists. Declaring one on a class that doesn't tick is a build error: the
 // half IS the resim's property.
 resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	ticks := s.tick.proc_name != "" || len(s.block_ticks) > 0
-	for &c in s.commands {
-		name := fmt.tprintf("%s_apply", c.proc_name)
-		cand, found := idx[name]
-		if !found {
-			demand_half(procs, name, fmt.tprintf("%s's predicted effect, replayed by the sim lane's resim", c.proc_name))
-			continue
-		}
-		loc := Loc{path = cand.path, line = cand.line}
-		if !ticks {
-			error_at(
-				loc,
-				"%s pairs a TICKING class's verb — %s doesn't tick, so its commands ride the knet loop and revert whole; predicted effects need the sim lane",
-				name, s.struct_name
-			)
-			continue
-		}
-		cand.claimed = true
-		idx[name] = cand
-		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
-			error_at(loc, "%s must be a plain proc — the generated verb thunk calls it, it is never registered", name)
-			continue
-		}
-		types := make([dynamic]string, context.temp_allocator)
-		if cand.pt.params != nil {
-			for f in cand.pt.params.list {
-				txt := strings.trim_space(node_text(cand.src, f.type))
-				for _ in 0 ..< max(1, len(f.names)) {
-					append(&types, txt)
-				}
-			}
-		}
-		ok := len(types) == 1 + len(c.args) && types[0] == fmt.tprintf("^%s", s.struct_name)
-		if ok {
-			for a, i in c.args {
-				if types[1 + i] != a.type_text {
-					ok = false
-					break
-				}
-			}
-		}
-		if !ok || cand.pt.results != nil {
-			error_at(
-				loc,
-				"%s: the shape is (self: ^%s, <%s's wire args>) with no results — resims re-run it with the LEDGERED args; facts belong to the verb",
-				name, s.struct_name, c.proc_name
-			)
-			continue
-		}
-		c.apply_proc = name
-	}
+    ticks := s.tick.proc_name != "" || len(s.block_ticks) > 0
+
+    for &c in s.commands {
+        name := fmt.tprintf("%s_apply", c.proc_name)
+        cand, found := idx[name]
+
+        if !found {
+            demand_half(
+                procs,
+                name,
+                fmt.tprintf("%s's predicted effect, replayed by the sim lane's resim", c.proc_name),
+            )
+            continue
+        }
+
+        loc := Loc {
+            path = cand.path,
+            line = cand.line,
+        }
+
+        if !ticks {
+            error_at(
+                loc,
+                "%s pairs a TICKING class's verb — %s doesn't tick, so its commands ride the knet loop and revert whole; predicted effects need the sim lane",
+                name,
+                s.struct_name,
+            )
+            continue
+        }
+
+        cand.claimed = true
+        idx[name] = cand
+
+        if has_attr(cand.vd, "gd_command") ||
+           has_attr(cand.vd, "gd_method") ||
+           has_attr(cand.vd, "gd_rpc") ||
+           has_attr(cand.vd, "gd_tick") {
+            error_at(
+                loc,
+                "%s must be a plain proc — the generated verb thunk calls it, it is never registered",
+                name,
+            )
+            continue
+        }
+
+        types := make([dynamic]string, context.temp_allocator)
+
+        if cand.pt.params != nil {
+            for f in cand.pt.params.list {
+                txt := strings.trim_space(node_text(cand.src, f.type))
+
+                for _ in 0 ..< max(1, len(f.names)) {
+                    append(&types, txt)
+                }
+            }
+        }
+
+        ok := len(types) == 1 + len(c.args) && types[0] == fmt.tprintf("^%s", s.struct_name)
+
+        if ok {
+            for a, i in c.args {
+                if types[1 + i] != a.type_text {
+                    ok = false
+                    break
+                }
+            }
+        }
+
+        if !ok || cand.pt.results != nil {
+            error_at(
+                loc,
+                "%s: the shape is (self: ^%s, <%s's wire args>) with no results — resims re-run it with the LEDGERED args; facts belong to the verb",
+                name,
+                s.struct_name,
+                c.proc_name,
+            )
+            continue
+        }
+
+        c.apply_proc = name
+    }
 }
 
 // Pair a script's @(gd_tick) with its name-paired halves and validate the
@@ -3755,66 +5040,85 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, pro
 // param TYPES are the compiler's to hold — the call site passes the tick's
 // returned values straight through.
 resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	if s.tick.proc_name == "" {
-		return
-	}
-	then_name := fmt.tprintf("%s_then", s.tick.proc_name)
-	fx_name := fmt.tprintf("%s_fx", s.tick.proc_name)
-	// Both asked, never short-circuited: forgetting the attribute on one half
-	// says nothing about the other, and hearing about only one would cost a
-	// second build to learn the rest.
-	undeclared := demand_half(procs, then_name, fmt.tprintf("%s's authority consequence", s.tick.proc_name))
-	if demand_half(procs, fx_name, fmt.tprintf("%s's owning-peer presentation", s.tick.proc_name)) {undeclared = true}
-	if game, _, ok := claim_tick_half(s, idx, then_name, true); ok {
-		s.tick.then_proc = then_name
-		s.tick.then_game = game
-	}
-	if game, mine, ok := claim_tick_half(s, idx, fx_name, false); ok {
-		s.tick.fx_proc = fx_name
-		s.tick.fx_game = game
-		s.tick.fx_mine = mine
-		if mine {
-			// The every-screen form: the fact tuple crosses the wire to
-			// watching screens, so every fact must be a wire primitive, and
-			// at least one must be a bool — the EVENT trigger (the tuple
-			// broadcasts on any tick a bool fact is true).
-			cand := idx[fx_name]
-			loc := Loc{path = cand.path, line = cand.line}
-			bools := 0
-			for ptype in s.tick.payload_types {
-				wire, _, wok := command_wire_type(ptype)
-				if !wok {
-					error_at(
-						loc,
-						"%s declares `mine` — the tick's facts cross the wire to watching screens, and %q is not a wire primitive (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
-						fx_name, ptype
-					)
-					continue
-				}
-				if wire == "bool" {
-					bools += 1
-				}
-				append(&s.tick.payload_wires, wire)
-			}
-			if bools == 0 {
-				error_at(
-					loc,
-					"%s declares `mine` but the tick returns no bool fact — a bool is the event trigger: the fact tuple broadcasts on any tick a bool fact is true",
-					fx_name
-				)
-			}
-		}
-	}
-	// `undeclared` stands the warning down: a half that exists and forgot to say
-	// so is already an error naming the same proc, and "nothing consumes the
-	// payload" would only argue for writing what is sitting right there.
-	if s.tick.payload_count > 0 && !undeclared && s.tick.then_proc == "" && s.tick.fx_proc == "" {
-		warn_at(
-			Loc{path = s.path, line = s.tick.line},
-			"tick %s returns a payload but neither `%s` nor `%s` consumes it",
-			s.tick.proc_name, then_name, fx_name
-		)
-	}
+    if s.tick.proc_name == "" {
+        return
+    }
+
+    then_name := fmt.tprintf("%s_then", s.tick.proc_name)
+    fx_name := fmt.tprintf("%s_fx", s.tick.proc_name)
+    // Both asked, never short-circuited: forgetting the attribute on one half
+    // says nothing about the other, and hearing about only one would cost a
+    // second build to learn the rest.
+    undeclared := demand_half(procs, then_name, fmt.tprintf("%s's authority consequence", s.tick.proc_name))
+
+    if demand_half(procs, fx_name, fmt.tprintf("%s's owning-peer presentation", s.tick.proc_name)) {
+        undeclared = true
+    }
+
+    if game, _, ok := claim_tick_half(s, idx, then_name, true); ok {
+        s.tick.then_proc = then_name
+        s.tick.then_game = game
+    }
+
+    if game, mine, ok := claim_tick_half(s, idx, fx_name, false); ok {
+        s.tick.fx_proc = fx_name
+        s.tick.fx_game = game
+        s.tick.fx_mine = mine
+
+        if mine {
+            // The every-screen form: the fact tuple crosses the wire to
+            // watching screens, so every fact must be a wire primitive, and
+            // at least one must be a bool — the EVENT trigger (the tuple
+            // broadcasts on any tick a bool fact is true).
+            cand := idx[fx_name]
+            loc := Loc {
+                path = cand.path,
+                line = cand.line,
+            }
+            bools := 0
+
+            for ptype in s.tick.payload_types {
+                wire, _, wok := command_wire_type(ptype)
+
+                if !wok {
+                    error_at(
+                        loc,
+                        "%s declares `mine` — the tick's facts cross the wire to watching screens, and %q is not a wire primitive (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+                        fx_name,
+                        ptype,
+                    )
+                    continue
+                }
+
+                if wire == "bool" {
+                    bools += 1
+                }
+
+                append(&s.tick.payload_wires, wire)
+            }
+
+            if bools == 0 {
+                error_at(
+                    loc,
+                    "%s declares `mine` but the tick returns no bool fact — a bool is the event trigger: the fact tuple broadcasts on any tick a bool fact is true",
+                    fx_name,
+                )
+            }
+        }
+    }
+
+    // `undeclared` stands the warning down: a half that exists and forgot to say
+    // so is already an error naming the same proc, and "nothing consumes the
+    // payload" would only argue for writing what is sitting right there.
+    if s.tick.payload_count > 0 && !undeclared && s.tick.then_proc == "" && s.tick.fx_proc == "" {
+        warn_at(
+            Loc{path = s.path, line = s.tick.line},
+            "tick %s returns a payload but neither `%s` nor `%s` consumes it",
+            s.tick.proc_name,
+            then_name,
+            fx_name,
+        )
+    }
 }
 
 // Pair each replicated field with its `<class>_<path>_edge` half — delta-lane
@@ -3826,168 +5130,268 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: ma
 // owner-streamed state interpolates — each lane has its own presentation
 // answer, and an edge on either would misfire by construction.
 resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-	snake := to_snake(s.struct_name)
-	for &r in s.replicates {
-		name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
-		cand, found := idx[name]
-		if !found {
-			demand_half(procs, name, fmt.tprintf("%s.%s's delta-lane edge", s.struct_name, strings.join(r.path, ".", context.temp_allocator)))
-			continue
-		}
-		cand.claimed = true
-		idx[name] = cand
-		loc := Loc{path = cand.path, line = cand.line}
+    snake := to_snake(s.struct_name)
 
-		field := fmt.tprintf("%s.%s", s.struct_name, strings.join(r.path, ".", context.temp_allocator))
-		if r.predict {
-			error_at(loc, "%s: %s is on the `gd:\"predict\"` lane — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)", name, field)
-			continue
-		}
-		if r.owner && r.interp {
-			// The owner lane's CONTINUOUS fields (`interp`) are rewritten by the
-			// render-time sampler every frame — an edge on them would fire
-			// forever; dress from the fields. A DISCRETE owner field (a u8 lap
-			// counter, a bool, an enum — the owner-local one-shot idiom: dash,
-			// jump, emote) snaps on arrival and edges exactly like a delta
-			// field: the registry diffs every entity after stream sampling,
-			// seeds on first sight, re-seeds on resync — the hand shadow +
-			// seed games wrote for it is the same machinery, minus the resync.
-			error_at(loc, "%s: %s is an INTERPOLATED `gd:\"owner\"` field — the render sampler rewrites it every frame, so it can't edge; dress continuous state from the fields. A discrete owner field (a counter, a bool, an enum; no `interp`) edges fine", name, field)
-			continue
-		}
-		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
-			error_at(loc, "%s must be a plain proc — the per-frame edge pass calls it, it is never registered", name)
-			continue
-		}
-		if cand.pt.results != nil {
-			error_at(loc, "%s: an edge half presents, it decides nothing — no results (consequences belong to verbs and ticks)", name)
-			continue
-		}
+    for &r in s.replicates {
+        name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
+        cand, found := idx[name]
 
-		types := make([dynamic]string, context.temp_allocator)
-		if cand.pt.params != nil {
-			for f in cand.pt.params.list {
-				t := strings.trim_space(node_text(cand.src, f.type))
-				for _ in 0 ..< max(1, len(f.names)) {
-					append(&types, t)
-				}
-			}
-		}
-		self_type := fmt.tprintf("^%s", s.struct_name)
-		at := 0
-		game := ""
-		if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
-			game = types[at][1:]
-			at += 1
-		}
-		if !(len(types) > at && types[at] == self_type) {
-			error_at(loc, "%s: expected `self: %s` %s — the shapes are (self, old, new: %s) or (game, self, old, new: %s)", name, self_type, game == "" ? "first" : "after the game param", r.type_text, r.type_text)
-			continue
-		}
-		at += 1
-		// Compare BASE type names: an imported block's field type is spelled
-		// bare at the block ("Gun_Mode") and qualified at the game
-		// ("play.Gun_Mode") — both are the same type, and the generated call
-		// site lets the compiler hold the exact match (the thunk derives the
-		// cast with type_of, so no spelling is ever spliced).
-		base_of :: proc(t: string) -> string {
-			b := t
-			if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
-			return b
-		}
-		if len(types) - at != 2 || types[at] != types[at + 1] || base_of(types[at]) != base_of(r.type_text) {
-			error_at(loc, "%s: expected exactly `old, new: %s` after `self` (the field's declared type) — found %d param(s)%s", name, r.type_text, len(types) - at, len(types) > at ? fmt.tprintf(" starting with %q", types[at]) : "")
-			continue
-		}
+        if !found {
+            demand_half(
+                procs,
+                name,
+                fmt.tprintf(
+                    "%s.%s's delta-lane edge",
+                    s.struct_name,
+                    strings.join(r.path, ".", context.temp_allocator),
+                ),
+            )
+            continue
+        }
 
-		r.edge_proc = name
-		r.edge_game = game
-	}
+        cand.claimed = true
+        idx[name] = cand
+        loc := Loc {
+            path = cand.path,
+            line = cand.line,
+        }
+
+        field := fmt.tprintf("%s.%s", s.struct_name, strings.join(r.path, ".", context.temp_allocator))
+
+        if r.predict {
+            error_at(
+                loc,
+                "%s: %s is on the `gd:\"predict\"` lane — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)",
+                name,
+                field,
+            )
+            continue
+        }
+
+        if r.owner && r.interp {
+            // The owner lane's CONTINUOUS fields (`interp`) are rewritten by the
+            // render-time sampler every frame — an edge on them would fire
+            // forever; dress from the fields. A DISCRETE owner field (a u8 lap
+            // counter, a bool, an enum — the owner-local one-shot idiom: dash,
+            // jump, emote) snaps on arrival and edges exactly like a delta
+            // field: the registry diffs every entity after stream sampling,
+            // seeds on first sight, re-seeds on resync — the hand shadow +
+            // seed games wrote for it is the same machinery, minus the resync.
+            error_at(
+                loc,
+                "%s: %s is an INTERPOLATED `gd:\"owner\"` field — the render sampler rewrites it every frame, so it can't edge; dress continuous state from the fields. A discrete owner field (a counter, a bool, an enum; no `interp`) edges fine",
+                name,
+                field,
+            )
+            continue
+        }
+
+        if has_attr(cand.vd, "gd_command") ||
+           has_attr(cand.vd, "gd_method") ||
+           has_attr(cand.vd, "gd_rpc") ||
+           has_attr(cand.vd, "gd_tick") {
+            error_at(loc, "%s must be a plain proc — the per-frame edge pass calls it, it is never registered", name)
+            continue
+        }
+
+        if cand.pt.results != nil {
+            error_at(
+                loc,
+                "%s: an edge half presents, it decides nothing — no results (consequences belong to verbs and ticks)",
+                name,
+            )
+            continue
+        }
+
+        types := make([dynamic]string, context.temp_allocator)
+
+        if cand.pt.params != nil {
+            for f in cand.pt.params.list {
+                t := strings.trim_space(node_text(cand.src, f.type))
+
+                for _ in 0 ..< max(1, len(f.names)) {
+                    append(&types, t)
+                }
+            }
+        }
+
+        self_type := fmt.tprintf("^%s", s.struct_name)
+        at := 0
+        game := ""
+
+        if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+            game = types[at][1:]
+            at += 1
+        }
+
+        if !(len(types) > at && types[at] == self_type) {
+            error_at(
+                loc,
+                "%s: expected `self: %s` %s — the shapes are (self, old, new: %s) or (game, self, old, new: %s)",
+                name,
+                self_type,
+                game == "" ? "first" : "after the game param",
+                r.type_text,
+                r.type_text,
+            )
+            continue
+        }
+
+        at += 1
+
+        // Compare BASE type names: an imported block's field type is spelled
+        // bare at the block ("Gun_Mode") and qualified at the game
+        // ("play.Gun_Mode") — both are the same type, and the generated call
+        // site lets the compiler hold the exact match (the thunk derives the
+        // cast with type_of, so no spelling is ever spliced).
+        base_of :: proc(t: string) -> string {
+            b := t
+
+            if j := strings.last_index(b, "."); j >= 0 {
+                b = b[j + 1:]
+            }
+
+            return b
+        }
+
+        if len(types) - at != 2 || types[at] != types[at + 1] || base_of(types[at]) != base_of(r.type_text) {
+            error_at(
+                loc,
+                "%s: expected exactly `old, new: %s` after `self` (the field's declared type) — found %d param(s)%s",
+                name,
+                r.type_text,
+                len(types) - at,
+                len(types) > at ? fmt.tprintf(" starting with %q", types[at]) : "",
+            )
+            continue
+        }
+
+        r.edge_proc = name
+        r.edge_game = game
+    }
 }
 
 @(private = "file")
-claim_tick_half :: proc(s: ^Script, idx: ^map[string]Half_Candidate, name: string, wants_by: bool) -> (game: string, mine: bool, ok: bool) {
-	cand, found := idx[name]
-	if !found {
-		return "", false, false
-	}
-	cand.claimed = true
-	idx[name] = cand
-	loc := Loc{path = cand.path, line = cand.line}
+claim_tick_half :: proc(
+    s: ^Script,
+    idx: ^map[string]Half_Candidate,
+    name: string,
+    wants_by: bool,
+) -> (
+    game: string,
+    mine: bool,
+    ok: bool,
+) {
+    cand, found := idx[name]
 
-	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
-		error_at(loc, "%s must be a plain proc — the generated tick thunk calls it, it is never registered", name)
-		return "", false, false
-	}
+    if !found {
+        return "", false, false
+    }
 
-	types := make([dynamic]string, context.temp_allocator)
-	names := make([dynamic]string, context.temp_allocator)
-	if cand.pt.params != nil {
-		for f in cand.pt.params.list {
-			t := strings.trim_space(node_text(cand.src, f.type))
-			for ni in 0 ..< max(1, len(f.names)) {
-				append(&types, t)
-				nm := ""
-				if ni < len(f.names) {
-					if ident, iok := f.names[ni].derived.(^ast.Ident); iok && ident != nil {
-						nm = ident.name
-					}
-				}
-				append(&names, nm)
-			}
-		}
-	}
+    cand.claimed = true
+    idx[name] = cand
+    loc := Loc {
+        path = cand.path,
+        line = cand.line,
+    }
 
-	self_type := fmt.tprintf("^%s", s.struct_name)
-	at := 0
-	if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
-		game = types[at][1:]
-		at += 1
-	}
-	if !(len(types) > at && types[at] == self_type) {
-		error_at(
-			loc,
-			"%s: expected `self: %s` %s — the shapes are (self%s, payload…) or (game, self%s, payload…)",
-			name, self_type, game == "" ? "first" : "after the game param",
-			wants_by ? ", by" : "", wants_by ? ", by" : ""
-		)
-		return "", false, false
-	}
-	at += 1
+    if has_attr(cand.vd, "gd_command") ||
+       has_attr(cand.vd, "gd_method") ||
+       has_attr(cand.vd, "gd_rpc") ||
+       has_attr(cand.vd, "gd_tick") {
+        error_at(loc, "%s must be a plain proc — the generated tick thunk calls it, it is never registered", name)
+        return "", false, false
+    }
 
-	if wants_by {
-		by_ok := false
-		if len(types) > at {
-			base := types[at]
-			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
-			by_ok = base == "Player_Id"
-		}
-		if !by_ok {
-			error_at(loc, "%s: the param after `self` must be the driving seat (`by: knet.Player_Id`)", name)
-			return "", false, false
-		}
-		at += 1
-	}
+    types := make([dynamic]string, context.temp_allocator)
+    names := make([dynamic]string, context.temp_allocator)
 
-	// The presentation half may declare `mine: bool` right after `self` —
-	// the EVERY-SCREEN form: the live pass fires it inline (mine=true), the
-	// authority broadcasts the fact tuple, and watching screens fire it when
-	// their watch clock reaches the fact's tick (mine=false). Detected by
-	// NAME so an extra bool fact can never silently shift into the slot.
-	if !wants_by && len(types) > at && types[at] == "bool" && names[at] == "mine" {
-		mine = true
-		at += 1
-	}
+    if cand.pt.params != nil {
+        for f in cand.pt.params.list {
+            t := strings.trim_space(node_text(cand.src, f.type))
 
-	if len(types) - at != s.tick.payload_count {
-		error_at(
-			loc,
-			"%s: expected the tick's %d payload value(s) after %s — found %d param(s)",
-			name, s.tick.payload_count, wants_by ? "`by`" : (mine ? "`mine`" : "`self`"), len(types) - at
-		)
-		return "", false, false
-	}
-	return game, mine, true
+            for ni in 0 ..< max(1, len(f.names)) {
+                append(&types, t)
+                nm := ""
+
+                if ni < len(f.names) {
+                    if ident, iok := f.names[ni].derived.(^ast.Ident); iok && ident != nil {
+                        nm = ident.name
+                    }
+                }
+
+                append(&names, nm)
+            }
+        }
+    }
+
+    self_type := fmt.tprintf("^%s", s.struct_name)
+    at := 0
+
+    if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+        game = types[at][1:]
+        at += 1
+    }
+
+    if !(len(types) > at && types[at] == self_type) {
+        error_at(
+            loc,
+            "%s: expected `self: %s` %s — the shapes are (self%s, payload…) or (game, self%s, payload…)",
+            name,
+            self_type,
+            game == "" ? "first" : "after the game param",
+            wants_by ? ", by" : "",
+            wants_by ? ", by" : "",
+        )
+        return "", false, false
+    }
+
+    at += 1
+
+    if wants_by {
+        by_ok := false
+
+        if len(types) > at {
+            base := types[at]
+
+            if j := strings.last_index(base, "."); j >= 0 {
+                base = base[j + 1:]
+            }
+
+            by_ok = base == "Player_Id"
+        }
+
+        if !by_ok {
+            error_at(loc, "%s: the param after `self` must be the driving seat (`by: knet.Player_Id`)", name)
+            return "", false, false
+        }
+
+        at += 1
+    }
+
+    // The presentation half may declare `mine: bool` right after `self` —
+    // the EVERY-SCREEN form: the live pass fires it inline (mine=true), the
+    // authority broadcasts the fact tuple, and watching screens fire it when
+    // their watch clock reaches the fact's tick (mine=false). Detected by
+    // NAME so an extra bool fact can never silently shift into the slot.
+    if !wants_by && len(types) > at && types[at] == "bool" && names[at] == "mine" {
+        mine = true
+        at += 1
+    }
+
+    if len(types) - at != s.tick.payload_count {
+        error_at(
+            loc,
+            "%s: expected the tick's %d payload value(s) after %s — found %d param(s)",
+            name,
+            s.tick.payload_count,
+            wants_by ? "`by`" : (mine ? "`mine`" : "`self`"),
+            len(types) - at,
+        )
+        return "", false, false
+    }
+
+    return game, mine, true
 }
 
 // Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),
@@ -3997,79 +5401,110 @@ claim_tick_half :: proc(s: ^Script, idx: ^map[string]Half_Candidate, name: strin
 // embedding entity — scriptgen fills it with `self`, it is not a Variant arg. rpc/connect config is
 // the caller's to attach (it is attribute-based). ok=false = a contract violation was reported.
 build_method_info :: proc(
-	src: string,
-	pt: ^ast.Proc_Type,
-	loc: Loc,
-	proc_name, struct_name: string,
-	allow_owner: bool,
-	vd: ^ast.Value_Decl = nil,
+    src: string,
+    pt: ^ast.Proc_Type,
+    loc: Loc,
+    proc_name, struct_name: string,
+    allow_owner: bool,
+    vd: ^ast.Value_Decl = nil,
 ) -> (
-	Method_Info,
-	bool
+    Method_Info,
+    bool,
 ) {
-	if !validate_struct_prefix(proc_name, struct_name, loc) {return {}, false}
-	m := Method_Info {
-		proc_name = proc_name,
-		gd_name   = strip_struct_prefix(proc_name, struct_name),
-		ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
-		line      = loc.line
-	}
-	ok := true
-	// A composed method may name the embedding entity as its second param (a pointer, never a
-	// Variant arg). Detect and skip it — the trampoline passes `self` there.
-	start := 1
-	if allow_owner && len(pt.params.list) > 1 {
-		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
-		if strings.has_prefix(p1, "^") {
-			m.owner = true
-			start = 2
-		}
-	}
-	for fi in start ..< len(pt.params.list) {
-		field := pt.params.list[fi]
-		atext := node_text(src, field.type)
-		vi, vok := map_variant(atext)
-		if !vok {
-			error_at(loc, "method %s: unsupported arg type %q", proc_name, atext)
-			ok = false
-			continue
-		}
-		for nm in field.names {
-			ident, _ := nm.derived.(^ast.Ident)
-			if ident == nil {continue}
-			append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
-		}
-	}
-	if pt.results != nil && len(pt.results.list) > 0 {
-		rtext := node_text(src, pt.results.list[0].type)
-		vi, vok := map_variant(rtext)
-		if !vok {
-			error_at(loc, "method %s: unsupported return type %q", proc_name, rtext)
-			ok = false
-		} else {
-			m.ret = vi
-			m.ret_type = strings.trim_space(rtext)
-		}
-	}
-	if vd != nil {ok = method_ownership(&m, vd, loc) && ok}
-	return m, ok
+    if !validate_struct_prefix(proc_name, struct_name, loc) {
+        return {}, false
+    }
+
+    m := Method_Info {
+        proc_name = proc_name,
+        gd_name = strip_struct_prefix(proc_name, struct_name),
+        ret = Variant_Info{enum_name = ".Nil", kind = .Nil},
+        line = loc.line,
+    }
+    ok := true
+    // A composed method may name the embedding entity as its second param (a pointer, never a
+    // Variant arg). Detect and skip it — the trampoline passes `self` there.
+    start := 1
+
+    if allow_owner && len(pt.params.list) > 1 {
+        p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+
+        if strings.has_prefix(p1, "^") {
+            m.owner = true
+            start = 2
+        }
+    }
+
+    for fi in start ..< len(pt.params.list) {
+        field := pt.params.list[fi]
+        atext := node_text(src, field.type)
+        vi, vok := map_variant(atext)
+
+        if !vok {
+            error_at(loc, "method %s: unsupported arg type %q", proc_name, atext)
+            ok = false
+            continue
+        }
+
+        for nm in field.names {
+            ident, _ := nm.derived.(^ast.Ident)
+
+            if ident == nil {
+                continue
+            }
+
+            append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
+        }
+    }
+
+    if pt.results != nil && len(pt.results.list) > 0 {
+        rtext := node_text(src, pt.results.list[0].type)
+        vi, vok := map_variant(rtext)
+
+        if !vok {
+            error_at(loc, "method %s: unsupported return type %q", proc_name, rtext)
+            ok = false
+        } else {
+            m.ret = vi
+            m.ret_type = strings.trim_space(rtext)
+        }
+    }
+
+    if vd != nil {
+        ok = method_ownership(&m, vd, loc) && ok
+    }
+
+    return m, ok
 }
 
 // Extract the string value of a `@(name="value")` attribute. Returns ("", false) if the
 // attribute is absent or not a string-valued Field_Value.
 attr_value :: proc(vd: ^ast.Value_Decl, name: string) -> (string, bool) {
-	for attr in vd.attributes {
-		for elem in attr.elems {
-			fv, ok := elem.derived.(^ast.Field_Value)
-			if !ok {continue}
-			ident, iok := fv.field.derived.(^ast.Ident)
-			if !iok || ident.name != name {continue}
-			lit, lok := fv.value.derived.(^ast.Basic_Lit)
-			if !lok {return "", false}
-			return strings.trim(lit.tok.text, "\"`"), true
-		}
-	}
-	return "", false
+    for attr in vd.attributes {
+        for elem in attr.elems {
+            fv, ok := elem.derived.(^ast.Field_Value)
+
+            if !ok {
+                continue
+            }
+
+            ident, iok := fv.field.derived.(^ast.Ident)
+
+            if !iok || ident.name != name {
+                continue
+            }
+
+            lit, lok := fv.value.derived.(^ast.Basic_Lit)
+
+            if !lok {
+                return "", false
+            }
+
+            return strings.trim(lit.tok.text, "\"`"), true
+        }
+    }
+
+    return "", false
 }
 
 // Read @(gd_command=...) without erasing its type. Every configured expression
@@ -4077,30 +5512,46 @@ attr_value :: proc(vd: ^ast.Value_Decl, name: string) -> (string, bool) {
 // type-checks it. Quoted values survive only as a rejected-form diagnostic. A
 // bare marker resolves later to ACTION_OWNER.
 command_config :: proc(vd: ^ast.Value_Decl, src: string) -> Command_Config {
-	for attr in vd.attributes {
-		for elem in attr.elems {
-			fv, ok := elem.derived.(^ast.Field_Value)
-			if !ok {continue}
-			ident, iok := fv.field.derived.(^ast.Ident)
-			if !iok || ident.name != "gd_command" {continue}
-			raw := strings.trim_space(node_text(src, fv.value))
-			if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '`') {
-				return Command_Config{invalid_quote = raw}
-			}
-			return Command_Config{policy_expr = raw}
-		}
-	}
-	return {}
+    for attr in vd.attributes {
+        for elem in attr.elems {
+            fv, ok := elem.derived.(^ast.Field_Value)
+
+            if !ok {
+                continue
+            }
+
+            ident, iok := fv.field.derived.(^ast.Ident)
+
+            if !iok || ident.name != "gd_command" {
+                continue
+            }
+
+            raw := strings.trim_space(node_text(src, fv.value))
+
+            if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '`') {
+                return Command_Config{invalid_quote = raw}
+            }
+
+            return Command_Config{policy_expr = raw}
+        }
+    }
+
+    return {}
 }
 
 // Total number of parameters (expanding multi-name fields).
 count_params :: proc(pt: ^ast.Proc_Type) -> int {
-	n := 0
-	if pt.params == nil {return 0}
-	for f in pt.params.list {
-		n += max(1, len(f.names))
-	}
-	return n
+    n := 0
+
+    if pt.params == nil {
+        return 0
+    }
+
+    for f in pt.params.list {
+        n += max(1, len(f.names))
+    }
+
+    return n
 }
 
 // Parse the comma-separated `@(gd_rpc="...")` config string into an Rpc_Info. An empty
@@ -4111,67 +5562,83 @@ count_params :: proc(pt: ^ast.Proc_Type) -> int {
 //   - `channel=N`          (default 0)
 // Unknown tokens are a codegen error (caught early, with the method name for context).
 parse_rpc_config :: proc(method, config: string) -> Rpc_Info {
-	r := Rpc_Info {
-		method     = method,
-		mode       = RPC_MODE_AUTHORITY,
-		transfer   = TRANSFER_MODE_RELIABLE,
-		call_local = false,
-		channel    = 0
-	}
-	if strings.trim_space(config) == "" {
-		return r
-	}
-	for part in strings.split(config, ",") {
-		tok := strings.trim_space(part)
-		if tok == "" {continue}
-		name := tok
-		value := ""
-		if eq := strings.index(tok, "="); eq >= 0 {
-			name = strings.trim_space(tok[:eq])
-			value = strings.trim_space(tok[eq + 1:])
-		}
-		switch name {
-		case "authority":
-			r.mode = RPC_MODE_AUTHORITY
-		case "any_peer":
-			r.mode = RPC_MODE_ANY_PEER
-		case "reliable":
-			r.transfer = TRANSFER_MODE_RELIABLE
-		case "unreliable":
-			r.transfer = TRANSFER_MODE_UNRELIABLE
-		case "unreliable_ordered":
-			r.transfer = TRANSFER_MODE_UNRELIABLE_ORDERED
-		case "call_local":
-			r.call_local = true
-		case "channel":
-			n, ok := strconv.parse_int(value)
-			if !ok {
-				errorf("rpc %q: `channel=` needs an integer (got %q)", method, value)
-			} else {
-				r.channel = n
-			}
-		case:
-			errorf("rpc %q: unknown config token %q (want authority/any_peer/reliable/unreliable/unreliable_ordered/call_local/channel=N)", method, tok)
-		}
-	}
-	return r
+    r := Rpc_Info {
+        method     = method,
+        mode       = RPC_MODE_AUTHORITY,
+        transfer   = TRANSFER_MODE_RELIABLE,
+        call_local = false,
+        channel    = 0,
+    }
+
+    if strings.trim_space(config) == "" {
+        return r
+    }
+
+    for part in strings.split(config, ",") {
+        tok := strings.trim_space(part)
+
+        if tok == "" {
+            continue
+        }
+
+        name := tok
+        value := ""
+
+        if eq := strings.index(tok, "="); eq >= 0 {
+            name = strings.trim_space(tok[:eq])
+            value = strings.trim_space(tok[eq + 1:])
+        }
+
+        switch name {
+        case "authority":
+            r.mode = RPC_MODE_AUTHORITY
+        case "any_peer":
+            r.mode = RPC_MODE_ANY_PEER
+        case "reliable":
+            r.transfer = TRANSFER_MODE_RELIABLE
+        case "unreliable":
+            r.transfer = TRANSFER_MODE_UNRELIABLE
+        case "unreliable_ordered":
+            r.transfer = TRANSFER_MODE_UNRELIABLE_ORDERED
+        case "call_local":
+            r.call_local = true
+        case "channel":
+            n, ok := strconv.parse_int(value)
+
+            if !ok {
+                errorf("rpc %q: `channel=` needs an integer (got %q)", method, value)
+            } else {
+                r.channel = n
+            }
+        case:
+            errorf(
+                "rpc %q: unknown config token %q (want authority/any_peer/reliable/unreliable/unreliable_ordered/call_local/channel=N)",
+                method,
+                tok,
+            )
+        }
+    }
+
+    return r
 }
 
 has_attr :: proc(vd: ^ast.Value_Decl, name: string) -> bool {
-	for attr in vd.attributes {
-		for elem in attr.elems {
-			if ident, ok := elem.derived.(^ast.Ident); ok && ident.name == name {
-				return true
-			}
-			// support `@(gd_method=...)` form (Field_Value)
-			if fv, ok := elem.derived.(^ast.Field_Value); ok {
-				if ident, iok := fv.field.derived.(^ast.Ident); iok && ident.name == name {
-					return true
-				}
-			}
-		}
-	}
-	return false
+    for attr in vd.attributes {
+        for elem in attr.elems {
+            if ident, ok := elem.derived.(^ast.Ident); ok && ident.name == name {
+                return true
+            }
+
+            // support `@(gd_method=...)` form (Field_Value)
+            if fv, ok := elem.derived.(^ast.Field_Value); ok {
+                if ident, iok := fv.field.derived.(^ast.Ident); iok && ident.name == name {
+                    return true
+                }
+            }
+        }
+    }
+
+    return false
 }
 
 // ---- nested replicated fields (through `using`/embedded sub-structs) ---------
@@ -4187,27 +5654,27 @@ has_attr :: proc(vd: ^ast.Value_Decl, name: string) -> bool {
 
 // A one-segment path (a top-level field). Heap-allocated so it outlives parse_script.
 path_of :: proc(seg: string) -> []string {
-	p := make([]string, 1)
-	p[0] = seg
-	return p
+    p := make([]string, 1)
+    p[0] = seg
+    return p
 }
 
 // prefix + [leaf], freshly allocated (sibling nested fields must not share backing).
 extend_path :: proc(prefix: []string, leaf: string) -> []string {
-	p := make([]string, len(prefix) + 1)
-	copy(p, prefix)
-	p[len(prefix)] = leaf
-	return p
+    p := make([]string, len(prefix) + 1)
+    copy(p, prefix)
+    p[len(prefix)] = leaf
+    return p
 }
 
 join_path :: proc(path: []string) -> string {
-	return strings.join(path, ".")
+    return strings.join(path, ".")
 }
 
 // The identifier-safe join: {"weapon","ammo"} -> "weapon_ammo" — edge half
 // names and their generated thunks, matching the hoisted-name convention.
 join_snake :: proc(path: []string) -> string {
-	return strings.join(path, "_")
+    return strings.join(path, "_")
 }
 
 // The entity-level name for a command or method composed from an embedded block: the access path
@@ -4216,13 +5683,15 @@ join_snake :: proc(path: []string) -> string {
 // and the method's registered name / trampoline — unique per field even for two blocks of the same
 // type (primary vs secondary).
 compose_member_name :: proc(path: []string, verb: string) -> string {
-	b := strings.builder_make()
-	for seg in path {
-		strings.write_string(&b, seg)
-		strings.write_byte(&b, '_')
-	}
-	strings.write_string(&b, verb)
-	return strings.to_string(b)
+    b := strings.builder_make()
+
+    for seg in path {
+        strings.write_string(&b, seg)
+        strings.write_byte(&b, '_')
+    }
+
+    strings.write_string(&b, verb)
+    return strings.to_string(b)
 }
 
 // How the entity's generated file must reach a composed command's proc: the import alias +
@@ -4230,15 +5699,27 @@ compose_member_name :: proc(path: []string, verb: string) -> string {
 // entity's OWN package — no qualifier, no import. `def_dir` is the block's package dir;
 // `scripts_dir` the entity's. A `godot:kit/combat` block yields alias "kit_combat".
 composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) {
-	if def_dir == scripts_dir || g_godot_root == "" {return "", ""}
-	if !strings.has_prefix(def_dir, g_godot_root) {return "", ""}
-	rel := strings.trim_prefix(def_dir[len(g_godot_root):], "/")
-	if rel == "" {return "", ""}
-	a := strings.builder_make()
-	for i in 0 ..< len(rel) {
-		strings.write_byte(&a, rel[i] == '/' ? '_' : rel[i])
-	}
-	return strings.to_string(a), strings.concatenate({"godot:", rel})
+    if def_dir == scripts_dir || g_godot_root == "" {
+        return "", ""
+    }
+
+    if !strings.has_prefix(def_dir, g_godot_root) {
+        return "", ""
+    }
+
+    rel := strings.trim_prefix(def_dir[len(g_godot_root):], "/")
+
+    if rel == "" {
+        return "", ""
+    }
+
+    a := strings.builder_make()
+
+    for i in 0 ..< len(rel) {
+        strings.write_byte(&a, rel[i] == '/' ? '_' : rel[i])
+    }
+
+    return strings.to_string(a), strings.concatenate({"godot:", rel})
 }
 
 // THE SHELF LINT — the namespace contract, enforced where block-ness is
@@ -4251,35 +5732,56 @@ composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) 
 // play/sim) — game-local blocks compose however they like. Direct fields
 // decide: a shelf block declares its own wire state.
 shelf_lint :: proc(s: ^Script, def: Struct_Def, path: []string) {
-	if g_godot_root == "" || !strings.has_prefix(def.dir, g_godot_root) {return}
-	rel := strings.trim_prefix(def.dir[len(g_godot_root):], "/")
-	if rel != "play" && rel != "play/sim" {return}
-	// Which SHELF a block belongs on is which LANE its fields declare, and since
-	// the lane became the first token that is a one-token read — this used to
-	// scan the option list behind `replicate` for a buried `predict`.
-	has_predict := false
-	for fld in def.fields {
-		val, has := tag_gd_value(fld.tag)
-		if !has {continue}
-		tok0 := val
-		if ci := strings.index(val, ","); ci >= 0 {tok0 = val[:ci]}
-		if decl.replicate_lane(strings.trim_space(tok0)) == .Predict {
-			has_predict = true
-		}
-	}
-	if rel == "play" && has_predict {
-		error_at(
-			Loc{path = s.path},
-			"%s embeds %s (as %q) from the godot:play shelf, but the block carries gd:\"predict\" fields — predicted blocks live on the sim shelf: move it to play/sim (import psim \"godot:play/sim\")",
-			s.struct_name, def.id, join_path(path)
-		)
-	} else if rel == "play/sim" && !has_predict {
-		error_at(
-			Loc{path = s.path},
-			"%s embeds %s (as %q) from the godot:play/sim shelf, but the block carries no gd:\"predict\" fields — the sim shelf is for predicted blocks; timeline-free and coop blocks live on godot:play",
-			s.struct_name, def.id, join_path(path)
-		)
-	}
+    if g_godot_root == "" || !strings.has_prefix(def.dir, g_godot_root) {
+        return
+    }
+
+    rel := strings.trim_prefix(def.dir[len(g_godot_root):], "/")
+
+    if rel != "play" && rel != "play/sim" {
+        return
+    }
+
+    // Which SHELF a block belongs on is which LANE its fields declare, and since
+    // the lane became the first token that is a one-token read — this used to
+    // scan the option list behind `replicate` for a buried `predict`.
+    has_predict := false
+
+    for fld in def.fields {
+        val, has := tag_gd_value(fld.tag)
+
+        if !has {
+            continue
+        }
+
+        tok0 := val
+
+        if ci := strings.index(val, ","); ci >= 0 {
+            tok0 = val[:ci]
+        }
+
+        if decl.replicate_lane(strings.trim_space(tok0)) == .Predict {
+            has_predict = true
+        }
+    }
+
+    if rel == "play" && has_predict {
+        error_at(
+            Loc{path = s.path},
+            "%s embeds %s (as %q) from the godot:play shelf, but the block carries gd:\"predict\" fields — predicted blocks live on the sim shelf: move it to play/sim (import psim \"godot:play/sim\")",
+            s.struct_name,
+            def.id,
+            join_path(path),
+        )
+    } else if rel == "play/sim" && !has_predict {
+        error_at(
+            Loc{path = s.path},
+            "%s embeds %s (as %q) from the godot:play/sim shelf, but the block carries no gd:\"predict\" fields — the sim shelf is for predicted blocks; timeline-free and coop blocks live on godot:play",
+            s.struct_name,
+            def.id,
+            join_path(path),
+        )
+    }
 }
 
 // apply_subst rewrites whole-identifier generic parameters in a type text to their
@@ -4287,34 +5789,49 @@ shelf_lint :: proc(s: ^Script, def: Struct_Def, path: []string) {
 // "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
 // substring of a longer name. Empty subst returns the input untouched.
 apply_subst :: proc(type_text: string, subst: map[string]string) -> string {
-	if len(subst) == 0 {return type_text}
-	b := strings.builder_make()
-	i := 0
-	for i < len(type_text) {
-		c := type_text[i]
-		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-			j := i
-			for j < len(type_text) && is_ident_byte(type_text[j]) {j += 1}
-			word := type_text[i:j]
-			if repl, ok := subst[word]; ok {
-				strings.write_string(&b, repl)
-			} else {
-				strings.write_string(&b, word)
-			}
-			i = j
-		} else {
-			strings.write_byte(&b, c)
-			i += 1
-		}
-	}
-	return strings.to_string(b)
+    if len(subst) == 0 {
+        return type_text
+    }
+
+    b := strings.builder_make()
+    i := 0
+
+    for i < len(type_text) {
+        c := type_text[i]
+
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+            j := i
+
+            for j < len(type_text) && is_ident_byte(type_text[j]) {
+                j += 1
+            }
+
+            word := type_text[i:j]
+
+            if repl, ok := subst[word]; ok {
+                strings.write_string(&b, repl)
+            } else {
+                strings.write_string(&b, word)
+            }
+
+            i = j
+        } else {
+            strings.write_byte(&b, c)
+            i += 1
+        }
+    }
+
+    return strings.to_string(b)
 }
 
 // Detect a typed signal field (gd.Signal0 … Signal4 / gd.SignalN) from its normalized
 // type text — used to reject signals inside nested structs (unsupported for now).
 is_signal_field_type :: proc(type_text: string) -> bool {
-	if _, _, ok := signal_type_params(type_text); ok {return true}
-	return strings.has_prefix(type_text, "gd.SignalN(") || strings.has_prefix(type_text, "godot.SignalN(")
+    if _, _, ok := signal_type_params(type_text); ok {
+        return true
+    }
+
+    return strings.has_prefix(type_text, "gd.SignalN(") || strings.has_prefix(type_text, "godot.SignalN(")
 }
 
 // Walk a resolved struct def's fields, appending each `gd:"replicate"` field to
@@ -4334,136 +5851,172 @@ is_signal_field_type :: proc(type_text: string) -> bool {
 //   * signal — registered by the runtime walk; scriptgen generates the typed `*_emit_*`
 //     helper (arity family only — SignalN needs its AST payload node, which the index
 //     doesn't carry, so it registers at runtime without a typed helper).
-recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[string]bool, name_prefix: string, subst: map[string]string, manual := false) {
-	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
-	visited[def.id] = true
-	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+recurse_into :: proc(
+    s: ^Script,
+    def: Struct_Def,
+    path: []string,
+    visited: ^map[string]bool,
+    name_prefix: string,
+    subst: map[string]string,
+    manual := false,
+) {
+    if visited[def.id] {
+        return
+    } // a type reachable from itself — stop, don't loop
 
-	{
-		// Record the embedded-block name (def.id is "<dir>|<name>"): method-
-		// family attributes on these receivers are legal (they hoist) —
-		// lint_attributed_receivers exempts them.
-		id := def.id
-		if j := strings.last_index(id, "|"); j >= 0 {
-			id = id[j + 1:]
-		}
-		g_embedded_blocks[id] = true
-	}
+    visited[def.id] = true
+    defer delete_key(visited, def.id) // allow the same type at independent sibling positions
 
-	shelf_lint(s, def, path) // shelf blocks must sit on the lane their shelf names
+    {
+        // Record the embedded-block name (def.id is "<dir>|<name>"): method-
+        // family attributes on these receivers are legal (they hoist) —
+        // lint_attributed_receivers exempts them.
+        id := def.id
 
-	// verb-/method-composition (the dual of the nested-replicate collection below): hoist this
-	// sub-struct's @(gd_command) and @(gd_method)/@(gd_rpc) procs onto the entity, keyed by the
-	// access PATH to this field. The entity's generated file routes each thunk/trampoline into
-	// `&self.<path>` and (if the block declared an owner param) passes `self`. Deeper embeds recurse
-	// below and hoist under their longer paths, so a gun three levels down still registers on the
-	// entity that owns the net id. The engine-facing name is path-prefixed (`weapon_reload`) so two
-	// blocks of the same type never collide.
-	if len(def.commands) > 0 || len(def.methods) > 0 || def.tick.proc_name != "" {
-		alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
-		// Tick-composition: the block's step hoists onto the entity, routed
-		// into `&self.<path>`, run AFTER the entity's own tick in field
-		// order — the entity writes intent first, blocks integrate. A tick
-		// that doesn't fit the block contract errors HERE, at the embed —
-		// where block-ness is actually asserted.
-		if def.tick.proc_name != "" && def.tick.bad != "" {
-			error_at(
-				Loc{path = s.path},
-				"%s embeds %s (as %q), but its @(gd_tick) can't compose: %s",
-				s.struct_name, def.id, join_path(path), def.tick.bad
-			)
-		} else if def.tick.proc_name != "" && !manual {
-			// `manual` (a `gd:"manual"` tag on the embed) opts OUT of auto-hoist:
-			// the wielder's own tick drives this block's step wherever it wants
-			// (any ordering, conditionally), so scriptgen must NOT also call it.
-			// The predict fields still flatten (the walk below is unchanged) —
-			// only the auto-call is skipped.
-			append(&s.block_ticks, Hoisted_Tick{
-				path        = path,
-				pkg_alias   = alias,
-				pkg_path    = ppath,
-				proc_name   = def.tick.proc_name,
-				wants_owner = def.tick.wants_owner,
-				wants_lane  = def.tick.wants_lane
-			})
-		}
-		for c in def.commands {
-			hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
-			hoisted.path = path
-			hoisted.pkg_alias = alias
-			hoisted.pkg_path = ppath
-			hoisted.name = compose_member_name(path, c.name)
-			append(&s.commands, hoisted)
-		}
-		for mi in def.methods {
-			hm := mi // shares the (read-only) args slice
-			hm.path = path
-			hm.pkg_alias = alias
-			hm.pkg_path = ppath
-			hm.gd_name = compose_member_name(path, mi.gd_name)
-			append(&s.methods, hm)
-			// Re-emit the rpc / connect config under the namespaced method name.
-			if hm.is_rpc {
-				rpc := mi.rpc
-				rpc.method = hm.gd_name
-				append(&s.rpcs, rpc)
-			}
-			if hm.connect != "" {
-				append(&s.connections, Connection_Info{signal = hm.connect, method = hm.gd_name})
-			}
-		}
-	}
+        if j := strings.last_index(id, "|"); j >= 0 {
+            id = id[j + 1:]
+        }
 
-	for fld in def.fields {
-		fpath := extend_path(path, fld.name)
-		// If `def` is a generic instantiation, resolve this field's generic params to the
-		// concrete args first (`cur: S` -> `cur: Gun_State`) — so interp classification,
-		// POD checks, and deeper resolution all see the real type. The OFFSET itself is
-		// path-based (type_of at the consumer compile), so it resolves generics regardless.
-		ftype := apply_subst(fld.type_text, subst)
-		// Signals declare by TYPE (tag optional) — check before the tagged/skip branches.
-		if is_signal_field_type(ftype) {
-			if arity, params, ok := signal_type_params(ftype); ok {
-				v, h := tag_gd_value(fld.tag)
-				parse_signal_field(s, fld.loc, strings.concatenate({name_prefix, fld.name}), arity, params, v, h)
-			}
-			continue
-		}
-		val, has := tag_gd_value(fld.tag)
-		if has {
-			// THE SHARED DISPATCH — the same one parse_script hands the script
-			// struct's own fields to. This used to be a second, hand-written token
-			// chain, and every difference between it and the top-level one was an
-			// accident rather than a decision: `export`/`onready=` reached the
-			// runtime unvalidated here while the identical tag was spelling- and
-			// arity-checked there. `def.fields` is already one row per name, so
-			// this declaration binds exactly one.
-			specs := strings.split(val, ",")
-			if len(specs) == 0 {continue}
-			walk_tagged_field(s, Tagged_Field{
-				ctx       = .Nested,
-				names     = {fld.name},
-				lines     = {fld.loc.line},
-				path_base = path, // the embed's own access path; leaf appended by the arms
-				type_text = ftype,
-				type_ctx  = def,
-				specs     = specs,
-				tok0      = strings.trim_space(specs[0]),
-				loc       = fld.loc
-			})
-			continue
-		}
-		if sub, sub_subst, ok := resolve_type(def, ftype); ok {
-			// `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
-			sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
-			// A manual embed owns its whole subtree: the wielder drives this
-			// block's tick, which drives its children — so a nested block under
-			// a manual one must not auto-hoist either.
-			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
-		} else {
-			unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports, def.dir)
-		}
-	}
+        g_embedded_blocks[id] = true
+    }
+
+    shelf_lint(s, def, path) // shelf blocks must sit on the lane their shelf names
+
+    // verb-/method-composition (the dual of the nested-replicate collection below): hoist this
+    // sub-struct's @(gd_command) and @(gd_method)/@(gd_rpc) procs onto the entity, keyed by the
+    // access PATH to this field. The entity's generated file routes each thunk/trampoline into
+    // `&self.<path>` and (if the block declared an owner param) passes `self`. Deeper embeds recurse
+    // below and hoist under their longer paths, so a gun three levels down still registers on the
+    // entity that owns the net id. The engine-facing name is path-prefixed (`weapon_reload`) so two
+    // blocks of the same type never collide.
+    if len(def.commands) > 0 || len(def.methods) > 0 || def.tick.proc_name != "" {
+        alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
+
+        // Tick-composition: the block's step hoists onto the entity, routed
+        // into `&self.<path>`, run AFTER the entity's own tick in field
+        // order — the entity writes intent first, blocks integrate. A tick
+        // that doesn't fit the block contract errors HERE, at the embed —
+        // where block-ness is actually asserted.
+        if def.tick.proc_name != "" && def.tick.bad != "" {
+            error_at(
+                Loc{path = s.path},
+                "%s embeds %s (as %q), but its @(gd_tick) can't compose: %s",
+                s.struct_name,
+                def.id,
+                join_path(path),
+                def.tick.bad,
+            )
+        } else if def.tick.proc_name != "" && !manual {
+            // `manual` (a `gd:"manual"` tag on the embed) opts OUT of auto-hoist:
+            // the wielder's own tick drives this block's step wherever it wants
+            // (any ordering, conditionally), so scriptgen must NOT also call it.
+            // The predict fields still flatten (the walk below is unchanged) —
+            // only the auto-call is skipped.
+            append(
+                &s.block_ticks,
+                Hoisted_Tick {
+                    path = path,
+                    pkg_alias = alias,
+                    pkg_path = ppath,
+                    proc_name = def.tick.proc_name,
+                    wants_owner = def.tick.wants_owner,
+                    wants_lane = def.tick.wants_lane,
+                },
+            )
+        }
+
+        for c in def.commands {
+            hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
+            hoisted.path = path
+            hoisted.pkg_alias = alias
+            hoisted.pkg_path = ppath
+            hoisted.name = compose_member_name(path, c.name)
+            append(&s.commands, hoisted)
+        }
+
+        for mi in def.methods {
+            hm := mi // shares the (read-only) args slice
+            hm.path = path
+            hm.pkg_alias = alias
+            hm.pkg_path = ppath
+            hm.gd_name = compose_member_name(path, mi.gd_name)
+            append(&s.methods, hm)
+
+            // Re-emit the rpc / connect config under the namespaced method name.
+            if hm.is_rpc {
+                rpc := mi.rpc
+                rpc.method = hm.gd_name
+                append(&s.rpcs, rpc)
+            }
+
+            if hm.connect != "" {
+                append(&s.connections, Connection_Info{signal = hm.connect, method = hm.gd_name})
+            }
+        }
+    }
+
+    for fld in def.fields {
+        fpath := extend_path(path, fld.name)
+        // If `def` is a generic instantiation, resolve this field's generic params to the
+        // concrete args first (`cur: S` -> `cur: Gun_State`) — so interp classification,
+        // POD checks, and deeper resolution all see the real type. The OFFSET itself is
+        // path-based (type_of at the consumer compile), so it resolves generics regardless.
+        ftype := apply_subst(fld.type_text, subst)
+
+        // Signals declare by TYPE (tag optional) — check before the tagged/skip branches.
+        if is_signal_field_type(ftype) {
+            if arity, params, ok := signal_type_params(ftype); ok {
+                v, h := tag_gd_value(fld.tag)
+                parse_signal_field(s, fld.loc, strings.concatenate({name_prefix, fld.name}), arity, params, v, h)
+            }
+
+            continue
+        }
+
+        val, has := tag_gd_value(fld.tag)
+
+        if has {
+            // THE SHARED DISPATCH — the same one parse_script hands the script
+            // struct's own fields to. This used to be a second, hand-written token
+            // chain, and every difference between it and the top-level one was an
+            // accident rather than a decision: `export`/`onready=` reached the
+            // runtime unvalidated here while the identical tag was spelling- and
+            // arity-checked there. `def.fields` is already one row per name, so
+            // this declaration binds exactly one.
+            specs := strings.split(val, ",")
+
+            if len(specs) == 0 {
+                continue
+            }
+
+            walk_tagged_field(
+                s,
+                Tagged_Field {
+                    ctx       = .Nested,
+                    names     = {fld.name},
+                    lines     = {fld.loc.line},
+                    path_base = path, // the embed's own access path; leaf appended by the arms
+                    type_text = ftype,
+                    type_ctx  = def,
+                    specs     = specs,
+                    tok0      = strings.trim_space(specs[0]),
+                    loc       = fld.loc,
+                },
+            )
+            continue
+        }
+
+        if sub, sub_subst, ok := resolve_type(def, ftype); ok {
+            // `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
+            sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
+            // A manual embed owns its whole subtree: the wielder drives this
+            // block's tick, which drives its children — so a nested block under
+            // a manual one must not auto-hoist either.
+            recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
+        } else {
+            unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports, def.dir)
+        }
+    }
 }
 
 // The unresolved-embed trap (the recorded "gun that never replicated"): a
@@ -4488,138 +6041,201 @@ g_embedded_blocks: map[string]bool
 // other receiver binds to NOTHING: the method compiles and silently never
 // registers — the reserved-suffix trap's attribute twin. Loud, per file.
 lint_attributed_receivers :: proc(path, src: string, file: ^ast.File, script_structs: map[string]bool) {
-	for decl in file.decls {
-		vd, ok := decl.derived.(^ast.Value_Decl)
-		if !ok {continue}
-		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-		if !is_proc {continue}
-		name_ident, _ := vd.names[0].derived.(^ast.Ident)
-		if name_ident == nil {continue}
-		attr := ""
-		switch {
-		case has_attr(vd, "gd_method"):
-			attr = "gd_method"
-		case has_attr(vd, "gd_rpc"):
-			attr = "gd_rpc"
-		case has_attr(vd, "gd_connect"):
-			attr = "gd_connect"
-		}
-		if attr == "" {continue}
-		recv := ""
-		if pl.type != nil && pl.type.params != nil && len(pl.type.params.list) > 0 {
-			recv = strings.trim_space(node_text(src, pl.type.params.list[0].type))
-		}
-		target := strings.has_prefix(recv, "^") ? recv[1:] : ""
-		if j := strings.last_index(target, "."); j >= 0 {
-			target = target[j + 1:]
-		}
-		if j := strings.index_byte(target, '('); j >= 0 {
-			target = strings.trim_space(target[:j]) // a generic block receiver: ^Machine($S)
-		}
-		if target != "" && (script_structs[target] || g_embedded_blocks[target]) {
-			continue
-		}
-		error_at(
-			Loc{path = path, line = name_ident.pos.line},
-			"proc %q wears @(%s) but its first param is %s — methods bind by receiver (`self: ^<ScriptClass>`, or an embedded block's type), so this one registers NOWHERE and silently never runs. Fix the receiver, or drop the attribute.",
-			name_ident.name, attr, recv == "" ? "missing" : fmt.tprintf("%q", recv)
-		)
-	}
+    for decl in file.decls {
+        vd, ok := decl.derived.(^ast.Value_Decl)
+
+        if !ok {
+            continue
+        }
+
+        if len(vd.names) != 1 || len(vd.values) != 1 {
+            continue
+        }
+
+        pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+
+        if !is_proc {
+            continue
+        }
+
+        name_ident, _ := vd.names[0].derived.(^ast.Ident)
+
+        if name_ident == nil {
+            continue
+        }
+
+        attr := ""
+
+        switch {
+        case has_attr(vd, "gd_method"):
+            attr = "gd_method"
+        case has_attr(vd, "gd_rpc"):
+            attr = "gd_rpc"
+        case has_attr(vd, "gd_connect"):
+            attr = "gd_connect"
+        }
+
+        if attr == "" {
+            continue
+        }
+
+        recv := ""
+
+        if pl.type != nil && pl.type.params != nil && len(pl.type.params.list) > 0 {
+            recv = strings.trim_space(node_text(src, pl.type.params.list[0].type))
+        }
+
+        target := strings.has_prefix(recv, "^") ? recv[1:] : ""
+
+        if j := strings.last_index(target, "."); j >= 0 {
+            target = target[j + 1:]
+        }
+
+        if j := strings.index_byte(target, '('); j >= 0 {
+            target = strings.trim_space(target[:j]) // a generic block receiver: ^Machine($S)
+        }
+
+        if target != "" && (script_structs[target] || g_embedded_blocks[target]) {
+            continue
+        }
+
+        error_at(
+            Loc{path = path, line = name_ident.pos.line},
+            "proc %q wears @(%s) but its first param is %s — methods bind by receiver (`self: ^<ScriptClass>`, or an embedded block's type), so this one registers NOWHERE and silently never runs. Fix the receiver, or drop the attribute.",
+            name_ident.name,
+            attr,
+            recv == "" ? "missing" : fmt.tprintf("%q", recv),
+        )
+    }
 }
 
 unresolved_embed_check :: proc(
-	loc: Loc,
-	class_name, field_label, type_text: string,
-	is_using: bool,
-	imports: map[string]string,
-	from_dir: string
+    loc: Loc,
+    class_name, field_label, type_text: string,
+    is_using: bool,
+    imports: map[string]string,
+    from_dir: string,
 ) {
-	t := strings.trim_space(type_text)
-	if len(t) == 0 || t[0] == '^' || strings.contains(t, "[") || strings.contains(t, "(") || strings.contains(t, "map[") {
-		return // decorated types are never tag-carrying embeds
-	}
-	alias := ""
-	name := t
-	if dot := strings.index_byte(t, '.'); dot >= 0 {
-		alias = t[:dot]
-		name = t[dot + 1:]
-	}
-	if len(name) == 0 || !(name[0] >= 'A' && name[0] <= 'Z') {
-		return // primitives and lowercase names: plain data by convention
-	}
-	if alias == "gd" || alias == "godot" {
-		return // engine types are opaque on purpose
-	}
-	if alias != "" {
-		imp, has := imports[alias]
-		if !has {
-			return // an alias the file never imported — the compiler's error, not ours
-		}
-		if strings.has_prefix(imp, "core:") || strings.has_prefix(imp, "base:") || strings.has_prefix(imp, "vendor:") {
-			return // stdlib can't carry gd tags
-		}
-		if strings.has_prefix(imp, "godot:") {
-			if g_godot_root == "" {
-				error_at(
-					loc,
-					"%s.%s: %q rides import %q, but the godot: collection root is unknown (pass -godot:<root> or set ODIN_GODOT_ROOT) — the resolver can't see inside it, and gd:\"…\" tags on its fields would SILENTLY never register",
-					class_name, field_label, t, imp
-				)
-			}
-			return // an indexed bundle whose name isn't a struct there: an enum/union — plain data
-		}
-		// The SHARED vocabulary tree (res://shared/…): a legal import from any module,
-		// but NOT a bundle source — scriptgen resolves nested bundles in the module's own
-		// package tree and in godot: collections only. Plain shared shapes (including
-		// runtime aliases) may be skipped only after proving no metadata is lost.
-		if !strings.contains_rune(imp, ':') && from_dir != "" && under_shared(resolve_lexical(from_dir, imp)) {
-			if shared_embed_plain(Struct_Def{dir=from_dir,imports=imports},t) {return}
-			error_at(
-				loc,
-				"%s.%s: %q comes from the SHARED package %q — res://shared/ carries plain types, constants and pure procs, and scriptgen does not resolve gd:\"…\"-tagged BUNDLES across it, so tags on its fields would SILENTLY never register (replicate, backup and composed verbs all vanish). A tagged bundle lives in the module itself or in a godot: collection package; an untagged POD struct from shared/ is fine by value.",
-				class_name, field_label, t, imp
-			)
-			return
-		}
-		error_at(
-			loc,
-			"%s.%s: %q comes from import %q, which scriptgen cannot see inside — gd:\"…\" tags on its fields would SILENTLY never register (replicate, backup, and composed verbs all vanish). Move the struct into this package or a godot: collection bundle; plain data from elsewhere is fine by value under a non-struct type or behind ^.",
-			class_name, field_label, t, imp
-		)
-		return
-	}
-	if is_using {
-		error_at(
-			loc,
-			"%s.%s: `using` embeds %q, but it doesn't resolve to a struct in this package — if it carries gd:\"…\" tags they would silently never register. Check the spelling, or drop `using` for plain data.",
-			class_name, field_label, t
-		)
-	}
+    t := strings.trim_space(type_text)
+
+    if len(t) == 0 ||
+       t[0] == '^' ||
+       strings.contains(t, "[") ||
+       strings.contains(t, "(") ||
+       strings.contains(t, "map[") {
+        return // decorated types are never tag-carrying embeds
+    }
+
+    alias := ""
+    name := t
+
+    if dot := strings.index_byte(t, '.'); dot >= 0 {
+        alias = t[:dot]
+        name = t[dot + 1:]
+    }
+
+    if len(name) == 0 || !(name[0] >= 'A' && name[0] <= 'Z') {
+        return // primitives and lowercase names: plain data by convention
+    }
+
+    if alias == "gd" || alias == "godot" {
+        return // engine types are opaque on purpose
+    }
+
+    if alias != "" {
+        imp, has := imports[alias]
+
+        if !has {
+            return // an alias the file never imported — the compiler's error, not ours
+        }
+
+        if strings.has_prefix(imp, "core:") || strings.has_prefix(imp, "base:") || strings.has_prefix(imp, "vendor:") {
+            return // stdlib can't carry gd tags
+        }
+
+        if strings.has_prefix(imp, "godot:") {
+            if g_godot_root == "" {
+                error_at(
+                    loc,
+                    "%s.%s: %q rides import %q, but the godot: collection root is unknown (pass -godot:<root> or set ODIN_GODOT_ROOT) — the resolver can't see inside it, and gd:\"…\" tags on its fields would SILENTLY never register",
+                    class_name,
+                    field_label,
+                    t,
+                    imp,
+                )
+            }
+
+            return // an indexed bundle whose name isn't a struct there: an enum/union — plain data
+        }
+
+        // The SHARED vocabulary tree (res://shared/…): a legal import from any module,
+        // but NOT a bundle source — scriptgen resolves nested bundles in the module's own
+        // package tree and in godot: collections only. Plain shared shapes (including
+        // runtime aliases) may be skipped only after proving no metadata is lost.
+        if !strings.contains_rune(imp, ':') && from_dir != "" && under_shared(resolve_lexical(from_dir, imp)) {
+            if shared_embed_plain(Struct_Def{dir = from_dir, imports = imports}, t) {
+                return
+            }
+
+            error_at(
+                loc,
+                "%s.%s: %q comes from the SHARED package %q — res://shared/ carries plain types, constants and pure procs, and scriptgen does not resolve gd:\"…\"-tagged BUNDLES across it, so tags on its fields would SILENTLY never register (replicate, backup and composed verbs all vanish). A tagged bundle lives in the module itself or in a godot: collection package; an untagged POD struct from shared/ is fine by value.",
+                class_name,
+                field_label,
+                t,
+                imp,
+            )
+            return
+        }
+
+        error_at(
+            loc,
+            "%s.%s: %q comes from import %q, which scriptgen cannot see inside — gd:\"…\" tags on its fields would SILENTLY never register (replicate, backup, and composed verbs all vanish). Move the struct into this package or a godot: collection bundle; plain data from elsewhere is fine by value under a non-struct type or behind ^.",
+            class_name,
+            field_label,
+            t,
+            imp,
+        )
+        return
+    }
+
+    if is_using {
+        error_at(
+            loc,
+            "%s.%s: `using` embeds %q, but it doesn't resolve to a struct in this package — if it carries gd:\"…\" tags they would silently never register. Check the spelling, or drop `using` for plain data.",
+            class_name,
+            field_label,
+            t,
+        )
+    }
 }
 
 // The verb's STABLE wire id — the shared hash law's u16 namespace (godot:decl
 // states it once, for the three places that used to inline the arithmetic).
 cmd_wire_id :: proc(name: string) -> u16 {
-	return decl.wire_id16(name)
+    return decl.wire_id16(name)
 }
 
 // Two verbs on one entity hashing to the same u16 — astronomically rare for a
 // handful of names, deterministic, and fatal on the wire, so it's a build
 // error naming both (rename one). Runs per script in main's resolution pass.
 validate_command_ids :: proc(s: ^Script) {
-	for c, i in s.commands {
-		for j in i + 1 ..< len(s.commands) {
-			o := s.commands[j]
-			if cmd_wire_id(c.name) == cmd_wire_id(o.name) {
-				error_at(
-					Loc{path = s.path},
-					"%s: commands %q and %q collide on wire id 0x%x — rename one verb",
-					s.struct_name, c.name, o.name, cmd_wire_id(c.name)
-				)
-			}
-		}
-	}
+    for c, i in s.commands {
+        for j in i + 1 ..< len(s.commands) {
+            o := s.commands[j]
+
+            if cmd_wire_id(c.name) == cmd_wire_id(o.name) {
+                error_at(
+                    Loc{path = s.path},
+                    "%s: commands %q and %q collide on wire id 0x%x — rename one verb",
+                    s.struct_name,
+                    c.name,
+                    o.name,
+                    cmd_wire_id(c.name),
+                )
+            }
+        }
+    }
 }
 
 // Two declarations landing on ONE engine method name. The composed formula
@@ -4634,17 +6250,24 @@ validate_command_ids :: proc(s: ^Script) {
 // validate_command_ids names both.) The generated conveniences can't trip this
 // — probes and forwards yield before they append.
 validate_method_names :: proc(s: ^Script) {
-	for m, i in s.methods {
-		for j in i + 1 ..< len(s.methods) {
-			o := s.methods[j]
-			if m.gd_name != o.gd_name {continue}
-			error_at(
-				Loc{path = s.path},
-				"%s: two declarations generate the engine method %q (%s and %s) — one of them silently never binds; rename the proc, or rename the embedded field whose path composes into it",
-				s.struct_name, m.gd_name, m.proc_name, o.proc_name
-			)
-		}
-	}
+    for m, i in s.methods {
+        for j in i + 1 ..< len(s.methods) {
+            o := s.methods[j]
+
+            if m.gd_name != o.gd_name {
+                continue
+            }
+
+            error_at(
+                Loc{path = s.path},
+                "%s: two declarations generate the engine method %q (%s and %s) — one of them silently never binds; rename the proc, or rename the embedded field whose path composes into it",
+                s.struct_name,
+                m.gd_name,
+                m.proc_name,
+                o.proc_name,
+            )
+        }
+    }
 }
 
 // Classify a `gd:"backup"` field's type: a whole-POD value (scalar / POD struct
@@ -4652,44 +6275,52 @@ validate_method_names :: proc(s: ^Script) {
 // rejection reason (a slice, a string — not self-contained + restorable); the
 // caller reports it. Element PODness itself is enforced by the generated #assert.
 classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, elem: string, bad: string) {
-	t := strings.trim_space(type_text)
-	switch {
-	case t == "string" || t == "cstring":
-		return .Pod, "", "", "a string (not self-contained bytes) — copy it into a fixed [N]u8 or a [dynamic]u8"
-	case strings.has_prefix(t, "map["):
-		// Split key/value at the `]` that closes `map[`, honoring nested brackets
-		// in the key (e.g. map[[2]int]V).
-		depth := 0
-		for i := 4; i < len(t); i += 1 {
-			switch t[i] {
-			case '[':
-				depth += 1
-			case ']':
-				if depth == 0 {
-					key = strings.trim_space(t[4:i])
-					elem = strings.trim_space(t[i + 1:])
-					if key == "" || elem == "" {
-						return .Map, "", "", "a malformed map type"
-					}
-					return .Map, key, elem, ""
-				}
-				depth -= 1
-			}
-		}
-		return .Map, "", "", "a malformed map type"
-	case strings.has_prefix(t, "[dynamic]"):
-		elem = strings.trim_space(t[len("[dynamic]"):])
-		if elem == "" {
-			return .Dyn, "", "", "a malformed dynamic-array type"
-		}
-		return .Dyn, "", elem, ""
-	case strings.has_prefix(t, "[]"):
-		return .Pod, "", "", "a slice (no owned storage to restore into) — use [dynamic]T or a map"
-	case:
-		// scalar / enum / vector / fixed [N]T array / POD struct — the whole
-		// value's bytes ARE its state (the generated #assert enforces PODness).
-		return .Pod, "", "", ""
-	}
+    t := strings.trim_space(type_text)
+
+    switch {
+    case t == "string" || t == "cstring":
+        return .Pod, "", "", "a string (not self-contained bytes) — copy it into a fixed [N]u8 or a [dynamic]u8"
+    case strings.has_prefix(t, "map["):
+        // Split key/value at the `]` that closes `map[`, honoring nested brackets
+        // in the key (e.g. map[[2]int]V).
+        depth := 0
+
+        for i := 4; i < len(t); i += 1 {
+            switch t[i] {
+            case '[':
+                depth += 1
+            case ']':
+                if depth == 0 {
+                    key = strings.trim_space(t[4:i])
+                    elem = strings.trim_space(t[i + 1:])
+
+                    if key == "" || elem == "" {
+                        return .Map, "", "", "a malformed map type"
+                    }
+
+                    return .Map, key, elem, ""
+                }
+
+                depth -= 1
+            }
+        }
+
+        return .Map, "", "", "a malformed map type"
+    case strings.has_prefix(t, "[dynamic]"):
+        elem = strings.trim_space(t[len("[dynamic]"):])
+
+        if elem == "" {
+            return .Dyn, "", "", "a malformed dynamic-array type"
+        }
+
+        return .Dyn, "", elem, ""
+    case strings.has_prefix(t, "[]"):
+        return .Pod, "", "", "a slice (no owned storage to restore into) — use [dynamic]T or a map"
+    case:
+        // scalar / enum / vector / fixed [N]T array / POD struct — the whole
+        // value's bytes ARE its state (the generated #assert enforces PODness).
+        return .Pod, "", "", ""
+    }
 }
 
 // The option set a lane accepts, for the unknown-option refusal. THE POINT OF
@@ -4700,28 +6331,32 @@ classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, e
 // reconstruct. What used to be four pairwise rules is now three table rows.
 @(private = "file")
 lane_options :: proc(lane: decl.Lane) -> string {
-	switch lane {
-	case .Owner:
-		return "`snap`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
-	case .Predict:
-		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `slack=N`, `glide=N`, `cut=N`, `wire=f16`, or `wire=CODEC`"
-	case .Delta, .None:
-		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
-	}
-	return ""
+    switch lane {
+    case .Owner:
+        return "`snap`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+    case .Predict:
+        return(
+            "`interp`, `interp=angle`, `interp=BLEND_PROC`, `slack=N`, `glide=N`, `cut=N`, `wire=f16`, or `wire=CODEC`" \
+        )
+    case .Delta, .None:
+        return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+    }
+
+    return ""
 }
 
 @(private = "file")
 lane_token :: proc(lane: decl.Lane) -> string {
-	switch lane {
-	case .Owner:
-		return "owner"
-	case .Predict:
-		return "predict"
-	case .Delta, .None:
-		return "replicate"
-	}
-	return "replicate"
+    switch lane {
+    case .Owner:
+        return "owner"
+    case .Predict:
+        return "predict"
+    case .Delta, .None:
+        return "replicate"
+    }
+
+    return "replicate"
 }
 
 // Parse the OPTIONS half of a lane tag into a Replicate_Info (the caller fills in
@@ -4738,266 +6373,387 @@ lane_token :: proc(lane: decl.Lane) -> string {
 // in. With the lane first, `gd:"replicate,owner"` and `gd:"replicate,slack=0.5"` are
 // not REJECTED combinations — they are unspellable, and the checks are gone.
 parse_replicate_info :: proc(
-	lane: decl.Lane,
-	type_text: string,
-	specs: []string,
-	floc: Loc,
-	struct_name, field_label: string
+    lane: decl.Lane,
+    type_text: string,
+    specs: []string,
+    floc: Loc,
+    struct_name, field_label: string,
 ) -> (
-	Replicate_Info,
-	bool
+    Replicate_Info,
+    bool,
 ) {
-	// Engine handle/heap types can never be replicated fields: object handles and Rids
-	// are peer-local, and String/Array/Dictionary/Packed_* own heap memory a memcpy would
-	// corrupt. Rejected HERE (with the type's name) because the generated POD #assert
-	// can't see engine semantics — a gd.String is pointer-sized and memcmp-safe, and still
-	// wrong to ship. POD engine value types (Vector2/3/4, Color, Transform*, ...) are fine.
-	if vi, vok := map_variant(type_text); vok {
-		denied :=
-			vi.enum_name == ".Object" ||
-			vi.enum_name == ".String" ||
-			vi.enum_name == ".String_Name" ||
-			vi.enum_name == ".Node_Path" ||
-			vi.enum_name == ".Array" ||
-			vi.enum_name == ".Dictionary" ||
-			vi.enum_name == ".Callable" ||
-			vi.enum_name == ".Signal" ||
-			vi.enum_name == ".Rid" ||
-			strings.has_prefix(vi.enum_name, ".Packed_")
-		if denied {
-			error_at(
-				floc,
-				"%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
-				struct_name,
-				field_label,
-				type_text
-			)
-			return {}, false
-		}
-	}
-	// The COLLECTIONS stance, held at build time: variable-length state never
-	// replicates as a field. The delta walk's whole contract is flat POD cells
-	// (a shadow memcmp per field, a u64 dirty mask, byte-identical apply) — a
-	// [dynamic]'s bytes are a header whose elements a memcpy would tear, and
-	// element identity breaks byte-diffing anyway (insert-at-front shifts
-	// every byte). The three honest shapes, all with worked examples:
-	//   BOUNDED       -> a fixed array + count/sentinel (cavecrawl's [6]Slot
-	//                    bag — one field, one diff atom; the cap is game
-	//                    design, own it)
-	//   RARE-CHANGE   -> an entity BLOB (session_set_blob — whole-value,
-	//                    reliable, rides every snapshot; the inscription)
-	//   LIVE ELEMENTS -> each element is an ENTITY: the registry IS the
-	//                    diffed dynamic collection (spawn = insert, despawn
-	//                    = remove, per-element fields diff normally; the
-	//                    floor's pickups)
-	if strings.has_prefix(type_text, "[dynamic]") ||
-	   strings.has_prefix(type_text, "[]") ||
-	   strings.has_prefix(type_text, "map[") {
-		error_at(
-			floc,
-			"%s.%s: %q is variable-length — replicated fields are flat POD cells (the delta walk memcmps and memcpys them whole, and byte-diffing has no element identity). Pick the collection's real shape: BOUNDED -> fixed array + count/sentinel (`[6]Slot`); RARE-CHANGE bytes/text -> an entity blob (ksess.session_set_blob); LIVE elements -> spawn each as an ENTITY (the registry is the diffed collection). (gd:\"backup\" still takes [dynamic]/map — that codec restores whole, it never diffs.)",
-			struct_name,
-			field_label,
-			type_text
-		)
-		return {}, false
-	}
-	rep := Replicate_Info {
-		type_text = type_text,
-		loc       = floc,
-		owner     = lane == .Owner,
-		predict   = lane == .Predict
-	}
-	snap_requested := false
-	for spec_raw, si in specs[1:] {
-		spec := strings.trim_space(spec_raw)
-		// A lane token in the OPTION list. This arm carried a migration door for
-		// one release — the old `gd:"replicate,predict"` grammar, rewritten for
-		// the reader — which came out once the three games out of this repo were
-		// retagged. What stays is the permanent law it shared a branch with, and
-		// it answers the old form just as exactly: whichever lane you wrote
-		// second, the field already has one.
-		if l := decl.replicate_lane(spec); l != .None {
-			error_at(
-				floc,
-				"%s.%s: `%s` is a LANE, not an option — this field already declared `%s`, and a field has exactly ONE lane (whoever writes its bytes owns them; two writers would fight every tick). The lane is the FIRST token: `replicate` for the delta lane, `owner` for owner-streamed, `predict` for the kit/sim predicted lane.",
-				struct_name, field_label, spec, lane_token(lane)
-			)
-			return {}, false
-		}
-		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,
-		// spliced verbatim into the generated descriptor (a missing/mistyped proc fails the
-		// consumer compile on that line).
-		if strings.has_prefix(spec, "interp=") {
-			name := strings.trim_space(spec[len("interp="):])
-			if name == "" {
-				error_at(floc, "%s.%s: `interp=` needs `angle` or a blend proc name (a knet.Blend_Proc in this package)", struct_name, field_label)
-				continue
-			}
-			// `interp=angle` is RESERVED: f32 radians blend the shortest arc
-			// (a raw lerp from +3.1 to -3.1 sweeps the long way around) — the
-			// built-in nobody should hand-write. Any other name is an author
-			// Blend_Proc, spliced verbatim.
-			if name == "angle" {
-				if interp_lerp_kind(type_text) != ".F32" {
-					error_at(floc, "%s.%s: `interp=angle` wants f32 radians (f32, or fixed arrays of f32) — %q isn't", struct_name, field_label, type_text)
-					continue
-				}
-				rep.interp = true
-				rep.lerp = ".Angle"
-				continue
-			}
-			rep.interp = true
-			rep.lerp = ".Custom"
-			rep.blend = name
-			continue
-		}
-		// `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in packets — half
-		// floats (stock) or an author knet.Wire_Codec, spliced verbatim like a blend proc.
-		// The struct-side value is untouched: shadows, prediction, and rings never see wire bytes.
-		if strings.has_prefix(spec, "wire=") {
-			name := strings.trim_space(spec[len("wire="):])
-			if name == "" {
-				error_at(floc, "%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)", struct_name, field_label)
-				continue
-			}
-			if name == "f16" {
-				// The same classifier bare `interp` uses: .F32 means "f32 elements all the
-				// way down" — exactly what a componentwise half-float encoding can carry.
-				if interp_lerp_kind(type_text) != ".F32" {
-					error_at(floc, "%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`", struct_name, field_label, type_text)
-					continue
-				}
-				rep.wire = ".F16"
-			} else {
-				rep.wire = ".Custom"
-				rep.codec = name
-			}
-			continue
-		}
-		// `slack=N`: this predicted float field's own reconcile tolerance (world
-		// units), overriding the lane default — a fast contested object rides loose
-		// drift while precise fields in the same lane stay tight. The numeric literal
-		// is spliced into the descriptor as f32. PREDICT-ONLY by membership: on the
-		// other two lanes this prefix simply isn't in the option set, and the
-		// unknown-option arm below names what that lane does take.
-		if lane == .Predict && strings.has_prefix(spec, "slack=") {
-			val := strings.trim_space(spec[len("slack="):])
-			if _, ok := strconv.parse_f64(val); !ok {
-				error_at(floc, "%s.%s: `slack=` needs a number — the reconcile tolerance in world units, e.g. slack=0.5", struct_name, field_label)
-				continue
-			}
-			rep.slack = val
-			continue
-		}
-		// `glide=N`: this field's render-error smoothing half-life (seconds), overriding
-		// the lane default — a slow-gliding avatar and a snappy ball can share one lane.
-		if lane == .Predict && strings.has_prefix(spec, "glide=") {
-			val := strings.trim_space(spec[len("glide="):])
-			if _, ok := strconv.parse_f64(val); !ok {
-				error_at(floc, "%s.%s: `glide=` needs a number — the smoothing half-life in seconds, e.g. glide=0.1", struct_name, field_label)
-				continue
-			}
-			rep.glide = val
-			continue
-		}
-		// `cut=N`: this field's snap threshold (world units) — a reconcile error past it
-		// is a teleport, and the whole entity snaps instead of gliding, overriding the lane.
-		if lane == .Predict && strings.has_prefix(spec, "cut=") {
-			val := strings.trim_space(spec[len("cut="):])
-			if _, ok := strconv.parse_f64(val); !ok {
-				error_at(floc, "%s.%s: `cut=` needs a number — the snap threshold in world units, e.g. cut=32", struct_name, field_label)
-				continue
-			}
-			rep.cut = val
-			continue
-		}
-		switch spec {
-		case "snap":
-			if lane != .Owner {
-				error_at(floc, "%s.%s: `snap` is the owner-stream opt-out from automatic interpolation; %s fields already snap unless they explicitly ask for interp", struct_name, field_label, lane_token(lane))
-				continue
-			}
-			snap_requested = true
-		case "interp":
-			if lane == .Owner {
-				error_at(
-					floc,
-					"%s.%s: bare `interp` is redundant on the owner lane and was removed; continuous `gd:\"owner\"` fields interpolate automatically (drop `interp`, or use `snap` to opt out)",
-					struct_name,
-					field_label,
-				)
-				continue
-			}
-			rep.interp = true
-		case "":
-		case:
-			error_at(floc, "%s.%s: unknown `%s` option %q — the %s lane takes %s", struct_name, field_label, lane_token(lane), spec, lane_token(lane), lane_options(lane))
-		}
-	}
-	if snap_requested && rep.interp {
-		error_at(floc, "%s.%s: `snap` and `interp` ask for opposite presentation policies; choose one", struct_name, field_label)
-		return {}, false
-	}
-	// Strong owner-stream default: continuous numeric/vector/quaternion fields
-	// interpolate automatically; discrete types have no stock blend and keep
-	// snapping. `snap` is the explicit opt-out for a float-shaped generation,
-	// meter, or other deliberately discontinuous value.
-	if lane == .Owner && !rep.interp && !snap_requested {
-		if kind := interp_lerp_kind(type_text); kind != "" {
-			rep.interp = true
-			rep.lerp = kind
-		}
-	}
-	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
-	// (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near
-	// the antipode). Non-float types can only snap — rejected loudly so a tagged int doesn't
-	// silently stutter at the stream rate; `interp=BLEND_PROC` is the escape hatch.
-	if rep.interp && rep.lerp == "" {
-		rep.lerp = interp_lerp_kind(type_text)
-		if rep.lerp == "" {
-			error_at(floc, "%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`", struct_name, field_label, type_text)
-			return {}, false
-		}
-	}
-	// PREDICT fields get their float-ness classified even without `interp`:
-	// kit/sim's reconcile TOLERANCE compares float fields within an epsilon
-	// (held-input drift is continuous) and everything else exactly (a flag
-	// byte differing is a real event). Blending still gates on .Interp, so
-	// this is metadata only — and predict-only, keeping every coop-lane
-	// generated file byte-identical.
-	if rep.predict && !rep.interp && rep.lerp == "" {
-		rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
-	}
-	// A PREDICTED quaternion that asks to `interp` GLIDES its reconcile
-	// correction like any other interp field — present.odin's predict_error/
-	// decay/apply grew a .Quat arm (the error is a rotation delta, eased toward
-	// identity, re-applied as shown = err ⊗ truth). No special-casing here: the
-	// lerp classifier already returned .Quat, and the descriptor carries it.
-	// WHAT SURVIVED THE MATRIX: the two FLOAT-NESS rules, which are per-lane
-	// checks about the field's TYPE, not cross-token implications about other
-	// tokens — the lane can't make an i32 carry a continuous reconcile error.
-	//
-	// `slack=` only bites on float fields: discrete predicted state always
-	// reconciles exactly (a differing byte is a real event), so slack there
-	// would be silently ignored by predict_within.
-	if rep.slack != "" && rep.lerp != ".F32" && rep.lerp != ".F64" {
-		error_at(floc, "%s.%s: `slack=` needs a float predicted field (f32/f64, float vectors/colors, or fixed arrays of them) — discrete predicted state always reconciles exactly; drop slack= here", struct_name, field_label)
-		return {}, false
-	}
-	// `glide=`/`cut=` shape the GLIDE of a reconcile correction — render-error
-	// smoothing, which only exists on a predicted field the eye INTERPOLATES, and
-	// only floats carry that error (.Quat/.Custom snap, so they'd silently ignore it).
-	glide_cut := rep.glide != "" ? "glide=" : (rep.cut != "" ? "cut=" : "")
-	if glide_cut != "" {
-		if !rep.interp {
-			error_at(floc, "%s.%s: `%s` shapes render-error smoothing — it needs `interp` beside it (`gd:\"predict,interp,%s…\"`); a non-interp predicted field snaps on reconcile, nothing to glide", struct_name, field_label, glide_cut, glide_cut)
-			return {}, false
-		}
-		if rep.lerp != ".F32" && rep.lerp != ".F64" {
-			error_at(floc, "%s.%s: `%s` needs a float predicted interp field (f32/f64, float vectors/colors, or fixed arrays of them) — only those carry a render error", struct_name, field_label, glide_cut)
-			return {}, false
-		}
-	}
-	return rep, true
+    // Engine handle/heap types can never be replicated fields: object handles and Rids
+    // are peer-local, and String/Array/Dictionary/Packed_* own heap memory a memcpy would
+    // corrupt. Rejected HERE (with the type's name) because the generated POD #assert
+    // can't see engine semantics — a gd.String is pointer-sized and memcmp-safe, and still
+    // wrong to ship. POD engine value types (Vector2/3/4, Color, Transform*, ...) are fine.
+    if vi, vok := map_variant(type_text); vok {
+        denied :=
+            vi.enum_name == ".Object" ||
+            vi.enum_name == ".String" ||
+            vi.enum_name == ".String_Name" ||
+            vi.enum_name == ".Node_Path" ||
+            vi.enum_name == ".Array" ||
+            vi.enum_name == ".Dictionary" ||
+            vi.enum_name == ".Callable" ||
+            vi.enum_name == ".Signal" ||
+            vi.enum_name == ".Rid" ||
+            strings.has_prefix(vi.enum_name, ".Packed_")
+
+        if denied {
+            error_at(
+                floc,
+                "%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
+                struct_name,
+                field_label,
+                type_text,
+            )
+            return {}, false
+        }
+    }
+
+    // The COLLECTIONS stance, held at build time: variable-length state never
+    // replicates as a field. The delta walk's whole contract is flat POD cells
+    // (a shadow memcmp per field, a u64 dirty mask, byte-identical apply) — a
+    // [dynamic]'s bytes are a header whose elements a memcpy would tear, and
+    // element identity breaks byte-diffing anyway (insert-at-front shifts
+    // every byte). The three honest shapes, all with worked examples:
+    //   BOUNDED       -> a fixed array + count/sentinel (cavecrawl's [6]Slot
+    //                    bag — one field, one diff atom; the cap is game
+    //                    design, own it)
+    //   RARE-CHANGE   -> an entity BLOB (session_set_blob — whole-value,
+    //                    reliable, rides every snapshot; the inscription)
+    //   LIVE ELEMENTS -> each element is an ENTITY: the registry IS the
+    //                    diffed dynamic collection (spawn = insert, despawn
+    //                    = remove, per-element fields diff normally; the
+    //                    floor's pickups)
+    if strings.has_prefix(type_text, "[dynamic]") ||
+       strings.has_prefix(type_text, "[]") ||
+       strings.has_prefix(type_text, "map[") {
+        error_at(
+            floc,
+            "%s.%s: %q is variable-length — replicated fields are flat POD cells (the delta walk memcmps and memcpys them whole, and byte-diffing has no element identity). Pick the collection's real shape: BOUNDED -> fixed array + count/sentinel (`[6]Slot`); RARE-CHANGE bytes/text -> an entity blob (ksess.session_set_blob); LIVE elements -> spawn each as an ENTITY (the registry is the diffed collection). (gd:\"backup\" still takes [dynamic]/map — that codec restores whole, it never diffs.)",
+            struct_name,
+            field_label,
+            type_text,
+        )
+        return {}, false
+    }
+
+    rep := Replicate_Info {
+        type_text = type_text,
+        loc       = floc,
+        owner     = lane == .Owner,
+        predict   = lane == .Predict,
+    }
+    snap_requested := false
+
+    for spec_raw, si in specs[1:] {
+        spec := strings.trim_space(spec_raw)
+
+        // A lane token in the OPTION list. This arm carried a migration door for
+        // one release — the old `gd:"replicate,predict"` grammar, rewritten for
+        // the reader — which came out once the three games out of this repo were
+        // retagged. What stays is the permanent law it shared a branch with, and
+        // it answers the old form just as exactly: whichever lane you wrote
+        // second, the field already has one.
+        if l := decl.replicate_lane(spec); l != .None {
+            error_at(
+                floc,
+                "%s.%s: `%s` is a LANE, not an option — this field already declared `%s`, and a field has exactly ONE lane (whoever writes its bytes owns them; two writers would fight every tick). The lane is the FIRST token: `replicate` for the delta lane, `owner` for owner-streamed, `predict` for the kit/sim predicted lane.",
+                struct_name,
+                field_label,
+                spec,
+                lane_token(lane),
+            )
+            return {}, false
+        }
+
+        // `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,
+        // spliced verbatim into the generated descriptor (a missing/mistyped proc fails the
+        // consumer compile on that line).
+        if strings.has_prefix(spec, "interp=") {
+            name := strings.trim_space(spec[len("interp="):])
+
+            if name == "" {
+                error_at(
+                    floc,
+                    "%s.%s: `interp=` needs `angle` or a blend proc name (a knet.Blend_Proc in this package)",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            // `interp=angle` is RESERVED: f32 radians blend the shortest arc
+            // (a raw lerp from +3.1 to -3.1 sweeps the long way around) — the
+            // built-in nobody should hand-write. Any other name is an author
+            // Blend_Proc, spliced verbatim.
+            if name == "angle" {
+                if interp_lerp_kind(type_text) != ".F32" {
+                    error_at(
+                        floc,
+                        "%s.%s: `interp=angle` wants f32 radians (f32, or fixed arrays of f32) — %q isn't",
+                        struct_name,
+                        field_label,
+                        type_text,
+                    )
+                    continue
+                }
+
+                rep.interp = true
+                rep.lerp = ".Angle"
+                continue
+            }
+
+            rep.interp = true
+            rep.lerp = ".Custom"
+            rep.blend = name
+            continue
+        }
+
+        // `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in packets — half
+        // floats (stock) or an author knet.Wire_Codec, spliced verbatim like a blend proc.
+        // The struct-side value is untouched: shadows, prediction, and rings never see wire bytes.
+        if strings.has_prefix(spec, "wire=") {
+            name := strings.trim_space(spec[len("wire="):])
+
+            if name == "" {
+                error_at(
+                    floc,
+                    "%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            if name == "f16" {
+                // The same classifier bare `interp` uses: .F32 means "f32 elements all the
+                // way down" — exactly what a componentwise half-float encoding can carry.
+                if interp_lerp_kind(type_text) != ".F32" {
+                    error_at(
+                        floc,
+                        "%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`",
+                        struct_name,
+                        field_label,
+                        type_text,
+                    )
+                    continue
+                }
+
+                rep.wire = ".F16"
+            } else {
+                rep.wire = ".Custom"
+                rep.codec = name
+            }
+
+            continue
+        }
+
+        // `slack=N`: this predicted float field's own reconcile tolerance (world
+        // units), overriding the lane default — a fast contested object rides loose
+        // drift while precise fields in the same lane stay tight. The numeric literal
+        // is spliced into the descriptor as f32. PREDICT-ONLY by membership: on the
+        // other two lanes this prefix simply isn't in the option set, and the
+        // unknown-option arm below names what that lane does take.
+        if lane == .Predict && strings.has_prefix(spec, "slack=") {
+            val := strings.trim_space(spec[len("slack="):])
+
+            if _, ok := strconv.parse_f64(val); !ok {
+                error_at(
+                    floc,
+                    "%s.%s: `slack=` needs a number — the reconcile tolerance in world units, e.g. slack=0.5",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            rep.slack = val
+            continue
+        }
+
+        // `glide=N`: this field's render-error smoothing half-life (seconds), overriding
+        // the lane default — a slow-gliding avatar and a snappy ball can share one lane.
+        if lane == .Predict && strings.has_prefix(spec, "glide=") {
+            val := strings.trim_space(spec[len("glide="):])
+
+            if _, ok := strconv.parse_f64(val); !ok {
+                error_at(
+                    floc,
+                    "%s.%s: `glide=` needs a number — the smoothing half-life in seconds, e.g. glide=0.1",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            rep.glide = val
+            continue
+        }
+
+        // `cut=N`: this field's snap threshold (world units) — a reconcile error past it
+        // is a teleport, and the whole entity snaps instead of gliding, overriding the lane.
+        if lane == .Predict && strings.has_prefix(spec, "cut=") {
+            val := strings.trim_space(spec[len("cut="):])
+
+            if _, ok := strconv.parse_f64(val); !ok {
+                error_at(
+                    floc,
+                    "%s.%s: `cut=` needs a number — the snap threshold in world units, e.g. cut=32",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            rep.cut = val
+            continue
+        }
+
+        switch spec {
+        case "snap":
+            if lane != .Owner {
+                error_at(
+                    floc,
+                    "%s.%s: `snap` is the owner-stream opt-out from automatic interpolation; %s fields already snap unless they explicitly ask for interp",
+                    struct_name,
+                    field_label,
+                    lane_token(lane),
+                )
+                continue
+            }
+
+            snap_requested = true
+        case "interp":
+            if lane == .Owner {
+                error_at(
+                    floc,
+                    "%s.%s: bare `interp` is redundant on the owner lane and was removed; continuous `gd:\"owner\"` fields interpolate automatically (drop `interp`, or use `snap` to opt out)",
+                    struct_name,
+                    field_label,
+                )
+                continue
+            }
+
+            rep.interp = true
+        case "":
+        case:
+            error_at(
+                floc,
+                "%s.%s: unknown `%s` option %q — the %s lane takes %s",
+                struct_name,
+                field_label,
+                lane_token(lane),
+                spec,
+                lane_token(lane),
+                lane_options(lane),
+            )
+        }
+    }
+
+    if snap_requested && rep.interp {
+        error_at(
+            floc,
+            "%s.%s: `snap` and `interp` ask for opposite presentation policies; choose one",
+            struct_name,
+            field_label,
+        )
+        return {}, false
+    }
+
+    // Strong owner-stream default: continuous numeric/vector/quaternion fields
+    // interpolate automatically; discrete types have no stock blend and keep
+    // snapping. `snap` is the explicit opt-out for a float-shaped generation,
+    // meter, or other deliberately discontinuous value.
+    if lane == .Owner && !rep.interp && !snap_requested {
+        if kind := interp_lerp_kind(type_text); kind != "" {
+            rep.interp = true
+            rep.lerp = kind
+        }
+    }
+
+    // Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
+    // (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near
+    // the antipode). Non-float types can only snap — rejected loudly so a tagged int doesn't
+    // silently stutter at the stream rate; `interp=BLEND_PROC` is the escape hatch.
+    if rep.interp && rep.lerp == "" {
+        rep.lerp = interp_lerp_kind(type_text)
+
+        if rep.lerp == "" {
+            error_at(
+                floc,
+                "%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`",
+                struct_name,
+                field_label,
+                type_text,
+            )
+            return {}, false
+        }
+    }
+
+    // PREDICT fields get their float-ness classified even without `interp`:
+    // kit/sim's reconcile TOLERANCE compares float fields within an epsilon
+    // (held-input drift is continuous) and everything else exactly (a flag
+    // byte differing is a real event). Blending still gates on .Interp, so
+    // this is metadata only — and predict-only, keeping every coop-lane
+    // generated file byte-identical.
+    if rep.predict && !rep.interp && rep.lerp == "" {
+        rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
+    }
+
+    // A PREDICTED quaternion that asks to `interp` GLIDES its reconcile
+    // correction like any other interp field — present.odin's predict_error/
+    // decay/apply grew a .Quat arm (the error is a rotation delta, eased toward
+    // identity, re-applied as shown = err ⊗ truth). No special-casing here: the
+    // lerp classifier already returned .Quat, and the descriptor carries it.
+    // WHAT SURVIVED THE MATRIX: the two FLOAT-NESS rules, which are per-lane
+    // checks about the field's TYPE, not cross-token implications about other
+    // tokens — the lane can't make an i32 carry a continuous reconcile error.
+    //
+    // `slack=` only bites on float fields: discrete predicted state always
+    // reconciles exactly (a differing byte is a real event), so slack there
+    // would be silently ignored by predict_within.
+    if rep.slack != "" && rep.lerp != ".F32" && rep.lerp != ".F64" {
+        error_at(
+            floc,
+            "%s.%s: `slack=` needs a float predicted field (f32/f64, float vectors/colors, or fixed arrays of them) — discrete predicted state always reconciles exactly; drop slack= here",
+            struct_name,
+            field_label,
+        )
+        return {}, false
+    }
+
+    // `glide=`/`cut=` shape the GLIDE of a reconcile correction — render-error
+    // smoothing, which only exists on a predicted field the eye INTERPOLATES, and
+    // only floats carry that error (.Quat/.Custom snap, so they'd silently ignore it).
+    glide_cut := rep.glide != "" ? "glide=" : (rep.cut != "" ? "cut=" : "")
+
+    if glide_cut != "" {
+        if !rep.interp {
+            error_at(
+                floc,
+                "%s.%s: `%s` shapes render-error smoothing — it needs `interp` beside it (`gd:\"predict,interp,%s…\"`); a non-interp predicted field snaps on reconcile, nothing to glide",
+                struct_name,
+                field_label,
+                glide_cut,
+                glide_cut,
+            )
+            return {}, false
+        }
+
+        if rep.lerp != ".F32" && rep.lerp != ".F64" {
+            error_at(
+                floc,
+                "%s.%s: `%s` needs a float predicted interp field (f32/f64, float vectors/colors, or fixed arrays of them) — only those carry a render error",
+                struct_name,
+                field_label,
+                glide_cut,
+            )
+            return {}, false
+        }
+    }
+
+    return rep, true
 }

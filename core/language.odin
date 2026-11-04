@@ -49,9 +49,11 @@ language_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.ObjectPt
 @(private = "file")
 language_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
+
     if instance == nil {
         return
     }
+
     free(cast(^OdinLanguage)instance)
 }
 
@@ -82,34 +84,80 @@ lv_get_extension :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
 }
 
 @(private = "file")
-lv_get_recognized_extensions :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_get_recognized_extensions :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(ret, make_psa("odin"))
 }
 
 @(private = "file")
-lv_get_reserved_words :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_get_reserved_words :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(
         ret,
         make_psa(
-            "package", "import", "proc", "struct", "enum", "union", "map", "bit_set",
-            "if", "else", "for", "switch", "case", "in", "not_in", "return", "defer",
-            "when", "where", "using", "cast", "transmute", "auto_cast", "distinct",
-            "context", "or_else", "or_return", "break", "continue", "fallthrough",
-            "nil", "true", "false", "dynamic", "matrix",
+            "package",
+            "import",
+            "proc",
+            "struct",
+            "enum",
+            "union",
+            "map",
+            "bit_set",
+            "if",
+            "else",
+            "for",
+            "switch",
+            "case",
+            "in",
+            "not_in",
+            "return",
+            "defer",
+            "when",
+            "where",
+            "using",
+            "cast",
+            "transmute",
+            "auto_cast",
+            "distinct",
+            "context",
+            "or_else",
+            "or_return",
+            "break",
+            "continue",
+            "fallthrough",
+            "nil",
+            "true",
+            "false",
+            "dynamic",
+            "matrix",
         ),
     )
 }
 
 @(private = "file")
-lv_get_comment_delimiters :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_get_comment_delimiters :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(ret, make_psa("//", "/* */"))
 }
 
 @(private = "file")
-lv_get_string_delimiters :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_get_string_delimiters :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(ret, make_psa("\" \"", "` `"))
 }
@@ -123,17 +171,28 @@ lv_noop :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
 // after a build, and collapsing them into a pathless bulk request would immediately walk every
 // module again. `_reload_all_scripts` remains the intentional all-module/manual escape hatch.
 @(private = "file")
-lv_reload_all_scripts :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_reload_all_scripts :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     reload_request()
 }
 
 @(private = "file")
 reload_script_object :: proc(script: godot.Script) -> bool {
-    if script == nil {return false}
+    if script == nil {
+        return false
+    }
+
     gpath := godot.resource_get_path(cast(godot.Resource)script)
     path := string_to_odin(gpath, context.temp_allocator)
-    if path == "" || !strings.has_suffix(path, ".odin") {return false}
+
+    if path == "" || !strings.has_suffix(path, ".odin") {
+        return false
+    }
+
     reload_request(source_path = path)
     return true
 }
@@ -142,7 +201,11 @@ reload_script_object :: proc(script: godot.Script) -> bool {
 lv_reload_scripts :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
     scripts := cast(^godot.Array)args[0]
-    if scripts == nil {return}
+
+    if scripts == nil {
+        return
+    }
+
     for i in 0 ..< godot.array_size(scripts) {
         value := godot.array_get(scripts, i)
         object := godot.variant_to_object(&value)
@@ -152,7 +215,11 @@ lv_reload_scripts :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 }
 
 @(private = "file")
-lv_reload_tool_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_reload_tool_script :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     script := (cast(^godot.Script)args[0])^
     _ = reload_script_object(script)
@@ -176,8 +243,14 @@ lv_make_template :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     context = gdext.godot_context()
     class_name := string_to_odin((cast(^godot.String)args[1])^, context.temp_allocator)
     base := string_to_odin((cast(^godot.String)args[2])^, context.temp_allocator)
-    if class_name == "" {class_name = "NewScript"}
-    if base == "" {base = "Node"}
+
+    if class_name == "" {
+        class_name = "NewScript"
+    }
+
+    if base == "" {
+        base = "Node"
+    }
 
     src := make_odin_template(class_name, base)
     defer delete(src)
@@ -212,14 +285,19 @@ make_odin_template :: proc(class_name, base: string) -> string {
 @(private = "file")
 core_to_snake :: proc(s: string) -> string {
     b := strings.builder_make()
+
     for r, i in s {
         if r >= 'A' && r <= 'Z' {
-            if i != 0 {strings.write_rune(&b, '_')}
+            if i != 0 {
+                strings.write_rune(&b, '_')
+            }
+
             strings.write_rune(&b, r + ('a' - 'A'))
         } else {
             strings.write_rune(&b, r)
         }
     }
+
     return strings.to_string(b)
 }
 
@@ -247,7 +325,11 @@ lv_true :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
 // `_handles_global_class_type(type: String) -> bool`: we own the global-class metadata for
 // our own script resource type ("OdinScript").
 @(private = "file")
-lv_handles_global_class_type :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_handles_global_class_type :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     type := string_to_odin((cast(^godot.String)args[0])^)
     defer delete(type)
@@ -259,7 +341,11 @@ lv_handles_global_class_type :: proc "c" (instance: gdext.ExtensionClassInstance
 // When the file declares no class name we return an EMPTY Dictionary — the engine treats a
 // missing "name" key as "no global class here" (ERR check on ret.has("name")).
 @(private = "file")
-lv_get_global_class_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_get_global_class_name :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     path := (cast(^godot.String)args[0])^
     text := godot.file_access_get_file_as_string(path)
@@ -268,21 +354,27 @@ lv_get_global_class_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
 
     d := godot.new_dictionary_default()
     name := parse_class_name(odin_text)
+
     if name != "" {
         base := parse_base_type(odin_text)
+
         if base == "" {
             base = "Node" // a named class with no //gd:extends registers under the default base
         }
+
         icon := parse_icon(odin_text)
+
         if icon == "" {
             icon = resolved_default_icon() // bundled Odin mark when the script sets no //gd:icon
         }
+
         gc_dict_set_string(&d, "name", name)
         gc_dict_set_string(&d, "base_type", base)
         // `//gd:icon <res-path>` threads into the global class registry so the editor's
         // ProjectSettings.get_global_class_list() entry carries the icon (empty => default).
         gc_dict_set_string(&d, "icon_path", icon)
     }
+
     (cast(^godot.Dictionary)ret)^ = d
 }
 
@@ -352,9 +444,14 @@ lv_dict_empty :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
 // completion yet, so return `{ "result": FAILED }` (a well-formed "nothing here"). Real
 // go-to-definition + completion are later DX work; until then this keeps the editor quiet.
 @(private = "file")
-lv_dict_result_failed :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_dict_result_failed :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     d := godot.new_dictionary_default()
+
     set_int := proc(d: ^godot.Dictionary, key: cstring, value: i64) {
         k := godot.new_string_cstring(key)
         kv := godot.variant_from_string(&k)
@@ -362,6 +459,7 @@ lv_dict_result_failed :: proc "c" (instance: gdext.ExtensionClassInstancePtr, ar
         vv := godot.variant_from_int(&iv)
         godot.dictionary_set(d, kv, vv)
     }
+
     // `_lookup_code`'s consumer (ScriptLanguageExtension::lookup_code,
     // script_language_extension.h) does ERR_FAIL_COND_V on BOTH `result` AND `type` —
     // UNCONDITIONALLY, even on a failed lookup — so a `{result}`-only Dictionary spams
@@ -383,13 +481,32 @@ lv_ptr_null :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
 // 4.6 — without it the engine asserts "must be overridden" then reads uninitialized
 // return memory. Return true for Odin's control-flow keywords, false otherwise.
 @(private = "file")
-lv_is_control_flow_keyword :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_is_control_flow_keyword :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     kw := string_to_odin((cast(^godot.String)args[0])^)
     defer delete(kw)
+
     switch kw {
-    case "if", "else", "for", "switch", "case", "when", "where", "break", "continue",
-         "fallthrough", "return", "defer", "or_else", "or_return", "in", "not_in":
+    case "if",
+         "else",
+         "for",
+         "switch",
+         "case",
+         "when",
+         "where",
+         "break",
+         "continue",
+         "fallthrough",
+         "return",
+         "defer",
+         "or_else",
+         "or_return",
+         "in",
+         "not_in":
         ret_bool(ret, true)
     case:
         ret_bool(ret, false)
@@ -407,7 +524,11 @@ lv_is_control_flow_keyword :: proc "c" (instance: gdext.ExtensionClassInstancePt
 // stderr (the honest integration probe in tests/debug uses this to observe WHETHER Godot
 // actually calls this virtual mid-run).
 @(private = "file")
-lv_debug_stack_info :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_debug_stack_info :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     (cast(^godot.Array)ret)^ = debug_capture_odin_stack(2)
 }
@@ -418,9 +539,11 @@ odin_language_register :: proc() {
     // Build the virtual table BEFORE registering the class, since the engine may
     // resolve the parent's virtuals during/right after registration.
     language_virtuals = make([dynamic]Virtual_Entry, 0, 64) // reserve: gdext allocator .Resize is broken (drops data)
+
     add := proc(name: string, fn: gdext.ExtensionClassCallVirtual) {
         append(&language_virtuals, Virtual_Entry{name = name, fn = fn})
     }
+
     add("_get_name", lv_get_name)
     add("_get_type", lv_get_type)
     add("_get_extension", lv_get_extension)
@@ -512,6 +635,7 @@ odin_language_unregister :: proc() {
         gdext.object_destroy(odin_language_object)
         odin_language_object = nil
     }
+
     delete(language_virtuals)
     language_virtuals = nil
 }

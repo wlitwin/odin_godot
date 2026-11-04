@@ -16,73 +16,86 @@ import "core:fmt"
 // (kicker_of / kicker_all / kicker_owned_by) answer what the old maps did.
 @(gd_half)
 kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
-	// Census time: fields NOT set yet. `mine` is role knowledge (who drives
-	// this body) and belongs here; `me_kick` — the pointer the drive reads —
-	// is set at BORN (slopball_entity_spawned), once the body has adopted its
-	// spawned x/y. The drive never runs on an unplaced body, on any role.
-	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
-		self.mine = true
-	}
+    // Census time: fields NOT set yet. `mine` is role knowledge (who drives
+    // this body) and belongs here; `me_kick` — the pointer the drive reads —
+    // is set at BORN (slopball_entity_spawned), once the body has adopted its
+    // spawned x/y. The drive never runs on an unplaced body, on any role.
+    if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
+        self.mine = true
+    }
 }
 
 @(gd_half)
 kicker_freed :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id) {
-	if self == game.me_kick {
-		game.me_kick = nil
-	}
+    if self == game.me_kick {
+        game.me_kick = nil
+    }
 }
 
 @(gd_half)
 ball_spawned :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.ball = self
-	game.ball_id = id
+    game.ball = self
+    game.ball_id = id
 }
 
 @(gd_half)
 ball_freed :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id) {
-	if game.ball_id == id {
-		game.ball = nil
-		game.ball_id = 0
-	}
+    if game.ball_id == id {
+        game.ball = nil
+        game.ball_id = 0
+    }
 }
 
 // Host: the pitch fills — one ball (host simulates it first), one kicker per
 // seated player, spread along their team's half.
 spawn_world :: proc(self: ^Slopball) {
-	if self.ball != nil {return} // the started flag flips on the EVENT; this guard is synchronous
-	ball, bid := ball_spawn(&self.boot, owner = self.ses.me) // typed, from the entity tag — no const, no cast
-	ball.puppet.x = PITCH_W / 2
-	ball.puppet.y = PITCH_H / 2
-	kboot.boot_spawn_send(&self.boot, bid)
-	seat_ball(self, self.ses.me)
-	self.kickoff_at = now_s() + KICKOFF_HOLD
+    if self.ball != nil {
+        return
+    } // the started flag flips on the EVENT; this guard is synchronous
 
-	for _, p in self.ses.players {
-		if !p.connected {continue}
-		if p.dedicated {continue} // the server referees; it fields no kicker
-		spawn_kicker(self, p.id)
-	}
-	// Go live: ship the full world to every seated client and start the
-	// per-tick delta walk (later joiners get it right behind their WELCOME).
-	ksess.session_start_replicating(&self.ses)
-	gd.print_str("SB_WORLD_UP")
+    ball, bid := ball_spawn(&self.boot, owner = self.ses.me) // typed, from the entity tag — no const, no cast
+    ball.puppet.x = PITCH_W / 2
+    ball.puppet.y = PITCH_H / 2
+    kboot.boot_spawn_send(&self.boot, bid)
+    seat_ball(self, self.ses.me)
+    self.kickoff_at = now_s() + KICKOFF_HOLD
+
+    for _, p in self.ses.players {
+        if !p.connected {
+            continue
+        }
+
+        if p.dedicated {
+            continue
+        } // the server referees; it fields no kicker
+
+        spawn_kicker(self, p.id)
+    }
+
+    // Go live: ship the full world to every seated client and start the
+    // per-tick delta walk (later joiners get it right behind their WELCOME).
+    ksess.session_start_replicating(&self.ses)
+    gd.print_str("SB_WORLD_UP")
 }
 
 // Host: one avatar for `pid`, placed on its team's side of the center line.
 spawn_kicker :: proc(self: ^Slopball, pid: knet.Player_Id) {
-	if _, has := kicker_owned_by(&self.boot, pid); has {return}
-	k, kid := kicker_spawn(&self.boot, owner = pid)
-	k.pid = u8(pid)
-	team := kicker_team(k.pid)
-	rank := (int(pid) - int(team)) / 2 // 0,1,2.. within the team
-	off := [4]f32{-70, 70, -120, 120}
-	k.x = team == 1 ? PITCH_W/2 - 120 : PITCH_W/2 + 120
-	// Fan the team OFF the center lane: a kickoff shot at the goal mouth must
-	// not thread a parked teammate (the acid learned this as an own-goal).
-	k.y = PITCH_H/2 + off[rank % 4]
-	kboot.boot_spawn_send(&self.boot, kid)
-	// Receipt: the frame this spawn was SENT on. BORN AT THE SEND means the
-	// dress (SB_SPAWN, printed by slopball_entity_spawned — on the host from
-	// INSIDE the send above) carries the same frame number; the acid pins it.
-	gd.print_str(fmt.tprintf("SB_SENT id=%d frame=%d", u32(kid), gd.engine_get_process_frames(gd.singleton_engine())))
+    if _, has := kicker_owned_by(&self.boot, pid); has {
+        return
+    }
+
+    k, kid := kicker_spawn(&self.boot, owner = pid)
+    k.pid = u8(pid)
+    team := kicker_team(k.pid)
+    rank := (int(pid) - int(team)) / 2 // 0,1,2.. within the team
+    off := [4]f32{-70, 70, -120, 120}
+    k.x = team == 1 ? PITCH_W / 2 - 120 : PITCH_W / 2 + 120
+    // Fan the team OFF the center lane: a kickoff shot at the goal mouth must
+    // not thread a parked teammate (the acid learned this as an own-goal).
+    k.y = PITCH_H / 2 + off[rank % 4]
+    kboot.boot_spawn_send(&self.boot, kid)
+    // Receipt: the frame this spawn was SENT on. BORN AT THE SEND means the
+    // dress (SB_SPAWN, printed by slopball_entity_spawned — on the host from
+    // INSIDE the send above) carries the same frame number; the acid pins it.
+    gd.print_str(fmt.tprintf("SB_SENT id=%d frame=%d", u32(kid), gd.engine_get_process_frames(gd.singleton_engine())))
 }

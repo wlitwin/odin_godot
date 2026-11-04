@@ -34,17 +34,17 @@ import "core:time"
 
 @(private = "file")
 Status_Phase :: enum {
-	Hidden,
-	Building,
-	Failed,
-	Live, // transient success flash
+    Hidden,
+    Building,
+    Failed,
+    Live, // transient success flash
 }
 
 @(private = "file")
 g_status: struct {
-	label:        godot.Label, // nil until the editor plugin creates it
-	phase:        Status_Phase,
-	live_started: time.Tick, // when the Live flash began (hide after LIVE_FLASH)
+    label:        godot.Label, // nil until the editor plugin creates it
+    phase:        Status_Phase,
+    live_started: time.Tick, // when the Live flash began (hide after LIVE_FLASH)
 }
 
 @(private = "file")
@@ -59,11 +59,11 @@ PLAY_GATE_CAP :: 60 * time.Second
 // toolbar. Called from OdinEditorPlugin._enter_tree (editor only, once).
 @(private)
 build_status_create :: proc(plug: godot.Editor_Plugin) {
-	label := godot.new_label()
-	godot.canvas_item_set_visible(cast(godot.Canvas_Item)label, false)
-	godot.editor_plugin_add_control_to_container(plug, .Container_Toolbar, cast(godot.Control)label)
-	g_status.label = label
-	g_status.phase = .Hidden
+    label := godot.new_label()
+    godot.canvas_item_set_visible(cast(godot.Canvas_Item)label, false)
+    godot.editor_plugin_add_control_to_container(plug, .Container_Toolbar, cast(godot.Control)label)
+    g_status.label = label
+    g_status.phase = .Hidden
 }
 
 // build_status_destroy — detach + free the Label on plugin _exit_tree (editor shutdown
@@ -71,25 +71,26 @@ build_status_create :: proc(plug: godot.Editor_Plugin) {
 // unloading dll.
 @(private)
 build_status_destroy :: proc(plug: godot.Editor_Plugin) {
-	if g_status.label == nil {
-		return
-	}
-	godot.editor_plugin_remove_control_from_container(plug, .Container_Toolbar, cast(godot.Control)g_status.label)
-	godot.node_queue_free(cast(godot.Node)g_status.label)
-	g_status.label = nil
-	g_status.phase = .Hidden
+    if g_status.label == nil {
+        return
+    }
+
+    godot.editor_plugin_remove_control_from_container(plug, .Container_Toolbar, cast(godot.Control)g_status.label)
+    godot.node_queue_free(cast(godot.Node)g_status.label)
+    g_status.label = nil
+    g_status.phase = .Hidden
 }
 
 @(private = "file")
 status_apply :: proc(text: string, color: godot.Color, tooltip: cstring) {
-	l := g_status.label
-	s := godot.new_string_odin(text)
-	godot.label_set_text(l, s)
-	fc := godot.new_string_name_cstring("font_color", true)
-	godot.control_add_theme_color_override(cast(godot.Control)l, fc, color)
-	tt := godot.new_string_cstring(tooltip)
-	godot.control_set_tooltip_text(cast(godot.Control)l, tt)
-	godot.canvas_item_set_visible(cast(godot.Canvas_Item)l, true)
+    l := g_status.label
+    s := godot.new_string_odin(text)
+    godot.label_set_text(l, s)
+    fc := godot.new_string_name_cstring("font_color", true)
+    godot.control_add_theme_color_override(cast(godot.Control)l, fc, color)
+    tt := godot.new_string_cstring(tooltip)
+    godot.control_set_tooltip_text(cast(godot.Control)l, tt)
+    godot.canvas_item_set_visible(cast(godot.Canvas_Item)l, true)
 }
 
 // build_status_pump — drive the widget from the reload coordinator's state. Called every
@@ -97,63 +98,67 @@ status_apply :: proc(text: string, color: godot.Color, tooltip: cstring) {
 // only touches the UI on a phase TRANSITION.
 @(private)
 build_status_pump :: proc() {
-	if g_status.label == nil {
-		return
-	}
-	sync.lock(&g_reload.mutex)
-	building := g_reload.build_running || g_reload.build_pending
-	failed := g_reload.last_build_failed
-	build_ms := g_reload.last_build_ms
-	sync.unlock(&g_reload.mutex)
+    if g_status.label == nil {
+        return
+    }
 
-	desired := g_status.phase
-	switch {
-	case building:
-		desired = .Building
-	case failed:
-		desired = .Failed
-	case g_status.phase == .Building:
-		// Build just settled cleanly -> flash success (the dll swap lands this same
-		// pump chain, reload_pump runs first).
-		desired = .Live
-	case g_status.phase == .Live:
-		if time.tick_since(g_status.live_started) > LIVE_FLASH {
-			desired = .Hidden
-		}
-	case g_status.phase == .Failed:
-		// `failed` cleared without a new build starting can't happen (only a build
-		// result mutates it), but normalize anyway.
-		desired = .Hidden
-	}
-	if desired == g_status.phase {
-		return
-	}
-	g_status.phase = desired
+    sync.lock(&g_reload.mutex)
+    building := g_reload.build_running || g_reload.build_pending
+    failed := g_reload.last_build_failed
+    build_ms := g_reload.last_build_ms
+    sync.unlock(&g_reload.mutex)
 
-	switch desired {
-	case .Hidden:
-		godot.canvas_item_set_visible(cast(godot.Canvas_Item)g_status.label, false)
-	case .Building:
-		status_apply(
-			"Odin: building…",
-			godot.Color{0.98, 0.86, 0.4, 1.0}, // editor warning yellow
-			"Odin scripts are compiling. Play waits for this to finish.",
-		)
-	case .Failed:
-		status_apply(
-			"Odin: build FAILED",
-			godot.Color{1.0, 0.44, 0.41, 1.0}, // editor error red
-			"The scripts build failed — compiler errors are in the Output panel. " +
-			"Play is blocked until a build succeeds.",
-		)
-	case .Live:
-		g_status.live_started = time.tick_now()
-		status_apply(
-			fmt.tprintf("Odin: live ✓ %.1fs", build_ms / 1000),
-			godot.Color{0.55, 0.92, 0.55, 1.0}, // success green
-			"Scripts rebuilt and hot-swapped — your last save is live.",
-		)
-	}
+    desired := g_status.phase
+
+    switch {
+    case building:
+        desired = .Building
+    case failed:
+        desired = .Failed
+    case g_status.phase == .Building:
+        // Build just settled cleanly -> flash success (the dll swap lands this same
+        // pump chain, reload_pump runs first).
+        desired = .Live
+    case g_status.phase == .Live:
+        if time.tick_since(g_status.live_started) > LIVE_FLASH {
+            desired = .Hidden
+        }
+    case g_status.phase == .Failed:
+        // `failed` cleared without a new build starting can't happen (only a build
+        // result mutates it), but normalize anyway.
+        desired = .Hidden
+    }
+
+    if desired == g_status.phase {
+        return
+    }
+
+    g_status.phase = desired
+
+    switch desired {
+    case .Hidden:
+        godot.canvas_item_set_visible(cast(godot.Canvas_Item)g_status.label, false)
+    case .Building:
+        status_apply(
+            "Odin: building…",
+            godot.Color{0.98, 0.86, 0.4, 1.0}, // editor warning yellow
+            "Odin scripts are compiling. Play waits for this to finish.",
+        )
+    case .Failed:
+        status_apply(
+            "Odin: build FAILED",
+            godot.Color{1.0, 0.44, 0.41, 1.0}, // editor error red
+            "The scripts build failed — compiler errors are in the Output panel. " +
+            "Play is blocked until a build succeeds.",
+        )
+    case .Live:
+        g_status.live_started = time.tick_now()
+        status_apply(
+            fmt.tprintf("Odin: live ✓ %.1fs", build_ms / 1000),
+            godot.Color{0.55, 0.92, 0.55, 1.0}, // success green
+            "Scripts rebuilt and hot-swapped — your last save is live.",
+        )
+    }
 }
 
 // build_gate_before_play — the body of OdinEditorPlugin._build (see export_plugin.odin).
@@ -163,38 +168,44 @@ build_status_pump :: proc() {
 // already shows "building…" from the frames before the press.
 @(private)
 build_gate_before_play :: proc() -> bool {
-	announced := false
-	start := time.tick_now()
-	for {
-		sync.lock(&g_reload.mutex)
-		busy := g_reload.build_running || g_reload.build_pending
-		failed := g_reload.last_build_failed
-		sync.unlock(&g_reload.mutex)
+    announced := false
+    start := time.tick_now()
 
-		if !busy {
-			if failed {
-				editor_msg_error(
-					"odin_godot: not starting the game — the last scripts build FAILED, so it would run " +
-					"your OLD code. Fix the compiler errors (Output panel), save, and Play again.",
-				)
-				return false
-			}
-			if announced {
-				godot.print_str("odin_godot: scripts build finished — starting the game.")
-			}
-			return true
-		}
-		if !announced {
-			announced = true
-			godot.print_str("odin_godot: waiting for the scripts build to finish before Play…")
-		}
-		if time.tick_since(start) > PLAY_GATE_CAP {
-			editor_msg_error(
-				"odin_godot: scripts build still running after 60s — not starting the game. " +
-				"If the build is genuinely wedged, check the Output panel / bin/.odin_reload.log.",
-			)
-			return false
-		}
-		time.sleep(50 * time.Millisecond)
-	}
+    for {
+        sync.lock(&g_reload.mutex)
+        busy := g_reload.build_running || g_reload.build_pending
+        failed := g_reload.last_build_failed
+        sync.unlock(&g_reload.mutex)
+
+        if !busy {
+            if failed {
+                editor_msg_error(
+                    "odin_godot: not starting the game — the last scripts build FAILED, so it would run " +
+                    "your OLD code. Fix the compiler errors (Output panel), save, and Play again.",
+                )
+                return false
+            }
+
+            if announced {
+                godot.print_str("odin_godot: scripts build finished — starting the game.")
+            }
+
+            return true
+        }
+
+        if !announced {
+            announced = true
+            godot.print_str("odin_godot: waiting for the scripts build to finish before Play…")
+        }
+
+        if time.tick_since(start) > PLAY_GATE_CAP {
+            editor_msg_error(
+                "odin_godot: scripts build still running after 60s — not starting the game. " +
+                "If the build is genuinely wedged, check the Output panel / bin/.odin_reload.log.",
+            )
+            return false
+        }
+
+        time.sleep(50 * time.Millisecond)
+    }
 }

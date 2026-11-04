@@ -92,15 +92,15 @@ NET_ID_INVALID :: Net_Id(0)
 // Entity_Type is known. A stale/despawned reference resolves to (nil, false) —
 // never keep a raw entity pointer when the lifetime can cross a despawn.
 Net_Ref :: struct($T: typeid) {
-	id: Net_Id,
+    id: Net_Id,
 }
 
 net_ref_id :: proc(ref: Net_Ref($T)) -> Net_Id {
-	return ref.id
+    return ref.id
 }
 
 net_ref_valid :: proc(ref: Net_Ref($T)) -> bool {
-	return ref.id != NET_ID_INVALID
+    return ref.id != NET_ID_INVALID
 }
 
 // One frame-local row from a generated `<entity>_all` query. `using ref`
@@ -114,9 +114,9 @@ net_ref_valid :: proc(ref: Net_Ref($T)) -> bool {
 // The row's pointer is valid only while that entity remains live; retain ref,
 // not the row or entity pointer, across a despawn boundary.
 Net_Entity :: struct($T: typeid) {
-	using ref: Net_Ref(T),
-	entity:    ^T,
-	owner:     Player_Id,
+    using ref: Net_Ref(T),
+    entity:    ^T,
+    owner:     Player_Id,
 }
 
 // The high bit of the id space is RESERVED for kit/sim's client-local

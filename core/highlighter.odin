@@ -74,19 +74,52 @@ C_FUNC :: godot.Color{0.67, 0.79, 0.90, 1.0}
 @(private = "file")
 is_keyword :: proc(w: string) -> (kw: bool, control: bool) {
     switch w {
-    case "if", "else", "for", "switch", "case", "when", "where", "break", "continue",
-         "fallthrough", "return", "defer", "or_else", "or_return", "in", "not_in":
+    case "if",
+         "else",
+         "for",
+         "switch",
+         "case",
+         "when",
+         "where",
+         "break",
+         "continue",
+         "fallthrough",
+         "return",
+         "defer",
+         "or_else",
+         "or_return",
+         "in",
+         "not_in":
         return true, true
-    case "package", "import", "proc", "struct", "enum", "union", "map", "bit_set",
-         "using", "cast", "transmute", "auto_cast", "distinct", "context", "nil",
-         "true", "false", "dynamic", "matrix":
+    case "package",
+         "import",
+         "proc",
+         "struct",
+         "enum",
+         "union",
+         "map",
+         "bit_set",
+         "using",
+         "cast",
+         "transmute",
+         "auto_cast",
+         "distinct",
+         "context",
+         "nil",
+         "true",
+         "false",
+         "dynamic",
+         "matrix":
         return true, false
     }
+
     return false, false
 }
 
 @(private = "file")
-is_digit :: proc(b: u8) -> bool {return b >= '0' && b <= '9'}
+is_digit :: proc(b: u8) -> bool {
+    return b >= '0' && b <= '9'
+}
 
 @(private = "file")
 is_alpha :: proc(b: u8) -> bool {
@@ -94,7 +127,9 @@ is_alpha :: proc(b: u8) -> bool {
 }
 
 @(private = "file")
-is_alnum :: proc(b: u8) -> bool {return is_alpha(b) || is_digit(b)}
+is_alnum :: proc(b: u8) -> bool {
+    return is_alpha(b) || is_digit(b)
+}
 
 // Add a `{ "color": color }` entry at rune-column `col`. Only emits when the color changes
 // from the previous entry (`last`) — entries persist until the next, so contiguous same-
@@ -104,6 +139,7 @@ hl_emit :: proc(d: ^godot.Dictionary, last: ^godot.Color, col: int, color: godot
     if color == last^ {
         return
     }
+
     last^ = color
     ci := godot.Int(col)
     kv := godot.variant_from_int(&ci)
@@ -122,33 +158,51 @@ hl_emit :: proc(d: ^godot.Dictionary, last: ^godot.Color, col: int, color: godot
 @(private = "file")
 tokenize_line :: proc(s: string, out: ^godot.Dictionary) {
     n := len(s)
+
     if n == 0 {
         return
     }
+
     // cols[byte] -> rune column at that byte (so multi-byte runes don't desync columns).
     cols := make([]int, n + 1)
     defer delete(cols)
+
     {
         col := 0
         i := 0
+
         for i < n {
             cols[i] = col
             b := s[i]
             size := 1
-            if b >= 0xF0 {size = 4} else if b >= 0xE0 {size = 3} else if b >= 0xC0 {size = 2}
-            for k in 1 ..< size {
-                if i + k < n {cols[i + k] = col}
+
+            if b >= 0xF0 {
+                size = 4
+            } else if b >= 0xE0 {
+                size = 3
+            } else if b >= 0xC0 {
+                size = 2
             }
+
+            for k in 1 ..< size {
+                if i + k < n {
+                    cols[i + k] = col
+                }
+            }
+
             col += 1
             i += size
         }
+
         cols[n] = col
     }
 
     last := godot.Color{-1, -1, -1, -1} // sentinel: nothing emitted yet
     i := 0
+
     for i < n {
         b := s[i]
+
         switch {
         case b == '/' && i + 1 < n && s[i + 1] == '/':
             hl_emit(out, &last, cols[i], C_COMMENT)
@@ -156,55 +210,95 @@ tokenize_line :: proc(s: string, out: ^godot.Dictionary) {
         case b == '/' && i + 1 < n && s[i + 1] == '*':
             hl_emit(out, &last, cols[i], C_COMMENT)
             i += 2
+
             for i < n {
                 if s[i] == '*' && i + 1 < n && s[i + 1] == '/' {
                     i += 2
                     break
                 }
+
                 i += 1
             }
         case b == '"':
             hl_emit(out, &last, cols[i], C_STRING)
             i += 1
+
             for i < n {
-                if s[i] == '\\' {i += 2;continue}
-                if s[i] == '"' {i += 1;break}
+                if s[i] == '\\' {
+                    i += 2
+                    continue
+                }
+
+                if s[i] == '"' {
+                    i += 1
+                    break
+                }
+
                 i += 1
             }
         case b == '`':
             hl_emit(out, &last, cols[i], C_STRING)
             i += 1
+
             for i < n {
-                if s[i] == '`' {i += 1;break}
+                if s[i] == '`' {
+                    i += 1
+                    break
+                }
+
                 i += 1
             }
         case b == '\'':
             hl_emit(out, &last, cols[i], C_STRING)
             i += 1
+
             for i < n {
-                if s[i] == '\\' {i += 2;continue}
-                if s[i] == '\'' {i += 1;break}
+                if s[i] == '\\' {
+                    i += 2
+                    continue
+                }
+
+                if s[i] == '\'' {
+                    i += 1
+                    break
+                }
+
                 i += 1
             }
         case is_digit(b):
             hl_emit(out, &last, cols[i], C_NUMBER)
             i += 1
-            for i < n && (is_alnum(s[i]) || s[i] == '.' || s[i] == '_') {i += 1}
+
+            for i < n && (is_alnum(s[i]) || s[i] == '.' || s[i] == '_') {
+                i += 1
+            }
         case is_alpha(b):
             start := i
             i += 1
-            for i < n && is_alnum(s[i]) {i += 1}
+
+            for i < n && is_alnum(s[i]) {
+                i += 1
+            }
+
             word := s[start:i]
             color := C_TEXT
+
             if kw, control := is_keyword(word); kw {
                 color = control ? C_CONTROL : C_KEYWORD
             } else if word[0] >= 'A' && word[0] <= 'Z' {
                 color = C_TYPE // PascalCase identifier -> type
             } else {
                 j := i // proc-call: next non-space byte is '('
-                for j < n && (s[j] == ' ' || s[j] == '\t') {j += 1}
-                if j < n && s[j] == '(' {color = C_FUNC}
+
+                for j < n && (s[j] == ' ' || s[j] == '\t') {
+                    j += 1
+                }
+
+                if j < n && s[j] == '(' {
+                    color = C_FUNC
+                }
             }
+
             hl_emit(out, &last, cols[start], color)
         case:
             hl_emit(out, &last, cols[i], C_TEXT) // whitespace / operators / punctuation
@@ -229,9 +323,11 @@ highlighter_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.Objec
 @(private = "file")
 highlighter_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
+
     if instance == nil {
         return
     }
+
     free(cast(^OdinSyntaxHighlighter)instance)
 }
 
@@ -250,7 +346,11 @@ hl_get_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
 }
 
 @(private = "file")
-hl_get_supported_languages :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+hl_get_supported_languages :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_psa(ret, make_psa("Odin")) // matched against OdinLanguage._get_name ("Odin")
 }
@@ -264,14 +364,20 @@ hl_create :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext
 }
 
 @(private = "file")
-hl_get_line_syntax_highlighting :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+hl_get_line_syntax_highlighting :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     context.allocator = runtime.heap_allocator()
     self := cast(^OdinSyntaxHighlighter)instance
     out := godot.new_dictionary_default()
+
     if self != nil {
         line := (cast(^godot.Int)args[0])^
         te := godot.syntax_highlighter_get_text_edit(cast(godot.Syntax_Highlighter)self.object)
+
         if te != nil {
             ltext := godot.text_edit_get_line(te, line)
             s := string_to_odin(ltext)
@@ -279,6 +385,7 @@ hl_get_line_syntax_highlighting :: proc "c" (instance: gdext.ExtensionClassInsta
             tokenize_line(s, &out)
         }
     }
+
     (cast(^godot.Dictionary)ret)^ = out
 }
 
@@ -300,7 +407,10 @@ odin_highlighter_register_class :: proc() {
     append(&highlighter_virtuals, Virtual_Entry{name = "_get_name", fn = hl_get_name})
     append(&highlighter_virtuals, Virtual_Entry{name = "_get_supported_languages", fn = hl_get_supported_languages})
     append(&highlighter_virtuals, Virtual_Entry{name = "_create", fn = hl_create})
-    append(&highlighter_virtuals, Virtual_Entry{name = "_get_line_syntax_highlighting", fn = hl_get_line_syntax_highlighting})
+    append(
+        &highlighter_virtuals,
+        Virtual_Entry{name = "_get_line_syntax_highlighting", fn = hl_get_line_syntax_highlighting},
+    )
 
     class_info := gdext.ExtensionClassCreationInfo2 {
         is_virtual                  = false,
@@ -349,34 +459,38 @@ lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     crash_watch_pump()
     // One-shot warning if running on an untested Godot version (the virtual table is pinned).
     check_engine_version_once()
+
     if highlighter_registered {
         return
     }
+
     if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
         highlighter_registered = true // never needed outside the editor
         return
     }
+
     highlighter_attempts += 1
-    if highlighter_attempts > 1800 { // ~30s @ 60fps safety cap
+
+    if highlighter_attempts > 1800 {     // ~30s @ 60fps safety cap
         highlighter_registered = true
         return
     }
 
     ei := godot.singleton_editor_interface()
+
     if ei == nil {
         return // editor UI not up yet — retry next frame
     }
+
     se := godot.editor_interface_get_script_editor(ei)
+
     if se == nil {
         return // ScriptEditor not built yet — retry next frame
     }
 
     odin_highlighter_register_class()
     odin_highlighter_object = gdext.classdb_construct_object(&odin_highlighter_class_name)
-    godot.script_editor_register_syntax_highlighter(
-        se,
-        cast(godot.Editor_Syntax_Highlighter)odin_highlighter_object,
-    )
+    godot.script_editor_register_syntax_highlighter(se, cast(godot.Editor_Syntax_Highlighter)odin_highlighter_object)
     highlighter_registered = true
     gdext_print("odin: Odin syntax highlighter registered", "ok") // editor_smoke marker
 }

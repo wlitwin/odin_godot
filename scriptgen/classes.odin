@@ -49,14 +49,23 @@ g_class_godot: map[string]string // Odin handle name -> Godot spelling ("" = neg
 // mapping and not a guess.
 @(private = "file")
 class_norm :: proc(name: string) -> string {
-	b := strings.builder_make(context.temp_allocator)
-	for i in 0 ..< len(name) {
-		c := name[i]
-		if c == '_' {continue}
-		if c >= 'A' && c <= 'Z' {c += 'a' - 'A'}
-		strings.write_byte(&b, c)
-	}
-	return strings.to_string(b)
+    b := strings.builder_make(context.temp_allocator)
+
+    for i in 0 ..< len(name) {
+        c := name[i]
+
+        if c == '_' {
+            continue
+        }
+
+        if c >= 'A' && c <= 'Z' {
+            c += 'a' - 'A'
+        }
+
+        strings.write_byte(&b, c)
+    }
+
+    return strings.to_string(b)
 }
 
 // Build the parent map from `<root>/godot/godot.gen.odin`'s alias lines. One
@@ -64,85 +73,148 @@ class_norm :: proc(name: string) -> string {
 // gen file is bindgen's output, not the author's).
 @(private = "file")
 ensure_class_index :: proc() {
-	if g_class_parent_built {return}
-	g_class_parent_built = true // even on failure: a one-shot empty index degrades to no-check
-	if g_godot_root == "" {return}
-	// godot.gen.odin holds the generated class edges; Variant.odin holds the two
-	// hand-written roots they terminate in (`Ref_Counted :: ^Object`, which is
-	// why the parent side tolerates a leading `^`, and `Object :: gd.ObjectPtr`,
-	// which is qualified and so parses as no edge at all — correctly, Object is
-	// the root). Without Variant.odin every RefCounted-descended class dead-ends
-	// one step short of Object and `//gd:extends RefCounted` + `owner: gd.Object`
-	// would read as a mismatch.
-	for rel in ([]string{"/godot/godot.gen.odin", "/godot/Variant.odin"}) {
-		path := strings.concatenate({g_godot_root, rel})
-		data, rerr := os.read_entire_file(path, context.allocator)
-		if rerr != nil {continue}
-		it := string(data)
-		for line in strings.split_lines_iterator(&it) {
-			l := strings.trim_space(line)
-			sep := strings.index(l, " :: ")
-			if sep <= 0 {continue}
-			name := strings.trim_space(l[:sep])
-			parent := strings.trim_space(l[sep + 4:])
-			parent = strings.trim_left(parent, "^")
-			// Alias lines only: a bare `A :: B` where both sides are plain idents.
-			if !ident_like(name) || !ident_like(parent) {continue}
-			g_class_parent[name] = parent
-			g_class_by_norm[class_norm(name)] = name
-			g_class_by_norm[class_norm(parent)] = parent
-		}
-	}
+    if g_class_parent_built {
+        return
+    }
+
+    g_class_parent_built = true // even on failure: a one-shot empty index degrades to no-check
+
+    if g_godot_root == "" {
+        return
+    }
+
+    // godot.gen.odin holds the generated class edges; Variant.odin holds the two
+    // hand-written roots they terminate in (`Ref_Counted :: ^Object`, which is
+    // why the parent side tolerates a leading `^`, and `Object :: gd.ObjectPtr`,
+    // which is qualified and so parses as no edge at all — correctly, Object is
+    // the root). Without Variant.odin every RefCounted-descended class dead-ends
+    // one step short of Object and `//gd:extends RefCounted` + `owner: gd.Object`
+    // would read as a mismatch.
+    for rel in ([]string{"/godot/godot.gen.odin", "/godot/Variant.odin"}) {
+        path := strings.concatenate({g_godot_root, rel})
+        data, rerr := os.read_entire_file(path, context.allocator)
+
+        if rerr != nil {
+            continue
+        }
+
+        it := string(data)
+
+        for line in strings.split_lines_iterator(&it) {
+            l := strings.trim_space(line)
+            sep := strings.index(l, " :: ")
+
+            if sep <= 0 {
+                continue
+            }
+
+            name := strings.trim_space(l[:sep])
+            parent := strings.trim_space(l[sep + 4:])
+            parent = strings.trim_left(parent, "^")
+
+            // Alias lines only: a bare `A :: B` where both sides are plain idents.
+            if !ident_like(name) || !ident_like(parent) {
+                continue
+            }
+
+            g_class_parent[name] = parent
+            g_class_by_norm[class_norm(name)] = name
+            g_class_by_norm[class_norm(parent)] = parent
+        }
+    }
 }
 
 @(private = "file")
 ident_like :: proc(s: string) -> bool {
-	if len(s) == 0 {return false}
-	if !(s[0] >= 'A' && s[0] <= 'Z') {return false} // class handles are PascalCase
-	for i in 0 ..< len(s) {
-		c := s[i]
-		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {continue}
-		return false
-	}
-	return true
+    if len(s) == 0 {
+        return false
+    }
+
+    if !(s[0] >= 'A' && s[0] <= 'Z') {
+        return false
+    } // class handles are PascalCase
+
+    for i in 0 ..< len(s) {
+        c := s[i]
+
+        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+            continue
+        }
+
+        return false
+    }
+
+    return true
 }
 
 // The Godot spelling of an Odin handle name, read from that class's own gen
 // file's `__class_name` line. "" when the class isn't a ClassDB class (the
 // builtin Variant types carry no such line) or the file isn't there.
 godot_class_name :: proc(odin_name: string) -> string {
-	if g_godot_root == "" {return ""}
-	if cached, found := g_class_godot[odin_name]; found {return cached}
-	path := strings.concatenate({g_godot_root, "/godot/", strings.to_lower(odin_name, context.temp_allocator), ".gen.odin"})
-	pascal := ""
-	if data, rerr := os.read_entire_file(path, context.temp_allocator); rerr == nil {
-		marker := "__class_name = new_string_name_cstring(\""
-		if idx := strings.index(string(data), marker); idx >= 0 {
-			rest := string(data)[idx + len(marker):]
-			if end := strings.index_byte(rest, '"'); end >= 0 {
-				pascal = strings.clone(rest[:end])
-			}
-		}
-	}
-	g_class_godot[odin_name] = pascal // cache the negative too — one read per name per run
-	return pascal
+    if g_godot_root == "" {
+        return ""
+    }
+
+    if cached, found := g_class_godot[odin_name]; found {
+        return cached
+    }
+
+    path := strings.concatenate(
+        {g_godot_root, "/godot/", strings.to_lower(odin_name, context.temp_allocator), ".gen.odin"},
+    )
+    pascal := ""
+
+    if data, rerr := os.read_entire_file(path, context.temp_allocator); rerr == nil {
+        marker := "__class_name = new_string_name_cstring(\""
+
+        if idx := strings.index(string(data), marker); idx >= 0 {
+            rest := string(data)[idx + len(marker):]
+
+            if end := strings.index_byte(rest, '"'); end >= 0 {
+                pascal = strings.clone(rest[:end])
+            }
+        }
+    }
+
+    g_class_godot[odin_name] = pascal // cache the negative too — one read per name per run
+    return pascal
 }
 
 // Is `handle` (an Odin class-handle name) the class `base` names, or one of its
 // ancestors? `known` is false when the index can't place `base` at all, which is
 // the caller's cue to stay silent rather than accuse.
 class_handle_covers :: proc(handle, base: string) -> (covers: bool, known: bool) {
-	ensure_class_index()
-	if len(g_class_by_norm) == 0 {return false, false}
-	base_odin, found := g_class_by_norm[class_norm(base)]
-	if !found {return false, false}
-	if _, is_class := g_class_by_norm[class_norm(handle)]; !is_class {return false, false}
-	cur := base_odin
-	for i := 0; i < 64; i += 1 { // the depth bound is a cycle guard, not a real limit
-		if class_norm(cur) == class_norm(handle) {return true, true}
-		next, has := g_class_parent[cur]
-		if !has {break}
-		cur = next
-	}
-	return false, true
+    ensure_class_index()
+
+    if len(g_class_by_norm) == 0 {
+        return false, false
+    }
+
+    base_odin, found := g_class_by_norm[class_norm(base)]
+
+    if !found {
+        return false, false
+    }
+
+    if _, is_class := g_class_by_norm[class_norm(handle)]; !is_class {
+        return false, false
+    }
+
+    cur := base_odin
+
+    for i := 0; i < 64; i += 1 {     // the depth bound is a cycle guard, not a real limit
+        if class_norm(cur) == class_norm(handle) {
+            return true, true
+        }
+
+        next, has := g_class_parent[cur]
+
+        if !has {
+            break
+        }
+
+        cur = next
+    }
+
+    return false, true
 }

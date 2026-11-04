@@ -24,18 +24,17 @@ import gd "godot:godot"
 //         p.hp -= 1                                     // direct field access
 //         pos := gd.node2d_get_global_position(p.owner) // engine calls via the owner
 //     }
-scripts_in_group :: proc(
-	node: gd.Object,
-	group: cstring,
-	$S: typeid,
-	allocator := context.temp_allocator,
-) -> []^S {
-	members := gd.nodes_in_group(node, group, context.temp_allocator)
-	out := make([dynamic]^S, 0, len(members), allocator)
-	for m in members {
-		if s := script_of(m, S); s != nil {append(&out, s)}
-	}
-	return out[:]
+scripts_in_group :: proc(node: gd.Object, group: cstring, $S: typeid, allocator := context.temp_allocator) -> []^S {
+    members := gd.nodes_in_group(node, group, context.temp_allocator)
+    out := make([dynamic]^S, 0, len(members), allocator)
+
+    for m in members {
+        if s := script_of(m, S); s != nil {
+            append(&out, s)
+        }
+    }
+
+    return out[:]
 }
 
 // first_script_in_group returns the first group member carrying script `S`, or nil — the
@@ -47,18 +46,30 @@ scripts_in_group :: proc(
 // class — contrast with `gd.first_in_group` + `script_of`, which inspects only whichever
 // node the engine lists first. Allocation-free.
 first_script_in_group :: proc "contextless" (node: gd.Object, group: cstring, $S: typeid) -> ^S {
-	tree := gd.node_get_tree(node)
-	if tree == nil {return nil}
-	g := gd.new_string_name_cstring(group, true)
-	arr := gd.scene_tree_get_nodes_in_group(tree, g)
-	defer gd.free_array(arr.untyped)
-	n := gd.array_size(&arr.untyped)
-	for i in 0 ..< n {
-		v := gd.array_get(&arr.untyped, i)
-		obj := gd.variant_to_object(&v)
-		gd.variant_destroy(&v)
-		if obj == nil {continue}
-		if s := script_of(obj, S); s != nil {return s}
-	}
-	return nil
+    tree := gd.node_get_tree(node)
+
+    if tree == nil {
+        return nil
+    }
+
+    g := gd.new_string_name_cstring(group, true)
+    arr := gd.scene_tree_get_nodes_in_group(tree, g)
+    defer gd.free_array(arr.untyped)
+    n := gd.array_size(&arr.untyped)
+
+    for i in 0 ..< n {
+        v := gd.array_get(&arr.untyped, i)
+        obj := gd.variant_to_object(&v)
+        gd.variant_destroy(&v)
+
+        if obj == nil {
+            continue
+        }
+
+        if s := script_of(obj, S); s != nil {
+            return s
+        }
+    }
+
+    return nil
 }

@@ -8,6 +8,6 @@ package validate_fixture
 import gd "godot:godot"
 
 sample_proc :: proc() -> gd.Int {
-	x: int = 42
-	return gd.Int(x)
+    x: int = 42
+    return gd.Int(x)
 }

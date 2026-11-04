@@ -10,16 +10,18 @@ package wasm_spike
 // Trivial pure proc — the ABI smoke test. GDScript-equivalent: add(2,3) == 5.
 @(export, link_name = "add")
 add :: proc "c" (a, b: i32) -> i32 {
-	return a + b
+    return a + b
 }
 
 // Slightly less trivial: touches memory + a loop, to confirm Odin codegen
 // beyond a single add instruction links cleanly as a side module.
 @(export, link_name = "sum_to")
 sum_to :: proc "c" (n: i32) -> i32 {
-	total: i32 = 0
-	for i: i32 = 1; i <= n; i += 1 {
-		total += i
-	}
-	return total
+    total: i32 = 0
+
+    for i: i32 = 1; i <= n; i += 1 {
+        total += i
+    }
+
+    return total
 }

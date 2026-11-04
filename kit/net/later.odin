@@ -25,55 +25,58 @@ package kit_net
 Later_Proc :: proc(user: rawptr, id: Net_Id, a: u64)
 
 Later_Entry :: struct {
-	due:  f64,
-	cb:   Later_Proc,
-	user: rawptr,
-	id:   Net_Id,
-	a:    u64,
+    due:  f64,
+    cb:   Later_Proc,
+    user: rawptr,
+    id:   Net_Id,
+    a:    u64,
 }
 
 Later :: struct {
-	entries: [dynamic]Later_Entry,
-	due_buf: [dynamic]Later_Entry, // collect-then-call: callbacks may push new entries
+    entries: [dynamic]Later_Entry,
+    due_buf: [dynamic]Later_Entry, // collect-then-call: callbacks may push new entries
 }
 
 later_destroy :: proc(l: ^Later) {
-	delete(l.entries)
-	delete(l.due_buf)
-	l^ = {}
+    delete(l.entries)
+    delete(l.due_buf)
+    l^ = {}
 }
 
 later_push :: proc(l: ^Later, due: f64, user: rawptr, cb: Later_Proc, id := NET_ID_INVALID, a := u64(0)) {
-	assert(cb != nil)
-	append(&l.entries, Later_Entry{due = due, cb = cb, user = user, id = id, a = a})
+    assert(cb != nil)
+    append(&l.entries, Later_Entry{due = due, cb = cb, user = user, id = id, a = a})
 }
 
 // Run everything due at `now`, in push order (stable: same-frame effects
 // present in the order they were queued). Returns how many ran. Effects
 // pushed BY an effect wait for their own due time on a later drain.
 later_drain :: proc(l: ^Later, now: f64) -> int {
-	clear(&l.due_buf)
-	i := 0
-	for i < len(l.entries) {
-		if l.entries[i].due <= now {
-			append(&l.due_buf, l.entries[i])
-			ordered_remove(&l.entries, i)
-		} else {
-			i += 1
-		}
-	}
-	for e in l.due_buf {
-		e.cb(e.user, e.id, e.a)
-	}
-	return len(l.due_buf)
+    clear(&l.due_buf)
+    i := 0
+
+    for i < len(l.entries) {
+        if l.entries[i].due <= now {
+            append(&l.due_buf, l.entries[i])
+            ordered_remove(&l.entries, i)
+        } else {
+            i += 1
+        }
+    }
+
+    for e in l.due_buf {
+        e.cb(e.user, e.id, e.a)
+    }
+
+    return len(l.due_buf)
 }
 
 // Drop everything pending (a level change: the world those effects were
 // about no longer exists).
 later_clear :: proc(l: ^Later) {
-	clear(&l.entries)
+    clear(&l.entries)
 }
 
 later_pending :: proc(l: ^Later) -> int {
-	return len(l.entries)
+    return len(l.entries)
 }

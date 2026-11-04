@@ -14,33 +14,34 @@ import knet "godot:kit/net"
 import play "godot:play"
 
 Kicker3 :: struct {
-	owner:   gd.Character_Body3d,
-	skin:    gd.Mesh_Instance3d `gd:"onready=Skin"`,
-	tag:     gd.Label3d `gd:"onready=Tag"`,
-	net_id:  knet.Net_Id,
-	pos:     [3]f32 `gd:"owner,wire=f16"`,
-	pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
-	mine:    bool, // set by the factory: this peer drives (and streams) this body
-	hx, hz:  f32, // HOST grant-loop scratch: last sampled pose (intent = displacement)
-	painted: bool, // one-shot: skin color + name tag applied
+    owner:   gd.Character_Body3d,
+    skin:    gd.Mesh_Instance3d `gd:"onready=Skin"`,
+    tag:     gd.Label3d `gd:"onready=Tag"`,
+    net_id:  knet.Net_Id,
+    pos:     [3]f32 `gd:"owner,wire=f16"`,
+    pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
+    mine:    bool, // set by the factory: this peer drives (and streams) this body
+    hx, hz:  f32, // HOST grant-loop scratch: last sampled pose (intent = displacement)
+    painted: bool, // one-shot: skin color + name tag applied
 }
 
 // Team by seat: odd player ids defend the LEFT goal, even the RIGHT — a stable
 // split that needs no picker (host is 1 = left; first joiner 2 = right; ...).
 kicker3_team :: proc "contextless" (pid: u8) -> u8 {
-	return pid % 2 == 1 ? u8(1) : u8(2)
+    return pid % 2 == 1 ? u8(1) : u8(2)
 }
 
 kicker3_process :: proc(self: ^Kicker3, delta: f64) {
-	if play.latch(&self.painted, self.pid != 0) {
-		// 3D has no per-node modulate: give this capsule its own material.
-		mat := gd.new_standard_material3d()
-		gd.base_material3d_set_albedo(cast(gd.Base_Material3d)mat, gd.peer_color(int(self.pid)))
-		gd.geometry_instance3d_set_material_override(cast(gd.Geometry_Instance3d)self.skin, cast(gd.Material)mat)
-	}
-	// My own body is driven by input.odin (move_and_slide, then publish).
-	// Everyone else's glides to their stream.
-	if !self.mine {
-		gd.node3d_set_position(cast(gd.Node3d)self.owner, self.pos)
-	}
+    if play.latch(&self.painted, self.pid != 0) {
+        // 3D has no per-node modulate: give this capsule its own material.
+        mat := gd.new_standard_material3d()
+        gd.base_material3d_set_albedo(cast(gd.Base_Material3d)mat, gd.peer_color(int(self.pid)))
+        gd.geometry_instance3d_set_material_override(cast(gd.Geometry_Instance3d)self.skin, cast(gd.Material)mat)
+    }
+
+    // My own body is driven by input.odin (move_and_slide, then publish).
+    // Everyone else's glides to their stream.
+    if !self.mine {
+        gd.node3d_set_position(cast(gd.Node3d)self.owner, self.pos)
+    }
 }

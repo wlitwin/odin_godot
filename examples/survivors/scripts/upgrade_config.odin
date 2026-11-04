@@ -21,28 +21,28 @@ package survivors_scripts
 import gd "godot:godot"
 
 Upgrade_Kind :: enum int {
-	StatMod   = 0,
-	AddWeapon = 1,
-	WeaponMod = 2,
+    StatMod   = 0,
+    AddWeapon = 1,
+    WeaponMod = 2,
 }
 
 // Which player stat a StatMod upgrade adjusts. Matches the switch in player_apply_upgrade.
 Upgrade_Stat :: enum int {
-	MoveSpeed       = 0,
-	MaxHealth       = 1, // also heals by `amount`
-	Damage          = 2, // damage_mult
-	FireRate        = 3, // fire_rate_mult
-	PickupRange     = 4,
-	ProjectileCount = 5,
+    MoveSpeed       = 0,
+    MaxHealth       = 1, // also heals by `amount`
+    Damage          = 2, // damage_mult
+    FireRate        = 3, // fire_rate_mult
+    PickupRange     = 4,
+    ProjectileCount = 5,
 }
 
 UpgradeConfig :: struct {
-	owner:       gd.Resource,
-	name:        gd.String   `gd:"export"`, // short title shown on the button
-	description: gd.String   `gd:"export,multiline"`, // one-line effect blurb
-	kind:        gd.Int      `gd:"export,enum=StatMod:AddWeapon:WeaponMod"`,
-	stat:        gd.Int      `gd:"export,enum=MoveSpeed:MaxHealth:Damage:FireRate:PickupRange:ProjectileCount"`,
-	amount:      f32         `gd:"export"`, // StatMod/WeaponMod magnitude (units depend on `stat`)
-	weapon:      ^gd.Resource `gd:"export,resource=WeaponConfig"`, // AddWeapon: the weapon to grant
-	color:       gd.Color    `gd:"export"`, // button accent tint
+    owner:       gd.Resource,
+    name:        gd.String `gd:"export"`, // short title shown on the button
+    description: gd.String `gd:"export,multiline"`, // one-line effect blurb
+    kind:        gd.Int `gd:"export,enum=StatMod:AddWeapon:WeaponMod"`,
+    stat:        gd.Int `gd:"export,enum=MoveSpeed:MaxHealth:Damage:FireRate:PickupRange:ProjectileCount"`,
+    amount:      f32 `gd:"export"`, // StatMod/WeaponMod magnitude (units depend on `stat`)
+    weapon:      ^gd.Resource `gd:"export,resource=WeaponConfig"`, // AddWeapon: the weapon to grant
+    color:       gd.Color `gd:"export"`, // button accent tint
 }

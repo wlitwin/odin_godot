@@ -40,7 +40,7 @@ core_script_struct: Script_Struct_Proc
 // so the native core can resolve it by name (dlsym) after boot; called directly on web.
 @(export)
 odin_scripts_set_core_api :: proc "c" (script_struct: Script_Struct_Proc) {
-	core_script_struct = script_struct
+    core_script_struct = script_struct
 }
 
 // Typed reference to another node's/resource's Odin script struct. Returns nil when `obj`
@@ -59,14 +59,17 @@ odin_scripts_set_core_api :: proc "c" (script_struct: Script_Struct_Proc) {
 // garbage). Because every script lives in one dll, `T` is the real script struct type, so a
 // matching `script_of(node, Enemy).hp` is a direct field access — no Variant marshaling.
 script_of :: proc "contextless" (obj: gdext.ObjectPtr, $T: typeid) -> ^T {
-	if core_script_struct == nil || obj == nil {
-		return nil
-	}
-	want := identity_for_typeid(typeid_of(T))
-	if want == nil {
-		return nil
-	}
-	return cast(^T)core_script_struct(obj, want)
+    if core_script_struct == nil || obj == nil {
+        return nil
+    }
+
+    want := identity_for_typeid(typeid_of(T))
+
+    if want == nil {
+        return nil
+    }
+
+    return cast(^T)core_script_struct(obj, want)
 }
 
 // ---- The any-class resolver (the static-dispatch door) ----
@@ -85,7 +88,7 @@ core_script_struct_any: Script_Struct_Any_Proc
 // just returns nil; an older scripts dll lacks this export and the core skips it.
 @(export)
 odin_scripts_set_core_api2 :: proc "c" (script_struct_any: Script_Struct_Any_Proc) {
-	core_script_struct_any = script_struct_any
+    core_script_struct_any = script_struct_any
 }
 
 // script_any resolves a live Godot object to its Odin script struct WITHOUT naming the
@@ -105,20 +108,25 @@ odin_scripts_set_core_api2 :: proc "c" (script_struct_any: Script_Struct_Any_Pro
 //
 // Same main-thread contract as script_of.
 script_any :: proc "contextless" (obj: gdext.ObjectPtr) -> (ptr: rawptr, id: typeid) {
-	if core_script_struct_any == nil || obj == nil {
-		return nil, nil
-	}
-	identity_ptr: [^]u8
-	identity_len: uintptr
-	p := core_script_struct_any(obj, &identity_ptr, &identity_len)
-	if p == nil || identity_ptr == nil || identity_len <= 0 {
-		return nil, nil
-	}
-	id = typeid_for_identity(string(identity_ptr[:int(identity_len)]))
-	if id == nil {
-		return nil, nil
-	}
-	return p, id
+    if core_script_struct_any == nil || obj == nil {
+        return nil, nil
+    }
+
+    identity_ptr: [^]u8
+    identity_len: uintptr
+    p := core_script_struct_any(obj, &identity_ptr, &identity_len)
+
+    if p == nil || identity_ptr == nil || identity_len <= 0 {
+        return nil, nil
+    }
+
+    id = typeid_for_identity(string(identity_ptr[:int(identity_len)]))
+
+    if id == nil {
+        return nil, nil
+    }
+
+    return p, id
 }
 
 // lookup finds the table entry whose `id` field matches — the scan behind a per-type
@@ -131,14 +139,15 @@ script_any :: proc "contextless" (obj: gdext.ObjectPtr) -> (ptr: rawptr, id: typ
 // no common header, no id-first layout convention, no casts. The slice param is the
 // LENGTH eraser: `[2]Damage_Entry` and `[7]Interact_Entry` both pass as `TABLE[:]`.
 lookup :: proc "contextless" (table: []$E, id: typeid) -> (entry: E, ok: bool) {
-	if id != nil {
-		for e in table {
-			if e.id == id {
-				return e, true
-			}
-		}
-	}
-	return {}, false
+    if id != nil {
+        for e in table {
+            if e.id == id {
+                return e, true
+            }
+        }
+    }
+
+    return {}, false
 }
 
 // dispatch composes script_any + lookup — the whole "interface" pattern in one call:
@@ -148,10 +157,12 @@ lookup :: proc "contextless" (table: []$E, id: typeid) -> (entry: E, ok: bool) {
 // ok=false folds "not an Odin script" and "no table entry for its class" together; when
 // a call site needs to tell those apart (rare), use script_any + lookup separately.
 dispatch :: proc "contextless" (table: []$E, obj: gdext.ObjectPtr) -> (entry: E, ctx: rawptr, ok: bool) {
-	ptr, id := script_any(obj)
-	if ptr == nil {
-		return {}, nil, false
-	}
-	e, found := lookup(table, id)
-	return e, ptr, found
+    ptr, id := script_any(obj)
+
+    if ptr == nil {
+        return {}, nil, false
+    }
+
+    e, found := lookup(table, id)
+    return e, ptr, found
 }

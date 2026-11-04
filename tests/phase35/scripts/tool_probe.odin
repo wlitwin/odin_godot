@@ -9,5 +9,5 @@ package phase35_scripts
 import gd "godot:godot"
 
 ToolProbe :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }

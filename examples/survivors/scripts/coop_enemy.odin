@@ -14,11 +14,13 @@ package survivors_scripts
 import gd "godot:godot"
 
 CoopEnemy :: struct {
-	owner: gd.Node2d,
-	id:    int `gd:"export"`, // stable cross-peer handle (spawn-replicated)
-	hp:    int `gd:"export"`, // host-owned, synced for client HUD/feedback
+    owner: gd.Node2d,
+    id:    int `gd:"export"`, // stable cross-peer handle (spawn-replicated)
+    hp:    int `gd:"export"`, // host-owned, synced for client HUD/feedback
 }
 
 coop_enemy_ready :: proc(self: ^CoopEnemy) {
-	if self.hp == 0 {self.hp = 20}
+    if self.hp == 0 {
+        self.hp = 20
+    }
 }

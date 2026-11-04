@@ -37,65 +37,74 @@ import knet "godot:kit/net"
 // the lane default; a field's own Field_Desc.cut (> 0) overrides it — but the
 // snap stays entity-coherent (any field past ITS cut snaps the whole pose).
 predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_Desc, cut: f32) {
-	v := knet.subset_view(desc, .Predicted)
-	over := false
-	for e in v.entries {
-		f := v.fields[e.field]
-		off := int(e.struct_off)
-		if .Interp not_in f.flags {
-			continue
-		}
-		fc := f.cut > 0 ? f.cut : cut // per-field cut overrides the lane default
-		#partial switch f.lerp {
-		case .F32:
-			for i in 0 ..< f.size / 4 {
-				d := (^f32)(rawptr(&shown[off + i * 4]))^ - (^f32)(rawptr(&truth[off + i * 4]))^
-				(^f32)(rawptr(&err[off + i * 4]))^ = d
-				if fc > 0 && abs(d) > fc {
-					over = true
-				}
-			}
-		case .Angle:
-			for i in 0 ..< f.size / 4 {
-				// The error is the SHORT arc — a glide across ±π must not
-				// spin the long way any more than the blend does.
-				d := knet.angle_arc((^f32)(rawptr(&truth[off + i * 4]))^, (^f32)(rawptr(&shown[off + i * 4]))^)
-				(^f32)(rawptr(&err[off + i * 4]))^ = d
-				if fc > 0 && abs(d) > fc {
-					over = true
-				}
-			}
-		case .F64:
-			for i in 0 ..< f.size / 8 {
-				d := (^f64)(rawptr(&shown[off + i * 8]))^ - (^f64)(rawptr(&truth[off + i * 8]))^
-				(^f64)(rawptr(&err[off + i * 8]))^ = d
-				if fc > 0 && abs(d) > f64(fc) {
-					over = true
-				}
-			}
-		case .Quat:
-			// A rotation's error is a ROTATION, not a componentwise difference:
-			// err = shown ⊗ conj(truth), the turn that carries truth to shown.
-			// decay eases it toward identity, apply re-applies it — so the drawn
-			// orientation glides to each correction the way a position does. cut
-			// (radians here) snaps past a big jump, as the scalar arms do.
-			for i in 0 ..< f.size / 16 {
-				bo := off + i * 16
-				ct: [4]f32
-				knet.quat_conj(raw_data(ct[:]), ([^]f32)(&truth[bo]))
-				knet.quat_mul(([^]f32)(&err[bo]), ([^]f32)(&shown[bo]), raw_data(ct[:]))
-				knet.quat_normalize(([^]f32)(&err[bo]))
-				if fc > 0 && knet.quat_angle(([^]f32)(&err[bo])) > fc {
-					over = true
-				}
-			}
-		}
-	}
-	if over {
-		for i in 0 ..< len(err) {
-			err[i] = 0
-		}
-	}
+    v := knet.subset_view(desc, .Predicted)
+    over := false
+
+    for e in v.entries {
+        f := v.fields[e.field]
+        off := int(e.struct_off)
+
+        if .Interp not_in f.flags {
+            continue
+        }
+
+        fc := f.cut > 0 ? f.cut : cut // per-field cut overrides the lane default
+
+        #partial switch f.lerp {
+        case .F32:
+            for i in 0 ..< f.size / 4 {
+                d := (^f32)(rawptr(&shown[off + i * 4]))^ - (^f32)(rawptr(&truth[off + i * 4]))^
+                (^f32)(rawptr(&err[off + i * 4]))^ = d
+
+                if fc > 0 && abs(d) > fc {
+                    over = true
+                }
+            }
+        case .Angle:
+            for i in 0 ..< f.size / 4 {
+                // The error is the SHORT arc — a glide across ±π must not
+                // spin the long way any more than the blend does.
+                d := knet.angle_arc((^f32)(rawptr(&truth[off + i * 4]))^, (^f32)(rawptr(&shown[off + i * 4]))^)
+                (^f32)(rawptr(&err[off + i * 4]))^ = d
+
+                if fc > 0 && abs(d) > fc {
+                    over = true
+                }
+            }
+        case .F64:
+            for i in 0 ..< f.size / 8 {
+                d := (^f64)(rawptr(&shown[off + i * 8]))^ - (^f64)(rawptr(&truth[off + i * 8]))^
+                (^f64)(rawptr(&err[off + i * 8]))^ = d
+
+                if fc > 0 && abs(d) > f64(fc) {
+                    over = true
+                }
+            }
+        case .Quat:
+            // A rotation's error is a ROTATION, not a componentwise difference:
+            // err = shown ⊗ conj(truth), the turn that carries truth to shown.
+            // decay eases it toward identity, apply re-applies it — so the drawn
+            // orientation glides to each correction the way a position does. cut
+            // (radians here) snaps past a big jump, as the scalar arms do.
+            for i in 0 ..< f.size / 16 {
+                bo := off + i * 16
+                ct: [4]f32
+                knet.quat_conj(raw_data(ct[:]), ([^]f32)(&truth[bo]))
+                knet.quat_mul(([^]f32)(&err[bo]), ([^]f32)(&shown[bo]), raw_data(ct[:]))
+                knet.quat_normalize(([^]f32)(&err[bo]))
+
+                if fc > 0 && knet.quat_angle(([^]f32)(&err[bo])) > fc {
+                    over = true
+                }
+            }
+        }
+    }
+
+    if over {
+        for i in 0 ..< len(err) {
+            err[i] = 0
+        }
+    }
 }
 
 // One frame of exponential decay per field: err *= 0.5^(dt/half_life), where a
@@ -103,129 +112,151 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 // lane default. Per-field k is why a slow-gliding avatar and a snappy ball can
 // share one lane.
 predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflife: f64) {
-	v := knet.subset_view(desc, .Predicted)
-	for e in v.entries {
-		f := v.fields[e.field]
-		off := int(e.struct_off)
-		if .Interp not_in f.flags {
-			continue
-		}
-		hl := f.glide > 0 ? f64(f.glide) : halflife
-		k := f32(math.pow(0.5, dt / hl))
-		#partial switch f.lerp {
-		case .F32, .Angle: // an angle error is already the short arc — plain decay
-			for i in 0 ..< f.size / 4 {
-				(^f32)(rawptr(&err[off + i * 4]))^ *= k
-			}
-		case .F64:
-			for i in 0 ..< f.size / 8 {
-				(^f64)(rawptr(&err[off + i * 8]))^ *= f64(k)
-			}
-		case .Quat:
-			// The rotational twin of `err *= k`: nlerp from identity to the
-			// current error by k shrinks its angle by k each frame, easing the
-			// rotation error toward "no correction" (identity, not zero).
-			ident := [4]f32{0, 0, 0, 1}
-			for i in 0 ..< f.size / 16 {
-				bo := off + i * 16
-				knet.quat_nlerp(([^]f32)(&err[bo]), raw_data(ident[:]), ([^]f32)(&err[bo]), k)
-			}
-		}
-	}
+    v := knet.subset_view(desc, .Predicted)
+
+    for e in v.entries {
+        f := v.fields[e.field]
+        off := int(e.struct_off)
+
+        if .Interp not_in f.flags {
+            continue
+        }
+
+        hl := f.glide > 0 ? f64(f.glide) : halflife
+        k := f32(math.pow(0.5, dt / hl))
+
+        #partial switch f.lerp {
+        case .F32, .Angle:
+            // an angle error is already the short arc — plain decay
+            for i in 0 ..< f.size / 4 {
+                (^f32)(rawptr(&err[off + i * 4]))^ *= k
+            }
+        case .F64:
+            for i in 0 ..< f.size / 8 {
+                (^f64)(rawptr(&err[off + i * 8]))^ *= f64(k)
+            }
+        case .Quat:
+            // The rotational twin of `err *= k`: nlerp from identity to the
+            // current error by k shrinks its angle by k each frame, easing the
+            // rotation error toward "no correction" (identity, not zero).
+            ident := [4]f32{0, 0, 0, 1}
+
+            for i in 0 ..< f.size / 16 {
+                bo := off + i * 16
+                knet.quat_nlerp(([^]f32)(&err[bo]), raw_data(ident[:]), ([^]f32)(&err[bo]), k)
+            }
+        }
+    }
 }
 
 // Present: add the decayed error onto the entity's float interp fields (the
 // caller restores the sim state first, so this is shown = truth + err).
 predict_error_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, err: []u8) {
-	v := knet.subset_view(desc, .Predicted)
-	for e in v.entries {
-		f := v.fields[e.field]
-		off := int(e.struct_off)
-		if .Interp not_in f.flags {
-			continue
-		}
-		base := uintptr(entity) + f.offset
-		#partial switch f.lerp {
-		case .F32:
-			for i in 0 ..< f.size / 4 {
-				(^f32)(rawptr(base + uintptr(i * 4)))^ += (^f32)(rawptr(&err[off + i * 4]))^
-			}
-		case .Angle:
-			for i in 0 ..< f.size / 4 {
-				p := (^f32)(rawptr(base + uintptr(i * 4)))
-				// add the gliding error, then keep the shown value in (-π, π]
-				p^ = knet.angle_arc(0, p^ + (^f32)(rawptr(&err[off + i * 4]))^)
-			}
-		case .F64:
-			for i in 0 ..< f.size / 8 {
-				(^f64)(rawptr(base + uintptr(i * 8)))^ += (^f64)(rawptr(&err[off + i * 8]))^
-			}
-		case .Quat:
-			// shown = err ⊗ truth (the entity field holds truth here). A zeroed
-			// error — the over-snap path, which can't know to write identity —
-			// reads as "no correction", so leave truth untouched.
-			for i in 0 ..< f.size / 16 {
-				bo := off + i * 16
-				e := ([^]f32)(&err[bo])
-				if e[0] == 0 && e[1] == 0 && e[2] == 0 && e[3] == 0 {
-					continue
-				}
-				p := ([^]f32)(rawptr(base + uintptr(i * 16)))
-				out: [4]f32
-				knet.quat_mul(raw_data(out[:]), e, p)
-				knet.quat_normalize(raw_data(out[:]))
-				p[0] = out[0];p[1] = out[1];p[2] = out[2];p[3] = out[3]
-			}
-		}
-	}
+    v := knet.subset_view(desc, .Predicted)
+
+    for e in v.entries {
+        f := v.fields[e.field]
+        off := int(e.struct_off)
+
+        if .Interp not_in f.flags {
+            continue
+        }
+
+        base := uintptr(entity) + f.offset
+
+        #partial switch f.lerp {
+        case .F32:
+            for i in 0 ..< f.size / 4 {
+                (^f32)(rawptr(base + uintptr(i * 4)))^ += (^f32)(rawptr(&err[off + i * 4]))^
+            }
+        case .Angle:
+            for i in 0 ..< f.size / 4 {
+                p := (^f32)(rawptr(base + uintptr(i * 4)))
+                // add the gliding error, then keep the shown value in (-π, π]
+                p^ = knet.angle_arc(0, p^ + (^f32)(rawptr(&err[off + i * 4]))^)
+            }
+        case .F64:
+            for i in 0 ..< f.size / 8 {
+                (^f64)(rawptr(base + uintptr(i * 8)))^ += (^f64)(rawptr(&err[off + i * 8]))^
+            }
+        case .Quat:
+            // shown = err ⊗ truth (the entity field holds truth here). A zeroed
+            // error — the over-snap path, which can't know to write identity —
+            // reads as "no correction", so leave truth untouched.
+            for i in 0 ..< f.size / 16 {
+                bo := off + i * 16
+                e := ([^]f32)(&err[bo])
+
+                if e[0] == 0 && e[1] == 0 && e[2] == 0 && e[3] == 0 {
+                    continue
+                }
+
+                p := ([^]f32)(rawptr(base + uintptr(i * 16)))
+                out: [4]f32
+                knet.quat_mul(raw_data(out[:]), e, p)
+                knet.quat_normalize(raw_data(out[:]))
+                p[0] = out[0]
+                p[1] = out[1]
+                p[2] = out[2]
+                p[3] = out[3]
+            }
+        }
+    }
 }
 
 // Write the interpolation of two predict-set blobs (struct layout, the shape
 // History holds) into the entity's predicted fields. alpha 0 = a, 1 = b.
 predict_blend :: proc(entity: rawptr, desc: ^knet.Entity_Desc, a: []u8, b: []u8, alpha: f32) {
-	v := knet.subset_view(desc, .Predicted)
-	for e in v.entries {
-		f := v.fields[e.field]
-		off := int(e.struct_off)
-		dst := rawptr(uintptr(entity) + f.offset)
-		if .Interp not_in f.flags {
-			// Discrete: hold the earlier sample until the later one's time
-			// truly arrives — the same step rule the stream ring applies.
-			copy(([^]u8)(dst)[:f.size], a[off:off + f.size])
-			continue
-		}
-		ap := rawptr(&a[off])
-		bp := rawptr(&b[off])
-		switch f.lerp {
-		case .Snap:
-			copy(([^]u8)(dst)[:f.size], a[off:off + f.size])
-		case .F32:
-			df := ([^]f32)(dst)
-			af := ([^]f32)(ap)
-			bf := ([^]f32)(bp)
-			for i in 0 ..< f.size / 4 {
-				df[i] = af[i] + (bf[i] - af[i]) * alpha
-			}
-		case .F64:
-			dd := ([^]f64)(dst)
-			ad := ([^]f64)(ap)
-			bd := ([^]f64)(bp)
-			for i in 0 ..< f.size / 8 {
-				dd[i] = ad[i] + (bd[i] - ad[i]) * f64(alpha)
-			}
-		case .Angle:
-			df := ([^]f32)(dst)
-			af := ([^]f32)(ap)
-			bf := ([^]f32)(bp)
-			for i in 0 ..< f.size / 4 {
-				df[i] = knet.angle_lerp(af[i], bf[i], alpha) // shortest arc across ±π
-			}
-		case .Quat:
-			// The stream path's nlerp, verbatim — hemisphere flip and the
-			// antipode hold live in ONE place (knet), never a drifted twin.
-			knet.quat_nlerp(([^]f32)(dst), ([^]f32)(ap), ([^]f32)(bp), alpha)
-		case .Custom:
-			f.blend(dst, ap, bp, alpha)
-		}
-	}
+    v := knet.subset_view(desc, .Predicted)
+
+    for e in v.entries {
+        f := v.fields[e.field]
+        off := int(e.struct_off)
+        dst := rawptr(uintptr(entity) + f.offset)
+
+        if .Interp not_in f.flags {
+            // Discrete: hold the earlier sample until the later one's time
+            // truly arrives — the same step rule the stream ring applies.
+            copy(([^]u8)(dst)[:f.size], a[off:off + f.size])
+            continue
+        }
+
+        ap := rawptr(&a[off])
+        bp := rawptr(&b[off])
+
+        switch f.lerp {
+        case .Snap:
+            copy(([^]u8)(dst)[:f.size], a[off:off + f.size])
+        case .F32:
+            df := ([^]f32)(dst)
+            af := ([^]f32)(ap)
+            bf := ([^]f32)(bp)
+
+            for i in 0 ..< f.size / 4 {
+                df[i] = af[i] + (bf[i] - af[i]) * alpha
+            }
+        case .F64:
+            dd := ([^]f64)(dst)
+            ad := ([^]f64)(ap)
+            bd := ([^]f64)(bp)
+
+            for i in 0 ..< f.size / 8 {
+                dd[i] = ad[i] + (bd[i] - ad[i]) * f64(alpha)
+            }
+        case .Angle:
+            df := ([^]f32)(dst)
+            af := ([^]f32)(ap)
+            bf := ([^]f32)(bp)
+
+            for i in 0 ..< f.size / 4 {
+                df[i] = knet.angle_lerp(af[i], bf[i], alpha) // shortest arc across ±π
+            }
+        case .Quat:
+            // The stream path's nlerp, verbatim — hemisphere flip and the
+            // antipode hold live in ONE place (knet), never a drifted twin.
+            knet.quat_nlerp(([^]f32)(dst), ([^]f32)(ap), ([^]f32)(bp), alpha)
+        case .Custom:
+            f.blend(dst, ap, bp, alpha)
+        }
+    }
 }

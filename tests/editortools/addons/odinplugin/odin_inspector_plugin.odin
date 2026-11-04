@@ -22,7 +22,7 @@ package odinplugin
 import gd "godot:godot"
 
 OdinInspectorPlugin :: struct {
-	owner: gd.Object,
+    owner: gd.Object,
 }
 
 // `_can_handle(object: Object) -> bool` — customize every object (true). The gd_name is
@@ -30,12 +30,12 @@ OdinInspectorPlugin :: struct {
 // underscore), which is the engine virtual name the Inspector dispatches.
 @(gd_method)
 odin_inspector_plugin__can_handle :: proc(self: ^OdinInspectorPlugin, object: ^gd.Object) -> bool {
-	return true
+    return true
 }
 
 // `_parse_begin(object: Object)` — runs at the top of the object's Inspector. Here it just
 // emits an observable sentinel (a real plugin would `add_custom_control(...)` a label/button).
 @(gd_method)
 odin_inspector_plugin__parse_begin :: proc(self: ^OdinInspectorPlugin, object: ^gd.Object) {
-	gd.print("EDITORTOOLS_INSPECTOR_PARSE_BEGIN")
+    gd.print("EDITORTOOLS_INSPECTOR_PARSE_BEGIN")
 }

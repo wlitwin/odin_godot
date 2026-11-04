@@ -46,19 +46,20 @@ Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z:
 // re-declares it to everyone already connected (SES_AOI). Client streams route
 // through the host authority gateway in either mode.
 session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: rawptr, locator: Locator_Proc) {
-	context.allocator = ses_allocator(s) // the SES_AOI re-declare's writer is the session's, not the caller's frame's
-	was := interest_on(s)
-	s.interest_r = radius
-	s.interest_hys = hysteresis
-	s.interest_user = user
-	s.locator = locator
-	if s.ran && s.is_host && s.send != nil && interest_on(s) != was {
-		w := knet.writer_make()
-		defer knet.writer_destroy(&w)
-		knet.write_u8(&w, SES_AOI)
-		knet.write_bool(&w, interest_on(s))
-		broadcast(s, knet.writer_bytes(&w), .Reliable)
-	}
+    context.allocator = ses_allocator(s) // the SES_AOI re-declare's writer is the session's, not the caller's frame's
+    was := interest_on(s)
+    s.interest_r = radius
+    s.interest_hys = hysteresis
+    s.interest_user = user
+    s.locator = locator
+
+    if s.ran && s.is_host && s.send != nil && interest_on(s) != was {
+        w := knet.writer_make()
+        defer knet.writer_destroy(&w)
+        knet.write_u8(&w, SES_AOI)
+        knet.write_bool(&w, interest_on(s))
+        broadcast(s, knet.writer_bytes(&w), .Reliable)
+    }
 }
 
 // Host: where `player` is looking from — almost always their avatar, fed
@@ -66,18 +67,18 @@ session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: ra
 // default: filtering starts when the game starts saying where they are).
 // `z` defaults away for 2D games.
 session_set_focus :: proc(s: ^Session, player: knet.Player_Id, x, y: f32, z: f32 = 0) {
-	// A zero map captures context.allocator at its FIRST insert and self-carries
-	// it forever after — so this one line decides where s.focus LIVES for the
-	// whole run. Called every host frame from game code, that first caller was
-	// whatever ambient happened to be installed: a frame arena would have handed
-	// the session a map that dies underneath it. The tracking pin caught it.
-	context.allocator = ses_allocator(s)
-	s.focus[player] = {x, y, z}
+    // A zero map captures context.allocator at its FIRST insert and self-carries
+    // it forever after — so this one line decides where s.focus LIVES for the
+    // whole run. Called every host frame from game code, that first caller was
+    // whatever ambient happened to be installed: a frame arena would have handed
+    // the session a map that dies underneath it. The tracking pin caught it.
+    context.allocator = ses_allocator(s)
+    s.focus[player] = {x, y, z}
 }
 
 @(private)
 interest_on :: proc(s: ^Session) -> bool {
-	return s.is_host && s.interest_r > 0 && s.locator != nil
+    return s.is_host && s.interest_r > 0 && s.locator != nil
 }
 
 // A struct key, not a packed u64: `u64(player) << 32 | u64(id)` silently
@@ -85,19 +86,19 @@ interest_on :: proc(s: ^Session) -> bool {
 // exactly the kind of invariant nobody re-checks when it breaks.
 @(private)
 Interest_Key :: struct {
-	player: knet.Player_Id,
-	id:     knet.Net_Id,
+    player: knet.Player_Id,
+    id:     knet.Net_Id,
 }
 
 @(private = "file")
 ikey :: proc(player: knet.Player_Id, id: knet.Net_Id) -> Interest_Key {
-	return Interest_Key{player, id}
+    return Interest_Key{player, id}
 }
 
 @(private = "file")
 d2 :: proc(a: [3]f32, bx, by, bz: f32) -> f32 {
-	dx, dy, dz := bx - a.x, by - a.y, bz - a.z
-	return dx * dx + dy * dy + dz * dz
+    dx, dy, dz := bx - a.x, by - a.y, bz - a.z
+    return dx * dx + dy * dy + dz * dz
 }
 
 // Host, once per net tick before the delta send: refresh every peer's
@@ -105,54 +106,62 @@ d2 :: proc(a: [3]f32, bx, by, bz: f32) -> f32 {
 // EXIT just forgets — the peer keeps a stale ghost until re-entry.
 @(private)
 interest_tick :: proc(s: ^Session) {
-	for pid, p in s.players {
-		if !p.connected || pid == s.me {
-			continue
-		}
-		focus, watching := s.focus[pid]
-		if !watching {
-			continue // no focus yet: this peer receives everything (see below)
-		}
-		for id in s.types {
-			e, live := s.reg.entries[id]
-			if !live {
-				continue
-			}
-			x, y, z, always := s.locator(s.interest_user, id, e.entity)
-			key := ikey(pid, id)
-			in_set := s.interest[key]
-			lim := in_set ? s.interest_r + s.interest_hys : s.interest_r
-			dd := d2(focus, x, y, z)
-			near := always || dd <= lim * lim
-			if near {
-				// Distance² for the bandwidth budget's near-first tiebreak
-				// (always-visible entities count as centered, 0).
-				s.interest_d2[key] = always ? 0 : dd
-				if !in_set {
-					s.interest[key] = true
-					// The re-entry resync: everything this peer missed while the
-					// entity was out of sight, in one reconciling spawn tuple.
-					w := knet.writer_make()
-					defer knet.writer_destroy(&w)
-					knet.write_u8(&w, SES_SPAWN)
-					write_spawn_tuple(s, &w, id)
-					session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
-				}
-			} else if in_set {
-				delete_key(&s.interest, key)
-				delete_key(&s.interest_d2, key)
-			}
-		}
-	}
+    for pid, p in s.players {
+        if !p.connected || pid == s.me {
+            continue
+        }
+
+        focus, watching := s.focus[pid]
+
+        if !watching {
+            continue // no focus yet: this peer receives everything (see below)
+        }
+
+        for id in s.types {
+            e, live := s.reg.entries[id]
+
+            if !live {
+                continue
+            }
+
+            x, y, z, always := s.locator(s.interest_user, id, e.entity)
+            key := ikey(pid, id)
+            in_set := s.interest[key]
+            lim := in_set ? s.interest_r + s.interest_hys : s.interest_r
+            dd := d2(focus, x, y, z)
+            near := always || dd <= lim * lim
+
+            if near {
+                // Distance² for the bandwidth budget's near-first tiebreak
+                // (always-visible entities count as centered, 0).
+                s.interest_d2[key] = always ? 0 : dd
+
+                if !in_set {
+                    s.interest[key] = true
+                    // The re-entry resync: everything this peer missed while the
+                    // entity was out of sight, in one reconciling spawn tuple.
+                    w := knet.writer_make()
+                    defer knet.writer_destroy(&w)
+                    knet.write_u8(&w, SES_SPAWN)
+                    write_spawn_tuple(s, &w, id)
+                    session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
+                }
+            } else if in_set {
+                delete_key(&s.interest, key)
+                delete_key(&s.interest_d2, key)
+            }
+        }
+    }
 }
 
 // Is `id` currently in `player`'s interest? Peers with no focus see all.
 @(private)
 interest_has :: proc(s: ^Session, player: knet.Player_Id, id: knet.Net_Id) -> bool {
-	if _, watching := s.focus[player]; !watching {
-		return true
-	}
-	return s.interest[ikey(player, id)]
+    if _, watching := s.focus[player]; !watching {
+        return true
+    }
+
+    return s.interest[ikey(player, id)]
 }
 
 // Shared freshness query for higher-level lanes (notably kit/sim snapshots).
@@ -160,22 +169,23 @@ interest_has :: proc(s: ^Session, player: knet.Player_Id, id: knet.Net_Id) -> bo
 // behavior. Existence remains global; this only decides whether a per-tick
 // state row is useful to this recipient now.
 session_interest_contains :: proc(s: ^Session, player: knet.Player_Id, id: knet.Net_Id) -> bool {
-	return interest_has(s, player, id)
+    return interest_has(s, player, id)
 }
 
 session_interest_distance_sq :: proc(
-	s: ^Session,
-	player: knet.Player_Id,
-	id: knet.Net_Id,
+    s: ^Session,
+    player: knet.Player_Id,
+    id: knet.Net_Id,
 ) -> (
-	distance_sq: f32,
-	known: bool,
+    distance_sq: f32,
+    known: bool,
 ) {
-	if _, focused := s.focus[player]; !focused {
-		return 0, false
-	}
-	distance_sq, known = s.interest_d2[ikey(player, id)]
-	return
+    if _, focused := s.focus[player]; !focused {
+        return 0, false
+    }
+
+    distance_sq, known = s.interest_d2[ikey(player, id)]
+    return
 }
 
 // Host: the interest-aware SES_STATE send — one collection (one shadow
@@ -183,36 +193,44 @@ session_interest_distance_sq :: proc(
 // state events.
 @(private)
 interest_send_state :: proc(s: ^Session, changed: ^[dynamic]knet.Net_Id) -> int {
-	scratch := knet.writer_make(4096, context.temp_allocator)
-	segs := make([dynamic]knet.Delta_Seg, context.temp_allocator)
-	dirty := knet.registry_collect_deltas(&scratch, &s.reg, &segs, changed)
-	if dirty == 0 {
-		return 0
-	}
-	for pid, p in s.players {
-		if !p.connected || pid == s.me {
-			continue
-		}
-		w := knet.writer_make(256, context.temp_allocator)
-		knet.write_u8(&w, SES_STATE)
-		count_at := len(w.buf)
-		knet.write_u16(&w, 0)
-		count := 0
-		for seg in segs {
-			if !interest_has(s, pid, seg.id) {
-				continue
-			}
-			append(&w.buf, ..scratch.buf[seg.from:seg.to])
-			count += 1
-		}
-		if count == 0 {
-			continue
-		}
-		w.buf[count_at] = u8(count)
-		w.buf[count_at + 1] = u8(count >> 8)
-		session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
-	}
-	return dirty
+    scratch := knet.writer_make(4096, context.temp_allocator)
+    segs := make([dynamic]knet.Delta_Seg, context.temp_allocator)
+    dirty := knet.registry_collect_deltas(&scratch, &s.reg, &segs, changed)
+
+    if dirty == 0 {
+        return 0
+    }
+
+    for pid, p in s.players {
+        if !p.connected || pid == s.me {
+            continue
+        }
+
+        w := knet.writer_make(256, context.temp_allocator)
+        knet.write_u8(&w, SES_STATE)
+        count_at := len(w.buf)
+        knet.write_u16(&w, 0)
+        count := 0
+
+        for seg in segs {
+            if !interest_has(s, pid, seg.id) {
+                continue
+            }
+
+            append(&w.buf, ..scratch.buf[seg.from:seg.to])
+            count += 1
+        }
+
+        if count == 0 {
+            continue
+        }
+
+        w.buf[count_at] = u8(count)
+        w.buf[count_at + 1] = u8(count >> 8)
+        session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
+    }
+
+    return dirty
 }
 
 // Split a raw stream batch (everything after the SES_STREAM tag: the sender
@@ -221,59 +239,72 @@ interest_send_state :: proc(s: ^Session, changed: ^[dynamic]knet.Net_Id) -> int 
 // outgoing batch and to forward a client owner's batch (exclude the origin).
 @(private)
 interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id, tick: u64 = 0) {
-	// The registry owns the batch layout end to end — this routing only ever
-	// sees opaque per-entity ranges to copy, so a wire change there can never
-	// silently mis-split here.
-	segs := make([dynamic]knet.Delta_Seg, 0, 16, context.temp_allocator)
-	sender_now, ok := knet.registry_collect_stream_segs(raw, &segs)
-	if !ok {
-		return // torn batch: forward nothing (the next tick supersedes)
-	}
-	budget := s.cfg.stream_budget
-	for pid, p in s.players {
-		if !p.connected || pid == s.me || p.peer == exclude {
-			continue
-		}
-		// The peer's interested segments, in the order they will be sent. With a
-		// budget on, that order is PRIORITY: stalest first (nothing starves),
-		// nearest breaking ties — and only the prefix that fits is sent, the rest
-		// deferred to a tick when their staleness has climbed. With no budget the
-		// registry's own order stands and everyone gets everything.
-		picks := make([dynamic]knet.Delta_Seg, 0, len(segs), context.temp_allocator)
-		for seg in segs {
-			if interest_has(s, pid, seg.id) {
-				append(&picks, seg)
-			}
-		}
-		if budget > 0 && len(picks) > 0 {
-			interest_prioritize(s, pid, tick, picks[:])
-		}
-		w := knet.writer_make(128, context.temp_allocator)
-		knet.write_u8(&w, SES_STREAM)
-		knet.write_f64(&w, sender_now)
-		count_at := len(w.buf)
-		knet.write_u16(&w, 0)
-		n := 0
-		used := 0
-		for seg in picks {
-			size := seg.to - seg.from
-			if budget > 0 && n > 0 && used + size > budget {
-				break // the peer's slice is full — the rest ride a later tick
-			}
-			append(&w.buf, ..raw[seg.from:seg.to])
-			used += size
-			n += 1
-			if budget > 0 {
-				s.stream_sent[ikey(pid, seg.id)] = tick // reset this pair's staleness
-			}
-		}
-		if n == 0 {
-			continue
-		}
-		assert(n <= int(max(u16)))
-		knet.writer_patch_u16(&w, count_at, u16(n))
-		session_send_packet(s, p.peer, knet.writer_bytes(&w), .Stream)
-	}
+    // The registry owns the batch layout end to end — this routing only ever
+    // sees opaque per-entity ranges to copy, so a wire change there can never
+    // silently mis-split here.
+    segs := make([dynamic]knet.Delta_Seg, 0, 16, context.temp_allocator)
+    sender_now, ok := knet.registry_collect_stream_segs(raw, &segs)
+
+    if !ok {
+        return // torn batch: forward nothing (the next tick supersedes)
+    }
+
+    budget := s.cfg.stream_budget
+
+    for pid, p in s.players {
+        if !p.connected || pid == s.me || p.peer == exclude {
+            continue
+        }
+
+        // The peer's interested segments, in the order they will be sent. With a
+        // budget on, that order is PRIORITY: stalest first (nothing starves),
+        // nearest breaking ties — and only the prefix that fits is sent, the rest
+        // deferred to a tick when their staleness has climbed. With no budget the
+        // registry's own order stands and everyone gets everything.
+        picks := make([dynamic]knet.Delta_Seg, 0, len(segs), context.temp_allocator)
+
+        for seg in segs {
+            if interest_has(s, pid, seg.id) {
+                append(&picks, seg)
+            }
+        }
+
+        if budget > 0 && len(picks) > 0 {
+            interest_prioritize(s, pid, tick, picks[:])
+        }
+
+        w := knet.writer_make(128, context.temp_allocator)
+        knet.write_u8(&w, SES_STREAM)
+        knet.write_f64(&w, sender_now)
+        count_at := len(w.buf)
+        knet.write_u16(&w, 0)
+        n := 0
+        used := 0
+
+        for seg in picks {
+            size := seg.to - seg.from
+
+            if budget > 0 && n > 0 && used + size > budget {
+                break // the peer's slice is full — the rest ride a later tick
+            }
+
+            append(&w.buf, ..raw[seg.from:seg.to])
+            used += size
+            n += 1
+
+            if budget > 0 {
+                s.stream_sent[ikey(pid, seg.id)] = tick // reset this pair's staleness
+            }
+        }
+
+        if n == 0 {
+            continue
+        }
+
+        assert(n <= int(max(u16)))
+        knet.writer_patch_u16(&w, count_at, u16(n))
+        session_send_packet(s, p.peer, knet.writer_bytes(&w), .Stream)
+    }
 }
 
 // Sort a peer's interested segments into SEND order for the budget: stalest
@@ -283,40 +314,55 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id, tick: u
 // the registry's order.
 @(private = "file")
 interest_prioritize :: proc(s: ^Session, pid: knet.Player_Id, tick: u64, picks: []knet.Delta_Seg) {
-	// Odin's sort predicate takes no context, so SCORE each pick into a parallel
-	// array (its staleness/distance are fixed for this tick) and sort that.
-	Score :: struct {
-		seg:   knet.Delta_Seg,
-		stale: u64,
-		d2:    f32,
-	}
-	scored := make([]Score, len(picks), context.temp_allocator)
-	for seg, i in picks {
-		last, sent := s.stream_sent[ikey(pid, seg.id)]
-		stale := sent ? tick - last : max(u64) // never shipped -> maximally stale
-		scored[i] = Score{seg = seg, stale = stale, d2 = s.interest_d2[ikey(pid, seg.id)]}
-	}
-	slice.stable_sort_by(scored, proc(a, b: Score) -> bool {
-		if a.stale != b.stale {return a.stale > b.stale} // stalest first
-		return a.d2 < b.d2 // then nearest
-	})
-	for sc, i in scored {
-		picks[i] = sc.seg
-	}
+    // Odin's sort predicate takes no context, so SCORE each pick into a parallel
+    // array (its staleness/distance are fixed for this tick) and sort that.
+    Score :: struct {
+        seg:   knet.Delta_Seg,
+        stale: u64,
+        d2:    f32,
+    }
+
+    scored := make([]Score, len(picks), context.temp_allocator)
+
+    for seg, i in picks {
+        last, sent := s.stream_sent[ikey(pid, seg.id)]
+        stale := sent ? tick - last : max(u64) // never shipped -> maximally stale
+        scored[i] = Score {
+            seg   = seg,
+            stale = stale,
+            d2    = s.interest_d2[ikey(pid, seg.id)],
+        }
+    }
+
+    slice.stable_sort_by(
+        scored,
+        proc(a, b: Score) -> bool {
+            if a.stale != b.stale {
+                return a.stale > b.stale
+            } // stalest first
+
+            return a.d2 < b.d2 // then nearest
+        },
+    )
+
+    for sc, i in scored {
+        picks[i] = sc.seg
+    }
 }
 
 // Forget an entity everywhere (despawn) or a player entirely (teardown).
 @(private)
 interest_forget_entity :: proc(s: ^Session, id: knet.Net_Id) {
-	for pid in s.players {
-		delete_key(&s.interest, ikey(pid, id))
-	}
+    for pid in s.players {
+        delete_key(&s.interest, ikey(pid, id))
+    }
 }
 
 @(private)
 interest_forget_player :: proc(s: ^Session, player: knet.Player_Id) {
-	delete_key(&s.focus, player)
-	for id in s.types {
-		delete_key(&s.interest, ikey(player, id))
-	}
+    delete_key(&s.focus, player)
+
+    for id in s.types {
+        delete_key(&s.interest, ikey(player, id))
+    }
 }

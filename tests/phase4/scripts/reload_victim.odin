@@ -11,9 +11,9 @@ import "godot:gdext"
 import gd "godot:godot"
 
 ReloadVictim :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 reload_victim_reload :: proc(self: ^ReloadVictim) {
-	gdext.object_destroy(cast(gdext.ObjectPtr)self.owner)
+    gdext.object_destroy(cast(gdext.ObjectPtr)self.owner)
 }

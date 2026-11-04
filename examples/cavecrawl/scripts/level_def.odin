@@ -12,10 +12,10 @@ package cavecrawl_scripts
 import gd "godot:godot"
 
 Level_Def :: struct {
-	owner:       gd.Resource,
-	scene:       ^gd.Resource `gd:"export,resource=PackedScene"`, // the floor's stage (markers + decoration), loaded LOCALLY by every peer
-	gems:        gd.Int `gd:"export,range=0:99:1"`, // chest stock
-	torches:     gd.Int `gd:"export,range=0:99:1"`,
-	wave_counts: gd.Packed_Int32_Array `gd:"export"`, // dwellers per wave
-	wave_rests:  gd.Packed_Int32_Array `gd:"export"`, // calm ticks after each wave clears
+    owner:       gd.Resource,
+    scene:       ^gd.Resource `gd:"export,resource=PackedScene"`, // the floor's stage (markers + decoration), loaded LOCALLY by every peer
+    gems:        gd.Int `gd:"export,range=0:99:1"`, // chest stock
+    torches:     gd.Int `gd:"export,range=0:99:1"`,
+    wave_counts: gd.Packed_Int32_Array `gd:"export"`, // dwellers per wave
+    wave_rests:  gd.Packed_Int32_Array `gd:"export"`, // calm ticks after each wave clears
 }

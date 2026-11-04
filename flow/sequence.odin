@@ -58,14 +58,14 @@ import "core:slice"
 
 // Status is the result of ticking an Action (and, recursively, its subtree).
 Status :: enum {
-	Running, // not finished yet — tick again next frame
-	Done, // finished; safe to stop ticking (re-ticking a Done node is a harmless no-op)
+    Running, // not finished yet — tick again next frame
+    Done, // finished; safe to stop ticking (re-ticking a Done node is a harmless no-op)
 }
 
 // Join selects when a Parallel is considered finished.
 Join :: enum {
-	All, // finished when every child is Done   (`parallel`)
-	Any, // finished when the first child is Done (`race`)
+    All, // finished when every child is Done   (`parallel`)
+    Any, // finished when the first child is Done (`race`)
 }
 
 Action_Proc :: proc(ctx: rawptr)
@@ -84,56 +84,64 @@ Custom_Free :: proc(data: rawptr)
 // `parallel` does to its already-done children while a slow sibling runs — never
 // repeats a side effect or regresses.
 Action :: union {
-	Wait, // wait a fixed number of seconds
-	Wait_Flag, // wait until a bool the caller owns becomes true (the `await signal` shape)
-	Wait_Until, // wait until a predicate over ctx returns true
-	Wait_Frames, // wait a fixed number of ticks regardless of delta
-	Call, // run a proc once, then complete instantly
-	Sequence, // run children in order
-	Parallel, // run children together (see Join)
-	Repeat, // run a body N times (or forever), resetting it between iterations
-	Custom, // an externally-defined step (the engine-bridge escape hatch)
+    Wait, // wait a fixed number of seconds
+    Wait_Flag, // wait until a bool the caller owns becomes true (the `await signal` shape)
+    Wait_Until, // wait until a predicate over ctx returns true
+    Wait_Frames, // wait a fixed number of ticks regardless of delta
+    Call, // run a proc once, then complete instantly
+    Sequence, // run children in order
+    Parallel, // run children together (see Join)
+    Repeat, // run a body N times (or forever), resetting it between iterations
+    Custom, // an externally-defined step (the engine-bridge escape hatch)
 }
 
 Wait :: struct {
-	duration: f64,
-	elapsed:  f64,
+    duration: f64,
+    elapsed:  f64,
 }
+
 Wait_Flag :: struct {
-	flag:      ^bool,
-	satisfied: bool,
+    flag:      ^bool,
+    satisfied: bool,
 }
+
 Wait_Until :: struct {
-	pred:      Predicate,
-	satisfied: bool,
+    pred:      Predicate,
+    satisfied: bool,
 }
+
 Call :: struct {
-	fn:    Action_Proc,
-	fired: bool,
+    fn:    Action_Proc,
+    fired: bool,
 }
+
 Sequence :: struct {
-	steps:  []Action,
-	cursor: int,
+    steps:  []Action,
+    cursor: int,
 }
+
 Parallel :: struct {
-	steps:    []Action,
-	join:     Join,
-	finished: bool, // latch: once Done, children are never ticked again (see advance)
+    steps:    []Action,
+    join:     Join,
+    finished: bool, // latch: once Done, children are never ticked again (see advance)
 }
+
 Repeat :: struct {
-	body:      ^Action,
-	total:     int,
-	remaining: int,
+    body:      ^Action,
+    total:     int,
+    remaining: int,
 }
+
 Wait_Frames :: struct {
-	total:     int,
-	remaining: int,
+    total:     int,
+    remaining: int,
 }
+
 Custom :: struct {
-	data:     rawptr,
-	on_tick:  Custom_Tick,
-	on_reset: Custom_Reset,
-	on_free:  Custom_Free,
+    data:     rawptr,
+    on_tick:  Custom_Tick,
+    on_reset: Custom_Reset,
+    on_free:  Custom_Free,
 }
 
 // ---- builders -------------------------------------------------------------
@@ -142,7 +150,7 @@ Custom :: struct {
 // the next step (see `advance`), so the total time of a chain of waits stays
 // accurate regardless of frame rate.
 wait :: proc(seconds: f64) -> Action {
-	return Wait{duration = seconds}
+    return Wait{duration = seconds}
 }
 
 // wait_flag completes once `flag^` is observed true. Point it at a field your
@@ -150,28 +158,28 @@ wait :: proc(seconds: f64) -> Action {
 // `await some_signal`. Once satisfied it stays satisfied even if the flag flips
 // back, so it is safe inside `parallel`.
 wait_flag :: proc(flag: ^bool) -> Action {
-	return Wait_Flag{flag = flag}
+    return Wait_Flag{flag = flag}
 }
 
 // wait_until completes once `pred(ctx)` returns true. Use for arbitrary game
 // conditions ("hp < 0", "in range").
 wait_until :: proc(pred: Predicate) -> Action {
-	return Wait_Until{pred = pred}
+    return Wait_Until{pred = pred}
 }
 
 // call runs `fn(ctx)` exactly once and completes in the same tick.
 call :: proc(fn: Action_Proc) -> Action {
-	return Call{fn = fn}
+    return Call{fn = fn}
 }
 
 // sequence runs its children one after another, advancing when each completes.
 sequence :: proc(steps: ..Action) -> Action {
-	return Sequence{steps = slice.clone(steps)}
+    return Sequence{steps = slice.clone(steps)}
 }
 
 // parallel runs all children every tick and completes when ALL are Done.
 parallel :: proc(steps: ..Action) -> Action {
-	return Parallel{steps = slice.clone(steps), join = .All}
+    return Parallel{steps = slice.clone(steps), join = .All}
 }
 
 // race runs all children every tick and completes when the FIRST one is Done
@@ -180,29 +188,29 @@ parallel :: proc(steps: ..Action) -> Action {
 // it never runs further and a Custom step gets its on_reset (flowgd.tween kills
 // its still-running Tween).
 race :: proc(steps: ..Action) -> Action {
-	return Parallel{steps = slice.clone(steps), join = .Any}
+    return Parallel{steps = slice.clone(steps), join = .Any}
 }
 
 // repeat runs `body` `times` times, resetting it between iterations. It advances
 // at most one iteration per tick (so a `forever(call(...))` can't spin a frame).
 repeat :: proc(times: int, body: Action) -> Action {
-	b := new(Action)
-	b^ = body
-	return Repeat{body = b, total = times, remaining = times}
+    b := new(Action)
+    b^ = body
+    return Repeat{body = b, total = times, remaining = times}
 }
 
 // forever runs `body` over and over, resetting between iterations; never Done.
 forever :: proc(body: Action) -> Action {
-	b := new(Action)
-	b^ = body
-	return Repeat{body = b, total = -1, remaining = -1}
+    b := new(Action)
+    b^ = body
+    return Repeat{body = b, total = -1, remaining = -1}
 }
 
 // wait_frames completes after `n` ticks regardless of their delta — for the
 // common "do this next frame" / "let the engine settle one frame" need. `n <= 0`
 // completes immediately.
 wait_frames :: proc(n: int) -> Action {
-	return Wait_Frames{total = n, remaining = n}
+    return Wait_Frames{total = n, remaining = n}
 }
 
 // custom is the escape hatch for step kinds this package doesn't know about
@@ -212,12 +220,12 @@ wait_frames :: proc(n: int) -> Action {
 // the step take part in `reset`/`destroy`. You own `data` — free it in `on_free`.
 // The `flowgd` package's Tween step is built on this.
 custom :: proc(
-	data: rawptr,
-	on_tick: Custom_Tick,
-	on_reset: Custom_Reset = nil,
-	on_free: Custom_Free = nil,
+    data: rawptr,
+    on_tick: Custom_Tick,
+    on_reset: Custom_Reset = nil,
+    on_free: Custom_Free = nil,
 ) -> Action {
-	return Custom{data = data, on_tick = on_tick, on_reset = on_reset, on_free = on_free}
+    return Custom{data = data, on_tick = on_tick, on_reset = on_reset, on_free = on_free}
 }
 
 // ---- runtime --------------------------------------------------------------
@@ -228,8 +236,8 @@ custom :: proc(
 // sequencer just accumulates whatever delta it is given, so a variable `_process`
 // delta is as correct as a fixed `_physics_process` one.
 tick :: proc(a: ^Action, ctx: rawptr, dt: f64) -> Status {
-	status, _ := advance(a, ctx, dt)
-	return status
+    status, _ := advance(a, ctx, dt)
+    return status
 }
 
 // advance is tick's worker. It also reports `leftover`: the slice of `dt` not
@@ -240,121 +248,147 @@ tick :: proc(a: ^Action, ctx: rawptr, dt: f64) -> Status {
 // (Wait_Flag/Wait_Until) consume no time and pass the whole dt through.
 @(private)
 advance :: proc(a: ^Action, ctx: rawptr, dt: f64) -> (status: Status, leftover: f64) {
-	// `&v` binds a MUTABLE reference into the union's active variant, so field
-	// writes below land directly in `a^` — no copy-back needed.
-	switch &v in a^ {
-	case Wait:
-		v.elapsed += dt
-		if v.elapsed >= v.duration {
-			return .Done, v.elapsed - v.duration // hand the overshoot to the next step
-		}
-		return .Running, 0
+    // `&v` binds a MUTABLE reference into the union's active variant, so field
+    // writes below land directly in `a^` — no copy-back needed.
+    switch &v in a^ {
+    case Wait:
+        v.elapsed += dt
 
-	case Wait_Flag:
-		if !v.satisfied && v.flag != nil && v.flag^ {
-			v.satisfied = true
-		}
-		return (.Done if v.satisfied else .Running), (dt if v.satisfied else 0)
+        if v.elapsed >= v.duration {
+            return .Done, v.elapsed - v.duration // hand the overshoot to the next step
+        }
 
-	case Wait_Until:
-		if !v.satisfied && v.pred != nil && v.pred(ctx) {
-			v.satisfied = true
-		}
-		return (.Done if v.satisfied else .Running), (dt if v.satisfied else 0)
+        return .Running, 0
 
-	case Wait_Frames:
-		if v.remaining <= 0 {
-			return .Done, dt
-		}
-		v.remaining -= 1
-		return .Running, 0
+    case Wait_Flag:
+        if !v.satisfied && v.flag != nil && v.flag^ {
+            v.satisfied = true
+        }
 
-	case Call:
-		if !v.fired {
-			if v.fn != nil {
-				v.fn(ctx)
-			}
-			v.fired = true
-		}
-		return .Done, dt
+        return (.Done if v.satisfied else .Running), (dt if v.satisfied else 0)
 
-	case Custom:
-		if v.on_tick == nil {
-			return .Done, dt
-		}
-		// a Custom step owns its own timing and can't report a sub-frame
-		// remainder, so it consumes the whole frame (like a Parallel barrier).
-		return v.on_tick(v.data, ctx, dt), 0
+    case Wait_Until:
+        if !v.satisfied && v.pred != nil && v.pred(ctx) {
+            v.satisfied = true
+        }
 
-	case Sequence:
-		rem := dt
-		for v.cursor < len(v.steps) {
-			step_status, step_leftover := advance(&v.steps[v.cursor], ctx, rem)
-			if step_status == .Running {
-				return .Running, 0
-			}
-			rem = step_leftover
-			v.cursor += 1
-		}
-		return .Done, rem
+        return (.Done if v.satisfied else .Running), (dt if v.satisfied else 0)
 
-	case Parallel:
-		// The latch matters: a parent Parallel re-ticks Done children while slow
-		// siblings run. Without it a finished `race` would keep advancing its
-		// LOSING branches, eventually firing their side effects.
-		if v.finished {
-			return .Done, dt
-		}
-		if len(v.steps) == 0 {
-			v.finished = true
-			return .Done, dt
-		}
-		done_count := 0
-		for i in 0 ..< len(v.steps) {
-			step_status, _ := advance(&v.steps[i], ctx, dt)
-			if step_status == .Done {
-				done_count += 1
-			}
-		}
-		target := len(v.steps) if v.join == .All else 1
-		if done_count >= target {
-			v.finished = true
-			if v.join == .Any {
-				// race semantics: first winner cancels the losers. Resetting an
-				// unfinished branch rewinds it and gives Custom steps their
-				// cancellation hook (e.g. flowgd.tween kills a running Tween).
-				for i in 0 ..< len(v.steps) {
-					if !is_done(&v.steps[i]) {
-						reset(&v.steps[i])
-					}
-				}
-			}
-			// a parallel is a barrier: its children consumed differing amounts of
-			// dt, so there is no single remainder to carry — report none.
-			return .Done, 0
-		}
-		return .Running, 0
+    case Wait_Frames:
+        if v.remaining <= 0 {
+            return .Done, dt
+        }
 
-	case Repeat:
-		if v.remaining == 0 {
-			return .Done, dt
-		}
-		body_status, body_leftover := advance(v.body, ctx, dt)
-		if body_status == .Done {
-			if v.remaining > 0 {
-				v.remaining -= 1
-			}
-			if v.remaining == 0 {
-				return .Done, body_leftover
-			}
-			reset(v.body)
-			// one iteration per tick (keeps `forever(call(...))` from spinning a
-			// frame); the sub-frame remainder between iterations is dropped.
-		}
-		return .Running, 0
-	}
+        v.remaining -= 1
+        return .Running, 0
 
-	return .Done, dt // nil / empty action is treated as already finished
+    case Call:
+        if !v.fired {
+            if v.fn != nil {
+                v.fn(ctx)
+            }
+
+            v.fired = true
+        }
+
+        return .Done, dt
+
+    case Custom:
+        if v.on_tick == nil {
+            return .Done, dt
+        }
+
+        // a Custom step owns its own timing and can't report a sub-frame
+        // remainder, so it consumes the whole frame (like a Parallel barrier).
+        return v.on_tick(v.data, ctx, dt), 0
+
+    case Sequence:
+        rem := dt
+
+        for v.cursor < len(v.steps) {
+            step_status, step_leftover := advance(&v.steps[v.cursor], ctx, rem)
+
+            if step_status == .Running {
+                return .Running, 0
+            }
+
+            rem = step_leftover
+            v.cursor += 1
+        }
+
+        return .Done, rem
+
+    case Parallel:
+        // The latch matters: a parent Parallel re-ticks Done children while slow
+        // siblings run. Without it a finished `race` would keep advancing its
+        // LOSING branches, eventually firing their side effects.
+        if v.finished {
+            return .Done, dt
+        }
+
+        if len(v.steps) == 0 {
+            v.finished = true
+            return .Done, dt
+        }
+
+        done_count := 0
+
+        for i in 0 ..< len(v.steps) {
+            step_status, _ := advance(&v.steps[i], ctx, dt)
+
+            if step_status == .Done {
+                done_count += 1
+            }
+        }
+
+        target := len(v.steps) if v.join == .All else 1
+
+        if done_count >= target {
+            v.finished = true
+
+            if v.join == .Any {
+                // race semantics: first winner cancels the losers. Resetting an
+                // unfinished branch rewinds it and gives Custom steps their
+                // cancellation hook (e.g. flowgd.tween kills a running Tween).
+                for i in 0 ..< len(v.steps) {
+                    if !is_done(&v.steps[i]) {
+                        reset(&v.steps[i])
+                    }
+                }
+            }
+
+            // a parallel is a barrier: its children consumed differing amounts of
+            // dt, so there is no single remainder to carry — report none.
+            return .Done, 0
+        }
+
+        return .Running, 0
+
+    case Repeat:
+        if v.remaining == 0 {
+            return .Done, dt
+        }
+
+        body_status, body_leftover := advance(v.body, ctx, dt)
+
+        if body_status == .Done {
+            if v.remaining > 0 {
+                v.remaining -= 1
+            }
+
+            if v.remaining == 0 {
+                return .Done, body_leftover
+            }
+
+            reset(v.body)
+            // one iteration per tick (keeps `forever(call(...))` from spinning a
+            // frame); the sub-frame remainder between iterations is dropped.
+        }
+
+        return .Running, 0
+    }
+
+    return .Done, dt // nil / empty action is treated as already finished
 }
 
 // is_done reports whether a node has finished WITHOUT ticking it (no side
@@ -365,27 +399,28 @@ advance :: proc(a: ^Action, ctx: rawptr, dt: f64) -> (status: Status, leftover: 
 // Tween is a no-op).
 @(private)
 is_done :: proc(a: ^Action) -> bool {
-	switch v in a^ {
-	case Wait:
-		return v.elapsed >= v.duration
-	case Wait_Flag:
-		return v.satisfied
-	case Wait_Until:
-		return v.satisfied
-	case Wait_Frames:
-		return v.remaining <= 0
-	case Call:
-		return v.fired
-	case Custom:
-		return false
-	case Sequence:
-		return v.cursor >= len(v.steps)
-	case Parallel:
-		return v.finished
-	case Repeat:
-		return v.remaining == 0
-	}
-	return true // nil / empty action
+    switch v in a^ {
+    case Wait:
+        return v.elapsed >= v.duration
+    case Wait_Flag:
+        return v.satisfied
+    case Wait_Until:
+        return v.satisfied
+    case Wait_Frames:
+        return v.remaining <= 0
+    case Call:
+        return v.fired
+    case Custom:
+        return false
+    case Sequence:
+        return v.cursor >= len(v.steps)
+    case Parallel:
+        return v.finished
+    case Repeat:
+        return v.remaining == 0
+    }
+
+    return true // nil / empty action
 }
 
 // reset rewinds a tree's cursors, timers, and one-shot latches so it can run
@@ -393,58 +428,62 @@ is_done :: proc(a: ^Action) -> bool {
 // bool stays as the caller left it; only the internal "already satisfied" latch
 // clears). Structure and allocations are preserved, so this is cheap.
 reset :: proc(a: ^Action) {
-	switch &v in a^ {
-	case Wait:
-		v.elapsed = 0
-	case Wait_Flag:
-		v.satisfied = false
-	case Wait_Until:
-		v.satisfied = false
-	case Wait_Frames:
-		v.remaining = v.total
-	case Call:
-		v.fired = false
-	case Custom:
-		if v.on_reset != nil {
-			v.on_reset(v.data)
-		}
-	case Sequence:
-		v.cursor = 0
-		for i in 0 ..< len(v.steps) {
-			reset(&v.steps[i])
-		}
-	case Parallel:
-		v.finished = false
-		for i in 0 ..< len(v.steps) {
-			reset(&v.steps[i])
-		}
-	case Repeat:
-		v.remaining = v.total
-		reset(v.body)
-	}
+    switch &v in a^ {
+    case Wait:
+        v.elapsed = 0
+    case Wait_Flag:
+        v.satisfied = false
+    case Wait_Until:
+        v.satisfied = false
+    case Wait_Frames:
+        v.remaining = v.total
+    case Call:
+        v.fired = false
+    case Custom:
+        if v.on_reset != nil {
+            v.on_reset(v.data)
+        }
+    case Sequence:
+        v.cursor = 0
+
+        for i in 0 ..< len(v.steps) {
+            reset(&v.steps[i])
+        }
+    case Parallel:
+        v.finished = false
+
+        for i in 0 ..< len(v.steps) {
+            reset(&v.steps[i])
+        }
+    case Repeat:
+        v.remaining = v.total
+        reset(v.body)
+    }
 }
 
 // destroy frees the child slices and repeat bodies the builders allocated, from
 // the same allocator they used. Skip it entirely if you built into an arena and
 // intend to `free_all` that arena instead.
 destroy :: proc(a: ^Action, allocator := context.allocator) {
-	#partial switch &v in a^ {
-	case Sequence:
-		for i in 0 ..< len(v.steps) {
-			destroy(&v.steps[i], allocator)
-		}
-		delete(v.steps, allocator)
-	case Parallel:
-		for i in 0 ..< len(v.steps) {
-			destroy(&v.steps[i], allocator)
-		}
-		delete(v.steps, allocator)
-	case Repeat:
-		destroy(v.body, allocator)
-		free(v.body, allocator)
-	case Custom:
-		if v.on_free != nil {
-			v.on_free(v.data)
-		}
-	}
+    #partial switch &v in a^ {
+    case Sequence:
+        for i in 0 ..< len(v.steps) {
+            destroy(&v.steps[i], allocator)
+        }
+
+        delete(v.steps, allocator)
+    case Parallel:
+        for i in 0 ..< len(v.steps) {
+            destroy(&v.steps[i], allocator)
+        }
+
+        delete(v.steps, allocator)
+    case Repeat:
+        destroy(v.body, allocator)
+        free(v.body, allocator)
+    case Custom:
+        if v.on_free != nil {
+            v.on_free(v.data)
+        }
+    }
 }

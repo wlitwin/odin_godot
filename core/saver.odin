@@ -54,9 +54,11 @@ saver_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.ObjectPtr {
 @(private = "file")
 saver_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
+
     if instance == nil {
         return
     }
+
     free(cast(^OdinResourceFormatSaver)instance)
 }
 
@@ -78,6 +80,7 @@ resource_is_odin_script :: proc(resource: gdext.ObjectPtr) -> bool {
     if resource == nil {
         return false
     }
+
     name := godot.new_string_name_cstring("OdinScript", true)
     return bool(godot.object_is_class(cast(godot.Object)resource, name))
 }
@@ -109,9 +112,14 @@ sv_recognize_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 // format unknown: odin". The engine's own savers are resource-scoped the same way
 // (ResourceFormatSaverText: "tscn" for PackedScene, else "tres").
 @(private = "file")
-sv_get_recognized_extensions :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+sv_get_recognized_extensions :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     resource := (cast(^gdext.ObjectPtr)args[0])^
+
     if resource_is_odin_script(resource) {
         ret_psa(ret, make_psa("odin"))
     } else {
@@ -164,18 +172,25 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
     // known, so fix the line up here. Only the template's default is ever
     // rewritten; user-authored package names are never touched.
     fixed_src := template_package_fixup(os_path, odin_src)
+
     if raw_data(fixed_src) != raw_data(odin_src) {
         fs := godot.new_string_odin(fixed_src)
         godot.script_set_source_code(cast(godot.Script)resource, fs)
         format_sync_editor_buffer(path, fixed_src)
     }
-    defer if raw_data(fixed_src) != raw_data(odin_src) {delete(fixed_src)}
+
+    defer if raw_data(fixed_src) != raw_data(odin_src) {
+        delete(fixed_src)
+    }
 
     // Format on save (core/format.odin): odinfmt the text hitting disk, keep the resource
     // + the open editor buffer in sync. Falls back to the original bytes on any problem
     // (no odinfmt, mid-edit syntax errors) — saving must never fail because of formatting.
     final_src := format_for_save(cast(godot.Script)resource, path, fixed_src)
-    defer if raw_data(final_src) != raw_data(fixed_src) {delete(final_src)}
+
+    defer if raw_data(final_src) != raw_data(fixed_src) {
+        delete(final_src)
+    }
 
     if werr := os.write_entire_file(os_path, transmute([]u8)final_src); werr != nil {
         ret_int(ret, 12) // ERR_FILE_CANT_WRITE
@@ -204,49 +219,66 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
 template_package_fixup :: proc(os_path: string, source: string) -> string {
     NEEDLE :: "\npackage scripts\n"
     at := strings.index(source, NEEDLE)
+
     if at < 0 {
         if !strings.has_prefix(source, "package scripts\n") {
             return source
         }
+
         at = -1 // package line first (no leading marker comments)
     }
+
     dir := os_path
+
     if i := strings.last_index_byte(dir, '/'); i >= 0 {
         dir = dir[:i]
     }
+
     sibling_pkg := ""
+
     if fd, err := os.open(dir); err == nil {
         defer os.close(fd)
+
         if entries, rerr := os.read_dir(fd, -1, context.temp_allocator); rerr == nil {
             for e in entries {
                 if !strings.has_suffix(e.name, ".odin") || strings.has_suffix(e.name, ".gen.odin") {
                     continue
                 }
+
                 if e.fullpath == os_path {
                     continue
                 }
+
                 data, rerr2 := os.read_entire_file(e.fullpath, context.temp_allocator)
+
                 if rerr2 != nil {
                     continue
                 }
+
                 text := string(data)
+
                 for line in strings.split_lines_iterator(&text) {
                     t := strings.trim_space(line)
+
                     if strings.has_prefix(t, "package ") {
                         sibling_pkg = strings.trim_space(t[len("package "):])
                         break
                     }
                 }
+
                 if sibling_pkg != "" {
                     break
                 }
             }
         }
     }
+
     if sibling_pkg == "" || sibling_pkg == "scripts" {
         return source
     }
+
     b := strings.builder_make()
+
     if at < 0 {
         strings.write_string(&b, "package ")
         strings.write_string(&b, sibling_pkg)
@@ -258,6 +290,7 @@ template_package_fixup :: proc(os_path: string, source: string) -> string {
         strings.write_string(&b, "\n")
         strings.write_string(&b, source[at + len(NEEDLE):])
     }
+
     return strings.to_string(b)
 }
 
@@ -265,9 +298,11 @@ odin_saver_register :: proc() {
     gdext.string_name_new_with_latin1_chars(&odin_saver_class_name, "OdinResourceFormatSaver", true)
 
     saver_virtuals = make([dynamic]Virtual_Entry, 0, 16) // reserve: gdext allocator .Resize is broken
+
     add := proc(name: string, fn: gdext.ExtensionClassCallVirtual) {
         append(&saver_virtuals, Virtual_Entry{name = name, fn = fn})
     }
+
     add("_save", sv_save)
     add("_recognize", sv_recognize)
     add("_recognize_path", sv_recognize_path)
@@ -306,6 +341,7 @@ odin_saver_unregister :: proc() {
         refcounted_release(odin_saver_object)
         odin_saver_object = nil
     }
+
     delete(saver_virtuals)
     saver_virtuals = nil
 }

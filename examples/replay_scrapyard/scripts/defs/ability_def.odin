@@ -26,19 +26,19 @@ package scrapyard_defs
 import gd "godot:godot"
 
 AbilityDef :: struct {
-	owner: gd.Resource,
-	turret: ^gd.Resource `gd:"export,resource=TurretDef"`,
-	id: gd.Int `gd:"export,range=1:254:1"`,
-	name: gd.String `gd:"export"`,
-	family: gd.Int `gd:"export,enum=Lob:Cone:Nova:Buff:Zone:Turret"`,
-	cooldown: gd.Int `gd:"export,range=1:3600:1"`, // ticks (60/s)
-	range: f32 `gd:"export,range=0:800:1"`, // lob leash / cone reach / buff friend-reach
-	radius: f32 `gd:"export,range=0:600:1"`, // lob splash / nova ring
-	arc_cos: f32 `gd:"export,range=-1:1:0.05"`, // cone half-angle cosine
-	speed: f32 `gd:"export,range=1:40:0.5"`, // lob glob px/tick
-	dmg: gd.Int `gd:"export,range=0:250:1"`, // direct wound (nova/cone; dealt_mult scales it)
-	status: ^gd.Resource `gd:"export,resource=StatusDef"`, // payload status id (0 = none)
-	self_buff: bool `gd:"export"`, // Buff: me (true) or the nearest friend (false)
-	duration: gd.Int `gd:"export,range=0:36000:1"`, // Zone: patch lifetime, ticks
-	pulse: gd.Int `gd:"export,range=1:600:1"`, // Zone: payload cadence, ticks
+    owner: gd.Resource,
+    turret: ^gd.Resource `gd:"export,resource=TurretDef"`,
+    id: gd.Int `gd:"export,range=1:254:1"`,
+    name: gd.String `gd:"export"`,
+    family: gd.Int `gd:"export,enum=Lob:Cone:Nova:Buff:Zone:Turret"`,
+    cooldown: gd.Int `gd:"export,range=1:3600:1"`, // ticks (60/s)
+    range: f32 `gd:"export,range=0:800:1"`, // lob leash / cone reach / buff friend-reach
+    radius: f32 `gd:"export,range=0:600:1"`, // lob splash / nova ring
+    arc_cos: f32 `gd:"export,range=-1:1:0.05"`, // cone half-angle cosine
+    speed: f32 `gd:"export,range=1:40:0.5"`, // lob glob px/tick
+    dmg: gd.Int `gd:"export,range=0:250:1"`, // direct wound (nova/cone; dealt_mult scales it)
+    status: ^gd.Resource `gd:"export,resource=StatusDef"`, // payload status id (0 = none)
+    self_buff: bool `gd:"export"`, // Buff: me (true) or the nearest friend (false)
+    duration: gd.Int `gd:"export,range=0:36000:1"`, // Zone: patch lifetime, ticks
+    pulse: gd.Int `gd:"export,range=1:600:1"`, // Zone: payload cadence, ticks
 }

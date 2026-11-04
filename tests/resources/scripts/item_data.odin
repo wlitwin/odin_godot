@@ -20,10 +20,10 @@ package resources_scripts
 import gd "godot:godot"
 
 ItemData :: struct {
-	owner: gd.Resource,
-	name:  gd.String `gd:"export"`,
-	value: gd.Int    `gd:"export,range=0:999"`,
-	icon:  ^gd.Resource `gd:"export,resource=Texture2D"`,
+    owner: gd.Resource,
+    name:  gd.String `gd:"export"`,
+    value: gd.Int `gd:"export,range=0:999"`,
+    icon:  ^gd.Resource `gd:"export,resource=Texture2D"`,
 }
 
 // item_total — a custom @(gd_method). Returns a value derived from the @export `value`
@@ -31,5 +31,5 @@ ItemData :: struct {
 // the @export value survived the round-trip (value 10 -> 110).
 @(gd_method)
 item_data_item_total :: proc(self: ^ItemData) -> int {
-	return int(self.value) + 100
+    return int(self.value) + 100
 }

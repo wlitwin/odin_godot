@@ -32,19 +32,19 @@ import gd "godot:godot"
 BURST_TTL :: f32(0.8) // seconds a spent emitter node lingers before reaping
 
 Burst :: struct {
-	node: gd.Cpu_Particles2d,
-	left: f32,
+    node: gd.Cpu_Particles2d,
+    left: f32,
 }
 
 // The game owns one of these (a field on the script struct); destroy() on
 // exit frees the tracking list (nodes belong to the scene tree).
 Bursts :: struct {
-	live: [dynamic]Burst,
+    live: [dynamic]Burst,
 }
 
 bursts_destroy :: proc(fx: ^Bursts) {
-	delete(fx.live)
-	fx^ = {}
+    delete(fx.live)
+    fx^ = {}
 }
 
 // The emitter itself: a configured one-shot spark burst under `parent` at a
@@ -52,63 +52,68 @@ bursts_destroy :: proc(fx: ^Bursts) {
 // through burst_at so they get reaped; this is the escape hatch for FX with
 // a home of their own.
 burst_node :: proc(parent: gd.Node, x, y: f32, color: gd.Color) -> gd.Cpu_Particles2d {
-	p := gd.new_cpu_particles2d()
-	gd.add_child(parent, cast(gd.Node)p)
-	gd.node2d_set_position(cast(gd.Node2d)p, {x, y})
-	gd.cpu_particles2d_set_amount(p, 12)
-	gd.cpu_particles2d_set_lifetime(p, 0.4)
-	gd.cpu_particles2d_set_one_shot(p, true)
-	gd.cpu_particles2d_set_explosiveness_ratio(p, 1.0) // all at once: a burst, not a stream
-	gd.cpu_particles2d_set_spread(p, 180)
-	gd.cpu_particles2d_set_param_min(p, .Param_Initial_Linear_Velocity, 40)
-	gd.cpu_particles2d_set_param_max(p, .Param_Initial_Linear_Velocity, 90)
-	gd.cpu_particles2d_set_color(p, color)
-	gd.cpu_particles2d_set_emitting(p, true)
-	return p
+    p := gd.new_cpu_particles2d()
+    gd.add_child(parent, cast(gd.Node)p)
+    gd.node2d_set_position(cast(gd.Node2d)p, {x, y})
+    gd.cpu_particles2d_set_amount(p, 12)
+    gd.cpu_particles2d_set_lifetime(p, 0.4)
+    gd.cpu_particles2d_set_one_shot(p, true)
+    gd.cpu_particles2d_set_explosiveness_ratio(p, 1.0) // all at once: a burst, not a stream
+    gd.cpu_particles2d_set_spread(p, 180)
+    gd.cpu_particles2d_set_param_min(p, .Param_Initial_Linear_Velocity, 40)
+    gd.cpu_particles2d_set_param_max(p, .Param_Initial_Linear_Velocity, 90)
+    gd.cpu_particles2d_set_color(p, color)
+    gd.cpu_particles2d_set_emitting(p, true)
+    return p
 }
 
 // A one-shot spark burst at a world position, in `color`, tracked for reaping.
 burst_at :: proc(fx: ^Bursts, parent: gd.Node, x, y: f32, color: gd.Color) {
-	p := burst_node(parent, x, y, color)
-	append(&fx.live, Burst{node = p, left = BURST_TTL})
+    p := burst_node(parent, x, y, color)
+    append(&fx.live, Burst{node = p, left = BURST_TTL})
 }
 
 // Reap spent burst emitters (call once per frame from process). Named like
 // its pool siblings floats_frame/shake_frame/tracers_frame — the bare
 // `frame` this file shipped with was the one outlier in its own convention.
 bursts_frame :: proc(fx: ^Bursts, delta: f64) {
-	for i := 0; i < len(fx.live); {
-		b := &fx.live[i]
-		b.left -= f32(delta)
-		if b.left <= 0 {
-			gd.node_queue_free(cast(gd.Node)b.node)
-			unordered_remove(&fx.live, i)
-			continue
-		}
-		i += 1
-	}
+    for i := 0; i < len(fx.live); {
+        b := &fx.live[i]
+        b.left -= f32(delta)
+
+        if b.left <= 0 {
+            gd.node_queue_free(cast(gd.Node)b.node)
+            unordered_remove(&fx.live, i)
+            continue
+        }
+
+        i += 1
+    }
 }
 
 // Flash a canvas item `color` and tween it back to white — the standard
 // hit-feedback animation, from code: set the property, let a Tween walk it
 // home. nil-safe (a victim's node may already be gone).
 flash :: proc(node: gd.Node, color: gd.Color) {
-	if cast(rawptr)node == nil {return}
-	gd.canvas_item_set_modulate(cast(gd.Canvas_Item)node, color)
-	tw := gd.node_create_tween(node)
-	defer gd.release_ref(tw)
-	white := gd.Color{1, 1, 1, 1}
-	v := gd.variant_from_color(&white)
-	defer gd.variant_destroy(&v)
-	// Caller-owned engine values, released after the call that consumes them
-	// (tracer_add's discipline) — the inline chain leaked a String and a
-	// NodePath per flash, ~forever on a hit-heavy screen.
-	s := gd.new_string_cstring("modulate")
-	defer gd.free_string(s)
-	np := gd.new_node_path_string(s)
-	defer gd.free_node_path(np)
-	tweener:=gd.tween_tween_property(tw, cast(gd.Object)node, np, v, 0.3)
-	gd.release_ref(tweener)
+    if cast(rawptr)node == nil {
+        return
+    }
+
+    gd.canvas_item_set_modulate(cast(gd.Canvas_Item)node, color)
+    tw := gd.node_create_tween(node)
+    defer gd.release_ref(tw)
+    white := gd.Color{1, 1, 1, 1}
+    v := gd.variant_from_color(&white)
+    defer gd.variant_destroy(&v)
+    // Caller-owned engine values, released after the call that consumes them
+    // (tracer_add's discipline) — the inline chain leaked a String and a
+    // NodePath per flash, ~forever on a hit-heavy screen.
+    s := gd.new_string_cstring("modulate")
+    defer gd.free_string(s)
+    np := gd.new_node_path_string(s)
+    defer gd.free_node_path(np)
+    tweener := gd.tween_tween_property(tw, cast(gd.Object)node, np, v, 0.3)
+    gd.release_ref(tweener)
 }
 
 // ---- floating text ---------------------------------------------------------------
@@ -123,45 +128,47 @@ FLOAT_TTL :: f32(0.9) // seconds aloft
 FLOAT_RISE :: f32(46) // px/s upward drift
 
 Float :: struct {
-	node: gd.Label,
-	left: f32,
+    node: gd.Label,
+    left: f32,
 }
 
 Floats :: struct {
-	live: [dynamic]Float,
+    live: [dynamic]Float,
 }
 
 floats_destroy :: proc(fx: ^Floats) {
-	delete(fx.live)
-	fx^ = {}
+    delete(fx.live)
+    fx^ = {}
 }
 
 // Pop `text` at a parent-relative position in `color`. The cstring is copied
 // by the engine; temp-allocated text is fine.
 float_text :: proc(fx: ^Floats, parent: gd.Node, x, y: f32, text: cstring, color := gd.Color{1, 1, 1, 1}) {
-	l := gd.new_label()
-	gd.set_text(cast(gd.Object)l, text)
-	gd.add_child(parent, cast(gd.Node)l)
-	gd.control_set_position(cast(gd.Control)l, {x, y}, false)
-	gd.canvas_item_set_modulate(cast(gd.Canvas_Item)l, color)
-	append(&fx.live, Float{node = l, left = FLOAT_TTL})
+    l := gd.new_label()
+    gd.set_text(cast(gd.Object)l, text)
+    gd.add_child(parent, cast(gd.Node)l)
+    gd.control_set_position(cast(gd.Control)l, {x, y}, false)
+    gd.canvas_item_set_modulate(cast(gd.Canvas_Item)l, color)
+    append(&fx.live, Float{node = l, left = FLOAT_TTL})
 }
 
 floats_frame :: proc(fx: ^Floats, delta: f64) {
-	for i := 0; i < len(fx.live); {
-		f := &fx.live[i]
-		f.left -= f32(delta)
-		if f.left <= 0 {
-			gd.node_queue_free(cast(gd.Node)f.node)
-			unordered_remove(&fx.live, i)
-			continue
-		}
-		pos := gd.control_get_position(cast(gd.Control)f.node)
-		gd.control_set_position(cast(gd.Control)f.node, {pos.x, pos.y - FLOAT_RISE * f32(delta)}, false)
-		t := f.left / FLOAT_TTL
-		gd.canvas_item_set_modulate(cast(gd.Canvas_Item)f.node, {1, 1, 1, t < 0.6 ? t / 0.6 : 1})
-		i += 1
-	}
+    for i := 0; i < len(fx.live); {
+        f := &fx.live[i]
+        f.left -= f32(delta)
+
+        if f.left <= 0 {
+            gd.node_queue_free(cast(gd.Node)f.node)
+            unordered_remove(&fx.live, i)
+            continue
+        }
+
+        pos := gd.control_get_position(cast(gd.Control)f.node)
+        gd.control_set_position(cast(gd.Control)f.node, {pos.x, pos.y - FLOAT_RISE * f32(delta)}, false)
+        t := f.left / FLOAT_TTL
+        gd.canvas_item_set_modulate(cast(gd.Canvas_Item)f.node, {1, 1, 1, t < 0.6 ? t / 0.6 : 1})
+        i += 1
+    }
 }
 
 // ---- screen shake -----------------------------------------------------------------
@@ -219,14 +226,14 @@ SHAKE_PITCH :: 3
 SHAKE_YAW :: 4
 
 Shake :: struct {
-	trauma:     f32, // 0..1
-	t:          f32, // running clock driving the jitter
-	// ---- knobs — the zero value of each keeps the kit default ----
-	max_offset: f32,         // px at full trauma            (0 → SHAKE_MAX)
-	max_roll:   f32,         // radians at full trauma       (0 → SHAKE_MAX_ROLL)
-	decay:      f32,         // trauma lost per second       (0 → SHAKE_DECAY)
-	exponent:   f32,         // amplitude = trauma^exponent  (0 → 2)
-	noise:      Shake_Noise, // channel driver               (nil → shake_noise_sines)
+    trauma:     f32, // 0..1
+    t:          f32, // running clock driving the jitter
+    // ---- knobs — the zero value of each keeps the kit default ----
+    max_offset: f32, // px at full trauma            (0 → SHAKE_MAX)
+    max_roll:   f32, // radians at full trauma       (0 → SHAKE_MAX_ROLL)
+    decay:      f32, // trauma lost per second       (0 → SHAKE_DECAY)
+    exponent:   f32, // amplitude = trauma^exponent  (0 → 2)
+    noise:      Shake_Noise, // channel driver               (nil → shake_noise_sines)
 }
 
 // Add trauma, optionally capped PER SOURCE. The cap solves the rapid-fire
@@ -240,7 +247,7 @@ Shake :: struct {
 // — while the outer max keeps a capped add from ever REDUCING trauma a bigger
 // event already banked (a gunshot during an explosion is a no-op, not a damper).
 shake_add :: proc(s: ^Shake, amount: f32, cap: f32 = 1) {
-	s.trauma = max(s.trauma, min(s.trauma + amount, cap))
+    s.trauma = max(s.trauma, min(s.trauma + amount, cap))
 }
 
 SHAKE_DECAY :: f32(1.6) // trauma/s — a full slam settles in ~0.6s
@@ -256,7 +263,7 @@ SHAKE_FREQ := [5]f32{91.7, 113.3, 71.9, 127.1, 83.9}
 SHAKE_PHASE := [5]f32{0, 1.7, 3.1, 0.9, 2.3}
 
 shake_noise_sines :: proc(channel: int, t: f32) -> f32 {
-	return math.sin(t * SHAKE_FREQ[channel % 5] + SHAKE_PHASE[channel % 5])
+    return math.sin(t * SHAKE_FREQ[channel % 5] + SHAKE_PHASE[channel % 5])
 }
 
 // The band-limited upgrade: OpenSimplex2 sampled along t, seeded per channel.
@@ -267,7 +274,7 @@ shake_noise_sines :: proc(channel: int, t: f32) -> f32 {
 //
 //     self.shake.noise = kfx.shake_noise_simplex
 shake_noise_simplex :: proc(channel: int, t: f32) -> f32 {
-	return noise.noise_2d(i64(channel) + 1, {f64(t) * 15, 0})
+    return noise.noise_2d(i64(channel) + 1, {f64(t) * 15, 0})
 }
 
 // Advance the trauma model one frame WITHOUT sampling: decay trauma, advance
@@ -276,23 +283,26 @@ shake_noise_simplex :: proc(channel: int, t: f32) -> f32 {
 // shake_sample/shake_angles any channels. (shake_offset ticks internally —
 // never call both in the same frame or the model advances twice.)
 shake_tick :: proc(s: ^Shake, delta: f64) {
-	if s.trauma <= 0 {
-		return
-	}
-	d := s.decay == 0 ? SHAKE_DECAY : s.decay
-	s.trauma = max(s.trauma - d * f32(delta), 0)
-	s.t += f32(delta)
+    if s.trauma <= 0 {
+        return
+    }
+
+    d := s.decay == 0 ? SHAKE_DECAY : s.decay
+    s.trauma = max(s.trauma - d * f32(delta), 0)
+    s.t += f32(delta)
 }
 
 // The shaped 0..1 envelope this frame: trauma^exponent. The power is the
 // feel-knob from the trauma talk — 2 (default) is the classic; 3 makes small
 // hits whisper even quieter while full slams stay full.
 shake_amp :: proc(s: ^Shake) -> f32 {
-	e := s.exponent == 0 ? 2 : s.exponent
-	if e == 2 {
-		return s.trauma * s.trauma
-	}
-	return math.pow(s.trauma, e)
+    e := s.exponent == 0 ? 2 : s.exponent
+
+    if e == 2 {
+        return s.trauma * s.trauma
+    }
+
+    return math.pow(s.trauma, e)
 }
 
 // This frame's shaped, UNIT-SCALE sample for `channel`: envelope × noise, in
@@ -300,11 +310,12 @@ shake_amp :: proc(s: ^Shake) -> f32 {
 // shipped appliers below do exactly that with the struct's knobs. Sampling
 // never advances the model; tick first. Idle → 0.
 shake_sample :: proc(s: ^Shake, channel: int) -> f32 {
-	if s.trauma <= 0 {
-		return 0
-	}
-	n := s.noise == nil ? Shake_Noise(shake_noise_sines) : s.noise
-	return shake_amp(s) * n(channel, s.t)
+    if s.trauma <= 0 {
+        return 0
+    }
+
+    n := s.noise == nil ? Shake_Noise(shake_noise_sines) : s.noise
+    return shake_amp(s) * n(channel, s.t)
 }
 
 // The 2D translation applier core — advance the model and return this frame's
@@ -312,25 +323,30 @@ shake_sample :: proc(s: ^Shake, channel: int) -> f32 {
 // allocation-free. Idle (no trauma) returns (0, 0) without advancing, so a
 // settled shake stays home; the frame trauma reaches 0 lands EXACTLY home.
 shake_offset :: proc(s: ^Shake, delta: f64) -> (ox, oy: f32) {
-	if s.trauma <= 0 {
-		return 0, 0
-	}
-	shake_tick(s, delta)
-	n := s.noise == nil ? Shake_Noise(shake_noise_sines) : s.noise
-	m := s.max_offset == 0 ? SHAKE_MAX : s.max_offset
-	amp := shake_amp(s) * m
-	ox = amp * n(SHAKE_X, s.t)
-	oy = amp * n(SHAKE_Y, s.t)
-	if s.trauma == 0 {ox, oy = 0, 0} // settle EXACTLY home on the last frame
-	return
+    if s.trauma <= 0 {
+        return 0, 0
+    }
+
+    shake_tick(s, delta)
+    n := s.noise == nil ? Shake_Noise(shake_noise_sines) : s.noise
+    m := s.max_offset == 0 ? SHAKE_MAX : s.max_offset
+    amp := shake_amp(s) * m
+    ox = amp * n(SHAKE_X, s.t)
+    oy = amp * n(SHAKE_Y, s.t)
+
+    if s.trauma == 0 {
+        ox, oy = 0, 0
+    } // settle EXACTLY home on the last frame
+
+    return
 }
 
 // This frame's roll in radians (SHAKE_ROLL × max_roll) — the 2D juice knob to
 // add on top of shake_offset (which already ticked). Camera2d note: rotation
 // only shows with ignore_rotation=false.
 shake_roll :: proc(s: ^Shake) -> f32 {
-	m := s.max_roll == 0 ? SHAKE_MAX_ROLL : s.max_roll
-	return m * shake_sample(s, SHAKE_ROLL)
+    m := s.max_roll == 0 ? SHAKE_MAX_ROLL : s.max_roll
+    return m * shake_sample(s, SHAKE_ROLL)
 }
 
 // The 3D rotational triple (roll, pitch, yaw), each in radians scaled by
@@ -338,10 +354,8 @@ shake_roll :: proc(s: ^Shake) -> f32 {
 // is most of what a 3D camera wants; games that want per-axis maxes sample
 // the channels directly instead.
 shake_angles :: proc(s: ^Shake) -> (roll, pitch, yaw: f32) {
-	m := s.max_roll == 0 ? SHAKE_MAX_ROLL : s.max_roll
-	return m * shake_sample(s, SHAKE_ROLL),
-		m * shake_sample(s, SHAKE_PITCH),
-		m * shake_sample(s, SHAKE_YAW)
+    m := s.max_roll == 0 ? SHAKE_MAX_ROLL : s.max_roll
+    return m * shake_sample(s, SHAKE_ROLL), m * shake_sample(s, SHAKE_PITCH), m * shake_sample(s, SHAKE_YAW)
 }
 
 // The 2D applier: advance the model via shake_offset and nudge every node to
@@ -349,11 +363,13 @@ shake_angles :: proc(s: ^Shake) -> (roll, pitch, yaw: f32) {
 // every child rides along). A thin convenience over the pure core; idle is a
 // no-op (the last settle frame already put them home).
 shake_frame :: proc(s: ^Shake, delta: f64, nodes: ..gd.Node) {
-	if s.trauma <= 0 {
-		return
-	}
-	ox, oy := shake_offset(s, delta)
-	for n in nodes {
-		gd.node2d_set_position(cast(gd.Node2d)n, {ox, oy})
-	}
+    if s.trauma <= 0 {
+        return
+    }
+
+    ox, oy := shake_offset(s, delta)
+
+    for n in nodes {
+        gd.node2d_set_position(cast(gd.Node2d)n, {ox, oy})
+    }
 }

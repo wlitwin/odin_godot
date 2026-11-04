@@ -25,25 +25,25 @@ import kcombat "godot:kit/combat"
 import knet "godot:kit/net"
 
 Tracer :: struct {
-	pos:     [3]f32,
-	vel:     [3]f32, // px/s (converted from the Fire's px/tick)
-	left:    f32, // seconds
-	shooter: knet.Player_Id,
-	node:    gd.Label,
-	half:    gd.Vector2, // half the glyph's box — Controls anchor TOP-LEFT, flights are centers
+    pos:     [3]f32,
+    vel:     [3]f32, // px/s (converted from the Fire's px/tick)
+    left:    f32, // seconds
+    shooter: knet.Player_Id,
+    node:    gd.Label,
+    half:    gd.Vector2, // half the glyph's box — Controls anchor TOP-LEFT, flights are centers
 }
 
 Tracers :: struct {
-	live: [dynamic]Tracer,
+    live: [dynamic]Tracer,
 }
 
 // Who can this shooter's tracer hit, right now. Slice from temp_allocator.
 Targets_Proc :: proc(user: rawptr, shooter: knet.Player_Id) -> []kcombat.Target
 
 Tracer_Hit :: struct {
-	shooter: knet.Player_Id,
-	target:  u32, // the kcombat.Target id the game supplied (a Net_Id, usually)
-	pos:     [3]f32, // the victim's position (where the sparks go)
+    shooter: knet.Player_Id,
+    target:  u32, // the kcombat.Target id the game supplied (a Net_Id, usually)
+    pos:     [3]f32, // the victim's position (where the sparks go)
 }
 
 On_Hit_Proc :: proc(user: rawptr, hit: Tracer_Hit)
@@ -55,16 +55,17 @@ On_Hit_Proc :: proc(user: rawptr, hit: Tracer_Hit)
 On_Expire_Proc :: proc(user: rawptr, shooter: knet.Player_Id, pos: [3]f32)
 
 tracers_destroy :: proc(t: ^Tracers) {
-	delete(t.live)
-	t^ = {}
+    delete(t.live)
+    t^ = {}
 }
 
 // Wipe every tracer (a level change: old rocks die with the old floor).
 tracers_clear :: proc(t: ^Tracers) {
-	for v in t.live {
-		gd.node_queue_free(cast(gd.Node)v.node)
-	}
-	clear(&t.live)
+    for v in t.live {
+        gd.node_queue_free(cast(gd.Node)v.node)
+    }
+
+    clear(&t.live)
 }
 
 // A tracer for `f` on this screen: a `glyph` Label under `parent`. The
@@ -72,29 +73,32 @@ tracers_clear :: proc(t: ^Tracers) {
 // visuals live on the frame clock. `tick_hz` is the session's rate
 // (ksess.session_tick_hz).
 tracer_add :: proc(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: string, tick_hz: int) {
-	node := gd.new_label()
-	s := gd.new_string_odin(glyph)
-	defer gd.free_string(s)
-	sv := gd.variant_from_string(&s)
-	defer gd.variant_destroy(&sv)
-	gd.set_value(cast(gd.Object)node, "text", sv)
-	gd.add_child(parent, cast(gd.Node)node)
-	// A Label positions by its TOP-LEFT, but a flight position is the slug's
-	// CENTER — uncorrected, every glyph hangs half a line-height below (and
-	// right of) the true line, which reads as "bullets leave below the
-	// barrel". Center the box on the flight.
-	min_sz := gd.control_get_combined_minimum_size(cast(gd.Control)node)
-	half := gd.Vector2{min_sz.x / 2, min_sz.y / 2}
-	gd.control_set_position(cast(gd.Control)node, {f.origin.x - half.x, f.origin.y - half.y}, false)
-	hz := f32(tick_hz)
-	append(&t.live, Tracer {
-		pos = f.origin,
-		vel = f.vel * hz,
-		left = f32(f.ttl) / hz,
-		shooter = f.shooter,
-		node = node,
-		half = half,
-	})
+    node := gd.new_label()
+    s := gd.new_string_odin(glyph)
+    defer gd.free_string(s)
+    sv := gd.variant_from_string(&s)
+    defer gd.variant_destroy(&sv)
+    gd.set_value(cast(gd.Object)node, "text", sv)
+    gd.add_child(parent, cast(gd.Node)node)
+    // A Label positions by its TOP-LEFT, but a flight position is the slug's
+    // CENTER — uncorrected, every glyph hangs half a line-height below (and
+    // right of) the true line, which reads as "bullets leave below the
+    // barrel". Center the box on the flight.
+    min_sz := gd.control_get_combined_minimum_size(cast(gd.Control)node)
+    half := gd.Vector2{min_sz.x / 2, min_sz.y / 2}
+    gd.control_set_position(cast(gd.Control)node, {f.origin.x - half.x, f.origin.y - half.y}, false)
+    hz := f32(tick_hz)
+    append(
+        &t.live,
+        Tracer {
+            pos = f.origin,
+            vel = f.vel * hz,
+            left = f32(f.ttl) / hz,
+            shooter = f.shooter,
+            node = node,
+            half = half,
+        },
+    )
 }
 
 // Fly every tracer one frame; on visual contact call `on_hit` (the game
@@ -104,30 +108,41 @@ tracer_add :: proc(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: string,
 // no wall-clock booking (nil = reap silently, the old behavior). Contact
 // sweeps the frame's segment, so it lands on the frame the crossing
 // happens — never after the authority's tick.
-tracers_frame :: proc(t: ^Tracers, delta: f64, user: rawptr, targets: Targets_Proc, on_hit: On_Hit_Proc, on_expire: On_Expire_Proc = nil) {
-	dt := f32(delta)
-	for i := 0; i < len(t.live); {
-		v := &t.live[i]
-		from := v.pos
-		step_vel := v.vel * dt
-		v.pos += step_vel
-		v.left -= dt
-		gd.control_set_position(cast(gd.Control)v.node, {v.pos.x - v.half.x, v.pos.y - v.half.y}, false)
+tracers_frame :: proc(
+    t: ^Tracers,
+    delta: f64,
+    user: rawptr,
+    targets: Targets_Proc,
+    on_hit: On_Hit_Proc,
+    on_expire: On_Expire_Proc = nil,
+) {
+    dt := f32(delta)
 
-		if hit, hit_ok := kcombat.projectile_hit(from, step_vel, targets(user, v.shooter)); hit_ok {
-			on_hit(user, Tracer_Hit{shooter = v.shooter, target = hit.id, pos = hit.pos})
-			gd.node_queue_free(cast(gd.Node)v.node)
-			unordered_remove(&t.live, i)
-			continue
-		}
-		if v.left <= 0 {
-			if on_expire != nil {
-				on_expire(user, v.shooter, v.pos)
-			}
-			gd.node_queue_free(cast(gd.Node)v.node)
-			unordered_remove(&t.live, i)
-			continue
-		}
-		i += 1
-	}
+    for i := 0; i < len(t.live); {
+        v := &t.live[i]
+        from := v.pos
+        step_vel := v.vel * dt
+        v.pos += step_vel
+        v.left -= dt
+        gd.control_set_position(cast(gd.Control)v.node, {v.pos.x - v.half.x, v.pos.y - v.half.y}, false)
+
+        if hit, hit_ok := kcombat.projectile_hit(from, step_vel, targets(user, v.shooter)); hit_ok {
+            on_hit(user, Tracer_Hit{shooter = v.shooter, target = hit.id, pos = hit.pos})
+            gd.node_queue_free(cast(gd.Node)v.node)
+            unordered_remove(&t.live, i)
+            continue
+        }
+
+        if v.left <= 0 {
+            if on_expire != nil {
+                on_expire(user, v.shooter, v.pos)
+            }
+
+            gd.node_queue_free(cast(gd.Node)v.node)
+            unordered_remove(&t.live, i)
+            continue
+        }
+
+        i += 1
+    }
 }

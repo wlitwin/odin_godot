@@ -60,9 +60,9 @@ package kit_net
 // authoritative-verdict on the host but tentative-local on a client — the one
 // return in the feature that used to force a role branch to read correctly.
 Command_Outcome :: enum u8 {
-	Rejected,
-	Predicted,
-	Applied,
+    Rejected,
+    Predicted,
+    Applied,
 }
 
 // Where an action runs. Results from the immediate co-op loop and the
@@ -70,29 +70,29 @@ Command_Outcome :: enum u8 {
 // the model remains explicit so equal raw sequence/command ids never alias in
 // logs or UI bookkeeping.
 Action_Model :: enum u8 {
-	Immediate,
-	Scheduled,
+    Immediate,
+    Scheduled,
 }
 
 // Why an action did not apply. None is the accepted/pending zero value; every
 // rejection path names one of the remaining values on the authority and in the
 // issuing peer's final callback.
 Action_Reject_Reason :: enum u8 {
-	None,
-	Access,
-	Rate,
-	Malformed,
-	Stale,
-	Predicate,
-	Timeout,
+    None,
+    Access,
+    Rate,
+    Malformed,
+    Stale,
+    Predicate,
+    Timeout,
 }
 
 action_reject_reason_valid :: proc(reason: Action_Reject_Reason) -> bool {
-	return reason >= .None && reason <= .Timeout
+    return reason >= .None && reason <= .Timeout
 }
 
 action_rejected :: proc(reason: Action_Reject_Reason) -> bool {
-	return reason != .None
+    return reason != .None
 }
 
 // The generated `<verb>_cmd` return. `state` preserves the compact, familiar
@@ -100,31 +100,31 @@ action_rejected :: proc(reason: Action_Reject_Reason) -> bool {
 // actionable; `seq` lets UI correlate the later confirmed/rejected callback.
 // A zero seq is normal for an authority-local immediate action.
 Action_Outcome :: struct {
-	state:  Command_Outcome,
-	reason: Action_Reject_Reason,
-	seq:    u32,
-	model:  Action_Model,
+    state:  Command_Outcome,
+    reason: Action_Reject_Reason,
+    seq:    u32,
+    model:  Action_Model,
 }
 
 action_outcome :: proc(
-	state: Command_Outcome,
-	reason := Action_Reject_Reason.None,
-	seq: u32 = 0,
-	model := Action_Model.Immediate,
+    state: Command_Outcome,
+    reason := Action_Reject_Reason.None,
+    seq: u32 = 0,
+    model := Action_Model.Immediate,
 ) -> Action_Outcome {
-	return {state = state, reason = reason, seq = seq, model = model}
+    return {state = state, reason = reason, seq = seq, model = model}
 }
 
 // It applied on THIS peer (authoritatively on the host, optimistically on a
 // client) — the role-free "should I show local feedback?" check.
 command_ok :: proc(r: Action_Outcome) -> bool {
-	return r.state != .Rejected
+    return r.state != .Rejected
 }
 
 Command_Env :: struct {
-	authority: bool, // this run is the authoritative one — consequences fire
-	user:      rawptr, // the game pointer `_then` procs receive (ctx.game_user)
-	by:        Player_Id, // who issued the command (ctx.me locally; the resolved sender on the host)
+    authority: bool, // this run is the authoritative one — consequences fire
+    user:      rawptr, // the game pointer `_then` procs receive (ctx.game_user)
+    by:        Player_Id, // who issued the command (ctx.me locally; the resolved sender on the host)
 }
 
 // Decode-args-and-run thunk, generated per command by scriptgen. Contract: decode
@@ -152,17 +152,17 @@ Cmd_Id :: distinct u16
 // Owner is zero so omitted policy is secure by default in both generated and
 // hand-built tables. Open world interactions must say Any_Seat explicitly.
 Action_Access :: enum u8 {
-	Owner,
-	Any_Seat,
-	Authority,
+    Owner,
+    Any_Seat,
+    Authority,
 }
 
 // Whether a client runs an action before the authority answers. This is typed
 // separately from access: opening a verb to any seat never silently enables
 // prediction, and making a class contested never silently opens its verbs.
 Action_Prediction :: enum u8 {
-	None,
-	Optimistic,
+    None,
+    Optimistic,
 }
 
 // One policy vocabulary for both immediate co-op commands and tick-scheduled
@@ -171,9 +171,9 @@ Action_Prediction :: enum u8 {
 // envelope. Negative values are invalid authoring data and fail loudly when a
 // descriptor is used.
 Action_Policy :: struct {
-	access:         Action_Access,
-	prediction:     Action_Prediction,
-	max_args_bytes: int,
+    access:         Action_Access,
+    prediction:     Action_Prediction,
+    max_args_bytes: int,
 }
 
 ACTION_ARGS_DEFAULT :: 4096
@@ -184,44 +184,46 @@ ACTION_ARGS_MAX :: MAX_FIELD_BYTES
 // when it omits policy just like bare @(gd_command) is.
 ACTION_OWNER :: Action_Policy{}
 ACTION_OWNER_PREDICTED :: Action_Policy {
-	prediction = .Optimistic,
+    prediction = .Optimistic,
 }
 ACTION_ANY_SEAT :: Action_Policy {
-	access = .Any_Seat,
+    access = .Any_Seat,
 }
 ACTION_ANY_SEAT_PREDICTED :: Action_Policy {
-	access     = .Any_Seat,
-	prediction = .Optimistic,
+    access     = .Any_Seat,
+    prediction = .Optimistic,
 }
 ACTION_AUTHORITY :: Action_Policy {
-	access = .Authority,
+    access = .Authority,
 }
 
 action_policy_valid :: proc(policy: Action_Policy) -> bool {
-	return(
-		policy.max_args_bytes >= 0 &&
-		policy.max_args_bytes <= ACTION_ARGS_MAX &&
-		!(policy.access == .Authority && policy.prediction == .Optimistic) \
-	)
+    return(
+        policy.max_args_bytes >= 0 &&
+        policy.max_args_bytes <= ACTION_ARGS_MAX &&
+        !(policy.access == .Authority && policy.prediction == .Optimistic) \
+    )
 }
 
 action_args_max :: proc(policy: Action_Policy) -> int {
-	assert(
-		action_policy_valid(policy),
-		"invalid Action_Policy: max_args_bytes is outside 0..ACTION_ARGS_MAX or the action predicts authority-only work",
-	)
-	if policy.max_args_bytes == 0 {
-		return ACTION_ARGS_DEFAULT
-	}
-	return policy.max_args_bytes
+    assert(
+        action_policy_valid(policy),
+        "invalid Action_Policy: max_args_bytes is outside 0..ACTION_ARGS_MAX or the action predicts authority-only work",
+    )
+
+    if policy.max_args_bytes == 0 {
+        return ACTION_ARGS_DEFAULT
+    }
+
+    return policy.max_args_bytes
 }
 
 action_args_allowed :: proc(policy: Action_Policy, bytes: int) -> bool {
-	return bytes >= 0 && bytes <= action_args_max(policy)
+    return bytes >= 0 && bytes <= action_args_max(policy)
 }
 
 action_predicts :: proc(policy: Action_Policy) -> bool {
-	return policy.prediction == .Optimistic
+    return policy.prediction == .Optimistic
 }
 
 // Static, callback-free metadata shared by immediate co-op commands and
@@ -230,79 +232,87 @@ action_predicts :: proc(policy: Action_Policy) -> bool {
 // Tooling can therefore inspect either model without learning Command_Proc or
 // kit/sim's Lane callback signatures.
 Action_Argument_Desc :: struct {
-	name:      string,
-	type_name: string, // author-facing Odin spelling
-	wire_kind: string, // canonical codec suffix (u16, string, net_id, ...)
+    name:      string,
+    type_name: string, // author-facing Odin spelling
+    wire_kind: string, // canonical codec suffix (u16, string, net_id, ...)
 }
 
 // Values returned after the verb's leading `bool`. They never cross the wire;
 // the authority threads them directly into the generated consequence.
 Action_Outcome_Value_Desc :: struct {
-	name:      string, // generated result_N when the return value is unnamed
-	type_name: string,
+    name:      string, // generated result_N when the return value is unnamed
+    type_name: string,
 }
 
 Action_Consequence_Desc :: struct {
-	name:           string, // empty when the action has no `<verb>_then` half
-	authority_only: bool,
-	takes_game:     bool, // consequence receives the generated game facade first
+    name:           string, // empty when the action has no `<verb>_then` half
+    authority_only: bool,
+    takes_game:     bool, // consequence receives the generated game facade first
 }
 
 Action_Desc :: struct($Id: typeid) {
-	name:        string,
-	id:          Id, // model-specific distinct wrapper; encoded as its underlying u16
-	model:       Action_Model,
-	policy:      Action_Policy,
-	arguments:   []Action_Argument_Desc,
-	outcomes:    []Action_Outcome_Value_Desc,
-	consequence: Action_Consequence_Desc,
+    name:        string,
+    id:          Id, // model-specific distinct wrapper; encoded as its underlying u16
+    model:       Action_Model,
+    policy:      Action_Policy,
+    arguments:   []Action_Argument_Desc,
+    outcomes:    []Action_Outcome_Value_Desc,
+    consequence: Action_Consequence_Desc,
 }
 
 action_desc_valid :: proc(action: Action_Desc($Id), model: Action_Model) -> bool {
-	if action.model != model || !action_policy_valid(action.policy) {
-		return false
-	}
-	for arg in action.arguments {
-		if arg.name == "" || arg.type_name == "" || arg.wire_kind == "" {return false}
-	}
-	for outcome in action.outcomes {
-		if outcome.name == "" || outcome.type_name == "" {return false}
-	}
-	if action.consequence.name == "" {
-		if action.consequence.authority_only || action.consequence.takes_game {return false}
-	} else if !action.consequence.authority_only {
-		return false
-	}
-	return true
+    if action.model != model || !action_policy_valid(action.policy) {
+        return false
+    }
+
+    for arg in action.arguments {
+        if arg.name == "" || arg.type_name == "" || arg.wire_kind == "" {
+            return false
+        }
+    }
+
+    for outcome in action.outcomes {
+        if outcome.name == "" || outcome.type_name == "" {
+            return false
+        }
+    }
+
+    if action.consequence.name == "" {
+        if action.consequence.authority_only || action.consequence.takes_game {
+            return false
+        }
+    } else if !action.consequence.authority_only {
+        return false
+    }
+
+    return true
 }
 
 // The descriptor-level access decision. Seat/connection/spectator checks live
 // one layer above this helper; this answers only the action's declared rule.
-action_access_allows :: proc(
-	policy: Action_Policy,
-	by, owner: Player_Id,
-	authority: bool,
-) -> bool {
-	if authority {
-		return true
-	}
-	switch policy.access {
-	case .Any_Seat:
-		return true
-	case .Owner:
-		return owner == by
-	case .Authority:
-		return false
-	}
-	return false
+action_access_allows :: proc(policy: Action_Policy, by, owner: Player_Id, authority: bool) -> bool {
+    if authority {
+        return true
+    }
+
+    switch policy.access {
+    case .Any_Seat:
+        return true
+    case .Owner:
+        return owner == by
+    case .Authority:
+        return false
+    }
+
+    return false
 }
 
 Command_Desc :: struct {
-	// The shared descriptor owns name/id/policy/arguments/outcomes/consequence.
-	// `using` preserves convenient `cmd.id` / `cmd.policy` selectors for
-	// low-level runtime code while keeping one metadata object.
-	using action: Action_Desc(Cmd_Id),
-	invoke: Command_Proc,
+    // The shared descriptor owns name/id/policy/arguments/outcomes/consequence.
+    // `using` preserves convenient `cmd.id` / `cmd.policy` selectors for
+    // low-level runtime code while keeping one metadata object.
+    using action: Action_Desc(Cmd_Id),
+    invoke:       Command_Proc,
 }
 
 // The id → descriptor lookup every receive/issue path routes through (sets are
@@ -312,30 +322,31 @@ Command_Desc :: struct {
 // both raw u16. The issue side converts its Cmd_Id in (the wire id is the same
 // value either way).
 command_find :: proc(set: ^Command_Set, id: u16) -> ^Command_Desc {
-	for &c in set.commands {
-		if u16(c.id) == id {
-			return &c
-		}
-	}
-	return nil
+    for &c in set.commands {
+        if u16(c.id) == id {
+            return &c
+        }
+    }
+
+    return nil
 }
 
 // Per entity TYPE: the command table + the replicated-field descriptor that
 // powers prediction reverts, torn-state restore, and reject-truth snapshots.
 Command_Set :: struct {
-	entity_desc:   ^Entity_Desc,
-	commands:      []Command_Desc,
-	// Byte offset of the entity struct's `net_id: Net_Id` field, or 0 for
-	// none — registry_insert writes the assigned id back through it, so no
-	// factory or spawn site ever forgets the assignment (forgetting used to
-	// mean commands silently targeting NET_ID_INVALID until the 3s expiry).
-	// 0 is safely "none": in script structs the owner handle occupies offset
-	// 0, so a real net_id field can never live there. scriptgen emits this.
-	net_id_offset: int,
-	// The class's `<field>_edge` halves (edge.odin) — delta-lane change
-	// presentation, fired by the per-frame registry_edges_tick walk. nil =
-	// the class declares none (and pays nothing: no mirror, no diff).
-	edges:         []Edge_Desc,
+    entity_desc:   ^Entity_Desc,
+    commands:      []Command_Desc,
+    // Byte offset of the entity struct's `net_id: Net_Id` field, or 0 for
+    // none — registry_insert writes the assigned id back through it, so no
+    // factory or spawn site ever forgets the assignment (forgetting used to
+    // mean commands silently targeting NET_ID_INVALID until the 3s expiry).
+    // 0 is safely "none": in script structs the owner handle occupies offset
+    // 0, so a real net_id field can never live there. scriptgen emits this.
+    net_id_offset: int,
+    // The class's `<field>_edge` halves (edge.odin) — delta-lane change
+    // presentation, fired by the per-frame registry_edges_tick walk. nil =
+    // the class declares none (and pays nothing: no mirror, no diff).
+    edges:         []Edge_Desc,
 }
 
 // Complete outgoing COMMAND message bytes → whoever owns the transport. The
@@ -354,29 +365,29 @@ Command_Send_Proc :: proc(user: rawptr, bytes: []u8)
 Command_Hook :: proc(user: rawptr, player: Player_Id, entity: Net_Id, cmd: u16, ok: bool) // cmd: raw wire id — the hook rides into the session's game-facing dispatch/events
 
 Command_Ctx :: struct {
-	is_authority: bool,
-	now_tick:     u64,
-	send:         Command_Send_Proc,
-	send_user:    rawptr,
-	pending:      Pending_Table, // client: in-flight predictions
-	dedup:        map[u64]Dedup_Window, // host: per-peer exactly-once windows
-	msg:          Writer, // outgoing command message scratch (reused per issue)
+    is_authority: bool,
+    now_tick:     u64,
+    send:         Command_Send_Proc,
+    send_user:    rawptr,
+    pending:      Pending_Table, // client: in-flight predictions
+    dedup:        map[u64]Dedup_Window, // host: per-peer exactly-once windows
+    msg:          Writer, // outgoing command message scratch (reused per issue)
 
-	// the cross-entity hook, mirrored here so generated wrappers can fire it
-	// for the authority's own commands (the session installs all three)
-	hook:         Command_Hook,
-	hook_user:    rawptr,
-	me:           Player_Id, // who "a local issue" is attributed to in the hook
+    // the cross-entity hook, mirrored here so generated wrappers can fire it
+    // for the authority's own commands (the session installs all three)
+    hook:         Command_Hook,
+    hook_user:    rawptr,
+    me:           Player_Id, // who "a local issue" is attributed to in the hook
 
-	// THE GAME pointer `<verb>_then` consequences receive (the session installs
-	// the factory's user here — the same `self` make_entity gets). Distinct from
-	// hook_user, which the session points at ITSELF to route the dispatcher.
-	game_user:    rawptr,
+    // THE GAME pointer `<verb>_then` consequences receive (the session installs
+    // the factory's user here — the same `self` make_entity gets). Distinct from
+    // hook_user, which the session points at ITSELF to route the dispatcher.
+    game_user:    rawptr,
 
-	// in-flight between command_begin and command_issue (generated code only)
-	_entity:      Net_Id,
-	_seq:         Intent_Seq,
-	_args_start:  int,
+    // in-flight between command_begin and command_issue (generated code only)
+    _entity:      Net_Id,
+    _seq:         Intent_Seq,
+    _args_start:  int,
 }
 
 // Fire the installed hook for a LOCALLY executed authoritative command — the
@@ -384,23 +395,23 @@ Command_Ctx :: struct {
 // take the same cross-entity path client commands do. No-op without a hook
 // (and clients never reach it: only the authority branch calls).
 command_hook_local :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id, ok: bool) {
-	if ctx.hook != nil {
-		ctx.hook(ctx.hook_user, ctx.me, entity, u16(cmd), ok) // the hook carries the raw wire id
-	}
+    if ctx.hook != nil {
+        ctx.hook(ctx.hook_user, ctx.me, entity, u16(cmd), ok) // the hook carries the raw wire id
+    }
 }
 
 command_ctx_make :: proc(allocator := context.allocator) -> Command_Ctx {
-	return Command_Ctx {
-		pending = pending_table_make(allocator),
-		dedup = make(map[u64]Dedup_Window, allocator),
-		msg = writer_make(allocator = allocator),
-	}
+    return Command_Ctx {
+        pending = pending_table_make(allocator),
+        dedup = make(map[u64]Dedup_Window, allocator),
+        msg = writer_make(allocator = allocator),
+    }
 }
 
 command_ctx_destroy :: proc(ctx: ^Command_Ctx) {
-	pending_table_destroy(&ctx.pending)
-	delete(ctx.dedup)
-	writer_destroy(&ctx.msg)
+    pending_table_destroy(&ctx.pending)
+    delete(ctx.dedup)
+    writer_destroy(&ctx.msg)
 }
 
 // ---------------------------------------------------------------------------
@@ -411,15 +422,15 @@ command_ctx_destroy :: proc(ctx: ^Command_Ctx) {
 // then the caller writes the args. Reuses ctx.msg — one command in flight at a
 // time between begin and issue.
 command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id) {
-	seq := ctx.pending.next_seq
-	ctx.pending.next_seq += 1
-	writer_reset(&ctx.msg)
-	write_net_id(&ctx.msg, entity)
-	write_u16(&ctx.msg, u16(cmd)) // wire bytes unchanged: the id crosses as a plain u16
-	write_u32(&ctx.msg, u32(seq))
-	ctx._entity = entity
-	ctx._seq = seq
-	ctx._args_start = len(ctx.msg.buf)
+    seq := ctx.pending.next_seq
+    ctx.pending.next_seq += 1
+    writer_reset(&ctx.msg)
+    write_net_id(&ctx.msg, entity)
+    write_u16(&ctx.msg, u16(cmd)) // wire bytes unchanged: the id crosses as a plain u16
+    write_u32(&ctx.msg, u32(seq))
+    ctx._entity = entity
+    ctx._seq = seq
+    ctx._args_start = len(ctx.msg.buf)
 }
 
 // Predict (iff declared) and send. The predicted run decodes the args back OUT
@@ -430,82 +441,75 @@ command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id) {
 // immediately but the command is STILL sent — the client's copy may be stale
 // and only the host may say no.
 Command_Issue_Result :: struct {
-	sent:                 bool,
-	prediction_attempted: bool,
-	prediction_applied:   bool,
-	reason:               Action_Reject_Reason,
-	seq:                  Intent_Seq,
+    sent:                 bool,
+    prediction_attempted: bool,
+    prediction_applied:   bool,
+    reason:               Action_Reject_Reason,
+    seq:                  Intent_Seq,
 }
 
 // The complete low-level issue result used by generated wrappers. `sent=false`
 // means local policy/size admission refused the action. A locally rejected
 // optimistic run is still sent because this peer may be stale; the two
 // prediction fields let the wrapper preserve that distinction for presentation.
-command_issue :: proc(
-	ctx: ^Command_Ctx,
-	entity: rawptr,
-	set: ^Command_Set,
-	cmd: Cmd_Id,
-) -> Command_Issue_Result {
-	assert(
-		!ctx.is_authority,
-		"command_issue is the client path — the authority runs the command proc directly",
-	)
-	c := command_find(set, u16(cmd))
-	if c == nil {
-		return {reason = .Malformed, seq = ctx._seq} // no such verb on this set — a hand-written caller's bug, never a wire input
-	}
-	args_bytes := len(ctx.msg.buf) - ctx._args_start
-	if !action_args_allowed(c.policy, args_bytes) {
-		return {reason = .Malformed, seq = ctx._seq}
-	}
-	result := Command_Issue_Result {
-		sent = true,
-		seq  = ctx._seq,
-	}
-	predicted := false
-	if action_predicts(c.policy) {
-		result.prediction_attempted = true
-		revert := fields_capture(entity, set.entity_desc)
-		r := reader_make(ctx.msg.buf[ctx._args_start:])
-		// A predicted run is ON SPEC: authority=false keeps the verb's `_then`
-		// consequence quiet — it fires once, on the host, when this arrives.
-		env := Command_Env {
-			authority = false,
-			user      = ctx.game_user,
-			by        = ctx.me,
-		}
-		if c.invoke(entity, &r, &env) && !r.err {
-			// Keep a copy of the wire args: if authoritative state lands on this
-			// entity while the prediction is in flight, the registry re-runs the
-			// SAME proc from these bytes on top of it (registry replay).
-			args_len := len(ctx.msg.buf) - ctx._args_start
-			args := make([]u8, args_len)
-			copy(args, ctx.msg.buf[ctx._args_start:])
-			pending_record(
-				&ctx.pending,
-				ctx._seq,
-				ctx._entity,
-				u16(cmd),
-				args,
-				revert,
-				ctx.now_tick,
-			)
-			predicted = true
-		} else {
-			fields_restore(entity, set.entity_desc, revert)
-			delete(revert)
-			result.reason = .Predicate
-		}
-	}
-	if !predicted {
-		pending_record_receipt(&ctx.pending, ctx._seq, ctx._entity, u16(cmd), ctx.now_tick)
-	}
-	if ctx.send != nil {
-		ctx.send(ctx.send_user, writer_bytes(&ctx.msg))
-	}
-	result.prediction_applied = predicted
-	return result
+command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> Command_Issue_Result {
+    assert(!ctx.is_authority, "command_issue is the client path — the authority runs the command proc directly")
+    c := command_find(set, u16(cmd))
+
+    if c == nil {
+        return {reason = .Malformed, seq = ctx._seq} // no such verb on this set — a hand-written caller's bug, never a wire input
+    }
+
+    args_bytes := len(ctx.msg.buf) - ctx._args_start
+
+    if !action_args_allowed(c.policy, args_bytes) {
+        return {reason = .Malformed, seq = ctx._seq}
+    }
+
+    result := Command_Issue_Result {
+        sent = true,
+        seq  = ctx._seq,
+    }
+    predicted := false
+
+    if action_predicts(c.policy) {
+        result.prediction_attempted = true
+        revert := fields_capture(entity, set.entity_desc)
+        r := reader_make(ctx.msg.buf[ctx._args_start:])
+        // A predicted run is ON SPEC: authority=false keeps the verb's `_then`
+        // consequence quiet — it fires once, on the host, when this arrives.
+        env := Command_Env {
+            authority = false,
+            user      = ctx.game_user,
+            by        = ctx.me,
+        }
+
+        if c.invoke(entity, &r, &env) && !r.err {
+            // Keep a copy of the wire args: if authoritative state lands on this
+            // entity while the prediction is in flight, the registry re-runs the
+            // SAME proc from these bytes on top of it (registry replay).
+            args_len := len(ctx.msg.buf) - ctx._args_start
+            args := make([]u8, args_len)
+            copy(args, ctx.msg.buf[ctx._args_start:])
+            pending_record(&ctx.pending, ctx._seq, ctx._entity, u16(cmd), args, revert, ctx.now_tick)
+            predicted = true
+        } else {
+            fields_restore(entity, set.entity_desc, revert)
+            delete(revert)
+            result.reason = .Predicate
+        }
+    }
+
+    if !predicted {
+        pending_record_receipt(&ctx.pending, ctx._seq, ctx._entity, u16(cmd), ctx.now_tick)
+    }
+
+    if ctx.send != nil {
+        ctx.send(ctx.send_user, writer_bytes(&ctx.msg))
+    }
+
+    result.prediction_applied = predicted
+    return result
 }
 
 // ---------------------------------------------------------------------------
@@ -513,17 +517,13 @@ command_issue :: proc(
 // read_header → dedup → resolve the entity (registry) → execute → result_write.
 
 Command_Header :: struct {
-	entity: Net_Id,
-	cmd:    u16,
-	seq:    Intent_Seq,
+    entity: Net_Id,
+    cmd:    u16,
+    seq:    Intent_Seq,
 }
 
 command_read_header :: proc(r: ^Reader) -> Command_Header {
-	return Command_Header {
-		entity = read_net_id(r),
-		cmd = read_u16(r),
-		seq = Intent_Seq(read_u32(r)),
-	}
+    return Command_Header{entity = read_net_id(r), cmd = read_u16(r), seq = Intent_Seq(read_u32(r))}
 }
 
 // Exactly-once gate: false = duplicate/stale (drop silently — the reliable
@@ -533,10 +533,10 @@ command_read_header :: proc(r: ^Reader) -> Command_Header {
 // other key would mis-attribute every consequence. The session already keys
 // this path by Player_Id; hand-driven callers must too.
 command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool {
-	win := ctx.dedup[peer_key] // zero value for a new peer IS the fresh window
-	ok := dedup_accept(&win, seq)
-	ctx.dedup[peer_key] = win
-	return ok
+    win := ctx.dedup[peer_key] // zero value for a new peer IS the fresh window
+    ok := dedup_accept(&win, seq)
+    ctx.dedup[peer_key] = win
+    return ok
 }
 
 // Run a received command authoritatively. Unknown command id (version skew, a
@@ -546,31 +546,37 @@ command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool
 // is this run's identity (authority + issuer + game pointer) — the thunk fires
 // the verb's `_then` consequence off it when the proc applies.
 command_execute :: proc(
-	entity: rawptr,
-	set: ^Command_Set,
-	cmd: u16,
-	r: ^Reader,
-	env: ^Command_Env,
+    entity: rawptr,
+    set: ^Command_Set,
+    cmd: u16,
+    r: ^Reader,
+    env: ^Command_Env,
 ) -> Action_Reject_Reason {
-	c := command_find(set, cmd)
-	if c == nil {
-		return .Malformed
-	}
-	if !action_args_allowed(c.policy, len(reader_remaining(r))) {
-		return .Malformed
-	}
-	revert := fields_capture(entity, set.entity_desc)
-	defer delete(revert)
-	ok := c.invoke(entity, r, env)
-	if r.err || len(reader_remaining(r)) != 0 {
-		fields_restore(entity, set.entity_desc, revert)
-		return .Malformed
-	}
-	if !ok {
-		fields_restore(entity, set.entity_desc, revert)
-		return .Predicate
-	}
-	return .None
+    c := command_find(set, cmd)
+
+    if c == nil {
+        return .Malformed
+    }
+
+    if !action_args_allowed(c.policy, len(reader_remaining(r))) {
+        return .Malformed
+    }
+
+    revert := fields_capture(entity, set.entity_desc)
+    defer delete(revert)
+    ok := c.invoke(entity, r, env)
+
+    if r.err || len(reader_remaining(r)) != 0 {
+        fields_restore(entity, set.entity_desc, revert)
+        return .Malformed
+    }
+
+    if !ok {
+        fields_restore(entity, set.entity_desc, revert)
+        return .Predicate
+    }
+
+    return .None
 }
 
 // Result message: confirm = header only (the client's optimistic state already
@@ -581,55 +587,58 @@ command_execute :: proc(
 // This keeps rate/access replies small while still delivering their typed
 // reason immediately instead of disguising them as timeouts.
 command_result_write :: proc(
-	w: ^Writer,
-	h: Command_Header,
-	reason: Action_Reject_Reason,
-	entity: rawptr = nil,
-	set: ^Command_Set = nil,
-	truth := false,
+    w: ^Writer,
+    h: Command_Header,
+    reason: Action_Reject_Reason,
+    entity: rawptr = nil,
+    set: ^Command_Set = nil,
+    truth := false,
 ) {
-	assert(action_reject_reason_valid(reason))
-	write_u32(w, u32(h.seq))
-	write_net_id(w, h.entity)
-	write_u16(w, h.cmd)
-	write_u8(w, u8(reason))
-	write_bool(w, truth)
-	if truth {
-		assert(reason != .None && entity != nil && set != nil)
-		write_full(w, entity, set.entity_desc)
-	}
+    assert(action_reject_reason_valid(reason))
+    write_u32(w, u32(h.seq))
+    write_net_id(w, h.entity)
+    write_u16(w, h.cmd)
+    write_u8(w, u8(reason))
+    write_bool(w, truth)
+
+    if truth {
+        assert(reason != .None && entity != nil && set != nil)
+        write_full(w, entity, set.entity_desc)
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Client result path: read → resolve res.entity (caller) → confirm / reject.
 
 Command_Result :: struct {
-	seq:       Intent_Seq,
-	entity:    Net_Id,
-	cmd:       u16,
-	reason:    Action_Reject_Reason,
-	has_truth: bool,
+    seq:       Intent_Seq,
+    entity:    Net_Id,
+    cmd:       u16,
+    reason:    Action_Reject_Reason,
+    has_truth: bool,
 }
 
 command_result_read :: proc(r: ^Reader) -> Command_Result {
-	res := Command_Result {
-		seq       = Intent_Seq(read_u32(r)),
-		entity    = read_net_id(r),
-		cmd       = read_u16(r),
-		reason    = Action_Reject_Reason(read_u8(r)),
-		has_truth = read_bool(r),
-	}
-	if !action_reject_reason_valid(res.reason) || (res.reason == .None && res.has_truth) {
-		r.err = true
-		return res
-	}
-	return res
+    res := Command_Result {
+        seq       = Intent_Seq(read_u32(r)),
+        entity    = read_net_id(r),
+        cmd       = read_u16(r),
+        reason    = Action_Reject_Reason(read_u8(r)),
+        has_truth = read_bool(r),
+    }
+
+    if !action_reject_reason_valid(res.reason) || (res.reason == .None && res.has_truth) {
+        r.err = true
+        return res
+    }
+
+    return res
 }
 
 // Confirmed: the prediction stands, its revert is freed, nothing replays.
 // (Non-predicted commands have no pending entry; the miss is harmless.)
 command_confirm :: proc(ctx: ^Command_Ctx, seq: Intent_Seq) -> bool {
-	return pending_confirm(&ctx.pending, seq)
+    return pending_confirm(&ctx.pending, seq)
 }
 
 // Rejected: pop the pending entry and apply the embedded truth snapshot. If the
@@ -641,41 +650,47 @@ command_confirm :: proc(ctx: ^Command_Ctx, seq: Intent_Seq) -> bool {
 // lagged echo of state this peer is authoritative for, and restoring it
 // yanks a moving owner backwards on every rejection.
 command_reject :: proc(
-	ctx: ^Command_Ctx,
-	res: Command_Result,
-	r: ^Reader,
-	entity: rawptr,
-	set: ^Command_Set,
-	owned_here := false,
+    ctx: ^Command_Ctx,
+    res: Command_Result,
+    r: ^Reader,
+    entity: rawptr,
+    set: ^Command_Set,
+    owned_here := false,
 ) {
-	// .Predicted is skipped unconditionally: this proc only runs on CLIENTS,
-	// where .Predicted fields belong to the sim lane's reconcile — a
-	// reject-truth may only land on the delta-lane fields the command could
-	// touch. .Owner joins the skip when this peer owns the entity (its streamed
-	// fields are authoritative here, not in the host's lagged truth).
-	skip := Subset_Skips{.Predicted}
-	if owned_here {
-		skip += {.Owner}
-	}
-	// Return to the entity's pre-prediction baseline first. A compact admission
-	// rejection has no truth payload, and a newer prediction's revert captured
-	// this one's writes; restoring only the rejected entry would clobber that
-	// chain. The registry replays surviving entries oldest-first afterwards.
-	#reverse for &pending in ctx.pending.entries {
-		if pending.entity == res.entity && pending.predicted {
-			fields_restore(entity, set.entity_desc, pending.revert, skip)
-		}
-	}
-	baseline := fields_capture(entity, set.entity_desc)
-	defer delete(baseline)
-	p, had := pending_reject(&ctx.pending, res.seq)
-	if res.has_truth {
-		apply_full(r, entity, set.entity_desc, skip)
-	}
-	if r.err {
-		fields_restore(entity, set.entity_desc, baseline, skip)
-	}
-	if had {
-		pending_dispose(p)
-	}
+    // .Predicted is skipped unconditionally: this proc only runs on CLIENTS,
+    // where .Predicted fields belong to the sim lane's reconcile — a
+    // reject-truth may only land on the delta-lane fields the command could
+    // touch. .Owner joins the skip when this peer owns the entity (its streamed
+    // fields are authoritative here, not in the host's lagged truth).
+    skip := Subset_Skips{.Predicted}
+
+    if owned_here {
+        skip += {.Owner}
+    }
+
+    // Return to the entity's pre-prediction baseline first. A compact admission
+    // rejection has no truth payload, and a newer prediction's revert captured
+    // this one's writes; restoring only the rejected entry would clobber that
+    // chain. The registry replays surviving entries oldest-first afterwards.
+    #reverse for &pending in ctx.pending.entries {
+        if pending.entity == res.entity && pending.predicted {
+            fields_restore(entity, set.entity_desc, pending.revert, skip)
+        }
+    }
+
+    baseline := fields_capture(entity, set.entity_desc)
+    defer delete(baseline)
+    p, had := pending_reject(&ctx.pending, res.seq)
+
+    if res.has_truth {
+        apply_full(r, entity, set.entity_desc, skip)
+    }
+
+    if r.err {
+        fields_restore(entity, set.entity_desc, baseline, skip)
+    }
+
+    if had {
+        pending_dispose(p)
+    }
 }

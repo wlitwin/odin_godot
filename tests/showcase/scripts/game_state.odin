@@ -18,15 +18,15 @@ score: gd.Int
 
 // Add to the shared score (called by a coin when it is collected).
 game_state_add :: proc "contextless" (amount: gd.Int) {
-	score += amount
+    score += amount
 }
 
 // Read the shared score (called by the HUD each frame).
 game_state_get :: proc "contextless" () -> gd.Int {
-	return score
+    return score
 }
 
 // Reset the score (called by the player on _ready, so a fresh run starts at 0).
 game_state_reset :: proc "contextless" () {
-	score = 0
+    score = 0
 }

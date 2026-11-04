@@ -17,23 +17,24 @@ import "core:time"
 // CHOOSE an identity can bypass this with their own token source — see
 // cavecrawl's CAVE_TOKEN env override.)
 persistent_token :: proc(path: cstring) -> u64 {
-	if bytes, ok := read_file(path, context.temp_allocator); ok && len(bytes) == 8 {
-		return (cast(^u64)raw_data(bytes))^
-	}
-	// First run: mint from the ENGINE clock — core:time is stuck inside the
-	// wasm module (the same freeze the netgd clock swap exists for), and a
-	// frozen mint would hand every fresh web player the SAME token, whose
-	// holder's seat the next joiner then legitimately steals. core:time is
-	// folded back in for extra native entropy (a harmless constant on web),
-	// scrambled (golden-ratio multiply) so near-simultaneous first launches
-	// don't collide on the low bits. Cryptographic strength is not the bar —
-	// unguessable-by-friends is (this is friendslop; see the voice-of-v1
-	// stance).
-	usec := u64(gd.time_get_ticks_usec(gd.singleton_time()))
-	token := (usec ~ u64(time.tick_now()._nsec)) * 0x9E3779B97F4A7C15
-	bits := token
-	_ = write_file(path, (cast([^]u8)&bits)[:8])
-	return token
+    if bytes, ok := read_file(path, context.temp_allocator); ok && len(bytes) == 8 {
+        return (cast(^u64)raw_data(bytes))^
+    }
+
+    // First run: mint from the ENGINE clock — core:time is stuck inside the
+    // wasm module (the same freeze the netgd clock swap exists for), and a
+    // frozen mint would hand every fresh web player the SAME token, whose
+    // holder's seat the next joiner then legitimately steals. core:time is
+    // folded back in for extra native entropy (a harmless constant on web),
+    // scrambled (golden-ratio multiply) so near-simultaneous first launches
+    // don't collide on the low bits. Cryptographic strength is not the bar —
+    // unguessable-by-friends is (this is friendslop; see the voice-of-v1
+    // stance).
+    usec := u64(gd.time_get_ticks_usec(gd.singleton_time()))
+    token := (usec ~ u64(time.tick_now()._nsec)) * 0x9E3779B97F4A7C15
+    bits := token
+    _ = write_file(path, (cast([^]u8)&bits)[:8])
+    return token
 }
 
 // The whole identity decision, in one call — every game grew this same
@@ -52,33 +53,38 @@ persistent_token :: proc(path: cstring) -> u64 {
 //      score-only sessions); keep it OFF when saves/succession matter and
 //      hand same-machine testers distinct env tokens instead.
 Token_Options :: struct {
-	env:          cstring, // env var naming an explicit token ("" = skip)
-	path:         cstring, // user:// file for the persisted token
-	per_instance: bool, // fold the pid in (see above — a deliberate trade)
+    env:          cstring, // env var naming an explicit token ("" = skip)
+    path:         cstring, // user:// file for the persisted token
+    per_instance: bool, // fold the pid in (see above — a deliberate trade)
 }
 
 token :: proc(opts: Token_Options, pid := u64(0)) -> u64 {
-	if opts.env != "" {
-		if v := gd.env_string(opts.env); v != "" {
-			return fnv64a(transmute([]u8)v)
-		}
-	}
-	base := persistent_token(opts.path)
-	if opts.per_instance {
-		p := pid != 0 ? pid : u64(gd.os_get_process_id(gd.singleton_os()))
-		both: [16]u8
-		(cast(^u64)&both[0])^ = base
-		(cast(^u64)&both[8])^ = p
-		return fnv64a(both[:])
-	}
-	return base
+    if opts.env != "" {
+        if v := gd.env_string(opts.env); v != "" {
+            return fnv64a(transmute([]u8)v)
+        }
+    }
+
+    base := persistent_token(opts.path)
+
+    if opts.per_instance {
+        p := pid != 0 ? pid : u64(gd.os_get_process_id(gd.singleton_os()))
+        both: [16]u8
+        (cast(^u64)&both[0])^ = base
+        (cast(^u64)&both[8])^ = p
+        return fnv64a(both[:])
+    }
+
+    return base
 }
 
 @(private = "file")
 fnv64a :: proc(data: []u8) -> u64 {
-	h := u64(1469598103934665603)
-	for c in data {
-		h = (h ~ u64(c)) * 1099511628211
-	}
-	return h
+    h := u64(1469598103934665603)
+
+    for c in data {
+        h = (h ~ u64(c)) * 1099511628211
+    }
+
+    return h
 }

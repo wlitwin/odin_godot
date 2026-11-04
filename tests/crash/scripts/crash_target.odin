@@ -30,7 +30,7 @@ import "core:os"
 import gd "godot:godot"
 
 CrashTarget :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 // The known message run.sh greps for (alongside the file:line of the panic call).
@@ -38,39 +38,39 @@ CRASH_TEST_PANIC_MESSAGE :: "CRASH_TEST_PANIC boom from odin script"
 
 @(gd_method)
 crash_target_do_panic :: proc(self: ^CrashTarget) {
-	panic(CRASH_TEST_PANIC_MESSAGE)
+    panic(CRASH_TEST_PANIC_MESSAGE)
 }
 
 @(gd_method)
 crash_target_do_segv :: proc(self: ^CrashTarget) {
-	// volatile_load so the nil deref cannot be folded away; classic "engine handle was
-	// nil" crash shape.
-	p := cast(^i64)rawptr(uintptr(0))
-	x := intrinsics.volatile_load(p)
-	gd.print_int(x) // never reached
+    // volatile_load so the nil deref cannot be folded away; classic "engine handle was
+    // nil" crash shape.
+    p := cast(^i64)rawptr(uintptr(0))
+    x := intrinsics.volatile_load(p)
+    gd.print_int(x) // never reached
 }
 
 @(gd_method)
 crash_target_do_overflow :: proc(self: ^CrashTarget) {
-	gd.print_int(overflow_rec(1))
+    gd.print_int(overflow_rec(1))
 }
 
 // Unbounded NON-TAIL recursion (the add after the call keeps it off the tail-call path
 // even if optimization settings ever change) with a fat frame, so the stack dies fast.
 @(private = "file")
 overflow_rec :: proc(n: i64) -> i64 {
-	pad: [512]i64
-	pad[int(n) & 511] = n
-	return overflow_rec(n + 1) + pad[int(n) & 511]
+    pad: [512]i64
+    pad[int(n) & 511] = n
+    return overflow_rec(n + 1) + pad[int(n) & 511]
 }
 
 crash_target_ready :: proc(self: ^CrashTarget) {
-	switch os.get_env("ODIN_CRASH_TEST", context.temp_allocator) {
-	case "panic":
-		crash_target_do_panic(self)
-	case "segv":
-		crash_target_do_segv(self)
-	case "overflow":
-		crash_target_do_overflow(self)
-	}
+    switch os.get_env("ODIN_CRASH_TEST", context.temp_allocator) {
+    case "panic":
+        crash_target_do_panic(self)
+    case "segv":
+        crash_target_do_segv(self)
+    case "overflow":
+        crash_target_do_overflow(self)
+    }
 }

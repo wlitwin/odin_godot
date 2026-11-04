@@ -65,22 +65,22 @@ import "core:mem"
 // engine call; they are VIEWS of the caller's storage and the doors consume
 // them synchronously (nothing here outlives the call).
 Endpoint :: struct {
-	addr:      cstring, // native: the host's address (join) · web: the relay url (both)
-	port:      int, // native: the port to bind or dial
-	room:      cstring, // web: the room code — RESERVED on host (empty = let the relay assign), knocked on join
-	peer_id:   u64, // steam: the host's steam id (join) — the lobby ceremony hands it over
-	max_peers: int, // host: the seat cap (0 = the transport's own default)
+    addr:      cstring, // native: the host's address (join) · web: the relay url (both)
+    port:      int, // native: the port to bind or dial
+    room:      cstring, // web: the room code — RESERVED on host (empty = let the relay assign), knocked on join
+    peer_id:   u64, // steam: the host's steam id (join) — the lobby ceremony hands it over
+    max_peers: int, // host: the seat cap (0 = the transport's own default)
 }
 
 Transport :: struct {
-	name:       string, // "enet" / "webrtc" / "steam" — status lines and logs
-	rendezvous: Rendezvous_Kind, // the torch flavor `address` feeds (.None = no migration on this transport)
-	open_host:  proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool,
-	open_join:  proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool,
-	pump:       proc(wire: ^Session_Wire),
-	close:      proc(wire: ^Session_Wire),
-	link:       proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool),
-	address:    proc(wire: ^Session_Wire, peer: ksess.Peer_Id, allocator: mem.Allocator) -> (addr: string, ok: bool),
+    name:       string, // "enet" / "webrtc" / "steam" — status lines and logs
+    rendezvous: Rendezvous_Kind, // the torch flavor `address` feeds (.None = no migration on this transport)
+    open_host:  proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool,
+    open_join:  proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool,
+    pump:       proc(wire: ^Session_Wire),
+    close:      proc(wire: ^Session_Wire),
+    link:       proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool),
+    address:    proc(wire: ^Session_Wire, peer: ksess.Peer_Id, allocator: mem.Allocator) -> (addr: string, ok: bool),
 }
 
 // ---- the doors -------------------------------------------------------------
@@ -89,38 +89,42 @@ Transport :: struct {
 // verb (pump, close, link, address, the torch) stops needing to be told again
 // — the single fact that dissolved the per-transport smear.
 transport_host :: proc(
-	wire: ^Session_Wire,
-	t: ^Transport,
-	at: Endpoint,
-	name: string,
-	token: u64 = 0,
-	dedicated := false,
+    wire: ^Session_Wire,
+    t: ^Transport,
+    at: Endpoint,
+    name: string,
+    token: u64 = 0,
+    dedicated := false,
 ) -> bool {
-	assert(t != nil && t.open_host != nil, "a Transport must fill open_host — see kit/netgd/transport.odin")
-	if !t.open_host(wire, at, name, token, dedicated) {
-		return false
-	}
-	wire.transport = t
-	transport_note_peer(wire)
-	return true
+    assert(t != nil && t.open_host != nil, "a Transport must fill open_host — see kit/netgd/transport.odin")
+
+    if !t.open_host(wire, at, name, token, dedicated) {
+        return false
+    }
+
+    wire.transport = t
+    transport_note_peer(wire)
+    return true
 }
 
 // Join over `t`. `spectate` takes a receive-only seat (ksess.Player.spectator).
 transport_join :: proc(
-	wire: ^Session_Wire,
-	t: ^Transport,
-	at: Endpoint,
-	name: string,
-	token: u64,
-	spectate := false,
+    wire: ^Session_Wire,
+    t: ^Transport,
+    at: Endpoint,
+    name: string,
+    token: u64,
+    spectate := false,
 ) -> bool {
-	assert(t != nil && t.open_join != nil, "a Transport must fill open_join — see kit/netgd/transport.odin")
-	if !t.open_join(wire, at, name, token, spectate) {
-		return false
-	}
-	wire.transport = t
-	transport_note_peer(wire)
-	return true
+    assert(t != nil && t.open_join != nil, "a Transport must fill open_join — see kit/netgd/transport.odin")
+
+    if !t.open_join(wire, at, name, token, spectate) {
+        return false
+    }
+
+    wire.transport = t
+    transport_note_peer(wire)
+    return true
 }
 
 // Which transport this wire rides. A wire opened the RAW way (gd.host /
@@ -129,7 +133,7 @@ transport_join :: proc(
 // class-checks the installed peer and answers ok=false when it is something
 // else, so the raw path degrades exactly as it did before this record existed.
 transport_of :: proc(wire: ^Session_Wire) -> ^Transport {
-	return wire.transport if wire.transport != nil else &ENET
+    return wire.transport if wire.transport != nil else &ENET
 }
 
 // The per-frame control-plane pump. kit/boot calls this every frame for every
@@ -138,67 +142,79 @@ transport_of :: proc(wire: ^Session_Wire) -> ^Transport {
 // that WebRTC — alone among transports — needed web_poll hand-called from
 // process(), and nothing said so.)
 transport_service :: proc(wire: ^Session_Wire) {
-	t := transport_of(wire)
-	if t.pump != nil {
-		t.pump(wire)
-	}
+    t := transport_of(wire)
+
+    if t.pump != nil {
+        t.pump(wire)
+    }
 }
 
 // Fold the transport's control state and the peer installed by this wire, so
 // a fresh host can bind the same port. A replacement peer belongs to its new
 // installer and is left alone. A raw wire_attach does not acquire a peer.
 transport_close :: proc(wire: ^Session_Wire) {
-	t := transport_of(wire)
-	if t.close != nil && cast(rawptr)wire.node != nil {
-		t.close(wire)
-	}
-	mp := wire.installed_mp
-	installed_id := wire.installed_peer_id
-	wire.installed_mp = nil
-	wire.installed_peer_id = 0
-	defer gd.release_ref(mp)
-	if mp != nil && installed_id != 0 {
-		peer := gd.multiplayer_api_get_multiplayer_peer(mp)
-		defer gd.release_ref(peer)
-		if peer != nil && gd.object_get_instance_id(cast(gd.Object)peer) == installed_id {
-			gd.multiplayer_peer_close(peer)
-			gd.multiplayer_api_set_multiplayer_peer(mp, nil)
-		}
-	}
+    t := transport_of(wire)
+
+    if t.close != nil && cast(rawptr)wire.node != nil {
+        t.close(wire)
+    }
+
+    mp := wire.installed_mp
+    installed_id := wire.installed_peer_id
+    wire.installed_mp = nil
+    wire.installed_peer_id = 0
+    defer gd.release_ref(mp)
+
+    if mp != nil && installed_id != 0 {
+        peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+        defer gd.release_ref(peer)
+
+        if peer != nil && gd.object_get_instance_id(cast(gd.Object)peer) == installed_id {
+            gd.multiplayer_peer_close(peer)
+            gd.multiplayer_api_set_multiplayer_peer(mp, nil)
+        }
+    }
 }
 
 @(private = "file")
 transport_note_peer :: proc(wire: ^Session_Wire) {
-	gd.release_ref(wire.installed_mp)
-	wire.installed_mp = nil
-	wire.installed_peer_id = 0
-	// WebRTC installs its peer asynchronously; its close callback owns that
-	// per-node signaling/peer lifecycle. Do not claim a pre-existing peer.
-	if wire.transport.rendezvous == .Web_Room {
-		return
-	}
-	mp := gd.node_get_multiplayer(wire.node)
-	if mp == nil {
-		return
-	}
-	peer := gd.multiplayer_api_get_multiplayer_peer(mp)
-	defer gd.release_ref(peer)
-	if peer != nil {
-		wire.installed_mp = mp
-		wire.installed_peer_id = gd.object_get_instance_id(cast(gd.Object)peer)
-	} else {
-		gd.release_ref(mp)
-	}
+    gd.release_ref(wire.installed_mp)
+    wire.installed_mp = nil
+    wire.installed_peer_id = 0
+
+    // WebRTC installs its peer asynchronously; its close callback owns that
+    // per-node signaling/peer lifecycle. Do not claim a pre-existing peer.
+    if wire.transport.rendezvous == .Web_Room {
+        return
+    }
+
+    mp := gd.node_get_multiplayer(wire.node)
+
+    if mp == nil {
+        return
+    }
+
+    peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+    defer gd.release_ref(peer)
+
+    if peer != nil {
+        wire.installed_mp = mp
+        wire.installed_peer_id = gd.object_get_instance_id(cast(gd.Object)peer)
+    } else {
+        gd.release_ref(mp)
+    }
 }
 
 // The transport's own view of a peer's link — see wire_link_quality, which is
 // the name games call this by.
 transport_link :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
-	t := transport_of(wire)
-	if t.link == nil {
-		return
-	}
-	return t.link(wire, peer)
+    t := transport_of(wire)
+
+    if t.link == nil {
+        return
+    }
+
+    return t.link(wire, peer)
 }
 
 // The rendezvous handle for `peer`, as THIS transport addresses it — what a
@@ -206,60 +222,63 @@ transport_link :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jit
 // has no address story (succession says so once and leaves migration honestly
 // absent) or the peer is unknown.
 transport_address :: proc(
-	wire: ^Session_Wire,
-	peer: ksess.Peer_Id,
-	allocator := context.temp_allocator,
-) -> (addr: string, ok: bool) {
-	t := transport_of(wire)
-	if t.address == nil {
-		return "", false
-	}
-	return t.address(wire, peer, allocator)
+    wire: ^Session_Wire,
+    peer: ksess.Peer_Id,
+    allocator := context.temp_allocator,
+) -> (
+    addr: string,
+    ok: bool,
+) {
+    t := transport_of(wire)
+
+    if t.address == nil {
+        return "", false
+    }
+
+    return t.address(wire, peer, allocator)
 }
 
 // ---- ENet ------------------------------------------------------------------
 
 ENET := Transport {
-	name       = "enet",
-	rendezvous = .Native_Addr,
-	open_host  = enet_open_host,
-	open_join  = enet_open_join,
-	// pump: the engine polls ENet inside its own multiplayer step.
-	// close: no separate control state; transport_close releases the owned peer.
-	link       = enet_link,
-	address    = enet_address,
+    name       = "enet",
+    rendezvous = .Native_Addr,
+    open_host  = enet_open_host,
+    open_join  = enet_open_join,
+    // pump: the engine polls ENet inside its own multiplayer step.
+    // close: no separate control state; transport_close releases the owned peer.
+    link       = enet_link,
+    address    = enet_address,
 }
 
 @(private = "file")
 enet_open_host :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool {
-	if !gd.host(wire.node, at.port, at.max_peers if at.max_peers > 0 else 32) {
-		return false
-	}
-	ksess.session_host_start(wire.ses, name, token, dedicated)
-	return true
+    if !gd.host(wire.node, at.port, at.max_peers if at.max_peers > 0 else 32) {
+        return false
+    }
+
+    ksess.session_host_start(wire.ses, name, token, dedicated)
+    return true
 }
 
 @(private = "file")
 enet_open_join :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool {
-	if !gd.join(wire.node, at.addr, at.port) {
-		return false
-	}
-	ksess.session_client_start(wire.ses, token, name, spectate)
-	return true
+    if !gd.join(wire.node, at.addr, at.port) {
+        return false
+    }
+
+    ksess.session_client_start(wire.ses, token, name, spectate)
+    return true
 }
 
 @(private = "file")
 enet_link :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
-	return enet_peer_stats(wire.node, peer)
+    return enet_peer_stats(wire.node, peer)
 }
 
 @(private = "file")
-enet_address :: proc(
-	wire: ^Session_Wire,
-	peer: ksess.Peer_Id,
-	allocator: mem.Allocator,
-) -> (addr: string, ok: bool) {
-	return peer_address(wire.node, peer, allocator)
+enet_address :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, allocator: mem.Allocator) -> (addr: string, ok: bool) {
+    return peer_address(wire.node, peer, allocator)
 }
 
 // ---- OFFLINE (single player) ------------------------------------------------
@@ -272,64 +291,68 @@ enet_address :: proc(
 // gotcha every game's hand-rolled `on_single` existed to re-derive. Works
 // identically on native and web; rendezvous .None (nobody to migrate to).
 OFFLINE := Transport {
-	name       = "offline",
-	rendezvous = .None,
-	open_host  = offline_open_host,
-	// open_join: a solo door has no join half — transport_join asserts.
-	// pump/close/link/address: no separate control state; transport_close
-	// releases the installed peer.
+    name       = "offline",
+    rendezvous = .None,
+    open_host  = offline_open_host,
+    // open_join: a solo door has no join half — transport_join asserts.
+    // pump/close/link/address: no separate control state; transport_close
+    // releases the installed peer.
 }
 
 @(private = "file")
 offline_open_host :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool {
-	_ = at
-	mp := gd.node_get_multiplayer(wire.node)
-	defer gd.release_ref(mp)
-	if cast(rawptr)mp == nil {
-		return false
-	}
-	peer:=gd.new_offline_multiplayer_peer()
-	gd.ref_counted_init_ref(peer)
-	defer gd.release_ref(peer)
-	gd.multiplayer_api_set_multiplayer_peer(mp,peer)
-	ksess.session_host_start(wire.ses, name, token, dedicated)
-	return true
+    _ = at
+    mp := gd.node_get_multiplayer(wire.node)
+    defer gd.release_ref(mp)
+
+    if cast(rawptr)mp == nil {
+        return false
+    }
+
+    peer := gd.new_offline_multiplayer_peer()
+    gd.ref_counted_init_ref(peer)
+    defer gd.release_ref(peer)
+    gd.multiplayer_api_set_multiplayer_peer(mp, peer)
+    ksess.session_host_start(wire.ses, name, token, dedicated)
+    return true
 }
 
 // ---- WebRTC ----------------------------------------------------------------
 
 WEBRTC := Transport {
-	name       = "webrtc",
-	rendezvous = .Web_Room,
-	open_host  = web_open_host,
-	open_join  = web_open_join,
-	pump       = web_poll, // the signaling socket is ours; the data channel is the engine's
-	close      = web_close,
-	// link: the browser's RTCPeerConnection stats are not plumbed through the
-	// engine's peer — nil, so the netgraph blanks its link row instead of
-	// showing an ENet-shaped zero.
-	// address: a room code is the run's rendezvous, not a peer's — the torch's
-	// .Web_Room arm carries the reservation the HOST minted, and needs no
-	// per-peer answer. (succession_torch's web arm never calls this.)
+    name       = "webrtc",
+    rendezvous = .Web_Room,
+    open_host  = web_open_host,
+    open_join  = web_open_join,
+    pump       = web_poll, // the signaling socket is ours; the data channel is the engine's
+    close      = web_close,
+    // link: the browser's RTCPeerConnection stats are not plumbed through the
+    // engine's peer — nil, so the netgraph blanks its link row instead of
+    // showing an ENet-shaped zero.
+    // address: a room code is the run's rendezvous, not a peer's — the torch's
+    // .Web_Room arm carries the reservation the HOST minted, and needs no
+    // per-peer answer. (succession_torch's web arm never calls this.)
 }
 
 @(private = "file")
 web_open_host :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool {
-	if !gd.webrtc_host(wire.node, at.addr, at.room) {
-		return false
-	}
-	// A browser tab makes a poor always-on box; `dedicated` is accepted (the
-	// door is uniform) and passed through, so a relay-hosted headless build
-	// gets the same infrastructure seat a native one would.
-	ksess.session_host_start(wire.ses, name, token, dedicated)
-	return true
+    if !gd.webrtc_host(wire.node, at.addr, at.room) {
+        return false
+    }
+
+    // A browser tab makes a poor always-on box; `dedicated` is accepted (the
+    // door is uniform) and passed through, so a relay-hosted headless build
+    // gets the same infrastructure seat a native one would.
+    ksess.session_host_start(wire.ses, name, token, dedicated)
+    return true
 }
 
 @(private = "file")
 web_open_join :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool {
-	if !gd.webrtc_join(wire.node, at.addr, at.room) {
-		return false
-	}
-	ksess.session_client_start(wire.ses, token, name, spectate)
-	return true
+    if !gd.webrtc_join(wire.node, at.addr, at.room) {
+        return false
+    }
+
+    ksess.session_client_start(wire.ses, token, name, spectate)
+    return true
 }

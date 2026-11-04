@@ -12,6 +12,6 @@ import gd "godot:godot"
 import "godot:play"
 
 BareProbe :: struct {
-	owner:  gd.Node2d,
-	health: play.Health, // hp/max must land in BareProbe's Entity_Desc
+    owner:  gd.Node2d,
+    health: play.Health, // hp/max must land in BareProbe's Entity_Desc
 }

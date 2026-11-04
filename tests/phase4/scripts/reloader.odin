@@ -22,42 +22,44 @@ import gd "godot:godot"
 RELOAD_V :: #config(RELOAD_V, 1)
 
 when RELOAD_V == 3 {
-	STEP :: 1000
+    STEP :: 1000
 } else when RELOAD_V == 2 {
-	STEP :: 100
+    STEP :: 100
 } else {
-	STEP :: 10
+    STEP :: 10
 }
 
-reload_step :: proc() -> int {return STEP}
+reload_step :: proc() -> int {
+    return STEP
+}
 
 // First field MUST be the owner Object pointer (core writes it at offset 0).
 Reloader :: struct {
-	owner:    gd.Node,
-	position: gd.Int `gd:"export"`,
-	callback: proc() -> int,
+    owner:    gd.Node,
+    position: gd.Int `gd:"export"`,
+    callback: proc() -> int,
 }
 
 reloader_ready :: proc(self: ^Reloader) {
-	self.callback = reload_step
+    self.callback = reload_step
 }
 
 // Lifecycle: bumps the exported position by STEP each frame (codegen wraps this as
 // the `proc "c"` process slot).
 reloader_process :: proc(self: ^Reloader, delta: f64) {
-	self.position += STEP
+    self.position += STEP
 }
 
 // Custom method: returns the compile-time STEP so GDScript can observe which build
 // (v1 vs v2) is currently live after a reload.
 @(gd_method)
 reloader_get_step :: proc(self: ^Reloader) -> int {
-	return STEP
+    return STEP
 }
 
 @(gd_method)
 reloader_get_cached_step :: proc(self: ^Reloader) -> int {
-	return self.callback != nil ? self.callback() : -1
+    return self.callback != nil ? self.callback() : -1
 }
 
 // Concurrency probe: the Phase 4 harness invokes this method on a Godot Thread, then
@@ -65,7 +67,7 @@ reloader_get_cached_step :: proc(self: ^Reloader) -> int {
 // trampoline to return before it mutates descriptors or instance state.
 @(gd_method)
 reloader_hold_reload_reader :: proc(self: ^Reloader, milliseconds: int) {
-	time.sleep(time.Duration(milliseconds) * time.Millisecond)
+    time.sleep(time.Duration(milliseconds) * time.Millisecond)
 }
 
 // Hot-reload hook: runs on each live instance AFTER the dll swap, with the NEW code. A real
@@ -73,6 +75,6 @@ reloader_hold_reload_reader :: proc(self: ^Reloader, milliseconds: int) {
 // prove the `<class>_reload` lifecycle fired on the swap. (A proc, not a field — no layout
 // change, so the reload still takes the same-layout fast path the rest of this test asserts.)
 reloader_reload :: proc(self: ^Reloader) {
-	self.callback = reload_step
-	gd.print("RELOAD_HOOK_FIRED")
+    self.callback = reload_step
+    gd.print("RELOAD_HOOK_FIRED")
 }

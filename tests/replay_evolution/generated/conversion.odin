@@ -1,12 +1,16 @@
 package scrapyard_revision_fixture
 import e "godot:replay/evolution"
 
-convert :: proc(old:Catalog_49)->(Catalog_50,bool) {
+convert :: proc(old: Catalog_49) -> (Catalog_50, bool) {
     // TODO: choose and review every new default below.
     defaults_reviewed := false
-    if !defaults_reviewed {return {},false}
-    defaults:Catalog_50
-    added:=[]string{
+
+    if !defaults_reviewed {
+        return {}, false
+    }
+
+    defaults: Catalog_50
+    added := []string {
         "$.mobs[0].pulse.windup", // TODO: defaults.mobs[0].pulse.windup
         "$.mobs[0].pulse.cooldown", // TODO: defaults.mobs[0].pulse.cooldown
         "$.mobs[0].pulse.radius", // TODO: defaults.mobs[0].pulse.radius
@@ -40,6 +44,6 @@ convert :: proc(old:Catalog_49)->(Catalog_50,bool) {
         "$.mobs[7].pulse.radius", // TODO: defaults.mobs[7].pulse.radius
         "$.mobs[7].pulse.damage", // TODO: defaults.mobs[7].pulse.damage
     }
-    value,report:=e.copy_preserved(old,defaults,added)
-    return value,report.error==.None
+    value, report := e.copy_preserved(old, defaults, added)
+    return value, report.error == .None
 }

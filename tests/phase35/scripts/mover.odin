@@ -9,10 +9,10 @@ package phase35_scripts
 import gd "godot:godot"
 
 Mover :: struct {
-	owner: gd.Node2d,
-	ticks: gd.Int `gd:"export"`,
+    owner: gd.Node2d,
+    ticks: gd.Int `gd:"export"`,
 }
 
 mover_process :: proc(self: ^Mover, delta: f64) {
-	self.ticks += 1
+    self.ticks += 1
 }

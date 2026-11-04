@@ -21,17 +21,17 @@ package scrapyard_defs
 import gd "godot:godot"
 
 MobDef :: struct {
-	owner: gd.Resource,
-	id: gd.Int `gd:"export,range=0:254:1"`, // wire kind (Mob.kind)
-	name: gd.String `gd:"export"`, // for humans reading the data (unused at runtime, for now)
-	hp: gd.Int `gd:"export,range=1:65535:1"`,
-	speed: f32 `gd:"export,range=10:400:1"`, // px/s (the tick divides it)
-	bite: gd.Int `gd:"export,range=0:20:1"`, // melee damage (0 = doesn't bite)
-	body_r: f32 `gd:"export,range=4:120:1"`, // slug target radius (the hulk body-blocks)
-	scale: f32 `gd:"export,range=0.2:8:0.05"`, // presentation size
-	prop: bool `gd:"export"`, // a standing PROP (barrel): brainless, shootable, doesn't gate the clear
-	boom_dmg: gd.Int `gd:"export,range=0:250:1"`, // death blast wound (0 = dies quietly)
-	boom_radius: f32 `gd:"export,range=0:600:1"`, // death blast reach
-	pulse: ^gd.Resource `gd:"export,resource=PulseDef"`,
-	boom_status: ^gd.Resource `gd:"export,resource=StatusDef"`, // death blast payload status (through the rulebook; 0 = none)
+    owner: gd.Resource,
+    id: gd.Int `gd:"export,range=0:254:1"`, // wire kind (Mob.kind)
+    name: gd.String `gd:"export"`, // for humans reading the data (unused at runtime, for now)
+    hp: gd.Int `gd:"export,range=1:65535:1"`,
+    speed: f32 `gd:"export,range=10:400:1"`, // px/s (the tick divides it)
+    bite: gd.Int `gd:"export,range=0:20:1"`, // melee damage (0 = doesn't bite)
+    body_r: f32 `gd:"export,range=4:120:1"`, // slug target radius (the hulk body-blocks)
+    scale: f32 `gd:"export,range=0.2:8:0.05"`, // presentation size
+    prop: bool `gd:"export"`, // a standing PROP (barrel): brainless, shootable, doesn't gate the clear
+    boom_dmg: gd.Int `gd:"export,range=0:250:1"`, // death blast wound (0 = dies quietly)
+    boom_radius: f32 `gd:"export,range=0:600:1"`, // death blast reach
+    pulse: ^gd.Resource `gd:"export,resource=PulseDef"`,
+    boom_status: ^gd.Resource `gd:"export,resource=StatusDef"`, // death blast payload status (through the rulebook; 0 = none)
 }

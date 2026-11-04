@@ -9,18 +9,26 @@ last: corpus.Result
 
 @(export)
 run_corpus :: proc "c" (seed: u32) -> u64 {
-	context = runtime.default_context()
-	arena: mem.Arena
-	mem.arena_init(&arena, backing[:])
-	context.allocator = mem.arena_allocator(&arena)
-	context.temp_allocator = context.allocator
-	last = corpus.run(u64(seed), 2400)
-	return last.ok ? last.hash : 0
+    context = runtime.default_context()
+    arena: mem.Arena
+    mem.arena_init(&arena, backing[:])
+    context.allocator = mem.arena_allocator(&arena)
+    context.temp_allocator = context.allocator
+    last = corpus.run(u64(seed), 2400)
+    return last.ok ? last.hash : 0
 }
 
 @(export)
-shots :: proc "c" () -> u32 {return last.shots}
+shots :: proc "c" () -> u32 {
+    return last.shots
+}
+
 @(export)
-hits :: proc "c" () -> u32 {return last.hits}
+hits :: proc "c" () -> u32 {
+    return last.hits
+}
+
 @(export)
-kills :: proc "c" (seat: u32) -> u32 {return seat < 2 ? last.kills[seat] : 0}
+kills :: proc "c" (seat: u32) -> u32 {
+    return seat < 2 ? last.kills[seat] : 0
+}

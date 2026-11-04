@@ -37,8 +37,11 @@ fail :: proc(msg: string) {
 
 has_label :: proc(cs: [dynamic]complete.Completion, label: string) -> bool {
     for c in cs {
-        if c.label == label {return true}
+        if c.label == label {
+            return true
+        }
     }
+
     return false
 }
 
@@ -48,6 +51,7 @@ free_cs :: proc(cs: [dynamic]complete.Completion) {
         delete(c.insert_text)
         delete(c.detail)
     }
+
     delete(cs)
 }
 
@@ -58,29 +62,45 @@ make_code :: proc(base: string, prefix: string) -> string {
     inject := strings.concatenate({"\tgd.", prefix, "￿"}) // U+FFFF caret marker at end
     lines := strings.split_lines(base)
     b := strings.builder_make()
+
     for ln in lines {
         strings.write_string(&b, ln)
         strings.write_byte(&b, '\n')
+
         if strings.contains(ln, "gd.singleton_input()") {
             strings.write_string(&b, inject)
             strings.write_byte(&b, '\n')
         }
     }
+
     return strings.to_string(b)
 }
 
 main :: proc() {
     root := os.get_env("ODIN_GODOT_ROOT", context.allocator)
+
     if root == "" {
-        if len(os.args) > 1 {root = os.args[1]} else {fail("set ODIN_GODOT_ROOT or pass repo root as arg 1")}
+        if len(os.args) > 1 {
+            root = os.args[1]
+        } else {
+            fail("set ODIN_GODOT_ROOT or pass repo root as arg 1")
+        }
     }
+
     ols_bin := os.get_env("OLS", context.allocator)
-    if ols_bin == "" {ols_bin = "ols"}
+
+    if ols_bin == "" {
+        ols_bin = "ols"
+    }
+
     share := os.get_env("ODIN_SHARE", context.allocator)
 
     fixture := strings.concatenate({root, "/tests/showcase/scripts/player.odin"})
     base, rerr := os.read_entire_file(fixture, context.allocator)
-    if rerr != nil {fail(fmt.tprintf("could not read fixture %s", fixture))}
+
+    if rerr != nil {
+        fail(fmt.tprintf("could not read fixture %s", fixture))
+    }
 
     sess: complete.Session
 
@@ -92,44 +112,77 @@ main :: proc() {
     cs0, ok0 := complete.session_complete(&sess, code0, fixture, root, share, ols_bin)
     cold := time.since(t_cold)
     fmt.printf("COLD session_complete: %.0f ms, ok=%v options=%d\n", time.duration_milliseconds(cold), ok0, len(cs0))
+
     if !ok0 {
         fail("persistent session failed COLD (is `ols` on PATH / OLS set?)")
     }
+
     if !has_label(cs0, "node2d_set_position") {
         fail("COLD: expected `node2d_set_position` not present — session not returning REAL godot procs")
     }
+
     for c in cs0 {
-        if c.label == "" || c.insert_text == "" {fail("a completion option had an empty label/insert_text")}
+        if c.label == "" || c.insert_text == "" {
+            fail("a completion option had an empty label/insert_text")
+        }
     }
+
     free_cs(cs0)
 
     // WARM: a handful of small edits, each re-queried against the resident index.
     prefixes := [4]string{"node2d_set_po", "node2d_set_pos", "node2d_set_p", "node2d_set_posi"}
     warm_total: time.Duration
     warm_max: time.Duration
+
     for p, i in prefixes {
         code := make_code(string(base), p)
         t := time.now()
         cs, ok := complete.session_complete(&sess, code, fixture, root, share, ols_bin)
         dt := time.since(t)
-        fmt.printf("WARM[%d] prefix=%q: %.0f ms, ok=%v options=%d\n", i, p, time.duration_milliseconds(dt), ok, len(cs))
-        if !ok {fail(fmt.tprintf("WARM[%d] session_complete returned ok=false", i))}
+        fmt.printf(
+            "WARM[%d] prefix=%q: %.0f ms, ok=%v options=%d\n",
+            i,
+            p,
+            time.duration_milliseconds(dt),
+            ok,
+            len(cs),
+        )
+
+        if !ok {
+            fail(fmt.tprintf("WARM[%d] session_complete returned ok=false", i))
+        }
+
         if !has_label(cs, "node2d_set_position") {
             fail(fmt.tprintf("WARM[%d] expected node2d_set_position for prefix %q", i, p))
         }
+
         free_cs(cs)
         warm_total += dt
-        if dt > warm_max {warm_max = dt}
+
+        if dt > warm_max {
+            warm_max = dt
+        }
     }
+
     warm_avg := time.Duration(i64(warm_total) / i64(len(prefixes)))
-    fmt.printf("WARM avg: %.0f ms, WARM max: %.0f ms, COLD: %.0f ms\n",
-        time.duration_milliseconds(warm_avg), time.duration_milliseconds(warm_max), time.duration_milliseconds(cold))
+    fmt.printf(
+        "WARM avg: %.0f ms, WARM max: %.0f ms, COLD: %.0f ms\n",
+        time.duration_milliseconds(warm_avg),
+        time.duration_milliseconds(warm_max),
+        time.duration_milliseconds(cold),
+    )
 
     // The whole point: warm must be MATERIALLY faster than the cold (index-once) path.
     if warm_max >= cold {
-        fail(fmt.tprintf("WARM max (%.0f ms) was not faster than COLD (%.0f ms) — index is not staying warm",
-            time.duration_milliseconds(warm_max), time.duration_milliseconds(cold)))
+        fail(
+            fmt.tprintf(
+                "WARM max (%.0f ms) was not faster than COLD (%.0f ms) — index is not staying warm",
+                time.duration_milliseconds(warm_max),
+                time.duration_milliseconds(cold),
+            ),
+        )
     }
+
     // And warm should be genuinely fast (well under the ~0.5-1.25s fresh spawn it replaces).
     if warm_avg > 300 * time.Millisecond {
         fail(fmt.tprintf("WARM avg %.0f ms is too slow to call a warm speedup", time.duration_milliseconds(warm_avg)))
@@ -144,25 +197,43 @@ main :: proc() {
     sig_code := make_code(string(base), "node2d_set_position(")
     t_sig := time.now()
     hint, hok := complete.session_signature_help(&sess, sig_code, fixture, root, share, ols_bin)
-    fmt.printf("WARM session_signature_help: %.0f ms, ok=%v hint=%q\n",
-        time.duration_milliseconds(time.since(t_sig)), hok, hint)
-    if !hok {fail("session_signature_help returned ok=false on a warm session")}
+    fmt.printf(
+        "WARM session_signature_help: %.0f ms, ok=%v hint=%q\n",
+        time.duration_milliseconds(time.since(t_sig)),
+        hok,
+        hint,
+    )
+
+    if !hok {
+        fail("session_signature_help returned ok=false on a warm session")
+    }
+
     if !strings.contains(hint, "node2d_set_position") {
         fail("session call_hint does not contain the proc name")
     }
+
     if !strings.contains(hint, "position_: Vector2") {
         fail("session call_hint is missing the parameter list (`position_: Vector2`)")
     }
+
     if !strings.contains(hint, strings.concatenate({marker, "self:"})) {
         fail("session call_hint does not mark the active `self` parameter with U+FFFF")
     }
+
     delete(hint)
 
     // NOT in a call -> ols answers null -> empty hint, still ok=true (session healthy).
     no_call := make_code(string(base), "node2d_set_p")
     hint2, hok2 := complete.session_signature_help(&sess, no_call, fixture, root, share, ols_bin)
-    if !hok2 {fail("session_signature_help (not in call) returned ok=false")}
-    if hint2 != "" {fail(fmt.tprintf("expected empty hint outside a call, got %q", hint2))}
+
+    if !hok2 {
+        fail("session_signature_help (not in call) returned ok=false")
+    }
+
+    if hint2 != "" {
+        fail(fmt.tprintf("expected empty hint outside a call, got %q", hint2))
+    }
+
     delete(hint2)
     fmt.println("session signatureHelp OK (in-call hint + empty outside call)")
 
@@ -179,12 +250,15 @@ main :: proc() {
     csr, okr := complete.session_complete(&sess, code_r, fixture, root, share, ols_bin)
     rec := time.since(t_rec)
     fmt.printf("RECOVERY after kill: %.0f ms, ok=%v options=%d\n", time.duration_milliseconds(rec), okr, len(csr))
+
     if !okr {
         fail("session did not recover after the ols process was killed")
     }
+
     if !has_label(csr, "node2d_set_position") {
         fail("RECOVERY: completions wrong after restart")
     }
+
     free_cs(csr)
 
     // ------------------------------------------------------------------
@@ -201,18 +275,40 @@ main :: proc() {
     bcs, bok := complete.session_complete(&bsess, code0, fixture, root, share, "/nonexistent/definitely/not/ols")
     bad := time.since(t_bad)
     fmt.printf("BOGUS ols: %.0f ms, ok=%v (expect ok=false, fast)\n", time.duration_milliseconds(bad), bok)
+
     if bok {
         fail("session_complete with a bogus ols returned ok=true — fallback signal broken")
     }
+
     if bad > 5 * time.Second {
-        fail(fmt.tprintf("session_complete with a bogus ols took %.0f ms — it hung instead of failing fast", time.duration_milliseconds(bad)))
+        fail(
+            fmt.tprintf(
+                "session_complete with a bogus ols took %.0f ms — it hung instead of failing fast",
+                time.duration_milliseconds(bad),
+            ),
+        )
     }
+
     free_cs(bcs)
     // signatureHelp against the same bogus session must also fail fast with an EMPTY hint —
     // the ok=false + "" contract lv_complete_code relies on (empty hint, never a hang).
-    bhint, bhok := complete.session_signature_help(&bsess, sig_code, fixture, root, share, "/nonexistent/definitely/not/ols")
-    if bhok {fail("session_signature_help with a bogus ols returned ok=true")}
-    if bhint != "" {fail(fmt.tprintf("bogus-ols hint must be empty, got %q", bhint))}
+    bhint, bhok := complete.session_signature_help(
+        &bsess,
+        sig_code,
+        fixture,
+        root,
+        share,
+        "/nonexistent/definitely/not/ols",
+    )
+
+    if bhok {
+        fail("session_signature_help with a bogus ols returned ok=true")
+    }
+
+    if bhint != "" {
+        fail(fmt.tprintf("bogus-ols hint must be empty, got %q", bhint))
+    }
+
     delete(bhint)
     fmt.println("bogus-ols signatureHelp fails fast with empty hint")
     complete.session_shutdown(&bsess)

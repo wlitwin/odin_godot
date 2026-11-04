@@ -26,23 +26,24 @@ package kit_session
 // The queue. Riders keep their public poll proc (`comms_poll`, `xfer_poll`,
 // `fire_poll`) and delegate here — the name games see never moves.
 App_Queue :: struct($T: typeid) {
-	items: [dynamic]T,
+    items: [dynamic]T,
 }
 
 // Handler side: file one. Called from a Relay_Proc / App_Handler, never from
 // game code — the whole point of the split is that nothing here calls out.
 appq_push :: proc(q: ^App_Queue($T), item: T) {
-	append(&q.items, item)
+    append(&q.items, item)
 }
 
 // Game side: drain one (call until ok = false each frame).
 appq_poll :: proc(q: ^App_Queue($T)) -> (item: T, ok: bool) {
-	if len(q.items) == 0 {
-		return
-	}
-	item = q.items[0]
-	ordered_remove(&q.items, 0)
-	return item, true
+    if len(q.items) == 0 {
+        return
+    }
+
+    item = q.items[0]
+    ordered_remove(&q.items, 0)
+    return item, true
 }
 
 // What is still queued, oldest first — for the rider that must ASK before it
@@ -50,14 +51,14 @@ appq_poll :: proc(q: ^App_Queue($T)) -> (item: T, ok: bool) {
 // superseded payload whose Ev_Done has not drained yet). Read-only; push and
 // poll own the shape.
 appq_items :: proc(q: ^App_Queue($T)) -> []T {
-	return q.items[:]
+    return q.items[:]
 }
 
 appq_len :: proc(q: ^App_Queue($T)) -> int {
-	return len(q.items)
+    return len(q.items)
 }
 
 appq_destroy :: proc(q: ^App_Queue($T)) {
-	delete(q.items)
-	q^ = {}
+    delete(q.items)
+    q^ = {}
 }

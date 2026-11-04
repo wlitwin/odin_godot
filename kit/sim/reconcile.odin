@@ -45,23 +45,23 @@ import knet "godot:kit/net"
 // from the registry; tests build them by hand. `hist` is the client's OWN
 // prediction ledger for the entity (one History per predicted entity).
 Entry :: struct {
-	id:     knet.Net_Id,
-	entity: rawptr,
-	hist:   ^History,
-	// The tick this entity was BORN (0 = existed from the start). A predicted
-	// spawn (a projectile fired mid-window) has no state before `born`, so the
-	// ledger, the rewind, and the resim must treat ticks < born as "not yet
-	// existing" — otherwise a reconcile landing before the spawn (which happens
-	// for the whole first round trip of the entity's life, the server running a
-	// transit behind) re-flies it from stale head state. See run_tick/note_all.
-	born:   u64,
+    id:     knet.Net_Id,
+    entity: rawptr,
+    hist:   ^History,
+    // The tick this entity was BORN (0 = existed from the start). A predicted
+    // spawn (a projectile fired mid-window) has no state before `born`, so the
+    // ledger, the rewind, and the resim must treat ticks < born as "not yet
+    // existing" — otherwise a reconcile landing before the spawn (which happens
+    // for the whole first round trip of the entity's life, the server running a
+    // transit behind) re-flies it from stale head state. See run_tick/note_all.
+    born:   u64,
 }
 
 // Authoritative predict-set state for one entity at the batch's tick —
 // struct-layout bytes (the wire decode happens at the packet edge, snapshot.odin).
 Truth :: struct {
-	id:   knet.Net_Id,
-	blob: []u8,
+    id:   knet.Net_Id,
+    blob: []u8,
 }
 
 // Step the whole predicted world one tick forward — the same proc the live
@@ -71,12 +71,13 @@ Resim_Proc :: proc(user: rawptr, tick: u64)
 // Ledger every entry's live predict set as the state AT `tick`. Call after
 // stepping each predicted tick — live frames and replays alike.
 note_all :: proc(entries: []Entry, tick: u64) {
-	for &e in entries {
-		if e.born != 0 && tick < e.born {
-			continue // not born yet — no state to ledger before the spawn tick
-		}
-		history_note(e.hist, tick, e.entity)
-	}
+    for &e in entries {
+        if e.born != 0 && tick < e.born {
+            continue // not born yet — no state to ledger before the spawn tick
+        }
+
+        history_note(e.hist, tick, e.entity)
+    }
 }
 
 // Reconcile authoritative tick `auth_tick` against the prediction ledger.
@@ -85,97 +86,108 @@ note_all :: proc(entries: []Entry, tick: u64) {
 // `mismatched` (optional) collects the ids whose predictions were wrong —
 // diagnostics and the render-error seeding (the lane's client_ingest) ride on it.
 reconcile :: proc(
-	entries: []Entry,
-	truths: []Truth,
-	auth_tick: u64,
-	head_tick: u64,
-	user: rawptr,
-	resim: Resim_Proc,
-	mismatched: ^[dynamic]knet.Net_Id = nil,
-	eps: f32 = 0, // tolerant float compare (predict-world's anti-churn; 0 = exact)
+    entries: []Entry,
+    truths: []Truth,
+    auth_tick: u64,
+    head_tick: u64,
+    user: rawptr,
+    resim: Resim_Proc,
+    mismatched: ^[dynamic]knet.Net_Id = nil,
+    eps: f32 = 0, // tolerant float compare (predict-world's anti-churn; 0 = exact)
 ) -> int {
-	if auth_tick == 0 || len(truths) == 0 {
-		return 0
-	}
+    if auth_tick == 0 || len(truths) == 0 {
+        return 0
+    }
 
-	// Pass 1: compare every truth against the ledger. No state is touched —
-	// the clean path must cost nothing but the memcmps.
-	wrong := 0
-	for t in truths {
-		e := find_entry(entries, t.id)
-		if e == nil {
-			continue // not under reconcile here (unknown / not predicted)
-		}
-		assert(len(t.blob) == e.hist.size, "truth blob must be the entity's predict-set size")
-		if !history_within(e.hist, auth_tick, t.blob, eps) {
-			wrong += 1
-			if mismatched != nil {
-				append(mismatched, t.id)
-			}
-		}
-	}
+    // Pass 1: compare every truth against the ledger. No state is touched —
+    // the clean path must cost nothing but the memcmps.
+    wrong := 0
 
-	if wrong == 0 {
-		// Right everywhere: absorb the truth into the ledger (it is equal
-		// bytes, but the slot stamp may be fresher knowledge than a lapped
-		// hole) and keep the speculation.
-		for t in truths {
-			if e := find_entry(entries, t.id); e != nil {
-				history_note_bytes(e.hist, auth_tick, t.blob)
-			}
-		}
-		return 0
-	}
+    for t in truths {
+        e := find_entry(entries, t.id)
 
-	// Pass 2: rewind the world to auth_tick. Truth-named entities take the
-	// truth; the rest take their own ledgered prediction (a coherent tick-T
-	// world, not a mix of T and head).
-	for t in truths {
-		if e := find_entry(entries, t.id); e != nil {
-			predict_restore(e.entity, e.hist.desc, t.blob)
-			history_note_bytes(e.hist, auth_tick, t.blob)
-		}
-	}
-	for &e in entries {
-		if find_truth(truths, e.id) == nil {
-			_ = history_restore(e.hist, auth_tick, e.entity) // miss = replay from live, see header
-		}
-	}
+        if e == nil {
+            continue // not under reconcile here (unknown / not predicted)
+        }
 
-	// Pass 3: replay. The callback steps the same tick procs the live frame
-	// runs; the ledger re-notes each tick so the NEXT authoritative batch
-	// compares against this corrected timeline.
-	resimmed := 0
-	for t := auth_tick + 1; t <= head_tick; t += 1 {
-		resim(user, t)
-		note_all(entries, t)
-		resimmed += 1
-	}
-	return resimmed
+        assert(len(t.blob) == e.hist.size, "truth blob must be the entity's predict-set size")
+
+        if !history_within(e.hist, auth_tick, t.blob, eps) {
+            wrong += 1
+
+            if mismatched != nil {
+                append(mismatched, t.id)
+            }
+        }
+    }
+
+    if wrong == 0 {
+        // Right everywhere: absorb the truth into the ledger (it is equal
+        // bytes, but the slot stamp may be fresher knowledge than a lapped
+        // hole) and keep the speculation.
+        for t in truths {
+            if e := find_entry(entries, t.id); e != nil {
+                history_note_bytes(e.hist, auth_tick, t.blob)
+            }
+        }
+
+        return 0
+    }
+
+    // Pass 2: rewind the world to auth_tick. Truth-named entities take the
+    // truth; the rest take their own ledgered prediction (a coherent tick-T
+    // world, not a mix of T and head).
+    for t in truths {
+        if e := find_entry(entries, t.id); e != nil {
+            predict_restore(e.entity, e.hist.desc, t.blob)
+            history_note_bytes(e.hist, auth_tick, t.blob)
+        }
+    }
+
+    for &e in entries {
+        if find_truth(truths, e.id) == nil {
+            _ = history_restore(e.hist, auth_tick, e.entity) // miss = replay from live, see header
+        }
+    }
+
+    // Pass 3: replay. The callback steps the same tick procs the live frame
+    // runs; the ledger re-notes each tick so the NEXT authoritative batch
+    // compares against this corrected timeline.
+    resimmed := 0
+
+    for t := auth_tick + 1; t <= head_tick; t += 1 {
+        resim(user, t)
+        note_all(entries, t)
+        resimmed += 1
+    }
+
+    return resimmed
 }
 
 @(private = "file")
 find_entry :: proc(entries: []Entry, id: knet.Net_Id) -> ^Entry {
-	for &e in entries {
-		if e.id == id {
-			return &e
-		}
-	}
-	return nil
+    for &e in entries {
+        if e.id == id {
+            return &e
+        }
+    }
+
+    return nil
 }
 
 @(private = "file")
 find_truth :: proc(truths: []Truth, id: knet.Net_Id) -> ^Truth {
-	for &t in truths {
-		if t.id == id {
-			return &t
-		}
-	}
-	return nil
+    for &t in truths {
+        if t.id == id {
+            return &t
+        }
+    }
+
+    return nil
 }
 
 // Complete whole-world correction. The physics mode never enters the legacy
 // field-equality shortcut or its missing-entity live-state fallback.
-lane_world_reconcile :: proc(l:^Lane,checkpoint:^World_Checkpoint,gate:=World_Commit_Gate{})->World_Result {
-    return world_reconcile(l,checkpoint,false,gate)
+lane_world_reconcile :: proc(l: ^Lane, checkpoint: ^World_Checkpoint, gate := World_Commit_Gate{}) -> World_Result {
+    return world_reconcile(l, checkpoint, false, gate)
 }

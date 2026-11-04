@@ -16,11 +16,11 @@ import knet "godot:kit/net"
 import "core:fmt"
 
 Orb :: struct {
-	owner:   gd.Node,
-	net_id:  knet.Net_Id, // wire identity (the session assigns it at spawn)
-	hp:      i32 `gd:"replicate"`,
-	stamina: i32 `gd:"replicate"`,
-	x, y:    f32 `gd:"owner"`, // owner-streamed: write them, they replicate
+    owner:   gd.Node,
+    net_id:  knet.Net_Id, // wire identity (the session assigns it at spawn)
+    hp:      i32 `gd:"replicate"`,
+    stamina: i32 `gd:"replicate"`,
+    x, y:    f32 `gd:"owner"`, // owner-streamed: write them, they replicate
 }
 
 // Spend stamina to strike: authoritative on the host, predicted on the issuing
@@ -29,10 +29,13 @@ Orb :: struct {
 // consequence below, never wire bytes.
 @(gd_command = knet.ACTION_OWNER_PREDICTED)
 orb_strike :: proc(self: ^Orb, cost: i32) -> (ok: bool, dealt: i32) {
-	if self.stamina < cost {return false, 0}
-	self.stamina -= cost
-	self.hp -= cost * 2
-	return true, cost * 2
+    if self.stamina < cost {
+        return false, 0
+    }
+
+    self.stamina -= cost
+    self.hp -= cost * 2
+    return true, cost * 2
 }
 
 // The strike's consequence — the name-paired, typed "and then…": fires ONCE,
@@ -42,5 +45,7 @@ orb_strike :: proc(self: ^Orb, cost: i32) -> (ok: bool, dealt: i32) {
 // clients, under injected latency.
 @(gd_half)
 orb_strike_then :: proc(self: ^Orb, by: knet.Player_Id, cost: i32, dealt: i32) {
-	gd.print_str(fmt.tprintf("ACID_THEN cost=%d dealt=%d hp=%d by_ok=%v", cost, dealt, self.hp, by != knet.PLAYER_ID_INVALID))
+    gd.print_str(
+        fmt.tprintf("ACID_THEN cost=%d dealt=%d hp=%d by_ok=%v", cost, dealt, self.hp, by != knet.PLAYER_ID_INVALID),
+    )
 }

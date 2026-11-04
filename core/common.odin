@@ -36,11 +36,13 @@ string_name_to_odin :: proc(name: gdext.StringNamePtr, allocator := context.allo
 lookup_virtual :: proc(table: []Virtual_Entry, name: gdext.StringNamePtr) -> rawptr {
     incoming := string_name_to_odin(name)
     defer delete(incoming)
+
     for entry in table {
         if entry.name == incoming {
             return cast(rawptr)entry.fn
         }
     }
+
     return nil
 }
 
@@ -55,6 +57,7 @@ call_virtual_with_data :: proc "c" (
     if userdata == nil {
         return
     }
+
     fn := cast(gdext.ExtensionClassCallVirtual)userdata
     fn(instance, args, ret)
 }
@@ -107,13 +110,16 @@ make_psa :: proc "contextless" (items: ..cstring) -> godot.Packed_String_Array {
         name := godot.new_string_name_cstring("push_back", true)
         psa_push_back = gdext.variant_get_ptr_builtin_method(.Packed_String_Array, &name, HASH_PSA_PUSH_BACK)
     }
+
     psa := godot.new_packed_string_array()
+
     for item in items {
         s := godot.new_string_cstring(item)
         arg0 := cast(gdext.TypePtr)&s
         result: bool // push_back returns bool; the ptrcall writes through here
         psa_push_back(cast(gdext.TypePtr)&psa, &arg0, cast(gdext.TypePtr)&result, 1)
     }
+
     return psa
 }
 
@@ -130,12 +136,17 @@ psa_ensure :: proc "contextless" (psa: ^godot.Packed_String_Array, item: cstring
         pn := godot.new_string_name_cstring("push_back", true)
         psa_push_back = gdext.variant_get_ptr_builtin_method(.Packed_String_Array, &pn, HASH_PSA_PUSH_BACK)
     }
+
     s := godot.new_string_cstring(item)
     defer godot.free_string(s)
     arg0 := cast(gdext.TypePtr)&s
     found: bool
     psa_has(cast(gdext.TypePtr)psa, &arg0, cast(gdext.TypePtr)&found, 1)
-    if found {return false}
+
+    if found {
+        return false
+    }
+
     result: bool
     psa_push_back(cast(gdext.TypePtr)psa, &arg0, cast(gdext.TypePtr)&result, 1)
     return true
@@ -146,6 +157,7 @@ psa_ensure :: proc "contextless" (psa: ^godot.Packed_String_Array, item: cstring
 // zeroed value, so an empty/never-filled array is a harmless no-op.
 psa_destroy :: proc "contextless" (psa: ^godot.Packed_String_Array) {
     dtor := gdext.variant_get_ptr_destructor(.Packed_String_Array)
+
     if dtor != nil {
         dtor(cast(gdext.TypePtr)psa)
     }
@@ -183,9 +195,11 @@ register_extension_class :: proc(
     level := gdext.InitializationLevel.Scene,
 ) {
     gdext.classdb_register_extension_class2(gdext.library, name, parent, info)
+
     if tracked_classes == nil {
         tracked_classes = make([dynamic]Tracked_Class, 0, 16)
     }
+
     append(&tracked_classes, Tracked_Class{name, level})
 }
 
@@ -196,7 +210,10 @@ register_extension_class :: proc(
 // the dll stays loaded until close_library, so their free callbacks still work.
 unregister_extension_classes :: proc(level: gdext.InitializationLevel) {
     for i := len(tracked_classes) - 1; i >= 0; i -= 1 {
-        if tracked_classes[i].level != level {continue}
+        if tracked_classes[i].level != level {
+            continue
+        }
+
         gdext.classdb_unregister_extension_class(gdext.library, tracked_classes[i].name)
         ordered_remove(&tracked_classes, i)
     }
@@ -206,9 +223,11 @@ unregister_extension_classes :: proc(level: gdext.InitializationLevel) {
 string_to_odin :: proc(s: godot.String, allocator := context.allocator) -> string {
     s := s
     length := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, nil, 0)
+
     if length <= 0 {
         return ""
     }
+
     buf := make([]u8, length, allocator)
     gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, cast(cstring)raw_data(buf), length)
     return string(buf)
@@ -244,6 +263,7 @@ HASH_PSA_HAS :: 2566493496
 shell_quote :: proc(s: string, allocator := context.allocator) -> string {
     b := strings.builder_make(allocator)
     strings.write_byte(&b, '\'')
+
     for i in 0 ..< len(s) {
         if s[i] == '\'' {
             strings.write_string(&b, `'\''`)
@@ -251,7 +271,7 @@ shell_quote :: proc(s: string, allocator := context.allocator) -> string {
             strings.write_byte(&b, s[i])
         }
     }
+
     strings.write_byte(&b, '\'')
     return strings.to_string(b)
 }
-

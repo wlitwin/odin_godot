@@ -33,7 +33,7 @@ Completion :: struct {
     label:       string, // owned (cloned) into the caller's allocator
     insert_text: string, // owned — what to type when the option is chosen
     detail:      string, // owned — signature / type hint (may be "")
-    kind:        int,    // Godot CodeCompletionKind (see lsp_kind_to_godot)
+    kind:        int, // Godot CodeCompletionKind (see lsp_kind_to_godot)
 }
 
 @(private)
@@ -45,6 +45,7 @@ counter: int
 shell_quote :: proc(s: string, allocator := context.allocator) -> string {
     b := strings.builder_make(allocator)
     strings.write_byte(&b, '\'')
+
     for i in 0 ..< len(s) {
         if s[i] == '\'' {
             strings.write_string(&b, `'\''`)
@@ -52,6 +53,7 @@ shell_quote :: proc(s: string, allocator := context.allocator) -> string {
             strings.write_byte(&b, s[i])
         }
     }
+
     strings.write_byte(&b, '\'')
     return strings.to_string(b)
 }
@@ -108,37 +110,35 @@ MAX_MODULE_DEPTH :: 8
 //
 // KEEP IN SYNC with core/diag/diag.odin's copy of this proc — two independent editor
 // features, one overlay shape.
-overlay_setup_cmd :: proc(
-    work, pkgdir: string,
-    allocator := context.allocator,
-) -> (cmd: string, overlay_dir: string) {
+overlay_setup_cmd :: proc(work, pkgdir: string, allocator := context.allocator) -> (cmd: string, overlay_dir: string) {
     mroot := module_root_of(pkgdir)
     rel := pkgdir[min(len(mroot) + 1, len(pkgdir)):] // "" | "ui" | "ui/widgets"
     // `up` is the module root's own path relative to `top` ("" = no extension: the
     // workspace root IS the module root, the pre-shared shape).
     top, up := shared_chain(mroot)
     full_rel := rel
+
     if up != "" {
         full_rel = rel == "" ? up : strings.concatenate({up, "/", rel}, context.temp_allocator)
     }
-    ov :=
-        full_rel == "" \
-        ? strings.clone(work, allocator) \
-        : strings.concatenate({work, "/", full_rel}, allocator)
+
+    ov := full_rel == "" ? strings.clone(work, allocator) : strings.concatenate({work, "/", full_rel}, allocator)
 
     b := strings.builder_make(allocator)
-    q :: proc(s: string) -> string {return shell_quote(s, context.temp_allocator)}
-    fmt.sbprintf(
-        &b,
-        "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
-        q(work), q(ov), q(pkgdir), q(ov),
-    )
+
+    q :: proc(s: string) -> string {
+        return shell_quote(s, context.temp_allocator)
+    }
+
+    fmt.sbprintf(&b, "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null", q(work), q(ov), q(pkgdir), q(ov))
+
     // The levels ABOVE the module root exist as real directories already (the `mkdir -p`
     // above made the whole chain). They need exactly two links, and deliberately no more:
     // sibling MODULES are never linked, because a module may not import another one.
     if up != "" {
         cut := strings.index_byte(up, '/')
         seg0 := cut >= 0 ? up[:cut] : up
+
         if seg0 != "shared" {
             // The project level: the shared tree beside the module chain.
             link_one(&b, strings.concatenate({top, "/shared"}, context.temp_allocator), work, "shared")
@@ -154,20 +154,31 @@ overlay_setup_cmd :: proc(
             )
         }
     }
+
     // One pass per level of the MODULE chain, root-first. `seg` is the chain's own segment
     // at that level — a real directory in the workspace, so it must not also be a symlink.
     real_dir := mroot
     mirror := up == "" ? work : strings.concatenate({work, "/", up}, context.temp_allocator)
+
     for {
         cut := strings.index_byte(rel, '/')
         seg := rel
-        if cut >= 0 {seg = rel[:cut]}
+
+        if cut >= 0 {
+            seg = rel[:cut]
+        }
+
         link_dirs(&b, real_dir, mirror, seg)
-        if seg == "" {break}
+
+        if seg == "" {
+            break
+        }
+
         real_dir = strings.concatenate({real_dir, "/", seg}, context.temp_allocator)
         mirror = strings.concatenate({mirror, "/", seg}, context.temp_allocator)
         rel = cut >= 0 ? rel[cut + 1:] : ""
     }
+
     return strings.to_string(b), ov
 }
 
@@ -182,25 +193,44 @@ overlay_setup_cmd :: proc(
 @(private = "file")
 shared_chain :: proc(mroot: string) -> (top: string, up: string) {
     parent := parent_dir(mroot)
-    if parent == "" {return "", ""}
+
+    if parent == "" {
+        return "", ""
+    }
+
     base := path_base(mroot)
     pbase := path_base(parent)
+
     // res://modules/<name> — checked first, so a module that happens to be NAMED `shared`
     // is still a module.
     if pbase == "modules" {
         gp := parent_dir(parent)
+
         if gp == "" || !is_dir(strings.concatenate({gp, "/shared"}, context.temp_allocator)) {
             return "", ""
         }
+
         return gp, strings.concatenate({"modules/", base}, context.temp_allocator)
     }
-    if base == "shared" {return parent, "shared"} // the shared tree root is itself a package
+
+    if base == "shared" {
+        return parent, "shared"
+    } // the shared tree root is itself a package
+
     if pbase == "shared" {
         gp := parent_dir(parent)
-        if gp == "" {return "", ""}
+
+        if gp == "" {
+            return "", ""
+        }
+
         return gp, strings.concatenate({"shared/", base}, context.temp_allocator)
     }
-    if !is_dir(strings.concatenate({parent, "/shared"}, context.temp_allocator)) {return "", ""}
+
+    if !is_dir(strings.concatenate({parent, "/shared"}, context.temp_allocator)) {
+        return "", ""
+    }
+
     return parent, base
 }
 
@@ -211,6 +241,7 @@ path_base :: proc(path: string) -> string {
     if idx := strings.last_index_byte(path, '/'); idx >= 0 {
         return path[idx + 1:]
     }
+
     return path
 }
 
@@ -218,7 +249,11 @@ path_base :: proc(path: string) -> string {
 @(private = "file")
 parent_dir :: proc(path: string) -> string {
     idx := strings.last_index_byte(path, '/')
-    if idx <= 0 {return ""}
+
+    if idx <= 0 {
+        return ""
+    }
+
     return path[:idx]
 }
 
@@ -236,6 +271,7 @@ link_one :: proc(b: ^strings.Builder, target, into, name: string) {
     if !is_dir(target) {
         return
     }
+
     fmt.sbprintf(
         b,
         " ; ln -s %s %s 2>/dev/null",
@@ -258,13 +294,23 @@ link_one :: proc(b: ^strings.Builder, target, into, name: string) {
 @(private = "file")
 module_root_of :: proc(pkgdir: string) -> string {
     root := pkgdir
+
     for _ in 0 ..< MAX_MODULE_DEPTH {
         idx := strings.last_index_byte(root, '/')
-        if idx <= 0 {break}
+
+        if idx <= 0 {
+            break
+        }
+
         parent := root[:idx]
-        if !has_authored_odin(parent) {break}
+
+        if !has_authored_odin(parent) {
+            break
+        }
+
         root = parent
     }
+
     return root
 }
 
@@ -273,15 +319,21 @@ module_root_of :: proc(pkgdir: string) -> string {
 @(private = "file")
 has_authored_odin :: proc(dir: string) -> bool {
     fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
     if err != nil {
         return false
     }
+
     for fi in fis {
-        if fi.type == .Directory {continue}
+        if fi.type == .Directory {
+            continue
+        }
+
         if strings.has_suffix(fi.name, ".odin") && !strings.has_suffix(fi.name, ".gen.odin") {
             return true
         }
     }
+
     return false
 }
 
@@ -291,13 +343,16 @@ has_authored_odin :: proc(dir: string) -> bool {
 @(private = "file")
 link_dirs :: proc(b: ^strings.Builder, from, into, except: string) {
     fis, err := os.read_directory_by_path(from, -1, context.temp_allocator)
+
     if err != nil {
         return
     }
+
     for fi in fis {
         if fi.type != .Directory || strings.has_prefix(fi.name, ".") || fi.name == except {
             continue
         }
+
         fmt.sbprintf(
             b,
             " ; ln -s %s %s 2>/dev/null",
@@ -321,6 +376,7 @@ CARET_MARKER :: "￿"
 // UTF-16 units for ASCII source (Odin identifiers) — the practical case for completion.
 caret_from_code :: proc(code: string, allocator := context.allocator) -> (clean: string, line: int, char: int) {
     before: string
+
     if idx := strings.index(code, CARET_MARKER); idx >= 0 {
         before = code[:idx]
         clean = strings.concatenate({before, code[idx + len(CARET_MARKER):]}, allocator)
@@ -328,12 +384,15 @@ caret_from_code :: proc(code: string, allocator := context.allocator) -> (clean:
         before = code
         clean = strings.clone(code, allocator)
     }
+
     line = strings.count(before, "\n")
+
     if nl := strings.last_index_byte(before, '\n'); nl >= 0 {
         char = len(before[nl + 1:])
     } else {
         char = len(before)
     }
+
     return
 }
 
@@ -352,24 +411,23 @@ MAX_OPTIONS :: 256
 // `gd.<caret>` -> "". Used to thin an over-long member list down to what's typed.
 prefix_at_caret :: proc(code: string) -> string {
     before := code
+
     if idx := strings.index(code, CARET_MARKER); idx >= 0 {
         before = code[:idx]
     }
+
     start := len(before)
+
     for start > 0 && is_ident_byte(before[start - 1]) {
         start -= 1
     }
+
     return before[start:]
 }
 
 @(private)
 is_ident_byte :: proc(c: byte) -> bool {
-    return(
-        (c >= 'a' && c <= 'z') ||
-        (c >= 'A' && c <= 'Z') ||
-        (c >= '0' && c <= '9') ||
-        c == '_' \
-    )
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
 // `matches_prefix` is a case-insensitive (ASCII) SUBSTRING test used to thin a
@@ -377,14 +435,24 @@ is_ident_byte :: proc(c: byte) -> bool {
 // everything (the caller still caps the count). Substring, not strict prefix, so
 // typing `set_position` still surfaces `node2d_set_position`.
 matches_prefix :: proc(label: string, prefix: string) -> bool {
-    if len(prefix) == 0 {return true}
-    if len(prefix) > len(label) {return false}
-    outer: for i in 0 ..= len(label) - len(prefix) {
-        for j in 0 ..< len(prefix) {
-            if ascii_lower(label[i + j]) != ascii_lower(prefix[j]) {continue outer}
-        }
+    if len(prefix) == 0 {
         return true
     }
+
+    if len(prefix) > len(label) {
+        return false
+    }
+
+    outer: for i in 0 ..= len(label) - len(prefix) {
+        for j in 0 ..< len(prefix) {
+            if ascii_lower(label[i + j]) != ascii_lower(prefix[j]) {
+                continue outer
+            }
+        }
+
+        return true
+    }
+
     return false
 }
 
@@ -489,7 +557,11 @@ frame :: proc(b: ^strings.Builder, payload: []byte) {
 @(private)
 add_msg :: proc(b: ^strings.Builder, msg: $T) {
     data, err := json.marshal(msg, {}, context.temp_allocator)
-    if err != nil {return}
+
+    if err != nil {
+        return
+    }
+
     frame(b, data)
 }
 
@@ -504,13 +576,43 @@ SIG_ID :: 4
 // A textDocument/signatureHelp request (id SIG_ID) is batched alongside the completion so
 // the same one-shot ols spawn also yields the editor call hint — when the caret is not
 // inside a call ols answers it with `result: null`, which parses to an empty hint.
-build_batch :: proc(uri: string, text: string, root_uri: string, line: int, char: int, allocator := context.allocator) -> string {
+build_batch :: proc(
+    uri: string,
+    text: string,
+    root_uri: string,
+    line: int,
+    char: int,
+    allocator := context.allocator,
+) -> string {
     b := strings.builder_make(allocator)
     add_msg(&b, Initialize{"2.0", 1, "initialize", {processId = 1, rootUri = root_uri, capabilities = {}}})
     add_msg(&b, Notify{"2.0", "initialized", {}})
-    add_msg(&b, DidOpen{"2.0", "textDocument/didOpen", {textDocument = {uri = uri, languageId = "odin", version = 1, text = text}}})
-    add_msg(&b, CompletionReq{"2.0", COMPLETION_ID, "textDocument/completion", {textDocument = {uri = uri}, position = {line = line, character = char}}})
-    add_msg(&b, CompletionReq{"2.0", SIG_ID, "textDocument/signatureHelp", {textDocument = {uri = uri}, position = {line = line, character = char}}})
+    add_msg(
+        &b,
+        DidOpen {
+            "2.0",
+            "textDocument/didOpen",
+            {textDocument = {uri = uri, languageId = "odin", version = 1, text = text}},
+        },
+    )
+    add_msg(
+        &b,
+        CompletionReq {
+            "2.0",
+            COMPLETION_ID,
+            "textDocument/completion",
+            {textDocument = {uri = uri}, position = {line = line, character = char}},
+        },
+    )
+    add_msg(
+        &b,
+        CompletionReq {
+            "2.0",
+            SIG_ID,
+            "textDocument/signatureHelp",
+            {textDocument = {uri = uri}, position = {line = line, character = char}},
+        },
+    )
     add_msg(&b, ShutdownReq{"2.0", 3, "shutdown"})
     add_msg(&b, Notify{"2.0", "exit", {}})
     return strings.to_string(b)
@@ -526,6 +628,7 @@ as_int :: proc(v: json.Value) -> (int, bool) {
     case json.Float:
         return int(t), true
     }
+
     return 0, false
 }
 
@@ -534,52 +637,102 @@ as_str :: proc(v: json.Value) -> (string, bool) {
     if s, ok := v.(json.String); ok {
         return string(s), true
     }
+
     return "", false
 }
 
 // Scan an ols stdout capture for the reply frame with `want_id` and return its `result`
 // json.Value (parsed into `parse_allocator`). found=false when no such reply exists.
 @(private)
-find_reply_result :: proc(output: string, want_id: int, parse_allocator: runtime.Allocator) -> (resv: json.Value, found: bool) {
+find_reply_result :: proc(
+    output: string,
+    want_id: int,
+    parse_allocator: runtime.Allocator,
+) -> (
+    resv: json.Value,
+    found: bool,
+) {
     data := transmute([]u8)output
     i := 0
     HDR :: "Content-Length:"
+
     for {
         // Locate the next Content-Length frame.
         rel := strings.index(string(data[i:]), HDR)
-        if rel < 0 {break}
+
+        if rel < 0 {
+            break
+        }
+
         hs := i + rel + len(HDR)
         // parse the number
         je := strings.index(string(data[hs:]), "\r\n")
-        if je < 0 {break}
+
+        if je < 0 {
+            break
+        }
+
         num_str := strings.trim_space(string(data[hs:hs + je]))
         length := 0
+
         for ch in num_str {
-            if ch < '0' || ch > '9' {break}
+            if ch < '0' || ch > '9' {
+                break
+            }
+
             length = length * 10 + int(ch - '0')
         }
+
         // body begins after the blank line (\r\n\r\n)
         sep := strings.index(string(data[hs:]), "\r\n\r\n")
-        if sep < 0 {break}
+
+        if sep < 0 {
+            break
+        }
+
         body_start := hs + sep + 4
         body_end := body_start + length
-        if body_end > len(data) {break}
+
+        if body_end > len(data) {
+            break
+        }
+
         body := data[body_start:body_end]
         i = body_end
 
         val, perr := json.parse(body, .JSON, true, parse_allocator)
-        if perr != nil {continue}
+
+        if perr != nil {
+            continue
+        }
+
         obj, ok := val.(json.Object)
-        if !ok {continue}
+
+        if !ok {
+            continue
+        }
+
         idv, has_id := obj["id"]
-        if !has_id {continue}
+
+        if !has_id {
+            continue
+        }
+
         id, idok := as_int(idv)
-        if !idok || id != want_id {continue}
+
+        if !idok || id != want_id {
+            continue
+        }
 
         resv, has_res := obj["result"]
-        if !has_res {continue}
+
+        if !has_res {
+            continue
+        }
+
         return resv, true // first matching reply is the answer
     }
+
     return nil, false
 }
 
@@ -587,9 +740,11 @@ find_reply_result :: proc(output: string, want_id: int, parse_allocator: runtime
 // Completion records. Tolerant of `result` being either {items:[...]} or a bare [...].
 parse_completion_output :: proc(output: string, allocator := context.allocator) -> [dynamic]Completion {
     res := make([dynamic]Completion, allocator)
+
     if resv, found := find_reply_result(output, COMPLETION_ID, context.temp_allocator); found {
         extract_items(&res, resv, allocator)
     }
+
     return res
 }
 
@@ -600,6 +755,7 @@ parse_signature_help_output :: proc(output: string, allocator := context.allocat
     if resv, found := find_reply_result(output, SIG_ID, context.temp_allocator); found {
         return signature_help_to_hint(resv, allocator)
     }
+
     return strings.clone("", allocator)
 }
 
@@ -609,10 +765,13 @@ parse_signature_help_output :: proc(output: string, allocator := context.allocat
 @(private)
 extract_items :: proc(res: ^[dynamic]Completion, resv: json.Value, allocator: runtime.Allocator) {
     items: json.Array
+
     #partial switch t in resv {
     case json.Object:
         if itv, ok2 := t["items"]; ok2 {
-            if arr, ok3 := itv.(json.Array); ok3 {items = arr}
+            if arr, ok3 := itv.(json.Array); ok3 {
+                items = arr
+            }
         }
     case json.Array:
         items = t
@@ -620,27 +779,41 @@ extract_items :: proc(res: ^[dynamic]Completion, resv: json.Value, allocator: ru
 
     for itv in items {
         ito, ok2 := itv.(json.Object)
-        if !ok2 {continue}
+
+        if !ok2 {
+            continue
+        }
+
         label, lok := as_str(ito["label"])
-        if !lok || label == "" {continue}
+
+        if !lok || label == "" {
+            continue
+        }
 
         insert := label
+
         if t, ok3 := as_str(ito["insertText"]); ok3 && t != "" {
             insert = t
         }
+
         detail, _ := as_str(ito["detail"])
         kind := 9 // PLAIN_TEXT default
+
         if kv, ok4 := ito["kind"]; ok4 {
             if lk, ok5 := as_int(kv); ok5 {
                 kind = lsp_kind_to_godot(lk)
             }
         }
-        append(res, Completion{
-            label       = strings.clone(label, allocator),
-            insert_text = strings.clone(insert, allocator),
-            detail      = strings.clone(detail, allocator),
-            kind        = kind,
-        })
+
+        append(
+            res,
+            Completion {
+                label = strings.clone(label, allocator),
+                insert_text = strings.clone(insert, allocator),
+                detail = strings.clone(detail, allocator),
+                kind = kind,
+            },
+        )
     }
 }
 
@@ -651,11 +824,23 @@ extract_items :: proc(res: ^[dynamic]Completion, resv: json.Value, allocator: ru
 parse_completion_reply :: proc(body: []u8, allocator := context.allocator) -> [dynamic]Completion {
     res := make([dynamic]Completion, allocator)
     val, perr := json.parse(body, .JSON, true, context.temp_allocator)
-    if perr != nil {return res}
+
+    if perr != nil {
+        return res
+    }
+
     obj, ok := val.(json.Object)
-    if !ok {return res}
+
+    if !ok {
+        return res
+    }
+
     resv, has_res := obj["result"]
-    if !has_res {return res}
+
+    if !has_res {
+        return res
+    }
+
     extract_items(&res, resv, allocator)
     return res
 }
@@ -682,24 +867,37 @@ parse_completion_reply :: proc(body: []u8, allocator := context.allocator) -> [d
 // hint — never a wrong one (ols does the real reasoning). Scan bounded to the last 4 KiB.
 in_call_context :: proc(code: string) -> bool {
     before := code
+
     if idx := strings.index(code, CARET_MARKER); idx >= 0 {
         before = code[:idx]
     }
+
     SCAN_LIMIT :: 4096
     stop := 0
-    if len(before) > SCAN_LIMIT {stop = len(before) - SCAN_LIMIT}
+
+    if len(before) > SCAN_LIMIT {
+        stop = len(before) - SCAN_LIMIT
+    }
+
     depth := 0
+
     for i := len(before) - 1; i >= stop; i -= 1 {
         switch before[i] {
         case ')':
             depth += 1
         case '(':
-            if depth == 0 {return true}
+            if depth == 0 {
+                return true
+            }
+
             depth -= 1
         case '{', '}', ';':
-            if depth == 0 {return false}
+            if depth == 0 {
+                return false
+            }
         }
     }
+
     return false
 }
 
@@ -712,34 +910,69 @@ in_call_context :: proc(code: string) -> bool {
 @(private)
 param_span :: proc(label: string, params_v: json.Value, active: int) -> (start, end: int, ok: bool) {
     params, pok := params_v.(json.Array)
-    if !pok || active < 0 || active >= len(params) {return 0, 0, false}
+
+    if !pok || active < 0 || active >= len(params) {
+        return 0, 0, false
+    }
+
     search_from := strings.index_byte(label, '(') + 1 // 0 when the label has no '('
+
     for p_v, i in params {
-        if i > active {break}
+        if i > active {
+            break
+        }
+
         po, ook := p_v.(json.Object)
-        if !ook {return 0, 0, false}
+
+        if !ook {
+            return 0, 0, false
+        }
+
         lv, has := po["label"]
-        if !has {return 0, 0, false}
+
+        if !has {
+            return 0, 0, false
+        }
+
         #partial switch t in lv {
         case json.String:
             s := string(t)
-            if s == "" {return 0, 0, false}
+
+            if s == "" {
+                return 0, 0, false
+            }
+
             rel := strings.index(label[search_from:], s)
-            if rel < 0 {return 0, 0, false}
+
+            if rel < 0 {
+                return 0, 0, false
+            }
+
             start = search_from + rel
             end = start + len(s)
             search_from = end
         case json.Array:
-            if len(t) != 2 {return 0, 0, false}
+            if len(t) != 2 {
+                return 0, 0, false
+            }
+
             s0, k0 := as_int(t[0])
             e0, k1 := as_int(t[1])
-            if !k0 || !k1 {return 0, 0, false}
+
+            if !k0 || !k1 {
+                return 0, 0, false
+            }
+
             start, end = s0, e0
         case:
             return 0, 0, false
         }
     }
-    if start < 0 || end > len(label) || start >= end {return 0, 0, false}
+
+    if start < 0 || end > len(label) || start >= end {
+        return 0, 0, false
+    }
+
     return start, end, true
 }
 
@@ -749,29 +982,54 @@ param_span :: proc(label: string, params_v: json.Value, active: int) -> (start, 
 // malformed results format to "" — CodeEdit treats an empty hint as "no tooltip".
 signature_help_to_hint :: proc(resv: json.Value, allocator := context.allocator) -> string {
     obj, ook := resv.(json.Object)
-    if !ook {return strings.clone("", allocator)} // null result: caret not in a call
+
+    if !ook {
+        return strings.clone("", allocator)
+    } // null result: caret not in a call
+
     sigs, aok := obj["signatures"].(json.Array)
-    if !aok || len(sigs) == 0 {return strings.clone("", allocator)}
+
+    if !aok || len(sigs) == 0 {
+        return strings.clone("", allocator)
+    }
 
     active_sig, _ := as_int(obj["activeSignature"]) // absent -> 0 (the LSP default)
     active_param_top, _ := as_int(obj["activeParameter"])
 
     b := strings.builder_make(allocator)
     emitted := 0
+
     for sig_v, i in sigs {
         sig, sok := sig_v.(json.Object)
-        if !sok {continue}
+
+        if !sok {
+            continue
+        }
+
         label, lok := as_str(sig["label"])
-        if !lok || label == "" {continue}
-        if emitted > 0 {strings.write_string(&b, "\n")}
+
+        if !lok || label == "" {
+            continue
+        }
+
+        if emitted > 0 {
+            strings.write_string(&b, "\n")
+        }
+
         emitted += 1
+
         if i != active_sig {
             strings.write_string(&b, label)
             continue
         }
+
         // Per-signature activeParameter (LSP 3.16+) overrides the top-level one.
         ap := active_param_top
-        if v, k := as_int(sig["activeParameter"]); k {ap = v}
+
+        if v, k := as_int(sig["activeParameter"]); k {
+            ap = v
+        }
+
         if start, end, found := param_span(label, sig["parameters"], ap); found {
             strings.write_string(&b, label[:start])
             strings.write_string(&b, CARET_MARKER)
@@ -782,6 +1040,7 @@ signature_help_to_hint :: proc(resv: json.Value, allocator := context.allocator)
             strings.write_string(&b, label)
         }
     }
+
     return strings.to_string(b)
 }
 
@@ -790,11 +1049,23 @@ signature_help_to_hint :: proc(resv: json.Value, allocator := context.allocator)
 // `allocator`; "" on null/malformed (never breaks completion).
 parse_signature_help_reply :: proc(body: []u8, allocator := context.allocator) -> string {
     val, perr := json.parse(body, .JSON, true, context.temp_allocator)
-    if perr != nil {return strings.clone("", allocator)}
+
+    if perr != nil {
+        return strings.clone("", allocator)
+    }
+
     obj, ok := val.(json.Object)
-    if !ok {return strings.clone("", allocator)}
+
+    if !ok {
+        return strings.clone("", allocator)
+    }
+
     resv, has_res := obj["result"]
-    if !has_res {return strings.clone("", allocator)}
+
+    if !has_res {
+        return strings.clone("", allocator)
+    }
+
     return signature_help_to_hint(resv, allocator)
 }
 
@@ -803,7 +1074,7 @@ parse_signature_help_reply :: proc(body: []u8, allocator := context.allocator) -
 // (LSP). None/parse-error -> ok=false.
 Definition :: struct {
     path: string, // owned (cloned) into the caller's allocator
-    line: int,    // 0-based (range.start.line)
+    line: int, // 0-based (range.start.line)
     ok:   bool,
 }
 
@@ -812,48 +1083,80 @@ Definition :: struct {
 // Takes the first; ok=false on null/empty/parse-error.
 parse_definition_reply :: proc(body: []u8, allocator := context.allocator) -> Definition {
     val, perr := json.parse(body, .JSON, true, context.temp_allocator)
-    if perr != nil {return Definition{}}
+
+    if perr != nil {
+        return Definition{}
+    }
+
     obj, ook := val.(json.Object)
-    if !ook {return Definition{}}
+
+    if !ook {
+        return Definition{}
+    }
+
     resv, has := obj["result"]
-    if !has {return Definition{}}
+
+    if !has {
+        return Definition{}
+    }
 
     loc: json.Object
+
     #partial switch t in resv {
     case json.Object:
         loc = t
     case json.Array:
         if len(t) > 0 {
-            if o, ok2 := t[0].(json.Object); ok2 {loc = o}
+            if o, ok2 := t[0].(json.Object); ok2 {
+                loc = o
+            }
         }
     }
-    if loc == nil {return Definition{}} // null / empty / unexpected result shape
+
+    if loc == nil {
+        return Definition{}
+    } // null / empty / unexpected result shape
 
     // Location: {uri, range}. LocationLink: {targetUri, targetSelectionRange|targetRange}.
     uri := ""
     rng: json.Object
+
     if u, ok2 := as_str(loc["uri"]); ok2 && u != "" {
         uri = u
-        if r, ok3 := loc["range"].(json.Object); ok3 {rng = r}
+
+        if r, ok3 := loc["range"].(json.Object); ok3 {
+            rng = r
+        }
     } else if u, ok2 := as_str(loc["targetUri"]); ok2 && u != "" {
         uri = u
+
         if r, ok3 := loc["targetSelectionRange"].(json.Object); ok3 {
             rng = r
         } else if r2, ok4 := loc["targetRange"].(json.Object); ok4 {
             rng = r2
         }
     }
-    if uri == "" {return Definition{}}
+
+    if uri == "" {
+        return Definition{}
+    }
 
     line := 0
+
     if rng != nil {
         if startv, ok3 := rng["start"].(json.Object); ok3 {
-            if lv, ok4 := as_int(startv["line"]); ok4 {line = lv}
+            if lv, ok4 := as_int(startv["line"]); ok4 {
+                line = lv
+            }
         }
     }
 
     path := uri
-    if strings.has_prefix(path, "file://") {path = path[len("file://"):]}
+
+    if strings.has_prefix(path, "file://") {
+        path = path[len("file://"):]
+    }
+
     return Definition{path = strings.clone(path, allocator), line = line, ok = true}
 }
 
@@ -867,12 +1170,14 @@ parse_definition_reply :: proc(body: []u8, allocator := context.allocator) -> De
 write_ols_json :: proc(path: string, root: string, share: string) -> bool {
     b := strings.builder_make(context.temp_allocator)
     strings.write_string(&b, "{\"collections\":[")
+
     if share != "" {
         fmt.sbprintf(&b, "{{\"name\":\"base\",\"path\":\"%s/base\"}},", share)
         fmt.sbprintf(&b, "{{\"name\":\"core\",\"path\":\"%s/core\"}},", share)
         fmt.sbprintf(&b, "{{\"name\":\"vendor\",\"path\":\"%s/vendor\"}},", share)
         fmt.sbprintf(&b, "{{\"name\":\"shared\",\"path\":\"%s/shared\"}},", share)
     }
+
     fmt.sbprintf(&b, "{{\"name\":\"godot\",\"path\":\"%s\"}}", root)
     strings.write_string(&b, "],\"enable_snippets\":true,\"enable_hover\":true}")
     return os.write_entire_file(path, transmute([]u8)strings.to_string(b)) == nil
@@ -892,14 +1197,19 @@ run_completion :: proc(
     share: string,
     ols_bin := "ols",
     allocator := context.allocator,
-) -> (opts: [dynamic]Completion, call_hint: string) {
+) -> (
+    opts: [dynamic]Completion,
+    call_hint: string,
+) {
     empty := make([dynamic]Completion, allocator)
     no_hint := strings.clone("", allocator)
 
     slash := strings.last_index_byte(abs_path, '/')
+
     if slash <= 0 {
         return empty, no_hint
     }
+
     pkgdir := abs_path[:slash]
     basename := abs_path[slash + 1:]
 
@@ -925,9 +1235,11 @@ run_completion :: proc(
     //    is the edited package's place IN that mirror, not the workspace root.
     setup_cmd, pkg_dir_ov := overlay_setup_cmd(work, pkgdir, context.temp_allocator)
     setup := strings.clone_to_cstring(setup_cmd, context.temp_allocator)
+
     if libc.system(setup) != 0 {
         return empty, no_hint
     }
+
     defer {
         cleanup := fmt.ctprintf(
             "rm -rf %s %s %s",
@@ -941,6 +1253,7 @@ run_completion :: proc(
     // 2. ols.json so collections resolve without `odin root`.
     ols_json := fmt.aprintf("%s/ols.json", work)
     defer delete(ols_json)
+
     if !write_ols_json(ols_json, root, share) {
         return empty, no_hint
     }
@@ -948,6 +1261,7 @@ run_completion :: proc(
     // 3. Overwrite the edited file with the LIVE (caret-stripped) editor buffer.
     overlay := fmt.aprintf("%s/%s", pkg_dir_ov, basename)
     defer delete(overlay)
+
     if werr := os.write_entire_file(overlay, transmute([]u8)clean); werr != nil {
         return empty, no_hint
     }
@@ -958,6 +1272,7 @@ run_completion :: proc(
     root_uri := fmt.aprintf("file://%s", work)
     defer delete(root_uri)
     batch := build_batch(uri, clean, root_uri, line, char, context.temp_allocator)
+
     if werr := os.write_entire_file(in_file, transmute([]u8)batch); werr != nil {
         return empty, no_hint
     }
@@ -973,9 +1288,11 @@ run_completion :: proc(
     libc.system(run) // rc ignored: the reply is read from the captured frames
 
     data, rerr := os.read_entire_file(out_file, context.allocator)
+
     if rerr != nil {
         return empty, no_hint
     }
+
     defer delete(data)
 
     delete(empty)

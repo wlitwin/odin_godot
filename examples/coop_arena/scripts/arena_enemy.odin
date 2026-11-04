@@ -24,16 +24,18 @@ package coop_arena
 import gd "godot:godot"
 
 ArenaEnemy :: struct {
-	owner: gd.Node2d,
-	id:    int `gd:"export"`, // stable cross-peer handle (spawn-replicated, mode 0)
-	hp:    int,               // peer-authoritative, NOT synced (kept identical by arena_damage)
-	dead:  bool,
+    owner: gd.Node2d,
+    id:    int `gd:"export"`, // stable cross-peer handle (spawn-replicated, mode 0)
+    hp:    int, // peer-authoritative, NOT synced (kept identical by arena_damage)
+    dead:  bool,
 }
 
 arena_enemy_ready :: proc(self: ^ArenaEnemy) {
-	// hp default stays a ready-time guard (NOT `export,default=`): hp is deliberately not a
-	// script property — exporting it would grow the wire-adjacent surface for no gain. On the
-	// host the spawner pokes hp BEFORE parenting, so this only fires on client-side spawner
-	// instances — where 12 must equal the host's COOP_ENEMY_HP for the peers to agree.
-	if self.hp == 0 {self.hp = 12}
+    // hp default stays a ready-time guard (NOT `export,default=`): hp is deliberately not a
+    // script property — exporting it would grow the wire-adjacent surface for no gain. On the
+    // host the spawner pokes hp BEFORE parenting, so this only fires on client-side spawner
+    // instances — where 12 must equal the host's COOP_ENEMY_HP for the peers to agree.
+    if self.hp == 0 {
+        self.hp = 12
+    }
 }

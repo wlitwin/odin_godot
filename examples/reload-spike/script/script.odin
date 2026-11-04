@@ -9,34 +9,36 @@ package script
 
 VERSION :: #config(VERSION, 1)
 
-@(private) g_init_marker: int   // set by @(init); 0 means @(init) never ran
-@(private) g_counter:     int   // per-load mutable state; must reset to a fresh value on reload
+@(private)
+g_init_marker: int // set by @(init); 0 means @(init) never ran
+@(private)
+g_counter: int // per-load mutable state; must reset to a fresh value on reload
 
 @(init)
 _auto_register :: proc "contextless" () {
-	g_init_marker = 0xBEEF
-	g_counter = 100
+    g_init_marker = 0xBEEF
+    g_counter = 100
 }
 
 // Fallback the host can call explicitly if @(init) didn't fire on dlopen.
 @(export)
 script_boot :: proc "c" () {
-	g_init_marker = 0xBEEF
-	g_counter = 100
+    g_init_marker = 0xBEEF
+    g_counter = 100
 }
 
 @(export)
 get_init_marker :: proc "c" () -> int {
-	return g_init_marker
+    return g_init_marker
 }
 
 @(export)
 bump :: proc "c" () -> int {
-	g_counter += 1
-	return g_counter
+    g_counter += 1
+    return g_counter
 }
 
 @(export)
 behavior_version :: proc "c" () -> int {
-	return VERSION
+    return VERSION
 }

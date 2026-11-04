@@ -26,20 +26,20 @@ package kit_combat
 // history is derived state; it must never replicate.
 
 Trail :: struct($N: int) {
-	at:   [N][2]f32,
-	tick: [N]u64, // which tick wrote each slot (0 = never — tick 0 predates any note)
+    at:   [N][2]f32,
+    tick: [N]u64, // which tick wrote each slot (0 = never — tick 0 predates any note)
 }
 
 // trail_note — the owner of the truth, once per tick.
 trail_note :: proc "contextless" (t: ^Trail($N), tick: u64, x, y: f32) {
-	i := int(tick % u64(N))
-	t.at[i] = {x, y}
-	t.tick[i] = tick
+    i := int(tick % u64(N))
+    t.at[i] = {x, y}
+    t.tick[i] = tick
 }
 
 // trail_read — the value AT `tick`, if the ledger still holds it. ok=false
 // for a tick never written or already lapped by the ring.
 trail_read :: proc "contextless" (t: ^Trail($N), tick: u64) -> (at: [2]f32, ok: bool) {
-	i := int(tick % u64(N))
-	return t.at[i], t.tick[i] == tick && tick != 0
+    i := int(tick % u64(N))
+    return t.at[i], t.tick[i] == tick && tick != 0
 }

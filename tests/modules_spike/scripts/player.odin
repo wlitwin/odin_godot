@@ -18,41 +18,41 @@ import rt "godot:runtime"
 game_state_bonus: int = 7
 
 Player :: struct {
-	owner:      gd.Node,
-	score:      gd.Int `gd:"export"`,
-	ready_mark: gd.Int `gd:"export"`,
-	ticks:      gd.Int `gd:"export"`,
+    owner:      gd.Node,
+    score:      gd.Int `gd:"export"`,
+    ready_mark: gd.Int `gd:"export"`,
+    ticks:      gd.Int `gd:"export"`,
 }
 
 player_ready :: proc(self: ^Player) {
-	self.ready_mark = 1
+    self.ready_mark = 1
 }
 
 player_process :: proc(self: ^Player, delta: f64) {
-	self.ticks += 1
+    self.ticks += 1
 }
 
 // Main-module identity + the module-local blackboard value: 1000 + game_state_bonus.
 @(gd_method)
 player_get_brand :: proc(self: ^Player) -> int {
-	return 1000 + game_state_bonus
+    return 1000 + game_state_bonus
 }
 
 // Mutate the module-local blackboard (proves the main dll's globals survive an
 // enemies-module reload untouched).
 @(gd_method)
 player_add_bonus :: proc(self: ^Player, n: gd.Int) {
-	game_state_bonus += int(n)
+    game_state_bonus += int(n)
 }
 
 // CROSS-MODULE CALL VIA THE ENGINE: invoke "take_hit" on `target` (an enemies-module
 // node) through Object::call — dynamic, name-based, no shared types required.
 @(gd_method)
 player_attack :: proc(self: ^Player, target: gd.Node, amount: gd.Int) {
-	m := gd.new_string_name_cstring("take_hit", true)
-	amt := amount
-	v := gd.variant_from_int(&amt)
-	_ = gd.object_call(cast(gd.Object)target, m, v)
+    m := gd.new_string_name_cstring("take_hit", true)
+    amt := amount
+    v := gd.variant_from_int(&amt)
+    _ = gd.object_call(cast(gd.Object)target, m, v)
 }
 
 // script_of semantics ACROSS modules: `target` carries the enemies module's Enemy
@@ -62,16 +62,18 @@ player_attack :: proc(self: ^Player, target: gd.Node, amount: gd.Int) {
 // Returns 1 when cross-access is (correctly) nil AND self-access works.
 @(gd_method)
 player_probe :: proc(self: ^Player, target: gd.Node) -> int {
-	cross := rt.script_of(target, Player) // enemy node as Player -> must be nil
-	self_ok := rt.script_of(self.owner, Player) // own node -> must be non-nil
-	if cross == nil && self_ok != nil {
-		return 1
-	}
-	return 0
+    cross := rt.script_of(target, Player) // enemy node as Player -> must be nil
+    self_ok := rt.script_of(self.owner, Player) // own node -> must be non-nil
+
+    if cross == nil && self_ok != nil {
+        return 1
+    }
+
+    return 0
 }
 
 // Hot-reload hook: MUST NOT fire when only the enemies module is swapped — the
 // harness fails the test if this marker ever appears in the log.
 player_reload :: proc(self: ^Player) {
-	gd.print("PLAYER_RELOAD_FIRED")
+    gd.print("PLAYER_RELOAD_FIRED")
 }

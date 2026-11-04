@@ -26,12 +26,14 @@ package godot
 //         // child is gd.Node — passes to any helper with no cast
 //     }
 array_unpack :: proc(arr: ^Typed_Array($T), allocator := context.temp_allocator) -> []T {
-	n := int(array_size(&arr.untyped))
-	out := make([]T, n, allocator)
-	for i in 0 ..< n {
-		v := array_get(&arr.untyped, Int(i))
-		out[i] = variant_to(&v, T)
-		variant_destroy(&v)
-	}
-	return out
+    n := int(array_size(&arr.untyped))
+    out := make([]T, n, allocator)
+
+    for i in 0 ..< n {
+        v := array_get(&arr.untyped, Int(i))
+        out[i] = variant_to(&v, T)
+        variant_destroy(&v)
+    }
+
+    return out
 }

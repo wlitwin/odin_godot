@@ -54,18 +54,18 @@ editor_plugin_virtuals: [dynamic]Virtual_Entry
 odin_editor_plugin_object: gdext.ObjectPtr
 
 OdinExportPlugin :: struct {
-    object: gdext.ObjectPtr
+    object: gdext.ObjectPtr,
 }
 
 OdinEditorPlugin :: struct {
-    object: gdext.ObjectPtr
+    object: gdext.ObjectPtr,
 }
 
 @(private = "file")
 export_binding_callbacks := gdext.InstanceBindingCallbacks {
     create    = nil,
     free      = nil,
-    reference = nil
+    reference = nil,
 }
 
 // ---- OdinExportPlugin instance plumbing ----
@@ -84,7 +84,11 @@ export_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.ObjectPtr 
 @(private = "file")
 export_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
-    if instance == nil {return}
+
+    if instance == nil {
+        return
+    }
+
     free(cast(^OdinExportPlugin)instance)
 }
 
@@ -110,7 +114,11 @@ editor_plugin_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.Obj
 @(private = "file")
 editor_plugin_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.ExtensionClassInstancePtr) {
     context = gdext.godot_context()
-    if instance == nil {return}
+
+    if instance == nil {
+        return
+    }
+
     free(cast(^OdinEditorPlugin)instance)
 }
 
@@ -129,7 +137,11 @@ ep_get_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
 }
 
 @(private = "file")
-pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+pl_get_plugin_name :: proc "c" (
+    instance: gdext.ExtensionClassInstancePtr,
+    args: [^]gdext.TypePtr,
+    ret: gdext.TypePtr,
+) {
     context = gdext.godot_context()
     ret_string(ret, godot.new_string_cstring("OdinGodot"))
 }
@@ -140,10 +152,16 @@ pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args:
 // A custom Callable is always valid + takes no args. Providing these (rather than leaving the
 // struct's optional fields nil) avoids any chance the engine calls a nil function pointer.
 @(private)
-menu_callable_is_valid :: proc "c" (userdata: rawptr) -> bool {return true}
+menu_callable_is_valid :: proc "c" (userdata: rawptr) -> bool {
+    return true
+}
+
 @(private)
 menu_callable_argc :: proc "c" (userdata: rawptr, is_valid: ^bool) -> i64 {
-    if is_valid != nil {is_valid^ = true}
+    if is_valid != nil {
+        is_valid^ = true
+    }
+
     return 0
 }
 
@@ -155,7 +173,7 @@ make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Calla
         token                   = gdext.library,
         call_func               = fn,
         is_valid_func           = menu_callable_is_valid,
-        get_argument_count_func = menu_callable_argc
+        get_argument_count_func = menu_callable_argc,
     }
     cb: godot.Callable
     gdext.callable_custom_create2(cast(gdext.TypePtr)&cb, &info)
@@ -165,9 +183,19 @@ make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Calla
 // "Build Odin Scripts" body: kick the SAME background build the save/reload path runs
 // (force=true so a manual click always rebuilds + gives feedback). Editor main thread.
 @(private = "file")
-build_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+build_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
-    if err != nil {err.error = .Ok} // signal success — else Godot logs "Error calling function from tool menu"
+
+    if err != nil {
+        err.error = .Ok
+    } // signal success — else Godot logs "Error calling function from tool menu"
+
     reload_request(force = true)
 }
 
@@ -175,10 +203,20 @@ build_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: 
 // lives inside the addon, which is `.gdignore`d, so it's invisible in the FileSystem dock —
 // users otherwise have to reach for their OS file manager).
 @(private = "file")
-setup_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+setup_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
     context.allocator = runtime.heap_allocator()
-    if err != nil {err.error = .Ok} // signal success — else Godot logs "Error calling function from tool menu"
+
+    if err != nil {
+        err.error = .Ok
+    } // signal success — else Godot logs "Error calling function from tool menu"
+
     setup_scripts_from_template()
 }
 
@@ -196,21 +234,39 @@ editor_msg_warn :: proc(s: string) {
 
 @(private = "file")
 dir_has_odin :: proc(dir: string) -> bool {
-    if !os.exists(dir) {return false}
-    fis, derr := os.read_directory_by_path(dir, -1, context.temp_allocator)
-    if derr != nil {return false}
-    for fi in fis {
-        if strings.has_suffix(fi.name, ".odin") {return true}
+    if !os.exists(dir) {
+        return false
     }
+
+    fis, derr := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
+    if derr != nil {
+        return false
+    }
+
+    for fi in fis {
+        if strings.has_suffix(fi.name, ".odin") {
+            return true
+        }
+    }
+
     return false
 }
 
 @(private = "file")
 rescan_editor_filesystem :: proc() {
     ei := godot.singleton_editor_interface()
-    if ei == nil {return}
+
+    if ei == nil {
+        return
+    }
+
     rfs := godot.editor_interface_get_resource_filesystem(ei)
-    if rfs == nil {return}
+
+    if rfs == nil {
+        return
+    }
+
     godot.editor_file_system_scan(rfs)
 }
 
@@ -220,16 +276,22 @@ rescan_editor_filesystem :: proc() {
 setup_scripts_from_template :: proc() {
     root := odin_collection_root()
     defer delete(root)
+
     if root == "" {
-        editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
+        editor_msg_error(
+            "odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.",
+        )
         return
     }
+
     // The built addon ships the template at <root>/template/scripts; an in-repo checkout
     // keeps it at <root>/build/template/scripts (dist.nix moves it up when packaging).
     src := strings.concatenate({root, "/template/scripts"})
     defer delete(src)
+
     if !os.exists(src) {
         alt := strings.concatenate({root, "/build/template/scripts"})
+
         if os.exists(alt) {
             delete(src)
             src = alt
@@ -244,39 +306,60 @@ setup_scripts_from_template :: proc() {
     defer delete(dest)
 
     if dir_has_odin(dest) {
-        editor_msg_warn(fmt.tprintf("odin_godot: res://scripts already exists with .odin files — leaving it untouched (%s).", dest))
+        editor_msg_warn(
+            fmt.tprintf(
+                "odin_godot: res://scripts already exists with .odin files — leaving it untouched (%s).",
+                dest,
+            ),
+        )
         return
     }
+
     fis, derr := os.read_directory_by_path(src, -1, context.temp_allocator)
+
     if derr != nil {
         editor_msg_error(
             fmt.tprintf(
                 "odin_godot: template not found at %s (nor under build/template/scripts) — is the addon intact?",
-                src
-            )
+                src,
+            ),
         )
         return
     }
+
     if !os.exists(dest) {
         if mkerr := os.make_directory(dest); mkerr != nil {
             editor_msg_error(fmt.tprintf("odin_godot: couldn't create %s.", dest))
             return
         }
     }
+
     copied := 0
+
     for fi in fis {
-        if fi.type == .Directory || strings.has_suffix(fi.name, ".gen.odin") {continue}
+        if fi.type == .Directory || strings.has_suffix(fi.name, ".gen.odin") {
+            continue
+        }
+
         data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
-        if rerr != nil {continue}
+
+        if rerr != nil {
+            continue
+        }
+
         out := strings.concatenate({dest, "/", fi.name}, context.temp_allocator)
-        if werr := os.write_entire_file(out, data); werr == nil {copied += 1}
+
+        if werr := os.write_entire_file(out, data); werr == nil {
+            copied += 1
+        }
     }
+
     rescan_editor_filesystem()
     godot.print_str(
         fmt.tprintf(
             "odin_godot: created res://scripts/ (%d file(s)) from the template. Next: Project > Tools > Build Odin Scripts, then Play.",
-            copied
-        )
+            copied,
+        ),
     )
 }
 
@@ -287,7 +370,7 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     ep_object := gdext.classdb_construct_object(&odin_export_class_name)
     godot.editor_plugin_add_export_plugin(
         cast(godot.Editor_Plugin)self.object,
-        cast(godot.Editor_Export_Plugin)ep_object
+        cast(godot.Editor_Export_Plugin)ep_object,
     )
     // Project > Tools items, so a new user never has to leave Godot:
     //   * "Set Up Odin Scripts" — copy the bundled template into res://scripts/ (the template
@@ -349,9 +432,11 @@ register_search_extension :: proc "contextless" () {
     // absent/another type the conversion yields an empty array and we still write a valid one.
     exts := godot.variant_to_packed_string_array(&v)
     defer psa_destroy(&exts)
+
     if !psa_ensure(&exts, "odin") {
         return // already present (persisted by a prior session or the user)
     }
+
     nv := godot.variant_from_packed_string_array(&exts)
     defer godot.variant_destroy(&nv)
     godot.set_setting(KEY, nv)
@@ -382,23 +467,39 @@ pl_build :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
 // without them an external checker flags every marked proc). Refuses to clobber an
 // existing file: users hand-tune ols.json, and regenerating is one delete away.
 @(private = "file")
-ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+ols_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
     context.allocator = runtime.heap_allocator()
-    if err != nil {err.error = .Ok}
+
+    if err != nil {
+        err.error = .Ok
+    }
 
     root := odin_collection_root()
     defer delete(root)
+
     if root == "" {
-        editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
+        editor_msg_error(
+            "odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.",
+        )
         return
     }
+
     gres := godot.new_string_cstring("res://ols.json")
     pg := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
     path := string_to_odin(pg)
     defer delete(path)
+
     if os.exists(path) {
-        editor_msg_warn(fmt.tprintf("odin_godot: %s already exists — leaving it untouched (delete it to regenerate).", path))
+        editor_msg_warn(
+            fmt.tprintf("odin_godot: %s already exists — leaving it untouched (delete it to regenerate).", path),
+        )
         return
     }
 
@@ -408,28 +509,32 @@ ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i6
     b := strings.builder_make(context.temp_allocator)
     strings.write_string(&b, "{\n    \"collections\": [\n")
     fmt.sbprintf(&b, "        {{\"name\": \"godot\", \"path\": \"%s\"}}", root)
+
     if share != "" {
         for c in ([3]string{"base", "core", "vendor"}) {
             fmt.sbprintf(&b, ",\n        {{\"name\": \"%s\", \"path\": \"%s/%s\"}}", c, share, c)
         }
     }
+
     strings.write_string(&b, "\n    ],\n")
     strings.write_string(
         &b,
         "    \"enable_snippets\": true,\n" +
         "    \"enable_hover\": true,\n" +
         "    \"enable_semantic_tokens\": true,\n" +
-		"    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_half -custom-attribute:gd_message\"\n}\n"
+        "    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_half -custom-attribute:gd_message\"\n}\n",
     )
+
     if werr := os.write_entire_file(path, transmute([]byte)strings.to_string(b)); werr != nil {
         editor_msg_error(fmt.tprintf("odin_godot: couldn't write %s.", path))
         return
     }
+
     godot.print_str(
         fmt.tprintf(
             "odin_godot: wrote %s — ols-based editors pick it up automatically; in JetBrains IDEs right-click it and choose the Odin plugin's import action.",
-            path
-        )
+            path,
+        ),
     )
 }
 
@@ -450,10 +555,12 @@ target_ext :: proc(target: string) -> string {
 @(private = "file")
 detect_target :: proc(features: ^godot.Packed_String_Array) -> string {
     n := godot.packed_string_array_size(features)
+
     for i in 0 ..< n {
         s := godot.packed_string_array_get(features, i64(i))
         feat := string_to_odin(s)
         defer delete(feat)
+
         switch feat {
         case "macos":
             return "macos"
@@ -465,6 +572,7 @@ detect_target :: proc(features: ^godot.Packed_String_Array) -> string {
             return "web"
         }
     }
+
     return ""
 }
 
@@ -484,6 +592,7 @@ dir_of :: proc(path: string) -> string {
     if idx := strings.last_index_byte(path, '/'); idx >= 0 {
         return path[:idx]
     }
+
     return "."
 }
 
@@ -495,28 +604,36 @@ dir_of :: proc(path: string) -> string {
 export_opt_level :: proc() -> string {
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring("odin_godot/export_optimization")
+
     if bool(godot.project_settings_has_setting(ps, key)) {
         def := godot.Variant{}
         v := godot.project_settings_get_setting(ps, key, def)
         s := godot.variant_to_string(&v)
         cand := string_to_odin(s, context.temp_allocator)
+
         switch cand {
-        case "none":       return "none"
-        case "minimal":    return "minimal"
-        case "size":       return "size"
-        case "speed":      return "speed"
-        case "aggressive": return "aggressive"
+        case "none":
+            return "none"
+        case "minimal":
+            return "minimal"
+        case "size":
+            return "size"
+        case "speed":
+            return "speed"
+        case "aggressive":
+            return "aggressive"
         case "": // unset/empty -> default below
         case:
             export_log(
                 fmt.tprintf(
                     "odin export: ignoring invalid odin_godot/export_optimization=%q " +
                     "(use none|minimal|size|speed|aggressive) — using speed",
-                    cand
-                )
+                    cand,
+                ),
             )
         }
     }
+
     return "speed"
 }
 
@@ -528,6 +645,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
 
     features := cast(^godot.Packed_String_Array)args[0]
     target := detect_target(features)
+
     if target == "" {
         export_error("odin export: could not determine target platform from features")
         return
@@ -540,10 +658,11 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     // editor has neither the env nor the maintainer's filesystem.
     root := odin_collection_root()
     defer delete(root)
+
     if root == "" {
         export_error(
             "odin export: couldn't locate the odin_godot collection — set the " +
-            "`odin_godot/root` project setting to the addon/checkout path, then retry."
+            "`odin_godot/root` project setting to the addon/checkout path, then retry.",
         )
         return
     }
@@ -562,25 +681,29 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         // toolchain shell (Finder/Steam) — where neither `odin` nor `emcc` is on the
         // inherited PATH (build_web.sh runs `odin`, and `emcc` shells its own sibling tools).
         odin_bin, odin_ok := resolve_odin_bin()
+
         if !odin_ok {
             export_error(
                 "odin export: `odin` not found — cannot build the web wasm. Set the " +
                 "`odin_godot/odin_bin` project setting to your odin binary (absolute path), " +
-                "or launch the editor from a shell where `odin` is on PATH."
+                "or launch the editor from a shell where `odin` is on PATH.",
             )
             return
         }
+
         defer delete(odin_bin)
         emcc_bin, emcc_ok := resolve_bin("odin_godot/emcc_bin", "EMCC", "emcc")
+
         if !emcc_ok {
             export_error(
                 "odin export: Emscripten `emcc` not found — required for web export. Install " +
                 "the Emscripten SDK (emsdk; activate 4.0.20 to match Godot 4.6's web " +
                 "templates), then set the `odin_godot/emcc_bin` project setting to its `emcc` " +
-                "(absolute path) or put it on the editor's PATH. See docs/exporting.md."
+                "(absolute path) or put it on the editor's PATH. See docs/exporting.md.",
             )
             return
         }
+
         defer delete(emcc_bin)
 
         opt := export_opt_level()
@@ -598,10 +721,11 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
             shell_quote(opt, context.temp_allocator),
             shell_quote(root, context.temp_allocator),
             shell_quote(root, context.temp_allocator),
-            shell_quote(proj, context.temp_allocator)
+            shell_quote(proj, context.temp_allocator),
         )
         export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm (-o:%s) -> %s", opt, outwasm))
         rc := libc.system(cmd)
+
         if rc != 0 {
             export_error(
                 fmt.tprintf(
@@ -613,20 +737,22 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
                     emcc_bin,
                     root,
                     root,
-                    proj
-                )
+                    proj,
+                ),
             )
             return
         }
+
         if !os.is_file(outwasm) {
             export_error(fmt.tprintf("odin export: web build reported success but %s is missing", outwasm))
             return
         }
+
         export_log(
             fmt.tprintf(
                 "odin export: built web SIDE_MODULE %s (bundled automatically via the .gdextension web.*.wasm32 entry)",
-                outwasm
-            )
+                outwasm,
+            ),
         )
         return
     }
@@ -634,14 +760,16 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     // Resolve the compiler (project setting -> env -> PATH) and prepend its dir to PATH, so
     // desktop export works from an editor launched outside a toolchain shell (Finder/Steam).
     odin_bin, odin_ok := resolve_odin_bin()
+
     if !odin_ok {
         export_error(
             "odin export: `odin` not found — cannot compile scripts. Set the " +
             "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or " +
-            "launch the editor from a shell where `odin` is on PATH."
+            "launch the editor from a shell where `odin` is on PATH.",
         )
         return
     }
+
     defer delete(odin_bin)
     opt := export_opt_level()
 
@@ -659,14 +787,21 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         shell_quote(root, context.temp_allocator),
         shell_quote(proj, context.temp_allocator),
         shell_quote(target, context.temp_allocator),
-        shell_quote(outdll, context.temp_allocator)
+        shell_quote(outdll, context.temp_allocator),
     )
     export_log(fmt.tprintf("odin export: compiling scripts for %s (-o:%s) -> %s", target, opt, outdll))
     rc := libc.system(cmd)
+
     if rc != 0 {
-        export_error(fmt.tprintf("odin export: FAILED to compile scripts dll (rc=%d) — the exported game will have no Odin scripts", rc))
+        export_error(
+            fmt.tprintf(
+                "odin export: FAILED to compile scripts dll (rc=%d) — the exported game will have no Odin scripts",
+                rc,
+            ),
+        )
         return
     }
+
     if !os.is_file(outdll) {
         export_error(fmt.tprintf("odin export: compile reported success but %s is missing", outdll))
         return
@@ -678,12 +813,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     path := godot.new_string_odin(outdll)
     tags := godot.new_packed_string_array()
     tgt := godot.new_string_cstring("")
-    godot.editor_export_plugin_add_shared_object(
-        cast(godot.Editor_Export_Plugin)self.object,
-        path,
-        tags,
-        tgt
-    )
+    godot.editor_export_plugin_add_shared_object(cast(godot.Editor_Export_Plugin)self.object, path, tags, tgt)
     export_log(fmt.tprintf("odin export: bundled %s", outdll))
 
     // Script MODULES (res://modules/<name>): build_export_scripts.sh (above) also built
@@ -699,17 +829,27 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     // consumer modules. Bundle that ONE image beside the exported core too.
     // No profile record means the ordinary native-free export path.
     native_record := fmt.tprintf("%s/.export_build/box3d-runtime.json", proj)
+
     if os.is_file(native_record) {
         native_leaf := fmt.tprintf("libogb3%s", ext)
-        if target == "windows" {native_leaf = "ogb3.dll"}
+
+        if target == "windows" {
+            native_leaf = "ogb3.dll"
+        }
+
         native_path := fmt.tprintf("%s/.export_build/%s", proj, native_leaf)
+
         if !os.is_file(native_path) {
             export_error(fmt.tprintf("odin export: verified Box3D profile is missing %s", native_path))
             return
         }
+
         native_string := godot.new_string_odin(native_path)
         godot.editor_export_plugin_add_shared_object(
-            cast(godot.Editor_Export_Plugin)self.object, native_string, tags, tgt,
+            cast(godot.Editor_Export_Plugin)self.object,
+            native_string,
+            tags,
+            tgt,
         )
         export_log(fmt.tprintf("odin export: bundled shared Box3D backend %s", native_path))
     }
@@ -724,24 +864,40 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
     if os.get_env("BUILD_MODULES", context.temp_allocator) == "0" {
         export_log(
             "odin export: BUILD_MODULES=0 — script modules NOT built or bundled; " +
-            "the exported game will only have the main res://scripts classes"
+            "the exported game will only have the main res://scripts classes",
         )
         return
     }
+
     modules_dir := fmt.tprintf("%s/modules", proj)
-    if !os.exists(modules_dir) {return}
+
+    if !os.exists(modules_dir) {
+        return
+    }
+
     fis, derr := os.read_directory_by_path(modules_dir, -1, context.temp_allocator)
+
     if derr != nil {
         export_error(fmt.tprintf("odin export: couldn't read %s — script modules not bundled", modules_dir))
         return
     }
+
     names := make([dynamic]string, context.temp_allocator)
+
     for fi in fis {
-        if fi.type != .Directory {continue}
-        if !dir_has_odin(fi.fullpath) {continue} // build_export_scripts.sh skipped it too
+        if fi.type != .Directory {
+            continue
+        }
+
+        if !dir_has_odin(fi.fullpath) {
+            continue
+        } // build_export_scripts.sh skipped it too
+
         append(&names, fi.name)
     }
+
     slice.sort(names[:]) // deterministic bundle/log order (matches the runtime's sorted load)
+
     for name in names {
         if strings.contains_rune(name, '.') {
             export_error(
@@ -749,31 +905,32 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
                     "odin export: script module '%s' has a dot in its name — the runtime only " +
                     "discovers dot-free libodinscripts_<name>%s dlls, so its classes would be " +
                     "silently absent from the exported game. Rename res://modules/%s.",
-                    name, ext, name
-                )
+                    name,
+                    ext,
+                    name,
+                ),
             )
             continue
         }
+
         dll := fmt.tprintf("%s/.export_build/libodinscripts_%s%s", proj, name, ext)
+
         if !os.is_file(dll) {
             export_error(
                 fmt.tprintf(
                     "odin export: script module '%s' dll missing (%s) — the exported game " +
                     "would ship WITHOUT this module's classes",
-                    name, dll
-                )
+                    name,
+                    dll,
+                ),
             )
             continue
         }
+
         path := godot.new_string_odin(dll)
         tags := godot.new_packed_string_array()
         tgt := godot.new_string_cstring("")
-        godot.editor_export_plugin_add_shared_object(
-            cast(godot.Editor_Export_Plugin)self.object,
-            path,
-            tags,
-            tgt
-        )
+        godot.editor_export_plugin_add_shared_object(cast(godot.Editor_Export_Plugin)self.object, path, tags, tgt)
         export_log(fmt.tprintf("odin export: bundled module '%s' (%s)", name, dll))
     }
 }
@@ -815,13 +972,13 @@ odin_export_register :: proc() {
         free_instance_func          = export_free_instance,
         get_virtual_call_data_func  = export_get_virtual_call_data,
         call_virtual_with_data_func = call_virtual_with_data,
-        class_userdata              = nil
+        class_userdata              = nil,
     }
     register_extension_class(
         &odin_export_class_name,
         godot.editor_export_plugin_name_ref(),
         &export_info,
-        level = .Editor
+        level = .Editor,
     )
 
     // OdinEditorPlugin (host that registers the export plugin).
@@ -840,13 +997,13 @@ odin_export_register :: proc() {
         free_instance_func          = editor_plugin_free_instance,
         get_virtual_call_data_func  = editor_plugin_get_virtual_call_data,
         call_virtual_with_data_func = call_virtual_with_data,
-        class_userdata              = nil
+        class_userdata              = nil,
     }
     register_extension_class(
         &odin_editor_plugin_class_name,
         godot.editor_plugin_name_ref(),
         &plugin_info,
-        level = .Editor
+        level = .Editor,
     )
 
     // Hand the editor plugin to the editor by class name; Godot instantiates it and

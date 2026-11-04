@@ -86,32 +86,35 @@ LEAD_DEEP_TICKS :: 8.0
 MAX_CATCHUP_TICKS :: 32
 
 Sim_Ticker :: struct {
-	dt:    f64, // seconds per tick — THE fixed dt tick procs implicitly step
-	acc:   f64,
-	tick:  u64, // ticks simulated so far (the client's PREDICTED tick head)
-	scale: f64, // timescale: 1.0 nominal, bent by lead_control within ±SCALE_NUDGE_MAX
+    dt:    f64, // seconds per tick — THE fixed dt tick procs implicitly step
+    acc:   f64,
+    tick:  u64, // ticks simulated so far (the client's PREDICTED tick head)
+    scale: f64, // timescale: 1.0 nominal, bent by lead_control within ±SCALE_NUDGE_MAX
 }
 
 sim_ticker_make :: proc(hz := DEFAULT_SIM_HZ) -> Sim_Ticker {
-	assert(hz > 0)
-	return Sim_Ticker{dt = 1.0 / f64(hz), scale = 1.0}
+    assert(hz > 0)
+    return Sim_Ticker{dt = 1.0 / f64(hz), scale = 1.0}
 }
 
 // Feed a frame's elapsed time; returns how many sim ticks to run this frame.
 // Time flows through the scale, so a bent clock accumulates faster or slower
 // wall time per tick — the whole timescale mechanism is this one multiply.
 sim_ticker_advance :: proc(t: ^Sim_Ticker, frame_dt: f64) -> int {
-	t.acc += frame_dt * t.scale
-	n := 0
-	for t.acc >= t.dt && n < MAX_CATCHUP_TICKS {
-		t.acc -= t.dt
-		t.tick += 1
-		n += 1
-	}
-	if n == MAX_CATCHUP_TICKS {
-		t.acc = 0 // stall backlog dropped — the session re-anchors the lead
-	}
-	return n
+    t.acc += frame_dt * t.scale
+    n := 0
+
+    for t.acc >= t.dt && n < MAX_CATCHUP_TICKS {
+        t.acc -= t.dt
+        t.tick += 1
+        n += 1
+    }
+
+    if n == MAX_CATCHUP_TICKS {
+        t.acc = 0 // stall backlog dropped — the session re-anchors the lead
+    }
+
+    return n
 }
 
 // ---------------------------------------------------------------------------
@@ -125,9 +128,9 @@ sim_ticker_advance :: proc(t: ^Sim_Ticker, frame_dt: f64) -> int {
 // The lane's ANCHOR seeds from this (slack = its margin) the moment the
 // first snapshot lands; lead_control trims from there.
 lead_target :: proc(clock: ^knet.Clock_Sync, dt: f64, jitter_mult := 2.0, slack_ticks := 1) -> int {
-	seconds := clock.rtt / 2 + clock.jitter * jitter_mult
-	ticks := int((seconds + dt - 1e-9) / dt) // ceil in tick units
-	return max(ticks, 1) + slack_ticks
+    seconds := clock.rtt / 2 + clock.jitter * jitter_mult
+    ticks := int((seconds + dt - 1e-9) / dt) // ceil in tick units
+    return max(ticks, 1) + slack_ticks
 }
 
 // Bend the clock toward closing `error_ticks`:
@@ -142,6 +145,6 @@ lead_target :: proc(clock: ^knet.Clock_Sync, dt: f64, jitter_mult := 2.0, slack_
 // Call once per margin update (or per frame; it is idempotent on the same
 // error). The session glue computes error as target_lead − measured_margin.
 lead_control :: proc(t: ^Sim_Ticker, error_ticks: f64, nudge := SCALE_NUDGE_MAX) {
-	p := clamp(error_ticks / 2.0, -1.0, 1.0)
-	t.scale = 1.0 + p * nudge
+    p := clamp(error_ticks / 2.0, -1.0, 1.0)
+    t.scale = 1.0 + p * nudge
 }

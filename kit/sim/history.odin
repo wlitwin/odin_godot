@@ -27,19 +27,19 @@ import knet "godot:kit/net"
 
 // Byte size of one predict-set snapshot. 0 = this entity type predicts nothing.
 predict_size :: proc(desc: ^knet.Entity_Desc) -> int {
-	return knet.subset_view(desc, .Predicted).struct_bytes
+    return knet.subset_view(desc, .Predicted).struct_bytes
 }
 
 // Entity → blob (caller sizes dst with predict_size).
 predict_capture :: proc(dst: []u8, entity: rawptr, desc: ^knet.Entity_Desc) {
-	knet.subset_capture(knet.subset_view(desc, .Predicted), entity, dst)
+    knet.subset_capture(knet.subset_view(desc, .Predicted), entity, dst)
 }
 
 // Blob → entity. The restore half of a reconcile: authoritative truth (or a
 // stored prediction) lands on exactly the predicted fields, nothing else —
 // delta-lane and owner-stream fields are never touched from here.
 predict_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
-	knet.subset_restore(knet.subset_view(desc, .Predicted), entity, src)
+    knet.subset_restore(knet.subset_view(desc, .Predicted), entity, src)
 }
 
 // Does the entity's live predict set equal `blob`? The clean-skip test: equal
@@ -47,86 +47,97 @@ predict_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
 // same memcmp discipline as the delta walk (POD fields, nothing follows
 // pointers).
 predict_matches :: proc(entity: rawptr, desc: ^knet.Entity_Desc, blob: []u8) -> bool {
-	return knet.subset_equal(knet.subset_view(desc, .Predicted), entity, blob)
+    return knet.subset_equal(knet.subset_view(desc, .Predicted), entity, blob)
 }
 
 // ---------------------------------------------------------------------------
 // History — the tick-indexed ring of predict-set snapshots.
 
 History :: struct {
-	write_guard: proc(user:rawptr)->bool,
-	guard_user: rawptr,
-	desc:            ^knet.Entity_Desc,
-	has_slack:       bool, // any predicted field carries a per-field slack (cached at make —
-	                       // keeps the exact-compare fast path a single memcmp, no field walk)
-	using ring:      Tick_Ring, // the tick-indexed store (slot .size = predict_size(desc), cached);
-	                            // promoted so callers read hist.size / .slots as before
+    write_guard: proc(user: rawptr) -> bool,
+    guard_user:  rawptr,
+    desc:        ^knet.Entity_Desc,
+    has_slack:   bool, // any predicted field carries a per-field slack (cached at make —
+    // keeps the exact-compare fast path a single memcmp, no field walk)
+    using ring:  Tick_Ring, // the tick-indexed store (slot .size = predict_size(desc), cached);
+    // promoted so callers read hist.size / .slots as before
 }
 
 // `slots` is the window in TICKS the ledger holds — size it from what reads
 // it: a client ring must cover its maximum lead (input RTT worth of ticks), a
 // server lag-comp ring covers the rewind bound (~250ms of ticks).
 history_make :: proc(desc: ^knet.Entity_Desc, slots: int, allocator := context.allocator) -> History {
-	has_slack := false
-	for f in desc.fields {
-		if .Predicted in f.flags && f.slack > 0 {
-			has_slack = true
-			break
-		}
-	}
-	return History {
-		desc      = desc,
-		has_slack = has_slack,
-		ring      = tick_ring_make(predict_size(desc), slots, allocator),
-	}
+    has_slack := false
+
+    for f in desc.fields {
+        if .Predicted in f.flags && f.slack > 0 {
+            has_slack = true
+            break
+        }
+    }
+
+    return History{desc = desc, has_slack = has_slack, ring = tick_ring_make(predict_size(desc), slots, allocator)}
 }
 
 history_destroy :: proc(h: ^History) {
-	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
-	tick_ring_destroy(&h.ring)
+    if h.write_guard != nil && !h.write_guard(h.guard_user) {
+        return
+    }
+
+    tick_ring_destroy(&h.ring)
 }
 
 // Note the entity's live predict set as the state AT `tick` — the owner of
 // the truth (server) or of the prediction (client), once per simulated tick.
 history_note :: proc(h: ^History, tick: u64, entity: rawptr) {
-	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
-	predict_capture(tick_ring_dst(&h.ring, tick), entity, h.desc)
+    if h.write_guard != nil && !h.write_guard(h.guard_user) {
+        return
+    }
+
+    predict_capture(tick_ring_dst(&h.ring, tick), entity, h.desc)
 }
 
 // Note an already-captured blob as the state AT `tick` — how arriving
 // authoritative truth replaces a wrong prediction in the ledger, so later
 // rewinds and compares read truth, not the superseded guess.
 history_note_bytes :: proc(h: ^History, tick: u64, blob: []u8) {
-	if h.write_guard!=nil && !h.write_guard(h.guard_user) {return}
-	tick_ring_note(&h.ring, tick, blob)
+    if h.write_guard != nil && !h.write_guard(h.guard_user) {
+        return
+    }
+
+    tick_ring_note(&h.ring, tick, blob)
 }
 
 // The snapshot AT `tick`, if the ledger still holds it (a view into the ring —
 // valid until that slot is re-noted). ok=false per THE LEDGER CONTRACT (ring.odin).
 history_read :: proc(h: ^History, tick: u64) -> (blob: []u8, ok: bool) {
-	return tick_ring_read(&h.ring, tick)
+    return tick_ring_read(&h.ring, tick)
 }
 
 // Restore the entity's predict set to its state AT `tick`. false = the ledger
 // no longer holds that tick (nothing written; the caller chooses the fallback).
 history_restore :: proc(h: ^History, tick: u64, entity: rawptr) -> bool {
-	blob, ok := history_read(h, tick)
-	if !ok {
-		return false
-	}
-	predict_restore(entity, h.desc, blob)
-	return true
+    blob, ok := history_read(h, tick)
+
+    if !ok {
+        return false
+    }
+
+    predict_restore(entity, h.desc, blob)
+    return true
 }
 
 // Stored@tick == blob? false when the tick is missing — a compare against
 // history the client no longer holds must read as a mismatch (resim from
 // truth), never as silently fine.
 history_matches :: proc(h: ^History, tick: u64, blob: []u8) -> bool {
-	stored, ok := history_read(h, tick)
-	if !ok {
-		return false
-	}
-	return mem.compare(stored, blob) == 0
+    stored, ok := history_read(h, tick)
+
+    if !ok {
+        return false
+    }
+
+    return mem.compare(stored, blob) == 0
 }
 
 // The TOLERANT compare: float fields (Lerp_Kind .F32/.F64 — scriptgen
@@ -142,58 +153,67 @@ history_matches :: proc(h: ^History, tick: u64, blob: []u8) -> bool {
 // on float (.F32/.F64) fields; discrete predicted state always compares exact
 // (a differing byte is a real event), whatever the tolerances say.
 predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> bool {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		defer off += f.size
-		fe := f.slack > 0 ? f.slack : eps // per-field slack overrides the lane default
-		#partial switch f.lerp {
-		case .F32:
-			for i in 0 ..< f.size / 4 {
-				av := (^f32)(rawptr(&a[off + i * 4]))^
-				bv := (^f32)(rawptr(&b[off + i * 4]))^
-				if abs(av - bv) > fe {
-					return false
-				}
-			}
-		case .Angle:
-			for i in 0 ..< f.size / 4 {
-				// wrapped compare: 3.14 vs -3.14 is a sliver, not a mismatch
-				if abs(knet.angle_arc((^f32)(rawptr(&a[off + i * 4]))^, (^f32)(rawptr(&b[off + i * 4]))^)) > fe {
-					return false
-				}
-			}
-		case .F64:
-			for i in 0 ..< f.size / 8 {
-				av := (^f64)(rawptr(&a[off + i * 8]))^
-				bv := (^f64)(rawptr(&b[off + i * 8]))^
-				if abs(av - bv) > f64(fe) {
-					return false
-				}
-			}
-		case:
-			if mem.compare(a[off:off + f.size], b[off:off + f.size]) != 0 {
-				return false
-			}
-		}
-	}
-	return true
+    off := 0
+
+    for f in desc.fields {
+        if .Predicted not_in f.flags {
+            continue
+        }
+
+        defer off += f.size
+        fe := f.slack > 0 ? f.slack : eps // per-field slack overrides the lane default
+
+        #partial switch f.lerp {
+        case .F32:
+            for i in 0 ..< f.size / 4 {
+                av := (^f32)(rawptr(&a[off + i * 4]))^
+                bv := (^f32)(rawptr(&b[off + i * 4]))^
+
+                if abs(av - bv) > fe {
+                    return false
+                }
+            }
+        case .Angle:
+            for i in 0 ..< f.size / 4 {
+                // wrapped compare: 3.14 vs -3.14 is a sliver, not a mismatch
+                if abs(knet.angle_arc((^f32)(rawptr(&a[off + i * 4]))^, (^f32)(rawptr(&b[off + i * 4]))^)) > fe {
+                    return false
+                }
+            }
+        case .F64:
+            for i in 0 ..< f.size / 8 {
+                av := (^f64)(rawptr(&a[off + i * 8]))^
+                bv := (^f64)(rawptr(&b[off + i * 8]))^
+
+                if abs(av - bv) > f64(fe) {
+                    return false
+                }
+            }
+        case:
+            if mem.compare(a[off:off + f.size], b[off:off + f.size]) != 0 {
+                return false
+            }
+        }
+    }
+
+    return true
 }
 
 // history_matches with the tolerant compare. The exact fast path (one memcmp,
 // no field walk) holds only when NOTHING wants slack — neither the lane
 // default nor any per-field override; otherwise the per-field compare runs.
 history_within :: proc(h: ^History, tick: u64, blob: []u8, eps: f32) -> bool {
-	if eps <= 0 && !h.has_slack {
-		return history_matches(h, tick, blob)
-	}
-	stored, ok := history_read(h, tick)
-	if !ok {
-		return false
-	}
-	return predict_within(stored, blob, h.desc, eps)
+    if eps <= 0 && !h.has_slack {
+        return history_matches(h, tick, blob)
+    }
+
+    stored, ok := history_read(h, tick)
+
+    if !ok {
+        return false
+    }
+
+    return predict_within(stored, blob, h.desc, eps)
 }
 
 // Lag-compensation rewind lives in lane.odin (lane_rewound_begin/end): it

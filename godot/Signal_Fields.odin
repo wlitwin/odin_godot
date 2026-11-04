@@ -42,41 +42,41 @@ package godot
 // `Signal1(Vector2)` or wrap it, `SignalN(struct { pos: Vector2 })`.
 
 Signal0 :: struct {
-	_marker: ^struct {},
+    _marker: ^struct{},
 }
 
 Signal1 :: struct($A: typeid) {
-	_marker: ^struct {
-		a: A,
-	},
+    _marker: ^struct {
+        a: A,
+    },
 }
 
 Signal2 :: struct($A, $B: typeid) {
-	_marker: ^struct {
-		a: A,
-		b: B,
-	},
+    _marker: ^struct {
+        a: A,
+        b: B,
+    },
 }
 
 Signal3 :: struct($A, $B, $C: typeid) {
-	_marker: ^struct {
-		a: A,
-		b: B,
-		c: C,
-	},
+    _marker: ^struct {
+        a: A,
+        b: B,
+        c: C,
+    },
 }
 
 Signal4 :: struct($A, $B, $C, $D: typeid) {
-	_marker: ^struct {
-		a: A,
-		b: B,
-		c: C,
-		d: D,
-	},
+    _marker: ^struct {
+        a: A,
+        b: B,
+        c: C,
+        d: D,
+    },
 }
 
 // The general form: the pointee IS the payload struct — its field names/types are the
 // signal's arg names/types (see the header comment for the rules).
 SignalN :: struct($P: typeid) {
-	_marker: ^P,
+    _marker: ^P,
 }

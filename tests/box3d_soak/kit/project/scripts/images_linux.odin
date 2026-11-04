@@ -1,17 +1,33 @@
-// Test-only image census reused from the accepted P4.1 module fixture.
 #+build linux
+// Test-only image census reused from the accepted P4.1 module fixture.
+
 package kit_gate_b_project
 
 import "core:os"
 import "core:strings"
 
-native_image_count :: proc()->int {
-	data,error:=os.read_entire_file("/proc/self/maps",context.allocator);if error!=nil{return -1};defer delete(data)
-	lines:=strings.split(string(data),"\n");defer delete(lines)
-	paths:=make(map[string]bool);defer delete(paths)
-	for line in lines {
-		if !strings.contains(line,"libogb3"){continue}
-		if start:=strings.index_byte(line,'/');start>=0{paths[line[start:]]=true}
-	}
-	return len(paths)
+native_image_count :: proc() -> int {
+    data, error := os.read_entire_file("/proc/self/maps", context.allocator)
+
+    if error != nil {
+        return -1
+    }
+
+    defer delete(data)
+    lines := strings.split(string(data), "\n")
+    defer delete(lines)
+    paths := make(map[string]bool)
+    defer delete(paths)
+
+    for line in lines {
+        if !strings.contains(line, "libogb3") {
+            continue
+        }
+
+        if start := strings.index_byte(line, '/'); start >= 0 {
+            paths[line[start:]] = true
+        }
+    }
+
+    return len(paths)
 }

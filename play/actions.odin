@@ -17,28 +17,31 @@ package play
 import gd "godot:godot"
 
 Key_Row :: struct {
-	action: cstring,
-	key:    gd.Key,
+    action: cstring,
+    key:    gd.Key,
 }
 
 Mouse_Row :: struct {
-	action: cstring,
-	button: gd.Mouse_Button,
+    action: cstring,
+    button: gd.Mouse_Button,
 }
 
 actions_install :: proc "contextless" (keys: []Key_Row, mice: []Mouse_Row = nil) {
-	if len(keys) > 0 && gd.has_action(keys[0].action) {
-		return // a scene reload re-ran ready — the map is already in
-	}
-	if len(keys) == 0 && len(mice) > 0 && gd.has_action(mice[0].action) {
-		return
-	}
-	for k in keys {
-		gd.add_action(k.action)
-		gd.action_add_key(k.action, i64(k.key))
-	}
-	for m in mice {
-		gd.add_action(m.action)
-		gd.action_add_mouse_button(m.action, i64(m.button))
-	}
+    if len(keys) > 0 && gd.has_action(keys[0].action) {
+        return // a scene reload re-ran ready — the map is already in
+    }
+
+    if len(keys) == 0 && len(mice) > 0 && gd.has_action(mice[0].action) {
+        return
+    }
+
+    for k in keys {
+        gd.add_action(k.action)
+        gd.action_add_key(k.action, i64(k.key))
+    }
+
+    for m in mice {
+        gd.add_action(m.action)
+        gd.action_add_mouse_button(m.action, i64(m.button))
+    }
 }

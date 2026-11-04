@@ -15,21 +15,21 @@ import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 
 Board :: struct {
-	owner:       gd.Node2d,
-	boot:        kboot.Boot, // with the three fields below: generated net facade
-	ses:         ksess.Session,
-	comms:       kcomms.Comms,
-	lane:        ksim.Lane,
-	// The pawn is a SEAT'S BODY (`avatar`): a host takeover parks it with its
-	// seat instead of adopting it — the knob rides the tag, onto the kinds row.
-	pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7,avatar"`,
-	// A NON-ticking tagged entity beside the ticking pawn: its typed spawn
-	// helper takes the host-asserted coop route (pawn's routes through
-	// boot_fire_spawn — a client's call predicts). Its owner stream is
-	// DECLARED at 20 Hz (`stream_hz=`), so every spawn of the kind — on every
-	// peer, the heir's rebuild included — carries the rate; an export spec may
-	// still trail behind the entity's own tokens.
-	chest_scene: ^gd.Resource `gd:"entity=Chest:8,stream_hz=20,group=Loot"`
+    owner:       gd.Node2d,
+    boot:        kboot.Boot, // with the three fields below: generated net facade
+    ses:         ksess.Session,
+    comms:       kcomms.Comms,
+    lane:        ksim.Lane,
+    // The pawn is a SEAT'S BODY (`avatar`): a host takeover parks it with its
+    // seat instead of adopting it — the knob rides the tag, onto the kinds row.
+    pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7,avatar"`,
+    // A NON-ticking tagged entity beside the ticking pawn: its typed spawn
+    // helper takes the host-asserted coop route (pawn's routes through
+    // boot_fire_spawn — a client's call predicts). Its owner stream is
+    // DECLARED at 20 Hz (`stream_hz=`), so every spawn of the kind — on every
+    // peer, the heir's rebuild included — carries the rate; an export spec may
+    // still trail behind the entity's own tokens.
+    chest_scene: ^gd.Resource `gd:"entity=Chest:8,stream_hz=20,group=Loot"`,
 }
 
 // Hand-written wins, name by name: this suppresses the generated on_net_down
@@ -53,14 +53,18 @@ pawn_freed :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id) {
 // the dress that used to be a type-switch in an untyped entity_spawned half.
 @(gd_half)
 pawn_born :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id, owner: knet.Player_Id) {
-	_ = game; _ = self; _ = id; _ = owner
+    _ = game
+    _ = self
+    _ = id
+    _ = owner
 }
 
 // MY avatar-kind entity (the pawn — `avatar` on its tag) was born: my spawn,
 // my drop-in, my reconnect reclaiming its standing body.
 @(gd_half)
 board_embodied :: proc(self: ^Board, id: knet.Net_Id) {
-	_ = self; _ = id
+    _ = self
+    _ = id
 }
 
 
@@ -75,8 +79,8 @@ board_sample :: proc(self: ^Board, tick: u64, input: ^Pawn_Input) {
 // Generated field constraints run first. This optional hook remains for
 // cross-field/game predicates; the bare `validate` token pairs the name.
 board_sample_validate :: proc(self: ^Board, input: ^Pawn_Input) -> bool {
-	_ = self
-	return input.trigger == 0 || input.buttons != 0
+    _ = self
+    return input.trigger == 0 || input.buttons != 0
 }
 
 // The SECOND input class's device read — one @(gd_sample) per input TYPE. This
@@ -128,14 +132,20 @@ board_horn_fx :: proc(g: ^Board, mine: bool, side: u8) {
 // presentation clock and the generated suffix-free door takes ^Boot.
 @(gd_event = "audience=everyone,timing=auto")
 chest_spark_fx :: proc(g: ^Board, chest: ^Chest, mine: bool, strength: f32) {
-	_ = g; _ = chest; _ = mine; _ = strength
+    _ = g
+    _ = chest
+    _ = mine
+    _ = strength
 }
 
 // Pawn is sim-tracked, so the same declaration lowers onto SIM_FACT/watch
 // timing. Observers excludes its owner; the door still takes ^Boot.
 @(gd_event = "audience=observers,timing=auto")
 pawn_cheered_fx :: proc(g: ^Board, pawn: ^Pawn, mine: bool, style: u8) {
-	_ = g; _ = pawn; _ = mine; _ = style
+    _ = g
+    _ = pawn
+    _ = mine
+    _ = style
 }
 
 // A static world occurrence has no clock to infer. The explicit immediate
@@ -143,7 +153,10 @@ pawn_cheered_fx :: proc(g: ^Board, pawn: ^Pawn, mine: bool, style: u8) {
 // announcing authority.
 @(gd_event = "audience=observers,timing=immediate,anchor=none")
 board_blast_fx :: proc(g: ^Board, mine: bool, x, y: f32) {
-	_ = g; _ = mine; _ = x; _ = y
+    _ = g
+    _ = mine
+    _ = x
+    _ = y
 }
 
 board_ready :: proc(self: ^Board) {
@@ -153,16 +166,19 @@ board_ready :: proc(self: ^Board) {
 // resolve to the same typed pointer, and iteration promotes ref.id onto the
 // row while carrying owner + entity without a second lookup.
 census_typecheck :: proc(self: ^Board, id: knet.Net_Id) {
-	ref := pawn_ref(id)
-	if pawn, ok := pawn_of(&self.boot, ref); ok {
-		_ = pawn
-	}
-	if pawn, ok := pawn_of(&self.boot, id); ok {
-		_ = pawn
-	}
-	for tracked in pawn_all(&self.boot) {
-		_ = tracked.id
-		_ = tracked.owner
-		_ = tracked.entity
-	}
+    ref := pawn_ref(id)
+
+    if pawn, ok := pawn_of(&self.boot, ref); ok {
+        _ = pawn
+    }
+
+    if pawn, ok := pawn_of(&self.boot, id); ok {
+        _ = pawn
+    }
+
+    for tracked in pawn_all(&self.boot) {
+        _ = tracked.id
+        _ = tracked.owner
+        _ = tracked.entity
+    }
 }

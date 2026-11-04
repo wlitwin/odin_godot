@@ -16,22 +16,22 @@ import gd "godot:godot"
 import rt "godot:runtime"
 
 Tester :: struct {
-	owner:     gd.Node2d,
-	// Declared signals (typed fields). Emission below is deliberately BY NAME via the
-	// gd.emit/gd.emit_args ergonomic helpers — that escape hatch is what this test covers.
-	pinged:    gd.Signal1(int) `gd:"args=value"`,
-	triggered: gd.Signal0,
-	// The struct-payload general form (gd.SignalN): 5 args — past the arity family's cap —
-	// and the payload struct's FIELD NAMES are the registered arg names (no `args=` tag).
-	// Emitted below through the scriptgen-generated typed helper (tester_emit_scored).
-	scored:    gd.SignalN(struct {
-		points: int,
-		combo:  i64,
-		streak: bool,
-		mult:   f32,
-		pos:    gd.Vector2,
-	}),
-	result:    gd.Int `gd:"export"`,
+    owner:     gd.Node2d,
+    // Declared signals (typed fields). Emission below is deliberately BY NAME via the
+    // gd.emit/gd.emit_args ergonomic helpers — that escape hatch is what this test covers.
+    pinged:    gd.Signal1(int) `gd:"args=value"`,
+    triggered: gd.Signal0,
+    // The struct-payload general form (gd.SignalN): 5 args — past the arity family's cap —
+    // and the payload struct's FIELD NAMES are the registered arg names (no `args=` tag).
+    // Emitted below through the scriptgen-generated typed helper (tester_emit_scored).
+    scored:    gd.SignalN(struct {
+            points: int,
+            combo:  i64,
+            streak: bool,
+            mult:   f32,
+            pos:    gd.Vector2,
+        }),
+    result:    gd.Int `gd:"export"`,
 }
 
 BIT_GET_NODE :: 1 << 0
@@ -50,98 +50,144 @@ BIT_FIRST_SCRIPT :: 1 << 12
 BIT_ARRAY_SLICE :: 1 << 13
 
 tester_ready :: proc(self: ^Tester) {
-	r: i64 = 0
+    r: i64 = 0
 
-	// --- nodes ---
-	target := gd.get_node(self.owner, "Target")
-	if target != nil {r |= BIT_GET_NODE}
-	if gd.get_parent(self.owner) != nil {r |= BIT_GET_PARENT}
-	if gd.get_tree(self.owner) != nil {r |= BIT_GET_TREE}
+    // --- nodes ---
+    target := gd.get_node(self.owner, "Target")
 
-	// --- groups ---
-	gd.add_to_group(self.owner, "ergo")
-	if gd.is_in_group(self.owner, "ergo") {r |= BIT_GROUP}
-	// prove remove works too (re-add so the driver still sees membership).
-	gd.remove_from_group(self.owner, "ergo")
-	if !gd.is_in_group(self.owner, "ergo") {
-		gd.add_to_group(self.owner, "ergo")
-	} else {
-		r &~= BIT_GROUP // remove_from_group did nothing -> fail the bit
-	}
+    if target != nil {
+        r |= BIT_GET_NODE
+    }
 
-	// --- scenes: spawn = load_scene + instantiate + add_child ---
-	bullet := gd.spawn(self.owner, "res://bullet.tscn")
-	if bullet != nil && gd.get_node(self.owner, "Bullet") != nil {r |= BIT_SPAWN}
+    if gd.get_parent(self.owner) != nil {
+        r |= BIT_GET_PARENT
+    }
 
-	// --- group ITERATION: Tester + the (script-less) Bullet share a group, so the
-	// node query must see both and the script-typed queries must filter to just us. ---
-	if bullet != nil {
-		gd.add_to_group(self.owner, "ergo_iter")
-		gd.add_to_group(bullet, "ergo_iter")
+    if gd.get_tree(self.owner) != nil {
+        r |= BIT_GET_TREE
+    }
 
-		members := gd.nodes_in_group(self.owner, "ergo_iter")
-		if len(members) == 2 && members[0] != nil && members[1] != nil {
-			r |= BIT_NODES_IN_GROUP
-		}
-		if gd.first_in_group(self.owner, "ergo_iter") != nil {r |= BIT_FIRST_IN_GROUP}
+    // --- groups ---
+    gd.add_to_group(self.owner, "ergo")
 
-		// Exactly ONE member carries this script, and it is us — the script-less
-		// Bullet must be skipped, not returned reinterpreted.
-		ts := rt.scripts_in_group(self.owner, "ergo_iter", Tester)
-		if len(ts) == 1 && ts[0] == self {r |= BIT_SCRIPTS_IN_GROUP}
-		if rt.first_script_in_group(self.owner, "ergo_iter", Tester) == self {
-			r |= BIT_FIRST_SCRIPT
-		}
-	}
+    if gd.is_in_group(self.owner, "ergo") {
+        r |= BIT_GROUP
+    }
 
-	// --- generic typed-array unpack, over a real engine return (get_children) ---
-	{
-		children := gd.node_get_children(self.owner, false)
-		defer gd.free_array(children.untyped)
-		kids := gd.array_unpack(&children)
-		// Target (scene child) + spawned Bullet, live handles throughout.
-		if len(kids) >= 2 {
-			ok := true
-			for k in kids {if k == nil {ok = false}}
-			if ok {r |= BIT_ARRAY_SLICE}
-		}
-	}
+    // prove remove works too (re-add so the driver still sees membership).
+    gd.remove_from_group(self.owner, "ergo")
 
-	// --- dynamic properties on the Target node, by name ---
-	if target != nil {
-		gd.set_int(target, "z_index", 7)
-		if gd.get_int(target, "z_index") == 7 {r |= BIT_INT}
+    if !gd.is_in_group(self.owner, "ergo") {
+        gd.add_to_group(self.owner, "ergo")
+    } else {
+        r &~= BIT_GROUP // remove_from_group did nothing -> fail the bit
+    }
 
-		gd.set_float(target, "rotation", 0.5)
-		f := gd.get_float(target, "rotation")
-		if f > 0.49 && f < 0.51 {r |= BIT_FLOAT}
+    // --- scenes: spawn = load_scene + instantiate + add_child ---
+    bullet := gd.spawn(self.owner, "res://bullet.tscn")
 
-		gd.set_bool(target, "visible", false)
-		if gd.get_bool(target, "visible") == false {r |= BIT_BOOL}
+    if bullet != nil && gd.get_node(self.owner, "Bullet") != nil {
+        r |= BIT_SPAWN
+    }
 
-		gd.set_string(target, "text", "hello")
-		if gd.get_string(target, "text") == "hello" {r |= BIT_STRING}
-	}
+    // --- group ITERATION: Tester + the (script-less) Bullet share a group, so the
+    // node query must see both and the script-typed queries must filter to just us. ---
+    if bullet != nil {
+        gd.add_to_group(self.owner, "ergo_iter")
+        gd.add_to_group(bullet, "ergo_iter")
 
-	self.result = r
+        members := gd.nodes_in_group(self.owner, "ergo_iter")
+
+        if len(members) == 2 && members[0] != nil && members[1] != nil {
+            r |= BIT_NODES_IN_GROUP
+        }
+
+        if gd.first_in_group(self.owner, "ergo_iter") != nil {
+            r |= BIT_FIRST_IN_GROUP
+        }
+
+        // Exactly ONE member carries this script, and it is us — the script-less
+        // Bullet must be skipped, not returned reinterpreted.
+        ts := rt.scripts_in_group(self.owner, "ergo_iter", Tester)
+
+        if len(ts) == 1 && ts[0] == self {
+            r |= BIT_SCRIPTS_IN_GROUP
+        }
+
+        if rt.first_script_in_group(self.owner, "ergo_iter", Tester) == self {
+            r |= BIT_FIRST_SCRIPT
+        }
+    }
+
+    // --- generic typed-array unpack, over a real engine return (get_children) ---
+    {
+        children := gd.node_get_children(self.owner, false)
+        defer gd.free_array(children.untyped)
+        kids := gd.array_unpack(&children)
+
+        // Target (scene child) + spawned Bullet, live handles throughout.
+        if len(kids) >= 2 {
+            ok := true
+
+            for k in kids {
+                if k == nil {
+                    ok = false
+                }
+            }
+
+            if ok {
+                r |= BIT_ARRAY_SLICE
+            }
+        }
+    }
+
+    // --- dynamic properties on the Target node, by name ---
+    if target != nil {
+        gd.set_int(target, "z_index", 7)
+
+        if gd.get_int(target, "z_index") == 7 {
+            r |= BIT_INT
+        }
+
+        gd.set_float(target, "rotation", 0.5)
+        f := gd.get_float(target, "rotation")
+
+        if f > 0.49 && f < 0.51 {
+            r |= BIT_FLOAT
+        }
+
+        gd.set_bool(target, "visible", false)
+
+        if gd.get_bool(target, "visible") == false {
+            r |= BIT_BOOL
+        }
+
+        gd.set_string(target, "text", "hello")
+
+        if gd.get_string(target, "text") == "hello" {
+            r |= BIT_STRING
+        }
+    }
+
+    self.result = r
 }
 
 // do_emit fires the script-declared `pinged` signal WITH a payload (gd.emit_args).
 @(gd_method)
 tester_do_emit :: proc(self: ^Tester, value: i64) {
-	v := value
-	gd.emit_args(self.owner, "pinged", gd.variant_from(&v))
+    v := value
+    gd.emit_args(self.owner, "pinged", gd.variant_from(&v))
 }
 
 // do_trigger fires the zero-payload `triggered` signal (gd.emit).
 @(gd_method)
 tester_do_trigger :: proc(self: ^Tester) {
-	gd.emit(self.owner, "triggered")
+    gd.emit(self.owner, "triggered")
 }
 
 // do_score fires the 5-arg SignalN `scored` signal through its generated TYPED helper —
 // the parameter names below are the payload struct's field names, compile-checked.
 @(gd_method)
 tester_do_score :: proc(self: ^Tester) {
-	tester_emit_scored(self, points = 10, combo = 3, streak = true, mult = 1.5, pos = gd.Vector2{2, 4})
+    tester_emit_scored(self, points = 10, combo = 3, streak = true, mult = 1.5, pos = gd.Vector2{2, 4})
 }

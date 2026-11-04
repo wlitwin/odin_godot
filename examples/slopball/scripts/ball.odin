@@ -22,22 +22,22 @@ import play "godot:play"
 // `ball_score_edge` half (slopball.odin) receives the whole old/new atomically
 // and narrates once, no seen_* mirrors, no double horn.
 Score :: struct {
-	l, r: u8, // goals by each team (LEFT defends left, scores right)
-	won:  u8, // 0 = playing, 1/2 = that side took the match
+    l, r: u8, // goals by each team (LEFT defends left, scores right)
+    won:  u8, // 0 = playing, 1/2 = that side took the match
 }
 
 Ball :: struct {
-	owner:  gd.Rigid_Body2d,
-	look:   gd.Node2d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
-	net_id: knet.Net_Id,
-	puppet: play.Puppet, // pose + velocity replicate through the embed
-	score:  Score `gd:"replicate"`, // host-authoritative deltas on the client-streamed entity
+    owner:  gd.Rigid_Body2d,
+    look:   gd.Node2d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
+    net_id: knet.Net_Id,
+    puppet: play.Puppet, // pose + velocity replicate through the embed
+    score:  Score `gd:"replicate"`, // host-authoritative deltas on the client-streamed entity
 }
 
 ball_ready :: proc(self: ^Ball) {
-	play.puppet_attach(&self.puppet, self.owner, PITCH_W / 2, PITCH_H / 2, skin = self.look)
+    play.puppet_attach(&self.puppet, self.owner, PITCH_W / 2, PITCH_H / 2, skin = self.look)
 }
 
 ball_process :: proc(self: ^Ball, delta: f64) {
-	play.puppet_frame(&self.puppet, f32(delta))
+    play.puppet_frame(&self.puppet, f32(delta))
 }

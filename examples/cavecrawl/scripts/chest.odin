@@ -16,27 +16,38 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 
 Chest :: struct {
-	owner:  gd.Node2d,
-	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate"`,
-	slots:  [8]kitems.Slot `gd:"replicate"`,
+    owner:  gd.Node2d,
+    net_id: knet.Net_Id,
+    x, y:   f32 `gd:"replicate"`,
+    slots:  [8]kitems.Slot `gd:"replicate"`,
 }
 
 @(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, taken: kitems.Slot) {
-	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
-	taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack
-	return taken.count > 0, taken
+    if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {
+        return false, {}
+    }
+
+    taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack
+    return taken.count > 0, taken
 }
 
 // The cross-entity half, next to its verb: runs on the HOST only, right after
 // the take applies — never on the taker's optimistic run (the credit reaches
 // their screen as an ordinary delta). See host.odin's cave_credit.
 @(gd_half)
-chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot) {
-	cave_credit(game, by, self, taken)
+chest_take_then :: proc(
+    game: ^CaveLobby,
+    self: ^Chest,
+    by: knet.Player_Id,
+    slot: i32,
+    px: f32,
+    py: f32,
+    taken: kitems.Slot,
+) {
+    cave_credit(game, by, self, taken)
 }
 
 chest_process :: proc(self: ^Chest, delta: f64) {
-	gd.node2d_set_position(self.owner, {self.x, self.y})
+    gd.node2d_set_position(self.owner, {self.x, self.y})
 }

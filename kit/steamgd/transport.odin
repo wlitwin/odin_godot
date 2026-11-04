@@ -51,40 +51,54 @@ import netgd "godot:kit/netgd"
 //            absence. Fill the slot against a real build, add the
 //            Rendezvous_Kind arm, and Steam migrates.
 TRANSPORT := netgd.Transport {
-	name       = "steam",
-	rendezvous = .None,
-	open_host  = steam_open_host,
-	open_join  = steam_open_join,
+    name       = "steam",
+    rendezvous = .None,
+    open_host  = steam_open_host,
+    open_join  = steam_open_join,
 }
 
 // The lobby id a signal handed you → the endpoint its owner answers on.
 // (Steam addresses peers by steam id, not by lobby: the lobby is the
 // phonebook, the owner's id is the number.)
 endpoint_of :: proc(lobby_id: u64) -> netgd.Endpoint {
-	return {peer_id = lobby_owner(lobby_id)}
+    return {peer_id = lobby_owner(lobby_id)}
 }
 
 @(private = "file")
-steam_open_host :: proc(wire: ^netgd.Session_Wire, at: netgd.Endpoint, name: string, token: u64, dedicated: bool) -> bool {
-	if !host_peer(wire.node) {
-		return false
-	}
-	ksess.session_host_start(wire.ses, name, token, dedicated)
-	return true
+steam_open_host :: proc(
+    wire: ^netgd.Session_Wire,
+    at: netgd.Endpoint,
+    name: string,
+    token: u64,
+    dedicated: bool,
+) -> bool {
+    if !host_peer(wire.node) {
+        return false
+    }
+
+    ksess.session_host_start(wire.ses, name, token, dedicated)
+    return true
 }
 
 @(private = "file")
-steam_open_join :: proc(wire: ^netgd.Session_Wire, at: netgd.Endpoint, name: string, token: u64, spectate: bool) -> bool {
-	if at.peer_id == 0 {
-		// The lobby answered with no owner (a dead or unjoined lobby): refuse
-		// at the door rather than installing a peer pointed at nobody, which
-		// would surface much later as an unexplained join timeout.
-		return false
-	}
-	if !client_peer(wire.node, at.peer_id) {
-		return false
-	}
-	ksess.session_client_start(wire.ses, token, name, spectate)
-	return true
-}
+steam_open_join :: proc(
+    wire: ^netgd.Session_Wire,
+    at: netgd.Endpoint,
+    name: string,
+    token: u64,
+    spectate: bool,
+) -> bool {
+    if at.peer_id == 0 {
+        // The lobby answered with no owner (a dead or unjoined lobby): refuse
+        // at the door rather than installing a peer pointed at nobody, which
+        // would surface much later as an unexplained join timeout.
+        return false
+    }
 
+    if !client_peer(wire.node, at.peer_id) {
+        return false
+    }
+
+    ksess.session_client_start(wire.ses, token, name, spectate)
+    return true
+}

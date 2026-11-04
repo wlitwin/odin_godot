@@ -66,107 +66,122 @@ package events
 // (cast it back to your struct, exactly like the flow sequencer's callbacks).
 
 Subscription :: struct($T: typeid) {
-	fn:    proc(ctx: rawptr, payload: T), // nil = tombstone (removed mid-emit)
-	ctx:   rawptr,
-	owner: u64, // caller-chosen tag for bulk removal (e.g. an engine instance id); 0 = untagged
+    fn:    proc(ctx: rawptr, payload: T), // nil = tombstone (removed mid-emit)
+    ctx:   rawptr,
+    owner: u64, // caller-chosen tag for bulk removal (e.g. an engine instance id); 0 = untagged
 }
 
 Event :: struct($T: typeid) {
-	subs:     [dynamic]Subscription(T),
-	emitting: int, // >0 while inside emit (counts nesting); removals tombstone instead of shifting
-	dirty:    bool, // tombstones pending compaction once the outermost emit unwinds
+    subs:     [dynamic]Subscription(T),
+    emitting: int, // >0 while inside emit (counts nesting); removals tombstone instead of shifting
+    dirty:    bool, // tombstones pending compaction once the outermost emit unwinds
 }
 
 // subscribe appends a subscription (called in subscription order). Duplicates are
 // allowed and fire once per subscription. `owner` tags it for unsubscribe_owner.
 subscribe :: proc(e: ^Event($T), ctx: rawptr, fn: proc(ctx: rawptr, payload: T), owner: u64 = 0) {
-	append(&e.subs, Subscription(T){fn = fn, ctx = ctx, owner = owner})
+    append(&e.subs, Subscription(T){fn = fn, ctx = ctx, owner = owner})
 }
 
 // unsubscribe removes the FIRST subscription matching (fn, ctx). Safe during emit.
 unsubscribe :: proc(e: ^Event($T), ctx: rawptr, fn: proc(ctx: rawptr, payload: T)) {
-	for &s, i in e.subs {
-		if s.fn == fn && s.ctx == ctx {
-			remove_at(e, i)
-			return
-		}
-	}
+    for &s, i in e.subs {
+        if s.fn == fn && s.ctx == ctx {
+            remove_at(e, i)
+            return
+        }
+    }
 }
 
 // unsubscribe_owner removes EVERY subscription tagged with `owner`. Safe during emit.
 // (owner 0 removes the untagged ones — tag real subscribers with a nonzero id.)
 unsubscribe_owner :: proc(e: ^Event($T), owner: u64) {
-	for i := len(e.subs) - 1; i >= 0; i -= 1 {
-		if e.subs[i].owner == owner && e.subs[i].fn != nil {
-			remove_at(e, i)
-		}
-	}
+    for i := len(e.subs) - 1; i >= 0; i -= 1 {
+        if e.subs[i].owner == owner && e.subs[i].fn != nil {
+            remove_at(e, i)
+        }
+    }
 }
 
 // emit calls every live subscriber, in subscription order, with a typed payload —
 // direct calls, no engine, no boxing. See the header for mid-emit semantics.
 emit :: proc(e: ^Event($T), payload: T) {
-	e.emitting += 1
-	n := len(e.subs) // snapshot: mid-emit subscribes run from the NEXT emit
-	for i in 0 ..< n {
-		s := e.subs[i] // re-read per index — callbacks may grow (realloc) the array
-		if s.fn != nil {
-			s.fn(s.ctx, payload)
-		}
-	}
-	e.emitting -= 1
-	if e.emitting == 0 && e.dirty {
-		compact(e)
-	}
+    e.emitting += 1
+    n := len(e.subs) // snapshot: mid-emit subscribes run from the NEXT emit
+
+    for i in 0 ..< n {
+        s := e.subs[i] // re-read per index — callbacks may grow (realloc) the array
+
+        if s.fn != nil {
+            s.fn(s.ctx, payload)
+        }
+    }
+
+    e.emitting -= 1
+
+    if e.emitting == 0 && e.dirty {
+        compact(e)
+    }
 }
 
 // count reports live (non-tombstoned) subscriptions.
 count :: proc(e: ^Event($T)) -> int {
-	n := 0
-	for s in e.subs {
-		if s.fn != nil {n += 1}
-	}
-	return n
+    n := 0
+
+    for s in e.subs {
+        if s.fn != nil {
+            n += 1
+        }
+    }
+
+    return n
 }
 
 // clear drops every subscription (safe during emit: not-yet-called subscribers of the
 // current emit will not fire).
 clear :: proc(e: ^Event($T)) {
-	if e.emitting > 0 {
-		for &s in e.subs {s.fn = nil}
-		e.dirty = true
-		return
-	}
-	clear_dynamic_array(&e.subs)
+    if e.emitting > 0 {
+        for &s in e.subs {
+            s.fn = nil
+        }
+
+        e.dirty = true
+        return
+    }
+
+    clear_dynamic_array(&e.subs)
 }
 
 // destroy frees the subscriber list. Must not be called from inside one of this
 // event's own callbacks — tear the publisher down from its exit_tree instead.
 destroy :: proc(e: ^Event($T)) {
-	assert(e.emitting == 0, "events.destroy called mid-emit")
-	delete(e.subs)
-	e^ = {}
+    assert(e.emitting == 0, "events.destroy called mid-emit")
+    delete(e.subs)
+    e^ = {}
 }
 
 @(private)
 remove_at :: proc(e: ^Event($T), i: int) {
-	if e.emitting > 0 {
-		e.subs[i].fn = nil // tombstone: the running emit skips it; compacted after
-		e.dirty = true
-		return
-	}
-	ordered_remove(&e.subs, i) // ordered: emit order == subscription order, always
+    if e.emitting > 0 {
+        e.subs[i].fn = nil // tombstone: the running emit skips it; compacted after
+        e.dirty = true
+        return
+    }
+
+    ordered_remove(&e.subs, i) // ordered: emit order == subscription order, always
 }
 
 @(private)
 compact :: proc(e: ^Event($T)) {
-	kept := 0
-	for s in e.subs {
-		if s.fn != nil {
-			e.subs[kept] = s
-			kept += 1
-		}
-	}
-	resize(&e.subs, kept)
-	e.dirty = false
+    kept := 0
+
+    for s in e.subs {
+        if s.fn != nil {
+            e.subs[kept] = s
+            kept += 1
+        }
+    }
+
+    resize(&e.subs, kept)
+    e.dirty = false
 }

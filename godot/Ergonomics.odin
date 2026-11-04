@@ -23,7 +23,7 @@ import gdext "godot:gdext"
 // (gd.get_value, gd.get_setting, …) transfer ownership to the caller — destroy the Variant
 // with this when done with it.
 variant_destroy :: proc "contextless" (v: ^Variant) {
-	gdext.variant_destroy(cast(gdext.VariantPtr)v)
+    gdext.variant_destroy(cast(gdext.VariantPtr)v)
 }
 
 // connect wires `obj`'s `signal` to `obj`'s OWN method `method` — the common self-connection
@@ -35,29 +35,29 @@ variant_destroy :: proc "contextless" (v: ^Variant) {
 // `method` must name a method the engine can dispatch (for an Odin script, a `@(gd_method)`).
 // `signal`/`method` must be string literals (they are interned — see the file header).
 connect :: proc "contextless" (obj: Object, signal: cstring, method: cstring, flags := i64(0)) -> Error {
-	s := new_string_name_cstring(signal, true)
-	m := new_string_name_cstring(method, true)
-	// The Callable is a ptrcall argument — the engine copies it into the connection, so our
-	// temporary still owns a Callable reference and must be released after the call.
-	cb := new_callable_object_string_name(obj, m)
-	defer free_callable(cb)
-	return object_connect(obj, s, cb, Int(flags))
+    s := new_string_name_cstring(signal, true)
+    m := new_string_name_cstring(method, true)
+    // The Callable is a ptrcall argument — the engine copies it into the connection, so our
+    // temporary still owns a Callable reference and must be released after the call.
+    cb := new_callable_object_string_name(obj, m)
+    defer free_callable(cb)
+    return object_connect(obj, s, cb, Int(flags))
 }
 
 // connect_to wires `emitter`'s `signal` to `target`'s method `method` (cross-object).
 // `signal`/`method` must be string literals (they are interned — see the file header).
 connect_to :: proc "contextless" (
-	emitter: Object,
-	signal: cstring,
-	target: Object,
-	method: cstring,
-	flags := i64(0),
+    emitter: Object,
+    signal: cstring,
+    target: Object,
+    method: cstring,
+    flags := i64(0),
 ) -> Error {
-	s := new_string_name_cstring(signal, true)
-	m := new_string_name_cstring(method, true)
-	cb := new_callable_object_string_name(target, m)
-	defer free_callable(cb)
-	return object_connect(emitter, s, cb, Int(flags))
+    s := new_string_name_cstring(signal, true)
+    m := new_string_name_cstring(method, true)
+    cb := new_callable_object_string_name(target, m)
+    defer free_callable(cb)
+    return object_connect(emitter, s, cb, Int(flags))
 }
 
 // connect_to_bound is connect_to with ONE bound integer argument appended to the
@@ -67,28 +67,28 @@ connect_to :: proc "contextless" (
 // trailing parameter). `signal`/`method` must be string literals or otherwise
 // program-lifetime cstrings (interned; see the file header).
 connect_to_bound :: proc "contextless" (
-	emitter: Object,
-	signal: cstring,
-	target: Object,
-	method: cstring,
-	bound: i64,
-	flags := i64(0),
+    emitter: Object,
+    signal: cstring,
+    target: Object,
+    method: cstring,
+    bound: i64,
+    flags := i64(0),
 ) -> Error {
-	s := new_string_name_cstring(signal, true)
-	m := new_string_name_cstring(method, true)
-	cb := new_callable_object_string_name(target, m)
-	defer free_callable(cb)
-	// bindv takes the bound args as an engine Array of Variants; every temporary here
-	// is released once the engine holds its own copy inside the bound Callable.
-	idx := Int(bound)
-	iv := variant_from_int(&idx)
-	defer variant_destroy(&iv)
-	arr := new_array_default()
-	defer free_array(arr)
-	array_push_back(&arr, iv)
-	bcb := callable_bindv(&cb, arr)
-	defer free_callable(bcb)
-	return object_connect(emitter, s, bcb, Int(flags))
+    s := new_string_name_cstring(signal, true)
+    m := new_string_name_cstring(method, true)
+    cb := new_callable_object_string_name(target, m)
+    defer free_callable(cb)
+    // bindv takes the bound args as an engine Array of Variants; every temporary here
+    // is released once the engine holds its own copy inside the bound Callable.
+    idx := Int(bound)
+    iv := variant_from_int(&idx)
+    defer variant_destroy(&iv)
+    arr := new_array_default()
+    defer free_array(arr)
+    array_push_back(&arr, iv)
+    bcb := callable_bindv(&cb, arr)
+    defer free_callable(bcb)
+    return object_connect(emitter, s, bcb, Int(flags))
 }
 
 // callable builds a Callable bound to `obj`'s method `method` (for connect/emit/Timer/etc.).
@@ -96,8 +96,8 @@ connect_to_bound :: proc "contextless" (
 // Callable is OWNED BY THE CALLER: release it with `free_callable` once the engine holds its
 // own copy (e.g. after the object_connect / timer call it was built for).
 callable :: proc "contextless" (obj: Object, method: cstring) -> Callable {
-	m := new_string_name_cstring(method, true)
-	return new_callable_object_string_name(obj, m)
+    m := new_string_name_cstring(method, true)
+    return new_callable_object_string_name(obj, m)
 }
 
 // is_editor reports whether the code is running inside the Godot editor (edit mode), i.e.
@@ -112,7 +112,7 @@ callable :: proc "contextless" (obj: Object, method: cstring) -> Callable {
 // the scene open. Use inside `//gd:tool` scripts; non-tool scripts only run at game time,
 // where this is always false.
 is_editor :: proc "contextless" () -> bool {
-	return bool(engine_is_editor_hint(singleton_engine()))
+    return bool(engine_is_editor_hint(singleton_engine()))
 }
 
 // sname interns a cstring as a Godot StringName — the concise inline form of
@@ -129,7 +129,7 @@ is_editor :: proc "contextless" () -> bool {
 // `fmt.ctprintf`-built or otherwise dynamic cstring; for those use
 // `new_string_name_cstring(name, false)` + `free_string_name`.
 sname :: proc "contextless" (name: cstring) -> String_Name {
-	return new_string_name_cstring(name, true)
+    return new_string_name_cstring(name, true)
 }
 
 // gstr builds a Godot String from a cstring — the inline form of `new_string_cstring`, for the
@@ -138,7 +138,7 @@ sname :: proc "contextless" (name: cstring) -> String_Name {
 //
 //     gd.label_set_text(lbl, gd.gstr("Score: 0"))   // or just gd.set_text(lbl, "Score: 0")
 gstr :: proc "contextless" (s: cstring) -> String {
-	return new_string_cstring(s)
+    return new_string_cstring(s)
 }
 
 // normalized — value-form vector normalization (the generated `vector2_normalized`
@@ -146,14 +146,22 @@ gstr :: proc "contextless" (s: cstring) -> String {
 // plain [2]f32, so this is pure Odin math — no engine round-trip). Returns the zero
 // vector for near-zero input, the branch every hand-rolled copy carried.
 normalized :: proc "contextless" (v: Vector2) -> Vector2 {
-	l := math.sqrt(v.x * v.x + v.y * v.y)
-	if l <= 0.00001 {return Vector2{}}
-	return Vector2{v.x / l, v.y / l}
+    l := math.sqrt(v.x * v.x + v.y * v.y)
+
+    if l <= 0.00001 {
+        return Vector2{}
+    }
+
+    return Vector2{v.x / l, v.y / l}
 }
 
 // normalized3 — the Vector3 form (slopball3d's `_xz` helper generalized).
 normalized3 :: proc "contextless" (v: Vector3) -> Vector3 {
-	l := math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
-	if l <= 0.00001 {return Vector3{}}
-	return Vector3{v.x / l, v.y / l, v.z / l}
+    l := math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+
+    if l <= 0.00001 {
+        return Vector3{}
+    }
+
+    return Vector3{v.x / l, v.y / l, v.z / l}
 }

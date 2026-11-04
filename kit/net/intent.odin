@@ -22,48 +22,49 @@ package kit_net
 Intent_Seq :: distinct u32
 
 Pending :: struct {
-	seq:         Intent_Seq,
-	entity:      Net_Id,
-	cmd:         u16, // command index — with `args`, enough to RE-RUN the prediction
-	args:        []u8, // the command's serialized args (owned copy; may be empty)
-	predicted:   bool, // owns speculative state/revert; false = receipt-only action
-	replayable:  bool, // explicit because a valid no-arg command also has empty bytes
-	revert:      []u8, // fields_capture buffer (shadow layout); freed via pending_dispose
-	issued_tick: u64,
+    seq:         Intent_Seq,
+    entity:      Net_Id,
+    cmd:         u16, // command index — with `args`, enough to RE-RUN the prediction
+    args:        []u8, // the command's serialized args (owned copy; may be empty)
+    predicted:   bool, // owns speculative state/revert; false = receipt-only action
+    replayable:  bool, // explicit because a valid no-arg command also has empty bytes
+    revert:      []u8, // fields_capture buffer (shadow layout); freed via pending_dispose
+    issued_tick: u64,
 }
 
 // Free a Pending's owned buffers — every path that pops an entry (confirm,
 // reject, expire, despawned-entity cleanup) must end here exactly once.
 pending_dispose :: proc(p: Pending) {
-	delete(p.revert)
-	delete(p.args)
+    delete(p.revert)
+    delete(p.args)
 }
 
 Pending_Table :: struct {
-	next_seq: Intent_Seq,
-	entries:  [dynamic]Pending,
+    next_seq: Intent_Seq,
+    entries:  [dynamic]Pending,
 }
 
 pending_table_make :: proc(allocator := context.allocator) -> Pending_Table {
-	return Pending_Table{next_seq = 1, entries = make([dynamic]Pending, 0, 16, allocator)}
+    return Pending_Table{next_seq = 1, entries = make([dynamic]Pending, 0, 16, allocator)}
 }
 
 pending_table_destroy :: proc(t: ^Pending_Table) {
-	for e in t.entries {
-		pending_dispose(e)
-	}
-	delete(t.entries)
-	t.entries = nil
+    for e in t.entries {
+        pending_dispose(e)
+    }
+
+    delete(t.entries)
+    t.entries = nil
 }
 
 // Allocate the next intent sequence and record the pending prediction. `revert`
 // ownership moves into the table. (Bookkeeping-only entry point — no cmd/args,
 // so the prediction is not replayable; the command loop uses pending_record.)
 pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u64) -> Intent_Seq {
-	seq := t.next_seq
-	t.next_seq += 1
-	pending_record(t, seq, entity, 0, nil, revert, now_tick, replayable = false)
-	return seq
+    seq := t.next_seq
+    t.next_seq += 1
+    pending_record(t, seq, entity, 0, nil, revert, now_tick, replayable = false)
+    return seq
 }
 
 // Record a pending prediction under an ALREADY-allocated seq — the command loop
@@ -72,104 +73,100 @@ pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u
 // owned copy of the serialized command args) is what makes the prediction
 // REPLAYABLE when authoritative state lands on top of it mid-flight.
 pending_record :: proc(
-	t: ^Pending_Table,
-	seq: Intent_Seq,
-	entity: Net_Id,
-	cmd: u16,
-	args: []u8,
-	revert: []u8,
-	now_tick: u64,
-	predicted := true,
-	replayable := true,
+    t: ^Pending_Table,
+    seq: Intent_Seq,
+    entity: Net_Id,
+    cmd: u16,
+    args: []u8,
+    revert: []u8,
+    now_tick: u64,
+    predicted := true,
+    replayable := true,
 ) {
-	append(
-		&t.entries,
-		Pending {
-			seq = seq,
-			entity = entity,
-			cmd = cmd,
-			args = args,
-			predicted = predicted,
-			replayable = replayable,
-			revert = revert,
-			issued_tick = now_tick,
-		},
-	)
+    append(
+        &t.entries,
+        Pending {
+            seq = seq,
+            entity = entity,
+            cmd = cmd,
+            args = args,
+            predicted = predicted,
+            replayable = replayable,
+            revert = revert,
+            issued_tick = now_tick,
+        },
+    )
 }
 
 // Track a sent, non-predicted action so confirmation/rejection/timeout remains
 // observable. It owns no gameplay snapshot and never participates in replay or
 // the client write-guard exemption.
-pending_record_receipt :: proc(
-	t: ^Pending_Table,
-	seq: Intent_Seq,
-	entity: Net_Id,
-	cmd: u16,
-	now_tick: u64,
-) {
-	pending_record(t, seq, entity, cmd, nil, nil, now_tick, predicted = false, replayable = false)
+pending_record_receipt :: proc(t: ^Pending_Table, seq: Intent_Seq, entity: Net_Id, cmd: u16, now_tick: u64) {
+    pending_record(t, seq, entity, cmd, nil, nil, now_tick, predicted = false, replayable = false)
 }
 
 @(private = "file")
 pending_take :: proc(t: ^Pending_Table, seq: Intent_Seq) -> (p: Pending, ok: bool) {
-	for e, i in t.entries {
-		if e.seq == seq {
-			p = e
-			ordered_remove(&t.entries, i) // order preserved: reverts must undo newest-first
-			return p, true
-		}
-	}
-	return {}, false
+    for e, i in t.entries {
+        if e.seq == seq {
+            p = e
+            ordered_remove(&t.entries, i) // order preserved: reverts must undo newest-first
+            return p, true
+        }
+    }
+
+    return {}, false
 }
 
 // The host confirmed the prediction: the optimistic state stands. The revert
 // buffer is freed here — nothing to undo, and (crucially) nothing to REPLAY:
 // the caller uses the seq to match/suppress the echoed transition's effects.
 pending_confirm :: proc(t: ^Pending_Table, seq: Intent_Seq) -> bool {
-	p, ok := pending_take(t, seq)
-	if ok {
-		pending_dispose(p)
-	}
-	return ok
+    p, ok := pending_take(t, seq)
+
+    if ok {
+        pending_dispose(p)
+    }
+
+    return ok
 }
 
 // The host rejected the prediction (or it can't apply anymore). Returns the
 // pending record; the CALLER restores the fields (it owns entity resolution)
 // and must pending_dispose(p) afterwards.
 pending_reject :: proc(t: ^Pending_Table, seq: Intent_Seq) -> (p: Pending, ok: bool) {
-	return pending_take(t, seq)
+    return pending_take(t, seq)
 }
 
 // Pop every entry older than `max_age_ticks` into `expired` (appended). The caller
 // reverts each exactly like a rejection — a result that never arrives must behave
 // as a loud "no". Entries are returned oldest-first.
-pending_expire :: proc(
-	t: ^Pending_Table,
-	now_tick: u64,
-	max_age_ticks: u64,
-	expired: ^[dynamic]Pending,
-) {
-	for i := 0; i < len(t.entries); {
-		if now_tick - t.entries[i].issued_tick >= max_age_ticks {
-			append(expired, t.entries[i])
-			ordered_remove(&t.entries, i)
-		} else {
-			i += 1
-		}
-	}
+pending_expire :: proc(t: ^Pending_Table, now_tick: u64, max_age_ticks: u64, expired: ^[dynamic]Pending) {
+    for i := 0; i < len(t.entries); {
+        if now_tick - t.entries[i].issued_tick >= max_age_ticks {
+            append(expired, t.entries[i])
+            ordered_remove(&t.entries, i)
+        } else {
+            i += 1
+        }
+    }
 }
 
 pending_count :: proc(t: ^Pending_Table) -> int {
-	n := 0
-	for &entry in t.entries {
-		if entry.predicted {n += 1}
-	}
-	return n
+    n := 0
+
+    for &entry in t.entries {
+        if entry.predicted {
+            n += 1
+        }
+    }
+
+    return n
 }
 
 // All authority results still owed, including non-predicted actions.
 pending_action_count :: proc(t: ^Pending_Table) -> int {
-	return len(t.entries)
+    return len(t.entries)
 }
 
 // ---------------------------------------------------------------------------
@@ -179,33 +176,44 @@ pending_action_count :: proc(t: ^Pending_Table) -> int {
 // all rejected (a command 64+ behind the newest is a stale retransmit, not new).
 
 Dedup_Window :: struct {
-	latest: Intent_Seq, // highest seq accepted so far (0 = none yet)
-	window: u64, // bit i = (latest - i) was seen, bit 0 = latest itself
+    latest: Intent_Seq, // highest seq accepted so far (0 = none yet)
+    window: u64, // bit i = (latest - i) was seen, bit 0 = latest itself
 }
 
 dedup_accept :: proc(d: ^Dedup_Window, seq: Intent_Seq) -> bool {
-	if seq == 0 {
-		return false // 0 is never a valid sequence (tables start at 1)
-	}
-	if d.latest == 0 || seq > d.latest {
-		shift := u64(seq - d.latest) // d.latest==0 → large shift → window clears, correct
-		if d.latest == 0 {shift = 64}
-		if shift >= 64 {
-			d.window = 1
-		} else {
-			d.window = (d.window << shift) | 1
-		}
-		d.latest = seq
-		return true
-	}
-	back := u64(d.latest - seq)
-	if back >= 64 {
-		return false // older than the window: stale duplicate
-	}
-	bit := u64(1) << back
-	if d.window & bit != 0 {
-		return false // already executed
-	}
-	d.window |= bit
-	return true // late-but-new arrival within the window
+    if seq == 0 {
+        return false // 0 is never a valid sequence (tables start at 1)
+    }
+
+    if d.latest == 0 || seq > d.latest {
+        shift := u64(seq - d.latest) // d.latest==0 → large shift → window clears, correct
+
+        if d.latest == 0 {
+            shift = 64
+        }
+
+        if shift >= 64 {
+            d.window = 1
+        } else {
+            d.window = (d.window << shift) | 1
+        }
+
+        d.latest = seq
+        return true
+    }
+
+    back := u64(d.latest - seq)
+
+    if back >= 64 {
+        return false // older than the window: stale duplicate
+    }
+
+    bit := u64(1) << back
+
+    if d.window & bit != 0 {
+        return false // already executed
+    }
+
+    d.window |= bit
+    return true // late-but-new arrival within the window
 }

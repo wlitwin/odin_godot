@@ -27,14 +27,24 @@ fail :: proc(msg: string) {
 // both present so the boundary check is genuinely exercised.
 make_set :: proc() -> map[string]bool {
     m := make(map[string]bool)
+
     for c in ([]string{"node", "node2d", "node3d", "sprite2d", "control", "color_picker", "object", "ref_counted"}) {
         m[c] = true
     }
+
     return m
 }
 
-expect :: proc(symbol: string, set: map[string]bool, want_class: string, want_member: string, want_is_class: bool, want_ok: bool) {
+expect :: proc(
+    symbol: string,
+    set: map[string]bool,
+    want_class: string,
+    want_member: string,
+    want_is_class: bool,
+    want_ok: bool,
+) {
     cls, member, is_class, ok := lookup.resolve_symbol(symbol, set)
+
     if ok != want_ok || cls != want_class || member != want_member || is_class != want_is_class {
         fail(
             fmt.tprintf(
@@ -51,6 +61,7 @@ expect :: proc(symbol: string, set: map[string]bool, want_class: string, want_me
             ),
         )
     }
+
     fmt.printf("  ok: %q -> class=%q member=%q is_class=%v ok=%v\n", symbol, cls, member, is_class, ok)
 }
 

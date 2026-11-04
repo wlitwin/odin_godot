@@ -13,24 +13,28 @@ import gd "godot:godot"
 import "core:fmt"
 
 Hud :: struct {
-	owner: gd.Label,
-	shown: gd.Int, // last score we rendered (avoids rebuilding the string every frame)
+    owner: gd.Label,
+    shown: gd.Int, // last score we rendered (avoids rebuilding the string every frame)
 }
 
 hud_ready :: proc(self: ^Hud) {
-	self.shown = -1 // force a first paint
-	hud_refresh(self)
+    self.shown = -1 // force a first paint
+    hud_refresh(self)
 }
 
 hud_process :: proc(self: ^Hud, delta: f64) {
-	hud_refresh(self)
+    hud_refresh(self)
 }
 
 // Plain helper (not a lifecycle name, not @(gd_method)) -> scriptgen leaves it alone.
 @(private = "file")
 hud_refresh :: proc(self: ^Hud) {
-	s := game_state_get()
-	if s == self.shown {return}
-	self.shown = s
-	gd.set_text(self.owner, fmt.ctprintf("Score: %d", s))
+    s := game_state_get()
+
+    if s == self.shown {
+        return
+    }
+
+    self.shown = s
+    gd.set_text(self.owner, fmt.ctprintf("Score: %d", s))
 }

@@ -17,15 +17,15 @@ package rpc_scripts
 import gd "godot:godot"
 
 NetNode :: struct {
-	owner:      gd.Node,
-	ping_count: gd.Int `gd:"export"`,
-	last_value: gd.Int `gd:"export"`,
+    owner:      gd.Node,
+    ping_count: gd.Int `gd:"export"`,
+    last_value: gd.Int `gd:"export"`,
 }
 
 // Bare `@(gd_rpc)`: all defaults — authority mode, reliable transfer, NO call_local, channel 0.
 @(gd_method, gd_rpc)
 net_node_ping :: proc(self: ^NetNode) {
-	self.ping_count += 1
+    self.ping_count += 1
 }
 
 // Explicit config: any_peer mode, unreliable transfer, call_local ON, channel 2. Because
@@ -33,6 +33,6 @@ net_node_ping :: proc(self: ^NetNode) {
 // single-process test can observe `last_value` change.
 @(gd_method, gd_rpc = "any_peer,unreliable,call_local,channel=2")
 net_node_set_value :: proc(self: ^NetNode, value: gd.Int) {
-	self.last_value = value
-	self.ping_count += 1
+    self.last_value = value
+    self.ping_count += 1
 }

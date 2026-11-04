@@ -35,37 +35,38 @@ package play_sim
 // ticks) so the def table stays the one vocabulary across lanes.
 
 Cool :: struct {
-	left: u16 `gd:"predict"`, // ticks until due — the predicted countdown
+    left: u16 `gd:"predict"`, // ticks until due — the predicted countdown
 }
 
 // The block tick: count down, never below zero. Inputless by contract —
 // intent (the arming) flows through the verbs the wielder's tick calls.
 @(gd_tick)
 cool_tick :: proc(c: ^Cool) {
-	if c.left > 0 {
-		c.left -= 1
-	}
+    if c.left > 0 {
+        c.left -= 1
+    }
 }
 
 // due reports whether the countdown has run out. Cheap and pure — safe in a
 // compound guard; pair with `arm` when the interval depends on state you
 // read after the check.
 due :: proc(c: ^Cool) -> bool {
-	return c.left == 0
+    return c.left == 0
 }
 
 // arm starts a countdown of `ticks` (a cooldown, a wind-up, a kickoff hold).
 arm :: proc(c: ^Cool, ticks: u16) {
-	c.left = ticks
+    c.left = ticks
 }
 
 // ready is the recurring-cooldown one-liner: if due, re-arm to `interval`
 // and return true (fire this tick); otherwise false. Short-circuits cleanly
 // as a guard's LAST clause — it re-arms only when everything before it held.
 ready :: proc(c: ^Cool, interval: u16) -> bool {
-	if c.left > 0 {
-		return false
-	}
-	c.left = interval
-	return true
+    if c.left > 0 {
+        return false
+    }
+
+    c.left = interval
+    return true
 }

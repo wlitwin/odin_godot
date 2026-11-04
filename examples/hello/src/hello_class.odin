@@ -37,11 +37,7 @@ set_value :: proc "contextless" (self: ^OdinHello, value: godot.Int) {
 
 // ---- Signal emission via the Object::emit_signal method bind ----
 emit_value_changed :: proc "contextless" (self: ^OdinHello, value: godot.Int) {
-    object_emit_signal := gdext.classdb_get_method_bind(
-        godot.object_name_ref(),
-        &emit_signal_name,
-        4047867050,
-    )
+    object_emit_signal := gdext.classdb_get_method_bind(godot.object_name_ref(), &emit_signal_name, 4047867050)
 
     value := value
     signal_name_argument := godot.variant_from(&value_changed_name)
@@ -91,12 +87,12 @@ hello_class_register :: proc() {
     gdext.string_name_new_with_latin1_chars(&emit_signal_name, "emit_signal", true)
 
     class_info := gdext.ExtensionClassCreationInfo2 {
-        is_virtual                  = false,
-        is_abstract                 = false,
-        is_exposed                  = true,
-        create_instance_func        = create_instance,
-        free_instance_func          = free_instance,
-        class_userdata              = nil,
+        is_virtual           = false,
+        is_abstract          = false,
+        is_exposed           = true,
+        create_instance_func = create_instance,
+        free_instance_func   = free_instance,
+        class_userdata       = nil,
     }
 
     gdext.classdb_register_extension_class2(

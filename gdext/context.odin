@@ -19,9 +19,11 @@ godot_allocator_proc :: proc(
     switch mode {
     case .Alloc, .Alloc_Non_Zeroed:
         ptr := mem_alloc(cast(c.size_t)size)
+
         if ptr == nil {
             return nil, .Out_Of_Memory
         }
+
         // Godot's mem_alloc does NOT zero. `.Alloc` is contractually required to
         // return zeroed memory — Odin's growing Arena reads a fresh block's header
         // (Memory_Block.used/.prev) expecting zero, and `assert(block.used == 0)`
@@ -30,6 +32,7 @@ godot_allocator_proc :: proc(
         if mode == .Alloc {
             mem.zero(ptr, size)
         }
+
         return mem.byte_slice(ptr, size), nil
 
     case .Free:
@@ -40,32 +43,42 @@ godot_allocator_proc :: proc(
 
     case .Resize, .Resize_Non_Zeroed:
         ptr: rawptr
+
         if old_memory == nil {
             ptr = mem_alloc(cast(c.size_t)size)
+
             if ptr == nil {
                 return nil, .Out_Of_Memory
             }
+
             if mode == .Resize {
                 mem.zero(ptr, size)
             }
+
             return mem.byte_slice(ptr, size), nil
         }
+
         ptr = mem_realloc(old_memory, cast(c.size_t)size)
+
         if ptr == nil {
             return nil, .Out_Of_Memory
         }
+
         // `.Resize` zeroes only the newly grown tail (bytes past old_size); the
         // preserved prefix keeps its contents. `.Resize_Non_Zeroed` zeroes nothing.
         if mode == .Resize && size > old_size {
             mem.zero(rawptr(uintptr(ptr) + uintptr(old_size)), size - old_size)
         }
+
         return mem.byte_slice(ptr, size), nil
 
     case .Query_Features:
         set := (^mem.Allocator_Mode_Set)(old_memory)
+
         if set != nil {
             set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Query_Features}
         }
+
         return nil, nil
 
     case .Query_Info:

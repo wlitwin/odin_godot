@@ -17,32 +17,38 @@ import gd "godot:godot"
 import rt "godot:runtime"
 
 PowerupManager :: struct {
-	owner: gd.Node2d,
-
-	pickup_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
-	// The drop table: a TYPED-ARRAY export (`array=`) — one Inspector-editable list of
-	// PowerupConfig .tres slots, assigned in game.tscn. (Element type is Resource: the
-	// engine validates elements against native classes; the pickup reads each entry
-	// TYPED via rt.script_of.)
-	drop_table: gd.Array `gd:"export,array=Resource"`,
-
-	next: int,
+    owner:        gd.Node2d,
+    pickup_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
+    // The drop table: a TYPED-ARRAY export (`array=`) — one Inspector-editable list of
+    // PowerupConfig .tres slots, assigned in game.tscn. (Element type is Resource: the
+    // engine validates elements against native classes; the pickup reads each entry
+    // TYPED via rt.script_of.)
+    drop_table:   gd.Array `gd:"export,array=Resource"`,
+    next:         int,
 }
 
 @(gd_method)
 powerup_manager_spawn_drop :: proc(self: ^PowerupManager, pos: gd.Vector2) {
-	n := int(gd.array_size(&self.drop_table))
-	if n == 0 {return}
-	// Typed spawn, deferred: spawn_drop arrives mid-physics, so parenting waits for
-	// idle time — which also makes the pokes below visible to the pickup's _ready.
-	p := rt.spawn_as_deferred(self.owner, cast(gd.Packed_Scene)self.pickup_scene, Pickup)
-	if p == nil {return}
-	gd.node2d_set_position(p.owner, pos)
+    n := int(gd.array_size(&self.drop_table))
 
-	// Hand the pickup its config (round-robin through the drop table) — a direct typed
-	// field poke: manager and pickup share this dll, no engine call needed.
-	cv := gd.array_get(&self.drop_table, gd.Int(self.next % n))
-	defer gd.variant_destroy(&cv)
-	self.next += 1
-	p.config = cast(^gd.Resource)gd.variant_to_object(&cv)
+    if n == 0 {
+        return
+    }
+
+    // Typed spawn, deferred: spawn_drop arrives mid-physics, so parenting waits for
+    // idle time — which also makes the pokes below visible to the pickup's _ready.
+    p := rt.spawn_as_deferred(self.owner, cast(gd.Packed_Scene)self.pickup_scene, Pickup)
+
+    if p == nil {
+        return
+    }
+
+    gd.node2d_set_position(p.owner, pos)
+
+    // Hand the pickup its config (round-robin through the drop table) — a direct typed
+    // field poke: manager and pickup share this dll, no engine call needed.
+    cv := gd.array_get(&self.drop_table, gd.Int(self.next % n))
+    defer gd.variant_destroy(&cv)
+    self.next += 1
+    p.config = cast(^gd.Resource)gd.variant_to_object(&cv)
 }

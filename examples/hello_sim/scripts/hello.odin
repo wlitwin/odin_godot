@@ -31,69 +31,76 @@ import ksim "godot:kit/sim"
 DEFAULT_PORT :: 4243
 
 HelloSim :: struct {
-	owner:   gd.Node2d,
-	ses:     ksess.Session,
-	comms:   kcomms.Comms,
-	boot:    kboot.Boot,
-	lane:    ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
-
-	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
-
-	me: ^Player
+    owner:        gd.Node2d,
+    ses:          ksess.Session,
+    comms:        kcomms.Comms,
+    boot:         kboot.Boot,
+    lane:         ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
+    player_scene: ^gd.Resource `gd:"entity=Player:1"`,
+    me:           ^Player,
 }
 
 now_s :: knet.now_s
 
 hello_sim_ready :: proc(self: ^HelloSim) {
-	role := gd.env_string("HELLO_ROLE", "")
-	profile :=
-	kboot.Network_Profile.Listen_Server_Action
-	if role == "serve" {
-		// The same game binary can host from a player's machine or run as an
-		// avatarless authority. The dedicated profile tightens admission and
-		// history bounds; boot_serve below is what supplies the trust boundary.
-		profile = .Dedicated_Competitive
-	}
-	// One generated attach owns the routine stack: boot + entity factory +
-	// simulation lane. The named profile installs a coherent session+lane pair,
-	// and scriptgen verifies the dedicated form has the validator below.
-	hello_sim_net_attach(self, kboot.Options{
-		title = "HELLO, SERVER AUTHORITY",
-		status = "Host a room, or join one at localhost",
-		legend = "Arrows move · Enter chat",
-		env = "HELLO",
-		min_players = 1,
-		// methods omitted = kboot.STANDARD_METHODS — the eight names above
-		// were the list every game wrote anyway
-	},
-	kboot.network_profile(profile))
+    role := gd.env_string("HELLO_ROLE", "")
+    profile := kboot.Network_Profile.Listen_Server_Action
 
-	switch role {
-	case "host":
-		hello_sim_on_host(self)
-	case "join":
-		hello_sim_on_join(self)
-	case "serve":
-		hello_sim_on_serve(self)
-	}
+    if role == "serve" {
+        // The same game binary can host from a player's machine or run as an
+        // avatarless authority. The dedicated profile tightens admission and
+        // history bounds; boot_serve below is what supplies the trust boundary.
+        profile = .Dedicated_Competitive
+    }
+
+    // One generated attach owns the routine stack: boot + entity factory +
+    // simulation lane. The named profile installs a coherent session+lane pair,
+    // and scriptgen verifies the dedicated form has the validator below.
+    hello_sim_net_attach(
+        self,
+        kboot.Options {
+            title       = "HELLO, SERVER AUTHORITY",
+            status      = "Host a room, or join one at localhost",
+            legend      = "Arrows move · Enter chat",
+            env         = "HELLO",
+            min_players = 1,
+            // methods omitted = kboot.STANDARD_METHODS — the eight names above
+            // were the list every game wrote anyway
+        },
+        kboot.network_profile(profile),
+    )
+
+    switch role {
+    case "host":
+        hello_sim_on_host(self)
+    case "join":
+        hello_sim_on_join(self)
+    case "serve":
+        hello_sim_on_serve(self)
+    }
 }
 
 hello_sim_exit_tree :: proc(self: ^HelloSim) {
-	hello_sim_net_detach(self)
-	ksess.session_destroy(&self.ses)
+    hello_sim_net_detach(self)
+    ksess.session_destroy(&self.ses)
 }
 
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
-	was := kboot.boot_phase(&self.boot)
-	if was == .Menu {return}
-	// The coop hello drove `me` right here, at frame rate. Promoted, the
-	// device read lives in the @(gd_sample) below and the movement in
-	// player_tick — the frame loop only pumps. Declared event halves are
-	// forwarded inside this generated call too.
- _ = hello_sim_net_frame(self, delta, now_s())
-	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
-		gd.print_str("HELLO_STARTED")
-	}
+    was := kboot.boot_phase(&self.boot)
+
+    if was == .Menu {
+        return
+    }
+
+    // The coop hello drove `me` right here, at frame rate. Promoted, the
+    // device read lives in the @(gd_sample) below and the movement in
+    // player_tick — the frame loop only pumps. Declared event halves are
+    // forwarded inside this generated call too.
+    _ = hello_sim_net_frame(self, delta, now_s())
+
+    if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
+        gd.print_str("HELLO_STARTED")
+    }
 }
 
 // The one place that still touches hardware (checklist step 4): fill my
@@ -101,12 +108,24 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 // screen predicts it this frame.
 @(gd_sample)
 hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
-	_ = tick
-	input^ = {}
-	if gd.is_action_pressed("ui_right") {input.move[0] += 1}
-	if gd.is_action_pressed("ui_left") {input.move[0] -= 1}
-	if gd.is_action_pressed("ui_down") {input.move[1] += 1}
-	if gd.is_action_pressed("ui_up") {input.move[1] -= 1}
+    _ = tick
+    input^ = {}
+
+    if gd.is_action_pressed("ui_right") {
+        input.move[0] += 1
+    }
+
+    if gd.is_action_pressed("ui_left") {
+        input.move[0] -= 1
+    }
+
+    if gd.is_action_pressed("ui_down") {
+        input.move[1] += 1
+    }
+
+    if gd.is_action_pressed("ui_up") {
+        input.move[1] -= 1
+    }
 }
 
 // ---- the doors (hello_net's plain host/join pair + the dedicated `serve`; ---
@@ -114,71 +133,110 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 
 @(gd_method)
 hello_sim_on_host :: proc(self: ^HelloSim) {
-	if kboot.boot_phase(&self.boot) != .Menu {return}
-	if !kboot.boot_host(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "player")) {return}
-	hello_sim_on_start(self)
+    if kboot.boot_phase(&self.boot) != .Menu {
+        return
+    }
+
+    if !kboot.boot_host(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "player")) {
+        return
+    }
+
+    hello_sim_on_start(self)
 }
 
 @(gd_method)
 hello_sim_on_join :: proc(self: ^HelloSim) {
-	if kboot.boot_phase(&self.boot) != .Menu {return}
-	kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
+    if kboot.boot_phase(&self.boot) != .Menu {
+        return
+    }
+
+    kboot.boot_join(
+        &self.boot,
+        "127.0.0.1",
+        kboot.boot_port(&self.boot, DEFAULT_PORT),
+        kboot.boot_token(&self.boot),
+        kboot.boot_name(&self.boot, "player"),
+    )
 }
 
 // The dedicated authority: referees and simulates, fields no square, and
 // never hands anyone the succession torch. This is "running the authority"
 // for a competitive game — a headless process on a machine you trust.
 hello_sim_on_serve :: proc(self: ^HelloSim) {
-	if kboot.boot_phase(&self.boot) != .Menu {return}
-	if !kboot.boot_serve(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "referee")) {return}
-	hello_sim_on_start(self)
+    if kboot.boot_phase(&self.boot) != .Menu {
+        return
+    }
+
+    if !kboot.boot_serve(
+        &self.boot,
+        kboot.boot_port(&self.boot, DEFAULT_PORT),
+        kboot.boot_name(&self.boot, "referee"),
+    ) {
+        return
+    }
+
+    hello_sim_on_start(self)
 }
 
 @(gd_method)
 hello_sim_on_start :: proc(self: ^HelloSim) {
-	if !self.ses.is_host || self.ses.replicating {return}
-	for _, p in self.ses.players {
-		if p.connected && !p.dedicated {spawn_player(self, p.id)}
-	}
-	ksess.session_start_replicating(&self.ses)
+    if !self.ses.is_host || self.ses.replicating {
+        return
+    }
+
+    for _, p in self.ses.players {
+        if p.connected && !p.dedicated {
+            spawn_player(self, p.id)
+        }
+    }
+
+    ksess.session_start_replicating(&self.ses)
 }
 
 @(gd_method)
 hello_sim_on_chat :: proc(self: ^HelloSim, text: gd.String) {
-	if kboot.boot_phase(&self.boot) != .Menu {kboot.boot_chat(&self.boot, text)}
+    if kboot.boot_phase(&self.boot) != .Menu {
+        kboot.boot_chat(&self.boot, text)
+    }
 }
 
 spawn_player :: proc(self: ^HelloSim, pid: knet.Player_Id) {
-	if _, has := player_owned_by(&self.boot, pid); has {return}
-	p, id := player_spawn(&self.boot, owner = pid)
-	p.pid = u8(pid)
-	p.x = 120 + f32(u64(pid) % 8) * 56
-	p.y = 180
-	kboot.boot_spawn_send(&self.boot, id)
+    if _, has := player_owned_by(&self.boot, pid); has {
+        return
+    }
+
+    p, id := player_spawn(&self.boot, owner = pid)
+    p.pid = u8(pid)
+    p.x = 120 + f32(u64(pid) % 8) * 56
+    p.y = 180
+    kboot.boot_spawn_send(&self.boot, id)
 }
 
 // ---- session event halves (the hello_net pattern) ---------------------------
 
 @(gd_half)
 hello_sim_welcomed :: proc(self: ^HelloSim, me: knet.Player_Id) {
-	gd.print_str(fmt.tprintf("HELLO_SEATED me=%d", u64(me)))
+    gd.print_str(fmt.tprintf("HELLO_SEATED me=%d", u64(me)))
 }
 
 @(gd_half)
 hello_sim_player_joined_then :: proc(self: ^HelloSim, id: knet.Player_Id, rejoin: bool) {
-	if self.ses.replicating && !rejoin {
-		spawn_player(self, id)
-	}
+    if self.ses.replicating && !rejoin {
+        spawn_player(self, id)
+    }
 }
 
 @(gd_half)
 hello_sim_entity_spawned :: proc(self: ^HelloSim, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type; _ = owner
-	// BORN = the fields are set: the node's FIRST placement is here — the
-	// entity's _process carries it from the next frame on (Godot runs no
-	// _process on a node added mid-_process, which every host-step spawn is).
-	if p, ok := player_of(&self.boot, id); ok {
-		gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
-	}
-	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+    _ = type
+    _ = owner
+
+    // BORN = the fields are set: the node's FIRST placement is here — the
+    // entity's _process carries it from the next frame on (Godot runs no
+    // _process on a node added mid-_process, which every host-step spawn is).
+    if p, ok := player_of(&self.boot, id); ok {
+        gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
+    }
+
+    gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

@@ -41,87 +41,87 @@ import "core:time"
 
 @(private)
 Reload_Probe_Notice :: enum {
-	None,
-	Orphaned_Generated_Code,
-	Script_Set_Changed,
+    None,
+    Orphaned_Generated_Code,
+    Script_Set_Changed,
 }
 
 @(private)
 Reload_State :: struct {
-	mutex:          sync.Mutex,
+    mutex:              sync.Mutex,
 
-	// A worker owns the serialized scan/build queue. Kept separate from build_running so
-	// a cheap periodic probe does not flash the editor's "building" status.
-	worker_running: bool,
-	// The worker is actually compiling/linking (not merely scanning fingerprints).
-	build_running:  bool,
-	// A save arrived while a build ran: rebuild once more when the current one finishes.
-	// Only the LATEST pending request is kept (coalesced). Stored as rawptr because the
-	// job points back to Reload_State; build_worker_entry casts it to ^Reload_Job.
-	build_pending:  bool,
-	pending_job:    rawptr, // core-allocator-owned ^Reload_Job
+    // A worker owns the serialized scan/build queue. Kept separate from build_running so
+    // a cheap periodic probe does not flash the editor's "building" status.
+    worker_running:     bool,
+    // The worker is actually compiling/linking (not merely scanning fingerprints).
+    build_running:      bool,
+    // A save arrived while a build ran: rebuild once more when the current one finishes.
+    // Only the LATEST pending request is kept (coalesced). Stored as rawptr because the
+    // job points back to Reload_State; build_worker_entry casts it to ^Reload_Job.
+    build_pending:      bool,
+    pending_job:        rawptr, // core-allocator-owned ^Reload_Job
 
-	// A build COMPLETED successfully: the main thread must swap the dll + refresh.
-	swap_ready:     bool,
-	// A build FAILED: the main thread must surface the error in the editor Output (the worker
-	// thread cannot call into Godot). Read + cleared by reload_pump_main_thread.
-	build_failed:   bool,
-	// File the build's combined stdout+stderr is captured to (so the COMPILER ERROR can be
-	// shown in Godot's Output, not just the terminal). Constant per project; set once.
-	log_path:       string,
-	// On failure, the worker reads `log_path` into here; the pump prints it (filtered) + frees.
-	build_output:   string,
-	// Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
-	last_build_ms:  f64,
-	// PERSISTENT outcome of the most recent finished build (unlike build_failed, which is a
-	// one-shot the pump consumes). Read by the toolbar status widget and the Play gate
-	// (core/build_status.odin): a red badge must stay red, and Play must stay blocked,
-	// until a build actually SUCCEEDS — not just until the failure has been printed once.
-	last_build_failed: bool,
-	// Worker-to-main one-shots. Scanning/hashing never calls Godot; the frame pump turns
-	// these into editor Output messages.
-	build_started:  bool,
-	probe_notice:   Reload_Probe_Notice,
+    // A build COMPLETED successfully: the main thread must swap the dll + refresh.
+    swap_ready:         bool,
+    // A build FAILED: the main thread must surface the error in the editor Output (the worker
+    // thread cannot call into Godot). Read + cleared by reload_pump_main_thread.
+    build_failed:       bool,
+    // File the build's combined stdout+stderr is captured to (so the COMPILER ERROR can be
+    // shown in Godot's Output, not just the terminal). Constant per project; set once.
+    log_path:           string,
+    // On failure, the worker reads `log_path` into here; the pump prints it (filtered) + frees.
+    build_output:       string,
+    // Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
+    last_build_ms:      f64,
+    // PERSISTENT outcome of the most recent finished build (unlike build_failed, which is a
+    // one-shot the pump consumes). Read by the toolbar status widget and the Play gate
+    // (core/build_status.odin): a red badge must stay red, and Play must stay blocked,
+    // until a build actually SUCCEEDS — not just until the failure has been printed once.
+    last_build_failed:  bool,
+    // Worker-to-main one-shots. Scanning/hashing never calls Godot; the frame pump turns
+    // these into editor Output messages.
+    build_started:      bool,
+    probe_notice:       Reload_Probe_Notice,
 
-	// PER-MODULE content hashes of the authored sources the LAST kicked build was for,
-	// keyed by module name ("" == the main scripts dir; "<name>" == res://modules/<name>).
-	// Guards against a rebuild LOOP: the editor's filesystem watcher re-triggers `_reload`
-	// when the build writes the `*.gen.odin` artifacts, but those don't change the
-	// authored-source hash, so an unchanged module is skipped — which is ALSO the payoff:
-	// a save in one module rebuilds only that module's dll. Missing key == never built.
-	last_hashes:    map[string]u64,
-	// Modules the next successful swap must hot-reload (heap-owned names, deduped).
-	// Appended by reload_request for each module it kicks a rebuild of; drained by the
-	// pump once swap_ready fires; cleared on build failure (never swap an unbuilt dll).
-	swap_modules:   [dynamic]string,
+    // PER-MODULE content hashes of the authored sources the LAST kicked build was for,
+    // keyed by module name ("" == the main scripts dir; "<name>" == res://modules/<name>).
+    // Guards against a rebuild LOOP: the editor's filesystem watcher re-triggers `_reload`
+    // when the build writes the `*.gen.odin` artifacts, but those don't change the
+    // authored-source hash, so an unchanged module is skipped — which is ALSO the payoff:
+    // a save in one module rebuilds only that module's dll. Missing key == never built.
+    last_hashes:        map[string]u64,
+    // Modules the next successful swap must hot-reload (heap-owned names, deduped).
+    // Appended by reload_request for each module it kicks a rebuild of; drained by the
+    // pump once swap_ready fires; cleared on build failure (never swap an unbuilt dll).
+    swap_modules:       [dynamic]string,
 
-	// One-time "odin not found" warning guard (don't spam on every save).
-	warned_no_odin: bool,
+    // One-time "odin not found" warning guard (don't spam on every save).
+    warned_no_odin:     bool,
 
-	// THE DELETION PROBE (worker-owned, always touched under mutex): a names-only
-	// fingerprint of the script tree,
-	// re-taken every ~2s. Saves already trigger rebuilds; DELETIONS never
-	// did — a script removed in the dock (or by git) left its generated code
-	// behind, breaking the next build invisibly (the dock hides gen files,
-	// and the staleness guard still hashes the vanished source). A changed
-	// name SET fires reload_request; the rebuild's regeneration does the rest.
-	// Catches creations from outside the editor as a bonus.
-	probe_hash: u64,
-	probe_initialized: bool,
-	probe_next_ns: i64,
-	reconcile_next_ns: i64,
-	// The edge trigger above can MISS a pulse: a source created and deleted
-	// inside one probe window samples as "no change" while the create already
-	// materialized its generated code (the editor's own import can kick that
-	// build). So the probe is also LEVEL-triggered on the inconsistent state
-	// itself — a `// ==== <src>` section in odin_godot_scripts.gen.odin whose
-	// source is gone, or a pre-consolidation `<name>.gen.odin` without its
-	// sibling. This remembers the orphan set already kicked, so a sweep that
-	// cannot succeed (read-only tree, ...) fires once instead of every two seconds.
-	probe_orphans: u64,
-	// True only while the first worker probe is establishing content-hash baselines.
-	// A source save racing that scan is forced so the baseline cannot swallow the edit.
-	baseline_in_flight: bool,
+    // THE DELETION PROBE (worker-owned, always touched under mutex): a names-only
+    // fingerprint of the script tree,
+    // re-taken every ~2s. Saves already trigger rebuilds; DELETIONS never
+    // did — a script removed in the dock (or by git) left its generated code
+    // behind, breaking the next build invisibly (the dock hides gen files,
+    // and the staleness guard still hashes the vanished source). A changed
+    // name SET fires reload_request; the rebuild's regeneration does the rest.
+    // Catches creations from outside the editor as a bonus.
+    probe_hash:         u64,
+    probe_initialized:  bool,
+    probe_next_ns:      i64,
+    reconcile_next_ns:  i64,
+    // The edge trigger above can MISS a pulse: a source created and deleted
+    // inside one probe window samples as "no change" while the create already
+    // materialized its generated code (the editor's own import can kick that
+    // build). So the probe is also LEVEL-triggered on the inconsistent state
+    // itself — a `// ==== <src>` section in odin_godot_scripts.gen.odin whose
+    // source is gone, or a pre-consolidation `<name>.gen.odin` without its
+    // sibling. This remembers the orphan set already kicked, so a sweep that
+    // cannot succeed (read-only tree, ...) fires once instead of every two seconds.
+    probe_orphans:      u64,
+    // True only while the first worker probe is establishing content-hash baselines.
+    // A source save racing that scan is forced so the baseline cannot swallow the edit.
+    baseline_in_flight: bool,
 }
 
 @(private)
@@ -129,80 +129,94 @@ g_reload: Reload_State
 
 @(private)
 Reload_Job :: struct {
-	state:    ^Reload_State,
-	odin_bin: string, // all strings are core-allocator-owned; the worker frees them
-	root:     string,
-	proj:     string,
-	scripts:  string,
-	log_path: string,
-	force:    bool,
-	probe:    bool,
-	reconcile: bool,
-	baseline_probe: bool,
-	// The main module is stored as "". Multiple names arise when save requests
-	// coalesce while another build is running.
-	scan_all:       bool,
-	target_modules: [dynamic]string,
+    state:          ^Reload_State,
+    odin_bin:       string, // all strings are core-allocator-owned; the worker frees them
+    root:           string,
+    proj:           string,
+    scripts:        string,
+    log_path:       string,
+    force:          bool,
+    probe:          bool,
+    reconcile:      bool,
+    baseline_probe: bool,
+    // The main module is stored as "". Multiple names arise when save requests
+    // coalesce while another build is running.
+    scan_all:       bool,
+    target_modules: [dynamic]string,
 }
 
 @(private = "file")
 Reload_Candidate :: struct {
-	name: string, // "" == the main module
-	dir:  string,
-	hash: u64,
+    name: string, // "" == the main module
+    dir:  string,
+    hash: u64,
 }
 
 @(private = "file")
 reload_job_add_target :: proc(job: ^Reload_Job, module: string) {
-	if job == nil || job.scan_all {return}
-	for existing in job.target_modules {
-		if existing == module {return}
-	}
-	append(&job.target_modules, strings.clone(module, core_allocator()))
+    if job == nil || job.scan_all {
+        return
+    }
+
+    for existing in job.target_modules {
+        if existing == module {
+            return
+        }
+    }
+
+    append(&job.target_modules, strings.clone(module, core_allocator()))
 }
 
 @(private = "file")
 reload_job_set_scan_all :: proc(job: ^Reload_Job) {
-	if job == nil || job.scan_all {return}
-	for module in job.target_modules {
-		delete(module, core_allocator())
-	}
-	delete(job.target_modules)
-	job.target_modules = nil
-	job.scan_all = true
+    if job == nil || job.scan_all {
+        return
+    }
+
+    for module in job.target_modules {
+        delete(module, core_allocator())
+    }
+
+    delete(job.target_modules)
+    job.target_modules = nil
+    job.scan_all = true
 }
 
 @(private = "file")
 reload_job_merge_scope :: proc(job, old: ^Reload_Job) {
-	if job == nil || old == nil {return}
-	if job.scan_all || old.scan_all {
-		reload_job_set_scan_all(job)
-		return
-	}
-	for module in old.target_modules {
-		reload_job_add_target(job, module)
-	}
+    if job == nil || old == nil {
+        return
+    }
+
+    if job.scan_all || old.scan_all {
+        reload_job_set_scan_all(job)
+        return
+    }
+
+    for module in old.target_modules {
+        reload_job_add_target(job, module)
+    }
 }
 
 // Turn an editor resource path into a build scope without touching the filesystem.
 // Shared code can affect every DLL; a normal save maps directly to one module root.
 @(private = "file")
 reload_job_scope_source :: proc(job: ^Reload_Job, source_path: string) {
-	if source_path == "" || source_path == "res://shared" ||
-	   strings.has_prefix(source_path, "res://shared/") {
-		reload_job_set_scan_all(job)
-		return
-	}
-	reload_job_add_target(job, scripts_module_for_res_path(source_path))
+    if source_path == "" || source_path == "res://shared" || strings.has_prefix(source_path, "res://shared/") {
+        reload_job_set_scan_all(job)
+        return
+    }
+
+    reload_job_add_target(job, scripts_module_for_res_path(source_path))
 }
 
 // Absolute filesystem path of `res://` for the open project (globalized, trailing-/ trimmed).
 @(private = "file")
 reload_project_dir :: proc(allocator := context.allocator) -> string {
-	gres := godot.new_string_odin("res://")
-	global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
-	s := string_to_odin(global, allocator)
-	return strings.trim_suffix(s, "/")
+    gres := godot.new_string_odin("res://")
+    global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+    s := string_to_odin(global, allocator)
+    return strings.trim_suffix(s, "/")
 }
 
 // The scripts PACKAGE directory to (re)compile. ProjectSetting `odin_godot/scripts_dir`
@@ -210,24 +224,28 @@ reload_project_dir :: proc(allocator := context.allocator) -> string {
 // by the examples + tests). Caller owns the result.
 @(private = "file")
 reload_scripts_dir :: proc(proj: string, allocator := context.allocator) -> string {
-	ps := godot.singleton_project_settings()
-	key := godot.new_string_cstring("odin_godot/scripts_dir")
-	if bool(godot.project_settings_has_setting(ps, key)) {
-		def := godot.Variant{}
-		v := godot.project_settings_get_setting(ps, key, def)
-		s := godot.variant_to_string(&v)
-		cand := string_to_odin(s, allocator)
-		if cand != "" {
-			// Globalize a res://-relative value; an absolute path passes through.
-			gs := godot.new_string_odin(cand)
-			global := godot.project_settings_globalize_path(ps, gs)
-			out := string_to_odin(global, allocator)
-			delete(cand, allocator)
-			return strings.trim_suffix(out, "/")
-		}
-		delete(cand, allocator)
-	}
-	return strings.concatenate({proj, "/scripts"}, allocator)
+    ps := godot.singleton_project_settings()
+    key := godot.new_string_cstring("odin_godot/scripts_dir")
+
+    if bool(godot.project_settings_has_setting(ps, key)) {
+        def := godot.Variant{}
+        v := godot.project_settings_get_setting(ps, key, def)
+        s := godot.variant_to_string(&v)
+        cand := string_to_odin(s, allocator)
+
+        if cand != "" {
+            // Globalize a res://-relative value; an absolute path passes through.
+            gs := godot.new_string_odin(cand)
+            global := godot.project_settings_globalize_path(ps, gs)
+            out := string_to_odin(global, allocator)
+            delete(cand, allocator)
+            return strings.trim_suffix(out, "/")
+        }
+
+        delete(cand, allocator)
+    }
+
+    return strings.concatenate({proj, "/scripts"}, allocator)
 }
 
 // Content hash of the AUTHORED `.odin` sources in `scripts` (skipping generated `*.gen.odin`).
@@ -236,12 +254,14 @@ reload_scripts_dir :: proc(proj: string, allocator := context.allocator) -> stri
 // output. Hashes each file's relative path + bytes (fnv64a chained); unreadable dir => 0.
 @(private = "file")
 hash_sources :: proc(scripts: string) -> u64 {
-	h: u64 = 0xcbf29ce484222325 // fnv64a offset basis
-	hash_sources_dir(scripts, "", &h)
-	if h == 0xcbf29ce484222325 {
-		return 0 // nothing hashed (unreadable or empty) — treat like "unknown", always build
-	}
-	return h
+    h: u64 = 0xcbf29ce484222325 // fnv64a offset basis
+    hash_sources_dir(scripts, "", &h)
+
+    if h == 0xcbf29ce484222325 {
+        return 0 // nothing hashed (unreadable or empty) — treat like "unknown", always build
+    }
+
+    return h
 }
 
 // Fold the shared tree's content hash into ONE module's, so an edit under res://shared
@@ -250,11 +270,12 @@ hash_sources :: proc(scripts: string) -> u64 {
 // module hash untouched, so a project without one behaves exactly as it did before.
 @(private = "file")
 mix_shared_hash :: proc(module, shared: u64) -> u64 {
-	if module == 0 || shared == 0 {
-		return module
-	}
-	b := transmute([8]u8)shared
-	return hash.fnv64a(b[:], module)
+    if module == 0 || shared == 0 {
+        return module
+    }
+
+    b := transmute([8]u8)shared
+    return hash.fnv64a(b[:], module)
 }
 
 // Recursive worker: the scripts dir can hold sub-package directories (the build compiles
@@ -262,36 +283,47 @@ mix_shared_hash :: proc(module, shared: u64) -> u64 {
 // made saves in a subdirectory silently skip the rebuild.
 @(private = "file")
 hash_sources_dir :: proc(dir, relative_dir: string, h: ^u64) {
-	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
-	if err != nil {
-		return
-	}
-	// os directory enumeration order is unspecified. Stable ordering makes the same
-	// source tree produce the same fingerprint across processes/filesystems.
-	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
-	for fi in fis {
-		relative_path := fi.name
-		if relative_dir != "" {
-			relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
-		}
-		if fi.type == .Directory {
-			// Skip hidden dirs and build output — not compiler inputs.
-			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
-				continue
-			}
-			hash_sources_dir(fi.fullpath, relative_path, h)
-			continue
-		}
-		// Only authored sources; skip generated artifacts.
-		if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
-			continue
-		}
-		data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
-		if rerr == nil {
-			h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
-			h^ = hash.fnv64a(data, h^)
-		}
-	}
+    fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
+    if err != nil {
+        return
+    }
+
+    // os directory enumeration order is unspecified. Stable ordering makes the same
+    // source tree produce the same fingerprint across processes/filesystems.
+    slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
+        return a.name < b.name
+    })
+
+    for fi in fis {
+        relative_path := fi.name
+
+        if relative_dir != "" {
+            relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
+        }
+
+        if fi.type == .Directory {
+            // Skip hidden dirs and build output — not compiler inputs.
+            if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+                continue
+            }
+
+            hash_sources_dir(fi.fullpath, relative_path, h)
+            continue
+        }
+
+        // Only authored sources; skip generated artifacts.
+        if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
+            continue
+        }
+
+        data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
+
+        if rerr == nil {
+            h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
+            h^ = hash.fnv64a(data, h^)
+        }
+    }
 }
 
 // `reload_request` — kick a background rebuild of the scripts dll (editor only).
@@ -305,446 +337,519 @@ hash_sources_dir :: proc(dir, relative_dir: string, h: ^u64) {
 // intentionally reconcile every module.
 @(private)
 reload_request :: proc(force := false, probe := false, reconcile := false, source_path := "") {
-	// Hard gate: never rebuild outside the editor (a shipped game has no compiler and must
-	// never shell out to one).
-	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
-		return
-	}
-	context.allocator = core_allocator()
+    // Hard gate: never rebuild outside the editor (a shipped game has no compiler and must
+    // never shell out to one).
+    if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+        return
+    }
 
-	// Godot-backed settings are resolved on the main thread. Everything that can walk or
-	// read the filesystem is handed to the worker below.
-	odin_bin, found := resolve_odin_bin()
-	if !found {
-		if probe {
-			return // a periodic probe must not warn before the user has tried to build
-		}
-		sync.lock(&g_reload.mutex)
-		warn := !g_reload.warned_no_odin
-		g_reload.warned_no_odin = true
-		sync.unlock(&g_reload.mutex)
-		if warn {
-			msg := godot.new_string_cstring(
-				"odin_godot: `odin` not found — live `@export` reload-on-save is OFF. Fix: set the " +
-					"`odin_godot/odin_bin` project setting to your odin binary (absolute path), or launch " +
-					"the editor from a shell where `odin` is on PATH.",
-			)
-			godot.gd_push_warning(godot.variant_from_string(&msg))
-		}
-		return
-	}
-	root := odin_collection_root()
-	proj := reload_project_dir()
-	scripts := reload_scripts_dir(proj)
+    context.allocator = core_allocator()
 
-	job := new(Reload_Job, core_allocator())
-	job.state = &g_reload
-	job.odin_bin = odin_bin
-	job.root = root
-	job.proj = proj
-	job.scripts = scripts
-	job.force = force
-	job.probe = probe
-	job.reconcile = reconcile
-	if probe || source_path == "" {
-		reload_job_set_scan_all(job)
-	} else {
-		reload_job_scope_source(job, source_path)
-	}
+    // Godot-backed settings are resolved on the main thread. Everything that can walk or
+    // read the filesystem is handed to the worker below.
+    odin_bin, found := resolve_odin_bin()
 
-	// Constant per project. Set/read under the same mutex as the queue, then give the
-	// worker its own clone so no unsynchronized state string is observed.
-	sync.lock(&g_reload.mutex)
-	if g_reload.log_path == "" {
-		g_reload.log_path = strings.concatenate({proj, "/bin/.odin_reload.log"})
-	}
-	job.log_path = strings.clone(g_reload.log_path)
+    if !found {
+        if probe {
+            return // a periodic probe must not warn before the user has tried to build
+        }
 
-	start_now := false
-	discard: ^Reload_Job
-	// The first probe records content baselines without rebuilding every module. Mark it
-	// before publishing the job so a concurrent real save can force its target if needed.
-	job.baseline_probe = probe && !g_reload.probe_initialized
-	if g_reload.worker_running {
-		old := cast(^Reload_Job)g_reload.pending_job
-		// A real save/manual request outranks the periodic filesystem probe. Otherwise
-		// coalesce to the latest paths/settings while preserving an earlier force=true.
-		if old != nil && !old.probe && job.probe {
-			discard = job
-		} else {
-			if old != nil {
-				job.force = job.force || old.force
-				if !old.probe || job.probe {
-					reload_job_merge_scope(job, old)
-				}
-				discard = old
-			}
-			if !job.probe && g_reload.baseline_in_flight {
-				job.force = true
-			}
-			g_reload.pending_job = rawptr(job)
-			g_reload.build_pending = true
-		}
-	} else {
-		g_reload.worker_running = true
-		g_reload.baseline_in_flight = job.baseline_probe
-		start_now = true
-	}
-	sync.unlock(&g_reload.mutex)
+        sync.lock(&g_reload.mutex)
+        warn := !g_reload.warned_no_odin
+        g_reload.warned_no_odin = true
+        sync.unlock(&g_reload.mutex)
 
-	if discard != nil {
-		destroy_reload_job(discard)
-	}
-	if start_now {
-		spawn_build_worker(job)
-	}
+        if warn {
+            msg := godot.new_string_cstring(
+                "odin_godot: `odin` not found — live `@export` reload-on-save is OFF. Fix: set the " +
+                "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or launch " +
+                "the editor from a shell where `odin` is on PATH.",
+            )
+            godot.gd_push_warning(godot.variant_from_string(&msg))
+        }
+
+        return
+    }
+
+    root := odin_collection_root()
+    proj := reload_project_dir()
+    scripts := reload_scripts_dir(proj)
+
+    job := new(Reload_Job, core_allocator())
+    job.state = &g_reload
+    job.odin_bin = odin_bin
+    job.root = root
+    job.proj = proj
+    job.scripts = scripts
+    job.force = force
+    job.probe = probe
+    job.reconcile = reconcile
+
+    if probe || source_path == "" {
+        reload_job_set_scan_all(job)
+    } else {
+        reload_job_scope_source(job, source_path)
+    }
+
+    // Constant per project. Set/read under the same mutex as the queue, then give the
+    // worker its own clone so no unsynchronized state string is observed.
+    sync.lock(&g_reload.mutex)
+
+    if g_reload.log_path == "" {
+        g_reload.log_path = strings.concatenate({proj, "/bin/.odin_reload.log"})
+    }
+
+    job.log_path = strings.clone(g_reload.log_path)
+
+    start_now := false
+    discard: ^Reload_Job
+    // The first probe records content baselines without rebuilding every module. Mark it
+    // before publishing the job so a concurrent real save can force its target if needed.
+    job.baseline_probe = probe && !g_reload.probe_initialized
+
+    if g_reload.worker_running {
+        old := cast(^Reload_Job)g_reload.pending_job
+
+        // A real save/manual request outranks the periodic filesystem probe. Otherwise
+        // coalesce to the latest paths/settings while preserving an earlier force=true.
+        if old != nil && !old.probe && job.probe {
+            discard = job
+        } else {
+            if old != nil {
+                job.force = job.force || old.force
+
+                if !old.probe || job.probe {
+                    reload_job_merge_scope(job, old)
+                }
+
+                discard = old
+            }
+
+            if !job.probe && g_reload.baseline_in_flight {
+                job.force = true
+            }
+
+            g_reload.pending_job = rawptr(job)
+            g_reload.build_pending = true
+        }
+    } else {
+        g_reload.worker_running = true
+        g_reload.baseline_in_flight = job.baseline_probe
+        start_now = true
+    }
+
+    sync.unlock(&g_reload.mutex)
+
+    if discard != nil {
+        destroy_reload_job(discard)
+    }
+
+    if start_now {
+        spawn_build_worker(job)
+    }
 }
 
 @(private = "file")
 destroy_reload_job :: proc(job: ^Reload_Job) {
-	if job == nil {return}
-	a := core_allocator()
-	if job.odin_bin != "" {delete(job.odin_bin, a)}
-	if job.root != "" {delete(job.root, a)}
-	if job.proj != "" {delete(job.proj, a)}
-	if job.scripts != "" {delete(job.scripts, a)}
-	if job.log_path != "" {delete(job.log_path, a)}
-	for module in job.target_modules {
-		delete(module, a)
-	}
-	delete(job.target_modules)
-	free(job, a)
+    if job == nil {
+        return
+    }
+
+    a := core_allocator()
+
+    if job.odin_bin != "" {
+        delete(job.odin_bin, a)
+    }
+
+    if job.root != "" {
+        delete(job.root, a)
+    }
+
+    if job.proj != "" {
+        delete(job.proj, a)
+    }
+
+    if job.scripts != "" {
+        delete(job.scripts, a)
+    }
+
+    if job.log_path != "" {
+        delete(job.log_path, a)
+    }
+
+    for module in job.target_modules {
+        delete(module, a)
+    }
+
+    delete(job.target_modules)
+    free(job, a)
 }
 
 @(private = "file")
 spawn_build_worker :: proc(job: ^Reload_Job) {
-	ctx := runtime.default_context()
-	ctx.allocator = core_allocator()
-	thread.create_and_start_with_data(rawptr(job), build_worker_entry, init_context = ctx, self_cleanup = true)
+    ctx := runtime.default_context()
+    ctx.allocator = core_allocator()
+    thread.create_and_start_with_data(rawptr(job), build_worker_entry, init_context = ctx, self_cleanup = true)
 }
 
 // Worker-side deletion/name probe. It performs every readdir/read/exists operation and
 // only publishes a tiny decision + editor notice under the state mutex.
 @(private = "file")
 reload_probe_worker :: proc(job: ^Reload_Job) -> (prepare: bool, force: bool, baseline: bool) {
-	FNV_BASIS :: u64(0xcbf29ce484222325)
+    FNV_BASIS :: u64(0xcbf29ce484222325)
 
-	orphans := FNV_BASIS
-	orphans_hash_dir(job.scripts, &orphans)
+    orphans := FNV_BASIS
+    orphans_hash_dir(job.scripts, &orphans)
 
-	h := FNV_BASIS
-	names_hash_dir(job.scripts, "scripts", &h)
-	names_hash_dir(strings.concatenate({job.proj, "/shared"}, context.temp_allocator), "shared", &h)
+    h := FNV_BASIS
+    names_hash_dir(job.scripts, "scripts", &h)
+    names_hash_dir(strings.concatenate({job.proj, "/shared"}, context.temp_allocator), "shared", &h)
 
-	state := job.state
-	sync.lock(&state.mutex)
-	if orphans != FNV_BASIS {
-		if orphans != state.probe_orphans {
-			state.probe_orphans = orphans
-			state.probe_notice = .Orphaned_Generated_Code
-			prepare = true
-			force = true
-		}
-	} else {
-		state.probe_orphans = 0
-	}
-	old := state.probe_hash
-	initialized := state.probe_initialized
-	state.probe_hash = h
-	state.probe_initialized = true
-	if initialized {
-		if old != h && !prepare {
-			state.probe_notice = .Script_Set_Changed
-			prepare = true
-		}
-	} else if !prepare {
-		// Establish every module's content baseline off-thread. This prevents the first
-		// later targeted save/reconciliation from rebuilding untouched modules merely
-		// because they had no hash entry yet.
-		prepare = true
-		baseline = true
-	}
-	if job.reconcile && !prepare {
-		prepare = true
-	}
-	sync.unlock(&state.mutex)
-	return
+    state := job.state
+    sync.lock(&state.mutex)
+
+    if orphans != FNV_BASIS {
+        if orphans != state.probe_orphans {
+            state.probe_orphans = orphans
+            state.probe_notice = .Orphaned_Generated_Code
+            prepare = true
+            force = true
+        }
+    } else {
+        state.probe_orphans = 0
+    }
+
+    old := state.probe_hash
+    initialized := state.probe_initialized
+    state.probe_hash = h
+    state.probe_initialized = true
+
+    if initialized {
+        if old != h && !prepare {
+            state.probe_notice = .Script_Set_Changed
+            prepare = true
+        }
+    } else if !prepare {
+        // Establish every module's content baseline off-thread. This prevents the first
+        // later targeted save/reconciliation from rebuilding untouched modules merely
+        // because they had no hash entry yet.
+        prepare = true
+        baseline = true
+    }
+
+    if job.reconcile && !prepare {
+        prepare = true
+    }
+
+    sync.unlock(&state.mutex)
+    return
 }
 
 // Hash authored inputs, select changed modules, and assemble the platform command. This
 // entire function runs on the worker: save callbacks no longer enumerate directories or
 // read source bytes on the editor thread.
 @(private = "file")
-prepare_reload_command :: proc(
-	job: ^Reload_Job,
-	force: bool,
-	baseline := false,
-) -> (cmd: string, build: bool) {
-	// Test/debug-only trace of the plan chosen BEFORE any module tree is walked. Kept
-	// behind an environment flag so normal editor saves stay quiet.
-	if os.get_env("ODIN_RELOAD_TRACE_SCANS", context.temp_allocator) == "1" {
-		if job.scan_all {
-			reason := "bulk"
-			if job.baseline_probe {
-				reason = "baseline"
-			} else if job.reconcile {
-				reason = "reconcile"
-			} else if job.probe {
-				reason = "probe"
-			}
-			os.write_string(
-				os.stderr,
-				fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE all reason=%s\n", reason),
-			)
-		} else {
-			for name in job.target_modules {
-				label := name
-				if label == "" {label = "main"}
-				os.write_string(
-					os.stderr,
-					fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE module=%s\n", label),
-				)
-			}
-		}
-	}
-	shared_dir := strings.concatenate({job.proj, "/shared"}, context.temp_allocator)
-	shared_h := hash_sources(shared_dir)
+prepare_reload_command :: proc(job: ^Reload_Job, force: bool, baseline := false) -> (cmd: string, build: bool) {
+    // Test/debug-only trace of the plan chosen BEFORE any module tree is walked. Kept
+    // behind an environment flag so normal editor saves stay quiet.
+    if os.get_env("ODIN_RELOAD_TRACE_SCANS", context.temp_allocator) == "1" {
+        if job.scan_all {
+            reason := "bulk"
 
-	cands := make([dynamic]Reload_Candidate, context.temp_allocator)
-	if job.scan_all {
-		append(
-			&cands,
-			Reload_Candidate{
-				name = "",
-				dir  = strings.clone(job.scripts, context.temp_allocator),
-				hash = mix_shared_hash(hash_sources(job.scripts), shared_h),
-			},
-		)
-		mroot := strings.concatenate({job.proj, "/modules"}, context.temp_allocator)
-		if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
-			for fi in fis {
-				if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
-					continue
-				}
-				append(
-					&cands,
-					Reload_Candidate{
-						name = strings.clone(fi.name, context.temp_allocator),
-						dir  = strings.clone(fi.fullpath, context.temp_allocator),
-						hash = mix_shared_hash(hash_sources(fi.fullpath), shared_h),
-					},
-				)
-			}
-		}
-	} else {
-		for name in job.target_modules {
-			dir := strings.clone(job.scripts, context.temp_allocator)
-			if name != "" {
-				dir = strings.concatenate({job.proj, "/modules/", name}, context.temp_allocator)
-			}
-			append(
-				&cands,
-				Reload_Candidate{
-					name = strings.clone(name, context.temp_allocator),
-					dir  = dir,
-					hash = mix_shared_hash(hash_sources(dir), shared_h),
-				},
-			)
-		}
-	}
+            if job.baseline_probe {
+                reason = "baseline"
+            } else if job.reconcile {
+                reason = "reconcile"
+            } else if job.probe {
+                reason = "probe"
+            }
 
-	state := job.state
-	changed := make([dynamic]Reload_Candidate, context.temp_allocator)
-	sync.lock(&state.mutex)
-	if state.last_hashes == nil {
-		state.last_hashes = make(map[string]u64, core_allocator())
-	}
-	for c in cands {
-		prev, seen := state.last_hashes[c.name]
-		if baseline && !seen {
-			state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
-			continue
-		}
-		if !force && c.hash != 0 && seen && prev == c.hash {
-			continue
-		}
-		append(&changed, c)
-	}
-	if len(changed) == 0 {
-		sync.unlock(&state.mutex)
-		os.write_string(os.stderr, "odin reload: authored sources unchanged — rebuild skipped\n")
-		return "", false
-	}
-	for c in changed {
-		if c.name in state.last_hashes {
-			state.last_hashes[c.name] = c.hash
-		} else {
-			state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
-		}
-		already := false
-		for name in state.swap_modules {
-			if name == c.name {
-				already = true
-				break
-			}
-		}
-		if !already {
-			append(&state.swap_modules, strings.clone(c.name, core_allocator()))
-		}
-	}
-	state.build_started = true
-	state.build_running = true
-	sync.unlock(&state.mutex)
+            os.write_string(os.stderr, fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE all reason=%s\n", reason))
+        } else {
+            for name in job.target_modules {
+                label := name
 
-	odin_dir := job.odin_bin
-	if idx := strings.last_index_byte(job.odin_bin, '/'); idx >= 0 {
-		odin_dir = job.odin_bin[:idx]
-	}
+                if label == "" {
+                    label = "main"
+                }
 
-	when ODIN_OS == .Windows {
-		parts := strings.builder_make(context.temp_allocator)
-		for c, i in changed {
-			if i > 0 {
-				strings.write_string(&parts, " && ")
-			}
-			fmt.sbprintf(
-				&parts,
-				`powershell -NoProfile -ExecutionPolicy Bypass -File "%s\build\build_scripts.ps1" -Root "%s" -Project "%s" -ScriptsDir "%s" -Odin "%s" -SkipCore -SkipModules`,
-				job.root,
-				job.root,
-				job.proj,
-				c.dir,
-				job.odin_bin,
-			)
-		}
-		cmd = fmt.aprintf(
-			`if not exist "%s\bin\" mkdir "%s\bin" & ( %s ) > "%s" 2>&1`,
-			job.proj,
-			job.proj,
-			strings.to_string(parts),
-			job.log_path,
-		)
-	} else {
-		q_proj := shell_quote(job.proj, context.temp_allocator)
-		q_odin_dir := shell_quote(odin_dir, context.temp_allocator)
-		q_odin_bin := shell_quote(job.odin_bin, context.temp_allocator)
-		q_root := shell_quote(job.root, context.temp_allocator)
-		q_log := shell_quote(job.log_path, context.temp_allocator)
-		parts := strings.builder_make(context.temp_allocator)
-		for c, i in changed {
-			if i > 0 {
-				strings.write_string(&parts, " && ")
-			}
-			q_dir := shell_quote(c.dir, context.temp_allocator)
-			fmt.sbprintf(
-				&parts,
-				"PATH=%s:\"$PATH\" ODIN=%s ODIN_GODOT_ROOT=%s SKIP_CORE=1 BUILD_MODULES=0 bash %s/build/build_scripts.sh %s %s",
-				q_odin_dir,
-				q_odin_bin,
-				q_root,
-				q_root,
-				q_proj,
-				q_dir,
-			)
-		}
-		cmd = fmt.aprintf(
-			"mkdir -p %s/bin; ( %s ) > %s 2>&1",
-			q_proj,
-			strings.to_string(parts),
-			q_log,
-		)
-	}
-	return cmd, true
+                os.write_string(os.stderr, fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE module=%s\n", label))
+            }
+        }
+    }
+
+    shared_dir := strings.concatenate({job.proj, "/shared"}, context.temp_allocator)
+    shared_h := hash_sources(shared_dir)
+
+    cands := make([dynamic]Reload_Candidate, context.temp_allocator)
+
+    if job.scan_all {
+        append(
+            &cands,
+            Reload_Candidate {
+                name = "",
+                dir = strings.clone(job.scripts, context.temp_allocator),
+                hash = mix_shared_hash(hash_sources(job.scripts), shared_h),
+            },
+        )
+        mroot := strings.concatenate({job.proj, "/modules"}, context.temp_allocator)
+
+        if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
+            for fi in fis {
+                if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
+                    continue
+                }
+
+                append(
+                    &cands,
+                    Reload_Candidate {
+                        name = strings.clone(fi.name, context.temp_allocator),
+                        dir = strings.clone(fi.fullpath, context.temp_allocator),
+                        hash = mix_shared_hash(hash_sources(fi.fullpath), shared_h),
+                    },
+                )
+            }
+        }
+    } else {
+        for name in job.target_modules {
+            dir := strings.clone(job.scripts, context.temp_allocator)
+
+            if name != "" {
+                dir = strings.concatenate({job.proj, "/modules/", name}, context.temp_allocator)
+            }
+
+            append(
+                &cands,
+                Reload_Candidate {
+                    name = strings.clone(name, context.temp_allocator),
+                    dir = dir,
+                    hash = mix_shared_hash(hash_sources(dir), shared_h),
+                },
+            )
+        }
+    }
+
+    state := job.state
+    changed := make([dynamic]Reload_Candidate, context.temp_allocator)
+    sync.lock(&state.mutex)
+
+    if state.last_hashes == nil {
+        state.last_hashes = make(map[string]u64, core_allocator())
+    }
+
+    for c in cands {
+        prev, seen := state.last_hashes[c.name]
+
+        if baseline && !seen {
+            state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
+            continue
+        }
+
+        if !force && c.hash != 0 && seen && prev == c.hash {
+            continue
+        }
+
+        append(&changed, c)
+    }
+
+    if len(changed) == 0 {
+        sync.unlock(&state.mutex)
+        os.write_string(os.stderr, "odin reload: authored sources unchanged — rebuild skipped\n")
+        return "", false
+    }
+
+    for c in changed {
+        if c.name in state.last_hashes {
+            state.last_hashes[c.name] = c.hash
+        } else {
+            state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
+        }
+
+        already := false
+
+        for name in state.swap_modules {
+            if name == c.name {
+                already = true
+                break
+            }
+        }
+
+        if !already {
+            append(&state.swap_modules, strings.clone(c.name, core_allocator()))
+        }
+    }
+
+    state.build_started = true
+    state.build_running = true
+    sync.unlock(&state.mutex)
+
+    odin_dir := job.odin_bin
+
+    if idx := strings.last_index_byte(job.odin_bin, '/'); idx >= 0 {
+        odin_dir = job.odin_bin[:idx]
+    }
+
+    when ODIN_OS == .Windows {
+        parts := strings.builder_make(context.temp_allocator)
+
+        for c, i in changed {
+            if i > 0 {
+                strings.write_string(&parts, " && ")
+            }
+
+            fmt.sbprintf(
+                &parts,
+                `powershell -NoProfile -ExecutionPolicy Bypass -File "%s\build\build_scripts.ps1" -Root "%s" -Project "%s" -ScriptsDir "%s" -Odin "%s" -SkipCore -SkipModules`,
+                job.root,
+                job.root,
+                job.proj,
+                c.dir,
+                job.odin_bin,
+            )
+        }
+
+        cmd = fmt.aprintf(
+            `if not exist "%s\bin\" mkdir "%s\bin" & ( %s ) > "%s" 2>&1`,
+            job.proj,
+            job.proj,
+            strings.to_string(parts),
+            job.log_path,
+        )
+    } else {
+        q_proj := shell_quote(job.proj, context.temp_allocator)
+        q_odin_dir := shell_quote(odin_dir, context.temp_allocator)
+        q_odin_bin := shell_quote(job.odin_bin, context.temp_allocator)
+        q_root := shell_quote(job.root, context.temp_allocator)
+        q_log := shell_quote(job.log_path, context.temp_allocator)
+        parts := strings.builder_make(context.temp_allocator)
+
+        for c, i in changed {
+            if i > 0 {
+                strings.write_string(&parts, " && ")
+            }
+
+            q_dir := shell_quote(c.dir, context.temp_allocator)
+            fmt.sbprintf(
+                &parts,
+                "PATH=%s:\"$PATH\" ODIN=%s ODIN_GODOT_ROOT=%s SKIP_CORE=1 BUILD_MODULES=0 bash %s/build/build_scripts.sh %s %s",
+                q_odin_dir,
+                q_odin_bin,
+                q_root,
+                q_root,
+                q_proj,
+                q_dir,
+            )
+        }
+
+        cmd = fmt.aprintf("mkdir -p %s/bin; ( %s ) > %s 2>&1", q_proj, strings.to_string(parts), q_log)
+    }
+
+    return cmd, true
 }
 
 @(private = "file")
-finish_reload_job :: proc(
-	job: ^Reload_Job,
-	did_build: bool,
-	rc: i32,
-	build_ms: f64,
-	log_content: string,
-) {
-	state := job.state
-	sync.lock(&state.mutex)
-	state.worker_running = false
-	if job.baseline_probe {
-		state.baseline_in_flight = false
-	}
-	if did_build {
-		state.build_running = false
-		state.last_build_ms = build_ms
-		state.last_build_failed = rc != 0
-		if rc == 0 {
-			state.swap_ready = true
-		} else {
-			state.build_failed = true
-			clear(&state.last_hashes)
-			for name in state.swap_modules {
-				delete(name, core_allocator())
-			}
-			clear(&state.swap_modules)
-			if state.build_output != "" {delete(state.build_output, core_allocator())}
-			state.build_output = log_content
-		}
-	}
-	next_job := cast(^Reload_Job)state.pending_job
-	has_next := state.build_pending && next_job != nil
-	state.pending_job = nil
-	state.build_pending = false
-	if has_next {
-		state.worker_running = true
-		state.baseline_in_flight = next_job.baseline_probe
-	}
-	sync.unlock(&state.mutex)
+finish_reload_job :: proc(job: ^Reload_Job, did_build: bool, rc: i32, build_ms: f64, log_content: string) {
+    state := job.state
+    sync.lock(&state.mutex)
+    state.worker_running = false
 
-	destroy_reload_job(job)
-	if has_next {
-		spawn_build_worker(next_job)
-	}
+    if job.baseline_probe {
+        state.baseline_in_flight = false
+    }
+
+    if did_build {
+        state.build_running = false
+        state.last_build_ms = build_ms
+        state.last_build_failed = rc != 0
+
+        if rc == 0 {
+            state.swap_ready = true
+        } else {
+            state.build_failed = true
+            clear(&state.last_hashes)
+
+            for name in state.swap_modules {
+                delete(name, core_allocator())
+            }
+
+            clear(&state.swap_modules)
+
+            if state.build_output != "" {
+                delete(state.build_output, core_allocator())
+            }
+
+            state.build_output = log_content
+        }
+    }
+
+    next_job := cast(^Reload_Job)state.pending_job
+    has_next := state.build_pending && next_job != nil
+    state.pending_job = nil
+    state.build_pending = false
+
+    if has_next {
+        state.worker_running = true
+        state.baseline_in_flight = next_job.baseline_probe
+    }
+
+    sync.unlock(&state.mutex)
+
+    destroy_reload_job(job)
+
+    if has_next {
+        spawn_build_worker(next_job)
+    }
 }
 
 @(private = "file")
 build_worker_entry :: proc(data: rawptr) {
-	job := cast(^Reload_Job)data
+    job := cast(^Reload_Job)data
 
-	// Private heap context — never the Godot context, and NO Godot calls below.
-	context = runtime.default_context()
-	context.allocator = runtime.heap_allocator()
+    // Private heap context — never the Godot context, and NO Godot calls below.
+    context = runtime.default_context()
+    context.allocator = runtime.heap_allocator()
 
-	force := job.force
-	baseline := false
-	if job.probe {
-		probe_prepare, probe_force, probe_baseline := reload_probe_worker(job)
-		if !probe_prepare {
-			finish_reload_job(job, false, 0, 0, "")
-			return
-		}
-		force = force || probe_force
-		baseline = probe_baseline
-	}
+    force := job.force
+    baseline := false
 
-	cmd, should_build := prepare_reload_command(job, force, baseline)
-	if !should_build {
-		finish_reload_job(job, false, 0, 0, "")
-		return
-	}
-	defer delete(cmd)
+    if job.probe {
+        probe_prepare, probe_force, probe_baseline := reload_probe_worker(job)
 
-	ccmd := strings.clone_to_cstring(cmd)
-	start := time.tick_now()
-	rc := libc.system(ccmd)
-	build_ms := time.duration_milliseconds(time.tick_since(start))
-	delete(ccmd)
+        if !probe_prepare {
+            finish_reload_job(job, false, 0, 0, "")
+            return
+        }
 
-	log_content: string
-	if rc != 0 {
-		os.write_string(os.stderr, "odin reload: background scripts build FAILED (see editor Output)\n")
-		if data, rerr := os.read_entire_file(job.log_path, core_allocator()); rerr == nil {
-			log_content = string(data)
-		}
-	}
-	finish_reload_job(job, true, rc, build_ms, log_content)
+        force = force || probe_force
+        baseline = probe_baseline
+    }
+
+    cmd, should_build := prepare_reload_command(job, force, baseline)
+
+    if !should_build {
+        finish_reload_job(job, false, 0, 0, "")
+        return
+    }
+
+    defer delete(cmd)
+
+    ccmd := strings.clone_to_cstring(cmd)
+    start := time.tick_now()
+    rc := libc.system(ccmd)
+    build_ms := time.duration_milliseconds(time.tick_since(start))
+    delete(ccmd)
+
+    log_content: string
+
+    if rc != 0 {
+        os.write_string(os.stderr, "odin reload: background scripts build FAILED (see editor Output)\n")
+
+        if data, rerr := os.read_entire_file(job.log_path, core_allocator()); rerr == nil {
+            log_content = string(data)
+        }
+    }
+
+    finish_reload_job(job, true, rc, build_ms, log_content)
 }
 
 // Print the meaningful lines of a failed build's captured output into Godot's Output, dropping
@@ -752,21 +857,37 @@ build_worker_entry :: proc(data: rawptr) {
 // lines so the actual `path(line:col) Error: …` stands out. print_str -> Output dock + stdout.
 @(private = "file")
 print_build_errors :: proc(output: string) {
-	b := strings.builder_make(context.temp_allocator)
-	it := output
-	for line in strings.split_lines_iterator(&it) {
-		if strings.contains(line, "could not find symbol") {continue}
-		if strings.has_prefix(line, "warning:") {continue}
-		if strings.has_prefix(line, "scriptgen: wrote") {continue}
-		if strings.has_prefix(line, "scriptgen: generated") {continue}
-		strings.write_string(&b, line)
-		strings.write_byte(&b, '\n')
-	}
-	text := strings.trim_space(strings.to_string(b))
-	if text == "" {
-		return
-	}
-	godot.print_str(strings.concatenate({"── odin_godot build errors ──\n", text}, context.temp_allocator))
+    b := strings.builder_make(context.temp_allocator)
+    it := output
+
+    for line in strings.split_lines_iterator(&it) {
+        if strings.contains(line, "could not find symbol") {
+            continue
+        }
+
+        if strings.has_prefix(line, "warning:") {
+            continue
+        }
+
+        if strings.has_prefix(line, "scriptgen: wrote") {
+            continue
+        }
+
+        if strings.has_prefix(line, "scriptgen: generated") {
+            continue
+        }
+
+        strings.write_string(&b, line)
+        strings.write_byte(&b, '\n')
+    }
+
+    text := strings.trim_space(strings.to_string(b))
+
+    if text == "" {
+        return
+    }
+
+    godot.print_str(strings.concatenate({"── odin_godot build errors ──\n", text}, context.temp_allocator))
 }
 
 // `reload_pump_main_thread` — drive a completed build's swap on the MAIN thread.
@@ -781,28 +902,38 @@ print_build_errors :: proc(output: string) {
 // no file contents.
 @(private = "file")
 names_hash_dir :: proc(dir, relative_dir: string, h: ^u64) {
-	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
-	if err != nil {
-		return
-	}
-	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
-	for fi in fis {
-		relative_path := fi.name
-		if relative_dir != "" {
-			relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
-		}
-		if fi.type == .Directory {
-			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
-				continue
-			}
-			names_hash_dir(fi.fullpath, relative_path, h)
-			continue
-		}
-		if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
-			continue
-		}
-		h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
-	}
+    fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
+    if err != nil {
+        return
+    }
+
+    slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
+        return a.name < b.name
+    })
+
+    for fi in fis {
+        relative_path := fi.name
+
+        if relative_dir != "" {
+            relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
+        }
+
+        if fi.type == .Directory {
+            if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+                continue
+            }
+
+            names_hash_dir(fi.fullpath, relative_path, h)
+            continue
+        }
+
+        if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
+            continue
+        }
+
+        h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
+    }
 }
 
 // scriptgen's per-DIR artifacts: ONE consolidated `odin_godot_scripts.gen.odin` holding
@@ -826,26 +957,33 @@ SECTION_BANNER :: "// ==== "
 // section names vanished procs, and the staleness guard `#load_hash`es a missing file).
 @(private = "file")
 orphan_sections_hash :: proc(gen_path, dir: string, h: ^u64) {
-	data, rerr := os.read_entire_file(gen_path, context.temp_allocator)
-	if rerr != nil {
-		return
-	}
-	it := string(data)
-	for line in strings.split_lines_iterator(&it) {
-		if !strings.has_prefix(line, SECTION_BANNER) {
-			continue
-		}
-		rest := line[len(SECTION_BANNER):]
-		cut := strings.index(rest, " (")
-		if cut <= 0 {
-			continue
-		}
-		src := rest[:cut]
-		full := strings.concatenate({dir, "/", src}, context.temp_allocator)
-		if !os.exists(full) {
-			h^ = hash.fnv64a(transmute([]byte)src, h^)
-		}
-	}
+    data, rerr := os.read_entire_file(gen_path, context.temp_allocator)
+
+    if rerr != nil {
+        return
+    }
+
+    it := string(data)
+
+    for line in strings.split_lines_iterator(&it) {
+        if !strings.has_prefix(line, SECTION_BANNER) {
+            continue
+        }
+
+        rest := line[len(SECTION_BANNER):]
+        cut := strings.index(rest, " (")
+
+        if cut <= 0 {
+            continue
+        }
+
+        src := rest[:cut]
+        full := strings.concatenate({dir, "/", src}, context.temp_allocator)
+
+        if !os.exists(full) {
+            h^ = hash.fnv64a(transmute([]byte)src, h^)
+        }
+    }
 }
 
 // Fingerprint of the ORPHANED generated code under `dir` (recursive). The FNV basis back
@@ -859,144 +997,168 @@ orphan_sections_hash :: proc(gen_path, dir: string, h: ^u64) {
 //      orphan sweep reaps these on its next run.
 @(private = "file")
 orphans_hash_dir :: proc(dir: string, h: ^u64) {
-	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
-	if err != nil {
-		return
-	}
-	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
-	for fi in fis {
-		if fi.type == .Directory {
-			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
-				continue
-			}
-			orphans_hash_dir(fi.fullpath, h)
-			continue
-		}
-		if !strings.has_suffix(fi.name, ".gen.odin") {
-			continue
-		}
-		if fi.name == SCRIPTS_GEN_NAME {
-			orphan_sections_hash(fi.fullpath, dir, h)
-			continue
-		}
-		if fi.name == GUARD_GEN_NAME || fi.name == BOOT_GEN_NAME {
-			continue // per-dir shims: unpaired by design
-		}
-		src := strings.concatenate(
-			{fi.fullpath[:len(fi.fullpath) - len(".gen.odin")], ".odin"},
-			context.temp_allocator,
-		)
-		if !os.exists(src) {
-			h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
-		}
-	}
+    fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
+    if err != nil {
+        return
+    }
+
+    slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
+        return a.name < b.name
+    })
+
+    for fi in fis {
+        if fi.type == .Directory {
+            if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+                continue
+            }
+
+            orphans_hash_dir(fi.fullpath, h)
+            continue
+        }
+
+        if !strings.has_suffix(fi.name, ".gen.odin") {
+            continue
+        }
+
+        if fi.name == SCRIPTS_GEN_NAME {
+            orphan_sections_hash(fi.fullpath, dir, h)
+            continue
+        }
+
+        if fi.name == GUARD_GEN_NAME || fi.name == BOOT_GEN_NAME {
+            continue // per-dir shims: unpaired by design
+        }
+
+        src := strings.concatenate(
+            {fi.fullpath[:len(fi.fullpath) - len(".gen.odin")], ".odin"},
+            context.temp_allocator,
+        )
+
+        if !os.exists(src) {
+            h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+        }
+    }
 }
 
 // The frame pump only schedules the deletion/name probe. Its filesystem work runs in
 // build_worker_entry, sharing the same coalescing queue as save-triggered builds.
 @(private = "file")
 reload_probe_fs :: proc() {
-	SECOND_NS :: i64(1_000_000_000)
-	now := time.tick_now()._nsec
-	if g_reload.probe_next_ns == 0 {
-		g_reload.probe_next_ns = now + 2 * SECOND_NS
-		g_reload.reconcile_next_ns = now + 30 * SECOND_NS
-		return
-	}
-	if now < g_reload.probe_next_ns {
-		return
-	}
-	g_reload.probe_next_ns = now + 2 * SECOND_NS
-	reconcile := now >= g_reload.reconcile_next_ns
-	if reconcile {
-		g_reload.reconcile_next_ns = now + 30 * SECOND_NS
-	}
-	reload_request(probe = true, reconcile = reconcile)
+    SECOND_NS :: i64(1_000_000_000)
+    now := time.tick_now()._nsec
+
+    if g_reload.probe_next_ns == 0 {
+        g_reload.probe_next_ns = now + 2 * SECOND_NS
+        g_reload.reconcile_next_ns = now + 30 * SECOND_NS
+        return
+    }
+
+    if now < g_reload.probe_next_ns {
+        return
+    }
+
+    g_reload.probe_next_ns = now + 2 * SECOND_NS
+    reconcile := now >= g_reload.reconcile_next_ns
+
+    if reconcile {
+        g_reload.reconcile_next_ns = now + 30 * SECOND_NS
+    }
+
+    reload_request(probe = true, reconcile = reconcile)
 }
 
 @(private)
 reload_pump_main_thread :: proc() {
-	if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
-		reload_probe_fs()
-	}
-	sync.lock(&g_reload.mutex)
-	// Don't swap while a coalesced follow-up build is STILL RUNNING: build A set
-	// swap_ready, but build B's linker may be rewriting the dll right now — the swap
-	// would snapshot a half-written image. Leave swap_ready set; B re-sets it (or flags
-	// failure) and the next frame swaps a settled dll.
-	ready := g_reload.swap_ready && !g_reload.worker_running
-	swap_names: []string
-	if ready {
-		g_reload.swap_ready = false
-		// Drain the per-module swap set (ownership of the heap-owned names moves here).
-		swap_names = make([]string, len(g_reload.swap_modules), context.temp_allocator)
-		copy(swap_names, g_reload.swap_modules[:])
-		clear(&g_reload.swap_modules)
-	}
-	failed := g_reload.build_failed
-	g_reload.build_failed = false
-	build_out := g_reload.build_output // transfer ownership to this frame
-	g_reload.build_output = ""
-	build_ms := g_reload.last_build_ms
-	build_started := g_reload.build_started
-	g_reload.build_started = false
-	probe_notice := g_reload.probe_notice
-	g_reload.probe_notice = .None
-	sync.unlock(&g_reload.mutex)
+    if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+        reload_probe_fs()
+    }
 
-	if probe_notice == .Orphaned_Generated_Code {
-		godot.print_str("odin_godot: generated code for a deleted script on disk — rebuilding to sweep")
-	} else if probe_notice == .Script_Set_Changed {
-		godot.print_str("odin_godot: script set changed on disk — rebuilding (stale gen files sweep with it)")
-	}
-	if build_started {
-		godot.print_str("odin_godot: rebuilding scripts…")
-	}
+    sync.lock(&g_reload.mutex)
+    // Don't swap while a coalesced follow-up build is STILL RUNNING: build A set
+    // swap_ready, but build B's linker may be rewriting the dll right now — the swap
+    // would snapshot a half-written image. Leave swap_ready set; B re-sets it (or flags
+    // failure) and the next frame swaps a settled dll.
+    ready := g_reload.swap_ready && !g_reload.worker_running
+    swap_names: []string
 
-	// A finished build failed: print the ACTUAL compiler error into Godot's Output (the build
-	// log was captured to a file, not the terminal — a GUI user never sees the terminal), then a
-	// prominent red summary.
-	if failed {
-		if build_out != "" {
-			print_build_errors(build_out)
-			delete(build_out, core_allocator())
-		}
-		msg := godot.new_string_cstring(
-			"odin_godot: scripts build FAILED — your change is NOT live (compiler errors above).",
-		)
-		godot.gd_push_error(godot.variant_from_string(&msg))
-	} else if build_out != "" {
-		delete(build_out, core_allocator())
-	}
+    if ready {
+        g_reload.swap_ready = false
+        // Drain the per-module swap set (ownership of the heap-owned names moves here).
+        swap_names = make([]string, len(g_reload.swap_modules), context.temp_allocator)
+        copy(swap_names, g_reload.swap_modules[:])
+        clear(&g_reload.swap_modules)
+    }
 
-	if !ready {
-		return
-	}
+    failed := g_reload.build_failed
+    g_reload.build_failed = false
+    build_out := g_reload.build_output // transfer ownership to this frame
+    g_reload.build_output = ""
+    build_ms := g_reload.last_build_ms
+    build_started := g_reload.build_started
+    g_reload.build_started = false
+    probe_notice := g_reload.probe_notice
+    g_reload.probe_notice = .None
+    sync.unlock(&g_reload.mutex)
 
-	context.allocator = core_allocator()
-	// Swap each module the finished build(s) covered. An empty drained set (a failed
-	// coalesced build cleared it while an earlier success left swap_ready) falls back to
-	// the main module — the pre-spike behavior.
-	swapped := 0
-	if len(swap_names) == 0 {
-		if odin_scripts_reload() {
-			swapped += 1
-		}
-	} else {
-		for name in swap_names {
-			if odin_scripts_reload(name) {
-				swapped += 1
-			}
-			delete(name) // heap-owned clone from reload_request
-		}
-	}
-	if swapped > 0 {
-		// Real (tool) instances are already re-bound by the swap; placeholders (the common
-		// non-tool editor case) still hold the OLD property list, so re-push their exports.
-		refresh_placeholder_exports()
-		os.write_string(os.stderr, "odin reload: scripts dll swapped + exports refreshed (RELOAD_SWAPPED)\n")
-		// Editor-Output confirmation (with the build time) so the user knows their save is now
-		// live — the visible bookend to the "rebuilding…" message from reload_request.
-		godot.print_str(fmt.tprintf("odin_godot: scripts reloaded — your change is live (%.1fs)", build_ms / 1000))
-	}
+    if probe_notice == .Orphaned_Generated_Code {
+        godot.print_str("odin_godot: generated code for a deleted script on disk — rebuilding to sweep")
+    } else if probe_notice == .Script_Set_Changed {
+        godot.print_str("odin_godot: script set changed on disk — rebuilding (stale gen files sweep with it)")
+    }
+
+    if build_started {
+        godot.print_str("odin_godot: rebuilding scripts…")
+    }
+
+    // A finished build failed: print the ACTUAL compiler error into Godot's Output (the build
+    // log was captured to a file, not the terminal — a GUI user never sees the terminal), then a
+    // prominent red summary.
+    if failed {
+        if build_out != "" {
+            print_build_errors(build_out)
+            delete(build_out, core_allocator())
+        }
+
+        msg := godot.new_string_cstring(
+            "odin_godot: scripts build FAILED — your change is NOT live (compiler errors above).",
+        )
+        godot.gd_push_error(godot.variant_from_string(&msg))
+    } else if build_out != "" {
+        delete(build_out, core_allocator())
+    }
+
+    if !ready {
+        return
+    }
+
+    context.allocator = core_allocator()
+    // Swap each module the finished build(s) covered. An empty drained set (a failed
+    // coalesced build cleared it while an earlier success left swap_ready) falls back to
+    // the main module — the pre-spike behavior.
+    swapped := 0
+
+    if len(swap_names) == 0 {
+        if odin_scripts_reload() {
+            swapped += 1
+        }
+    } else {
+        for name in swap_names {
+            if odin_scripts_reload(name) {
+                swapped += 1
+            }
+
+            delete(name) // heap-owned clone from reload_request
+        }
+    }
+
+    if swapped > 0 {
+        // Real (tool) instances are already re-bound by the swap; placeholders (the common
+        // non-tool editor case) still hold the OLD property list, so re-push their exports.
+        refresh_placeholder_exports()
+        os.write_string(os.stderr, "odin reload: scripts dll swapped + exports refreshed (RELOAD_SWAPPED)\n")
+        // Editor-Output confirmation (with the build time) so the user knows their save is now
+        // live — the visible bookend to the "rebuilding…" message from reload_request.
+        godot.print_str(fmt.tprintf("odin_godot: scripts reloaded — your change is live (%.1fs)", build_ms / 1000))
+    }
 }

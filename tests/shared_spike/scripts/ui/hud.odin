@@ -16,26 +16,26 @@ import ids "../../shared/ids"
 GAIN :: ids.STEP * 2
 
 Hud :: struct {
-	owner:      gd.Node,
-	shown:      gd.Int `gd:"export"`,
-	ready_mark: gd.Int `gd:"export"`,
+    owner:      gd.Node,
+    shown:      gd.Int `gd:"export"`,
+    ready_mark: gd.Int `gd:"export"`,
 }
 
 hud_ready :: proc(self: ^Hud) {
-	self.ready_mark = 1
+    self.ready_mark = 1
 }
 
 @(gd_method)
 hud_shared_step :: proc(self: ^Hud) -> int {
-	return ids.STEP
+    return ids.STEP
 }
 
 @(gd_method)
 hud_brand :: proc(self: ^Hud) -> int {
-	return ids.brand(.None)
+    return ids.brand(.None)
 }
 
 @(gd_method)
 hud_gain :: proc(self: ^Hud) -> int {
-	return GAIN
+    return GAIN
 }

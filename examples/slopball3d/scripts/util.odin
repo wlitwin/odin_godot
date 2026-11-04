@@ -19,5 +19,5 @@ BALL_REST_Y :: f32(0.2) // the ball's radius: where gravity parks it
 // Normalize in the GROUND plane — steering is 2D even when the ball flies.
 // Drops y, then leans on the library's value-form normalize.
 normalized_xz :: proc "contextless" (v: [3]f32) -> [3]f32 {
-	return gd.normalized3({v.x, 0, v.z})
+    return gd.normalized3({v.x, 0, v.z})
 }

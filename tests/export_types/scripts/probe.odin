@@ -18,23 +18,23 @@ package export_types_scripts
 import gd "godot:godot"
 
 Probe :: struct {
-	owner:       gd.Node,
-	// scalar atoms with hints
-	health:      i32 `gd:"export,range=0:100:5"`, // ranged int (narrowed to i32)
-	mode:        i32 `gd:"export,enum=Idle:Walk:Run"`, // enum-int dropdown
-	description: gd.String `gd:"export,multiline"`, // multi-line text
-	// math structs (whole-struct Variants, no narrowing)
-	velocity:    gd.Vector3 `gd:"export"`,
-	tint:        gd.Color `gd:"export"`,
-	grid:        gd.Vector2i `gd:"export"`,
-	// container / path / packed
-	scores:      gd.Packed_Int32_Array `gd:"export"`,
-	target:      gd.Node_Path `gd:"export"`,
-	// typed resource picker
-	texture:     gd.Object `gd:"export,resource=Texture2D"`,
-	// typed arrays (tag form) — BOTH set from the scene file (regression: scene-assigned
-	// typed-array exports used to crash inst_set during SceneState::instantiate; the
-	// suite previously only exercised the Inspector/set() path).
-	nums:        gd.Array `gd:"export,array=int"`,
-	table:       gd.Array `gd:"export,array=Resource"`,
+    owner:       gd.Node,
+    // scalar atoms with hints
+    health:      i32 `gd:"export,range=0:100:5"`, // ranged int (narrowed to i32)
+    mode:        i32 `gd:"export,enum=Idle:Walk:Run"`, // enum-int dropdown
+    description: gd.String `gd:"export,multiline"`, // multi-line text
+    // math structs (whole-struct Variants, no narrowing)
+    velocity:    gd.Vector3 `gd:"export"`,
+    tint:        gd.Color `gd:"export"`,
+    grid:        gd.Vector2i `gd:"export"`,
+    // container / path / packed
+    scores:      gd.Packed_Int32_Array `gd:"export"`,
+    target:      gd.Node_Path `gd:"export"`,
+    // typed resource picker
+    texture:     gd.Object `gd:"export,resource=Texture2D"`,
+    // typed arrays (tag form) — BOTH set from the scene file (regression: scene-assigned
+    // typed-array exports used to crash inst_set during SceneState::instantiate; the
+    // suite previously only exercised the Inspector/set() path).
+    nums:        gd.Array `gd:"export,array=int"`,
+    table:       gd.Array `gd:"export,array=Resource"`,
 }

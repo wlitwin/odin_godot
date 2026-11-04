@@ -12,22 +12,24 @@ package repgen_fixture
 import gd "godot:godot"
 
 Scout :: struct {
-	owner: gd.Node2d,
-	x:     f32 `gd:"predict,interp"`,
-	beep:  u16 `gd:"predict"`,
+    owner: gd.Node2d,
+    x:     f32 `gd:"predict,interp"`,
+    beep:  u16 `gd:"predict"`,
 }
 
 @(gd_tick)
 scout_tick :: proc(self: ^Scout) -> (pinged: bool, dist: f32) {
-	self.x += 1
-	if self.beep > 0 {
-		self.beep -= 1
-	} else {
-		self.beep = 60
-		pinged = true
-		dist = self.x
-	}
-	return
+    self.x += 1
+
+    if self.beep > 0 {
+        self.beep -= 1
+    } else {
+        self.beep = 60
+        pinged = true
+        dist = self.x
+    }
+
+    return
 }
 
 // The every-screen shape: `mine` right after `self` (by NAME — a bool fact
@@ -35,7 +37,7 @@ scout_tick :: proc(self: ^Scout) -> (pinged: bool, dist: f32) {
 // contract: they cross to watching screens.
 @(gd_half)
 scout_tick_fx :: proc(self: ^Scout, mine: bool, pinged: bool, dist: f32) {
-	_ = mine
-	_ = pinged
-	_ = dist
+    _ = mine
+    _ = pinged
+    _ = dist
 }

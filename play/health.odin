@@ -52,41 +52,41 @@ package play
 import kcombat "godot:kit/combat"
 
 Health :: struct {
-	hp:  i32 `gd:"replicate"`, // host-authoritative; 0 = dead/downed (what that MEANS is yours)
-	max: i32 `gd:"replicate"`, // stamped by health_arm; replicated so every screen can draw a bar
+    hp:  i32 `gd:"replicate"`, // host-authoritative; 0 = dead/downed (what that MEANS is yours)
+    max: i32 `gd:"replicate"`, // stamped by health_arm; replicated so every screen can draw a bar
 }
 
 // health_arm — host, at spawn / a max change (a plate part, a boss dialing its pool): stamp the
 // max and fill to it. A max change that should NOT full-heal is a direct `h.max = ...` instead.
 health_arm :: proc(h: ^Health, max: i32) {
-	h.max = max
-	h.hp = max
+    h.max = max
+    h.hp = max
 }
 
 // health_hurt — host: take `dmg`, clamped. Returns what actually landed (`dealt`, for hit credit
 // — 0 on a corpse) and whether THIS hit was the killing one (false on a corpse: a death edge
 // fires once).
 health_hurt :: proc(h: ^Health, dmg: i32) -> (dealt: i32, died: bool) {
-	return kcombat.hurt(&h.hp, dmg)
+    return kcombat.hurt(&h.hp, dmg)
 }
 
 // health_kill — host: drop to 0 outright (a self-destruct, a detonate combo, a dev cheat).
 health_kill :: proc(h: ^Health) {
-	h.hp = 0
+    h.hp = 0
 }
 
 // health_heal — host: restore `amount`, clamped to max. Reviving a corpse is a heal from 0 —
 // gate "may this target be healed" yourself (that's policy).
 health_heal :: proc(h: ^Health, amount: i32) {
-	kcombat.heal(&h.hp, h.max, amount)
+    kcombat.heal(&h.hp, h.max, amount)
 }
 
 // health_dead / health_frac — the two reads every gate and bar wants, named. `hp`/`max` are
 // public; these state the intent (frac guards an unarmed max).
 health_dead :: proc "contextless" (h: ^Health) -> bool {
-	return h.hp == 0
-}
-health_frac :: proc "contextless" (h: ^Health) -> f32 {
-	return h.max > 0 ? f32(h.hp) / f32(h.max) : 0
+    return h.hp == 0
 }
 
+health_frac :: proc "contextless" (h: ^Health) -> f32 {
+    return h.max > 0 ? f32(h.hp) / f32(h.max) : 0
+}

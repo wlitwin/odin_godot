@@ -29,10 +29,10 @@ Tween_Configure :: proc(t: gd.Tween, ctx: rawptr)
 
 @(private)
 Tween_Step :: struct {
-	node:      gd.Node,
-	configure: Tween_Configure,
-	tween:     gd.Tween,
-	started:   bool,
+    node:      gd.Node,
+    configure: Tween_Configure,
+    tween:     gd.Tween,
+    started:   bool,
 }
 
 // tween builds a flow step that, on its first tick, calls `node.create_tween()`,
@@ -42,47 +42,57 @@ Tween_Step :: struct {
 // still-running Tween). The Tween is processed by the SceneTree, not by flow — this
 // step only kicks it off and watches for completion.
 tween :: proc(node: gd.Node, configure: Tween_Configure) -> flow.Action {
-	s := new(Tween_Step)
-	s.node = node
-	s.configure = configure
-	return flow.custom(s, tween_tick, tween_reset, tween_free)
+    s := new(Tween_Step)
+    s.node = node
+    s.configure = configure
+    return flow.custom(s, tween_tick, tween_reset, tween_free)
 }
 
 @(private)
 tween_tick :: proc(data: rawptr, ctx: rawptr, dt: f64) -> flow.Status {
-	s := cast(^Tween_Step)data
-	if s.node == nil {
-		return .Done
-	}
-	if !s.started {
-		s.tween = gd.node_create_tween(s.node)
-		if s.configure != nil {
-			s.configure(s.tween, ctx)
-		}
-		s.started = true
-		return .Running // give the SceneTree at least one frame to run it
-	}
-	if s.tween == nil || !gd.tween_is_valid(s.tween) {
-		return .Done
-	}
-	return .Running if gd.tween_is_running(s.tween) else .Done
+    s := cast(^Tween_Step)data
+
+    if s.node == nil {
+        return .Done
+    }
+
+    if !s.started {
+        s.tween = gd.node_create_tween(s.node)
+
+        if s.configure != nil {
+            s.configure(s.tween, ctx)
+        }
+
+        s.started = true
+        return .Running // give the SceneTree at least one frame to run it
+    }
+
+    if s.tween == nil || !gd.tween_is_valid(s.tween) {
+        return .Done
+    }
+
+    return .Running if gd.tween_is_running(s.tween) else .Done
 }
 
 @(private)
 tween_reset :: proc(data: rawptr) {
-	s := cast(^Tween_Step)data
-	if s.started && s.tween != nil && gd.tween_is_valid(s.tween) {
-		gd.tween_kill(s.tween)
-	}
-	s.tween = nil
-	s.started = false
+    s := cast(^Tween_Step)data
+
+    if s.started && s.tween != nil && gd.tween_is_valid(s.tween) {
+        gd.tween_kill(s.tween)
+    }
+
+    s.tween = nil
+    s.started = false
 }
 
 @(private)
 tween_free :: proc(data: rawptr) {
-	s := cast(^Tween_Step)data
-	if s.started && s.tween != nil && gd.tween_is_valid(s.tween) {
-		gd.tween_kill(s.tween)
-	}
-	free(s)
+    s := cast(^Tween_Step)data
+
+    if s.started && s.tween != nil && gd.tween_is_valid(s.tween) {
+        gd.tween_kill(s.tween)
+    }
+
+    free(s)
 }

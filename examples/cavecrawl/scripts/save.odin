@@ -21,11 +21,13 @@ GAME_VERSION :: u16(11) // stamped into saves; bump when cave content shifts
 // Where the save lives; tests point it somewhere disposable via env.
 @(private = "file")
 save_path :: proc() -> cstring {
-	p := gd.env_string("CAVE_SAVE")
-	if p != "" {
-		return fmt.ctprintf("%s", p)
-	}
-	return "user://cave_save.fslp"
+    p := gd.env_string("CAVE_SAVE")
+
+    if p != "" {
+        return fmt.ctprintf("%s", p)
+    }
+
+    return "user://cave_save.fslp"
 }
 
 // The backup half (kboot.boot_migration's generated table calls it, host
@@ -34,8 +36,11 @@ save_path :: proc() -> cstring {
 // diorama of it.
 @(gd_half)
 cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
-	if !self.started {return}
-	write_game_blob(self, w)
+    if !self.started {
+        return
+    }
+
+    write_game_blob(self, w)
 }
 
 // The campaign bytes are now DECLARED, not hand-serialized: the six gd:"backup"
@@ -46,36 +51,39 @@ cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
 // bridge the generated codec to the blob call sites (a []u8 in, a Writer out).
 @(private = "file")
 write_game_blob :: proc(self: ^CaveLobby, w: ^knet.Writer) {
-	cave_lobby_backup_write(self, w)
+    cave_lobby_backup_write(self, w)
 }
 
 @(private = "file")
 read_game_blob :: proc(self: ^CaveLobby, blob: []u8) -> bool {
-	r := knet.reader_make(blob)
-	return cave_lobby_backup_read(self, &r)
+    r := knet.reader_make(blob)
+    return cave_lobby_backup_read(self, &r)
 }
 
 // Host: write the run to disk — one call, everything phases 0-5 built.
 @(gd_method)
 cave_lobby_save_run :: proc(self: ^CaveLobby) {
-	if !self.ses.is_host || !self.started {return}
-	blob := knet.writer_make()
-	defer knet.writer_destroy(&blob)
-	write_game_blob(self, &blob)
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	ksave.save_write(&self.ses, &w, GAME_VERSION, knet.writer_bytes(&blob))
-	ok := ksave.write_file(save_path(), knet.writer_bytes(&w))
-	gd.print_str(fmt.tprintf("CAVE_SAVED ok=%v bytes=%d", ok, len(knet.writer_bytes(&w))))
-	// #24: the replicated-state fingerprint at the exact moment this snapshot was
-	// taken. session_state_hash walks the DELTA lane (owner-streamed x/y and
-	// interpolation are excluded by construction, so it is stable across the wire
-	// and across a save). The resume prints the same line; the acid asserts they
-	// match, proving the save round-trips the LIVE entity state byte-for-byte —
-	// the desync-forensics probe the game never had, complementing the seed
-	// checksums that only cover procgen.
-	gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
-	kcomms.comms_system(&self.comms, "the run is etched in stone")
+    if !self.ses.is_host || !self.started {
+        return
+    }
+
+    blob := knet.writer_make()
+    defer knet.writer_destroy(&blob)
+    write_game_blob(self, &blob)
+    w := knet.writer_make()
+    defer knet.writer_destroy(&w)
+    ksave.save_write(&self.ses, &w, GAME_VERSION, knet.writer_bytes(&blob))
+    ok := ksave.write_file(save_path(), knet.writer_bytes(&w))
+    gd.print_str(fmt.tprintf("CAVE_SAVED ok=%v bytes=%d", ok, len(knet.writer_bytes(&w))))
+    // #24: the replicated-state fingerprint at the exact moment this snapshot was
+    // taken. session_state_hash walks the DELTA lane (owner-streamed x/y and
+    // interpolation are excluded by construction, so it is stable across the wire
+    // and across a save). The resume prints the same line; the acid asserts they
+    // match, proving the save round-trips the LIVE entity state byte-for-byte —
+    // the desync-forensics probe the game never had, complementing the seed
+    // checksums that only cover procgen.
+    gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
+    kcomms.comms_system(&self.comms, "the run is etched in stone")
 }
 
 // Host a RESUMED run: the world, the roster (everyone reclaimable), the
@@ -86,64 +94,80 @@ cave_lobby_save_run :: proc(self: ^CaveLobby) {
 // standing by a failed host is fine — the next *_start re-inits).
 @(gd_method)
 cave_lobby_on_resume :: proc(self: ^CaveLobby) {
-	if self.running {return}
-	blob, err := ksave.resume(&self.ses, my_name(self), save_path(), GAME_VERSION)
-	switch err {
-	case .No_File:
-		kui.lobby_set_status(&self.boot.ui, "No saved run to resume")
-		gd.print_str("CAVE_RESUME_FAIL no-file")
-		return
-	case .Bad_Envelope, .Wrong_Version:
-		kui.lobby_set_status(&self.boot.ui, "That save is from another cave")
-		gd.print_str("CAVE_RESUME_FAIL header")
-		return
-	case .Corrupt:
-		gd.print_str("CAVE_RESUME_FAIL snapshot")
-		return
-	case .Ok:
-	}
-	if !read_game_blob(self, blob) {
-		gd.print_str("CAVE_RESUME_FAIL blob")
-		return
-	}
-	// #24: fingerprint the restored delta lane BEFORE the resumed sim ticks —
-	// it must equal the CAVE_STATE_HASH the save printed. ksave.resume restored
-	// exactly the entities save_write serialized, so a match proves nothing was
-	// dropped or misread across the file. (read_game_blob restored only host-local
-	// caches — brains, the director — which are not on the delta lane this hashes.)
-	gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
-	if !gd.host(self.owner, port()) {
-		gd.print_str("CAVE_HOST_FAIL")
-		return
-	}
-	self.cols = kcombat.combat_columns(&self.ses) // find, not redeclare
-	self.slain_col = ksess.session_stat_column(&self.ses, "slain")
-	// The snapshot restored the depth; the resumed AUTHORITY needs the
-	// floor's caches (scenery markers, wave plan) before its first tick.
-	if self.level != nil {
-		cave_cache_floor(self, int(self.level.depth))
-	}
-	self.running = true
-	enter_the_cave(self)
-	kui.chat_show(&self.boot.chat, true)
-	kcomms.comms_system(&self.comms, "the cave remembers")
-	door_open := false
-	for _, d in self.doors {door_open = d.open}
-	gd.print_str(
-		fmt.tprintf(
-			"CAVE_RESUMED me=%d players=%d entities=%d reg=%d dwellers=%d gems=%d door=%v",
-			u64(self.ses.me),
-			// ROSTER size, disconnected rows included — after a resume everyone
-			// starts disconnected; the receipt counts seats, not presence.
-			ksess.session_count(&self.ses, connected_only = false, players_only = false),
-			len(self.boot.ent_nodes),
-			knet.registry_count(&self.ses.reg),
-			len(self.dwellers),
-			int(cave_lobby_world_gems(self)),
-			door_open,
-		),
-	)
-	gd.print_str(fmt.tprintf("CAVE_BLOB wave=%d ticks=%d brains=%d", self.director.wave, self.host_ticks, len(self.brains)))
+    if self.running {
+        return
+    }
+
+    blob, err := ksave.resume(&self.ses, my_name(self), save_path(), GAME_VERSION)
+
+    switch err {
+    case .No_File:
+        kui.lobby_set_status(&self.boot.ui, "No saved run to resume")
+        gd.print_str("CAVE_RESUME_FAIL no-file")
+        return
+    case .Bad_Envelope, .Wrong_Version:
+        kui.lobby_set_status(&self.boot.ui, "That save is from another cave")
+        gd.print_str("CAVE_RESUME_FAIL header")
+        return
+    case .Corrupt:
+        gd.print_str("CAVE_RESUME_FAIL snapshot")
+        return
+    case .Ok:
+    }
+
+    if !read_game_blob(self, blob) {
+        gd.print_str("CAVE_RESUME_FAIL blob")
+        return
+    }
+
+    // #24: fingerprint the restored delta lane BEFORE the resumed sim ticks —
+    // it must equal the CAVE_STATE_HASH the save printed. ksave.resume restored
+    // exactly the entities save_write serialized, so a match proves nothing was
+    // dropped or misread across the file. (read_game_blob restored only host-local
+    // caches — brains, the director — which are not on the delta lane this hashes.)
+    gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
+
+    if !gd.host(self.owner, port()) {
+        gd.print_str("CAVE_HOST_FAIL")
+        return
+    }
+
+    self.cols = kcombat.combat_columns(&self.ses) // find, not redeclare
+    self.slain_col = ksess.session_stat_column(&self.ses, "slain")
+
+    // The snapshot restored the depth; the resumed AUTHORITY needs the
+    // floor's caches (scenery markers, wave plan) before its first tick.
+    if self.level != nil {
+        cave_cache_floor(self, int(self.level.depth))
+    }
+
+    self.running = true
+    enter_the_cave(self)
+    kui.chat_show(&self.boot.chat, true)
+    kcomms.comms_system(&self.comms, "the cave remembers")
+    door_open := false
+
+    for _, d in self.doors {
+        door_open = d.open
+    }
+
+    gd.print_str(
+        fmt.tprintf(
+            "CAVE_RESUMED me=%d players=%d entities=%d reg=%d dwellers=%d gems=%d door=%v",
+            u64(self.ses.me),
+            // ROSTER size, disconnected rows included — after a resume everyone
+            // starts disconnected; the receipt counts seats, not presence.
+            ksess.session_count(&self.ses, connected_only = false, players_only = false),
+            len(self.boot.ent_nodes),
+            knet.registry_count(&self.ses.reg),
+            len(self.dwellers),
+            int(cave_lobby_world_gems(self)),
+            door_open,
+        ),
+    )
+    gd.print_str(
+        fmt.tprintf("CAVE_BLOB wave=%d ticks=%d brains=%d", self.director.wave, self.host_ticks, len(self.brains)),
+    )
 }
 
 
@@ -154,7 +178,7 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 // the manual door the driver presses.
 @(gd_method)
 cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
-	_ = kboot.boot_take_over(&self.boot)
+    _ = kboot.boot_take_over(&self.boot)
 }
 
 // The heir's half, fired AFTER the kit resumed the run as ours: read the
@@ -163,27 +187,30 @@ cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
 // cave_lobby_migrating.
 @(gd_half)
 cave_lobby_took_over :: proc(self: ^CaveLobby, r: ^knet.Reader) {
-	if !cave_lobby_backup_read(self, r) {
-		gd.print_str("CAVE_TAKEOVER_FAIL blob")
-		return
-	}
-	self.cols = kcombat.combat_columns(&self.ses)
-	self.slain_col = ksess.session_stat_column(&self.ses, "slain")
-	if self.level != nil {
-		cave_cache_floor(self, int(self.level.depth))
-	}
-	self.host_gone = false
-	kui.lobby_set_status(&self.boot.ui, "You carry the torch now")
-	kcomms.comms_system(&self.comms, "the torch passes")
-	gd.print_str(
-		fmt.tprintf(
-			"CAVE_TAKEOVER me=%d players=%d entities=%d dwellers=%d",
-			u64(self.ses.me),
-			// Roster rows, like CAVE_RESUMED — the takeover moment still counts
-			// seats mid-reconnect, not who has knocked yet.
-			ksess.session_count(&self.ses, connected_only = false, players_only = false),
-			knet.registry_count(&self.ses.reg),
-			len(self.dwellers),
-		),
-	)
+    if !cave_lobby_backup_read(self, r) {
+        gd.print_str("CAVE_TAKEOVER_FAIL blob")
+        return
+    }
+
+    self.cols = kcombat.combat_columns(&self.ses)
+    self.slain_col = ksess.session_stat_column(&self.ses, "slain")
+
+    if self.level != nil {
+        cave_cache_floor(self, int(self.level.depth))
+    }
+
+    self.host_gone = false
+    kui.lobby_set_status(&self.boot.ui, "You carry the torch now")
+    kcomms.comms_system(&self.comms, "the torch passes")
+    gd.print_str(
+        fmt.tprintf(
+            "CAVE_TAKEOVER me=%d players=%d entities=%d dwellers=%d",
+            u64(self.ses.me),
+            // Roster rows, like CAVE_RESUMED — the takeover moment still counts
+            // seats mid-reconnect, not who has knocked yet.
+            ksess.session_count(&self.ses, connected_only = false, players_only = false),
+            knet.registry_count(&self.ses.reg),
+            len(self.dwellers),
+        ),
+    )
 }

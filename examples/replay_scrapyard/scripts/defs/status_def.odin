@@ -16,15 +16,15 @@ package scrapyard_defs
 import gd "godot:godot"
 
 StatusDef :: struct {
-	owner: gd.Resource,
-	id: gd.Int `gd:"export,range=1:254:1"`, // Effect.kind on the wire
-	name: gd.String `gd:"export"`,
-	duration: gd.Int `gd:"export,range=1:36000:1"`, // ticks (60/s)
-	max_stacks: gd.Int `gd:"export,range=1:9:1"`, // 1 = classic refresh-only
-	move_mult: f32 `gd:"export,range=0:3:0.05"`, // 1 = untouched; 0 = frozen solid
-	dot_dmg: gd.Int `gd:"export,range=-20:20:1"`, // per pulse PER STACK; negative HEALS
-	dot_every: gd.Int `gd:"export,range=0:600:1"`, // pulse cadence, ticks (0 = no dot)
-	taken_mult: f32 `gd:"export,range=0:4:0.05"`, // damage-taken while afflicted (armor <1, vulnerable >1)
-	dealt_mult: f32 `gd:"export,range=0:4:0.05"`, // damage-dealt (buff seats; consumed when runners wear statuses)
-	tint: gd.Color `gd:"export"`, // the afflicted body's wash (alpha 0 = no tint)
+    owner: gd.Resource,
+    id: gd.Int `gd:"export,range=1:254:1"`, // Effect.kind on the wire
+    name: gd.String `gd:"export"`,
+    duration: gd.Int `gd:"export,range=1:36000:1"`, // ticks (60/s)
+    max_stacks: gd.Int `gd:"export,range=1:9:1"`, // 1 = classic refresh-only
+    move_mult: f32 `gd:"export,range=0:3:0.05"`, // 1 = untouched; 0 = frozen solid
+    dot_dmg: gd.Int `gd:"export,range=-20:20:1"`, // per pulse PER STACK; negative HEALS
+    dot_every: gd.Int `gd:"export,range=0:600:1"`, // pulse cadence, ticks (0 = no dot)
+    taken_mult: f32 `gd:"export,range=0:4:0.05"`, // damage-taken while afflicted (armor <1, vulnerable >1)
+    dealt_mult: f32 `gd:"export,range=0:4:0.05"`, // damage-dealt (buff seats; consumed when runners wear statuses)
+    tint: gd.Color `gd:"export"`, // the afflicted body's wash (alpha 0 = no tint)
 }

@@ -26,61 +26,81 @@ import "core:fmt"
 // gate restores its marker after marshaling the return value; nested calls keep
 // their caller's temporaries alive. Freestanding default-temp guards are no-ops.
 @(private)
-web_temp_arena:runtime.Arena
+web_temp_arena: runtime.Arena
 @(private)
-web_temp_ready:bool
+web_temp_ready: bool
+
 @(private)
-web_temp_ensure :: proc "contextless"(){
- if web_temp_ready{return}
- context=runtime.default_context()
- context.allocator=web_aligned_allocator()
- if runtime.arena_init(&web_temp_arena,4*runtime.Megabyte,context.allocator)!=nil{runtime.trap()}
- web_temp_ready=true
+web_temp_ensure :: proc "contextless" () {
+    if web_temp_ready {
+        return
+    }
+
+    context = runtime.default_context()
+    context.allocator = web_aligned_allocator()
+
+    if runtime.arena_init(&web_temp_arena, 4 * runtime.Megabyte, context.allocator) != nil {
+        runtime.trap()
+    }
+
+    web_temp_ready = true
 }
+
 @(private)
-web_temporary_allocator :: proc "contextless"()->runtime.Allocator{
- web_temp_ensure();context=runtime.default_context()
- return runtime.arena_allocator(&web_temp_arena)
+web_temporary_allocator :: proc "contextless" () -> runtime.Allocator {
+    web_temp_ensure()
+    context = runtime.default_context()
+    return runtime.arena_allocator(&web_temp_arena)
 }
+
 @(private)
-web_temporary_shutdown :: proc "contextless"(){
- if web_script_access_depth!=0{runtime.trap()}
- if web_temp_ready{runtime.arena_destroy(&web_temp_arena);web_temp_ready=false}
+web_temporary_shutdown :: proc "contextless" () {
+    if web_script_access_depth != 0 {
+        runtime.trap()
+    }
+
+    if web_temp_ready {
+        runtime.arena_destroy(&web_temp_arena)
+        web_temp_ready = false
+    }
 }
+
 @(private)
 web_script_context :: proc "contextless" () -> runtime.Context {
-	c := runtime.default_context()
-	a := web_aligned_allocator()
-	c.allocator = a
-	c.temp_allocator = web_temporary_allocator()
-	// Make `core:math/rand` work in the browser. The default chacha8 generator carried by
-	// runtime.default_context() lazily self-seeds from the OS entropy source on first use —
-	// but freestanding_wasm32 has none (runtime.HAS_RAND_BYTES == false), so that path hits
-	// `panic_contextless("no runtime entropy source")` -> wasm `unreachable` trap on EVERY
-	// rand call. Point the context at our own state (seeded below + in web_startup) so it is
-	// already `_seeded` and never reaches the entropy path. One shared global state -> the
-	// sequence ADVANCES across script calls instead of restarting each invocation. (Native is
-	// unaffected: scripts_native.odin never touches random_generator, so native scripts keep
-	// runtime.default_context()'s OS-seeded generator.)
-	//
-	// REAL ENTROPY: web_startup seeded `web_random_state` with a fixed fallback so rand never
-	// traps even before the engine is up; here, on the FIRST script context (the engine is
-	// fully booted by the time any script lifecycle runs), we RESEED once from Godot's own
-	// global RNG, which the web platform seeds from the browser's entropy. So each page load
-	// gets a different sequence — no extra JS/Emscripten glue.
-	if !web_random_seeded {
-		web_random_seeded = true
-		web_reseed_random_from_engine()
-	}
-	c.random_generator = runtime.default_random_generator(&web_random_state)
-	// Surface panics/asserts/logs in the browser console. The freestanding defaults are
-	// silent (the assertion handler is literally `// Do nothing` then traps; the logger's
-	// stderr write is a no-op), which is exactly why the rand entropy panic showed only a
-	// bare `unreachable executed`. Route both through Godot's print path (reaches the JS
-	// console) — see web_assertion_failure_proc / web_logger_proc below.
-	c.assertion_failure_proc = web_assertion_failure_proc
-	c.logger = runtime.Logger{web_logger_proc, nil, .Debug, nil}
-	return c
+    c := runtime.default_context()
+    a := web_aligned_allocator()
+    c.allocator = a
+    c.temp_allocator = web_temporary_allocator()
+
+    // Make `core:math/rand` work in the browser. The default chacha8 generator carried by
+    // runtime.default_context() lazily self-seeds from the OS entropy source on first use —
+    // but freestanding_wasm32 has none (runtime.HAS_RAND_BYTES == false), so that path hits
+    // `panic_contextless("no runtime entropy source")` -> wasm `unreachable` trap on EVERY
+    // rand call. Point the context at our own state (seeded below + in web_startup) so it is
+    // already `_seeded` and never reaches the entropy path. One shared global state -> the
+    // sequence ADVANCES across script calls instead of restarting each invocation. (Native is
+    // unaffected: scripts_native.odin never touches random_generator, so native scripts keep
+    // runtime.default_context()'s OS-seeded generator.)
+    //
+    // REAL ENTROPY: web_startup seeded `web_random_state` with a fixed fallback so rand never
+    // traps even before the engine is up; here, on the FIRST script context (the engine is
+    // fully booted by the time any script lifecycle runs), we RESEED once from Godot's own
+    // global RNG, which the web platform seeds from the browser's entropy. So each page load
+    // gets a different sequence — no extra JS/Emscripten glue.
+    if !web_random_seeded {
+        web_random_seeded = true
+        web_reseed_random_from_engine()
+    }
+
+    c.random_generator = runtime.default_random_generator(&web_random_state)
+    // Surface panics/asserts/logs in the browser console. The freestanding defaults are
+    // silent (the assertion handler is literally `// Do nothing` then traps; the logger's
+    // stderr write is a no-op), which is exactly why the rand entropy panic showed only a
+    // bare `unreachable executed`. Route both through Godot's print path (reaches the JS
+    // console) — see web_assertion_failure_proc / web_logger_proc below.
+    c.assertion_failure_proc = web_assertion_failure_proc
+    c.logger = runtime.Logger{web_logger_proc, nil, .Debug, nil}
+    return c
 }
 
 // Persistent PRNG state backing `context.random_generator` for compiled scripts on web.
@@ -103,15 +123,19 @@ web_random_seeded: bool // false until reseeded from the engine on the first scr
 // first; two `randi()` draws (each a random 32-bit value in an Int) compose a 64-bit seed.
 @(private)
 web_reseed_random_from_engine :: proc "contextless" () {
-	// reset_u64 is a context-ful runtime proc (though it doesn't allocate); give it a throwaway
-	// context so it's callable from here. The .Reset path only writes into web_random_state.
-	context = runtime.default_context()
-	gd.gd_randomize()
-	hi := u64(u32(gd.gd_randi()))
-	lo := u64(u32(gd.gd_randi()))
-	seed := (hi << 32) | lo
-	if seed == 0 {seed = WEB_RANDOM_FALLBACK_SEED} // never reseed to a degenerate zero state
-	runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), seed)
+    // reset_u64 is a context-ful runtime proc (though it doesn't allocate); give it a throwaway
+    // context so it's callable from here. The .Reset path only writes into web_random_state.
+    context = runtime.default_context()
+    gd.gd_randomize()
+    hi := u64(u32(gd.gd_randi()))
+    lo := u64(u32(gd.gd_randi()))
+    seed := (hi << 32) | lo
+
+    if seed == 0 {
+        seed = WEB_RANDOM_FALLBACK_SEED
+    } // never reseed to a degenerate zero state
+
+    runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), seed)
 }
 
 // context.assertion_failure_proc for compiled scripts on web. A script `panic`, failed
@@ -122,19 +146,19 @@ web_reseed_random_from_engine :: proc "contextless" () {
 // sentinel. Returns `!` (never returns) — terminate with runtime.trap() like the default.
 @(private)
 web_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	buf: [1024]byte
-	msg := fmt.bprintf(
-		buf[:],
-		"ODIN_SCRIPT_PANIC %s: %s (%s:%d:%d)",
-		prefix,
-		message,
-		loc.file_path,
-		loc.line,
-		loc.column,
-	)
-	gd.error_str(msg) // -> push_error -> console.error
-	gd.print_str(msg) // -> print     -> console.log (guarantees the message is captured)
-	runtime.trap()
+    buf: [1024]byte
+    msg := fmt.bprintf(
+        buf[:],
+        "ODIN_SCRIPT_PANIC %s: %s (%s:%d:%d)",
+        prefix,
+        message,
+        loc.file_path,
+        loc.line,
+        loc.column,
+    )
+    gd.error_str(msg) // -> push_error -> console.error
+    gd.print_str(msg) // -> print     -> console.log (guarantees the message is captured)
+    runtime.trap()
 }
 
 // context.logger for compiled scripts on web. The freestanding default logger writes to a
@@ -142,17 +166,17 @@ web_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_
 // Godot's print path instead: Error/Fatal -> push_error (console.error), else -> print.
 @(private)
 web_logger_proc :: proc(
-	data: rawptr,
-	level: runtime.Logger_Level,
-	text: string,
-	options: runtime.Logger_Options,
-	location := #caller_location,
+    data: rawptr,
+    level: runtime.Logger_Level,
+    text: string,
+    options: runtime.Logger_Options,
+    location := #caller_location,
 ) {
-	if level >= .Error {
-		gd.error_str(text)
-	} else {
-		gd.print_str(text)
-	}
+    if level >= .Error {
+        gd.error_str(text)
+    } else {
+        gd.print_str(text)
+    }
 }
 
 // A SIDE_MODULE has no CRT / entry point, so the Odin `@(init)` chain is not run
@@ -161,51 +185,68 @@ web_logger_proc :: proc(
 // (`__$startup_runtime` is generated by the compiler from all `@(init)` procs.) We also
 // install the web script context hook so allocating scripts work in the browser.
 web_startup :: proc "contextless" () {
-	rt.script_context_hook = web_script_context
-	context = runtime.default_context()
-	// Seed the script PRNG with a fixed NON-ZERO fallback up front, so core:math/rand can
-	// never hit the (absent) OS entropy source and trap — even if something draws before the
-	// first script context reseeds it from the engine (see web_script_context above).
-	// reset_u64 drives the generator's .Reset mode, marking the state `_seeded`.
-	runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), WEB_RANDOM_FALLBACK_SEED)
-	runtime._startup_runtime()
+    rt.script_context_hook = web_script_context
+    context = runtime.default_context()
+    // Seed the script PRNG with a fixed NON-ZERO fallback up front, so core:math/rand can
+    // never hit the (absent) OS entropy source and trap — even if something draws before the
+    // first script context reseeds it from the engine (see web_script_context above).
+    // reset_u64 drives the generator's .Reset mode, marking the state `_seeded`.
+    runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), WEB_RANDOM_FALLBACK_SEED)
+    runtime._startup_runtime()
 }
 
 // Read the manifest directly (same module — no dlsym). The registrations have already
 // run via web_startup, so the registry is populated.
 @(private)
 odin_scripts_load :: proc() {
- if !box3d_web_initialize(){gd.print_str("ODIN_BOX3D_WEB_SERVICE_REJECTED one-domain service/identity/origin validation failed");return}
-	// Single module on web: wire the typed cross-script resolver directly (no dlsym).
-	rt.odin_scripts_set_core_api(odin_script_struct)
-	rt.odin_scripts_set_core_api2(odin_script_struct_any)
-	n: i32
-	descs := rt.odin_scripts_manifest(&n)
-	index_scripts_manifest(descs, int(n))
-	// Registration errors from the reflection walk (run in web_startup's @(init) chain).
-	// Same module — read the table directly and surface immediately: this runs at .Scene
-	// init, where push_error already reaches the JS console (no frame pump on web).
-	en: i32
-	errs := rt.odin_scripts_registration_errors(&en)
-	scripts_note_registration_errors(errs, int(en))
-	scripts_surface_registration_errors()
+    if !box3d_web_initialize() {
+        gd.print_str("ODIN_BOX3D_WEB_SERVICE_REJECTED one-domain service/identity/origin validation failed")
+        return
+    }
+
+    // Single module on web: wire the typed cross-script resolver directly (no dlsym).
+    rt.odin_scripts_set_core_api(odin_script_struct)
+    rt.odin_scripts_set_core_api2(odin_script_struct_any)
+    n: i32
+    descs := rt.odin_scripts_manifest(&n)
+    index_scripts_manifest(descs, int(n))
+    // Registration errors from the reflection walk (run in web_startup's @(init) chain).
+    // Same module — read the table directly and surface immediately: this runs at .Scene
+    // init, where push_error already reaches the JS console (no frame pump on web).
+    en: i32
+    errs := rt.odin_scripts_registration_errors(&en)
+    scripts_note_registration_errors(errs, int(en))
+    scripts_surface_registration_errors()
 }
 
 // No hot reload in the browser (no compiler, no dlopen). Always reports failure.
 // (`module` mirrors the native per-module signature so shared callers compile.)
 @(private)
 odin_scripts_reload :: proc(module := "") -> bool {
-	return false
+    return false
 }
 
 // Shared instance bookkeeping uses native generation leases. Web has one permanently
 // linked image and no dlopen/reload, so the same hooks compile to inert tokens.
 @(private)
-script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {return box3d_web_image.alive?rawptr(&box3d_web_image):nil}
+script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {
+    return box3d_web_image.alive ? rawptr(&box3d_web_image) : nil
+}
+
 @(private)
-script_generation_retain :: proc "contextless" (generation: rawptr) {if generation!=nil{box3d_web_pin(generation)}}
+script_generation_retain :: proc "contextless" (generation: rawptr) {
+    if generation != nil {
+        box3d_web_pin(generation)
+    }
+}
+
 @(private)
-script_generation_release :: proc "contextless" (generation: rawptr) {if generation!=nil{box3d_web_unpin(generation)}}
+script_generation_release :: proc "contextless" (generation: rawptr) {
+    if generation != nil {
+        box3d_web_unpin(generation)
+    }
+}
+
 @(private)
 script_generations_collect_pending :: proc() {}
 

@@ -35,6 +35,7 @@ expect_args :: proc "contextless" (
 
     for arg_type, arg_idx in arg_types {
         type := gdext.variant_get_type(cast(^godot.Variant)args[arg_idx])
+
         if type != arg_type {
             error.error = .Invalid_Argument
             error.expected = cast(i32)arg_type
@@ -87,21 +88,25 @@ bind_property_and_methods_cstring :: proc(
     static_strings := true,
 ) {
     class_name := godot.new_string_name_cstring(class_name, static_strings)
+
     defer if !static_strings {
         godot.free_string_name(class_name)
     }
 
     name := godot.new_string_name_cstring(name, static_strings)
+
     defer if !static_strings {
         godot.free_string_name(name)
     }
 
     getter_name := godot.new_string_name_cstring(getter_name, static_strings)
+
     defer if !static_strings {
         godot.free_string_name(getter_name)
     }
 
     setter_name := godot.new_string_name_cstring(setter_name, static_strings)
+
     defer if !static_strings {
         godot.free_string_name(setter_name)
     }

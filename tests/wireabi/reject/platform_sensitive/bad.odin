@@ -5,9 +5,10 @@ package bad_platform_wire
 import gd "godot:godot"
 
 Nested :: struct {
-	count: int,
+    count: int,
 }
+
 BadPlatformWire :: struct {
-	owner: gd.Node,
-	state: Nested `gd:"replicate"`,
+    owner: gd.Node,
+    state: Nested `gd:"replicate"`,
 }

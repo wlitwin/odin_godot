@@ -47,23 +47,23 @@ INTERP_MARGIN :: 0.010 // 10 ms
 // interp_delay still guarantees; max = the ceiling). delay is the live value the
 // session reads. target and shrink_s are the controller's own memory.
 Interp_Adapt :: struct {
-	min:      f64,
-	max:      f64,
-	delay:    f64, // the current interp_delay (what the session renders against)
-	target:   f64, // last-computed target (need + margin, clamped) — for the netgraph/tests
-	shrink_s: f64, // continuous seconds the target has read below delay-deadband
+    min:      f64,
+    max:      f64,
+    delay:    f64, // the current interp_delay (what the session renders against)
+    target:   f64, // last-computed target (need + margin, clamped) — for the netgraph/tests
+    shrink_s: f64, // continuous seconds the target has read below delay-deadband
 }
 
 // interp_adapt_reset — arm the controller at *_start. floor is the delay a set
 // interp_delay still guarantees (and the value adapting starts from); ceiling is
 // the cap. Adapting begins at the floor and only ever grows from real link need.
 interp_adapt_reset :: proc(a: ^Interp_Adapt, floor, ceiling: f64) {
-	a^ = Interp_Adapt {
-		min    = floor,
-		max    = max(ceiling, floor), // a nonsense ceiling below the floor collapses to the floor
-		delay  = floor,
-		target = floor,
-	}
+    a^ = Interp_Adapt {
+        min    = floor,
+        max    = max(ceiling, floor), // a nonsense ceiling below the floor collapses to the floor
+        delay  = floor,
+        target = floor,
+    }
 }
 
 // interp_adapt_update — advance the controller by dt real seconds toward the
@@ -71,33 +71,36 @@ interp_adapt_reset :: proc(a: ^Interp_Adapt, floor, ceiling: f64) {
 // margin). Returns the new delay (also stored in a.delay). Pure: same inputs,
 // same output — the property the tests lean on.
 interp_adapt_update :: proc(a: ^Interp_Adapt, want, dt: f64) -> f64 {
-	if dt <= 0 {
-		return a.delay
-	}
-	target := want + INTERP_MARGIN
-	target = clamp(target, a.min, a.max)
-	a.target = target
+    if dt <= 0 {
+        return a.delay
+    }
 
-	cur := a.delay
-	switch {
-	case target > cur:
-		// GROW: straight at the target, and re-arm the shrink gate. A link that
-		// pokes back up mid-hold resets the whole 5-second countdown, by design.
-		cur = min(cur + GROW_RATE * dt, target)
-		a.shrink_s = 0
-	case target < cur - SHRINK_DEADBAND:
-		// The target reads better by more than the deadband — start (or continue)
-		// the hysteresis countdown; only actually shrink once it has held.
-		a.shrink_s += dt
-		if a.shrink_s >= SHRINK_HOLD {
-			cur = max(cur - SHRINK_RATE * dt, target)
-		}
-	case:
-		// Inside the deadband: neither grow nor commit to a shrink. Hold, and drop
-		// any partial countdown — the link is effectively where we render it.
-		a.shrink_s = 0
-	}
+    target := want + INTERP_MARGIN
+    target = clamp(target, a.min, a.max)
+    a.target = target
 
-	a.delay = clamp(cur, a.min, a.max)
-	return a.delay
+    cur := a.delay
+
+    switch {
+    case target > cur:
+        // GROW: straight at the target, and re-arm the shrink gate. A link that
+        // pokes back up mid-hold resets the whole 5-second countdown, by design.
+        cur = min(cur + GROW_RATE * dt, target)
+        a.shrink_s = 0
+    case target < cur - SHRINK_DEADBAND:
+        // The target reads better by more than the deadband — start (or continue)
+        // the hysteresis countdown; only actually shrink once it has held.
+        a.shrink_s += dt
+
+        if a.shrink_s >= SHRINK_HOLD {
+            cur = max(cur - SHRINK_RATE * dt, target)
+        }
+    case:
+        // Inside the deadband: neither grow nor commit to a shrink. Hold, and drop
+        // any partial countdown — the link is effectively where we render it.
+        a.shrink_s = 0
+    }
+
+    a.delay = clamp(cur, a.min, a.max)
+    return a.delay
 }

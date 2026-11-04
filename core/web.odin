@@ -35,11 +35,11 @@ WEB :: #config(ODIN_GODOT_WEB, false)
 //     both collide with Emscripten's arena and detach Emscripten's cached HEAP views
 //     when it grows memory via raw `memory.grow`.
 core_allocator :: proc() -> runtime.Allocator {
-	when WEB {
-		return web_aligned_allocator()
-	} else {
-		return runtime.heap_allocator()
-	}
+    when WEB {
+        return web_aligned_allocator()
+    } else {
+        return runtime.heap_allocator()
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -57,79 +57,92 @@ WEB_ALLOC_HEADER :: size_of(rawptr)
 
 @(private = "file")
 web_aligned_alloc :: proc "contextless" (size, alignment: int) -> rawptr {
-	a := max(alignment, WEB_ALLOC_HEADER)
-	total := size + a + WEB_ALLOC_HEADER
-	base := gdext.mem_alloc(cast(c.size_t)total)
-	if base == nil {
-		return nil
-	}
-	addr := uintptr(base) + WEB_ALLOC_HEADER
-	aligned := (addr + uintptr(a) - 1) & ~(uintptr(a) - 1)
-	(cast(^rawptr)(aligned - WEB_ALLOC_HEADER))^ = base
-	return rawptr(aligned)
+    a := max(alignment, WEB_ALLOC_HEADER)
+    total := size + a + WEB_ALLOC_HEADER
+    base := gdext.mem_alloc(cast(c.size_t)total)
+
+    if base == nil {
+        return nil
+    }
+
+    addr := uintptr(base) + WEB_ALLOC_HEADER
+    aligned := (addr + uintptr(a) - 1) & ~(uintptr(a) - 1)
+    (cast(^rawptr)(aligned - WEB_ALLOC_HEADER))^ = base
+    return rawptr(aligned)
 }
 
 @(private = "file")
 web_aligned_free :: proc "contextless" (ptr: rawptr) {
-	if ptr == nil {
-		return
-	}
-	base := (cast(^rawptr)(uintptr(ptr) - WEB_ALLOC_HEADER))^
-	gdext.mem_free(base)
+    if ptr == nil {
+        return
+    }
+
+    base := (cast(^rawptr)(uintptr(ptr) - WEB_ALLOC_HEADER))^
+    gdext.mem_free(base)
 }
 
 @(private = "file")
 web_aligned_allocator_proc :: proc(
-	allocator_data: rawptr,
-	mode: mem.Allocator_Mode,
-	size, alignment: int,
-	old_memory: rawptr,
-	old_size: int,
-	loc := #caller_location,
+    allocator_data: rawptr,
+    mode: mem.Allocator_Mode,
+    size, alignment: int,
+    old_memory: rawptr,
+    old_size: int,
+    loc := #caller_location,
 ) -> (
-	[]byte,
-	mem.Allocator_Error,
+    []byte,
+    mem.Allocator_Error,
 ) {
-	switch mode {
-	case .Alloc, .Alloc_Non_Zeroed:
-		p := web_aligned_alloc(size, alignment)
-		if p == nil {
-			return nil, .Out_Of_Memory
-		}
-		if mode == .Alloc {
-			mem.zero(p, size)
-		}
-		return mem.byte_slice(p, size), nil
-	case .Free:
-		web_aligned_free(old_memory)
-		return nil, nil
-	case .Free_All:
-		return nil, .Mode_Not_Implemented
-	case .Resize, .Resize_Non_Zeroed:
-		p := web_aligned_alloc(size, alignment)
-		if p == nil {
-			return nil, .Out_Of_Memory
-		}
-		if old_memory != nil {
-			mem.copy(p, old_memory, min(size, old_size))
-			web_aligned_free(old_memory)
-		}
-		if mode == .Resize && size > old_size {
-			mem.zero(rawptr(uintptr(p) + uintptr(old_size)), size - old_size)
-		}
-		return mem.byte_slice(p, size), nil
-	case .Query_Features:
-		set := (^mem.Allocator_Mode_Set)(old_memory)
-		if set != nil {
-			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Resize_Non_Zeroed, .Query_Features}
-		}
-		return nil, nil
-	case .Query_Info:
-		return nil, .Mode_Not_Implemented
-	}
-	return nil, nil
+    switch mode {
+    case .Alloc, .Alloc_Non_Zeroed:
+        p := web_aligned_alloc(size, alignment)
+
+        if p == nil {
+            return nil, .Out_Of_Memory
+        }
+
+        if mode == .Alloc {
+            mem.zero(p, size)
+        }
+
+        return mem.byte_slice(p, size), nil
+    case .Free:
+        web_aligned_free(old_memory)
+        return nil, nil
+    case .Free_All:
+        return nil, .Mode_Not_Implemented
+    case .Resize, .Resize_Non_Zeroed:
+        p := web_aligned_alloc(size, alignment)
+
+        if p == nil {
+            return nil, .Out_Of_Memory
+        }
+
+        if old_memory != nil {
+            mem.copy(p, old_memory, min(size, old_size))
+            web_aligned_free(old_memory)
+        }
+
+        if mode == .Resize && size > old_size {
+            mem.zero(rawptr(uintptr(p) + uintptr(old_size)), size - old_size)
+        }
+
+        return mem.byte_slice(p, size), nil
+    case .Query_Features:
+        set := (^mem.Allocator_Mode_Set)(old_memory)
+
+        if set != nil {
+            set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Resize_Non_Zeroed, .Query_Features}
+        }
+
+        return nil, nil
+    case .Query_Info:
+        return nil, .Mode_Not_Implemented
+    }
+
+    return nil, nil
 }
 
 web_aligned_allocator :: proc "contextless" () -> runtime.Allocator {
-	return mem.Allocator{procedure = web_aligned_allocator_proc, data = nil}
+    return mem.Allocator{procedure = web_aligned_allocator_proc, data = nil}
 }

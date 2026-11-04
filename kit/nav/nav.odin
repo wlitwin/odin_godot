@@ -55,12 +55,12 @@ g_never_resims: int
 // gated.
 @(deferred_none = pass_done)
 pass_never_resims :: proc() {
-	g_never_resims += 1
+    g_never_resims += 1
 }
 
 @(private)
 pass_done :: proc() {
-	g_never_resims -= 1
+    g_never_resims -= 1
 }
 
 // The gate every query runs first. An assert and not a silent empty path on
@@ -69,10 +69,10 @@ pass_done :: proc() {
 // bug this module exists to prevent.
 @(private)
 lane_check :: proc() {
-	assert(
-		g_never_resims > 0,
-		"kit/nav: path query outside a pass_never_resims() scope — the NavigationServer is live state that does not rewind, so a resimulating pass would steer YESTERDAY's ticks across TODAY's mesh. Claim the lane at the query site (see docs/kit/nav.md), or move the query to a pass that can honestly claim it",
-	)
+    assert(
+        g_never_resims > 0,
+        "kit/nav: path query outside a pass_never_resims() scope — the NavigationServer is live state that does not rewind, so a resimulating pass would steer YESTERDAY's ticks across TODAY's mesh. Claim the lane at the query site (see docs/kit/nav.md), or move the query to a pass that can honestly claim it",
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -80,16 +80,16 @@ lane_check :: proc() {
 
 // The default 2D navigation map of the world `node` lives in.
 map_2d :: proc(node: gd.Node) -> gd.Rid {
-	vp := gd.node_get_viewport(node)
-	world := gd.viewport_find_world_2d(vp)
-	return gd.world2d_get_navigation_map(world)
+    vp := gd.node_get_viewport(node)
+    world := gd.viewport_find_world_2d(vp)
+    return gd.world2d_get_navigation_map(world)
 }
 
 // The default 3D navigation map of the world `node` lives in.
 map_3d :: proc(node: gd.Node) -> gd.Rid {
-	vp := gd.node_get_viewport(node)
-	world := gd.viewport_find_world_3d(vp)
-	return gd.world3d_get_navigation_map(world)
+    vp := gd.node_get_viewport(node)
+    world := gd.viewport_find_world_3d(vp)
+    return gd.world3d_get_navigation_map(world)
 }
 
 // ---------------------------------------------------------------------------
@@ -99,12 +99,12 @@ map_3d :: proc(node: gd.Node) -> gd.Rid {
 // An optimized path across the node's default 2D map ([] when unreachable
 // or the map hasn't synced yet). The caller owns the slice.
 path_2d :: proc(node: gd.Node, from, to: [3]f32, allocator := context.allocator) -> [][3]f32 {
-	return path_2d_on(map_2d(node), from, to, allocator)
+    return path_2d_on(map_2d(node), from, to, allocator)
 }
 
 // An optimized path across the node's default 3D map. The caller owns it.
 path_3d :: proc(node: gd.Node, from, to: [3]f32, allocator := context.allocator) -> [][3]f32 {
-	return path_3d_on(map_3d(node), from, to, allocator)
+    return path_3d_on(map_3d(node), from, to, allocator)
 }
 
 // A path across an ALREADY-RESOLVED map. `path_2d` re-walks node -> viewport
@@ -114,30 +114,34 @@ path_3d :: proc(node: gd.Node, from, to: [3]f32, allocator := context.allocator)
 // is why this form exists). Resolve `map_2d` once outside the loop, call this
 // inside it.
 path_2d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.allocator) -> [][3]f32 {
-	lane_check()
-	server := gd.singleton_navigation_server2d()
-	pts := gd.navigation_server2d_map_get_path(server, nav_map, {from.x, from.y}, {to.x, to.y}, true, 1)
-	n := int(gd.packed_vector2_array_size(&pts))
-	out := make([][3]f32, n, allocator)
-	for i in 0 ..< n {
-		p := gd.packed_vector2_array_get(&pts, gd.Int(i))
-		out[i] = {p.x, p.y, 0}
-	}
-	return out
+    lane_check()
+    server := gd.singleton_navigation_server2d()
+    pts := gd.navigation_server2d_map_get_path(server, nav_map, {from.x, from.y}, {to.x, to.y}, true, 1)
+    n := int(gd.packed_vector2_array_size(&pts))
+    out := make([][3]f32, n, allocator)
+
+    for i in 0 ..< n {
+        p := gd.packed_vector2_array_get(&pts, gd.Int(i))
+        out[i] = {p.x, p.y, 0}
+    }
+
+    return out
 }
 
 // The 3D twin of path_2d_on — same reason, same shape.
 path_3d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.allocator) -> [][3]f32 {
-	lane_check()
-	server := gd.singleton_navigation_server3d()
-	pts := gd.navigation_server3d_map_get_path(server, nav_map, {from.x, from.y, from.z}, {to.x, to.y, to.z}, true, 1)
-	n := int(gd.packed_vector3_array_size(&pts))
-	out := make([][3]f32, n, allocator)
-	for i in 0 ..< n {
-		p := gd.packed_vector3_array_get(&pts, gd.Int(i))
-		out[i] = {p.x, p.y, p.z}
-	}
-	return out
+    lane_check()
+    server := gd.singleton_navigation_server3d()
+    pts := gd.navigation_server3d_map_get_path(server, nav_map, {from.x, from.y, from.z}, {to.x, to.y, to.z}, true, 1)
+    n := int(gd.packed_vector3_array_size(&pts))
+    out := make([][3]f32, n, allocator)
+
+    for i in 0 ..< n {
+        p := gd.packed_vector3_array_get(&pts, gd.Int(i))
+        out[i] = {p.x, p.y, p.z}
+    }
+
+    return out
 }
 
 // The waypoint to walk toward RIGHT NOW. `idx` is the follower's cursor
@@ -145,12 +149,15 @@ path_3d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.alloc
 // never re-targeted — a stateless nearest-scan would walk you backwards to
 // points you already passed. ok=false = the path is done (or empty).
 next_point :: proc "contextless" (path: [][3]f32, idx: ^int, pos: [3]f32, reach: f32) -> (goal: [3]f32, ok: bool) {
-	for idx^ < len(path) {
-		d := path[idx^] - pos
-		if d.x * d.x + d.y * d.y + d.z * d.z > reach * reach {
-			return path[idx^], true
-		}
-		idx^ += 1
-	}
-	return {}, false
+    for idx^ < len(path) {
+        d := path[idx^] - pos
+
+        if d.x * d.x + d.y * d.y + d.z * d.z > reach * reach {
+            return path[idx^], true
+        }
+
+        idx^ += 1
+    }
+
+    return {}, false
 }

@@ -11,24 +11,27 @@ import gd "godot:godot"
 import "core:fmt"
 
 Main :: struct {
-	owner: gd.Node,
+    owner: gd.Node,
 }
 
 main_ready :: proc(self: ^Main) {
-	fmt.println("EXPORT_RAN")
-	if main_add(self, 2, 3) == 5 {
-		fmt.println("EXPORT_ASSERT_OK")
-	} else {
-		fmt.println("EXPORT_ASSERT_FAIL")
-	}
-	// End the headless run from inside the game.
-	tree := gd.node_get_tree(self.owner)
-	if tree != nil {
-		gd.scene_tree_quit(tree, 0)
-	}
+    fmt.println("EXPORT_RAN")
+
+    if main_add(self, 2, 3) == 5 {
+        fmt.println("EXPORT_ASSERT_OK")
+    } else {
+        fmt.println("EXPORT_ASSERT_FAIL")
+    }
+
+    // End the headless run from inside the game.
+    tree := gd.node_get_tree(self.owner)
+
+    if tree != nil {
+        gd.scene_tree_quit(tree, 0)
+    }
 }
 
 @(gd_method)
 main_add :: proc(self: ^Main, a, b: int) -> int {
-	return a + b
+    return a + b
 }
