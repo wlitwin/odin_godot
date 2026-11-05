@@ -15,6 +15,10 @@ terminal acknowledgement and typed cleanup/engine shutdown. Input uses a real
 focus frame and human typing cadence. Saved screenshots document the 1280×720
 widgets. Clipboard contents are restored and never included in reports.
 
+Set `N1_EXTRA_QUERY` to add launch query parameters to every actor, for example
+`N1_EXTRA_QUERY='latency=50&jitter=5&loss=100'` for a simulated 100 ms round
+trip with jitter and 1% unreliable loss (each page delays what it receives).
+
 Set `N1_SAME_BROWSER=1` to use two ordinary tabs in one default browser context
 and profile, sharing IndexedDB. `N1_BROWSER=firefox` selects Firefox; Chrome is
 the default. This arrangement removes automation's background-throttling bypass

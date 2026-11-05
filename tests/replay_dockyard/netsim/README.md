@@ -71,6 +71,27 @@ loss. Both sides ended on the identical complete signature in every run.
 | 200 ms | off | 16 of 3,600 | 0 / 0 | 21 | 417 kbit/s |
 | 200 ms | ≤ 4 | 16 of 3,600 | 0 / 0 | 19 | 417 kbit/s |
 
+### Browser (Chrome 156, Web export with the WebSIMD backend)
+
+The ordinary production export passed `tests/replay_dockyard/online/run.py
+--production-ui` (two Chrome processes, real Host/Join and invite, 1,200
+ticks, all five state parts equal). The qualification driver then ran it for
+3,600 ticks with `N1_EXTRA_QUERY='latency=50&jitter=5&loss=100'` (100 ms round
+trip) and passed its gameplay and state checks. Whole `Room.frame` call times:
+
+| Role and frame kind | Count | p50 | p95 | p99 | Max |
+| --- | --- | --- | --- | --- | --- |
+| Host, one tick | 3,600 | 1.15 ms | 1.48 ms | 1.68 ms | 6.60 ms |
+| Client, one tick, no correction | 791 | 0.77 ms | 1.10 ms | 1.38 ms | 1.79 ms |
+| Client, with a confirmation/correction | 2,787 | 2.73 ms | 3.72 ms | 4.21 ms | 6.11 ms |
+
+Client prediction depth before those frames was p50 15, p95 17, max 25 ticks.
+The earlier eight-step corrections measured p95 7.0 ms / max 10.5 ms (Chrome)
+and p95 8.6 ms / max 45.9 ms (Firefox). One 100 ms frame per side occurred at
+head 0, during connection setup. The qualification assessment still reports
+BUDGET_REJECTED because this run used no forced TURN relay, lasted 60 s rather
+than 610 s, and its repair class counts only exactly-eight-step repairs.
+
 ## What changed and why
 
 1. **Window.** Physics mode allowed eight ticks of prediction. Confirmation lags

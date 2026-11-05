@@ -94,6 +94,8 @@ async function open(role,{profileDir,rendered=false,headless=process.env.N1_HEAD
  const url=new URL(base);for(const [k,v] of Object.entries({service,local:process.env.N1_EXTERNAL_SERVICE==='1'?'0':'1',scripted:'1',ticks:String(ticks),render:rendered?'1':'0',...query}))url.searchParams.set(k,v);
  if(process.env.REPLAY_TURN_PROVIDER==='1')url.searchParams.set('relay','1');
  if(production)url.searchParams.set('ui_layout','1');
+ // Optional simulated conditions for every actor, e.g. N1_EXTRA_QUERY='latency=50&jitter=5&loss=100'.
+ for(const [k,v] of new URLSearchParams(process.env.N1_EXTRA_QUERY||''))url.searchParams.set(k,v);
  actor.url=url.toString();actor.navigation_start_ms=performance.now();await page.goto(actor.url,{waitUntil:'domcontentloaded',timeout:60000});
  actor.isolated=await page.evaluate(()=>crossOriginIsolated);
  actor.previous_clipboard=await readClipboard(actor);
