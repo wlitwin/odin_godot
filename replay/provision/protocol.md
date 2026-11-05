@@ -50,6 +50,22 @@ bound handshakes, connections, ingress and buffers. These limits do not replace
 account authorization, per-user creation quotas or room retirement. Rooms remain
 resident for the hub's lifetime and persist across restarts.
 
+### Optional trusted retirement
+
+Embeddings with an ephemeral end/rehost policy can provide `creation_guard`,
+`reclaim` and `lifecycle_user` to `hub_open`. Defaults preserve the resident-only
+contract above. The reclaim hook runs only after a validated, budgeted Create
+finds no free slot. `hub_room_idle` requires an idle interval and no live lease;
+the embedding must additionally protect physical connections and detach borrowed
+signaling/checkpoint references before calling `hub_archive_room`.
+
+The SQLite adapter atomically archives the exact expected private bundle and
+removes it from the resident table. Archived IDs stay reserved through the
+creation guard and storage commit check. A failed CAS/archive cannot publish a
+replacement room; uncertain storage fences the hub. The wire protocol and bundle
+schema are unchanged. The sample service enables this only for explicitly opted-in
+cooperative deployments with checkpoint publication disabled.
+
 ## Wire and retry contract
 
 The optional human-entered **short room code v1** is a client-side recipe using

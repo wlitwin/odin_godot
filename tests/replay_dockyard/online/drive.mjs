@@ -45,7 +45,7 @@ async function request(actor,action='status',extra={}){
  await actor.page.waitForFunction(id=>globalThis.dockyardResponse?.id===id,{timeout:15000},id);
  return actor.page.evaluate(()=>globalThis.dockyardResponse);
 }
-async function open(role,{profileDir,rendered=false,headless=true,setup,browserName='chrome',query={}}={}){
+async function open(role,{profileDir,rendered=false,headless=process.env.N1_HEADLESS!=='0',setup,browserName=process.env.N1_BROWSER||'chrome',query={}}={}){
  const directory=path.join(output,role);fs.mkdirSync(directory);
  const flags=['--no-sandbox','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader','--ignore-gpu-blocklist','--enable-webgl','--disable-background-timer-throttling','--disable-renderer-backgrounding'];
  if(rendered)for(const flag of ['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader','--ignore-gpu-blocklist']){const i=flags.indexOf(flag);if(i>=0)flags.splice(i,1);}
@@ -58,11 +58,16 @@ async function open(role,{profileDir,rendered=false,headless=true,setup,browserN
  const launchEnvironment={...process.env};
  if(geckoProfile)Object.assign(launchEnvironment,{MOZ_PROFILER_STARTUP:'1',MOZ_PROFILER_SHUTDOWN:geckoProfile.path,MOZ_PROFILER_STARTUP_FEATURES:geckoProfile.features,MOZ_PROFILER_STARTUP_FILTERS:geckoProfile.filters,MOZ_PROFILER_STARTUP_ENTRIES:String(geckoProfile.entries),MOZ_PROFILER_STARTUP_INTERVAL:String(geckoProfile.interval_ms)});
  const endpoint=firefox?process.env.FIREFOX_BIDI_ENDPOINT:null;
- const browser=endpoint?await puppeteer.connect({browserWSEndpoint:endpoint,protocol:'webDriverBiDi'}):await puppeteer.launch({browser:firefox?'firefox':'chrome',protocol:firefox?'webDriverBiDi':'cdp',executablePath:firefox?'/Applications/Firefox.app/Contents/MacOS/firefox':process.env.CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless,userDataDir:profile,args:firefox?['--no-remote']:flags,env:launchEnvironment});
- const actor=actors[role]={role,browser,browser_name:browserName,shutdown:false,version:await browser.version(),profile_dir:profile};
+ const shared=process.env.N1_SAME_BROWSER==='1'?actors.host:null;
+ const backgroundFlags=['--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows'];
+ if(process.env.N1_SAME_BROWSER==='1')for(const flag of backgroundFlags){let index;while((index=flags.indexOf(flag))>=0)flags.splice(index,1);}
+ const browser=shared?shared.browser:endpoint?await puppeteer.connect({browserWSEndpoint:endpoint,protocol:'webDriverBiDi'}):await puppeteer.launch({browser:firefox?'firefox':'chrome',protocol:firefox?'webDriverBiDi':'cdp',executablePath:firefox?'/Applications/Firefox.app/Contents/MacOS/firefox':process.env.CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless,userDataDir:profile,args:firefox?['--no-remote']:flags,ignoreDefaultArgs:process.env.N1_SAME_BROWSER==='1'?backgroundFlags:undefined,env:launchEnvironment});
+ const actor=actors[role]={role,browser,browser_name:browserName,shutdown:false,version:await browser.version(),profile_dir:shared?shared.profile_dir:profile};
  if(geckoProfile)actor.cpu_profiler=geckoProfile;
  fs.writeFileSync(path.join(directory,'process.json'),JSON.stringify({pid:browser.process()?.pid??null,argv:browser.process()?.spawnargs??null,owned_os_launch_endpoint:endpoint||null,profile_dir:profile},null,2));
- const page=actor.page=await browser.newPage();await page.setViewport({width:1280,height:720,deviceScaleFactor:1});
+ const page=actor.page=await browser.newPage();
+ const viewport=process.env.N1_VIEWPORT?JSON.parse(process.env.N1_VIEWPORT):{width:1280,height:720,deviceScaleFactor:1};
+ actor.viewport=viewport;await page.setViewport(viewport);
  if(!firefox)await browser.defaultBrowserContext().overridePermissions(new URL(base).origin,['clipboard-read','clipboard-write','clipboard-sanitized-write']);
  // The shared selected-pair probe does not modify protocol or payloads.
  await installRelayProbe(page,relay||{iceServers:[]});
@@ -77,7 +82,7 @@ async function open(role,{profileDir,rendered=false,headless=true,setup,browserN
   if(text.includes('ODIN_BOX3D_WEB_SHUTDOWN_OK'))actor.shutdown=true;
   if(text.startsWith('DOCKYARD_LOBBY ')&&actor.cold_lobby_ms===undefined)actor.cold_lobby_ms=performance.now()-actor.navigation_start_ms;
   if(text.startsWith('DOCKYARD_MENU_READY ')&&actor.cold_usable_menu_ms===undefined)actor.cold_usable_menu_ms=performance.now()-actor.navigation_start_ms;
-  for(const tag of ['DOCKYARD_LOBBY','DOCKYARD_VISUALS_READY','DOCKYARD_MENU_READY','DOCKYARD_CONNECTION','SAMPLE_QUALIFICATION_TRANSFER','SAMPLE_HOST_LOST','SAMPLE_REHOST_FROM','SAMPLE_STATUS','SAMPLE_ROOM','SAMPLE_READY','SAMPLE_RTC','SAMPLE_NETWORK','SAMPLE_GAME','SAMPLE_WEB_FRAME','SAMPLE_INPUTS','SAMPLE_TAIL','SAMPLE_RESULT']){
+  for(const tag of ['DOCKYARD_LOBBY','DOCKYARD_VISUALS_READY','DOCKYARD_MENU_READY','DOCKYARD_UI_LAYOUT','DOCKYARD_CONNECTION','SAMPLE_QUALIFICATION_TRANSFER','SAMPLE_HOST_LOST','SAMPLE_REHOST_FROM','SAMPLE_STATUS','SAMPLE_ROOM','SAMPLE_READY','SAMPLE_RTC','SAMPLE_NETWORK','SAMPLE_GAME','SAMPLE_WEB_FRAME','SAMPLE_INPUTS','SAMPLE_TAIL','SAMPLE_RESULT']){
    if(text.startsWith(tag+' ')){try{actor[tag]=JSON.parse(text.slice(tag.length+1));actor.event_counts??={};actor.event_counts[tag]=(actor.event_counts[tag]||0)+1;}catch(e){errors.push(role+' malformed '+tag);}}
   }
   const expectedFrozenSocket=['frozen','hostfrozen'].includes(process.env.R1_FLOW)&&text.includes('WebSocket connection')&&text.includes('Page entered Back-Forward Cache');
@@ -88,6 +93,7 @@ async function open(role,{profileDir,rendered=false,headless=true,setup,browserN
  page.on('pageerror',e=>errors.push(role+': '+String(e.stack||e)));
  const url=new URL(base);for(const [k,v] of Object.entries({service,local:process.env.N1_EXTERNAL_SERVICE==='1'?'0':'1',scripted:'1',ticks:String(ticks),render:rendered?'1':'0',...query}))url.searchParams.set(k,v);
  if(process.env.REPLAY_TURN_PROVIDER==='1')url.searchParams.set('relay','1');
+ if(production)url.searchParams.set('ui_layout','1');
  actor.url=url.toString();actor.navigation_start_ms=performance.now();await page.goto(actor.url,{waitUntil:'domcontentloaded',timeout:60000});
  actor.isolated=await page.evaluate(()=>crossOriginIsolated);
  actor.previous_clipboard=await readClipboard(actor);
@@ -114,22 +120,47 @@ async function typeAt(actor,x,y,text){
  await actor.page.keyboard.type(text,{delay:40});await delay(100);
  if(nativeEntry){await actor.page.click('#dockyard-room-entry button[type=submit]');await delay(100);}
 }
+async function controlPoint(actor,key,x,y){
+ const until=Date.now()+500;
+ while(!actor.DOCKYARD_UI_LAYOUT&&Date.now()<until)await delay(25);
+ const layout=actor.DOCKYARD_UI_LAYOUT,control=layout?.controls?.[key];
+ if(!control)return {x,y}; // Earlier immutable candidates have no layout probe.
+ return actor.page.evaluate(({layout,control})=>{
+  const canvas=document.querySelector('canvas').getBoundingClientRect();
+  const r=control.rect,p=layout.viewport;
+  return {x:canvas.x+(r[0]+r[2]/2)*canvas.width/p[0],y:canvas.y+(r[1]+r[3]/2)*canvas.height/p[1]};
+ },{layout,control});
+}
+async function clickControl(actor,key,x,y){
+ await actor.page.bringToFront();const point=await controlPoint(actor,key,x,y);await actor.page.mouse.click(point.x,point.y);
+}
+async function typeControl(actor,key,x,y,text){
+ const point=await controlPoint(actor,key,x,y);await typeAt(actor,point.x,point.y,text);
+}
 async function productionEnrollment(host,clientLabel='client',clientOptions={}){
- // Coordinates are for the declared 1280x720 fixture. The saved screenshot and
- // resulting public enrollment/game evidence validate the real widgets.
- await typeAt(host,1000,452,'Mint');await host.page.mouse.click(855,530);
+ // Observe actual logical Control rectangles; earlier immutable candidates
+ // retain the reference-coordinate fallback. No game state is edited here.
+ await typeControl(host,'name',1000,452,'Mint');await clickControl(host,'host',855,530);
  await writeClipboard(host,'');
  let invitation='',deadline=Date.now()+20000;
  while(Date.now()<deadline&&!errors.length){
-  await host.page.mouse.click(1030,560);await delay(250);await finishCopyDialog(host);
+  await clickControl(host,'copy',1030,560);await delay(250);await finishCopyDialog(host);
   invitation=await readClipboard(host);if(invitation)break;
  }
  check(validInvite(invitation),'actual production Copy Invite did not provide a valid room code');report.copy_invite_verified=true;
- const client=await open(clientLabel,clientOptions);if(clientLabel!=='client')client.expected_role='client';check(client.cohort===host.cohort,'different production cohorts');
- await typeAt(client,1000,452,'Coral');await typeAt(client,1000,488,'invalid');await client.page.mouse.click(906,530);
+ const client=process.env.N1_PREOPEN_CLIENT==='1'&&actors[clientLabel]?actors[clientLabel]:await open(clientLabel,clientOptions);if(clientLabel!=='client')client.expected_role='client';check(client.cohort===host.cohort,'different production cohorts');
+ if(process.env.N1_SAME_BROWSER==='1'){
+  await client.page.bringToFront();
+  report.hidden_host_before_join=await host.page.evaluate(()=>({visibility:document.visibilityState,method:globalThis.dockyardWebRuntimeV2?.mode(),frames:engine.rtenv.MainLoop.currentFrameNumber}));
+ }
+ await typeControl(client,'name',1000,452,'Coral');await typeControl(client,'code',1000,488,'invalid');await clickControl(client,'join',906,530);
  deadline=Date.now()+5000;while(!invalidInviteMessage(client.DOCKYARD_CONNECTION?.message)&&Date.now()<deadline)await delay(50);
  check(invalidInviteMessage(client.DOCKYARD_CONNECTION?.message),'actual production invalid-invite rejection unavailable');report.invalid_invite_rejected=true;
- await typeAt(client,1000,488,invitation);await client.page.mouse.click(906,530);invitation='';
+ await typeControl(client,'code',1000,488,invitation);await clickControl(client,'join',906,530);invitation='';
+ if(process.env.N1_SAME_BROWSER==='1'){
+  report.hidden_host_after_join=await host.page.evaluate(()=>({visibility:document.visibilityState,method:globalThis.dockyardWebRuntimeV2?.mode(),frames:engine.rtenv.MainLoop.currentFrameNumber}));
+  check(report.hidden_host_before_join.visibility==='hidden'&&report.hidden_host_after_join.visibility==='hidden'&&report.hidden_host_after_join.method==='worker'&&report.hidden_host_after_join.frames>report.hidden_host_before_join.frames,'hidden host did not keep its actual engine loop running');
+ }
  return client;
 }
 function validate(a){
@@ -159,6 +190,7 @@ try{
   report.expected_refusal={case:scenario,isolated:false,game_started:false,notice};report.result='PASS';
  }else{
  const host=await open('host');check(/^[0-9a-f]{16}$/.test(host.cohort),'actual cohort missing');
+ if(process.env.N1_PREOPEN_CLIENT==='1'){await open('client');report.both_menus_ready_before_hosting=true;}
  console.log('N1_COHORT '+host.cohort);
  const until=Date.now()+45000;while(!fs.existsSync(path.join(output,'service.ready'))&&Date.now()<until)await delay(100);
  check(fs.existsSync(path.join(output,'service.ready')),'actual service startup not acknowledged');
@@ -238,7 +270,22 @@ try{
   if(relay)check(a.selected_pairs.every(v=>v.policy==='relay'&&v.local==='relay'&&v.remote==='relay'),'selected route was not forced TURN');
   if(process.env.REPLAY_TURN_PROVIDER==='1')check(a.selected_pairs.every(v=>v.credentialExpires>0),'actual provider credential expiry unavailable');
  }
- report.all_five_byte_equal=true;report.result='PASS';
+ report.all_five_byte_equal=true;
+ if(process.env.N1_SAME_BROWSER==='1'){
+  check(host.browser===client.browser&&host.page.browserContext()===client.page.browserContext(),'same-browser test did not share the default storage context');
+  const hint=a=>a.page.evaluate(()=>Object.entries(sessionStorage).filter(([key])=>key.startsWith('replay-party-seat-v1/')));
+  const [hh,ch]=await Promise.all([hint(host),hint(client)]);
+  check(hh.length===1&&ch.length===1&&hh[0][0]===ch[0][0]&&hh[0][1]==='0'&&ch[0][1]==='1','tabs did not keep distinct storage seats');
+  for(const a of [host,client]){
+   await a.page.waitForFunction(()=>navigator.locks.query().then(q=>!q.held.some(l=>l.name.startsWith('replay-party-seat-v1/'))),{timeout:15000,polling:100});
+   await a.page.waitForFunction(()=>typeof engine!=='undefined'&&engine.rtenv===null,{timeout:15000,polling:100});
+   a.godot_runtime_exit_observed=true;
+  }
+  report.same_browser_context=true;
+  report.distinct_storage_seats=true;report.seat_locks_released=true;
+  report.scope='Two tabs in one browser default context and profile, real production Host/Join through the selected Room/TURN service; complete five-part comparison and typed cleanup.';
+ }
+ report.result='PASS';
  }
  }
 }catch(e){report.error=String(e.stack||e);}
@@ -253,12 +300,13 @@ finally{
    }
    if(a.shutdown){await a.page.waitForFunction(()=>typeof engine!=='undefined'&&engine.rtenv===null,{timeout:15000});a.godot_runtime_exit_observed=true;}
   }catch(e){errors.push(a.role+': failure cleanup '+String(e));}
-  report[a.role]=Object.fromEntries(Object.entries(a).filter(([k])=>!['browser','page','previous_clipboard'].includes(k)));await a.browser.close();
+  report[a.role]=Object.fromEntries(Object.entries(a).filter(([k])=>!['browser','page','previous_clipboard'].includes(k)));
  }
+ for(const browser of new Set(Object.values(actors).map(a=>a.browser)))await browser.close();
  report.errors=errors;fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 }
 console.log(JSON.stringify({result:report.result,error:report.error,report:path.join(output,'report.json')}));
 return report.result==='PASS'?0:1;
 }
-export {actors,errors,report,open,request,delay,check,validate,productionEnrollment,relayPairs,output,ticks,readClipboard,writeClipboard,restoreClipboard,finishCopyDialog,typeAt};
+export {actors,errors,report,open,request,delay,check,validate,productionEnrollment,relayPairs,output,ticks,readClipboard,writeClipboard,restoreClipboard,finishCopyDialog,typeAt,controlPoint,clickControl,typeControl};
 if(process.argv[1]===fileURLToPath(import.meta.url))process.exit(await run());

@@ -38,6 +38,11 @@ var settings_box: VBoxContainer
 var camera_zoom := 18.8
 var pending_transition := ""
 var pending_exit_code := 0
+var hud: Control
+var status_panel: PanelContainer
+var help_panel: PanelContainer
+var layout_probe := false
+var layout_report_pending := false
 var colors := {"robot_a":Color("4ce4cf"),"robot_b":Color("ff836e"),"cargo_a":Color("ffc857"),"cargo_b":Color("ffc857"),"cargo_long":Color("ea87c7"),"crane":Color("f8b65c"),"barge":Color("407f8d"),"ramp":Color("62858a"),"ground":Color("304c59"),"crane_anchor":Color("597582")}
 
 func material(color: Color, unshaded: bool=false) -> StandardMaterial3D:
@@ -66,10 +71,11 @@ func text(parent: Control, content: String, font: int, color: Color) -> Label:
 	parent.add_child(label)
 	return label
 
-func panel(parent: Control, at: Vector2, width: float) -> VBoxContainer:
+func panel(parent: Control, width: float) -> VBoxContainer:
 	var p := PanelContainer.new()
-	p.position = at
 	p.custom_minimum_size.x = width
+	p.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	p.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.035,0.075,0.105,0.94)
 	style.set_corner_radius_all(14)
@@ -84,11 +90,70 @@ func panel(parent: Control, at: Vector2, width: float) -> VBoxContainer:
 	p.add_child(box)
 	return box
 
+func centered_panel(parent: Control, width: float) -> VBoxContainer:
+	var center := CenterContainer.new()
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var box := panel(center,width)
+	var backdrop: Control = box.get_parent()
+	backdrop.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	backdrop.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return box
+
+func fit_camera() -> void:
+	if not is_instance_valid(camera):
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var aspect := viewport_size.x / maxf(viewport_size.y,1.0)
+	# Keep the reference dock visible on narrow windows. DPI does not enter
+	# this calculation; projection and pointer rays share viewport coordinates.
+	camera.size = camera_zoom * maxf(1.0,(1280.0/720.0)/aspect)
+
+func queue_layout_report() -> void:
+	if not layout_probe or layout_report_pending:
+		return
+	layout_report_pending = true
+	call_deferred("report_layout")
+
+func control_layout(control: Control) -> Dictionary:
+	var rect := control.get_global_rect()
+	var screen := control.get_screen_transform() * Rect2(Vector2.ZERO,control.size)
+	return {"rect":[rect.position.x,rect.position.y,rect.size.x,rect.size.y],
+		"screen_rect":[screen.position.x,screen.position.y,screen.size.x,screen.size.y],
+		"visible":control.is_visible_in_tree(),"focused":control.has_focus()}
+
+func ui_layout() -> Dictionary:
+	var controls := {}
+	for entry in [["name",party_name],["code",party_code],["host",party_host],["join",party_join],
+		["watch",party_watch],["recent",party_recent],["copy",party_copy],["copy_watch",party_copy_watch],
+		["leave",party_leave],["rehost",party_rehost],["retry",retry_button],["next",next_button]]:
+		controls[entry[0]] = control_layout(entry[1])
+	var panels := {}
+	for entry in [["status",status_panel],["help",help_panel],["crew",party_box.get_parent()],
+		["results",result_box.get_parent()],["settings",settings_box.get_parent()]]:
+		panels[entry[0]] = control_layout(entry[1])
+	var viewport_size := get_viewport().get_visible_rect().size
+	var pixels := get_window().size
+	var origin := hud.get_screen_transform().origin
+	return {"viewport":[viewport_size.x,viewport_size.y],"window_pixels":[pixels.x,pixels.y],
+		"screen_origin":[origin.x,origin.y],
+		"panels":panels,"controls":controls,"camera_size":camera.size,"camera_zoom":camera_zoom}
+
+func report_layout() -> void:
+	# Container sorting is deferred; observe settled geometry after a resize.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	layout_report_pending = false
+	if is_inside_tree():
+		print("DOCKYARD_UI_LAYOUT ",JSON.stringify(ui_layout()))
+
 func _ready() -> void:
 	sample = get_parent()
 	feedback=preload("res://feedback.gd").new()
 	add_child(feedback)
 	if OS.has_feature("web"):
+		add_child(preload("res://web_runtime.gd").new())
 		web_text_entry=preload("res://web_text_entry.gd").new()
 		add_child(web_text_entry)
 	get_tree().auto_accept_quit=false
@@ -196,6 +261,7 @@ func _ready() -> void:
 		beams.append(beam)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	camera.size = camera_zoom
 	camera.position = Vector3(14,17,20)
 	add_child(camera)
@@ -218,23 +284,58 @@ func _ready() -> void:
 	add_child(env)
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
-	var hud := Control.new()
-	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud = Control.new()
+	hud.name = "HUD"
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(hud)
-	var box := panel(hud,Vector2(24,22),360)
+	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var margins := MarginContainer.new()
+	margins.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(margins)
+	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for edge in ["left","right"]:
+		margins.add_theme_constant_override("margin_"+edge,24)
+	for edge in ["top","bottom"]:
+		margins.add_theme_constant_override("margin_"+edge,22)
+	var rows := VBoxContainer.new()
+	rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margins.add_child(rows)
+	var top := HBoxContainer.new()
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rows.add_child(top)
+	var box := panel(top,360)
+	status_panel = box.get_parent()
 	title = text(box,"DOCKYARD DUO",27,Color("fff2d6"))
 	objective = text(box,"Get the cargo onto the barge",17,Color("a9f3db"))
 	crew = text(box,"Opening the dock…",14,Color("9bb9c6"))
-	var help := panel(hud,Vector2(24,590),650)
+	crew.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var horizontal_space := Control.new()
+	horizontal_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	horizontal_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(horizontal_space)
+	var right := VBoxContainer.new()
+	right.custom_minimum_size.x = 440
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top.add_child(right)
+	var vertical_space := Control.new()
+	vertical_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vertical_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.add_child(vertical_space)
+	var help := panel(rows,650)
+	help_panel = help.get_parent()
 	hint = text(help,"WASD / arrows   MOVE     ·     mouse + hold   MAGNET",16,Color("e6f1f2"))
-	text(help,"Space  BOOST    ·    1 / 2 / 3  AIM    ·    Match each load to its bay; release to latch.",14,Color("9bb9c6"))
-	text(help,"1 GRAB  /  2 HAUL TO THE MATCHING BAY  /  3 RELEASE & SETTLE.     F2 settings · Esc crew · F3 diagnostics",13,Color("b1d8d2"))
-	debug = text(hud,"",12,Color("a9d6cf"))
-	debug.position = Vector2(710,26)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var help_detail := text(help,"Space  BOOST    ·    1 / 2 / 3  AIM    ·    Match each load to its bay; release to latch.",14,Color("9bb9c6"))
+	help_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var help_flow := text(help,"1 GRAB  /  2 HAUL TO THE MATCHING BAY  /  3 RELEASE & SETTLE.     F2 settings · Esc crew · F3 diagnostics",13,Color("b1d8d2"))
+	help_flow.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	debug = text(right,"",12,Color("a9d6cf"))
+	debug.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	debug.visible = false
-	result_box = panel(hud,Vector2(410,190),430)
+	result_box = centered_panel(hud,430)
 	result = text(result_box,"",26,Color("fff2d6"))
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	retry_button = Button.new()
 	retry_button.text = "RETRY THIS JOB"
 	retry_button.pressed.connect(func(): sample.call("retry",false))
@@ -244,7 +345,7 @@ func _ready() -> void:
 	next_button.pressed.connect(func(): sample.call("retry",true))
 	result_box.add_child(next_button)
 	result_box.get_parent().visible=false
-	party_box=panel(hud,Vector2(810,390),440)
+	party_box=panel(right,440)
 	text(party_box,"BUILD YOUR CREW",23,Color("fff2d6"))
 	party_name=LineEdit.new()
 	party_name.placeholder_text="Your crew name"
@@ -314,7 +415,7 @@ func _ready() -> void:
 	party_rehost.pressed.connect(request_rehost)
 	party_box.add_child(party_rehost)
 	party_box.get_parent().visible=false
-	settings_box=panel(hud,Vector2(410,190),430)
+	settings_box=centered_panel(hud,430)
 	text(settings_box,"YOUR DOCK",26,Color("fff2d6"))
 	text(settings_box,"Local settings · the shared job keeps running",14,Color("b1d8d2"))
 	text(settings_box,"Sound",16,Color("e6f1f2"))
@@ -331,7 +432,7 @@ func _ready() -> void:
 	zoom.max_value=24
 	zoom.step=.2
 	zoom.value=camera_zoom
-	zoom.value_changed.connect(func(value: float): camera_zoom=value;camera.size=value)
+	zoom.value_changed.connect(func(value: float): camera_zoom=value;fit_camera())
 	settings_box.add_child(zoom)
 	var motion:=CheckButton.new()
 	motion.text="Reduce particles / flashes"
@@ -342,6 +443,18 @@ func _ready() -> void:
 	close_settings.pressed.connect(func(): settings_box.get_parent().visible=false)
 	settings_box.add_child(close_settings)
 	settings_box.get_parent().visible=false
+	layout_probe = OS.get_environment("DOCKYARD_LAYOUT_PROBE")=="1"
+	if OS.has_feature("web"):
+		layout_probe = layout_probe or str(JavaScriptBridge.eval("new URLSearchParams(location.search).get('ui_layout')||'0'",true))=="1"
+	get_viewport().size_changed.connect(fit_camera)
+	get_viewport().size_changed.connect(queue_layout_report)
+	party_name.focus_entered.connect(queue_layout_report)
+	party_code.focus_entered.connect(queue_layout_report)
+	for control in [status_panel,help_panel,party_box.get_parent(),result_box.get_parent(),settings_box.get_parent()]:
+		control.resized.connect(queue_layout_report)
+		control.visibility_changed.connect(queue_layout_report)
+	fit_camera()
+	queue_layout_report()
 	prepare_visuals()
 
 func prepare_visuals() -> void:
@@ -358,11 +471,11 @@ func prepare_visuals() -> void:
 	add_child(loading)
 	var cover:=ColorRect.new()
 	cover.color=Color("103849")
-	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	loading.add_child(cover)
+	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center:=CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	cover.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	text(center,"Preparing the dock…",26,Color("fff2d6"))
 	for i in range(beams.size()):
 		beams[i].position=Vector3(float(i)*.3,1,0)

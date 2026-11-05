@@ -48,6 +48,21 @@ rendezvous_hub_destroy :: proc(r: ^Rendezvous_Hub) {
     r^ = {}
 }
 
+// Trusted room lifecycle seam: drop the cached service pointer before the hub
+// archives/frees its room. A connected physical peer prevents reclamation.
+rendezvous_hub_release_idle_slot :: proc(r: ^Rendezvous_Hub, slot: int) -> bool {
+    if !r.ready || slot < 0 || slot >= len(r.rooms) {return false}
+    for binding in r.bindings {
+        if binding.peer != 0 && binding.room == slot && rendezvous_connection_live(r.socket, binding.peer) {return false}
+    }
+    for peer in r.rooms[slot].peers {
+        if peer.physical != 0 && rendezvous_connection_live(r.socket, peer.physical) {return false}
+    }
+    rendezvous_destroy(&r.rooms[slot])
+    for &binding in r.bindings {if binding.room == slot {binding = {}}}
+    return true
+}
+
 rendezvous_hub_pump :: proc(r: ^Rendezvous_Hub) {
     if !r.ready {
         return

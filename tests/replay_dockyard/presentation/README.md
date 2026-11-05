@@ -39,3 +39,28 @@ reference machine. Real two-person co-op feedback remains separate and required.
 Actual presentation captures do not qualify the final hardware time/memory/load
 contract. Q1 measures those boundaries on the final frozen candidate, retaining
 all raw samples, failures and outliers.
+
+## Viewport and DPI checks
+
+`layout.gd` loads the actual prepared SDK scene and checks seven window sizes:
+corner margins, panel bounds, centered modals, camera fit and pointer projection.
+The fixture observes real Controls and changes their visibility only for modal
+geometry checks; it supplies no simulation or networking verdict.
+
+```sh
+DOCKYARD_LAYOUT_OUTPUT=/NEW/layout.json GODOT --headless --path /ABS/SDK/PROJECT \
+  --script /ABS/REPO/tests/replay_dockyard/presentation/layout.gd
+node tests/replay_dockyard/presentation/layout.mjs /ABS/EXPORTED_WEB_DIR /NEW/OUTPUT
+```
+
+The browser check runs the ordinary Web export through eight CSS-size/DPR
+arrangements, including normal and 2× DPI, small landscape, ultrawide and portrait.
+It checks actual corner placement, centered settings, field hit targets, the
+native room-code dialog, matching CSS geometry across DPR values, screenshots
+and full engine exit. Software WebGL is allowed for this layout check; these are
+not GPU performance or mobile-support results.
+
+The read-only `ui_layout=1` query (or native `DOCKYARD_LAYOUT_PROBE=1`) emits
+settled Control rectangles on layout/focus changes. It is disabled by default
+and contains no field text or invitation codes. The online UI harness uses those
+logical rectangles and the canvas's CSS bounds to target controls after resize.

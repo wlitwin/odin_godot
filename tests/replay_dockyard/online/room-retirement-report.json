@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "result": "ROOM_CAPACITY_LIFECYCLE_FIXED_DEPLOYED_AND_HOST_JOIN_VERIFIED",
+  "root_cause": "Resident capacity16 was also a lifetime limit: finished crews remained resident forever. User and validation rooms accumulated to16; later Create requests returned Capacity.",
+  "implementation": {
+    "capacity": 16,
+    "reclaim_idle_ms": 30000,
+    "active_lease_and_live_signaling_protected": true,
+    "private_bundle_archived_atomically": true,
+    "archived_ids_reserved": true,
+    "history_deleted": false,
+    "wire_protocol_changed": false,
+    "client_update_required": false
+  },
+  "deployment": {
+    "confirmed": true,
+    "terminal": "t1rm",
+    "package": "/nix/store/qq0rxpynbazazb4il7ak3m1vbl25n5jr-dockyard-replay-room-1",
+    "system": "/nix/store/1mvj3rmhn9dyjyrza3cdr43pcg8pxh9n-nixos-system-pi-25.11.20260410.54170c5",
+    "source": "/Users/walter/.local/share/odin-godot/dockyard-room-source-v7",
+    "backup": {
+      "backup": "/var/lib/dockyard-room-backups/20261104T230308Z/rooms.sqlite3",
+      "active_rooms": 16,
+      "integrity": "ok",
+      "system": "/nix/store/819rrqhs2rdrf9li4dj838l5b5zdjiq7-nixos-system-pi-25.11.20260410.54170c5"
+    },
+    "production_connections_before": 0,
+    "legacy_connections_before": 0
+  },
+  "validation": {
+    "provision_native_and_wasm": {
+      "tests": 18,
+      "result": "PASS",
+      "terminal": "t1r9"
+    },
+    "sqlite_and_crash_recovery": {
+      "tests": 43,
+      "result": "PASS",
+      "terminal": "t1rb"
+    },
+    "private_capacity1_two_sequential_complete_pairs": {
+      "result": "PASS",
+      "terminal": "t1rh",
+      "database": {
+        "active": 1,
+        "archived": 1,
+        "integrity": "ok"
+      }
+    },
+    "public_host_join": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/room-retirement-v1/live-pair-v1/report.json",
+      "sha256": "6b468b331ee62c7d6c571faec76c5914f6b133b29f283bc02e1cff1d13b12fd5",
+      "result": "PASS",
+      "all_five_byte_equal": true
+    },
+    "legacy_signal": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/room-retirement-v1/legacy-after.json",
+      "sha256": "13383419bfdb683e1920c46f0b4590fb0121e0469d6cac23e5e0fac2acc4be98",
+      "result": "PASS"
+    },
+    "database_after": {
+      "active_rooms": 16,
+      "archived_rooms": 1,
+      "integrity": "ok",
+      "system": "/nix/store/1mvj3rmhn9dyjyrza3cdr43pcg8pxh9n-nixos-system-pi-25.11.20260410.54170c5",
+      "room_pid": 2394484,
+      "coturn_pid": 1144
+    }
+  },
+  "private_test_unit_stopped": true,
+  "user_action": "Reload the game and Host again. Existing Web ZIP remains compatible.",
+  "release_admitted": false,
+  "scope": "Fixes public resident-room exhaustion; original gameplay/performance/off-network/human gates are unchanged."
+}

@@ -82,6 +82,7 @@ open :: proc(
            s,
            "CREATE TABLE IF NOT EXISTS replay_provision(room BLOB PRIMARY KEY NOT NULL, value BLOB NOT NULL);",
        ) ||
+       !execute(s, "CREATE TABLE IF NOT EXISTS replay_provision_archive(room BLOB PRIMARY KEY NOT NULL, value BLOB NOT NULL);") ||
        !execute(
                s,
                "CREATE TABLE IF NOT EXISTS replay_room_checkpoint(room BLOB PRIMARY KEY NOT NULL, metadata BLOB NOT NULL, bytes BLOB NOT NULL);",
@@ -282,6 +283,11 @@ commit :: proc(user: rawptr, expected: u64, next: p.Bundle) -> bool {
 
     if err != .None {
         s.error = err
+        return false
+    }
+
+    if !found && creation_guard(s, next.record.room) != .None {
+        s.error = .Conflict
         return false
     }
 

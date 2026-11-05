@@ -47,14 +47,26 @@ remote connectivity checks. See [deployment configuration](deploy/README.md).
 The deployed review Room endpoint is
 `wss://mc.laserturtle.net:62127/replay-room/dockyard`; use `relay=1` for its
 authenticated TURN provider. The package README includes the encoded launch URL.
+The service [archives idle disconnected crews](deploy/pi.md#resident-room-lifecycle)
+when resident capacity is needed, so completed test/player rooms do not exhaust
+the16 active slots. See the [deployment verification](../../tests/replay_dockyard/online/room-retirement-report.json).
 Choose a name and **Host** or **Join**, sharing the five-character room code.
 The host's copy button displays the code so a crewmate can also type it directly.
 On Web, clicking the code field opens a native browser text field: paste with
 Cmd/Ctrl+V and choose **Use code**, then **Join**. The copy dialog uses a native
 **Copy code** button and also supports Cmd/Ctrl+C. This works inside itch's iframe
 without clipboard-read permission. Older complete invitation tickets are still
-accepted. Separate browser profiles have separate stored identities.
-**Recent Crew** reuses membership. **Watch** uses the same short code to enroll a
+accepted. Tabs in the same browser can play as separate players. Each live tab
+holds its own saved player seat; reloading keeps that tab's seat, and duplicating
+a tab chooses another available seat. The first seat preserves existing saved
+crews. Refresh all open tabs after updating an older build.
+Hidden tabs use timer updates to keep room traffic running, returning to normal
+display-synchronized rendering when visible. Browsers may throttle these updates;
+a frozen or suspended host still loses its hosting permission.
+For same-browser testing in Firefox, load both tabs before hosting. Loading a
+second game after hosting can still expire the first tab's lease; this separate
+startup limitation is retained in the [two-tab checks](../../tests/replay_dockyard/online/two-tabs-report.json).
+**Recent Crew** reuses that seat's membership. **Watch** uses the same short code to enroll a
 receive-only observer through its separate invitation.
 
 ## Play
@@ -78,6 +90,16 @@ host can retry or select the next of three arrangements through a Replay action.
 Host loss or expired hosting permission ends the job and offers **Start a New
 Crew** after closing the old runtime. Seamless takeover and full-match replay
 are outside this candidate. See [recovery evidence](../../tests/replay_dockyard/recovery/README.md).
+
+### Viewport and high-DPI layout
+
+The HUD uses a 1280×720 design size with Godot's `canvas_items` stretch mode and
+`expand` aspect handling. Anchored containers keep status at the top left, crew
+controls at the top right and instructions at the bottom left. Settings and
+results use centered containers. Text and pointer hit targets share the same
+logical viewport coordinates; device pixel ratio does not multiply the UI scale.
+The orthographic camera retains the reference dock framing on narrow windows.
+See the [layout checks](../../tests/replay_dockyard/presentation/README.md).
 
 ## Build from source
 

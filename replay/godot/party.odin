@@ -50,6 +50,7 @@ Party_Config :: struct {
     storage:                      Party_Storage,
     entropy:                      p.Entropy, // optional embedding/test source; default uses Godot Crypto
     short_codes:                  bool, // opt-in cooperative Player/single-use, five-character code v1
+    browser_seats:                bool, // opt-in exclusive durable browser seat per live tab
 }
 
 // Stable-address owner. Storage is borrowed; close Party before its native store.
@@ -65,6 +66,8 @@ Party :: struct {
     connection:                                                                                                Provision_Connection,
     relay:                                                                                                     Relay_Connection,
     recent_op:                                                                                                 storagegd.Browser_Store_Op,
+    browser_seat:                                                                                              storagegd.Browser_Seat,
+    seat_resolved:                                                                                             bool,
     recent_room, recent_revision, target:                                                                      u64,
     request:                                                                                                   p.Request,
     grant:                                                                                                     p.Grant,
@@ -145,7 +148,14 @@ party_open :: proc(o: ^Party, cfg: Party_Config, allocator := context.allocator)
     o.scope, o.initialized = party_scope(cfg.service), true
 
     when gd.IS_WEB {
-        if !storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8) {
+        o.seat_resolved = !cfg.browser_seats
+        opened: bool
+        if cfg.browser_seats {
+            opened = storagegd.browser_seat_open(&o.browser_seat, o.config.namespace, o.scope)
+        } else {
+            opened = storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8)
+        }
+        if !opened {
             party_fail(o, .Storage)
             return false
         }
@@ -521,6 +531,7 @@ party_close :: proc(o: ^Party) {
     relay_close(&o.relay)
     enrollment_profile_close(&o.profile)
     storagegd.browser_store_close(&o.recent_op)
+    storagegd.browser_seat_close(&o.browser_seat)
 
     if o.config.tls != nil {
         gd.release_ref(o.config.tls)
@@ -608,6 +619,27 @@ party_random :: proc(entropy: p.Entropy) -> (p.Secret, u64, bool) {
 @(private)
 party_recent_frame :: proc(o: ^Party) {
     when gd.IS_WEB {
+        if !o.seat_resolved {
+            if storagegd.browser_seat_poll(&o.browser_seat) != .Complete {
+                return
+            }
+            if o.browser_seat.failed {
+                party_fail(o, .Storage)
+                return
+            }
+            // Seat zero preserves existing saved crews. Additional live seats
+            // share the database but never enrollment or Recent selection keys.
+            if o.browser_seat.seat > 0 {
+                previous := o.scope
+                o.scope = strings.clone(fmt.tprintf("%s.seat%d", previous, o.browser_seat.seat))
+                delete(previous)
+            }
+            o.seat_resolved = true
+            if !storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8) {
+                party_fail(o, .Storage)
+                return
+            }
+        }
         if !o.recent_loaded {
             if storagegd.browser_store_poll(&o.recent_op) != .Complete {
                 return

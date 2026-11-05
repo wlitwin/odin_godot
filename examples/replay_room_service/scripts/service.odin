@@ -28,6 +28,7 @@ import transportgd "godot:replay/godot/transport"
 ReplayRoomService :: struct {
     owner:              gd.Node,
     ready:              bool,
+    reclaim_idle_ms:    u64,
     store:              db.Store,
     hub:                p.Hub,
     signal:             rgd.Rendezvous_Hub,
@@ -122,6 +123,12 @@ replay_room_service_ready :: proc(self: ^ReplayRoomService) {
     content, valid := parse_content(gd.env_string("REPLAY_ROOM_CONTENT", ""))
     port, rooms := gd.env_int("REPLAY_ROOM_PORT", 49740), gd.env_int("REPLAY_ROOM_CAPACITY", 16)
     mode := gd.env_string("REPLAY_ROOM_MODE", "cooperative")
+    reclaim_idle := gd.env_int("REPLAY_ROOM_RECLAIM_IDLE_MS", 0)
+    if reclaim_idle < 0 || reclaim_idle > 86400000 || (reclaim_idle != 0 && reclaim_idle < 1000) ||
+       (reclaim_idle != 0 && (mode != "cooperative" || gd.env_string("REPLAY_ROOM_CHECKPOINT_MODEL", "") != "disabled")) {
+        fail(self, "reclamation requires cooperative checkpoint-disabled mode and an idle interval of1000..86400000ms"); return
+    }
+    self.reclaim_idle_ms = u64(reclaim_idle)
     bind := gd.env_string("REPLAY_ROOM_BIND", "127.0.0.1")
 
     if !valid ||
@@ -195,7 +202,10 @@ replay_room_service_ready :: proc(self: ^ReplayRoomService) {
         cfg.policy.mode = .Dedicated
     }
 
-    if p.hub_open(&self.hub, cfg, existing[:count], db.commit, &self.store, auth.native_clock(), self.wire) != .None ||
+    reclaim: p.Reclaim
+    if self.reclaim_idle_ms != 0 {reclaim = reclaim_room}
+    if p.hub_open(&self.hub, cfg, existing[:count], db.commit, &self.store, auth.native_clock(), self.wire,
+                  creation_guard = room_creation_guard, reclaim = reclaim, lifecycle_user = self) != .None ||
        !rgd.rendezvous_hub_init(&self.signal, &self.hub, &self.socket) {
         fail(self, "coordinator startup failed")
         return

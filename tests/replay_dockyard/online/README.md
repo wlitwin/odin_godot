@@ -15,6 +15,29 @@ terminal acknowledgement and typed cleanup/engine shutdown. Input uses a real
 focus frame and human typing cadence. Saved screenshots document the 1280×720
 widgets. Clipboard contents are restored and never included in reports.
 
+Set `N1_SAME_BROWSER=1` to use two ordinary tabs in one default browser context
+and profile, sharing IndexedDB. `N1_BROWSER=firefox` selects Firefox; Chrome is
+the default. This arrangement removes automation's background-throttling bypass
+flags. The same production Host/Join, complete-state and cleanup checks
+apply. `browser_seat.mjs NEW_OUTPUT [chrome|firefox]` separately exercises the
+actual embedded seat helper with three same-profile tabs, a copied opener hint,
+reload, closed-seat reuse and pending acquisition teardown. It does not claim
+gameplay acceptance.
+
+`N1_PREOPEN_CLIENT=1` loads both menus before hosting. This is a separate named
+arrangement: Firefox's cold second-tab-after-Host case still loses its lease,
+while the preloaded arrangement passes. Both outcomes are retained in
+[two-tabs-report.json](two-tabs-report.json); the cold failure is not a pass or
+a change to the lease contract.
+
+The Web runtime uses one timer-only worker to wake the existing engine loop
+while the page is hidden. `browser_runtime.mjs` checks hidden frame progress,
+visible RAF restoration and all workers disappearing after hidden engine exit.
+`frozen_host.mjs` freezes the actual host document beyond its lease, then
+requires hosting permission to end and both engines to close cleanly. These
+fixtures reuse `run.py`'s immutable export server and endpoint binding; they
+do not modify simulation state or extend a hosting lease.
+
 The earlier `prepare.py` fixture adds a source-bound GDScript autoload to a copied
 project for narrow public-method/widget checks. **Do not ship that fixture.** It
 never writes private simulation fields or fabricates a network message. Both
@@ -59,6 +82,6 @@ allocation-failure checks validate the allocator-backed path-block implementatio
 separately from the real native/browser room checks.
 
 Local functional results do not qualify Internet reachability, browser rendering
-budgets, long recovery or human playability. Public endpoint selection is still
-required for actual remote acceptance. The later lifecycle/performance/release
+budgets, long recovery or human playability. The configured public endpoint's
+independent outside-network acceptance remains separate. The lifecycle/performance/release
 cards remain separate on the [roadmap](../../../docs/design/box3d/web-showcase-roadmap.md).

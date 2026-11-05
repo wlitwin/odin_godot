@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "result": "RESPONSIVE_UI_LAYOUT_AND_HIDPI_REVIEW_PASS",
+  "release_admitted": false,
+  "goal_complete": false,
+  "artifact": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/export-v2/report.json",
+    "sha256": "dfe2e50eaafc50e0decdd2b2975cb1e8d15cfafe5ab51469f0a74f9c03a2b19f"
+  },
+  "deployed_service": {
+    "url": "wss://mc.laserturtle.net:62127/replay-room/dockyard",
+    "report": {
+      "path": "/Users/walter/data/code/odin/odin_godot/tests/replay_dockyard/online/public-deployment-report.json",
+      "sha256": "58dc419e5b29939da77a6924c4fec041bcf200e1310e9c4b0e74a594e6c1d2a1"
+    }
+  },
+  "cohort": "58a43f78f7481773",
+  "implementation": {
+    "layout": "Full-rect anchored margins with container-managed top-left status, top-right crew/debug, bottom-left help and centered settings/results.",
+    "stretch": "1280x720 design size; canvas_items and expand; HiDPI enabled.",
+    "camera": "Reference dock framing retained on narrow viewports; native camera pointer projection roundtrips checked.",
+    "input": "Controls are hit-tested using logical viewport rectangles mapped to the CSS canvas, without applying DPR twice.",
+    "scope": "UI/project settings only; no game rules, networking, crypto, backend API or server deployment changes."
+  },
+  "validation": {
+    "native_seven_sizes": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/native-layout-v4.json",
+      "sha256": "65a4668825356045ad06bda588294e554168248a67d93dc356d56a688ec6e1ad",
+      "result": "PASS"
+    },
+    "web_eight_css_dpi_arrangements": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/browser-layout-v1/report.json",
+      "sha256": "cccedbffbb961602bf4fd9c0757595739ea478877e21b6feac60f5de4d746e5b",
+      "result": "PASS",
+      "css_invariant_across_dpr": true,
+      "pointer_targets": true,
+      "full_engine_exit": true
+    },
+    "public_960x540_dpr2_pair": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/public-pair-v1/report.json",
+      "sha256": "c762dc82db980dd0e53a82329538cc77f1677acaf893beed6eaefb463772f24e",
+      "result": "PASS",
+      "all_five_byte_equal": true,
+      "export_binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/public-pair-v1/export-binding.json",
+        "sha256": "062af1f1763e70e06a9c6d5809b3d8cdeb7458b9d6f63b3666dc80ab0bba69fa"
+      }
+    }
+  },
+  "source_selection": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/source-selection.json",
+    "sha256": "7451f6e82fcb1192b762f389db74ee36cdc126428a3dad10e842429763e9bfed",
+    "baseline_commit": "510f87d8e7b5d19327f32360047d1566fa10c011",
+    "isolated_build": true,
+    "reason": "Concurrent native API edits in the main worktree differ from the cached backend source manifest. This UI artifact uses the committed baseline and copies only the UI changes."
+  },
+  "historical_qualification": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/historical-invite-qualification.json",
+    "sha256": "56308260741b6a2945d984c1cc9df8688ffb19524264b441768f4ff6c53764f5"
+  },
+  "open_gates": [
+    {
+      "id": "Q1",
+      "requirement": "Original repair8 maximum25ms",
+      "status": "REJECTED",
+      "observed_max_ms": 45.92,
+      "observed_p95_ms": 8.599,
+      "observed_p99_ms": 9.64,
+      "count": 3968,
+      "outliers_over_25ms": 1,
+      "cause": "UNESTABLISHED",
+      "decision": "User question pending. Original limit remains unchanged."
+    },
+    {
+      "id": "N1",
+      "requirement": "Independent outside-network acceptance",
+      "status": "NOT_OBSERVED",
+      "available": "Actual public WSS route deployed, valid standardTLS, sameWAN fullgame/forcedrelay/observer/reconnect/credentialrefusal/cleanup passes. STUN-only direct notestablished onreferenceNetwork; failure retained."
+    },
+    {
+      "id": "P1",
+      "requirement": "Two-human cooperative play feedback",
+      "status": "NOT_OBSERVED",
+      "available": "Actual rendered/audio/settings/readability and scripted cooperative rounds; automation is not human feedback."
+    },
+    {
+      "id": "observer-scripted-terminal-audit",
+      "status": "FAILED",
+      "detail": "Late observer enrolled with short room code and received the world, but terminal input-history audit could not materialize tick1791 after snapshot catchups through1801. No waiver or speculative protocol change."
+    }
+  ],
+  "public_upload_performed": false,
+  "screenshots_visually_inspected": [
+    "1280x720-dpr1.png",
+    "1920x1080-dpr2-settings.png",
+    "720x1280-dpr2.png"
+  ],
+  "delivery": {
+    "zip": "/Users/walter/data/code/odin/odin_godot/examples/replay_dockyard/out/itch-d02d5d4f6778eeef/Dockyard-Duo-html5.zip",
+    "zip_sha256": "f828edebe3270e369e29a552675453789e6e3dec7d5f9dfbfe33a751443090ce",
+    "zip_bytes": 13011301,
+    "candidate_manifest_sha256": "a241fb58762f840facc1cf7f1c2aaa8e2a297299d9a043f3582da3a1514c3df8",
+    "uploaded": false
+  }
+}

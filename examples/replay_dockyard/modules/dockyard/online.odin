@@ -114,6 +114,7 @@ online_init :: proc(self: ^DockyardDuo) -> bool {
         ice_json          = ice,
         relay_credentials = launch_int("DOCKYARD_ROOM_RELAY", "relay", 0) == 1,
         short_codes       = true,
+        browser_seats     = true,
     }
 
     if !ok || !rgd.party_open(&o.party, cfg, allocator) {

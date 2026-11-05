@@ -25,6 +25,10 @@ Hub :: struct {
     allocator:                            mem.Allocator,
     config:                               Hub_Config,
     rooms:                                []^Room,
+    activity:                             []u64,
+    creation_guard:                       Creation_Guard,
+    reclaim:                              Reclaim,
+    lifecycle_user:                       rawptr,
     commit:                               Commit,
     user:                                 rawptr,
     entropy:                              Entropy,
@@ -59,6 +63,9 @@ hub_open :: proc(
     wire: tr.Transport,
     entropy := Entropy{read = random_bytes},
     allocator := context.allocator,
+    creation_guard: Creation_Guard = nil,
+    reclaim: Reclaim = nil,
+    lifecycle_user: rawptr = nil,
 ) -> Error {
     if h.ready ||
        commit == nil ||
@@ -87,6 +94,8 @@ hub_open :: proc(
     h.allocator, h.config, h.commit, h.user, h.clock, h.wire, h.entropy =
         allocator, config, commit, user, clock, wire, entropy
     h.rooms = make([]^Room, config.rooms, allocator)
+    h.activity = make([]u64, config.rooms, allocator)
+    h.creation_guard, h.reclaim, h.lifecycle_user = creation_guard, reclaim, lifecycle_user
 
     if !codecs_init(&h.codecs, allocator) || !auth.rpc_codecs_init(&h.control_codecs, allocator) {
         hub_close(h)
@@ -101,6 +110,7 @@ hub_open :: proc(
     }
 
     h.now, h.budget = now, 32
+    for &at in h.activity {at = now}
 
     for b, i in existing {
         h.rooms[i] = new(Room, allocator)
@@ -124,6 +134,7 @@ hub_close :: proc(h: ^Hub) {
     }
 
     delete(h.rooms, h.allocator)
+    delete(h.activity, h.allocator)
     codecs_destroy(&h.codecs)
     auth.rpc_codecs_destroy(&h.control_codecs)
     crypto.zero_explicit(h, size_of(Hub))
@@ -177,6 +188,10 @@ hub_receive :: proc(h: ^Hub, from: tr.Peer_Id, bytes: []u8) -> bool {
     if result != .None {
         g, ticket = {}, {}
         h.rejected += 1
+    } else {
+        for room, i in h.rooms {
+            if room != nil && room.bundle.record.room == q.room {h.activity[i] = h.now; break}
+        }
     }
 
     reply := Reply{PROTOCOL, q.room, q.content, rec.hash(bytes), result, g, ticket}
@@ -221,7 +236,14 @@ hub_control_receive :: proc(h: ^Hub, from: tr.Peer_Id, bytes: []u8) -> bool {
     }
 
     room := hub_room(h, q.room)
-    return room != nil && auth.service_receive(&room.service, from, bytes)
+    if room == nil {return false}
+    accepted := auth.service_receive(&room.service, from, bytes)
+    if accepted {
+        for item, i in h.rooms {
+            if item == room {h.activity[i] = max(h.activity[i], room.service.coordinator.now); break}
+        }
+    }
+    return accepted
 }
 
 @(private)
@@ -240,6 +262,13 @@ hub_request :: proc(h: ^Hub, q: Request) -> (Grant, Ticket, Error) {
             return {}, {}, .Denied
         }
 
+        if h.creation_guard != nil {
+            if error := h.creation_guard(h.lifecycle_user, q.room); error != .None {
+                if error == .Storage {hub_poison(h)}
+                return {}, {}, error
+            }
+        }
+
         slot := -1
 
         for r, i in h.rooms {
@@ -250,7 +279,10 @@ hub_request :: proc(h: ^Hub, q: Request) -> (Grant, Ticket, Error) {
         }
 
         if slot < 0 {
-            return {}, {}, .Capacity
+            if h.reclaim == nil {return {}, {}, .Capacity}
+            if error := h.reclaim(h.lifecycle_user, h); error != .None {return {}, {}, error}
+            for r, i in h.rooms {if r == nil {slot = i; break}}
+            if slot < 0 {return {}, {}, .Capacity}
         }
 
         b, err := make_room(q.room, q.content, q.claim, q.endpoint, h.config.policy, h.entropy)
@@ -275,6 +307,7 @@ hub_request :: proc(h: ^Hub, q: Request) -> (Grant, Ticket, Error) {
         }
 
         h.rooms[slot], room = candidate, candidate
+        h.activity[slot] = h.now
     }
 
     switch q.verb {

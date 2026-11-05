@@ -39,7 +39,7 @@ def native_allowed(relative):
         return len(parts)==2 and (parts[1]=='box3d-runtime.json' or parts[1].endswith('.dylib') and '.r' not in parts[1] and '.p' not in parts[1])
     if parts[0] in ['content','audio','addons','modules','scripts']:
         return not relative.name.endswith(('.gen.odin','.sqlite','.sqlite3','.db','.pem','.key'))
-    return len(parts)==1 and relative.name in ['project.godot','odin_godot.gdextension','main.tscn','view.gd','feedback.gd','web_text_entry.gd','launch.py','CONTRIBUTING.md']
+    return len(parts)==1 and relative.name in ['project.godot','odin_godot.gdextension','main.tscn','view.gd','feedback.gd','web_text_entry.gd','web_runtime.gd','launch.py','CONTRIBUTING.md']
 
 SERVE='''#!/usr/bin/env python3
 from functools import partial

@@ -73,6 +73,26 @@ Systemd supplies Coturn's existing server-only signing secret with
 Room issues and refreshes authenticated member credentials with a600-second TTL.
 The game content/cohort must match the selected frozen browser artifact.
 
+## Resident room lifecycle
+
+`REPLAY_ROOM_CAPACITY=16` limits resident crews. With
+`REPLAY_ROOM_RECLAIM_IDLE_MS=30000`, a full cooperative, checkpoint-disabled
+deployment may reclaim an idle crew when another player hosts. A live hosting
+lease or connected signaling peer prevents reclamation. New/preloaded rooms get
+the idle grace period; authenticated provisioning/control traffic refreshes it.
+
+Reclamation first detaches the unused signaling bridge, then moves the exact
+private admission bundle from `replay_provision` to `replay_provision_archive` in
+one checked transaction. History remains private and archived room IDs remain
+reserved. A failed/uncertain archive fences the hub. Active crews and other
+deployment modes retain their existing behavior; reclamation is opt-in.
+An expired disconnected crew may therefore stop appearing in Recent Crew;
+players should Host a new crew in that case.
+
+The original deployment retained every finished crew in the resident inventory,
+so normal use and validation eventually filled all16 slots. The server-side
+lifecycle update fixes that exhaustion without increasing the active-room limit.
+
 ## Acceptance scope
 
 A check from this home's public address back into the same router is hairpin

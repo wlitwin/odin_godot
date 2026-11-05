@@ -61,6 +61,23 @@ strings are copied. Closing releases connections, profile operations, owned stri
 and the retained TLS reference. Browser CAS and native CAS retain their observed
 revision; conflicts do not refresh merely to overwrite another window's choice.
 
+Games that allow separate players in multiple browser tabs can opt into
+`Party_Config.browser_seats=true`. Party first acquires an exclusive Web Lock
+for a durable seat in the namespace/service scope, then opens its IndexedDB
+enrollment and Recent keys. Seat zero uses the original keys, preserving saved
+crews. Other live tabs use `.seatN` suffixes, so joining the same room cannot
+adopt the first tab's credentials or overwrite its Recent selection. Native
+storage and the default browser mode remain unchanged.
+
+A per-tab `sessionStorage` hint remembers the seat across reloads. Duplicated
+tabs may copy that hint, but the exclusive lock forces a different seat while
+the original is open. Closing Party or the document releases the seat; a fresh
+tab chooses the first free seat, including the original saved crew at seat zero.
+The hint contains no room credentials. Up to 32 seats are available per scope;
+unavailable Web Locks/session storage or exhausted seats fail before credentials
+are opened. Keep Party alive for the entire Room lifetime and close Room before
+Party. Refresh all open tabs when updating from the older shared-identity build.
+
 `party_open(&party, config, allocator)` optionally selects the allocator for its
 entire lifetime. Party retains that choice for later frames, enrollment retries
 and close. Close it before destroying the borrowed native store or allocator.

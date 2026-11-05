@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "result": "REVIEW_FIX_VALIDATED_WITH_FIREFOX_COLD_START_LIMITATION",
+  "release_admitted": false,
+  "goal_complete": false,
+  "cohort": "58a43f78f7481773",
+  "artifact": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/export-v5/report.json",
+    "sha256": "e95a623cc3708aabaa536a832169966da8d68429a5bdc053747f5c241eb2d8b0"
+  },
+  "source_selection": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/source-selection-v5.json",
+    "sha256": "966fa4a350bb0ec70321cab0aa6a4acc957119b8c550053fce4ff036ce531757"
+  },
+  "implementation": {
+    "storage": "Opt-in Party browser seats with Web Locks and per-tab session hints; default seat retains legacy enrollment and Recent keys. Duplicated live tabs cannot copy credentials.",
+    "background": "One timer-only worker wakes the original engine loop while hidden; original visible RAF is retained. Worker/listener ownership ends with the scene. No new physics loop or lease bypass.",
+    "server": "No server/protocol/port changes; deployed Room/TURN remains compatible."
+  },
+  "validation": {
+    "storage_chrome": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/seats-chrome/report.json",
+      "sha256": "f61a70527f08a9494df30fe59c6e88d0dcee5b3809ff0cc294a998fbcef19cbb",
+      "result": "PASS"
+    },
+    "storage_firefox": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/seats-firefox/report.json",
+      "sha256": "48a5af1393520c0693806d9add90cb7d8550e11d5825875a02e0b506e4ff6d5b",
+      "result": "PASS"
+    },
+    "chrome_same_profile_cold_join": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/worker-chrome/report.json",
+      "sha256": "acf3530c420f51ab3a4a4c2937fc26fc5cc1449ed25d71342f1fea87a0d211aa",
+      "result": "PASS",
+      "confirmed_ticks": 120,
+      "all_five_byte_equal": true,
+      "distinct_storage_seats": true,
+      "seat_locks_released": true,
+      "hidden_host_before_join": {
+        "visibility": "hidden",
+        "method": "worker",
+        "frames": 162
+      },
+      "hidden_host_after_join": {
+        "visibility": "hidden",
+        "method": "worker",
+        "frames": 270
+      },
+      "export_binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/worker-chrome/export-binding.json",
+        "sha256": "6b1b8204bbce6cec921be3482dfdece09e0ca9e1e1b36a8eb5831be8b63dab8d"
+      }
+    },
+    "firefox_same_profile_both_menus_preloaded": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/preopen-firefox-v2/report.json",
+      "sha256": "b02edd2dc04b39744891aa6e8d8d072f7d74ef474ae8641291d65d2dde886df1",
+      "result": "PASS",
+      "confirmed_ticks": 120,
+      "all_five_byte_equal": true,
+      "distinct_storage_seats": true,
+      "seat_locks_released": true,
+      "hidden_host_before_join": {
+        "visibility": "hidden",
+        "method": "worker",
+        "frames": 152
+      },
+      "hidden_host_after_join": {
+        "visibility": "hidden",
+        "method": "worker",
+        "frames": 241
+      },
+      "export_binding": {
+        "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/preopen-firefox-v2/export-binding.json",
+        "sha256": "03b08a867e15e63164e6668c434fd1db2a17a325273b2e0c425f7a0ba2e6c13b"
+      }
+    },
+    "hidden_runtime_and_all_workers_exit": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/runtime-final/report.json",
+      "sha256": "53cc3f29b18192ec5c8ac5b6267ff397e9c2ddf9d3a81ce10a0e82bacd95e43b",
+      "result": "PASS"
+    },
+    "actual_frozen_host_fences": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/frozen-host-v1/report.json",
+      "sha256": "022e6fbd79916f5960a0a27ab58c25bd106be6b939babb6608478f77c26d5c1b",
+      "result": "PASS"
+    }
+  },
+  "native_party_defaults": {
+    "handle": "t1rw",
+    "actual_exit": 0,
+    "tests": 3
+  },
+  "packaging_tests": {
+    "handle": "t1rz",
+    "actual_exit": 0,
+    "tests": 8
+  },
+  "retained_failures": {
+    "original_shared_identity_case": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/baseline-chrome/report.json",
+      "sha256": "50ff6628a7383b0494219b5cdf152ad5d37de2d8b20b2bd9689fbb29a85183d5"
+    },
+    "identity_only_hidden_host_case": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/shared-chrome/report.json",
+      "sha256": "0470c3750edd9f2525580b546e9333e57a20d214378f63cc863e1f4872b1fb6f"
+    },
+    "window_timer_throttling_case": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/background-chrome/report.json",
+      "sha256": "4bf1c8ad3f4151c389012e2661ef31afd7317d6cf3eed5b18482a1ef8a60745d"
+    },
+    "firefox_cold_second_tab_after_host": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/worker-firefox/report.json",
+      "sha256": "400d75dc3fd9be3a8c98199f678b4c450b82c1f76f0e95d589e0b94c1420f63e",
+      "result": "FAIL",
+      "detail": "Hidden host timer loop advanced, but host lost permission during second-game startup. Cause is not established. Loading both menus before hosting is a distinct passing arrangement, not a waiver."
+    },
+    "preopen_fixture_focus_assertion": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/preopen-firefox/report.json",
+      "sha256": "e316d0f4737f39837a25f0be4e4c80527b8c2c74487a8e3255314f5a00765699",
+      "detail": "Harness assumed an already open client tab was foreground; corrected by focusing that tab before observing hidden-host progress. Real client had enrolled."
+    }
+  },
+  "historical_qualification": {
+    "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/P1/responsive-ui-v1/final-report.json",
+    "sha256": "0e0b605f4bd9fb2c80e87793be932c45910a4311d42faa868da40c63ca0a8031"
+  },
+  "open_gates": [
+    {
+      "id": "Q1",
+      "requirement": "Original repair8 maximum25ms",
+      "status": "REJECTED",
+      "observed_max_ms": 45.92,
+      "observed_p95_ms": 8.599,
+      "observed_p99_ms": 9.64,
+      "count": 3968,
+      "outliers_over_25ms": 1,
+      "cause": "UNESTABLISHED",
+      "decision": "User question pending. Original limit remains unchanged."
+    },
+    {
+      "id": "N1",
+      "requirement": "Independent outside-network acceptance",
+      "status": "NOT_OBSERVED",
+      "available": "Actual public WSS route deployed, valid standardTLS, sameWAN fullgame/forcedrelay/observer/reconnect/credentialrefusal/cleanup passes. STUN-only direct notestablished onreferenceNetwork; failure retained."
+    },
+    {
+      "id": "P1",
+      "requirement": "Two-human cooperative play feedback",
+      "status": "NOT_OBSERVED",
+      "available": "Actual rendered/audio/settings/readability and scripted cooperative rounds; automation is not human feedback."
+    },
+    {
+      "id": "observer-scripted-terminal-audit",
+      "status": "FAILED",
+      "detail": "Late observer enrolled with short room code and received the world, but terminal input-history audit could not materialize tick1791 after snapshot catchups through1801. No waiver or speculative protocol change."
+    }
+  ],
+  "public_upload_performed": false,
+  "public_network_scope": "Existing public WSS with authenticated forced TURN from the reference host on the same WAN; independent outside-network acceptance remains separate.",
+  "deployed_service": {
+    "url": "wss://mc.laserturtle.net:62127/replay-room/dockyard"
+  },
+  "delivery": {
+    "result": "ZIP_BYTES_VERIFIED",
+    "zip": "/Users/walter/data/code/odin/odin_godot/examples/replay_dockyard/out/itch-f36cd9d77989d693/Dockyard-Duo-html5.zip",
+    "sha256": "7f36c536f2a397d156fe1f287fbd64c9e3c0fb57ca34ae9a99470cf27c4b153c",
+    "bytes": 13016376,
+    "files": 19,
+    "extracted": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/zip-extracted",
+    "service_url": "wss://mc.laserturtle.net:62127/replay-room/dockyard",
+    "smoke": {
+      "path": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/zip-smoke/report.json",
+      "sha256": "b428eab09076e814c578336b9993ae73d497857428108f91b044386c6b1406f0",
+      "result": "PASS"
+    },
+    "candidate": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-box3d-web-showcase-ldn92t89/N1/two-tabs-v1/candidate-v2",
+    "candidate_manifest_sha256": "1f21a046e6ff6a3e69236ed69a6d615f6e7afcf98c1d95c7e8df0870c5544aa5",
+    "uploaded": false
+  },
+  "finite_work_complete": true,
+  "server_deployment_required": false
+}

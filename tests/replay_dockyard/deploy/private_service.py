@@ -23,9 +23,16 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--package', required=True)
     p.add_argument('--out', type=Path, required=True)
+    p.add_argument('--remote-port', type=int, default=49741)
+    p.add_argument('--capacity', type=int, default=16)
+    p.add_argument('--reclaim-idle-ms', type=int, default=0)
     a = p.parse_args()
     if not re.fullmatch(r'/nix/store/[a-z0-9]{32}-dockyard-replay-room-1', a.package):
         p.error('use the successful package store path')
+    if not 1024 <= a.remote_port <= 65535 or a.remote_port == 49740:
+        p.error('choose a private port distinct from the production49740 listener')
+    if not 1 <= a.capacity <= 32 or a.reclaim_idle_ms not in [0] and not 1000 <= a.reclaim_idle_ms <= 86400000:
+        p.error('invalid room capacity or reclamation interval')
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=False, mode=0o700)
     unit = 'dockyard-room-review-'+secrets.token_hex(4)
@@ -38,7 +45,9 @@ def main():
         'PATH': '/run/current-system/sw/bin',
         'REPLAY_ROOM_CONTENT': '0x58a43f78f7481773',
         'REPLAY_ROOM_CHECKPOINT_MODEL': 'disabled',
-        'REPLAY_ROOM_BIND': '127.0.0.1', 'REPLAY_ROOM_PORT': '49740',
+        'REPLAY_ROOM_BIND': '127.0.0.1', 'REPLAY_ROOM_PORT': str(a.remote_port),
+        'REPLAY_ROOM_CAPACITY': str(a.capacity),
+        'REPLAY_ROOM_RECLAIM_IDLE_MS': str(a.reclaim_idle_ms),
         'REPLAY_ROOM_LOCAL_DEVELOPMENT': '1',
         'REPLAY_ROOM_DB': state+'/rooms.sqlite3', 'REPLAY_ROOM_CREATE_DB': '1',
         'REPLAY_ROOM_TURN_URLS': 'turn:mc.laserturtle.net:3478',
@@ -58,7 +67,8 @@ def main():
     start += ['/run/current-system/sw/bin/bash', '-c', script, 'room-review',
               a.package+'/bin/replay-room-service']
     record = {'unit': unit, 'package': a.package, 'private_service_url': 'ws://127.0.0.1:'+str(port),
-              'public_service_started': False, 'remote_bind': '127.0.0.1:49740',
+              'public_service_started': False, 'remote_bind': '127.0.0.1:'+str(a.remote_port),
+              'capacity': a.capacity, 'reclaim_idle_ms': a.reclaim_idle_ms,
               'state_directory': state, 'scope': 'Owned temporary private service; no public deployment claim.'}
     (out/'launch.json').write_text(json.dumps(record, indent=2)+'\n')
     stopping = False
@@ -89,7 +99,7 @@ def main():
         else:
             raise TimeoutError('bounded private service startup')
         tunnel_args = [*SSH[:-1], '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=10',
-                       '-N', '-L', f'127.0.0.1:{port}:127.0.0.1:49740', SSH[-1]]
+                       '-N', '-L', f'127.0.0.1:{port}:127.0.0.1:{a.remote_port}', SSH[-1]]
         stream = (out/'tunnel.log').open('xb')
         tunnel = subprocess.Popen(tunnel_args, stdout=stream, stderr=subprocess.STDOUT,
                                   start_new_session=True)
