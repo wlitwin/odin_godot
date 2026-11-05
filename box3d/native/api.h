@@ -226,6 +226,15 @@ OGB3_API ogb3_status ogb3_abi_layout(uint32_t type, uint32_t field_index,
  * token. Snapshot capture/validation report OGB3_CAPACITY for this condition.
  */
 OGB3_API uint64_t ogb3_build_fingerprint(void);
+/* Process-wide length scale: Box3D's lengthUnitsPerMeter, default 1. Contact
+ * slop (0.005 m x units), speculative distance and AABB margins scale with it,
+ * so scenes much smaller than a metre (a 3 cm ball) can use e.g. 0.1. Set it
+ * before the first world, geometry or ogb3_build_fingerprint call in the
+ * process; after that only the current value is accepted (OGB3_UNSUPPORTED).
+ * The determinism fingerprint is computed with the chosen value, so processes
+ * using different values never match. Kit/Replay are validated with 1 only. */
+OGB3_API ogb3_status ogb3_set_length_units_per_meter(float units);
+OGB3_API float ogb3_get_length_units_per_meter(void);
 OGB3_API ogb3_status ogb3_world_def_default(ogb3_world_def *);
 OGB3_API ogb3_status ogb3_body_def_default(ogb3_body_def *);
 OGB3_API ogb3_status ogb3_shape_def_default(ogb3_shape_def *);

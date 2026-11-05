@@ -67,7 +67,12 @@ return `.Out_Of_Memory`; upstream engine allocations still assert on exhaustion.
 Positions use meters in a Y-up, right-handed coordinate system. Rotations use
 quaternions in `(x, y, z, w)` order. Transforms are rigid; bake scale into immutable
 geometry. The initial corpus uses one worker, 60 ticks per second and four
-substeps. Process-wide unit settings must be initialized before creating worlds.
+substeps. Process-wide unit settings must be initialized before creating worlds:
+`set_length_units_per_meter` (default 1) scales Box3D's contact slop, speculative
+distance and AABB margins, so a scene far smaller than a metre can use e.g. 0.1.
+Call it before the first world, geometry or `build_fingerprint`; afterwards only the
+current value is accepted. The fingerprint includes it. Kit and Replay are validated
+with 1 only.
 Keep engine configuration and callback identity fixed during a simulation run.
 
 All mutation, queries, capture and restore happen at settled step boundaries on

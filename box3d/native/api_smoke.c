@@ -100,6 +100,11 @@ static void body_type_roundtrip(void) {
 }
 int main(void) {
   assert(ogb3_abi_version() == 1);
+  /* Before initialization the scale is settable and validated. */
+  assert(ogb3_set_length_units_per_meter(0.0f) == OGB3_INVALID_ARGUMENT);
+  assert(ogb3_set_length_units_per_meter(NAN) == OGB3_INVALID_ARGUMENT);
+  OK(ogb3_set_length_units_per_meter(1.0f));
+  assert(ogb3_get_length_units_per_meter() == 1.0f);
   uint32_t size, align, offset;
   uint32_t forged_valid;
   OK(ogb3_world_valid(1, &forged_valid));
@@ -107,6 +112,11 @@ int main(void) {
   OK(ogb3_abi_layout(OGB3_T_BODY_DEF, 1, &size, &align, &offset));
   assert(size == 88 && align == 4 && offset == 4);
   maximum_public_worlds();
+  /* Worlds now exist: the engine is initialized, so only the current scale is
+   * accepted and a change is refused rather than silently ignored. */
+  assert(ogb3_set_length_units_per_meter(2.0f) == OGB3_UNSUPPORTED);
+  OK(ogb3_set_length_units_per_meter(1.0f));
+  assert(ogb3_get_length_units_per_meter() == 1.0f);
   body_type_roundtrip();
   ogb3_world_def wd;
   OK(ogb3_world_def_default(&wd));

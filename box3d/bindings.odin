@@ -399,6 +399,20 @@ build_fingerprint :: proc() -> u64 {
     return c_build_fingerprint()
 }
 
+// Process-wide length scale (Box3D's lengthUnitsPerMeter, default 1). Contact slop
+// (0.005 m x units), speculative distance and AABB margins scale with it, so a scene
+// far smaller than a metre, such as a 3 cm golf ball, can use e.g. 0.1. Call it before
+// the first world, geometry or build_fingerprint in the process; afterwards only the
+// current value is accepted (.Unsupported). The fingerprint is computed with it, so
+// processes using different values never match. Kit and Replay are validated with 1.
+set_length_units_per_meter :: proc(units: f32) -> Status {
+    return c_set_length_units_per_meter(units)
+}
+
+get_length_units_per_meter :: proc() -> f32 {
+    return c_get_length_units_per_meter()
+}
+
 // Allocation-free identity of the actual loaded native image. Cookie is a
 // process-local lifetime token, never a game/wire identity or authentication.
 DOMAIN_CONTRACT_VERSION :: u32(1)
@@ -592,6 +606,10 @@ foreign native {
     raw_abi_layout :: proc(type_id, field: u32, size, alignment, offset: ^u32) -> Status ---
     @(link_name = "ogb3_build_fingerprint")
     raw_build_fingerprint :: proc() -> u64 ---
+    @(link_name = "ogb3_set_length_units_per_meter")
+    raw_set_length_units_per_meter :: proc(units: f32) -> Status ---
+    @(link_name = "ogb3_get_length_units_per_meter")
+    raw_get_length_units_per_meter :: proc() -> f32 ---
     @(link_name = "ogb3_world_def_default")
     raw_world_def_default :: proc(def: ^World_Def) -> Status ---
     @(link_name = "ogb3_body_def_default")
@@ -1116,6 +1134,24 @@ c_build_fingerprint :: proc() -> u64 {
     }
 
     return raw_build_fingerprint()
+}
+
+@(private)
+c_set_length_units_per_meter :: proc(a0: f32) -> Status {
+    if status := domain_access_check(); status != .Ok {
+        return status
+    }
+
+    return raw_set_length_units_per_meter(a0)
+}
+
+@(private)
+c_get_length_units_per_meter :: proc() -> f32 {
+    if status := domain_access_check(); status != .Ok {
+        return 0
+    }
+
+    return raw_get_length_units_per_meter()
 }
 
 @(private)

@@ -141,6 +141,7 @@ static int nonnegative(float x) { return isfinite(x) && x >= 0; }
 static ogb3_allocation_stats allocations;
 static int initialized;
 static uint64_t fingerprint;
+static float length_units_per_meter = 1.0f;
 /* The address identifies this loaded engine image, even when another image
  * contains byte-identical code. It is never a portable identity. The host is
  * responsible for keeping this image loaded throughout owner/callback use. */
@@ -451,7 +452,7 @@ static ogb3_status initialize(void) {
   int count = b3GetWorldCount();
   if (count != 0)
     return count >= B3_MAX_WORLDS ? OGB3_CAPACITY : OGB3_UNSUPPORTED;
-  b3SetLengthUnitsPerMeter(1.0f);
+  b3SetLengthUnitsPerMeter(length_units_per_meter);
   b3SetAllocator(engine_alloc, engine_free);
   /* Keep the admitted four-wide profile independent of runtime AVX2 dispatch. */
   b3SetSIMDWidth(4);
@@ -468,6 +469,16 @@ ogb3_status ogb3_engine_allocation_stats(ogb3_allocation_stats *out) {
   return OGB3_OK;
 }
 uint32_t ogb3_abi_version(void) { return 1; }
+ogb3_status ogb3_set_length_units_per_meter(float units) {
+  ARG(isfinite(units) && units >= 0.001f && units <= 1000.0f);
+  /* Fixed once the engine is initialized: tolerances and the fingerprint
+   * already used the current value. Repeating it is harmless. */
+  if (initialized)
+    return units == length_units_per_meter ? OGB3_OK : OGB3_UNSUPPORTED;
+  length_units_per_meter = units;
+  return OGB3_OK;
+}
+float ogb3_get_length_units_per_meter(void) { return length_units_per_meter; }
 uint64_t ogb3_build_fingerprint(void) {
   if (fingerprint)
     return fingerprint;
