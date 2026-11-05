@@ -124,10 +124,68 @@ short_code_uses_existing_protocol_single_use_and_independent_member_credentials 
     )
     _, invalid := p.creator_short_invite(record, 2)
     testing.expect(t, !invalid)
+    _, no_uses := p.creator_short_invite(record, uses = 0)
+    testing.expect(t, !no_uses)
+    _, too_many := p.creator_short_invite(record, uses = p.SHORT_CODE_MAX_USES + 1)
+    testing.expect(t, !too_many)
     // The published code is never an administrator claim.
     f.clock.now += 1000 // Refill the existing per-peer limiter before testing authorization.
     invite.claim = ticket.secret
     testing.expect_value(t, hub_call(&f, invite).result, p.Error.Denied)
+}
+
+// A party game registers one code for several players: each guest joins with
+// the same five characters until the uses run out.
+@(test)
+short_code_with_several_uses_seats_that_many_guests :: proc(t: ^testing.T) {
+    f: Hub_Fixture
+    hub_setup(&f)
+    defer hub_destroy(&f)
+    code, ok := p.short_code(ADMIN, 55)
+    assert(ok)
+    ticket, valid := p.short_ticket_parse(string(code[:]), 55)
+    assert(valid)
+    q := create_request(ticket.room)
+    creator := hub_call(&f, q)
+    testing.expect_value(t, creator.result, p.Error.None)
+    url, _ := p.service_url("wss://rooms.example.test")
+    record := p.Enrollment_Record {
+        version  = p.ENROLLMENT_VERSION,
+        revision = 2,
+        state    = .Ready,
+        service  = url,
+        request  = q,
+        grant    = creator.grant,
+    }
+    invite, issued := p.creator_short_invite(record, uses = 3)
+    assert(issued)
+    testing.expect(t, p.request_valid(invite) && invite.role == .Player && invite.uses == 3)
+    testing.expect_value(t, hub_call(&f, invite).result, p.Error.None)
+    keys: [3]p.Secret
+
+    for i in 0 ..< 4 {
+        f.clock.now += 1000 // Refill the per-peer limiter between guests.
+        join := p.Request {
+            version = p.PROTOCOL,
+            verb = .Join,
+            room = ticket.room,
+            content = 55,
+            claim = {0 = u8(80 + i)},
+            ticket = ticket.secret,
+            endpoint = address(u16(45010 + i)),
+        }
+        reply := hub_call(&f, join)
+
+        if i < 3 {
+            testing.expect_value(t, reply.result, p.Error.None)
+            testing.expect(t, !reply.grant.can_host && reply.grant.key != creator.grant.key)
+            keys[i] = reply.grant.key
+        } else {
+            testing.expect_value(t, reply.result, p.Error.Denied)
+        }
+    }
+
+    testing.expect(t, keys[0] != keys[1] && keys[1] != keys[2] && keys[0] != keys[2])
 }
 
 @(test)

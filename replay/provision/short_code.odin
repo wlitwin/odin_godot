@@ -5,10 +5,12 @@ import "core:strings"
 
 // Opt-in, human-entered cooperative room codes (format v1). The code is a
 // low-entropy invitation, not an administrator or member credential. Only
-// Player, single-use invitations are issued through this door. The existing
+// Player invitations are issued through this door: single-use by default, or
+// up to SHORT_CODE_MAX_USES uses so one code seats a whole party. The existing
 // confidential transport, global/peer request limits, durable invite use count
 // and random creator/member secrets remain necessary and unchanged.
 SHORT_CODE_BYTES :: 5
+SHORT_CODE_MAX_USES :: 8
 SHORT_CODE_ALPHABET :: "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 short_code :: proc(creator: Secret, content: u64) -> ([SHORT_CODE_BYTES]u8, bool) {
@@ -116,11 +118,14 @@ creator_short_invite :: proc(
     record: Enrollment_Record,
     index: u32 = 0,
     local_development: bool = false,
+    uses: u8 = 1,
 ) -> (
     Request,
     bool,
 ) {
-    if !enrollment_record_valid(record, local_development) ||
+    if uses == 0 ||
+       uses > SHORT_CODE_MAX_USES ||
+       !enrollment_record_valid(record, local_development) ||
        record.state != .Ready ||
        record.request.verb != .Create {
         return {}, false
@@ -146,7 +151,7 @@ creator_short_invite :: proc(
             claim = record.request.claim,
             ticket = ticket.secret,
             role = .Player,
-            uses = 1,
+            uses = uses,
         },
         true
 }

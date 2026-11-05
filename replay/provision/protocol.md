@@ -72,7 +72,8 @@ The optional human-entered **short room code v1** is a client-side recipe using
 this existing protocol. `short_code` maps a random creator claim and content ID
 to five characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. Separate HMAC-SHA256
 domains derive the room locator and two invitation secrets (crew index 0, watch
-index 1). `creator_short_invite` registers only `.Player`, one-use invitations;
+index 1). `creator_short_invite` registers only `.Player` invitations, single-use unless the
+caller asks for up to `SHORT_CODE_MAX_USES` (8) uses;
 the normal server authorization checks still require the full creator claim.
 Codes are case-insensitive and trimmed at the edges. Other input is rejected.
 The independent member/creator credentials, message shapes, protocol version,

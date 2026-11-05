@@ -49,7 +49,7 @@ Party_Config :: struct {
     tls:                          gd.Tls_Options,
     storage:                      Party_Storage,
     entropy:                      p.Entropy, // optional embedding/test source; default uses Godot Crypto
-    short_codes:                  bool, // opt-in cooperative Player/single-use, five-character code v1
+    short_codes:                  bool, // opt-in cooperative Player, five-character code v1; invite_uses 1..8
     browser_seats:                bool, // opt-in exclusive durable browser seat per live tab
 }
 
@@ -93,7 +93,7 @@ party_scope :: proc(service: string) -> string {
 party_open :: proc(o: ^Party, cfg: Party_Config, allocator := context.allocator) -> bool {
     context.allocator = allocator
 
-    if cfg.short_codes && (cfg.invite_role != .Player || cfg.invite_uses != 1) {
+    if cfg.short_codes && (cfg.invite_role != .Player || cfg.invite_uses > p.SHORT_CODE_MAX_USES) {
         return false
     }
 
@@ -150,11 +150,13 @@ party_open :: proc(o: ^Party, cfg: Party_Config, allocator := context.allocator)
     when gd.IS_WEB {
         o.seat_resolved = !cfg.browser_seats
         opened: bool
+
         if cfg.browser_seats {
             opened = storagegd.browser_seat_open(&o.browser_seat, o.config.namespace, o.scope)
         } else {
             opened = storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8)
         }
+
         if !opened {
             party_fail(o, .Storage)
             return false
@@ -409,7 +411,11 @@ party_frame :: proc(o: ^Party) {
             )
 
             if o.config.short_codes {
-                short, valid := p.creator_short_invite(e.record, local_development = o.config.local_development)
+                short, valid := p.creator_short_invite(
+                    e.record,
+                    local_development = o.config.local_development,
+                    uses = o.config.invite_uses,
+                )
 
                 if valid {
                     q, ok = short, true
@@ -623,10 +629,12 @@ party_recent_frame :: proc(o: ^Party) {
             if storagegd.browser_seat_poll(&o.browser_seat) != .Complete {
                 return
             }
+
             if o.browser_seat.failed {
                 party_fail(o, .Storage)
                 return
             }
+
             // Seat zero preserves existing saved crews. Additional live seats
             // share the database but never enrollment or Recent selection keys.
             if o.browser_seat.seat > 0 {
@@ -634,12 +642,15 @@ party_recent_frame :: proc(o: ^Party) {
                 o.scope = strings.clone(fmt.tprintf("%s.seat%d", previous, o.browser_seat.seat))
                 delete(previous)
             }
+
             o.seat_resolved = true
+
             if !storagegd.browser_store_read(&o.recent_op, o.config.namespace, o.scope, 8) {
                 party_fail(o, .Storage)
                 return
             }
         }
+
         if !o.recent_loaded {
             if storagegd.browser_store_poll(&o.recent_op) != .Complete {
                 return

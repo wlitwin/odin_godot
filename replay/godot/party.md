@@ -105,7 +105,9 @@ Room still validates the authenticated roster and process incarnation.
 ### Optional five-character room codes
 
 Cooperative games may set `short_codes=true` with `invite_role=.Player` and
-`invite_uses=1`. This uses the provision layer's short-code format v1, while
+`invite_uses` from 1 to `SHORT_CODE_MAX_USES` (8). With one use the code seats one
+guest; a party game that seats several players with one code sets more, and each
+guest joins with the same five characters until the uses run out. This uses the provision layer's short-code format v1, while
 keeping the existing Room wire protocol and durable enrollment. Create derives
 the room locator from a fresh creator claim's code. A collision cannot replace
 the server's creator or adopt another local enrollment. Display `code[:code_count]`

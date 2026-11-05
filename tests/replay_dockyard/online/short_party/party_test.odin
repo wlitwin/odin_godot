@@ -113,7 +113,7 @@ five_character_collision_preserves_an_existing_local_enrollment :: proc(t: ^test
 }
 
 @(test)
-short_codes_do_not_accept_privileged_or_reusable_invite_configuration :: proc(t: ^testing.T) {
+short_codes_do_not_accept_privileged_or_unbounded_invite_configuration :: proc(t: ^testing.T) {
     l: Ledger
     o: rgd.Party
     defer rgd.party_close(&o)
@@ -121,8 +121,19 @@ short_codes_do_not_accept_privileged_or_reusable_invite_configuration :: proc(t:
     cfg.invite_role = .Trusted_Peer
     testing.expect(t, !rgd.party_open(&o, cfg))
     cfg.invite_role = .Player
-    cfg.invite_uses = 2
+    cfg.invite_uses = p.SHORT_CODE_MAX_USES + 1
     testing.expect(t, !rgd.party_open(&o, cfg))
+}
+
+// One short code may seat a whole party (opt-in, up to SHORT_CODE_MAX_USES).
+@(test)
+short_codes_accept_a_bounded_multi_use_player_invite :: proc(t: ^testing.T) {
+    l: Ledger
+    o: rgd.Party
+    defer rgd.party_close(&o)
+    cfg := config(&l)
+    cfg.invite_uses = 3
+    testing.expect(t, rgd.party_open(&o, cfg))
 }
 
 @(test)
