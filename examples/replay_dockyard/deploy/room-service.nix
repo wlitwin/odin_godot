@@ -1,6 +1,7 @@
 { lib, stdenv, stdenvNoCC, fetchurl, autoPatchelfHook, unzip, odin, clang, lld
 , cmake, gnumake, python3, git, ripgrep, sqlite, zlib, libGL, libxkbcommon
-, alsa-lib, libpulseaudio, fontconfig, xorg, procps
+, alsa-lib, libpulseaudio, fontconfig, procps
+, libx11, libxcursor, libxrandr, libxinerama, libxi, libxext, libxrender
 }:
 let
   nativeSource = lib.fileset.toSource {
@@ -48,8 +49,8 @@ let
     };
     nativeBuildInputs = [ unzip autoPatchelfHook ];
     buildInputs = [ stdenv.cc.cc.lib zlib libGL libxkbcommon alsa-lib
-      libpulseaudio fontconfig xorg.libX11 xorg.libXcursor xorg.libXrandr
-      xorg.libXinerama xorg.libXi xorg.libXext xorg.libXrender ];
+      libpulseaudio fontconfig libx11 libxcursor libxrandr libxinerama libxi
+      libxext libxrender ];
     # Godot loads fontconfig dynamically, so ELF DT_NEEDED discovery misses it.
     runtimeDependencies = [ (lib.getLib fontconfig) ];
     dontUnpack = true;
