@@ -15,7 +15,10 @@ Diagnostic scene paths are not definition data. Body pose is relative to the
 World; its global rigid transform is the presentation coordinate frame. Shape
 local_pose and positive scale are passed to the shared baker, never discarded.
 Sphere center and both capsule endpoints are explicit. Hull limit is256 points.
-Mesh/heightfield require Static, non-sensor and sensor events disabled. Heightfield
+Mesh/heightfield require Static, non-sensor and sensor events disabled. Box3D mesh
+collision is one-sided and counter-clockwise, the reverse of Godot's front faces;
+Box3DEditorMeshBaker converts the winding, and Box3DMeshCleanup welds and repairs
+meshes assembled from parts (see mesh_cleanup.gd). Heightfield
 triangulation and every stable ID/content hash belong to the shared Odin baker.
 
 Same resource key on different bodies denotes the same immutable geometry;

@@ -111,9 +111,15 @@ Select an authored World/body/shape, character/joint setting, MeshInstance or
 bake artifact to use its Inspector panel. The normal exported property editors
 remain active. Validation/inspection uses the shared tool module and reports
 field diagnostics and hexadecimal identities. World baking saves the checked
-owning artifact; Mesh baking requires an explicit stable shape key and copies
-actual surface vertices/indices into a Mesh shape Resource. Source affine
-transforms are baked, including corrected triangle winding for reflection.
+owning artifact; Mesh baking requires an explicit stable shape key and bakes the
+actual surface triangles into a Mesh shape Resource. Source affine transforms are
+baked. Godot's clockwise front faces become Box3D's counter-clockwise ones (Box3D
+mesh collision is one-sided), with reflections accounted for. `Box3DMeshCleanup`
+then welds vertices within 1 mm, drops zero-area triangles, removes buried faces
+(back-to-back caps where closed parts touch, a part's base hidden inside another)
+and splits T-junctions, so every interior edge is shared by exactly two triangles
+and Box3D can smooth contacts across it. Projects assembling meshes from several
+parts, such as a GridMap, can call `Box3DMeshCleanup.build` themselves.
 Skinned/blend-shape sources, non-triangle surfaces, invalid transforms and
 unsupported mesh sensor flags report errors. Render-only UV/normal/tangent data
 is not collision identity.

@@ -25,6 +25,19 @@ func frame_case(path: String,label: String) -> bool:
 	var rejected: Dictionary=draw.submit_frame_json(encoded,stale)
 	if rejected.get("ok",true) or rejected.get("error","")!="Stale" or draw.mesh!=null:draw.free();fail("stale clear");return false
 	draw.enabled=false;draw.free();print("BOX3D_EDITOR_FRAME ",label," actual_file=",path," lines=",result.lines," NativeDelta=0");return true
+# A BoxMesh (24 per-face vertices) bakes to a closed box: 8 welded vertices, 12
+# triangles, every edge shared by exactly two, every normal outward, mirrored or not.
+func closed_outward_box(transform: Transform3D) -> bool:
+	var baked: Dictionary=Box3DEditorMeshBaker.bake_mesh(BoxMesh.new(),"mesh.box",transform)
+	if not baked.get("ok",false):fail("BoxMesh bake: "+JSON.stringify(baked.get("errors",[])));return false
+	var box: Box3DMeshShape3D=baked.resource;var uses: Dictionary={}
+	for t in range(0,box.indices.size(),3):
+		var a: Vector3=box.vertices[box.indices[t]];var b: Vector3=box.vertices[box.indices[t+1]];var c: Vector3=box.vertices[box.indices[t+2]]
+		if (b-a).cross(c-a).dot((a+b+c)/3.0)<=0.0:fail("BoxMesh triangle faces inward under "+str(transform.basis));return false
+		for k in 3:
+			var edge:=Vector2i(mini(box.indices[t+k],box.indices[t+(k+1)%3]),maxi(box.indices[t+k],box.indices[t+(k+1)%3]));uses[edge]=uses.get(edge,0)+1
+	if box.vertices.size()!=8 or box.indices.size()!=36 or uses.values().any(func(n): return n!=2):fail("BoxMesh not a closed welded box: %d vertices, %d indices" % [box.vertices.size(),box.indices.size()]);return false
+	return true
 func _initialize() -> void:
 	probe=Node.new();probe.set_script(load("res://modules/editor_probe/probe.odin"));root.add_child(probe)
 	services=Box3DEditorServices.new(root)
@@ -38,7 +51,11 @@ func _initialize() -> void:
 	var second: Dictionary=Box3DEditorMeshBaker.bake_mesh(source,"mesh.imported",transform,flags,"procedural://actual-arraymesh","revision1")
 	if not first.get("ok",false) or not second.get("ok",false):fail("actual ArrayMesh extraction");return
 	var shape: Box3DMeshShape3D=first.resource;var errors: Array=[]
-	if shape.vertices.size()!=6 or shape.indices!=PackedInt32Array([0,1,2,3,4,5]) or shape.vertices[0]!=Vector3(5,6,7) or shape.density!=0.75 or shape.enable_sensor_events or shape.box3d_shape_definition("shape",errors,"static",false)!=second.resource.box3d_shape_definition("shape",errors,"static",false):fail("actual surfaces/transform/flags/determinism");return
+	# The two identical one-triangle surfaces weld into ONE triangle in Box3D's
+	# counter-clockwise order, so its normal is Godot's visible front face (+Y).
+	var front: Vector3=(shape.vertices[shape.indices[1]]-shape.vertices[shape.indices[0]]).cross(shape.vertices[shape.indices[2]]-shape.vertices[shape.indices[0]])
+	if shape.vertices.size()!=3 or shape.indices.size()!=3 or front.y<=0.0 or shape.authoring_metadata.cleanup.buried_removed!=1 or shape.vertices[0]!=Vector3(5,6,7) or shape.density!=0.75 or shape.enable_sensor_events or shape.box3d_shape_definition("shape",errors,"static",false)!=second.resource.box3d_shape_definition("shape",errors,"static",false):fail("actual surfaces/transform/flags/determinism/winding");return
+	if not closed_outward_box(Transform3D.IDENTITY) or not closed_outward_box(Transform3D(Basis.IDENTITY.scaled(Vector3(-1,1,1)),Vector3.ZERO)):return
 	if ResourceSaver.save(shape,"res://baked-mesh.tres")!=OK:fail("shape Resource save");return
 	var loaded: Box3DMeshShape3D=ResourceLoader.load("res://baked-mesh.tres","",ResourceLoader.CACHE_MODE_IGNORE)
 	if loaded==null or loaded==shape or loaded.authoring_metadata!=shape.authoring_metadata or loaded.vertices!=shape.vertices:fail("shape Resource metadata/data roundtrip");return

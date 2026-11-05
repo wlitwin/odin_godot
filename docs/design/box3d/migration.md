@@ -72,8 +72,10 @@ events disabled. Hulls are convex point clouds. Heightfields bake to triangle
 meshes; transformed boxes can bake to exact hull vertices. Body and World
 transforms are rigid. Do not rely on cancelling body scales, shear, reflections
 in a body pose or top-level ancestry to silently disappear. The mesh import tool
-can explicitly bake a nonsingular affine source transform into geometry and fix
-reflected triangle winding.
+can explicitly bake a nonsingular affine source transform into geometry. It
+converts Godot's clockwise triangles to Box3D's counter-clockwise ones and welds
+and repairs the mesh so a fast body does not pop at seams between parts; see the
+[editor workflow](editor.md).
 
 Pin uses a spherical point constraint, Hinge a Revolute constraint and Slider a
 Prismatic constraint. The remaining named types use their matching native
