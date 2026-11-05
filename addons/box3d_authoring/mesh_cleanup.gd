@@ -134,7 +134,8 @@ static func _remove_covered(indices: PackedInt32Array, vertices: PackedVector3Ar
 # triangles on the bump's base edges. Only faces on an edge still shared by more
 # than two triangles are considered, and one counts as enclosed only when rays
 # leaving its front in five directions (along the normal and tilted 45 degrees four
-# ways) all first meet the BACK of another triangle.
+# ways) all first meet the BACK of another triangle, starting either 1 weld
+# distance or 1/50 of one off the face.
 static func _remove_enclosed(indices: PackedInt32Array, vertices: PackedVector3Array, weld_distance: float) -> Array:
 	var uses := _edge_uses(indices)
 	var kept := PackedInt32Array()
@@ -157,11 +158,23 @@ static func _enclosed(indices: PackedInt32Array, vertices: PackedVector3Array, t
 	var n := (b - a).cross(c - a).normalized()
 	var tangent := (b - a).normalized()
 	var bitangent := n.cross(tangent)
-	var from := (a + b + c) / 3.0 + n * weld_distance
-	for direction in [n, (n + tangent).normalized(), (n - tangent).normalized(), (n + bitangent).normalized(), (n - bitangent).normalized()]:
-		if not _first_hit_is_back_face(indices, vertices, t, from, direction):
-			return false
-	return true
+	# The ray along the normal is tilted a fraction of a degree: a symmetric face
+	# (a bump's rim sliver) has its centre exactly under the seam between two
+	# triangles, and a ray along that seam can miss both.
+	var normal := (n + tangent * 0.0123 + bitangent * 0.0071).normalized()
+	var directions := [normal, (n + tangent).normalized(), (n - tangent).normalized(), (n + bitangent).normalized(), (n - bitangent).normalized()]
+	# Rays start weld_distance off the face, or much closer: a thin sliver under a
+	# shallow slope (a bump's rim) is buried by far less than weld_distance.
+	for offset in [weld_distance, weld_distance * 0.02]:
+		var from: Vector3 = (a + b + c) / 3.0 + n * offset
+		var all_back := true
+		for direction in directions:
+			if not _first_hit_is_back_face(indices, vertices, t, from, direction):
+				all_back = false
+				break
+		if all_back:
+			return true
+	return false
 
 # Whether the nearest triangle the ray meets (other than `skip`) faces away from it.
 static func _first_hit_is_back_face(indices: PackedInt32Array, vertices: PackedVector3Array, skip: int, from: Vector3, direction: Vector3) -> bool:
