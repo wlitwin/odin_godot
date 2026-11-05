@@ -123,7 +123,7 @@ against the initial count. Fixed limits are:
 | --- | --- |
 | Initial dynamics 32; total bodies 35, shapes 35, contacts 147, joints 1 | Initial declaration and actual world counters before/after each staged operation |
 | H=128, fixed 60 Hz/four substeps, single caller | Exact history size and shared `world_step_fixed`; adapters reject incompatible tick configuration |
-| Prediction/ordinary synchronous correction at most 8 ticks | Explicit ages; older repair returns hold/resync without truncation or live-world fallback |
+| Prediction/ordinary synchronous correction at most the configured window (default 30, ceiling `net.PHYSICS_WINDOW` 32; originally 8) | Explicit ages; older repair returns hold/resync without truncation or live-world fallback |
 | Normal physics core work 4 ms; eligible correction work 4 ms | Caller-supplied monotonic elapsed ns and over-target observation; integrated acceptance-test ceilings, never wall-clock runtime rejection |
 | Requested live resources plus reserved staging at most 64 MiB | Process-global engine live + snapshot-wrapper live + additional game/history/adapter bytes + explicit future reservation |
 
@@ -177,7 +177,7 @@ rejected publication discards all candidate images/execution and leaves publishe
 solver/game/history/events unchanged. An exact repeat of an already confirmed
 complete image/Side/fields/identity is an idempotent acknowledgment with no
 solver steps, even when the head has advanced; it does not admit an older
-required rewind. An unconfirmed repair older than eight ticks still rejects.
+required rewind. An unconfirmed repair older than the configured window still rejects.
 Pose equality or a motion hash alone cannot establish that no-op. Commit infallibly selects the accepted
 execution and game/Side/history together; only afterward release retired images
 and execution. Eviction, rewind, reset, branch reads and destruction release each

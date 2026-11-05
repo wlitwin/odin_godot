@@ -8,7 +8,18 @@ import tr "godot:replay/transport"
 
 Physics_Schemas :: struct {
     state, occurrence, accepted, decisions: sc.Schema,
-    chunk, ack, fact:                       sc.Schema,
+    chunk, ack, fact, status:               sc.Schema,
+}
+
+// Steady-state driver feedback (wire revision 2). Accepted facts already carry
+// every decision and a complete signature per tick, so a predicting client
+// confirms without complete images; this small reliable message supplies the
+// runtime-only values a Snapshot used to: the authority head it was sent at,
+// this peer's newest received input (arrival-margin feedback for the lead
+// controller) and its settled action sequence.
+Physics_Status :: struct {
+    generation, serial, tick:     u64,
+    action_settled, input_newest: u64,
 }
 
 Physics_Metadata :: struct($N: int) {
@@ -65,8 +76,26 @@ Physics_Fact_Header :: struct {
     version, count:     u32,
 }
 
+// Facts carry only a signature's complete digest (wire revision 2): SHA-256
+// over the encoded identity, epoch, tick and every part length and digest.
+FACT_DIGEST_BYTES :: size_of(bd.Digest)
+
+// Matching identity, epoch, tick and complete digest is exactly a full
+// Signature match (complete commits to every part), and also works for the
+// compact signatures facts carry.
+physics_signature_match :: proc(a, b: bd.Signature) -> bool {
+    return a.identity == b.identity && a.epoch == b.epoch && a.tick == b.tick && a.complete == b.complete
+}
+
+@(private)
+Physics_Sign_Cache :: struct {
+    epoch, tick: u64,
+    complete:    bd.Digest,
+}
+
 Server_Physics :: struct($S, $C, $A, $E: typeid, $N: int) {
     allocator:        mem.Allocator,
+    signed:           [PHYSICS_HISTORY]Physics_Sign_Cache, // one signature per authority tick, shared by every peer
     schemas:          Physics_Schemas,
     metadata:         []Physics_Metadata(N),
     views:            [MAX_PEERS][PHYSICS_HISTORY]Physics_Sent_View,
@@ -104,8 +133,8 @@ physics_config_default :: proc() -> Config {
     cfg.history = 128
     cfg.hz = 60
     cfg.lead = 2
-    cfg.max_prediction = 8
-    cfg.max_future = 8
+    cfg.max_prediction = PHYSICS_DEFAULT_WINDOW
+    cfg.max_future = PHYSICS_DEFAULT_WINDOW
     cfg.max_rewind = 8
     cfg.max_view_span = 8
     cfg.snapshot_every = 3
@@ -122,10 +151,10 @@ physics_config_valid :: proc(model: Model($S, $C, $A, $E, $N), cfg: Config) -> b
         complete_codec_valid(model.complete_codec) &&
         cfg.history == 128 &&
         cfg.hz == 60 &&
-        cfg.max_prediction <= 8 &&
-        cfg.max_future <= 8 &&
-        cfg.lead <= 6 &&
-        cfg.max_rewind <= 8 &&
+        cfg.max_prediction <= PHYSICS_WINDOW &&
+        cfg.max_future <= PHYSICS_WINDOW &&
+        cfg.lead <= PHYSICS_WINDOW - 2 &&
+        cfg.max_rewind <= PHYSICS_WINDOW &&
         cfg.snapshot_every <= 8 &&
         cfg.egress_bytes_per_pump >= COMPLETE_PART_BYTES + 512 &&
         model.group.id == 0 &&
@@ -148,7 +177,8 @@ physics_schemas_init :: proc(
        sc.init(&s.decisions, Accepted_Decisions(N), allocator = allocator).error != .None ||
        sc.init(&s.chunk, Physics_Chunk_Header, allocator = allocator).error != .None ||
        sc.init(&s.ack, Physics_Ack, allocator = allocator).error != .None ||
-       sc.init(&s.fact, Physics_Fact_Header, allocator = allocator).error != .None {
+       sc.init(&s.fact, Physics_Fact_Header, allocator = allocator).error != .None ||
+       sc.init(&s.status, Physics_Status, allocator = allocator).error != .None {
         return .Invalid_Schema
     }
 
@@ -195,6 +225,7 @@ physics_schemas_destroy :: proc(s: ^Physics_Schemas) {
     sc.destroy(&s.chunk)
     sc.destroy(&s.ack)
     sc.destroy(&s.fact)
+    sc.destroy(&s.status)
     s^ = {}
 }
 

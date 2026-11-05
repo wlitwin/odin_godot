@@ -67,6 +67,13 @@ client_input_feedback :: proc(c: ^Client($S, $C, $A, $E, $N), newest, truth_tick
         c.clock_scale = clamp(1 + (3 - margin) * 0.005, 0.98, 1.02)
     }
 
+    // Prediction depth already at the window: running faster only stalls on
+    // capacity and drops this client's controls, making its inputs later still.
+    // Hold the rate until confirmation catches up.
+    if c.timeline.head - c.timeline.confirmed + 2 >= u64(c.cfg.max_prediction) {
+        c.clock_scale = min(c.clock_scale, 1)
+    }
+
     if newest <= timing.last_echo {
         return
     }

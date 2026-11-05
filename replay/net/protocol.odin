@@ -37,6 +37,7 @@ Kind :: enum u16 {
     Physics_Ack,
     Physics_Facts,
     Physics_Request,
+    Physics_Status,
 }
 
 @(private)

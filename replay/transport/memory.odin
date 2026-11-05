@@ -7,10 +7,15 @@ import sc "godot:replay/schema"
 // Deterministic channel-service model, not an ENet implementation. Reliable
 // packets retry and preserve per-direction order; unreliable packets may drop,
 // duplicate, and reorder. Time advances only when the harness says so.
+// bytes_per_tick > 0 adds a per-direction serialization queue: each packet
+// occupies the link for ceil(bytes / bytes_per_tick) ticks before its latency
+// starts, so bulk sends delay everything queued behind them (bufferbloat).
+// Zero keeps the unlimited-bandwidth model and its trace hashes unchanged.
 Faults :: struct {
     latency_ticks, jitter_ticks:         u32,
     loss_permyriad, duplicate_permyriad: u32,
     retry_ticks:                         u32,
+    bytes_per_tick:                      u32,
 }
 
 DEFAULT_FAULTS :: Faults {
@@ -57,6 +62,7 @@ Memory :: struct {
     connected:                  []bool,
     generations:                []u64,
     packets:                    []Pending,
+    link_free:                  []u64, // per (from, to) direction: tick the serialization queue drains
     bytes:                      []u8,
     trace:                      []Trace,
     trace_count, trace_dropped: int,
@@ -93,6 +99,7 @@ memory_init :: proc(
     m.connected = make([]bool, cfg.peers + 1, allocator)
     m.generations = make([]u64, cfg.peers + 1, allocator)
     m.packets = make([]Pending, cfg.packets, allocator)
+    m.link_free = make([]u64, (cfg.peers + 1) * (cfg.peers + 1), allocator)
     m.bytes = make([]u8, cfg.packets * cfg.packet_bytes, allocator)
     m.trace = make([]Trace, cfg.trace_entries, allocator)
     return true
@@ -102,6 +109,7 @@ memory_destroy :: proc(m: ^Memory) {
     delete(m.connected, m.allocator)
     delete(m.generations, m.allocator)
     delete(m.packets, m.allocator)
+    delete(m.link_free, m.allocator)
     delete(m.bytes, m.allocator)
     delete(m.trace, m.allocator)
     m^ = {}
@@ -155,6 +163,10 @@ memory_set_faults :: proc(m: ^Memory, faults: Faults) -> bool {
 
     for value in values {
         hash = (hash ~ value) * 0x100000001b3
+    }
+
+    if faults.bytes_per_tick != 0 {
+        hash = (hash ~ u64(faults.bytes_per_tick)) * 0x100000001b3
     }
 
     note(m, Trace{tick = m.now, kind = .Fault_Change, payload_hash = hash})
@@ -252,13 +264,22 @@ memory_send :: proc(user: rawptr, to: Peer_Id, channel: Channel, bytes: []u8) ->
 
             m.sequence += 1
             jitter := r.rng_next(&m.rng) % (u64(m.faults.jitter_ticks) + 1)
+            start := m.now
+
+            if m.faults.bytes_per_tick != 0 {
+                link := &m.link_free[int(e.id) * (m.config.peers + 1) + int(to)]
+                rate := u64(m.faults.bytes_per_tick)
+                start = saturating_add(max(m.now, link^), (u64(len(bytes)) + rate - 1) / rate)
+                link^ = start
+            }
+
             packet = {
                 active   = true,
                 from     = e.id,
                 to       = to,
                 channel  = channel,
                 sequence = m.sequence,
-                due      = saturating_add(m.now, u64(m.faults.latency_ticks) + jitter),
+                due      = saturating_add(start, u64(m.faults.latency_ticks) + jitter),
                 count    = len(bytes),
             }
             copy(m.bytes[i * m.config.packet_bytes:(i + 1) * m.config.packet_bytes], bytes)

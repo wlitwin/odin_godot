@@ -170,6 +170,24 @@ engine with [engine_notices.gd](../../tests/replay_dockyard/package/engine_notic
 and pass that output directory as `--godot-notices` to `collect`. The extractor
 records its actual engine version; compiled module inventories can vary by target.
 
+## Test under real-world network conditions
+
+Simulate a remote connection locally. Each process delays what it receives, so
+set the same values on both roles: `--latency 50` on host and client is a
+100 ms round trip. Loss applies to unreliable packets.
+
+```sh
+python3 examples/replay_dockyard/launch.py host --project /tmp/dockyard-build/project --latency 50 --jitter 5 --loss 100
+python3 examples/replay_dockyard/launch.py client --project /tmp/dockyard-build/project --latency 50 --jitter 5 --loss 100
+```
+
+Browser builds take `latency`, `jitter` and `loss` query parameters. Optional
+input delay (`--input-delay N` or `input_delay=N`, 0–6 ticks) applies once the
+joined round trip passes 100 ms: steadier remote robots and shallower
+corrections, for that much extra local input lag. It is off by default.
+The [network harness](../../tests/replay_dockyard/netsim/README.md) measures
+the actual rules and physics under round trip, jitter, loss and bandwidth.
+
 ## Create an itch.io ZIP or upload with Butler
 
 From the repository root, point the publishing script at a prepared candidate

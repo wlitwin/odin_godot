@@ -7,9 +7,20 @@ import bd "godot:box3d/diagnostics"
 import sc "godot:replay/schema"
 
 ACCEPTED_PHYSICS_VERSION :: u32(1)
+// Complete-physics wire revision, carried in every fact header. 2: steady
+// state is accepted facts + small Physics_Status; complete images only for
+// Welcome, explicit mismatch requests and spectators. Peers on another
+// revision reject each other's facts instead of half-working.
+PHYSICS_WIRE_VERSION :: u32(2)
 PHYSICS_HISTORY :: 128
-PHYSICS_PREDICTION :: 8
-PHYSICS_REPAIR :: 8
+// Ceiling for a complete-physics runner's prediction/repair window
+// (Config.max_prediction, max_future). Each side's active window is its
+// configured max_prediction. Prediction depth must cover the round trip plus
+// the input arrival reserve, so the ceiling sits well past ordinary RTTs.
+PHYSICS_WINDOW :: 32
+// Default window: 500 ms at 60 Hz, enough lead and confirmation lag for
+// round trips up to roughly 400 ms before the client stalls.
+PHYSICS_DEFAULT_WINDOW :: 30
 
 Control_Origin :: enum u8 {
     Neutral,

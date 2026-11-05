@@ -99,7 +99,11 @@ selected execution. Retired state is released afterward. Missing history,
 capture/open failure, resource refusal or a rejected gate never falls back to the
 live solver or truncates a suffix.
 
-Ordinary prediction and synchronous repair are limited to eight ticks. Deeper
+Ordinary prediction and synchronous repair are limited to `net.PHYSICS_WINDOW`
+(32 ticks) by the provider; a runner's active window is its configured
+`max_prediction` (default 30). Image capture, clone and restore keep every seal
+validation, but the process-local seal is a word-parallel hash and the exact
+FNV-1a complete digest is computed on first request. Deeper
 required repair returns an explicit limit/history error and needs a complete
 recovery policy. `correct_reusing` returns `Reuse_Disabled` for managed state.
 Offline audit has a separate bound of the replayable retained window (127 ticks

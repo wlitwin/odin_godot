@@ -9,6 +9,9 @@ import delta "godot:replay/delta"
 
 MAX_PEERS :: 16
 INPUT_WINDOW :: 8
+// Ceiling for Config.input_delay_max; below INPUT_WINDOW so every input
+// packet still repeats each tick's sample INPUT_WINDOW times.
+INPUT_DELAY_MAX :: 6
 ACTION_CAPACITY :: 16
 GAME_EVENTS :: 32
 WIRE_EVENTS :: 40 // 32 gameplay occurrences + up to eight action verdicts
@@ -190,6 +193,14 @@ Config :: struct {
     unreliable_packet_limit:               int,
     require_permit:                        bool,
     max_rewind, max_view_span, view_slack: u32,
+    // Optional local input delay (Quantum-style input offset), predicting
+    // clients with Scheduled controls only. When the round trip measured at
+    // Welcome exceeds input_delay_ping_ms, each sampled control is scheduled
+    // ceil((rtt - ping) * hz) ticks ahead, capped at input_delay_max, and sent
+    // at once. The client then leads the authority by that many fewer ticks,
+    // so prediction and correction depth shrink at the cost of that much local
+    // response delay. 0 = off. Fixed per Welcome: a sent sample never changes.
+    input_delay_max, input_delay_ping_ms:  u32,
 }
 
 DEFAULT_CONFIG :: Config {
@@ -213,6 +224,14 @@ DEFAULT_CONFIG :: Config {
     max_rewind              = 30,
     max_view_span           = 12,
     view_slack              = 4,
+}
+
+// A control sampled ahead of its tick under input delay, already sent.
+Delayed_Control :: struct($Control: typeid) {
+    tick:  u64,
+    value: Control,
+    stamp: View_Stamp,
+    valid: bool,
 }
 
 Stats :: struct {
@@ -526,6 +545,9 @@ Client :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
     mixed_presentation:                                                                                               bool,
     watch_clock:                                                                                                      f64,
     lead_ticks:                                                                                                       u32,
+    input_delay:                                                                                                      u32, // ticks, fixed at Welcome
+    delayed:                                                                                                          [INPUT_DELAY_MAX +
+    1]Delayed_Control(Control),
     clock_scale:                                                                                                      f64,
     input_sent:                                                                                                       []Input_Sent,
     input_timing:                                                                                                     Input_Timing,

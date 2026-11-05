@@ -34,6 +34,24 @@ or skip authority ticks, retime accepted requests, or bypass admission or
 authority fencing.
 Applications driving `Client` directly must apply `clock_scale`; the Godot Session
 adapter already does so. Spectators and latest-observation models keep scale 1.
+While prediction depth is within two ticks of `max_prediction` the scale is held
+at or below 1: running faster there only stalls on capacity and drops controls.
+Complete-physics drivers receive the margin in a small `Physics_Status` at the
+`snapshot_every` cadence instead of in a complete snapshot.
+
+## Optional input delay
+
+`Config.input_delay_max` (0 = off, at most `INPUT_DELAY_MAX`, 6) enables a
+Quantum-style input offset for predicting clients with Scheduled controls. When
+the round trip measured at Welcome exceeds `input_delay_ping_ms`, the client
+picks `ceil((rtt - ping) * hz)` ticks, capped at the maximum, as `input_delay`
+for that Welcome. Each sampled control is then scheduled that many ticks ahead
+and sent at once; the tick plays it when it arrives. Because inputs reach the
+authority earlier, the arrival-margin controller settles the client that many
+ticks closer to the authority, so prediction depth, correction work and remote
+misprediction shrink, at the cost of the same local response delay. The delay
+is fixed per Welcome so a sent sample never changes, and every tick's sample is
+still repeated in `INPUT_WINDOW` consecutive input packets.
 
 Long local pump gaps invalidate outstanding samples, avoiding calibration from
 local suspension. The gap threshold is the larger of 250 ms and

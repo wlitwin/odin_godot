@@ -372,6 +372,7 @@ qualification_end :: proc(self: ^DockyardDuo) {
 }
 
 qualification_frame :: proc(self: ^DockyardDuo, dt: f64, control: Control) -> net.Error {
+    control := canonical_control(control)
     state := self.state
     q := &state.qualification
 

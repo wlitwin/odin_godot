@@ -543,14 +543,28 @@ client_step :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), contr
         }
     }
 
-    batch.controls[c.seat - 1] = control
-    batch.stamps[c.seat - 1] = c.presented
+    tick := c.timeline.head + 1
+    own, stamp := control, c.presented
 
-    if c.presented.valid {
-        batch.views[c.seat - 1] = {c.presented.from_tick, c.presented.to_tick, c.presented.fraction, .Historical}
+    // Input delay: this tick plays the sample scheduled (and already sent)
+    // input_delay ticks ago; without one (just after Welcome) hold the last.
+    if c.input_delay > 0 {
+        slot := c.delayed[tick % u64(len(c.delayed))]
+
+        if slot.valid && slot.tick == tick {
+            own, stamp = slot.value, slot.stamp
+        } else {
+            own, stamp = c.model.hold(c.held[c.seat - 1]), {}
+        }
     }
 
-    tick := c.timeline.head + 1
+    batch.controls[c.seat - 1] = own
+    batch.stamps[c.seat - 1] = stamp
+
+    if stamp.valid {
+        batch.views[c.seat - 1] = {stamp.from_tick, stamp.to_tick, stamp.fraction, .Historical}
+    }
+
     predicted_index := -1
 
     for &action, i in c.actions[:c.action_count] {
@@ -600,6 +614,11 @@ client_step :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), contr
     }
 
     c.held = batch.controls
+
+    if c.input_delay > 0 {
+        future := tick + u64(c.input_delay)
+        c.delayed[future % u64(len(c.delayed))] = {future, control, c.presented, true}
+    }
 
     if err := client_sync_predicted(c, tick); err != .None {
         return err
@@ -945,7 +964,8 @@ client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), by
        Kind(meta.kind) != .Reject &&
        Kind(meta.kind) != .Removed &&
        Kind(meta.kind) != .Physics_Part &&
-       Kind(meta.kind) != .Physics_Facts {
+       Kind(meta.kind) != .Physics_Facts &&
+       Kind(meta.kind) != .Physics_Status {
         c.stats.rejected_packets += 1
         return
     }
@@ -1005,6 +1025,13 @@ client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), by
         }
 
         return client_physics_part(c, bytes, expected)
+    case .Physics_Status:
+        if c.physics == nil {
+            c.stats.rejected_packets += 1
+            return
+        }
+
+        client_physics_status(c, bytes, expected)
     case .Physics_Facts:
         if c.physics == nil {
             c.stats.rejected_packets += 1
@@ -1113,8 +1140,20 @@ client_welcome_core :: proc(
     if (c.phase == .Joining || c.phase == .Resyncing) && packet.echo_ms <= c.now {
         rtt := min(c.now - packet.echo_ms, c.cfg.timeout_ms)
         measured := u32((rtt * u64(c.cfg.hz) + 999) / 1000) + 4
+        delay := u32(0)
+
+        if c.cfg.input_delay_max > 0 &&
+           !c.spectator &&
+           c.model.control_timing == .Scheduled &&
+           rtt > u64(c.cfg.input_delay_ping_ms) {
+            over := rtt - u64(c.cfg.input_delay_ping_ms)
+            delay = u32(min((over * u64(c.cfg.hz) + 999) / 1000, u64(c.cfg.input_delay_max)))
+        }
+
+        // Samples sent `delay` ticks early need that much less lead.
+        c.input_delay = delay
         c.lead_ticks = clamp(
-            max(measured, c.cfg.lead),
+            max(measured > delay ? measured - delay : 0, c.cfg.lead),
             c.cfg.lead,
             min(c.cfg.max_future - 2, c.cfg.max_prediction - 2),
         )
@@ -1173,6 +1212,7 @@ client_welcome_core :: proc(
 
     client_timing_reset(c)
     client_parts_reset(c)
+    c.delayed = {} // samples scheduled under the previous Welcome were never accepted here
     c.features_sent = false
     c.fact_repair_negotiated, c.fact_repair_sent, c.fact_repair_last = false, false, 0
     c.action_copies_negotiated, c.action_copies_sent, c.action_copies_last = false, false, 0
@@ -1533,10 +1573,19 @@ client_send_inputs :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats)
         sample.value = c.model.neutral
     }
 
-    first := max(c.timeline.confirmed + 1, c.timeline.head >= INPUT_WINDOW ? c.timeline.head - INPUT_WINDOW + 1 : 1)
+    // Under input delay the newest samples are scheduled future ticks.
+    last := c.timeline.head + u64(c.input_delay)
+    first := max(c.timeline.confirmed + 1, last >= INPUT_WINDOW ? last - INPUT_WINDOW + 1 : 1)
 
-    for tick := first; tick <= c.timeline.head; tick += 1 {
-        if input, ok := r.read_input(&c.timeline, tick); ok {
+    for tick := first; tick <= last; tick += 1 {
+        if tick > c.timeline.head {
+            slot := c.delayed[tick % u64(len(c.delayed))]
+
+            if slot.valid && slot.tick == tick {
+                packet.samples[packet.count] = {tick, slot.value, slot.stamp}
+                packet.count += 1
+            }
+        } else if input, ok := r.read_input(&c.timeline, tick); ok {
             packet.samples[packet.count] = {tick, input.controls[c.seat - 1], input.stamps[c.seat - 1]}
             packet.count += 1
         }

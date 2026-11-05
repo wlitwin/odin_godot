@@ -108,6 +108,9 @@ typedef struct Resource {
   b3RegistrySlot *slots;
   uint8_t *normalized;
   uint64_t normalized_size, seal, complete, motion, geometry_bytes;
+  /* complete is exact FNV-1a over normalized, computed on first digest
+   * request: per-tick captures never pay a byte-serial walk nobody reads. */
+  uint32_t complete_ready;
   uint64_t fingerprint, native_requested_bytes;
   uint32_t version;
   ogb3_body_state *bodies;
@@ -216,24 +219,72 @@ uint64_t ogb3_snapshot_test_hash_bytes(uint64_t h, const void *p, size_t n) {
   return hash_bytes(h, p, n);
 }
 #endif
+/* Process-local integrity hash for the seal. The seal is never serialized,
+ * transmitted or compared across processes; it only detects in-memory change
+ * of an immutable resource. Four independent multiply/rotate lanes over 8-byte
+ * words keep every validate() walk (capture, clone, restore, dump, digest)
+ * memory-bandwidth bound instead of one dependent multiply per byte. */
+static inline uint64_t seal_rotl(uint64_t x, unsigned k) {
+  return (x << k) | (x >> (64u - k));
+}
+static inline uint64_t seal_fmix(uint64_t x) {
+  x ^= x >> 33;
+  x *= UINT64_C(0xff51afd7ed558ccd);
+  x ^= x >> 33;
+  x *= UINT64_C(0xc4ceb9fe1a85ec53);
+  x ^= x >> 33;
+  return x;
+}
+static uint64_t seal_bytes(uint64_t h, const void *data, size_t n) {
+  const uint8_t *p = data;
+  const uint64_t k1 = UINT64_C(0x9e3779b97f4a7c15),
+                 k2 = UINT64_C(0xc2b2ae3d27d4eb4f);
+  uint64_t a = h ^ k1, b = h + k2, c = h - k1, d = seal_rotl(h, 29) ^ k2;
+  size_t length = n;
+  while (n >= 32) {
+    uint64_t w[4];
+    memcpy(w, p, 32);
+    a = seal_rotl((a ^ w[0]) * k1, 31) * k2;
+    b = seal_rotl((b ^ w[1]) * k1, 31) * k2;
+    c = seal_rotl((c ^ w[2]) * k1, 31) * k2;
+    d = seal_rotl((d ^ w[3]) * k1, 31) * k2;
+    p += 32;
+    n -= 32;
+  }
+  while (n >= 8) {
+    uint64_t w;
+    memcpy(&w, p, 8);
+    a = seal_rotl((a ^ w) * k1, 31) * k2;
+    a ^= seal_rotl(a, 17);
+    p += 8;
+    n -= 8;
+  }
+  if (n) {
+    uint64_t w = 0;
+    memcpy(&w, p, n);
+    b = seal_rotl((b ^ w ^ ((uint64_t)n << 56)) * k1, 31) * k2;
+  }
+  return seal_fmix(a ^ seal_rotl(b, 13) ^ seal_rotl(c, 27) ^
+                   seal_rotl(d, 41) ^ (uint64_t)length);
+}
 static uint64_t seal(const Resource *r) {
 #ifdef OGB3_TESTING
   seal_walks++;
 #endif
   uint64_t h =
-      hash_bytes(14695981039346656037ull, r->image.data, (size_t)r->image.size);
+      seal_bytes(14695981039346656037ull, r->image.data, (size_t)r->image.size);
   for (int i = 0; i < r->recording->registry.entries.count; i++) {
     const b3GeometryEntry *g = r->recording->registry.entries.data + i;
-    h = hash_bytes(h, &g->kind, sizeof(g->kind));
-    h = hash_bytes(h, &g->byteCount, sizeof(g->byteCount));
-    h = hash_bytes(h, g->bytes, (size_t)g->byteCount);
+    h = seal_bytes(h, &g->kind, sizeof(g->kind));
+    h = seal_bytes(h, &g->byteCount, sizeof(g->byteCount));
+    h = seal_bytes(h, g->bytes, (size_t)g->byteCount);
   }
-  h = hash_bytes(h, &r->sensor_pending_count, sizeof(r->sensor_pending_count));
-  h = hash_bytes(h, r->sensor_pending,
+  h = seal_bytes(h, &r->sensor_pending_count, sizeof(r->sensor_pending_count));
+  h = seal_bytes(h, r->sensor_pending,
                  (size_t)r->sensor_pending_count * sizeof(*r->sensor_pending));
-  h = hash_bytes(h, &r->contact_pending_count,
+  h = seal_bytes(h, &r->contact_pending_count,
                  sizeof(r->contact_pending_count));
-  h = hash_bytes(h, r->contact_pending,
+  h = seal_bytes(h, r->contact_pending,
                  (size_t)r->contact_pending_count *
                      sizeof(*r->contact_pending));
   return h;
@@ -787,8 +838,8 @@ int32_t ogb3_snapshot_capture(uint32_t packed, ogb3_snapshot **out) {
     OGB3_OBS_END(observe_finalize, status);
     OGB3_OBS_RETURN(observe_capture, status);
   }
-  r->complete = hash_bytes(14695981039346656037ull, r->normalized,
-                           (size_t)r->normalized_size);
+  r->complete = 0;
+  r->complete_ready = 0;
   r->motion = b3HashWorldState(w);
   r->native_requested_bytes = (uint64_t)(b3GetByteCount() - native_before);
   s->resource = r;
@@ -1154,8 +1205,14 @@ int32_t ogb3_snapshot_digest(const ogb3_snapshot *s, uint64_t *complete,
   int32_t status = validate(s);
   if (status)
     return status;
-  *complete = s->resource->complete;
-  *motion = s->resource->motion;
+  Resource *r = s->resource;
+  if (!r->complete_ready) {
+    r->complete = hash_bytes(14695981039346656037ull, r->normalized,
+                             (size_t)r->normalized_size);
+    r->complete_ready = 1;
+  }
+  *complete = r->complete;
+  *motion = r->motion;
   return OGB3_OK;
 }
 #ifdef OGB3_TESTING

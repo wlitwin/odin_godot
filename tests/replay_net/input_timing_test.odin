@@ -283,3 +283,88 @@ latest_observation_clients_do_not_calibrate_a_scheduled_input_lead :: proc(t: ^t
         testing.expect(t, !sent.valid)
     }
 }
+
+input_delay_run :: proc(t: ^testing.T, delay_max: u32) -> (lead: u64, chosen: u32) {
+    f: Fixture
+    cfg := net.DEFAULT_CONFIG
+    cfg.input_delay_max, cfg.input_delay_ping_ms = delay_max, 100
+    // Six-tick one-way latency: a 200 ms round trip.
+    fixture_init(&f, {latency_ticks = 6, retry_ticks = 6}, cfg)
+    defer fixture_destroy(&f)
+    clocks: [3]r.Clock
+
+    for &clock in clocks {
+        r.clock_init(&clock, 60)
+    }
+
+    for step in 0 ..< 900 {
+        assert(tr.memory_advance(&f.network, f.clock))
+        now := f.clock * 1000 / 60
+        assert(net.server_pump(&f.server, now) == .None)
+
+        for &client, i in f.clients {
+            catchups := client.stats.snapshot_catchups
+            assert(net.client_pump(&client, now) == .None)
+
+            if client.stats.snapshot_catchups != catchups {
+                r.clock_init(&clocks[i], 60)
+            }
+        }
+
+        assert(net.server_step(&f.server) == .None)
+
+        for &client, i in f.clients {
+            count, ok := r.clock_add(&clocks[i], client.clock_scale / 60)
+            assert(ok)
+
+            for _ in 0 ..< count {
+                if client.phase == .Running && !client.spectator {
+                    // Inputs change every 20 ticks so delayed samples are visible.
+                    err := net.client_step(&client, Control{move = i8((step / 20) % 3) - 1})
+                    assert(err == .None || err == .Capacity)
+                }
+
+                r.clock_consume(&clocks[i])
+            }
+
+            changes: [512]view.Change(net.Net_Event(Event))
+
+            for view.drain(&client.journal, changes[:]) > 0 {}
+        }
+
+        f.clock += 1
+    }
+
+    c := &f.clients[0]
+    testing.expect_value(t, c.phase, net.Phase.Running)
+    testing.expect_value(t, c.stats.resyncs, u64(0))
+    testing.expect_value(t, f.server.stats.rejected_inputs, u64(0))
+
+    // Every confirmed own-seat input the client recorded is exactly what the
+    // authority accepted for that tick: a sample sent early never changes.
+    first := c.timeline.confirmed > 100 ? c.timeline.confirmed - 100 : 1
+
+    for tick in first ..= c.timeline.confirmed {
+        mine, found := r.read_input(&c.timeline, tick)
+        theirs, accepted := r.read_input(&f.server.timeline, tick)
+
+        if found && accepted {
+            testing.expect_value(t, mine.controls[c.seat - 1], theirs.controls[c.seat - 1])
+        }
+    }
+
+    return c.timeline.head - f.server.timeline.head, c.input_delay
+}
+
+// Quantum-style input offset: past the ping threshold the client schedules
+// each sample input_delay ticks ahead and sends it at once, so it leads the
+// authority by about that many fewer ticks while staying consistent.
+@(test)
+input_delay_schedules_samples_ahead_and_shortens_lead :: proc(t: ^testing.T) {
+    plain, none := input_delay_run(t, 0)
+    delayed, chosen := input_delay_run(t, 4)
+    testing.expect_value(t, none, u32(0))
+    testing.expect_value(t, chosen, u32(4)) // ceil((200 - 100) ms * 60 Hz) = 6, capped at 4
+    testing.expect(t, delayed + 3 <= plain, fmt.tprintf("lead plain=%d delayed=%d", plain, delayed))
+    fmt.printf("INPUT_DELAY lead_plain=%d lead_delayed=%d delay=%d\n", plain, delayed, chosen)
+}

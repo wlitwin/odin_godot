@@ -22,11 +22,20 @@ server_physics_send_fact :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, tic
     signature: bd.Signature
     reused := false
     tx := &s.physics.tx[index]
+    cached := &s.physics.signed[tick % PHYSICS_HISTORY]
+
+    // An authority tick's complete state never changes within an epoch, so
+    // sign it once for every peer.
+    if cached.epoch == s.cfg.epoch && cached.tick == tick {
+        signature.complete = cached.complete
+        reused = true
+    }
 
     // A locally constructed Snapshot already owns the canonical full5 bytes
     // and its signed header. Copy that value before any transport callback;
     // never borrow transfer storage across send or reuse another scope/tick.
-    if tx.purpose == .Snapshot &&
+    if !reused &&
+       tx.purpose == .Snapshot &&
        tx.tick == tick &&
        tx.generation == peer.generation &&
        tx.serial == peer.serial &&
@@ -71,10 +80,11 @@ server_physics_send_fact :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, tic
         }
     }
 
+    cached^ = {s.cfg.epoch, tick, signature.complete}
     length :=
         s.physics.schemas.fact.wire_size +
         s.physics.schemas.accepted.wire_size +
-        bd.SIGNATURE_BYTES +
+        FACT_DIGEST_BYTES +
         int(fact.count) * s.physics.schemas.occurrence.wire_size
 
     if length + sc.HEADER_BYTES > len(s.txb) {
@@ -83,7 +93,7 @@ server_physics_send_fact :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, tic
 
     body := s.txb[sc.HEADER_BYTES:sc.HEADER_BYTES + length]
     at := 0
-    header := Physics_Fact_Header{peer.generation, peer.serial, ACCEPTED_PHYSICS_VERSION, u32(fact.count)}
+    header := Physics_Fact_Header{peer.generation, peer.serial, PHYSICS_WIRE_VERSION, u32(fact.count)}
 
     if sc.encode(&s.physics.schemas.fact, header, body[:s.physics.schemas.fact.wire_size]).error != .None {
         return false
@@ -98,11 +108,9 @@ server_physics_send_fact :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, tic
 
     at += s.physics.schemas.accepted.wire_size
 
-    if _, error := bd.signature_encode(signature, body[at:at + bd.SIGNATURE_BYTES]); error != .None {
-        return false
-    }
-
-    at += bd.SIGNATURE_BYTES
+    complete := signature.complete
+    copy(body[at:at + FACT_DIGEST_BYTES], complete[:])
+    at += FACT_DIGEST_BYTES
 
     for event in fact.events[:fact.count] {
         if sc.encode(&s.physics.schemas.occurrence, event, body[at:at + s.physics.schemas.occurrence.wire_size]).error !=
@@ -124,7 +132,21 @@ server_physics_send_fact :: proc(s: ^Server($S, $C, $A, $E, $N), index: int, tic
         return false
     }
 
-    return server_send(s, peer.connection, .Reliable, s.txb[:sc.HEADER_BYTES + length]) == .Sent
+    bytes := s.txb[:sc.HEADER_BYTES + length]
+
+    if server_send(s, peer.connection, .Reliable, bytes) != .Sent {
+        return false
+    }
+
+    // Unreliable copy: a reliable ordered channel holds every later fact behind
+    // one lost packet until it is retransmitted (at least a round trip). The
+    // copy usually fills the gap first; the client treats repeats as exact
+    // idempotent facts, and the reliable original still guarantees delivery.
+    if len(bytes) <= s.cfg.unreliable_packet_limit {
+        _ = server_send(s, peer.connection, .Unreliable, bytes)
+    }
+
+    return true
 }
 
 @(private)
@@ -152,6 +174,28 @@ server_physics_peer_flush :: proc(s: ^Server($S, $C, $A, $E, $N), index: int) {
         }
     }
 
+    // Drivers confirm from signed accepted facts (wire revision 2). They get no
+    // periodic complete image: only a small status at the snapshot cadence,
+    // plus an image they explicitly request on a same-history mismatch. A
+    // periodic image (tens of KB, reliable and ordered) delayed every fact
+    // queued behind it by its serialization time on a real uplink.
+    if !peer.spectator {
+        if !server_physics_send_facts(s, index) {
+            return
+        }
+
+        if len(tx.data.bytes) != 0 {
+            server_physics_parts_flush(s, index)
+        }
+
+        if s.timeline.head != 0 && s.timeline.head - peer.snapshot_sent >= u64(s.cfg.snapshot_every) {
+            server_physics_send_status(s, index)
+        }
+
+        return
+    }
+
+    // Spectators do not predict: their complete image remains the catch-up path.
     // Construct an already-due image before its fact, retaining fact-before-
     // chunk delivery. This reuses existing owned transfer storage and avoids a
     // second checkpoint/view solely to sign the same current tick.
@@ -166,21 +210,8 @@ server_physics_peer_flush :: proc(s: ^Server($S, $C, $A, $E, $N), index: int) {
         _ = server_physics_prepare(s, index, .Snapshot)
     }
 
-    for _ in 0 ..< 8 {
-        if peer.facts_sent >= s.timeline.head {
-            break
-        }
-
-        if s.timeline.head - peer.facts_sent >= PHYSICS_HISTORY {
-            peer.checkpoint_pending = true
-            return
-        }
-
-        if !server_physics_send_fact(s, index, peer.facts_sent + 1) {
-            break
-        }
-
-        peer.facts_sent += 1
+    if !server_physics_send_facts(s, index) {
+        return
     }
 
     if len(tx.data.bytes) != 0 {
@@ -233,4 +264,57 @@ physics_verdicts_valid :: proc(entry: Accepted_Input($C, $A, $N), events: []r.Oc
     }
 
     return true
+}
+
+// Send up to eight pending accepted facts in order. False when the peer fell
+// a whole history behind and now needs a fresh Welcome.
+@(private)
+server_physics_send_facts :: proc(s: ^Server($S, $C, $A, $E, $N), index: int) -> bool {
+    peer := &s.peers[index]
+
+    for _ in 0 ..< 8 {
+        if peer.facts_sent >= s.timeline.head {
+            break
+        }
+
+        if s.timeline.head - peer.facts_sent >= PHYSICS_HISTORY {
+            peer.checkpoint_pending = true
+            return false
+        }
+
+        if !server_physics_send_fact(s, index, peer.facts_sent + 1) {
+            break
+        }
+
+        peer.facts_sent += 1
+    }
+
+    return true
+}
+
+@(private)
+server_physics_send_status :: proc(s: ^Server($S, $C, $A, $E, $N), index: int) {
+    peer := &s.peers[index]
+    status := Physics_Status {
+        generation     = peer.generation,
+        serial         = peer.serial,
+        tick           = s.timeline.head,
+        action_settled = peer.action_settled,
+        input_newest   = peer.input_newest,
+    }
+    meta := sc.Envelope_Meta {
+        kind    = u16(Kind.Physics_Status),
+        epoch   = s.cfg.epoch,
+        tick    = s.timeline.head,
+        content = s.cfg.content,
+    }
+
+    if sc.pack(&s.physics.schemas.status, status, meta, s.txb).error != .None {
+        return
+    }
+
+    if server_send(s, peer.connection, .Reliable, s.txb[:sc.HEADER_BYTES + s.physics.schemas.status.wire_size]) ==
+       .Sent {
+        peer.snapshot_sent = s.timeline.head
+    }
 }

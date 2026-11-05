@@ -59,6 +59,12 @@ real_revisions_use_complete_predecessors_and_preserve_failed_publication :: proc
     defer r.complete_checkpoint_destroy(&before)
     base := save(t, &timeline, 4)
     defer r.complete_checkpoint_destroy(&base)
+
+    // Fill the rest of the provider's prediction window; one more tick exceeds it.
+    for _ in 9 ..= int(net.PHYSICS_WINDOW) {
+        ok(t, r.advance(&timeline, f.Input{}).error)
+    }
+
     testing.expect_value(t, r.advance(&timeline, f.Input{}).error, r.Error.Prediction_Limit)
     testing.expect_value(t, r.revise_input(&timeline, 6, f.Input{spawn = 1, abort = true}).error, r.Error.Aborted)
     after_failure := save(t, &timeline, 8)

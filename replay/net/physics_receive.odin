@@ -303,3 +303,28 @@ client_physics_ack :: proc(c: ^Client($S, $C, $A, $E, $N), header: Physics_Chunk
     ack := Physics_Ack{header.generation, header.serial, header.id, header.digest}
     client_send(c, &c.physics.schemas.ack, .Physics_Ack, ack, c.timeline.head, .Reliable)
 }
+
+// Steady-state driver feedback (wire revision 2): settle acknowledged actions
+// and feed the input-lead controller the authority's newest received input
+// relative to the head it was sent at. Confirmation itself comes from signed
+// facts; a status never advances or verifies state.
+@(private)
+client_physics_status :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expected: sc.Envelope_Meta) {
+    status: Physics_Status
+    meta, report := sc.unpack(&c.physics.schemas.status, &status, bytes, expected)
+
+    if report.error != .None ||
+       c.spectator ||
+       c.phase != .Running ||
+       status.generation != c.generation ||
+       status.serial != c.serial ||
+       status.tick != meta.tick ||
+       status.tick == 0 {
+        c.stats.rejected_packets += 1
+        return
+    }
+
+    c.authority_tick_seen = max(c.authority_tick_seen, status.tick)
+    client_retire(c, min(status.action_settled, c.last_outcome))
+    client_input_feedback(c, status.input_newest, status.tick)
+}

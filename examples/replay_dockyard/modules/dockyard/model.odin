@@ -409,6 +409,19 @@ boost :: proc(game: ^Game, seat: u16, value: Action, ctx: ^r.Step(Event)) -> boo
     return true
 }
 
+// Aim only steers the magnet while grab is held (see magnet). Zero aim
+// otherwise keeps the predicted (held) input of a remote driver exact while
+// they just drive, so confirming their real inputs needs no re-simulation.
+canonical_control :: proc(value: Control) -> Control {
+    result := value
+
+    if !result.grab {
+        result.aim_x, result.aim_y, result.aim_z = 0, 0, 0
+    }
+
+    return result
+}
+
 state_valid :: proc(game: Game) -> bool {
     if game.joint == 0 ||
        game.score > 3 ||

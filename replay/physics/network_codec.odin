@@ -20,6 +20,7 @@ Network_Codec :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) 
     ),
     catalog:                                                                    b.Recovery_Catalog,
     config:                                                                     Config,
+    config_hash:                                                                u64, // config_contract(config), derived at init
     native_identity:                                                            b.Recovery_Identity,
     allocator:                                                                  mem.Allocator,
     state, occurrence, accepted, controls, actions, decisions, provider_config: sc.Schema,
@@ -97,6 +98,7 @@ network_codec_init :: proc(
     c.ownership = ownership
     c.allocator = allocator
     c.config = config
+    c.config_hash = config_contract(config)
     c.native_identity = identity
 
     for &asset, index in c.config.assets {
@@ -227,7 +229,7 @@ network_codec_init :: proc(
 
             image := cast(^Image)image_pointer
 
-            if config_contract(image.config) != config_contract(ctx.config) ||
+            if image.config_hash != ctx.config_hash ||
                (image.catalog_identity.profile != 0 && image.catalog_identity != ctx.native_identity) {
                 return 0, .Checkpoint_Contract
             }
@@ -405,7 +407,7 @@ network_codec_init :: proc(
 
             image := cast(^Image)image_pointer
 
-            if config_contract(image.config) != config_contract(ctx.config) ||
+            if image.config_hash != ctx.config_hash ||
                (image.catalog_identity.profile != 0 && image.catalog_identity != ctx.native_identity) {
                 return 0, .Checkpoint_Contract
             }
@@ -639,7 +641,7 @@ network_attach_checkpoint :: proc(
 
     original := cast(^Image)pointer
 
-    if config_contract(original.config) != config_contract(c.config) ||
+    if original.config_hash != c.config_hash ||
        (original.catalog_identity.profile != 0 && original.catalog_identity != c.native_identity) {
         return {}, .Checkpoint_Contract
     }

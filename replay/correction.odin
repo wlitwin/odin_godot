@@ -7,8 +7,12 @@ import "core:mem"
 // user; the timeline owns only the resulting value inputs, never this callback.
 // External side effects in apply are not part of the timeline transaction.
 Input_Rewrite :: struct($Input: typeid) {
-    user:  rawptr,
-    apply: proc(user: rawptr, tick: u64, original: Input) -> Input,
+    user:       rawptr,
+    apply:      proc(user: rawptr, tick: u64, original: Input) -> Input,
+    // Optional, checked complete revisions only: true when a and b drive the
+    // step identically (byte-different metadata the step never reads). Nil
+    // means byte equality.
+    equivalent: proc(user: rawptr, a, b: ^Input) -> bool,
 }
 
 read_input :: proc(t: ^Timeline($State, $Input, $Event), tick: u64) -> (input: Input, ok: bool) {
@@ -123,6 +127,10 @@ revise_inputs_impl :: proc(
     t.busy = true
     defer t.busy = false
 
+    if checked {
+        return revise_inputs_skipping(t, first, n, rewrite, check)
+    }
+
     if err := external_begin(t, base.image, .Revision, u64(n)); err != .None {
         return {error = err, tick = first}
     }
@@ -194,6 +202,158 @@ revise_inputs_impl :: proc(
 
     external_publish(t)
     return {steps = n, tick = t.head}
+}
+
+// Complete-state revision that executes only from the first tick whose
+// rewritten input differs from the recorded one. A complete Timeline step is a
+// pure function of the predecessor image and the tick input (the provider
+// contract that confirmation signatures already verify), so an unchanged prefix
+// re-derives byte-identical records. When every input matches, the published
+// execution and records stay as they are and only the requested check runs, on
+// the committed record. Rewriters are still called once per tick, in order.
+// Result.steps counts the ticks actually executed.
+@(private)
+revise_inputs_skipping :: proc(
+    t: ^Timeline($State, $Input, $Event),
+    first: u64,
+    n: int,
+    rewrite: Input_Rewrite(Input),
+    check: Revision_Check(State, Event),
+) -> Result {
+    // staged[i].input is scratch for the rewritten value of tick first+i; no
+    // staged record owns an image outside an active run.
+    divergent := -1
+
+    for i in 0 ..< n {
+        tick := first + u64(i)
+        original := record_at(t, tick)
+
+        if original == nil || !original.has_input {
+            return {error = .History_Missing, tick = tick}
+        }
+
+        t.staged[i].input = rewrite.apply(rewrite.user, tick, original.input)
+
+        if divergent < 0 && !correction_bytes_equal(&t.staged[i].input, &original.input) {
+            if rewrite.equivalent == nil || !rewrite.equivalent(rewrite.user, &t.staged[i].input, &original.input) {
+                divergent = i
+            }
+        }
+    }
+
+    resume := divergent < 0 ? n : divergent
+    checks := 0
+
+    // A check inside the unchanged prefix reads the committed record.
+    if int(check.tick - first) < resume {
+        record := record_at(t, check.tick)
+        run := t.run
+        run.value = t.execution
+        error := revision_check_record(t, record, &run, check)
+
+        if error != .None {
+            return {error = error, tick = check.tick}
+        }
+
+        checks += 1
+    }
+
+    if resume == n {
+        revise_record_prefix(t, first, n)
+        return {steps = 0, tick = t.head}
+    }
+
+    base := record_at(t, first + u64(resume) - 1)
+
+    if base == nil {
+        return {error = .History_Missing, tick = first + u64(resume) - 1}
+    }
+
+    if err := external_begin(t, base.image, .Revision, u64(n - resume)); err != .None {
+        return {error = err, tick = first + u64(resume)}
+    }
+
+    defer external_finish(t)
+    before := base.frame
+
+    for i in resume ..< n {
+        tick := first + u64(i)
+        input := t.staged[i].input
+        slot := &t.staged[i] // keeps prefix scratch inputs [0, resume) intact
+
+        if err := simulate(t, slot, before, input); err != .None {
+            return {error = err, steps = i - resume, tick = tick}
+        }
+
+        if tick == check.tick {
+            if error := revision_check_record(t, slot, &t.run, check); error != .None {
+                return {error = error, steps = i - resume + 1, tick = tick}
+            }
+
+            checks += 1
+        }
+
+        before = slot.frame
+    }
+
+    if checks != 1 {
+        return {error = .Invalid_Config, steps = n - resume, tick = check.tick}
+    }
+
+    if err := external_prepare(t); err != .None {
+        return {error = err, steps = n - resume, tick = t.head}
+    }
+
+    for i in resume ..< n {
+        commit(t, &t.staged[i])
+    }
+
+    external_publish(t)
+    revise_record_prefix(t, first, resume)
+    return {steps = n - resume, tick = t.head}
+}
+
+// Record the rewritten (accepted) inputs of an unexecuted equivalent prefix.
+// Their frames, images and events are already the ones those inputs produce.
+@(private)
+revise_record_prefix :: proc(t: ^Timeline($State, $Input, $Event), first: u64, count: int) {
+    for i in 0 ..< count {
+        record_at(t, first + u64(i)).input = t.staged[i].input
+    }
+}
+
+// Clone, admit, and borrow one record to a revision check. `run` supplies the
+// execution the provider admits against: the staged run, or the published one.
+@(private)
+revision_check_record :: proc(
+    t: ^Timeline($State, $Input, $Event),
+    record: ^Record(State, Input, Event),
+    run: ^External_Run,
+    check: Revision_Check(State, Event),
+) -> Error {
+    owned, clone_error := clone_record_complete(record, t.external, t.epoch, t.allocator)
+
+    if clone_error != .None {
+        return clone_error
+    }
+
+    defer complete_checkpoint_destroy(&owned)
+
+    if owned._image_bytes > max(u64) - owned._owned_bytes {
+        return .Resource_Limit
+    }
+
+    usage := run.usage
+    run.usage.image_bytes = t.image_bytes
+    run.usage.savepoint_bytes = owned._image_bytes + owned._owned_bytes
+    admission_error := external_usage_check(run, .Revision)
+    run.usage = usage
+
+    if admission_error != .None {
+        return admission_error
+    }
+
+    return check.check(check.user, &owned)
 }
 
 // Ingest a COMPLETE authoritative frame and its complete occurrence batch.

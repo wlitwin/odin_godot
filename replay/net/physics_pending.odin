@@ -195,7 +195,7 @@ client_physics_apply_pending :: proc(c: ^Client($S, $C, $A, $E, $N)) -> Error {
     if c.spectator {
         known := c.physics.signatures[tick % PHYSICS_HISTORY]
 
-        if known.epoch == c.cfg.epoch && known.tick == tick && bd.compare(known, inspection.signature) != .Match {
+        if known.epoch == c.cfg.epoch && known.tick == tick && !physics_signature_match(known, inspection.signature) {
             client_physics_drop_pending(c)
             return .Invalid_Frame
         }
@@ -206,7 +206,7 @@ client_physics_apply_pending :: proc(c: ^Client($S, $C, $A, $E, $N)) -> Error {
     if tick > c.timeline.head {
         // Drivers can catch up through signed accepted facts. Spectators do not
         // predict, so their validated complete snapshot remains the catch-up path.
-        if !c.spectator && tick - c.timeline.confirmed > PHYSICS_REPAIR {
+        if !c.spectator && tick - c.timeline.confirmed > u64(c.cfg.max_prediction) {
             client_physics_drop_pending(c)
             return .None
         }
@@ -242,7 +242,7 @@ client_physics_apply_pending :: proc(c: ^Client($S, $C, $A, $E, $N)) -> Error {
             if len(c.journal.queue) - c.journal.queue_count < int(gap) * WIRE_EVENTS * 2 {
                 return .None
             }
-        } else if len(c.journal.queue) - c.journal.queue_count < PHYSICS_REPAIR * WIRE_EVENTS * 2 {
+        } else if len(c.journal.queue) - c.journal.queue_count < int(c.cfg.max_prediction) * WIRE_EVENTS * 2 {
             return .Presentation
         }
 

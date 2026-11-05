@@ -16,6 +16,12 @@ def main():
     parser.add_argument('--godot', default=os.environ.get('GODOT') or shutil.which('godot') or '/Applications/Godot.app/Contents/MacOS/Godot')
     parser.add_argument('--address', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=49791)
+    parser.add_argument('--latency', type=int, default=0,
+                        help='Simulated receive delay in ms for this process (set on both roles; RTT = sum)')
+    parser.add_argument('--jitter', type=int, default=0, help='Simulated extra random delay in ms')
+    parser.add_argument('--loss', type=int, default=0, help='Simulated unreliable packet loss, per 10000')
+    parser.add_argument('--input-delay', type=int, default=0,
+                        help='Client input delay cap in ticks (0..6), applied once the round trip exceeds 100 ms')
     args = parser.parse_args()
     project = args.project.resolve(strict=True)
     if not (project / 'project.godot').is_file() or not (project / 'bin').is_dir():
@@ -32,7 +38,9 @@ def main():
     env.update(BOX3D_SAMPLE_ROLE='client' if args.mode == 'client' else 'host',
                BOX3D_SAMPLE_SCRIPTED='0', BOX3D_SAMPLE_TICKS='0',
                BOX3D_SAMPLE_PORT=str(args.port), DOCKYARD_HOST=args.address,
-               ODIN_SCRIPTS_DLL=str(scripts))
+               ODIN_SCRIPTS_DLL=str(scripts),
+               DOCKYARD_LATENCY=str(args.latency), DOCKYARD_JITTER=str(args.jitter), DOCKYARD_LOSS=str(args.loss),
+               DOCKYARD_INPUT_DELAY=str(args.input_delay))
     env.pop('BOX3D_SAMPLE_OUTPUT', None)
     if args.mode == 'online':
         env.pop('BOX3D_SAMPLE_ROLE', None)

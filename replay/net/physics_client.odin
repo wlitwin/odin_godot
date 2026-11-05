@@ -21,7 +21,7 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
        sc.decode(&c.physics.schemas.fact, &header, body[:at]).error != .None ||
        header.generation != c.generation ||
        header.serial != c.serial ||
-       header.version != ACCEPTED_PHYSICS_VERSION ||
+       header.version != PHYSICS_WIRE_VERSION ||
        header.count > WIRE_EVENTS {
         c.stats.rejected_packets += 1
         return .None
@@ -30,7 +30,7 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     if len(body) !=
        at +
            c.physics.schemas.accepted.wire_size +
-           bd.SIGNATURE_BYTES +
+           FACT_DIGEST_BYTES +
            int(header.count) * c.physics.schemas.occurrence.wire_size {
         c.stats.rejected_packets += 1
         return .None
@@ -48,16 +48,15 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     }
 
     at += c.physics.schemas.accepted.wire_size
-    signature, signature_error := bd.signature_decode(body[at:at + bd.SIGNATURE_BYTES])
-    at += bd.SIGNATURE_BYTES
-
-    if signature_error != .None ||
-       signature.identity != c.model.complete_codec.identity ||
-       signature.epoch != c.cfg.epoch ||
-       signature.tick != entry.tick {
-        c.stats.rejected_packets += 1
-        return .None
+    // Compact signature: identity, epoch and tick are this session's own; the
+    // complete digest commits to them and to every part.
+    signature := bd.Signature {
+        identity = c.model.complete_codec.identity,
+        epoch    = c.cfg.epoch,
+        tick     = entry.tick,
     }
+    copy(signature.complete[:], body[at:at + FACT_DIGEST_BYTES])
+    at += FACT_DIGEST_BYTES
 
     fact := Facts_Packet(E) {
         generation = c.generation,
@@ -95,6 +94,11 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
         return .None
     }
 
+    // A late repeat (usually the unreliable copy) of an already confirmed tick.
+    if entry.tick <= c.timeline.confirmed && c.facts[entry.tick % PHYSICS_HISTORY].tick == entry.tick {
+        return .None
+    }
+
     if error := accepted_can_note(
         &c.physics.accepted,
         entry,
@@ -115,7 +119,9 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
 
     old_signature := c.physics.signatures[entry.tick % PHYSICS_HISTORY]
 
-    if old_signature.epoch == c.cfg.epoch && old_signature.tick == entry.tick && old_signature != signature {
+    if old_signature.epoch == c.cfg.epoch &&
+       old_signature.tick == entry.tick &&
+       !physics_signature_match(old_signature, signature) {
         c.stats.rejected_packets += 1
         return .None
     }
@@ -252,7 +258,7 @@ physics_verification_matches :: proc(
         proof.pending_id == pending_id &&
         proof.generation == generation &&
         proof.serial == serial &&
-        proof.signature == expected \
+        physics_signature_match(proof.signature, expected) \
     )
 }
 
@@ -292,13 +298,13 @@ client_physics_apply_accepted :: proc(c: ^Client($S, $C, $A, $E, $N), verified: 
         return .None
     }
 
-    if c.timeline.head - first + 1 > PHYSICS_REPAIR {
+    if c.timeline.head - first + 1 > u64(c.cfg.max_prediction) {
         client_resync(c, .History_Missing, first)
         return .None
     }
 
     // Reserve presentation queue headroom before committing simulation work.
-    if len(c.journal.queue) - c.journal.queue_count < PHYSICS_REPAIR * WIRE_EVENTS * 2 {
+    if len(c.journal.queue) - c.journal.queue_count < int(c.cfg.max_prediction) * WIRE_EVENTS * 2 {
         return .Presentation
     }
 
@@ -310,6 +316,10 @@ client_physics_apply_accepted :: proc(c: ^Client($S, $C, $A, $E, $N), verified: 
     }
     rewrite := r.Input_Rewrite(Batch(C, A, N)) {
         user = &context_value,
+        equivalent = proc(pointer: rawptr, x, y: ^Batch(C, A, N)) -> bool {
+            context_value := cast(^Physics_Check(S, C, A, E, N))pointer
+            return batch_step_equivalent(&context_value.client.model, x, y)
+        },
         apply = proc(pointer: rawptr, tick: u64, original: Batch(C, A, N)) -> Batch(C, A, N) {
             context_value := cast(^Physics_Check(S, C, A, E, N))pointer
             c := context_value.client
@@ -361,7 +371,7 @@ client_physics_apply_accepted :: proc(c: ^Client($S, $C, $A, $E, $N), verified: 
                 return .External_State
             }
 
-            if bd.compare(context_value.expected, signature) != .Match {
+            if !physics_signature_match(context_value.expected, signature) {
                 context_value.actual = actual
                 context_value.mismatch = true
                 return .Diverged_External
@@ -407,9 +417,17 @@ client_physics_apply_accepted :: proc(c: ^Client($S, $C, $A, $E, $N), verified: 
         return .Simulation
     }
 
+    // Accepted values equal to the prediction re-derive identical records, so
+    // only the divergent suffix executes. A confirmation that changed nothing
+    // is not a correction: presentation revisions stay put.
     c.physics.repairs += 1
-    c.stats.corrections += 1
     c.stats.replayed_ticks += u64(result.steps)
+    c.stats.reused_correction_ticks += c.physics.last_planned_depth - u64(result.steps)
+
+    if result.steps > 0 {
+        c.stats.corrections += 1
+    }
+
     c.held = context_value.held
 
     if error := client_physics_confirm(c, target); error != .None {

@@ -322,6 +322,21 @@ session_options :: proc(self: ^DockyardDuo, port: u16) -> rgd.Session_Options {
     options.address = state.address
     options.network = net.physics_config_default()
     options.network.snapshot_every = 1
+    // Optional simulated network conditions for local testing. Each process
+    // delays what it RECEIVES, so set them on both roles: latency=50 on host
+    // and client is a 100 ms round trip. Loss applies to unreliable packets.
+    // Native: DOCKYARD_LATENCY/JITTER/LOSS (launch.py --latency/--jitter/--loss);
+    // browser: ?latency=&jitter=&loss= query parameters.
+    options.latency_ms = u32(clamp(launch_int("DOCKYARD_LATENCY", "latency", 0), 0, 5000))
+    options.jitter_ms = u32(clamp(launch_int("DOCKYARD_JITTER", "jitter", 0), 0, 1000))
+    options.loss_permyriad = u32(clamp(launch_int("DOCKYARD_LOSS", "loss", 0), 0, 5000))
+    // Optional input delay (ticks, 0..6) once the joined round trip passes
+    // 100 ms: steadier remote robots and shallower corrections for that much
+    // local input lag. Off by default. DOCKYARD_INPUT_DELAY / ?input_delay=.
+    options.network.input_delay_max = u32(
+        clamp(launch_int("DOCKYARD_INPUT_DELAY", "input_delay", 0), 0, net.INPUT_DELAY_MAX),
+    )
+    options.network.input_delay_ping_ms = 100
 
     when gd.IS_WEB {
         options.backend = .Rtc

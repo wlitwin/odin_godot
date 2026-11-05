@@ -5,6 +5,7 @@ import "core:time"
 import "core:reflect"
 import b "godot:box3d"
 import r "godot:replay"
+import net "godot:replay/net"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
 import "base:runtime"
@@ -63,6 +64,7 @@ Image :: struct {
     ownership:                            Owner_Context,
     snapshot:                             b.Snapshot,
     config:                               Config,
+    config_hash:                          u64, // config_contract(config), derived once per image
     contract, bytes:                      u64,
     allocator:                            mem.Allocator,
     sensor_count:                         u32,
@@ -84,6 +86,8 @@ Working :: struct {
     catalog:                                      b.Recovery_Catalog,
     catalog_identity:                             b.Recovery_Identity,
     revision, admitted_revision, native_required: u64,
+    contract:                                     u64, // the source image's catalog contract: same config + identity
+    config_hash:                                  u64, // the source image's config_contract(config)
 }
 
 @(private)
@@ -504,6 +508,8 @@ image_make :: proc(
     native_required: u64 = 0,
     constructor_info: ^b.Snapshot_Info = nil,
     ownership: Owner_Context = {},
+    contract: u64 = 0, // nonzero: the already-derived catalog_contract(config, catalog identity)
+    config_hash: u64 = 0, // nonzero: the already-derived config_contract(config)
 ) -> (
     rawptr,
     u64,
@@ -576,11 +582,13 @@ image_make :: proc(
     }
 
     image := cast(^Image)pointer
+    config_hash := config_hash != 0 ? config_hash : config_contract(config)
     image^ = {
         ownership           = ownership,
         snapshot            = snapshot,
         config              = config,
-        contract            = catalog_contract(config, catalog_identity),
+        config_hash         = config_hash,
+        contract            = contract != 0 ? contract : catalog_contract_from(config_hash, catalog_identity),
         bytes               = bytes,
         allocator           = allocator,
         sensor_count        = u32(len(sensors)),
@@ -655,6 +663,8 @@ clone :: proc(pointer: rawptr) -> (rawptr, r.Error) {
         image.native_required,
         &info,
         image.ownership,
+        image.contract,
+        image.config_hash,
     )
 
     if make_error != .None {
@@ -720,6 +730,8 @@ open :: proc(pointer: rawptr) -> (rawptr, r.Error) {
         sensors          = image.sensors,
         catalog_identity = image.catalog_identity,
         native_required  = image.native_required,
+        contract         = image.contract,
+        config_hash      = image.config_hash,
     }
 
     if error := charge(size_of(Working)); error != .None {
@@ -800,6 +812,8 @@ capture :: proc(pointer: rawptr) -> (rawptr, u64, r.Error) {
         work.native_required,
         &info,
         work.ownership,
+        work.contract,
+        work.config_hash,
     )
 
     if make_error != .None {
@@ -951,8 +965,8 @@ participant :: proc(
         require_step = true,
         limits = {
             history_frames = 128,
-            max_prediction_ticks = 8,
-            max_repair_ticks = 8,
+            max_prediction_ticks = net.PHYSICS_WINDOW,
+            max_repair_ticks = net.PHYSICS_WINDOW,
             max_audit_ticks = 127,
             max_bytes = b.ALPHA_RESOURCE_BYTES,
         },
@@ -1155,7 +1169,12 @@ digests :: proc(checkpoint: ^r.Complete_Checkpoint($S, $E)) -> (b.World_Digests,
 
 @(private)
 catalog_contract :: proc(config: Config, identity: b.Recovery_Identity) -> u64 {
-    value := config_contract(config)
+    return catalog_contract_from(config_contract(config), identity)
+}
+
+@(private)
+catalog_contract_from :: proc(config_hash: u64, identity: b.Recovery_Identity) -> u64 {
+    value := config_hash
 
     if identity.profile != 0 {
         fold(&value, u64(identity.solver_format))

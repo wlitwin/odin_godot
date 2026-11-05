@@ -381,6 +381,10 @@ actual_checked_prefix_then_later_predicted_failure_aborts_entire_client_suffix :
     }
     tr.memory_advance(&pair.memory, 0)
     net.server_pump(&pair.server, 0)
+    // The host's own accepted control differs from the client's held guess at
+    // the first unconfirmed tick, so the revision really executes the whole
+    // suffix (an unchanged prefix would reuse its records without stepping).
+    testing.expect_value(t, net.server_local(&pair.server, f.Control{x = 10}), net.Error.None)
     testing.expect_value(t, net.server_step(&pair.server), net.Error.None)
     tr.memory_advance(&pair.memory, 0)
     testing.expect_value(t, net.client_pump(&pair.client, 0), net.Error.Simulation)
@@ -477,4 +481,74 @@ actual_action_receiver_deduplicates_exact_values_and_rejects_conflicting_sequenc
     entry, found := net.server_accepted_input(&pair.server, 4)
     testing.expect(t, found && entry.batch.has_action[1] && entry.decisions.applied[1])
     testing.expect_value(t, entry.batch.actions[1].kind, f.Action_Kind.Spawn)
+}
+
+// Wire revision 2: a predicting driver confirms from signed accepted facts
+// alone. With every accepted input equal to the prediction, confirmation
+// re-executes nothing, no complete image reaches the driver, and the small
+// status still feeds the input-lead controller.
+@(test)
+driver_confirms_from_facts_without_images_or_reexecution :: proc(t: ^testing.T) {
+    pair := new(Native_Pair)
+    defer free(pair)
+    pair_open(t, pair)
+    defer pair_close(t, pair)
+    now := u64(0)
+
+    exchange :: proc(pair: ^Native_Pair, now: u64) {
+        tr.memory_advance(&pair.memory, now)
+        net.server_pump(&pair.server, now)
+        net.server_local(&pair.server, f.Control{})
+        net.server_step(&pair.server)
+        tr.memory_advance(&pair.memory, now)
+        net.client_pump(&pair.client, now)
+
+        if step := net.client_step(&pair.client, f.Control{}); step != .None && step != .Capacity {
+            panic("client step")
+        }
+    }
+
+    for _ in 0 ..< 20 {
+        now += 16
+        exchange(pair, now)
+    }
+
+    replayed := pair.client.stats.replayed_ticks
+    reused := pair.client.stats.reused_correction_ticks
+    corrections := pair.client.stats.corrections
+    confirmed := pair.client.timeline.confirmed
+    compares := pair.client.physics.verified_compares + pair.client.physics.full_compares
+
+    for _ in 0 ..< 60 {
+        now += 16
+        exchange(pair, now)
+    }
+
+    testing.expect(t, pair.client.timeline.confirmed >= confirmed + 50)
+    testing.expect_value(t, pair.client.stats.replayed_ticks, replayed)
+    testing.expect_value(t, pair.client.stats.corrections, corrections)
+    testing.expect(t, pair.client.stats.reused_correction_ticks > reused)
+    testing.expect_value(t, pair.client.physics.verified_compares + pair.client.physics.full_compares, compares)
+    testing.expect(t, pair.client.stats.timing_samples > 0)
+    testing.expect_value(t, pair.client.stats.resyncs, u64(0))
+
+    for tx in pair.server.physics.tx {
+        testing.expect_value(t, len(tx.data.bytes), 0)
+    }
+
+    tick := pair.client.timeline.confirmed
+    left, le := r.capture_complete(&pair.client.timeline, tick)
+    right, re := r.capture_complete(&pair.server.timeline, tick)
+    testing.expect(t, le == .None && re == .None)
+    defer r.complete_checkpoint_destroy(&left)
+    defer r.complete_checkpoint_destroy(&right)
+    n, _ := ph.dump(&left, nil)
+    m, _ := ph.dump(&right, nil)
+    x, y := make([]u8, int(n)), make([]u8, int(m))
+    defer delete(x)
+    defer delete(y)
+    ph.dump(&left, x)
+    ph.dump(&right, y)
+    testing.expect(t, n == m && mem.compare(x, y) == 0)
+    testing.expect_value(t, left.frame, right.frame)
 }

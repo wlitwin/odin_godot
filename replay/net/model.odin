@@ -4,6 +4,42 @@ import r "godot:replay"
 import "core:crypto/sha2"
 import "core:mem"
 
+// True when two batches drive network_step identically: every field the step,
+// action and verdict paths read is byte-equal. View stamps never reach the
+// step; views and fresh bits only matter when the model reads them. Byte
+// equality is stricter than value equality, so a false result only costs an
+// unnecessary re-simulation.
+batch_step_equivalent :: proc(model: ^Model($S, $C, $A, $E, $N), x, y: ^Batch(C, A, N)) -> bool {
+    if x.prediction_group != y.prediction_group ||
+       x.prediction_seat != y.prediction_seat ||
+       x.joins != y.joins ||
+       x.leaves != y.leaves ||
+       x.has_action != y.has_action ||
+       x.sequences != y.sequences ||
+       x.rejections != y.rejections ||
+       !batch_bytes_equal(&x.authority, &y.authority) ||
+       !batch_bytes_equal(&x.controls, &y.controls) {
+        return false
+    }
+
+    for present, i in x.has_action {
+        if present && !batch_bytes_equal(&x.actions[i], &y.actions[i]) {
+            return false
+        }
+    }
+
+    if model.reset_player != nil && x.fresh != y.fresh {
+        return false
+    }
+
+    return model.step_view == nil || batch_bytes_equal(&x.views, &y.views)
+}
+
+@(private)
+batch_bytes_equal :: proc(x, y: ^$T) -> bool {
+    return mem.compare((cast([^]u8)x)[:size_of(T)], (cast([^]u8)y)[:size_of(T)]) == 0
+}
+
 @(private)
 network_step :: proc(state: ^$State, input: Batch($Control, $Action, $Seats), ctx: ^r.Step(Net_Event($Event))) {
     model := cast(^Model(State, Control, Action, Event, Seats))ctx.user
@@ -189,6 +225,8 @@ config_valid :: proc(cfg: Config) -> bool {
         cfg.lead < u32(cfg.history) &&
         cfg.max_prediction >= cfg.lead + 2 &&
         cfg.max_future >= cfg.lead + 2 &&
+        cfg.input_delay_max <= INPUT_DELAY_MAX &&
+        cfg.max_future >= cfg.input_delay_max + 2 &&
         cfg.max_future < u32(cfg.history) &&
         cfg.max_prediction < u32(cfg.history - 2) &&
         cfg.snapshot_every > 0 &&
