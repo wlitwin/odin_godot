@@ -355,7 +355,11 @@ composite_budget_consumes_cumulative_requests_and_exact_limit :: proc(t: ^testin
     testing.expect(t, e == nil)
     mem.free(bytes)
     testing.expect_value(t, a.account(a.user, bg.CATEGORY_KIT_CORE, 0, 400), bg.OK)
-    wd := World_Def{{0, -10, 0}, 1, 1}
+    wd := World_Def {
+        gravity           = {0, -10, 0},
+        enable_sleep      = 1,
+        enable_continuous = 1,
+    }
     world: u32
     image: rawptr
     testing.expect_value(t, world_create(&wd, &world), bg.OK)

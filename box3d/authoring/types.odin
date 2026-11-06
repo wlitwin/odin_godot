@@ -32,13 +32,19 @@ IDENTITY_POSE :: Pose_Input {
 }
 
 Scene_Input :: struct {
-    schema_version: u32,
-    namespace:      string,
-    gravity:        [3]f32,
-    enable_sleep:   bool,
-    bodies:         []Body_Input,
-    joints:         []Joint_Input,
-    characters:     []Character_Input,
+    schema_version:                                             u32,
+    namespace:                                                  string,
+    gravity:                                                    [3]f32,
+    enable_sleep:                                               bool,
+    // Optional solver tuning; each 0 keeps Box3D's (length-scaled) default.
+    restitution_threshold, hit_event_threshold, contact_hertz:  f32,
+    contact_damping_ratio, contact_speed, maximum_linear_speed: f32,
+    isotropic_inertia_tolerance:                                f32,
+    restitution_iterations:                                     u32,
+    enable_restitution_propagation:                             bool,
+    bodies:                                                     []Body_Input,
+    joints:                                                     []Joint_Input,
+    characters:                                                 []Character_Input,
 }
 
 Body_Input :: struct {
@@ -47,6 +53,10 @@ Body_Input :: struct {
     linear_velocity, angular_velocity:                               [3]f32,
     linear_damping, angular_damping, gravity_scale, sleep_threshold: f32,
     enable_sleep, is_awake, is_bullet, is_enabled, sensor:           bool,
+    allow_fast_rotation:                                             bool, // optional; wheels and balls
+    motion_locks:                                                    u32, // optional Motion_Lock bits
+    safety_factor:                                                   f32, // optional; 0 keeps Box3D's 0.5
+    disable_contact_recycling:                                       bool,
     shapes:                                                          []Shape_Input,
 }
 
@@ -66,6 +76,9 @@ Shape_Input :: struct {
     category_bits, mask_bits:                               u64,
     group_index:                                            i32,
     is_sensor, enable_sensor_events, enable_contact_events: bool,
+    rolling_resistance:                                     f32, // optional
+    tangent_velocity:                                       [3]f32, // optional conveyor velocity
+    skip_contact_creation, disable_speculative_contact:     bool,
 }
 
 Kind :: enum u32 {

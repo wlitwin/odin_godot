@@ -15,6 +15,17 @@ extends Resource
 @export var is_sensor: bool = false
 @export var enable_sensor_events: bool = true
 @export var enable_contact_events: bool = false
+@export_group("Surface")
+## A torque opposing rolling, scaled by the shape's radius (Box3D's rolling
+## resistance); 0 rolls freely.
+@export var rolling_resistance: float = 0.0
+## Conveyor-belt surface velocity (Box3D's tangent velocity).
+@export var tangent_velocity: Vector3 = Vector3.ZERO
+@export_group("Contacts")
+## Skip creating contacts with existing overlaps when the shape is added.
+@export var skip_contact_creation: bool = false
+## Turn off speculative contacts (they catch fast bodies before they touch).
+@export var disable_speculative_contact: bool = false
 
 func _shape_kind() -> String:
 	return ""
@@ -33,8 +44,9 @@ func box3d_shape_definition(path: String, errors: Array, body_type: String, body
 	var kind := _shape_kind()
 	if kind in ["sphere", "capsule"] and (absf(scale.x-scale.y)>d.EPS or absf(scale.x-scale.z)>d.EPS):
 		d.issue(errors, path+".scale", "Scale", "Sphere/capsule scale must be uniform.")
-	for field in ["density", "friction", "restitution"]:
+	for field in ["density", "friction", "restitution", "rolling_resistance"]:
 		d.scalar(get(field), path+"."+field, errors, true)
+	var tangent_data := d.vector(tangent_velocity, path+".tangent_velocity", errors)
 	if category_bits < 0 or mask_bits < 0:
 		d.issue(errors, path+".filter", "Dimension", "Godot integer filter fields must be nonnegative; negative values are not reinterpreted as unsigned bits.")
 	if group_index < -2147483648 or group_index > 2147483647:
@@ -52,6 +64,8 @@ func box3d_shape_definition(path: String, errors: Array, body_type: String, body
 		"columns":0, "rows":0, "spacing":[1.0,1.0], "heights":[],
 		"density":density,"friction":friction,"restitution":restitution,"category_bits":category_bits,
 		"mask_bits":mask_bits,"group_index":group_index,"is_sensor":is_sensor,
-		"enable_sensor_events":enable_sensor_events,"enable_contact_events":enable_contact_events}
+		"enable_sensor_events":enable_sensor_events,"enable_contact_events":enable_contact_events,
+		"rolling_resistance":rolling_resistance,"tangent_velocity":tangent_data,
+		"skip_contact_creation":skip_contact_creation,"disable_speculative_contact":disable_speculative_contact}
 	result.merge(_geometry(path,errors), true)
 	return result

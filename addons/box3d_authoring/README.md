@@ -21,6 +21,13 @@ Box3DEditorMeshBaker converts the winding, and Box3DMeshCleanup welds and repair
 meshes assembled from parts (see mesh_cleanup.gd). Heightfield
 triangulation and every stable ID/content hash belong to the shared Odin baker.
 
+Less common Box3D settings sit in Inspector groups and default to Box3D's own
+values: World "Solver" (restitution/hit thresholds, contact stiffness, damping and
+push-out speed, speed limit, restitution iterations), Body "Motion" (fast rotation
+for wheels and balls, axis locks, continuous-collision safety factor, contact
+recycling) and shape "Surface"/"Contacts" (rolling resistance, conveyor tangent
+velocity, contact creation on add, speculative contacts). See box3d/README.md.
+
 Same resource key on different bodies denotes the same immutable geometry;
 per-instance sensor/material/filter definitions stay separate. Duplicate body or
 per-body resource keys fail. Engine integer filter fields accept nonnegative

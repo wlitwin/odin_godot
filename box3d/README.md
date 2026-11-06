@@ -75,6 +75,26 @@ current value is accepted. The fingerprint includes it. Kit and Replay are valid
 with 1 only.
 Keep engine configuration and callback identity fixed during a simulation run.
 
+ABI 2 exposes the rest of Box3D's value settings; in each, 0 keeps Box3D's
+default, so existing definitions are unchanged:
+
+| Definition | Settings |
+| --- | --- |
+| `World_Def` | `restitution_threshold`, `hit_event_threshold`, `contact_hertz`, `contact_damping_ratio`, `contact_speed` (push-out speed), `maximum_linear_speed`, `isotropic_inertia_tolerance`, `restitution_iterations`, `enable_restitution_propagation` |
+| `Body_Def` | `allow_fast_rotation`, `motion_locks` (`Motion_Locks` bit set), `safety_factor`, `disable_contact_recycling` |
+| `Shape_Def` | `rolling_resistance`, `tangent_velocity` (conveyor), `skip_contact_creation`, `disable_speculative_contact` |
+
+Box3D scales the world thresholds and speeds by the length unit, so a game that
+sets `set_length_units_per_meter(0.1)` also shrinks the restitution threshold to
+0.1 m/s and the push-out speed to 0.3 m/s; set them back explicitly if the bodies
+move at ordinary speeds. Box3D caps spin at a quarter turn per step (47 rad/s at
+60 Hz) unless a body sets `allow_fast_rotation`; a small ball rolling faster than
+radius x 47 m/s otherwise slides. Above that cap the contact point turns with the
+ball within a substep, so a fast-spinning ball rides about r(1 - cos(w h)) into
+the floor (h = one substep). Settings that only matter through callbacks or APIs
+the SDK does not expose (custom filtering, pre-solve and hit events, explosions,
+manual mass) are left out. Snapshots and recovery keep all of these.
+
 All mutation, queries, capture and restore happen at settled step boundaries on
 the owning thread. The package does not schedule ticks or mutate Godot scenes.
 Run Odin tests with `-define:ODIN_TEST_THREADS=1`; the supplied test script does so.

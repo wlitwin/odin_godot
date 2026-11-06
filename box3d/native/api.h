@@ -66,6 +66,16 @@ typedef struct {
 typedef struct {
   ogb3_vec3 gravity;
   uint32_t enable_sleep, enable_continuous;
+  /* ABI 2 solver tuning. Each 0 keeps Box3D's default, which Box3D scales by
+   * the length unit for the thresholds and speeds (see
+   * ogb3_set_length_units_per_meter): restitution threshold 1 m/s, hit event
+   * threshold 1 m/s, contact hertz 30, contact damping ratio 10, contact
+   * (push-out) speed 3 m/s, maximum linear speed 400 m/s, isotropic inertia
+   * tolerance 0.2, two restitution iterations, no restitution propagation. */
+  float restitution_threshold, hit_event_threshold, contact_hertz,
+      contact_damping_ratio, contact_speed, maximum_linear_speed,
+      isotropic_inertia_tolerance;
+  uint32_t restitution_iterations, enable_restitution_propagation;
 } ogb3_world_def;
 enum { OGB3_STATIC = 0, OGB3_KINEMATIC = 1, OGB3_DYNAMIC = 2 };
 typedef struct {
@@ -74,12 +84,34 @@ typedef struct {
   ogb3_vec3 linear_velocity, angular_velocity;
   float linear_damping, angular_damping, gravity_scale, sleep_threshold;
   uint32_t enable_sleep, is_awake, is_bullet, is_enabled;
+  /* Box3D caps angular speed at a quarter turn per step (47 rad/s at 60 Hz)
+   * unless a body allows fast rotation; meant for round bodies that roll fast,
+   * such as wheels and balls (a 3.5 cm ball rolls at 1.6 m/s at the cap). ABI 2. */
+  uint32_t allow_fast_rotation;
+  uint32_t motion_locks;  /* OGB3_LOCK_* bits; 0 = free */
+  float safety_factor;    /* continuous-collision margin; 0 keeps Box3D's 0.5 */
+  uint32_t disable_contact_recycling; /* 0 keeps Box3D's contact recycling on */
 } ogb3_body_def;
+enum {
+  OGB3_LOCK_LINEAR_X = 1,
+  OGB3_LOCK_LINEAR_Y = 2,
+  OGB3_LOCK_LINEAR_Z = 4,
+  OGB3_LOCK_ANGULAR_X = 8,
+  OGB3_LOCK_ANGULAR_Y = 16,
+  OGB3_LOCK_ANGULAR_Z = 32,
+  OGB3_LOCK_ALL = 63
+};
 typedef struct {
   uint64_t category_bits, mask_bits;
   int32_t group_index;
   float density, friction, restitution;
   uint32_t is_sensor, enable_sensor_events, enable_contact_events;
+  /* ABI 2. All 0 keep Box3D's defaults: no rolling resistance (a torque
+   * opposing rolling, scaled by the shape's radius), no tangent (conveyor)
+   * velocity, contact creation on add, speculative contacts on. */
+  float rolling_resistance;
+  ogb3_vec3 tangent_velocity;
+  uint32_t skip_contact_creation, disable_speculative_contact;
 } ogb3_shape_def;
 typedef struct {
   ogb3_body body_a, body_b;

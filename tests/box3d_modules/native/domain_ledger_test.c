@@ -66,7 +66,7 @@ int main(void) {
   ogb3_domain_contract c, same;
   OK(ogb3_domain_contract_get(&c));
   cookie = c.cookie;
-  assert(cookie && c.size == sizeof c && c.version == 1 && c.abi_version == 1 &&
+  assert(cookie && c.size == sizeof c && c.version == 1 && c.abi_version == 2 &&
          c.logical_version == OGB3_STATE_DUMP_VERSION && c.resource_version == 2 &&
          c.recovery_version == 1 && c.pointer_bits == 8 * sizeof(void *) &&
          c.endian == 1);

@@ -163,7 +163,7 @@ box3d_web_initialize :: proc() -> bool {
         if actual.cookie == 0 ||
            actual.size != size_of(bg.Domain_Contract) ||
            actual.version != 1 ||
-           actual.abi_version != 1 ||
+           actual.abi_version != 2 ||
            actual.logical_version != 4 ||
            actual.resource_version != 2 ||
            actual.recovery_version != 1 ||

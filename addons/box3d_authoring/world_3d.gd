@@ -5,6 +5,27 @@ extends Node3D
 @export var stable_key: String = "world"
 @export var gravity: Vector3 = Vector3(0,-9.81,0)
 @export var enable_sleep: bool = true
+@export_group("Solver")
+## Each 0 keeps Box3D's default. Box3D scales the speeds and thresholds by its
+## length unit (lengthUnitsPerMeter), so a game that shrinks the unit for small
+## objects can set them back to real-world values here.
+## Impacts slower than this (m/s) do not bounce; default 1 m/s.
+@export var restitution_threshold: float = 0.0
+## Impacts faster than this (m/s) raise hit events; default 1 m/s.
+@export var hit_event_threshold: float = 0.0
+## Contact stiffness (Hz); default 30.
+@export var contact_hertz: float = 0.0
+## Contact damping ratio; default 10.
+@export var contact_damping_ratio: float = 0.0
+## Fastest speed (m/s) used to push overlapping bodies apart; default 3 m/s.
+@export var contact_speed: float = 0.0
+## Speed limit (m/s) for any body; default 400 m/s.
+@export var maximum_linear_speed: float = 0.0
+## Inertia close enough to a sphere's (0..1) is treated as one; default 0.2.
+@export var isotropic_inertia_tolerance: float = 0.0
+## Restitution solver iterations (up to 63); default 2.
+@export var restitution_iterations: int = 0
+@export var enable_restitution_propagation: bool = false
 
 func _snapshot() -> Dictionary:
 	var d:=Box3DAuthoringData
@@ -72,7 +93,18 @@ func _snapshot() -> Dictionary:
 	characters.sort_custom(func(a,b):return a.stable_key<b.stable_key)
 	# Shared bake alone deduplicates geometry and enforces the Native8-asset limit.
 	bodies.sort_custom(func(a,b):return a.stable_key<b.stable_key)
-	var definition: Dictionary = {"schema_version":d.SCHEMA_VERSION,"namespace":stable_key,"gravity":gravity_data,"enable_sleep":enable_sleep,"bodies":bodies}
+	for field in ["restitution_threshold","hit_event_threshold","contact_hertz","contact_damping_ratio","contact_speed","maximum_linear_speed"]:
+		d.scalar(get(field),"world."+field,errors,true)
+	d.scalar(isotropic_inertia_tolerance,"world.isotropic_inertia_tolerance",errors,true)
+	if isotropic_inertia_tolerance>1.0:
+		d.issue(errors,"world.isotropic_inertia_tolerance","Dimension","Isotropic inertia tolerance is 0..1.")
+	if restitution_iterations<0 or restitution_iterations>63:
+		d.issue(errors,"world.restitution_iterations","Dimension","Restitution iterations are 0..63.")
+	var definition: Dictionary = {"schema_version":d.SCHEMA_VERSION,"namespace":stable_key,"gravity":gravity_data,"enable_sleep":enable_sleep,"bodies":bodies,
+		"restitution_threshold":restitution_threshold,"hit_event_threshold":hit_event_threshold,"contact_hertz":contact_hertz,
+		"contact_damping_ratio":contact_damping_ratio,"contact_speed":contact_speed,"maximum_linear_speed":maximum_linear_speed,
+		"isotropic_inertia_tolerance":isotropic_inertia_tolerance,"restitution_iterations":restitution_iterations,
+		"enable_restitution_propagation":enable_restitution_propagation}
 	if not joints.is_empty() or not characters.is_empty():
 		definition.schema_version=d.MOTION_SCHEMA_VERSION
 		definition["joints"]=joints

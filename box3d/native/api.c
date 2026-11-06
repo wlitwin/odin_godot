@@ -134,6 +134,9 @@ static int world_is_valid(ogb3_world w) {
       return OGB3_INVALID_HANDLE;                                              \
   } while (0)
 static int nonnegative(float x) { return isfinite(x) && x >= 0; }
+/* Nonnegative and within the snapshot codec's 1e6 bound, so any created world
+ * stays restorable. */
+static int bounded(float x) { return nonnegative(x) && x <= 1e6f; }
 
 /* Process-global, single caller counters. Box3D's allocator OOM is an
  * assertion, not a recoverable status; these measure engine requested bytes
@@ -192,7 +195,7 @@ static ogb3_status domain_contract(ogb3_domain_contract *out) {
   c.cookie = domain_cookie();
   c.size = sizeof c;
   c.version = OGB3_DOMAIN_CONTRACT_VERSION;
-  c.abi_version = 1;
+  c.abi_version = ogb3_abi_version();
 #ifdef OGB3_HAS_STATE_DUMP
   c.logical_version = OGB3_STATE_DUMP_VERSION;
 #endif
@@ -468,7 +471,7 @@ ogb3_status ogb3_engine_allocation_stats(ogb3_allocation_stats *out) {
   *out = allocations;
   return OGB3_OK;
 }
-uint32_t ogb3_abi_version(void) { return 1; }
+uint32_t ogb3_abi_version(void) { return 2; }
 ogb3_status ogb3_set_length_units_per_meter(float units) {
   ARG(isfinite(units) && units >= 0.001f && units <= 1000.0f);
   /* Fixed once the engine is initialized: tolerances and the fingerprint
@@ -492,7 +495,10 @@ uint64_t ogb3_build_fingerprint(void) {
 
 ogb3_status ogb3_world_def_default(ogb3_world_def *d) {
   ARG(d);
-  *d = (ogb3_world_def){{0, -10, 0}, 1, 1};
+  memset(d, 0, sizeof *d);
+  d->gravity = (ogb3_vec3){0, -10, 0};
+  d->enable_sleep = 1;
+  d->enable_continuous = 1;
   return OGB3_OK;
 }
 ogb3_status ogb3_body_def_default(ogb3_body_def *d) {
@@ -507,6 +513,7 @@ ogb3_status ogb3_body_def_default(ogb3_body_def *d) {
   d->enable_sleep = b.enableSleep;
   d->is_awake = b.isAwake;
   d->is_enabled = b.isEnabled;
+  d->allow_fast_rotation = b.allowFastRotation;
   return OGB3_OK;
 }
 ogb3_status ogb3_shape_def_default(ogb3_shape_def *d) {
@@ -530,7 +537,15 @@ ogb3_status ogb3_world_create(const ogb3_world_def *d, ogb3_world *out) {
   ARG(out);
   *out = 0;
   ARG(d && validvec(&d->gravity) && d->enable_sleep <= 1 &&
-      d->enable_continuous <= 1);
+      d->enable_continuous <= 1 && bounded(d->restitution_threshold) &&
+      bounded(d->hit_event_threshold) && bounded(d->contact_hertz) &&
+      bounded(d->contact_damping_ratio) && bounded(d->contact_speed) &&
+      bounded(d->maximum_linear_speed) &&
+      isfinite(d->isotropic_inertia_tolerance) &&
+      d->isotropic_inertia_tolerance >= 0 &&
+      d->isotropic_inertia_tolerance <= 1 &&
+      d->restitution_iterations <= B3_MAX_RESTITUTION_ITERATIONS &&
+      d->enable_restitution_propagation <= 1);
   ogb3_status init_status = initialize();
   if (init_status != OGB3_OK)
     return init_status;
@@ -540,6 +555,24 @@ ogb3_status ogb3_world_create(const ogb3_world_def *d, ogb3_world *out) {
   b.gravity = vec(d->gravity);
   b.enableSleep = d->enable_sleep;
   b.enableContinuous = d->enable_continuous;
+  /* 0 keeps Box3D's (length-scaled) default. */
+  if (d->restitution_threshold > 0)
+    b.restitutionThreshold = d->restitution_threshold;
+  if (d->hit_event_threshold > 0)
+    b.hitEventThreshold = d->hit_event_threshold;
+  if (d->contact_hertz > 0)
+    b.contactHertz = d->contact_hertz;
+  if (d->contact_damping_ratio > 0)
+    b.contactDampingRatio = d->contact_damping_ratio;
+  if (d->contact_speed > 0)
+    b.contactSpeed = d->contact_speed;
+  if (d->maximum_linear_speed > 0)
+    b.maximumLinearSpeed = d->maximum_linear_speed;
+  if (d->isotropic_inertia_tolerance > 0)
+    b.isotropicInertiaTolerance = d->isotropic_inertia_tolerance;
+  if (d->restitution_iterations > 0)
+    b.restitutionIterations = (int)d->restitution_iterations;
+  b.enableRestitutionPropagation = d->enable_restitution_propagation;
   b.workerCount = 1;
   *out = world_bits(b3CreateWorld(&b));
   return *out ? OGB3_OK : OGB3_OUT_OF_MEMORY;
@@ -634,7 +667,9 @@ ogb3_status ogb3_body_create(ogb3_world w, const ogb3_body_def *d,
       nonnegative(d->linear_damping) && nonnegative(d->angular_damping) &&
       isfinite(d->gravity_scale) && nonnegative(d->sleep_threshold) &&
       d->enable_sleep <= 1 && d->is_awake <= 1 && d->is_bullet <= 1 &&
-      d->is_enabled <= 1);
+      d->is_enabled <= 1 && d->allow_fast_rotation <= 1 &&
+      d->motion_locks <= OGB3_LOCK_ALL && bounded(d->safety_factor) &&
+      d->disable_contact_recycling <= 1);
   b3BodyDef b = b3DefaultBodyDef();
   b.type = (b3BodyType)d->type;
   b.position = vec(d->pose.position);
@@ -649,6 +684,16 @@ ogb3_status ogb3_body_create(ogb3_world w, const ogb3_body_def *d,
   b.isAwake = d->is_awake;
   b.isBullet = d->is_bullet;
   b.isEnabled = d->is_enabled;
+  b.allowFastRotation = d->allow_fast_rotation;
+  b.motionLocks.linearX = (d->motion_locks & OGB3_LOCK_LINEAR_X) != 0;
+  b.motionLocks.linearY = (d->motion_locks & OGB3_LOCK_LINEAR_Y) != 0;
+  b.motionLocks.linearZ = (d->motion_locks & OGB3_LOCK_LINEAR_Z) != 0;
+  b.motionLocks.angularX = (d->motion_locks & OGB3_LOCK_ANGULAR_X) != 0;
+  b.motionLocks.angularY = (d->motion_locks & OGB3_LOCK_ANGULAR_Y) != 0;
+  b.motionLocks.angularZ = (d->motion_locks & OGB3_LOCK_ANGULAR_Z) != 0;
+  if (d->safety_factor > 0)
+    b.safetyFactor = d->safety_factor;
+  b.enableContactRecycling = !d->disable_contact_recycling;
   *out = body_bits(b3CreateBody(world_id(w), &b));
   return *out ? OGB3_OK : OGB3_OUT_OF_MEMORY;
 }
@@ -845,7 +890,12 @@ ogb3_status ogb3_geometry_mesh(const ogb3_vec3 *p, uint32_t n,
 static int shape_def(const ogb3_shape_def *d, b3ShapeDef *b) {
   if (!d || !nonnegative(d->density) || !nonnegative(d->friction) ||
       !nonnegative(d->restitution) || d->is_sensor > 1 ||
-      d->enable_sensor_events > 1 || d->enable_contact_events > 1)
+      d->enable_sensor_events > 1 || d->enable_contact_events > 1 ||
+      !bounded(d->rolling_resistance) || !validvec(&d->tangent_velocity) ||
+      fabsf(d->tangent_velocity.x) > 1e6f ||
+      fabsf(d->tangent_velocity.y) > 1e6f ||
+      fabsf(d->tangent_velocity.z) > 1e6f || d->skip_contact_creation > 1 ||
+      d->disable_speculative_contact > 1)
     return 0;
   *b = b3DefaultShapeDef();
   b->filter.categoryBits = d->category_bits;
@@ -857,6 +907,10 @@ static int shape_def(const ogb3_shape_def *d, b3ShapeDef *b) {
   b->isSensor = d->is_sensor;
   b->enableSensorEvents = d->enable_sensor_events;
   b->enableContactEvents = d->enable_contact_events;
+  b->baseMaterial.rollingResistance = d->rolling_resistance;
+  b->baseMaterial.tangentVelocity = vec(d->tangent_velocity);
+  b->invokeContactCreation = !d->skip_contact_creation;
+  b->enableSpeculativeContact = !d->disable_speculative_contact;
   return 1;
 }
 ogb3_status ogb3_shape_box(ogb3_body body, const ogb3_shape_def *d,
@@ -1185,14 +1239,23 @@ ogb3_status ogb3_abi_layout(uint32_t type, uint32_t field, uint32_t *size,
     static const uint32_t offsets[] = {
         offsetof(ogb3_world_def, gravity),
         offsetof(ogb3_world_def, enable_sleep),
-        offsetof(ogb3_world_def, enable_continuous)};
+        offsetof(ogb3_world_def, enable_continuous),
+        offsetof(ogb3_world_def, restitution_threshold),
+        offsetof(ogb3_world_def, hit_event_threshold),
+        offsetof(ogb3_world_def, contact_hertz),
+        offsetof(ogb3_world_def, contact_damping_ratio),
+        offsetof(ogb3_world_def, contact_speed),
+        offsetof(ogb3_world_def, maximum_linear_speed),
+        offsetof(ogb3_world_def, isotropic_inertia_tolerance),
+        offsetof(ogb3_world_def, restitution_iterations),
+        offsetof(ogb3_world_def, enable_restitution_propagation)};
     *size = sizeof(ogb3_world_def);
     *align = _Alignof(ogb3_world_def);
     if (field == UINT32_MAX) {
       *offset = 0;
       return OGB3_OK;
     }
-    ARG(field < 3);
+    ARG(field < 12);
     *offset = offsets[field];
     return OGB3_OK;
   }
@@ -1209,14 +1272,18 @@ ogb3_status ogb3_abi_layout(uint32_t type, uint32_t field, uint32_t *size,
         offsetof(ogb3_body_def, enable_sleep),
         offsetof(ogb3_body_def, is_awake),
         offsetof(ogb3_body_def, is_bullet),
-        offsetof(ogb3_body_def, is_enabled)};
+        offsetof(ogb3_body_def, is_enabled),
+        offsetof(ogb3_body_def, allow_fast_rotation),
+        offsetof(ogb3_body_def, motion_locks),
+        offsetof(ogb3_body_def, safety_factor),
+        offsetof(ogb3_body_def, disable_contact_recycling)};
     *size = sizeof(ogb3_body_def);
     *align = _Alignof(ogb3_body_def);
     if (field == UINT32_MAX) {
       *offset = 0;
       return OGB3_OK;
     }
-    ARG(field < 12);
+    ARG(field < 16);
     *offset = offsets[field];
     return OGB3_OK;
   }
@@ -1230,14 +1297,18 @@ ogb3_status ogb3_abi_layout(uint32_t type, uint32_t field, uint32_t *size,
         offsetof(ogb3_shape_def, restitution),
         offsetof(ogb3_shape_def, is_sensor),
         offsetof(ogb3_shape_def, enable_sensor_events),
-        offsetof(ogb3_shape_def, enable_contact_events)};
+        offsetof(ogb3_shape_def, enable_contact_events),
+        offsetof(ogb3_shape_def, rolling_resistance),
+        offsetof(ogb3_shape_def, tangent_velocity),
+        offsetof(ogb3_shape_def, skip_contact_creation),
+        offsetof(ogb3_shape_def, disable_speculative_contact)};
     *size = sizeof(ogb3_shape_def);
     *align = _Alignof(ogb3_shape_def);
     if (field == UINT32_MAX) {
       *offset = 0;
       return OGB3_OK;
     }
-    ARG(field < 9);
+    ARG(field < 13);
     *offset = offsets[field];
     return OGB3_OK;
   }

@@ -27,7 +27,8 @@ when ODIN_OS == .Linux {
     foreign import native_math "system:m"
 }
 
-ABI_VERSION :: 1
+ABI_VERSION :: 2
+MAX_RESTITUTION_ITERATIONS :: 63 // Box3D's B3_MAX_RESTITUTION_ITERATIONS
 
 Status :: enum i32 {
     Ok               = 0,
@@ -69,9 +70,23 @@ IDENTITY_POSE :: Pose {
 }
 
 World_Def :: struct {
-    gravity:           Vec3,
-    enable_sleep:      u32,
-    enable_continuous: u32,
+    gravity:                        Vec3,
+    enable_sleep:                   u32,
+    enable_continuous:              u32,
+    // Solver tuning (ABI 2). Each 0 keeps Box3D's default, which Box3D scales by
+    // the length unit for the thresholds and speeds: restitution threshold 1 m/s,
+    // hit event threshold 1 m/s, contact hertz 30, contact damping ratio 10,
+    // contact (push-out) speed 3 m/s, maximum linear speed 400 m/s, isotropic
+    // inertia tolerance 0.2, two restitution iterations, no propagation.
+    restitution_threshold:          f32,
+    hit_event_threshold:            f32,
+    contact_hertz:                  f32,
+    contact_damping_ratio:          f32,
+    contact_speed:                  f32,
+    maximum_linear_speed:           f32,
+    isotropic_inertia_tolerance:    f32,
+    restitution_iterations:         u32,
+    enable_restitution_propagation: u32,
 }
 
 Body_Type :: enum i32 {
@@ -81,30 +96,54 @@ Body_Type :: enum i32 {
 }
 
 Body_Def :: struct {
-    type:             Body_Type,
-    pose:             Pose,
-    linear_velocity:  Vec3,
-    angular_velocity: Vec3,
-    linear_damping:   f32,
-    angular_damping:  f32,
-    gravity_scale:    f32,
-    sleep_threshold:  f32,
-    enable_sleep:     u32,
-    is_awake:         u32,
-    is_bullet:        u32,
-    is_enabled:       u32,
+    type:                      Body_Type,
+    pose:                      Pose,
+    linear_velocity:           Vec3,
+    angular_velocity:          Vec3,
+    linear_damping:            f32,
+    angular_damping:           f32,
+    gravity_scale:             f32,
+    sleep_threshold:           f32,
+    enable_sleep:              u32,
+    is_awake:                  u32,
+    is_bullet:                 u32,
+    is_enabled:                u32,
+    // Lift Box3D's angular speed cap (a quarter turn per step, 47 rad/s at
+    // 60 Hz) for round bodies that roll fast, such as wheels and balls.
+    allow_fast_rotation:       u32,
+    motion_locks:              Motion_Locks, // 0 = free
+    safety_factor:             f32, // continuous-collision margin; 0 keeps Box3D's 0.5
+    disable_contact_recycling: u32,
 }
 
+Motion_Lock :: enum u32 {
+    Linear_X,
+    Linear_Y,
+    Linear_Z,
+    Angular_X,
+    Angular_Y,
+    Angular_Z,
+}
+
+Motion_Locks :: distinct bit_set[Motion_Lock;u32]
+
 Shape_Def :: struct {
-    category_bits:         u64,
-    mask_bits:             u64,
-    group_index:           i32,
-    density:               f32,
-    friction:              f32,
-    restitution:           f32,
-    is_sensor:             u32,
-    enable_sensor_events:  u32,
-    enable_contact_events: u32,
+    category_bits:               u64,
+    mask_bits:                   u64,
+    group_index:                 i32,
+    density:                     f32,
+    friction:                    f32,
+    restitution:                 f32,
+    is_sensor:                   u32,
+    enable_sensor_events:        u32,
+    enable_contact_events:       u32,
+    // ABI 2. All 0 keep Box3D's defaults: no rolling resistance (a torque
+    // opposing rolling, scaled by the shape's radius), no tangent (conveyor)
+    // velocity, contact creation on add, speculative contacts on.
+    rolling_resistance:          f32,
+    tangent_velocity:            Vec3,
+    skip_contact_creation:       u32,
+    disable_speculative_contact: u32,
 }
 
 Hinge_Def :: struct {
@@ -163,8 +202,10 @@ Allocation_Stats :: struct {
 #assert(size_of(World) == 4 && size_of(Body) == 8 && size_of(Shape) == 8 && size_of(Joint) == 8)
 #assert(size_of(Status) == 4 && size_of(Body_Type) == 4)
 #assert(size_of(Vec3) == 12 && size_of(Quat) == 16 && size_of(Pose) == 28)
-#assert(size_of(World_Def) == 20 && size_of(Body_Def) == 88)
-#assert(size_of(Shape_Def) == 48 && size_of(Hinge_Def) == 104)
+// ABI 2 added solver tuning, fast rotation, motion locks, safety factor, contact
+// recycling, rolling resistance, tangent velocity and contact flags.
+#assert(size_of(World_Def) == 56 && size_of(Body_Def) == 104)
+#assert(size_of(Shape_Def) == 72 && size_of(Hinge_Def) == 104)
 #assert(size_of(Query_Filter) == 16 && size_of(Ray_Hit) == 40 && size_of(Sensor_Event) == 24)
 #assert(size_of(Allocation_Stats) == 32)
 #assert(size_of(World_Counters) == 24 && size_of(Body_State) == 80)
@@ -197,6 +238,15 @@ abi_check :: proc() -> Status {
                 offset_of(World_Def, gravity),
                 offset_of(World_Def, enable_sleep),
                 offset_of(World_Def, enable_continuous),
+                offset_of(World_Def, restitution_threshold),
+                offset_of(World_Def, hit_event_threshold),
+                offset_of(World_Def, contact_hertz),
+                offset_of(World_Def, contact_damping_ratio),
+                offset_of(World_Def, contact_speed),
+                offset_of(World_Def, maximum_linear_speed),
+                offset_of(World_Def, isotropic_inertia_tolerance),
+                offset_of(World_Def, restitution_iterations),
+                offset_of(World_Def, enable_restitution_propagation),
             },
         },
         {
@@ -216,6 +266,10 @@ abi_check :: proc() -> Status {
                 offset_of(Body_Def, is_awake),
                 offset_of(Body_Def, is_bullet),
                 offset_of(Body_Def, is_enabled),
+                offset_of(Body_Def, allow_fast_rotation),
+                offset_of(Body_Def, motion_locks),
+                offset_of(Body_Def, safety_factor),
+                offset_of(Body_Def, disable_contact_recycling),
             },
         },
         {
@@ -232,6 +286,10 @@ abi_check :: proc() -> Status {
                 offset_of(Shape_Def, is_sensor),
                 offset_of(Shape_Def, enable_sensor_events),
                 offset_of(Shape_Def, enable_contact_events),
+                offset_of(Shape_Def, rolling_resistance),
+                offset_of(Shape_Def, tangent_velocity),
+                offset_of(Shape_Def, skip_contact_creation),
+                offset_of(Shape_Def, disable_speculative_contact),
             },
         },
         {

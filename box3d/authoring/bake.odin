@@ -402,6 +402,19 @@ bake_asset :: proc(
         return {}, fail(.Dimension, "material")
     }
 
+    if !finite(input.rolling_resistance) ||
+       input.rolling_resistance < 0 ||
+       input.rolling_resistance > 1e6 ||
+       !finite3(input.tangent_velocity) {
+        return {}, fail(.Dimension, "material")
+    }
+
+    for v in input.tangent_velocity {
+        if abs(v) > 1e6 {
+            return {}, fail(.Dimension, "material")
+        }
+    }
+
     mesh := input.kind == "mesh" || input.kind == "heightfield"
 
     if mesh && (body_type != .Static || sensor || input.is_sensor || input.enable_sensor_events) {
@@ -672,6 +685,28 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
         return {}, fail(.Nonfinite, "gravity")
     }
 
+    tuning := [6]f32 {
+        input.restitution_threshold,
+        input.hit_event_threshold,
+        input.contact_hertz,
+        input.contact_damping_ratio,
+        input.contact_speed,
+        input.maximum_linear_speed,
+    }
+
+    for v in tuning {
+        if !finite(v) || v < 0 || v > 1e6 {
+            return {}, fail(.Dimension, "world.solver")
+        }
+    }
+
+    if !finite(input.isotropic_inertia_tolerance) ||
+       input.isotropic_inertia_tolerance < 0 ||
+       input.isotropic_inertia_tolerance > 1 ||
+       input.restitution_iterations > b.MAX_RESTITUTION_ITERATIONS {
+        return {}, fail(.Dimension, "world.solver")
+    }
+
     if len(input.bodies) == 0 || len(input.bodies) > MAX_BODIES {
         return {}, fail(.Capacity, "bodies.count")
     }
@@ -733,9 +768,18 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
 
     scene.data.schema_version = input.schema_version
     scene.data.world = {
-        gravity           = vector(input.gravity),
-        enable_sleep      = u32(input.enable_sleep),
-        enable_continuous = 1,
+        gravity                        = vector(input.gravity),
+        enable_sleep                   = u32(input.enable_sleep),
+        enable_continuous              = 1,
+        restitution_threshold          = clean(input.restitution_threshold),
+        hit_event_threshold            = clean(input.hit_event_threshold),
+        contact_hertz                  = clean(input.contact_hertz),
+        contact_damping_ratio          = clean(input.contact_damping_ratio),
+        contact_speed                  = clean(input.contact_speed),
+        maximum_linear_speed           = clean(input.maximum_linear_speed),
+        isotropic_inertia_tolerance    = clean(input.isotropic_inertia_tolerance),
+        restitution_iterations         = input.restitution_iterations,
+        enable_restitution_propagation = u32(input.enable_restitution_propagation),
     }
     scene.data.bodies, ok = allocate(Baked_Body, len(input.bodies), allocator)
 
@@ -823,19 +867,30 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
             return {}, fail(.Dimension, "body.settings", body_index)
         }
 
+        if body.motion_locks > 63 ||
+           !finite(body.safety_factor) ||
+           body.safety_factor < 0 ||
+           body.safety_factor > 1e6 {
+            return {}, fail(.Dimension, "body.settings", body_index)
+        }
+
         out.definition = {
-            type             = kind,
-            pose             = pose,
-            linear_velocity  = vector(body.linear_velocity),
-            angular_velocity = vector(body.angular_velocity),
-            linear_damping   = clean(body.linear_damping),
-            angular_damping  = clean(body.angular_damping),
-            gravity_scale    = clean(body.gravity_scale),
-            sleep_threshold  = clean(body.sleep_threshold),
-            enable_sleep     = u32(body.enable_sleep),
-            is_awake         = u32(body.is_awake),
-            is_bullet        = u32(body.is_bullet),
-            is_enabled       = u32(body.is_enabled),
+            type                      = kind,
+            pose                      = pose,
+            linear_velocity           = vector(body.linear_velocity),
+            angular_velocity          = vector(body.angular_velocity),
+            linear_damping            = clean(body.linear_damping),
+            angular_damping           = clean(body.angular_damping),
+            gravity_scale             = clean(body.gravity_scale),
+            sleep_threshold           = clean(body.sleep_threshold),
+            enable_sleep              = u32(body.enable_sleep),
+            is_awake                  = u32(body.is_awake),
+            is_bullet                 = u32(body.is_bullet),
+            is_enabled                = u32(body.is_enabled),
+            allow_fast_rotation       = u32(body.allow_fast_rotation),
+            motion_locks              = transmute(b.Motion_Locks)body.motion_locks,
+            safety_factor             = clean(body.safety_factor),
+            disable_contact_recycling = u32(body.disable_contact_recycling),
         }
         shape_order: [MAX_SHAPES]int
 
@@ -944,15 +999,19 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
             shape.body_id = out.logical_id
             shape.asset_id = asset_id
             shape.definition = {
-                category_bits         = s.category_bits,
-                mask_bits             = s.mask_bits,
-                group_index           = s.group_index,
-                density               = clean(s.density),
-                friction              = clean(s.friction),
-                restitution           = clean(s.restitution),
-                is_sensor             = u32(body.sensor || s.is_sensor),
-                enable_sensor_events  = u32(s.enable_sensor_events),
-                enable_contact_events = u32(s.enable_contact_events),
+                category_bits               = s.category_bits,
+                mask_bits                   = s.mask_bits,
+                group_index                 = s.group_index,
+                density                     = clean(s.density),
+                friction                    = clean(s.friction),
+                restitution                 = clean(s.restitution),
+                is_sensor                   = u32(body.sensor || s.is_sensor),
+                enable_sensor_events        = u32(s.enable_sensor_events),
+                enable_contact_events       = u32(s.enable_contact_events),
+                rolling_resistance          = clean(s.rolling_resistance),
+                tangent_velocity            = vector(s.tangent_velocity),
+                skip_contact_creation       = u32(s.skip_contact_creation),
+                disable_speculative_contact = u32(s.disable_speculative_contact),
             }
         }
     }

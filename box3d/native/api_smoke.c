@@ -98,8 +98,149 @@ static void body_type_roundtrip(void) {
   OK(ogb3_world_destroy(w));
   puts("PASS body type: invalid refusal, kinematic cache/source-free restore, dynamic mass and stable identity");
 }
+/* Box3D caps spin at a quarter turn per step unless a body allows fast
+ * rotation. The flag must survive a snapshot restore and a Kinematic to
+ * Dynamic switch, which is how Replay steps and how games put balls in play. */
+static void fast_rotation(void) {
+  ogb3_world_def wd;
+  OK(ogb3_world_def_default(&wd));
+  wd.gravity = (ogb3_vec3){0, 0, 0};
+  for (uint32_t allow = 0; allow <= 1; ++allow) {
+    ogb3_world w;
+    OK(ogb3_world_create(&wd, &w));
+    ogb3_body_def def;
+    OK(ogb3_body_def_default(&def));
+    assert(def.allow_fast_rotation == 0);
+    def.type = OGB3_KINEMATIC;
+    def.allow_fast_rotation = allow;
+    ogb3_body body;
+    OK(ogb3_body_create(w, &def, &body));
+    ogb3_shape_def sd;
+    OK(ogb3_shape_def_default(&sd));
+    ogb3_shape shape;
+    OK(ogb3_shape_sphere(body, &sd, &(ogb3_vec3){0, 0, 0}, .035f, &shape));
+    ogb3_body_key key;
+    OK(ogb3_body_get_key(body, &key));
+    ogb3_snapshot *saved = NULL;
+    OK(ogb3_snapshot_capture(w, &saved));
+    OK(ogb3_world_destroy(w));
+    OK(ogb3_world_create(&wd, &w));
+    OK(ogb3_snapshot_restore(w, saved));
+    ogb3_snapshot_release(saved);
+    OK(ogb3_body_resolve(w, key, &body));
+    OK(ogb3_body_set_type(body, OGB3_DYNAMIC));
+    OK(ogb3_body_set_velocity(body, &(ogb3_vec3){0, 0, 0},
+                              &(ogb3_vec3){200, 0, 0}));
+    OK(ogb3_world_step_fixed(w));
+    ogb3_snapshot *after = NULL;
+    OK(ogb3_snapshot_capture(w, &after));
+    ogb3_body_state state;
+    OK(ogb3_snapshot_body_state(after, key, &state));
+    ogb3_snapshot_release(after);
+    float spin = state.angular_velocity.x;
+    assert(allow ? spin > 190 : spin < 50);
+    OK(ogb3_world_destroy(w));
+  }
+  ogb3_world w;
+  OK(ogb3_world_create(&wd, &w));
+  ogb3_body_def bad;
+  OK(ogb3_body_def_default(&bad));
+  bad.allow_fast_rotation = 2;
+  ogb3_body body;
+  assert(ogb3_body_create(w, &bad, &body) == OGB3_INVALID_ARGUMENT);
+  OK(ogb3_world_destroy(w));
+  puts("PASS fast rotation: capped at a quarter turn per step without the flag, "
+       "kept with it through restore and a Kinematic to Dynamic switch");
+}
+/* A sphere rolling (or resting) on a static floor for one second; returns its
+ * final velocity. */
+static ogb3_vec3 roll_on_floor(float rolling_resistance, ogb3_vec3 conveyor,
+                               ogb3_vec3 start) {
+  ogb3_world_def wd;
+  OK(ogb3_world_def_default(&wd));
+  ogb3_world w;
+  OK(ogb3_world_create(&wd, &w));
+  ogb3_body_def fd;
+  OK(ogb3_body_def_default(&fd));
+  fd.pose.position.y = -.5f;
+  ogb3_body floor;
+  OK(ogb3_body_create(w, &fd, &floor));
+  ogb3_shape_def sd;
+  OK(ogb3_shape_def_default(&sd));
+  sd.tangent_velocity = conveyor;
+  ogb3_shape shape;
+  OK(ogb3_shape_box(floor, &sd, &(ogb3_vec3){50, .5f, 50}, &shape));
+  ogb3_body_def bd;
+  OK(ogb3_body_def_default(&bd));
+  bd.type = OGB3_DYNAMIC;
+  bd.allow_fast_rotation = 1;
+  bd.pose.position.y = .25f;
+  bd.linear_velocity = start;
+  bd.angular_velocity = (ogb3_vec3){start.z / .25f, 0, -start.x / .25f};
+  ogb3_body ball;
+  OK(ogb3_body_create(w, &bd, &ball));
+  OK(ogb3_shape_def_default(&sd));
+  sd.rolling_resistance = rolling_resistance;
+  OK(ogb3_shape_sphere(ball, &sd, &(ogb3_vec3){0, 0, 0}, .25f, &shape));
+  for (int i = 0; i < 60; ++i)
+    OK(ogb3_world_step_fixed(w));
+  ogb3_vec3 v, wv;
+  OK(ogb3_body_get_velocity(ball, &v, &wv));
+  OK(ogb3_world_destroy(w));
+  return v;
+}
+/* ABI 2 world, body and shape settings reach Box3D and are range-checked. */
+static void abi2_settings(void) {
+  ogb3_world_def wd;
+  OK(ogb3_world_def_default(&wd));
+  assert(wd.contact_speed == 0 && wd.restitution_iterations == 0 &&
+         wd.enable_sleep == 1 && wd.enable_continuous == 1);
+  ogb3_world w;
+  ogb3_world_def bad = wd;
+  bad.contact_hertz = -1;
+  assert(ogb3_world_create(&bad, &w) == OGB3_INVALID_ARGUMENT);
+  bad = wd;
+  bad.isotropic_inertia_tolerance = 2;
+  assert(ogb3_world_create(&bad, &w) == OGB3_INVALID_ARGUMENT);
+  bad = wd;
+  bad.restitution_iterations = 64;
+  assert(ogb3_world_create(&bad, &w) == OGB3_INVALID_ARGUMENT);
+  wd.contact_speed = 3;
+  wd.restitution_threshold = 1;
+  wd.gravity = (ogb3_vec3){0, 0, 0};
+  OK(ogb3_world_create(&wd, &w));
+  ogb3_body_def def;
+  OK(ogb3_body_def_default(&def));
+  def.type = OGB3_DYNAMIC;
+  def.motion_locks = 64;
+  ogb3_body body;
+  assert(ogb3_body_create(w, &def, &body) == OGB3_INVALID_ARGUMENT);
+  def.motion_locks = OGB3_LOCK_LINEAR_X;
+  def.linear_velocity = (ogb3_vec3){1, 0, 1};
+  OK(ogb3_body_create(w, &def, &body));
+  ogb3_shape_def sd;
+  OK(ogb3_shape_def_default(&sd));
+  ogb3_shape shape;
+  sd.rolling_resistance = -1;
+  assert(ogb3_shape_box(body, &sd, &(ogb3_vec3){.25f, .25f, .25f}, &shape) ==
+         OGB3_INVALID_ARGUMENT);
+  sd.rolling_resistance = 0;
+  OK(ogb3_shape_box(body, &sd, &(ogb3_vec3){.25f, .25f, .25f}, &shape));
+  OK(ogb3_world_step_fixed(w));
+  ogb3_pose pose;
+  OK(ogb3_body_get_pose(body, &pose));
+  assert(pose.position.x == 0 && pose.position.z > 0);
+  OK(ogb3_world_destroy(w));
+  float free_roll = roll_on_floor(0, (ogb3_vec3){0, 0, 0}, (ogb3_vec3){2, 0, 0}).x;
+  float resisted = roll_on_floor(.5f, (ogb3_vec3){0, 0, 0}, (ogb3_vec3){2, 0, 0}).x;
+  assert(free_roll > 1.8f && resisted < free_roll - .5f);
+  ogb3_vec3 carried = roll_on_floor(0, (ogb3_vec3){1, 0, 0}, (ogb3_vec3){0, 0, 0});
+  assert(fabsf(carried.x) > .1f);
+  puts("PASS ABI 2 settings: world tuning range checks, motion locks, rolling "
+       "resistance and conveyor tangent velocity reach Box3D");
+}
 int main(void) {
-  assert(ogb3_abi_version() == 1);
+  assert(ogb3_abi_version() == 2);
   /* Before initialization the scale is settable and validated. */
   assert(ogb3_set_length_units_per_meter(0.0f) == OGB3_INVALID_ARGUMENT);
   assert(ogb3_set_length_units_per_meter(NAN) == OGB3_INVALID_ARGUMENT);
@@ -110,7 +251,7 @@ int main(void) {
   OK(ogb3_world_valid(1, &forged_valid));
   assert(!forged_valid);
   OK(ogb3_abi_layout(OGB3_T_BODY_DEF, 1, &size, &align, &offset));
-  assert(size == 88 && align == 4 && offset == 4);
+  assert(size == 104 && align == 4 && offset == 4); /* ABI 2 body settings */
   maximum_public_worlds();
   /* Worlds now exist: the engine is initialized, so only the current scale is
    * accepted and a change is refused rather than silently ignored. */
@@ -118,6 +259,8 @@ int main(void) {
   OK(ogb3_set_length_units_per_meter(1.0f));
   assert(ogb3_get_length_units_per_meter() == 1.0f);
   body_type_roundtrip();
+  fast_rotation();
+  abi2_settings();
   ogb3_world_def wd;
   OK(ogb3_world_def_default(&wd));
   ogb3_world w;

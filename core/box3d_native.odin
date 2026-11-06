@@ -126,7 +126,7 @@ box3d_native_initialize :: proc() -> bool {
     contract: bg.Domain_Contract
 
     if native.ogb3_domain_contract_get(&contract) != bg.OK ||
-       contract.abi_version != 1 ||
+       contract.abi_version != 2 ||
        contract.logical_version != 4 ||
        contract.resource_version != 2 ||
        contract.recovery_version != 1 {

@@ -111,7 +111,7 @@ def query_domain(path):
     require(ctypes.sizeof(Domain) == 104 and domain.size == 104,
             "native domain contract layout differs from the SDK")
     require(domain.cookie != 0 and (domain.version, domain.abi_version,
-            domain.logical_version, domain.resource_version, domain.recovery_version) == (1, 1, 4, 2, 1),
+            domain.logical_version, domain.resource_version, domain.recovery_version) == (1, 2, 4, 2, 1),
             "native domain/API/logical/resource/recovery versions differ from the SDK")
     require(domain.pointer_bits == ctypes.sizeof(ctypes.c_void_p) * 8 and domain.endian == 1,
             "native pointer width or byte order differs from the SDK process")
