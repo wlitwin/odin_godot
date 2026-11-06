@@ -38,3 +38,8 @@ deployment's TLS endpoint/reverse proxy for `wss://` clients. The
 [provisioning connection](../../provision/protocol.md#godot-connection-and-tls)
 describes the verified-TLS contract. Public TLS/origin configuration still needs
 deployment acceptance beyond the local fixture.
+
+`websocket_requested_path(w, peer, buffer)` returns the path an accepted peer asked
+for in its handshake (`/replay-room/golf`), without query or fragment. A gateway that
+forwards several public paths to one listener keeps the original path, so a service
+can serve each path differently; the room service uses it to tell games apart.

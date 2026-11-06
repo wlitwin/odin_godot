@@ -247,6 +247,43 @@ websocket_peers :: proc(w: ^Websocket, dst: []tr.Peer_Id) -> int {
     return count
 }
 
+// The path an accepted peer requested in its WebSocket handshake ("/" if none),
+// copied into `dst`. A gateway that forwards several public paths to one service
+// keeps the original path, so a service can tell its routes apart. Empty (with
+// false) for an unknown or not-yet-open peer.
+websocket_requested_path :: proc(w: ^Websocket, id: tr.Peer_Id, dst: []u8) -> (string, bool) {
+    peer := websocket_find(w, id)
+
+    if peer == nil {
+        return "", false
+    }
+
+    url := gd.web_socket_peer_get_requested_url(peer)
+    defer gd.free_string(url)
+    text := gd.gd_string_to_odin(url, context.temp_allocator)
+
+    // A server-side requested URL may be a bare path or a full URL.
+    if at := strings.index(text, "://"); at >= 0 {
+        rest := text[at + 3:]
+        slash := strings.index_byte(rest, '/')
+        text = slash >= 0 ? rest[slash:] : "/"
+    }
+
+    if query := strings.index_any(text, "?#"); query >= 0 {
+        text = text[:query]
+    }
+
+    if text == "" {
+        text = "/"
+    }
+
+    if len(text) > len(dst) {
+        return "", false
+    }
+
+    return string(dst[:copy(dst, text)]), true
+}
+
 websocket_disconnect :: proc(w: ^Websocket, id: tr.Peer_Id) {
     for &slot in w.peers {
         if slot.id == id {

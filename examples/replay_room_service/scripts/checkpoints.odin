@@ -16,7 +16,7 @@ import scenegd "godot:replay/godot/scene"
 // The operator-selected content ID determines executable validation code.
 // Request fields never select a model. Unknown content remains admission-only
 // unless the deployment explicitly requires a supported checkpoint model.
-checkpoint_open :: proc(self: ^ReplayRoomService, content: u64) -> (string, bool) {
+checkpoint_open :: proc(self: ^Game, content: u64) -> (string, bool) {
     required := gd.env_string("REPLAY_ROOM_CHECKPOINT_MODEL", "")
     name, valid := checkpoint_model(content, required)
 

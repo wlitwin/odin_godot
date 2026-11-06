@@ -5,9 +5,13 @@ SSH port82. Deployment changes belong in `~/data/code/pi-nix`. Its existing
 GameServers and Coturn services remain the shared infrastructure.
 
 The deployed gateway preserves `wss://mc.laserturtle.net:62127/rtc` and forwards
-legacy paths to GameServers.Signal on literal loopback port62129. The exact
-`/replay-room/dockyard` path forwards to the existing Odin/Godot Replay Room
-implementation on loopback49740. Nginx terminates TLS with the existing ACME
+legacy paths to GameServers.Signal on literal loopback port62129. Every
+`/replay-room/<game>` path forwards to the one Odin/Godot Replay Room service on
+loopback49740, which hosts several games (`REPLAY_ROOM_GAMES`, see the
+[room service](../../replay_room_service/README.md#hosting-several-games)):
+`/replay-room/dockyard` reaches Dockyard's cohorts, `/replay-room/golf` the
+minigolf game's. In pi-nix the games and their cohorts are listed in
+`services/replay-room.nix`. Nginx terminates TLS with the existing ACME
 certificate. The Elixir `SIGNAL_LOCAL_PROXY=1` option explicitly binds its
 private listener to loopback; the ordinary direct-TLS default is retained.
 No new authority protocol implementation or router port is required.

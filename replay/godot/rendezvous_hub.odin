@@ -51,15 +51,30 @@ rendezvous_hub_destroy :: proc(r: ^Rendezvous_Hub) {
 // Trusted room lifecycle seam: drop the cached service pointer before the hub
 // archives/frees its room. A connected physical peer prevents reclamation.
 rendezvous_hub_release_idle_slot :: proc(r: ^Rendezvous_Hub, slot: int) -> bool {
-    if !r.ready || slot < 0 || slot >= len(r.rooms) {return false}
+    if !r.ready || slot < 0 || slot >= len(r.rooms) {
+        return false
+    }
+
     for binding in r.bindings {
-        if binding.peer != 0 && binding.room == slot && rendezvous_connection_live(r.socket, binding.peer) {return false}
+        if binding.peer != 0 && binding.room == slot && rendezvous_connection_live(r.socket, binding.peer) {
+            return false
+        }
     }
+
     for peer in r.rooms[slot].peers {
-        if peer.physical != 0 && rendezvous_connection_live(r.socket, peer.physical) {return false}
+        if peer.physical != 0 && rendezvous_connection_live(r.socket, peer.physical) {
+            return false
+        }
     }
+
     rendezvous_destroy(&r.rooms[slot])
-    for &binding in r.bindings {if binding.room == slot {binding = {}}}
+
+    for &binding in r.bindings {
+        if binding.room == slot {
+            binding = {}
+        }
+    }
+
     return true
 }
 
@@ -93,6 +108,53 @@ rendezvous_hub_pump :: proc(r: ^Rendezvous_Hub) {
             binding = {}
         }
     }
+}
+
+// Whether `bytes` from `from` belongs to this hub: the peer is already bound to
+// one of its rooms, or the message names one of its current rendezvous codes.
+// Unlike rendezvous_hub_receive it never disconnects or binds, so a service
+// hosting several hubs on one socket can ask each in turn.
+rendezvous_hub_claims :: proc(r: ^Rendezvous_Hub, from: tr.Peer_Id, bytes: []u8) -> bool {
+    if !r.ready || from == 0 {
+        return false
+    }
+
+    for binding in r.bindings {
+        if binding.peer == from {
+            return true
+        }
+    }
+
+    if len(bytes) > 32768 || !wiregd.json_depth(bytes) {
+        return false
+    }
+
+    rendezvous_hub_pump(r)
+    text := gd.new_string_odin(string(bytes))
+    defer gd.free_string(text)
+    value := gd.json_parse_string(text)
+    defer gd.variant_destroy(&value)
+
+    if gdext.variant_get_type(&value) != .Dictionary {
+        return false
+    }
+
+    data := gd.variant_to_dictionary(&value)
+    defer gd.free_dictionary(data)
+    code := wiregd.get_string(&data, "room", 64)
+    defer delete(code)
+
+    if len(code) != 64 {
+        return false
+    }
+
+    for &room in r.rooms {
+        if room.ready && string(room.code[:]) == code {
+            return true
+        }
+    }
+
+    return false
 }
 
 // The first bounded JSON message selects an opaque current rendezvous code.

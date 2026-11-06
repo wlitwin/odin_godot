@@ -3,8 +3,8 @@
 Run this standalone Godot/Odin service to enroll room members, coordinate which
 process may accept gameplay results, and connect peers through RTC signaling. Its
 admission hub persists credentials; its authority coordinator grants and checks
-time-bounded hosting leases. It supports one game content ID
-and up to 32 resident rooms (16 by default). Native clients can use ENet gameplay;
+time-bounded hosting leases. It hosts one game content ID, or several games under
+URL slugs, with up to 32 resident rooms each (16 by default). Native clients can use ENet gameplay;
 browser clients use RTC. The service stores and transfers durable checkpoints
 for the compiled Cavecrawl, Speedball, Scrapyard, Quickdraw, Claimball, Slopball,
 and Slopball3D models. It does not run gameplay; checkpoint download does not grant authority or automatically resume a game.
@@ -45,9 +45,10 @@ gameplay addresses, browser use and recovery boundaries.
 
 | Environment variable | Meaning |
 | --- | --- |
-| `REPLAY_ROOM_CONTENT` | Required nonzero decimal or `0x` hexadecimal game content ID |
+| `REPLAY_ROOM_CONTENT` | Nonzero decimal or `0x` hexadecimal game content ID (one game) |
+| `REPLAY_ROOM_GAMES` | Several games instead of `REPLAY_ROOM_CONTENT`: `slug=ID[,ID...];slug=ID...` (see [hosting several games](#hosting-several-games)) |
 | `REPLAY_ROOM_CHECKPOINT_MODEL` | Optional required model: `cavecrawl`, `cavecrawl-owned`, `speedball`, `scrapyard`, `quickdraw`, `claimball`, `slopball`, `slopball3d`; `disabled` turns checkpoint endpoints off. By default, a matching compiled content ID enables its model; other content IDs remain admission-only |
-| `REPLAY_ROOM_DB` | Required private SQLite file path; protect its directory/backups |
+| `REPLAY_ROOM_DB` | Required private SQLite file path (a directory with `REPLAY_ROOM_GAMES`); protect it and its backups |
 | `REPLAY_ROOM_CREATE_DB=1` | Explicit first-time database creation |
 | `REPLAY_ROOM_BIND` | Listener address, default `127.0.0.1` |
 | `REPLAY_ROOM_PORT` | Listener port, default `49740` |
@@ -64,6 +65,34 @@ The optional [relay provider](../../replay/relay/README.md) authenticates enable
 members through a connection-bound challenge and issues expiring credentials.
 Clients never receive the signing secret. Coturn uses the same server-only secret
 with `use-auth-secret`; the client helper refreshes credentials in the background.
+
+## Hosting several games
+
+One service can host several games behind one listener. Each game build (content
+ID) keeps its own room set, database, signaling rooms, relay credentials and
+checkpoint endpoints; only the socket is shared. Name them by URL slug:
+
+```sh
+REPLAY_ROOM_GAMES="dockyard=0xd2904f8ea7f26f58;golf=0x12c034204e71c85c,0x5530253a67438e67"
+REPLAY_ROOM_DB=/private/rooms   # a directory: <id>.sqlite3 per content ID
+```
+
+A slug is the last segment of the WebSocket path the gateway forwards: a game
+connecting to `wss://host:62127/replay-room/golf` reaches only the IDs listed under
+`golf`. Its first packet or signaling message picks the game by content ID or room
+code; anything a connection's slug does not list closes the connection, so a client
+on the wrong path or an unlisted build fails at once instead of timing out. List
+several IDs under one slug to keep an older build's rooms reachable after an update.
+Each ID's capacity is `REPLAY_ROOM_CAPACITY`.
+
+A new ID's database is created on first start and recorded by `<id>.created`; if a
+recorded database later disappears the service refuses to start rather than
+replace it. Named checkpoint models (`REPLAY_ROOM_CHECKPOINT_MODEL=cavecrawl`, …)
+need the single-game form; with several games the compiled model is chosen per
+content ID, or `disabled` turns checkpoints off for all of them. The ready line
+becomes one `REPLAY_ROOM_GAME slug=… content=… rooms=… checkpoints=…` per game, then
+`REPLAY_ROOM_SERVICE_READY games=N tls=… port=…`. Without `REPLAY_ROOM_GAMES` the
+service behaves exactly as before, on any path.
 
 Without explicit loopback development mode, certificate/key material is required.
 The client must verify the certificate and hostname. Public browser origins need
