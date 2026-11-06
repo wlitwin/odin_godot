@@ -13,8 +13,11 @@ extends RefCounted
 ## - Buried faces: closed pieces that touch leave faces inside the mesh, such as
 ##   back-to-back end caps or a bump's base under the bump. They can never be
 ##   touched but put extra triangles on the edges around them, so they are removed.
-## - T-junctions: a vertex lying inside a neighbour's edge means the two sides share
-##   no edge; that triangle is split at the vertex.
+## - T-junctions: a vertex lying inside another triangle's edge means the two sides
+##   share no edge; that triangle is split at the vertex. Every edge is checked, not
+##   just open ones: where pieces of different widths meet (a lane's floor against a
+##   corner's), a buried face can make the edge look shared while the two floors
+##   still meet in a T. Once split, the buried face crowds the edge and is removed.
 ##
 ## Triangles must already be in Box3D order; `append_triangles` converts a Mesh.
 
@@ -47,15 +50,18 @@ static func build(triangles: PackedVector3Array, weld_distance: float = 0.001) -
 		indices.append_array([a, b, c])
 	var twins := _remove_twins(indices)
 	var covered := _remove_covered(twins[0], vertices, weld_distance)
-	var enclosed := _remove_enclosed(covered[0], vertices, weld_distance)
+	# Make every edge conforming first, so buried faces show up as crowded edges.
+	var split := _split_t_junctions(covered[0], vertices, weld_distance)
+	var twins_after := _remove_twins(split[0])
+	var covered_after := _remove_covered(twins_after[0], vertices, weld_distance)
+	var enclosed := _remove_enclosed(covered_after[0], vertices, weld_distance)
 	indices = enclosed[0]
-	var splits := _split_t_junctions(indices, vertices, weld_distance)
 	return {
 		"vertices": vertices,
 		"indices": indices,
 		"zero_area": zero_area,
-		"buried": twins[1] + covered[1] + enclosed[1],
-		"t_junctions": splits,
+		"buried": twins[1] + covered[1] + twins_after[1] + covered_after[1] + enclosed[1],
+		"t_junctions": split[1],
 		"crowded_edges": _crowded_edges(indices),
 	}
 
@@ -111,7 +117,10 @@ static func _remove_covered(indices: PackedInt32Array, vertices: PackedVector3Ar
 	var removed := 0
 	for i in keys.size():
 		var t := i * 3
-		var opposite: Array = planes.get(_plane_key(indices, vertices, t, true, weld_distance), [])
+		var key := _plane_key(indices, vertices, t, true, weld_distance)
+		var opposite: Array = []
+		for step in [-1, 0, 1]:
+			opposite.append_array(planes.get(Vector4i(key.x, key.y, key.z, key.w + step), []))
 		var a := vertices[indices[t]]
 		var b := vertices[indices[t + 1]]
 		var c := vertices[indices[t + 2]]
@@ -195,53 +204,87 @@ static func _first_hit_is_back_face(indices: PackedInt32Array, vertices: PackedV
 			back = (ob - oa).cross(oc - oa).dot(direction) > 0.0
 	return back
 
-# Splits triangles whose single-use edge has another vertex lying inside it. Edits
-# `indices` in place and returns the number of splits.
-static func _split_t_junctions(indices: PackedInt32Array, vertices: PackedVector3Array, weld_distance: float) -> int:
+# Splits every triangle whose edges have other vertices lying inside them, until no
+# edge does. A triangle with points on one edge is fanned from the opposite corner;
+# with points on several edges it is fanned from a new vertex at its centre. Both
+# keep its winding. Returns [new indices, triangles split]; may append to `vertices`.
+static func _split_t_junctions(indices: PackedInt32Array, vertices: PackedVector3Array, weld_distance: float) -> Array:
 	var splits := 0
-	var changed := true
-	while changed and splits < 4096:
-		changed = false
-		var uses := _edge_uses(indices)
+	for _round in 8:
+		var grid := _vertex_grid(vertices)
+		var out := PackedInt32Array()
+		var changed := false
 		for t in range(0, indices.size(), 3):
+			var corners := [indices[t], indices[t + 1], indices[t + 2]]
+			var points := []
+			var edges_with_points := 0
 			for k in 3:
-				var a := indices[t + k]
-				var b := indices[t + (k + 1) % 3]
-				if uses[_edge(a, b)] != 1:
-					continue
-				var p := _vertex_inside(vertices, a, b, weld_distance)
-				if p < 0:
-					continue
-				var c := indices[t + (k + 2) % 3]
-				# (a, b, c) becomes (a, p, c) and (p, b, c): same winding.
-				indices[t] = a
-				indices[t + 1] = p
-				indices[t + 2] = c
-				indices.append_array([p, b, c])
-				splits += 1
-				changed = true
-				break
-			if changed:
-				break
-	return splits
+				var inside := _vertices_inside(vertices, grid, corners[k], corners[(k + 1) % 3], weld_distance)
+				points.append(inside)
+				if not inside.is_empty():
+					edges_with_points += 1
+			if edges_with_points == 0:
+				out.append_array(corners)
+				continue
+			changed = true
+			splits += 1
+			if edges_with_points == 1:
+				for k in 3:
+					if points[k].is_empty():
+						continue
+					var chain: Array = [corners[k]] + points[k] + [corners[(k + 1) % 3]]
+					var apex: int = corners[(k + 2) % 3]
+					for i in chain.size() - 1:
+						out.append_array([chain[i], chain[i + 1], apex])
+			else:
+				var polygon := []
+				for k in 3:
+					polygon.append(corners[k])
+					polygon.append_array(points[k])
+				vertices.append((vertices[corners[0]] + vertices[corners[1]] + vertices[corners[2]]) / 3.0)
+				var centre := vertices.size() - 1
+				for i in polygon.size():
+					out.append_array([polygon[i], polygon[(i + 1) % polygon.size()], centre])
+		indices = out
+		if not changed:
+			break
+	return [indices, splits]
 
-# The vertex nearest `a` lying strictly inside segment a-b, or -1.
-static func _vertex_inside(vertices: PackedVector3Array, a: int, b: int, weld_distance: float) -> int:
+const GRID_CELL := 0.25
+
+static func _vertex_grid(vertices: PackedVector3Array) -> Dictionary:
+	var grid := {}
+	for v in vertices.size():
+		grid.get_or_add(Vector3i((vertices[v] / GRID_CELL).floor()), PackedInt32Array()).append(v)
+	return grid
+
+# The vertices lying strictly inside segment a-b (within weld_distance of it and more
+# than weld_distance from both ends), ordered from a to b.
+static func _vertices_inside(vertices: PackedVector3Array, grid: Dictionary, a: int, b: int, weld_distance: float) -> Array:
 	var origin := vertices[a]
 	var span := vertices[b] - origin
 	var length := span.length()
-	var best := -1
-	var best_t := 2.0
-	for v in vertices.size():
-		if v == a or v == b:
-			continue
-		var t := (vertices[v] - origin).dot(span) / (length * length)
-		if t <= 0.0 or t >= 1.0 or t >= best_t:
-			continue
-		if (origin + span * t).distance_to(vertices[v]) <= weld_distance and t * length > weld_distance and (1.0 - t) * length > weld_distance:
-			best = v
-			best_t = t
-	return best
+	if length <= 2.0 * weld_distance:
+		return []
+	var low := Vector3i(((origin.min(vertices[b]) - Vector3.ONE * weld_distance) / GRID_CELL).floor())
+	var high := Vector3i(((origin.max(vertices[b]) + Vector3.ONE * weld_distance) / GRID_CELL).floor())
+	var found := []
+	for x in range(low.x, high.x + 1):
+		for y in range(low.y, high.y + 1):
+			for z in range(low.z, high.z + 1):
+				var cell: Variant = grid.get(Vector3i(x, y, z))
+				if cell == null:
+					continue
+				for v: int in cell:
+					if v == a or v == b:
+						continue
+					var t := (vertices[v] - origin).dot(span) / (length * length)
+					if t * length <= weld_distance or (1.0 - t) * length <= weld_distance:
+						continue
+					if (origin + span * t).distance_to(vertices[v]) <= weld_distance:
+						found.append([t, v])
+	found.sort_custom(func(p, q): return p[0] < q[0])
+	return found.map(func(p): return p[1])
 
 # The triangle's vertices rotated to start at the smallest index, keeping winding.
 static func _rotation(indices: PackedInt32Array, t: int) -> Vector3i:
@@ -254,13 +297,19 @@ static func _rotation(indices: PackedInt32Array, t: int) -> Vector3i:
 		return Vector3i(b, c, a)
 	return Vector3i(c, a, b)
 
-# A triangle's plane, quantized: unit normal to 1/1000 and offset to weld_distance.
+# A triangle's plane, quantized: unit normal to 1/50 (about a degree) and the
+# offset along that rounded normal to weld_distance. Kit pieces are rarely exact
+# (a 1 m tile may span 0.9999 m), so faces that meet back to back can differ by a
+# fraction of a millimetre; measuring the offset along the rounded normal keeps a
+# hair of tilt from moving a face far from its partner. Callers also check the
+# neighbouring offsets.
 static func _plane_key(indices: PackedInt32Array, vertices: PackedVector3Array, t: int, flip: bool, weld_distance: float) -> Vector4i:
 	var a := vertices[indices[t]]
 	var n := (vertices[indices[t + 1]] - a).cross(vertices[indices[t + 2]] - a).normalized()
 	if flip:
 		n = -n
-	return Vector4i(roundi(n.x * 1000.0), roundi(n.y * 1000.0), roundi(n.z * 1000.0), roundi(n.dot(a) / weld_distance))
+	var q := Vector3i((n * 50.0).round())
+	return Vector4i(q.x, q.y, q.z, roundi(Vector3(q).normalized().dot(a) / weld_distance))
 
 # Whether a coplanar point lies inside triangle abc, edges included.
 static func _inside(p: Vector3, a: Vector3, b: Vector3, c: Vector3, weld_distance: float) -> bool:
