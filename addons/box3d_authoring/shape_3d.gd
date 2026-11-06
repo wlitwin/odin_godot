@@ -17,7 +17,8 @@ extends Resource
 @export var enable_contact_events: bool = false
 @export_group("Surface")
 ## A torque opposing rolling, scaled by the shape's radius (Box3D's rolling
-## resistance); 0 rolls freely.
+## resistance); 0 rolls freely. Keep it well below the friction against the floor,
+## or friction cannot start a pushed body rolling.
 @export var rolling_resistance: float = 0.0
 ## Conveyor-belt surface velocity (Box3D's tangent velocity).
 @export var tangent_velocity: Vector3 = Vector3.ZERO

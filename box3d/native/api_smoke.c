@@ -239,6 +239,50 @@ static void abi2_settings(void) {
   puts("PASS ABI 2 settings: world tuning range checks, motion locks, rolling "
        "resistance and conveyor tangent velocity reach Box3D");
 }
+/* rolling_resistance_limit.patch: a light ball (a 0.2 kg golf ball) pushed
+ * without spin starts rolling. Upstream compared the squared rolling impulse
+ * against maxImpulse^2 + FLT_EPSILON; this ball's impulses square far below
+ * FLT_EPSILON, so the limit never applied and rolling resistance held its spin
+ * at zero: it slid until friction stopped it. */
+static void light_ball_rolls(void) {
+  ogb3_world_def wd;
+  OK(ogb3_world_def_default(&wd));
+  ogb3_world w;
+  OK(ogb3_world_create(&wd, &w));
+  ogb3_body_def bd;
+  OK(ogb3_body_def_default(&bd));
+  bd.pose.position.y = -.5f;
+  ogb3_body floor;
+  OK(ogb3_body_create(w, &bd, &floor));
+  ogb3_shape_def sd;
+  OK(ogb3_shape_def_default(&sd));
+  sd.friction = .5f;
+  ogb3_shape shape;
+  OK(ogb3_shape_box(floor, &sd, &(ogb3_vec3){50, .5f, 50}, &shape));
+  const float r = .035f;
+  OK(ogb3_body_def_default(&bd));
+  bd.type = OGB3_DYNAMIC;
+  bd.pose.position.y = r;
+  bd.linear_velocity = (ogb3_vec3){1, 0, 0};
+  ogb3_body ball;
+  OK(ogb3_body_create(w, &bd, &ball));
+  OK(ogb3_shape_def_default(&sd));
+  sd.friction = .3f;
+  sd.density = 1114;
+  sd.rolling_resistance = .07f;
+  OK(ogb3_shape_sphere(ball, &sd, &(ogb3_vec3){0, 0, 0}, r, &shape));
+  /* Rolling (spin x radius matches speed) within 1/6 s. A box floor stops it
+   * soon after: against hulls Box3D scales rolling resistance by a quarter of
+   * the hull's inner radius when that exceeds the ball's. */
+  for (int i = 0; i < 10; ++i)
+    OK(ogb3_world_step_fixed(w));
+  ogb3_vec3 v, wv;
+  OK(ogb3_body_get_velocity(ball, &v, &wv));
+  float rolling = -wv.z * r;
+  assert(v.x > .3f && rolling > .3f && fabsf(rolling - v.x) < .05f * v.x);
+  OK(ogb3_world_destroy(w));
+  puts("PASS rolling resistance limit: a pushed light ball starts rolling");
+}
 int main(void) {
   assert(ogb3_abi_version() == 2);
   /* Before initialization the scale is settable and validated. */
@@ -261,6 +305,7 @@ int main(void) {
   body_type_roundtrip();
   fast_rotation();
   abi2_settings();
+  light_ball_rolls();
   ogb3_world_def wd;
   OK(ogb3_world_def_default(&wd));
   ogb3_world w;

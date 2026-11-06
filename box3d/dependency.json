@@ -57,5 +57,19 @@
       }
     }
   ],
-  "engine_patches": []
+  "engine_patches": [
+    {
+      "path": "box3d/native/patches/rolling_resistance_limit.patch",
+      "sha256": "33201e35dcfbc144c60896169aa1cee9c4ec479a74eaf58073bef6475022a216",
+      "reason": "Limit rolling resistance without an absolute FLT_EPSILON on the squared angular impulse (scalar and wide contact solvers), as friction already does; light bodies' impulses square below it, so rolling resistance locked their spin instead of limiting it.",
+      "base_files": {
+        "src/contact_solver.c": "200d1d6010fb9995c06cddf8e259493dc50bbd94d45fbb9b08d9aa7e2a889e93",
+        "src/contact_solver_wide.inl": "3b8481229692249d534cfe7a04c4525f1f9c8537c90d2fdeaeb53e276bd9b549"
+      },
+      "output_files": {
+        "src/contact_solver.c": "a58641ed1857ceb7e29e74cded3d5b276b6c917c4748025c31f7c6fa9d21f0dc",
+        "src/contact_solver_wide.inl": "2b9775103057378627d26e0c6686790c38a734edb190929ba453a1200c32a1ec"
+      }
+    }
+  ]
 }

@@ -91,7 +91,15 @@ move at ordinary speeds. Box3D caps spin at a quarter turn per step (47 rad/s at
 60 Hz) unless a body sets `allow_fast_rotation`; a small ball rolling faster than
 radius x 47 m/s otherwise slides. Above that cap the contact point turns with the
 ball within a substep, so a fast-spinning ball rides about r(1 - cos(w h)) into
-the floor (h = one substep). Settings that only matter through callbacks or APIs
+the floor (h = one substep). Rolling resistance limits a contact's angular impulse
+to `rolling_resistance` x radius x normal impulse, so it only lets friction start
+a roll when the mixed friction (Box3D's default is `sqrt(a * b)`) is well above
+it; against a mesh the radius is the rolling shape's, against a box or hull it is
+the larger of that and a quarter of the hull's inner radius. The SDK's engine
+patch `rolling_resistance_limit.patch` makes that limit apply to light bodies:
+upstream compared the squared impulse with an absolute `FLT_EPSILON`, which a
+0.2 kg ball's impulses never exceed, so rolling resistance held its spin at zero.
+Settings that only matter through callbacks or APIs
 the SDK does not expose (custom filtering, pre-solve and hit events, explosions,
 manual mass) are left out. Snapshots and recovery keep all of these.
 

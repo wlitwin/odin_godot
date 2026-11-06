@@ -78,10 +78,17 @@ separate upstream MIT components are not relabelled as repository-owned code.
 The current engine tree is `50877041b7e4de95ff0b6c194182aa50d453b736`,
 with git-archive SHA-256
 `a9143675b297bb6c6f3d031d1bdf5c265d8642139eea26f265958066bd947935`.
-`engine_patches` is empty: upstream rounds block allocator strides to alignment,
-packs compound geometry at aligned offsets, and replaces the old broadphase
-with paired nodes/parents/proxies. Lifecycle tests retain alignment/free-list,
-compound ownership and last-moved-proxy destruction regressions.
+Upstream rounds block allocator strides to alignment, packs compound geometry at
+aligned offsets, and replaces the old broadphase with paired nodes/parents/proxies,
+so the July patches below are not needed. Lifecycle tests retain
+alignment/free-list, compound ownership and last-moved-proxy destruction
+regressions.
+
+`engine_patches` holds one patch, verified by input and output file hashes:
+
+| Engine patch | Purpose |
+| --- | --- |
+| `rolling_resistance_limit.patch` | Limit rolling resistance as friction is limited, without an absolute `FLT_EPSILON` on the squared angular impulse, in the scalar and wide contact solvers. Light bodies' impulses square below it (a 0.2 kg ball's are about 1e-4 per substep), so the limit never applied and rolling resistance held their spin at zero. `api_smoke.c`'s `light_ball_rolls` fails without it. |
 
 The rollback reference pin remains unchanged. Its C shim is adapted by
 `rollback_shim_box3d_33626332.patch` (SHA-256
