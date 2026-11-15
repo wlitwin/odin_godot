@@ -143,8 +143,10 @@ class SuiteRunnerTests(unittest.TestCase):
 
 class RealManifestTests(unittest.TestCase):
     def test_all_entries_declare_capability(self):
+        # Inspect the whole manifest even when CI runs this test inside a shard.
+        environment = {**os.environ, 'SUITE_SHARD_INDEX': '0', 'SUITE_SHARD_COUNT': '1'}
         result = subprocess.run(['bash', str(ROOT / 'tests/run_all.sh'), '--list'],
-            cwd=ROOT, capture_output=True, text=True, check=True)
+            cwd=ROOT, env=environment, capture_output=True, text=True, check=True)
         rows = [line.split('\t') for line in result.stdout.splitlines()]
         self.assertGreater(len(rows), 300)
         entries = {name: (capability, script) for name, capability, script in rows}
